@@ -271,7 +271,8 @@
 //!
 //! | Parameter | Default | What it prevents |
 //! |---|---|---|
-//! | `ssas_per_request` | 1 | Nothing by itself — an exposure dial. Raising it amortises the request round trip over several cycles, at the price of multiplying the *unfunded* exposure to that many quotas, and it scales the two deadlines below. |
+//! | `ssas_per_request` | 1 | Nothing by itself — an exposure dial. With dynamic batching it is the largest batch the Exit may derive; otherwise it is the exact batch size. Raising it amortises the request round trip over several cycles, at the price of multiplying the *unfunded* exposure to that many quotas, and it scales the two deadlines below. |
+//! | `allow_dynamic_ssa_batches` | true | Lets a sub-range per-SSA offer satisfy `quota_range` by committing to the smallest batch whose total quota enters the range. Disable it to retain the fixed-batch, per-SSA admission rule. |
 //! | `max_failed_cycles` | 1 | An Entry losing one cycle per batch indefinitely while a single funded sibling holds the Session open. One loss is survivable, the second closes the Session. Only reachable above a batch of one, where the failing cycle is not always the last one standing. |
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
@@ -433,11 +434,14 @@ mod worker;
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SupervisorConfig {
-    /// Number of SSAs the Exit asks the Entry to commit to in a single `SsaRequest`.
+    /// Maximum number of SSAs the Exit may ask the Entry to commit to in one `SsaRequest`.
     ///
-    /// Batching amortizes the request round trip over several deposit cycles. It lives here rather
-    /// than beside the other Exit settings because this is what acts on it: the supervisor allocates
-    /// the indices, and it scales both deadlines below by this factor.
+    /// With [`allow_dynamic_ssa_batches`](Self::allow_dynamic_ssa_batches), Session admission picks
+    /// the smallest batch no larger than this value whose total quota is inside the Exit's accepted
+    /// range. With dynamic batching disabled, this remains the exact batch size, preserving the
+    /// original fixed-batch behavior. Batching amortizes the request round trip over several deposit
+    /// cycles. It lives here rather than beside the other Exit settings because the supervisor acts
+    /// on the selected value: it allocates the indices and scales both deadlines below by this factor.
     ///
     /// Two things it costs, both linear in the value:
     ///
@@ -463,6 +467,21 @@ pub struct SupervisorConfig {
     /// Default: 1, which reproduces the unbatched exchange byte-for-byte.
     #[default(1)]
     pub ssas_per_request: usize,
+
+    /// Whether Session admission may derive a smaller SSA batch from the Entry's offered quota.
+    ///
+    /// When enabled, the Exit tries batch sizes from one through
+    /// [`ssas_per_request`](Self::ssas_per_request) and selects the first whose total quota is inside
+    /// `IncomingSessionPixConfig::quota_range`. If none fits, the Session is refused with
+    /// `UnacceptablePixParams`. Choosing the smallest fit limits Entry work, deposits, Exit memory,
+    /// and the chance of exceeding the Entry's unadvertised `max_ssas_per_request` cap.
+    ///
+    /// When disabled, the offered per-SSA quota itself must be inside `quota_range`, and the Exit
+    /// requests exactly `ssas_per_request` SSAs, matching the behavior before dynamic batching.
+    ///
+    /// Default: `true`.
+    #[default(true)]
+    pub allow_dynamic_ssa_batches: bool,
 
     /// Cycles this Session may lose without recovering them before it is closed. The next one closes
     /// it.
@@ -1071,6 +1090,7 @@ mod tests {
     fn valid_cfg() -> SupervisorConfig {
         SupervisorConfig {
             ssas_per_request: 1,
+            allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
@@ -1095,6 +1115,11 @@ mod tests {
     #[test]
     fn validation_accepts_valid_configs() {
         assert!(validate_pix_supervision(&valid_cfg(), &valid_rcn_cfg()).is_ok());
+    }
+
+    #[test]
+    fn dynamic_ssa_batches_are_enabled_by_default() {
+        assert!(SupervisorConfig::default().allow_dynamic_ssa_batches);
     }
 
     #[test]

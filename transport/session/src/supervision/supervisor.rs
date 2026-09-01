@@ -1238,6 +1238,7 @@ mod tests {
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
             ssas_per_request: 1,
+            allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),

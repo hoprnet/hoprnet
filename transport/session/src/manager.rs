@@ -228,9 +228,10 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
 /// set of an SSA cycle, chunked into packet-sized messages, plus a reserve for ordinary Start
-/// traffic. Batching multiplies that: an Exit that asks for
-/// [`ssas_per_request`](crate::SupervisorConfig::ssas_per_request) SSAs at once gets that many
-/// cycles' commitment sets back-to-back, all landing here, so the per-cycle term is scaled by it.
+/// traffic. Batching multiplies that: an Exit may ask for up to
+/// [`ssas_per_request`](crate::SupervisorConfig::ssas_per_request) SSAs at once and gets that many
+/// cycles' commitment sets back-to-back, all landing here, so the per-cycle term is scaled by the
+/// configured maximum even when dynamic admission selects less for a particular Session.
 ///
 /// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
@@ -402,7 +403,8 @@ pub fn max_cycle_budget_for_quota(quota_bytes: u64, ssas_per_request: usize) -> 
 pub const DEFAULT_MAX_SSAS_PER_SSA_REQUEST: usize = 2;
 
 /// Default for [`SupervisorConfig::ssas_per_request`](crate::SupervisorConfig::ssas_per_request) —
-/// how many SSAs an Exit asks for in a single [`SsaServerCommitmentMessage`].
+/// how many SSAs an Exit may ask for in a single [`SsaServerCommitmentMessage`]. It is the maximum
+/// in dynamic mode and the exact batch in fixed mode.
 ///
 /// One, so that the default configuration produces exactly the unbatched exchange: same wire bytes,
 /// same supervisor deadlines, same Start protocol channel capacity.
@@ -770,19 +772,22 @@ pub struct IncomingSessionPixConfig {
     /// Default `false`.
     #[default(false)]
     pub enforce_pix: bool,
-    /// Acceptable range of data quota per one SSA in bytes.
+    /// Acceptable range of data quota in bytes.
     ///
-    /// If an Entry sends PIX parameters for SSA reconstruction that are outside this quota range,
-    /// the incoming Session will be rejected.
+    /// With dynamic SSA batches enabled, the Exit selects the smallest batch up to
+    /// [`SupervisorConfig::ssas_per_request`] whose total `batch_size × quota_per_ssa` is inside this
+    /// range. With dynamic batches disabled, the Entry's per-SSA quota itself must be inside the
+    /// range and the configured batch size is used exactly. An offer that satisfies neither rule is
+    /// rejected before the Session is established.
     ///
     /// The default is derived from the default PIX dimensions
     /// ([`crate::DEFAULT_PIX_POLYS_PER_SSA`] × ([`crate::DEFAULT_PIX_SHARES_PER_POLY`] +
     /// [`crate::DEFAULT_PIX_SURPLUS_SHARES`])) rather than hard-coded, so that an Entry running the
     /// default configuration is always accepted. The upper bound is exactly
-    /// [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing to serve
-    /// per SSA cycle, and accepting more than our own nominal dimensions would raise both that
-    /// exposure and the reconstructor memory held per Session. An Exit that wants to serve Entries
-    /// configured with larger dimensions must widen this range explicitly.
+    /// [`DEFAULT_PIX_SSA_QUOTA`]. Since every dynamic batch has at least one member, that upper bound
+    /// still caps the data served by any one SSA cycle. Accepting larger dimensions would raise both
+    /// that exposure and the reconstructor memory held per Session, so an Exit that wants to serve
+    /// them must widen this range explicitly.
     ///
     /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
     /// PAYLOAD_SIZE` — so this bounds the traffic actually served rather than the fraction of it the
@@ -830,6 +835,25 @@ pub struct IncomingSessionPixConfig {
 }
 
 impl IncomingSessionPixConfig {
+    /// Selects the batch size with which an Entry's per-SSA quota is acceptable.
+    ///
+    /// Dynamic mode walks from one upwards so it asks for no more Entry work, deposits or Exit
+    /// reconstructor state than necessary. Fixed mode is the legacy rule: validate one SSA against
+    /// the range, then request exactly the configured batch size.
+    fn ssa_batch_size_for_quota(&self, quota_per_ssa: SsaQuota) -> Option<usize> {
+        let configured_batch = self.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
+
+        if !self.supervision.allow_dynamic_ssa_batches {
+            return self.quota_range.contains(&quota_per_ssa).then_some(configured_batch);
+        }
+
+        (1..=configured_batch).find(|batch_size| {
+            quota_per_ssa
+                .checked_mul(*batch_size as u64)
+                .is_some_and(|batch_quota| self.quota_range.contains(&batch_quota))
+        })
+    }
+
     /// The supervisor configuration for Sessions accepted under these settings.
     pub fn supervisor_config(&self) -> SupervisorConfig {
         self.supervision.clone()
@@ -1281,8 +1305,9 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈162
-///   MiB–649 MiB per SSA).
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈162 MiB–649 MiB). Dynamic admission checks
+///   the smallest `batch_size × quota_per_ssa` up to the configured maximum; fixed admission checks the per-SSA quota
+///   itself and retains the configured exact batch.
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
 /// - The Exit only checks the *product* `polys × (threshold + surplus)`, not the individual values, so the Entry can
 ///   split it to suit its computing power. The computation is easily parallelizable in the number of polynomials, but
@@ -1298,10 +1323,10 @@ impl PixToolbox {
 /// [`SsaReconstructor`]. This produces an *Exit commitment* (a group element) that is sent back to
 /// the Entry as a [`SsaServerCommitmentMessage`].
 ///
-/// One action, and therefore one message, can carry a whole batch:
+/// One action, and therefore one message, carries the batch selected during admission: no more than
 /// [`SupervisorConfig::ssas_per_request`](crate::SupervisorConfig::ssas_per_request) SSAs at
 /// contiguous indices, sharing the single `params` field, since every SSA in a Session uses the same
-/// negotiated dimensions. The Entry caps what it will accept at
+/// dimensions. The Entry caps what it will accept at
 /// [`SessionManagerConfig::max_ssas_per_ssa_request`], and rejects an over-cap request in full while
 /// replying with an `UnacceptablePixParams` [`StartErrorType`], so the Exit does not have to infer the
 /// refusal from a deadline. The default is a batch of one, which is byte-for-byte the unbatched
@@ -3176,8 +3201,8 @@ where
     /// A CAS loop rather than an unconditional `fetch_add` with a rollback: an add that is
     /// provisionally over the ceiling is briefly visible to every concurrent initiation, and with
     /// enough of them arriving at once the budget would appear exhausted to Sessions that do fit.
-    fn reserve_cycle_budget(&self, params: &PixParams) -> Option<Arc<CycleBudgetReservation>> {
-        let bytes = cycle_budget_for(params, self.cfg.pix_config.supervision.ssas_per_request);
+    fn reserve_cycle_budget(&self, params: &PixParams, ssas_per_request: usize) -> Option<Arc<CycleBudgetReservation>> {
+        let bytes = cycle_budget_for(params, ssas_per_request);
         let ceiling = self.cfg.pix_config.max_live_cycle_bytes;
 
         self.live_cycle_bytes
@@ -3196,8 +3221,12 @@ where
 
     /// Checks the PIX parameters offered by the Entry during the Session Initiation.
     ///
-    /// Returns the validated parameters, or `None` if the offered parameters were rejected.
-    fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<PixParams> {
+    /// Returns the validated parameters and selected SSA batch size, or `None` if the offer cannot
+    /// satisfy this Exit's PIX policy.
+    fn check_pix_params(
+        &self,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> Option<(PixParams, usize)> {
         // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
         if req.capabilities.0.contains(Capability::UsePIX) {
             // Client offered PIX, so validate the offered parameters. Unpacking is what enforces the
@@ -3231,28 +3260,28 @@ where
             }
 
             let quota_per_ssa = pix_params_to_quota(&params);
+            let ssas_per_request = self.cfg.pix_config.ssa_batch_size_for_quota(quota_per_ssa);
+            let accepted_quota = ssas_per_request.and_then(|batch_size| quota_per_ssa.checked_mul(batch_size as u64));
             debug!(
                 challenge = req.challenge,
                 %params,
                 acceptable_range = ?self.cfg.pix_config.quota_range,
+                dynamic_batches = self.cfg.pix_config.supervision.allow_dynamic_ssa_batches,
+                configured_max_ssas_per_request = self.cfg.pix_config.supervision.ssas_per_request,
+                selected_ssas_per_request = ?ssas_per_request,
                 offered_quota_mb_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
-                "client offered MB SSA quota"
+                accepted_quota_mb = ?accepted_quota.map(|quota| quota as f64 / (1024.0 * 1024.0)),
+                "client offered PIX SSA quota"
             );
 
-            // The compared quota covers the whole cycle, surplus included, so the range bounds what
-            // this Exit will actually serve rather than a fraction of it. See `pix_params_to_quota`.
-            self.cfg
-                .pix_config
-                .quota_range
-                .contains(&quota_per_ssa)
-                .then_some(params)
+            ssas_per_request.map(|batch_size| (params, batch_size))
         } else if self.cfg.pix_config.enforce_pix {
             // Client didn't offer PIX, but PIX is enforced
             None
         } else {
             // Client didn't offer PIX, and PIX is not enforced, so set default values
             // which are not going to be used.
-            Some(DEFAULT_PIX_PARAMS)
+            Some((DEFAULT_PIX_PARAMS, 1))
         }
     }
 
@@ -3293,7 +3322,7 @@ where
         }
 
         // Verify if the client offered the right parameters for PIX
-        let Some(client_params) = self.check_pix_params(&session_req) else {
+        let Some((client_params, ssas_per_request)) = self.check_pix_params(&session_req) else {
             error!(
                 challenge = session_req.challenge,
                 "client offered unacceptable PIX parameters"
@@ -3318,7 +3347,7 @@ where
             return Ok(());
         };
 
-        info!(params = %client_params, "client offered acceptable PIX parameters");
+        info!(params = %client_params, ssas_per_request, "client offered acceptable PIX parameters");
 
         // Charge this Session's reconstructor state against the node-wide budget before anything is
         // allocated for it. Only a PIX Session holds cycle state, so only a PIX Session is charged —
@@ -3329,10 +3358,10 @@ where
         // could be applied: by then the Entry has funded a cycle and refusing costs it that deposit,
         // whereas a Session refused now is one the peer can retry elsewhere at no charge.
         let cycle_budget = if session_req.capabilities.0.contains(Capability::UsePIX) {
-            let Some(reservation) = self.reserve_cycle_budget(&client_params) else {
+            let Some(reservation) = self.reserve_cycle_budget(&client_params, ssas_per_request) else {
                 warn!(
                     challenge = session_req.challenge,
-                    requested = cycle_budget_for(&client_params, self.cfg.pix_config.supervision.ssas_per_request),
+                    requested = cycle_budget_for(&client_params, ssas_per_request),
                     outstanding = self.live_cycle_bytes.load(Ordering::Relaxed),
                     ceiling = self.cfg.pix_config.max_live_cycle_bytes,
                     "refusing a PIX session: the node's live reconstructor-cycle budget is exhausted"
@@ -3433,12 +3462,12 @@ where
                 .set(SessionSsaState::new(client_params))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
-            let (handle, action_rx) = spawn_supervisor_worker(
-                self.cfg.pix_config.supervisor_config(),
-                client_params,
-                session_id,
-                std::time::Instant::now(),
-            );
+            let supervisor_config = SupervisorConfig {
+                ssas_per_request,
+                ..self.cfg.pix_config.supervisor_config()
+            };
+            let (handle, action_rx) =
+                spawn_supervisor_worker(supervisor_config, client_params, session_id, std::time::Instant::now());
 
             let _ = slot.pix_egress_gate.set(handle.gate.clone());
             let _ = slot.pix_supervisor.set(handle);
@@ -4466,7 +4495,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use hopr_protocol_pix::{MAX_POLY_THRESHOLD, SsaGeneratorConfig, SsaIndex, SsaReconstructorConfig};
+    use hopr_protocol_pix::{SsaGeneratorConfig, SsaIndex, SsaReconstructorConfig};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
@@ -6099,6 +6128,94 @@ mod tests {
         Ok(())
     }
 
+    /// Dynamic admission chooses the least expensive batch that brings the Entry's total offer into
+    /// the accepted range. A cap is still a cap: it may leave the offer unsatisfiable, and checked
+    /// multiplication must make an overflowing candidate a refusal rather than a wrapped match.
+    #[test]
+    fn dynamic_ssa_batches_choose_the_smallest_satisfying_batch() {
+        let config = |quota_range, ssas_per_request| IncomingSessionPixConfig {
+            quota_range,
+            supervision: SupervisorConfig {
+                ssas_per_request,
+                allow_dynamic_ssa_batches: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(Some(1), config(100..=350, 4).ssa_batch_size_for_quota(100));
+        assert_eq!(Some(3), config(250..=350, 4).ssa_batch_size_for_quota(100));
+        assert_eq!(None, config(250..=350, 2).ssa_batch_size_for_quota(100));
+        assert_eq!(
+            None,
+            config(150..=175, 4).ssa_batch_size_for_quota(100),
+            "the first multiple jumps over the range and every later one is larger"
+        );
+        assert_eq!(None, config(100..=350, 4).ssa_batch_size_for_quota(400));
+        assert_eq!(
+            None,
+            config(u64::MAX..=u64::MAX, 2).ssa_batch_size_for_quota(u64::MAX / 2 + 1),
+            "an overflowing batch quota must not wrap into the accepted range"
+        );
+    }
+
+    /// Disabling dynamic admission restores both halves of the old contract: only the per-SSA quota
+    /// is compared with `quota_range`, and an accepted offer uses the configured batch exactly.
+    #[test]
+    fn disabling_dynamic_ssa_batches_preserves_fixed_batch_admission() {
+        let fixed = |quota_range| IncomingSessionPixConfig {
+            quota_range,
+            supervision: SupervisorConfig {
+                ssas_per_request: 3,
+                allow_dynamic_ssa_batches: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(
+            None,
+            fixed(250..=350).ssa_batch_size_for_quota(100),
+            "fixed mode must not rescue a sub-range SSA even when three of them total 300"
+        );
+        assert_eq!(
+            Some(3),
+            fixed(100..=100).ssa_batch_size_for_quota(100),
+            "an individually accepted SSA must retain the configured exact batch"
+        );
+    }
+
+    /// Admission reserves against the batch it selected for this Session, not the configured dynamic
+    /// ceiling. Otherwise a ceiling of nine would charge every already-satisfactory one-SSA offer as
+    /// nine and silently divide the number of Sessions the Exit can admit.
+    #[test]
+    fn live_cycle_reservation_uses_the_selected_batch_size() -> anyhow::Result<()> {
+        let params = small_pix_params();
+        let selected_batch = 2;
+        let expected = cycle_budget_for(&params, selected_batch);
+        let manager: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    max_live_cycle_bytes: expected,
+                    supervision: SupervisorConfig {
+                        ssas_per_request: 4,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let reservation = manager
+            .reserve_cycle_budget(&params, selected_batch)
+            .context("the selected batch should fit exactly")?;
+        assert_eq!(expected, manager.live_cycle_bytes.load(Ordering::Relaxed));
+        drop(reservation);
+        assert_eq!(0, manager.live_cycle_bytes.load(Ordering::Relaxed));
+
+        Ok(())
+    }
+
     /// A non-PIX Session reserves nothing.
     ///
     /// `check_pix_params` hands back nominal parameters for a peer that offered no PIX at all, and
@@ -7293,13 +7410,14 @@ mod tests {
         );
     }
 
-    /// Verifies that an incoming session initiation with a PIX quota outside the acceptable range
-    /// is rejected with `StartErrorReason::UnacceptablePixParams`.
+    /// Verifies that an incoming Session whose PIX quota cannot reach the acceptable range within
+    /// the configured dynamic batch ceiling is rejected with
+    /// `StartErrorReason::UnacceptablePixParams`.
     ///
     /// ## Steps
-    /// 1. Bob's manager is configured with `pix_config.quota_range: 0..=2048*1024*1024` (accepts quotas up to ~2 GiB).
-    /// 2. The test encodes `additional_data` at the maximum legal dimensions, which translates to a quota of ~4 GiB —
-    ///    outside the allowed range, while each individual dimension is in range.
+    /// 1. Bob's manager accepts exactly two times the Entry's per-SSA quota, but leaves the dynamic batch ceiling at
+    ///    its default of one.
+    /// 2. The test offers valid PIX dimensions whose quota would therefore need a batch of two.
     /// 3. `handle_incoming_session_initiation` is called with `Capability::UsePIX` and the out-of-range quota.
     /// 4. Bob's manager sends a `SessionError` back to the peer with reason `UnacceptablePixParams`.
     /// 5. The test receives the error on a one-shot channel and asserts `err.reason == UnacceptablePixParams` and
@@ -7309,12 +7427,25 @@ mod tests {
     async fn incoming_session_with_unacceptable_pix_quota_is_rejected() -> anyhow::Result<()> {
         use std::sync::Arc;
 
+        use hopr_protocol_pix::SsaReconstructorConfig;
         use hopr_protocol_start::{StartErrorReason, StartInitiation};
         use tokio::sync::oneshot;
 
+        let params = small_pix_params();
+        let quota_per_ssa = pix_params_to_quota(&params);
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: TEST_SURPLUS_SHARES,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
-                quota_range: 0..=2048 * 1024 * 1024,
+                quota_range: 2 * quota_per_ssa..=2 * quota_per_ssa,
                 ..Default::default()
             },
             ..Default::default()
@@ -7339,14 +7470,9 @@ mod tests {
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
 
         let alice_pseudonym = HoprPseudonym::random();
-
-        // The largest dimensions the protocol admits: quota = 16192 * 255 * 1038 ≈ 3.99 GiB, well
-        // outside the acceptable range of 0..=2048*1024*1024. Both dimensions are individually
-        // legal, so this exercises the quota check rather than the range check that precedes it.
-        let additional_data = pix_additional_data(MAX_POLYS_PER_SSA, MAX_POLY_THRESHOLD, 0);
 
         mgr.handle_incoming_session_initiation(
             alice_pseudonym,
@@ -7354,7 +7480,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data,
+                additional_data: params.into_additional_data(0),
             },
         )
         .await?;
@@ -10054,15 +10180,16 @@ mod tests {
 
         // Valid params should still be accepted, and arrive intact — including the surplus, which
         // no other check looks at and which would therefore be free to go missing.
-        let accepted = mgr
+        let (accepted, batch_size) = mgr
             .check_pix_params(&offer(packed(8192, 128, 37)))
             .context("should accept valid params")?;
         assert_eq!(PixParams::try_new(8192, 128, 37, LOCAL_PIX_SUITE)?, accepted);
+        assert_eq!(1, batch_size);
 
         // Every surplus a byte can hold is legal.
         for surplus in [0, 1, u8::MAX] {
             assert_eq!(
-                Some(PixParams::try_new(8192, 128, surplus, LOCAL_PIX_SUITE)?),
+                Some((PixParams::try_new(8192, 128, surplus, LOCAL_PIX_SUITE)?, 1)),
                 mgr.check_pix_params(&offer(packed(8192, 128, surplus)))
             );
         }

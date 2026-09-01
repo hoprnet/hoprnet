@@ -1047,10 +1047,11 @@ mod tests {
     use super::*;
 
     /// The Exit computes the offered quota as `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`
-    /// and rejects the Session when it falls outside `quota_range`. An Entry running the default
-    /// `PixGlobalConfig` must therefore always be acceptable to an Exit running the default
-    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and
-    /// before both structs became `serde(default)` there was no way for an operator to fix it.
+    /// and rejects the Session when neither that quota nor an allowed dynamic batch falls inside
+    /// `quota_range`. The default batch ceiling is one, so an Entry running the default
+    /// `PixGlobalConfig` must itself be acceptable to an Exit running the default
+    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and before
+    /// both structs became `serde(default)` there was no way for an operator to fix it.
     ///
     /// The surplus is in that product, so this also guards the alias that gives the two crates one
     /// default surplus: if `additional_shares` and `hopr-protocol-pix`'s own default drift apart
@@ -1433,20 +1434,31 @@ mod tests {
             cfg.incoming_session_pix_config.supervision.max_recovery_time,
             "unspecified supervision fields must fall back to their defaults"
         );
+        assert!(
+            cfg.incoming_session_pix_config.supervision.allow_dynamic_ssa_batches,
+            "omitting allow_dynamic_ssa_batches must retain its true default"
+        );
         assert_eq!(
             IncomingSessionPixConfig::default().quota_range,
             cfg.incoming_session_pix_config.quota_range
         );
 
-        // Both SSA batch knobs must be settable from a config file too, since raising one without the
-        // other is a silently fatal misconfiguration and an operator needs to be able to do both.
+        // Both SSA batch knobs and the fixed-mode opt-out must be settable from a config file too.
+        // Raising the Exit's ceiling past the Entry's is a silently fatal misconfiguration, and an
+        // operator who needs the old exact-batch policy must be able to select it explicitly.
         let json = r#"{
             "pix": { "max_ssas_per_request": 5 },
-            "incoming_session_pix_config": { "supervision": { "ssas_per_request": 5 } }
+            "incoming_session_pix_config": {
+                "supervision": {
+                    "ssas_per_request": 5,
+                    "allow_dynamic_ssa_batches": false
+                }
+            }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("SSA batch config must deserialize");
         assert_eq!(5, cfg.pix.max_ssas_per_request);
         assert_eq!(5, cfg.incoming_session_pix_config.supervision.ssas_per_request);
+        assert!(!cfg.incoming_session_pix_config.supervision.allow_dynamic_ssa_batches);
         cfg.validate().expect("a matched pair of batch knobs must validate");
 
         // Same defect one struct down: every Exit-side reconstructor dial used to be unreachable

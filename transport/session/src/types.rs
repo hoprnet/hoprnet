@@ -199,9 +199,10 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
 /// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
 /// Both must be derived from it so the two cannot drift apart: the Exit computes the
-/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if it falls
-/// outside its configured range, so a hard-coded range that no longer matches the
-/// dimension defaults makes every PIX Session fail to establish.
+/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if neither
+/// it nor an allowed dynamic batch brings the total inside the configured range. At the default
+/// batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
+/// every PIX Session fail to establish.
 ///
 /// ## Choosing the split
 ///

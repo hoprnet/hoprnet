@@ -537,8 +537,8 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
 /// per cycle.
 ///
 /// ## Steps
-/// 1. Bob (Exit) is configured with `ssas_per_request: 3`; Alice (Entry) with a matching `max_ssas_per_ssa_request: 3`,
-///    without which the request would be rejected wholesale.
+/// 1. Bob (Exit) accepts only three times the Entry's per-SSA quota and allows a dynamic batch up to 3; Alice (Entry)
+///    has a matching `max_ssas_per_ssa_request: 3`, without which the derived request would be rejected wholesale.
 /// 2. Both transports relay every Start protocol message to the peer manager, counting how many of them are
 ///    `SsaRequest`s.
 /// 3. Exactly one `SsaRequest` goes out — the batch is one message, not three.
@@ -560,6 +560,9 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         threshold: 2,
         surplus_shares: 2,
     };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+    let quota_per_ssa = cycle_quota(&params);
+    let accepted_batch_quota = quota_per_ssa * BATCH as u64;
 
     let alice_mgr = SessionManager::new(SessionManagerConfig {
         max_ssas_per_ssa_request: BATCH,
@@ -567,7 +570,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
+            quota_range: accepted_batch_quota..=accepted_batch_quota,
             supervision: SupervisorConfig {
                 ssas_per_request: BATCH,
                 ..Default::default()
@@ -811,7 +814,8 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// and then blame the deposit.
 ///
 /// ## Steps
-/// 1. Bob (Exit) batches 3 SSAs per request; Alice (Entry) accepts at most 1, so the very first request is refused.
+/// 1. Bob (Exit) derives a batch of 3 SSAs from its accepted quota range; Alice (Entry) accepts at most 1, so the very
+///    first request is refused.
 /// 2. Both transports relay Start protocol messages to the peer manager, counting `SessionError`s.
 /// 3. Alice sends exactly one `SessionError` and drops her half of the Session.
 /// 4. Bob's `handle_session_error` closes his half too. The 2 s bound is the whole point: Bob's kill-switch window is
@@ -828,6 +832,9 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
         threshold: 2,
         surplus_shares: 2,
     };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+    let quota_per_ssa = cycle_quota(&params);
+    let accepted_batch_quota = 3 * quota_per_ssa;
 
     // Alice accepts 1, Bob asks for 3 — the mismatch this test is about.
     let alice_mgr = SessionManager::new(SessionManagerConfig {
@@ -836,7 +843,7 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
+            quota_range: accepted_batch_quota..=accepted_batch_quota,
             supervision: SupervisorConfig {
                 ssas_per_request: 3,
                 // Deadlines left at their defaults, so the scaled commitment window is 3 × 20 s and the

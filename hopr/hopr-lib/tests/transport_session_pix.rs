@@ -1012,7 +1012,8 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
     Ok(())
 }
 
-/// 1-hop PIX session in which the Exit requests [`SSA_BATCH`] SSAs per `SsaRequest`.
+/// 1-hop PIX session in which the Exit derives [`SSA_BATCH`] SSAs per `SsaRequest` from the Entry's
+/// sub-range per-SSA quota.
 ///
 /// The supervisor's own unit tests already pin the batch onto a single `RequestSsa` action, and
 /// `hopr-transport-session`'s integration tests pin that action onto a single `SsaRequest` message.
@@ -1045,12 +1046,17 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::Result<()> {
-    // Both PIX sides raised together: the Exit asks for SSA_BATCH per request, and the Entry has to
-    // accept that many or it refuses every request outright.
+    let quota_per_ssa = PIX_POLYS as u64
+        * (PIX_SHARES as u64 + PIX_SURPLUS as u64)
+        * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
+    let accepted_batch_quota = quota_per_ssa * SSA_BATCH as u64;
+
+    // The Exit's range admits the Entry's dimensions only as a batch of SSA_BATCH, and the Entry has
+    // to accept that many or it refuses every derived request outright.
     let cluster = build_pix_cluster_with_entry_cap(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: accepted_batch_quota..=accepted_batch_quota,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
             // Session at these dimensions.
