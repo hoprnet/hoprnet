@@ -55,9 +55,10 @@
 //!                                          ├── hard deadline is immutable
 //!                                          └── progress resets idle timer
 //!                                          │
-//!                                     Recovered (tombstone phase)
-//!                                          │
-//!                                     tombstone expiry → RetireSsa
+//!                                     Recovered
+//!                                          ├── bounded paid FIFO drain
+//!                                          ├── successor progress → handoff
+//!                                          └── diagnostic tombstone expiry → RetireSsa
 //! ```
 //!
 //! **Key deadlines** (all configurable via [`SupervisorConfig`]):
@@ -71,16 +72,19 @@
 //! * **Recovery hard deadline** — absolute per-SSA backstop, never extended. This is a resource guard (session slot +
 //!   reconstructor memory), not a liveliness mechanism.
 //!
-//! Both recovery clocks start when the cycle reaches the **front of its batch**, not when its deposit
-//! confirms. A batch is served in index order — the Entry's emission window is clamped to one cycle —
-//! so a cycle behind the front is queued, not stalled, and arming at funding would measure the queue
-//! wait instead of the recovery. The front cycle is still on the clock from funding, so a
-//! funded-but-never-served cycle is caught as before.
+//! Both recovery clocks start when the cycle reaches the **paid transport front**, not when its
+//! deposit confirms. A batch is served in index order, and the final SURBs buffered for a recovered
+//! predecessor still carry that predecessor's shares. The predecessor keeps its original immutable
+//! hard clock while this bounded tail drains; the successor's clocks start only when the negotiated
+//! remainder is exhausted or funded successor progress proves the FIFO boundary. A queued cycle is
+//! therefore not charged for either its batch wait or its predecessor's pipeline delay.
 //!
 //! **Fault tracking** — an `UnverifiableShares` event closes the Session on arrival, with no
 //! tolerance to configure and no running totals to keep: the event means a polynomial's share set
-//! failed to open its commitment, which permanently dooms the cycle. Late reports against an already
-//! terminal SSA are absorbed. See the configuration section below for why this is not a dial.
+//! failed to open its commitment, which permanently dooms the cycle. Late fault reports against an
+//! already terminal SSA are absorbed. Progress is the one narrow exception: the sole immediate
+//! recovered predecessor may report its bounded, already-paid FIFO tail. See the configuration
+//! section below for why this is not a dial.
 //!
 //! **Rolling SSAs** — to maintain continuity, the supervisor requests the *next* batch when the
 //! current one is "almost recovered" (early threshold reached) or fully recovered, so the commitment
@@ -95,8 +99,9 @@
 //! `MAX_OVERLAPPING_BATCHES` generations and
 //! `MAX_OVERLAPPING_BATCHES × ssas_per_request` live cycles may own reconstructor state. If the
 //! early signal arrives while both generations are still live, the supervisor records the owed
-//! request and retries it only after one generation releases all of its cycle state. Recovered
-//! supervisor tombstones do not count because full recovery removes their reconstructor state.
+//! request and retries it only after one generation releases its heavyweight cycle state. Recovered
+//! supervisor tombstones do not count because full recovery removes their heavyweight reconstructor
+//! state; one constant-bounded per-Session tail receipt is tracked separately.
 //!
 //! ## The `ServiceGate` — egress gating
 //!
@@ -151,10 +156,11 @@
 //! gate flips to funded mode. It then enforces `max_served_without_progress`: a
 //! ceiling on how many packets may be served between SSA recovery progress
 //! events, as a defense-in-depth backstop even when the supervisor's
-//! service-gated idle timer is alive. Only progress from that funded front emits
-//! `ProgressNotification` and resets the watermark; unfunded or off-front progress cannot buy it
-//! service. A rotation to an unfunded successor emits `WithholdService` and restores the bounded
-//! allowance. A funded successor stays open, but another `ReleaseService` rebaselines its ceiling.
+//! service-gated idle timer is alive. Only progress from that funded front—or from its sole bounded
+//! recovered predecessor while the FIFO drains—emits `ProgressNotification` and resets the
+//! watermark; unfunded, off-front, older, or over-budget progress cannot buy service. A rotation to
+//! an unfunded successor emits `WithholdService` and restores the bounded allowance. A funded
+//! successor stays open, but another `ReleaseService` rebaselines its ceiling.
 //!
 //! The gate is implemented with lock-free atomics and CAS loops.  It uses
 //! the generation-counter `SlotNotify` to avoid the two classic
@@ -282,7 +288,7 @@
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
 //! | `max_served_without_progress` | 2048 | Packets served with no share of *any* kind coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. Counts `shares_seen`, so a conforming Entry's surplus resets it; see below. |
-//! | `tombstone_retention_window` | 30 s | A late acknowledgement arriving after its cycle's record is gone, with nothing left to attribute it to. |
+//! | `tombstone_retention_window` | 30 s | Bounds how long recovered-cycle diagnostics and observer ownership remain; the separately bounded FIFO-tail receipt may outlive it. |
 //!
 //! ## What is *not* here: the price of a cycle
 //!
@@ -345,10 +351,13 @@
 //!
 //! Both now read [`SsaRecoveryProgress::shares_seen`](hopr_protocol_pix::SsaRecoveryProgress::shares_seen),
 //! which counts every share the cycle accepts — surplus included, up to the negotiated budget per
-//! polynomial. The run resets the ceiling and refreshes the idle deadline exactly like the useful
-//! shares around it, so **neither parameter has to be sized against the dimensions any more.** What
-//! `max_served_without_progress` still bounds is genuine silence: packets served with no share of any
-//! kind coming back.
+//! polynomial. Full cryptographic recovery no longer cuts that signal off: the reconstructor drops
+//! its heavy state but retains one shared per-polynomial remainder, and the supervisor keeps that
+//! recovered predecessor as the paid front until the tail is exhausted or successor progress proves
+//! the FIFO boundary. The run therefore resets the ceiling and refreshes the idle deadline exactly
+//! like the useful shares around it, even across recovery, so **neither parameter has to be sized
+//! against the dimensions any more.** What `max_served_without_progress` still bounds is genuine
+//! silence: packets served with no share of any kind coming back.
 //!
 //! The one dimension-dependent property that remains is not a supervisor parameter at all: a
 //! polynomial's whole emission, `threshold + surplus`, should fit one peer deferral bucket
@@ -572,10 +581,12 @@ pub struct SupervisorConfig {
     /// keeps this instrument where it belongs: far enough out that
     /// [`max_recovery_idle`](Self::max_recovery_idle) is what actually binds.
     ///
-    /// The clock starts when the cycle reaches the front of its batch, which is up to one
-    /// predecessor's surplus tail — ~4096 packets, ~23 s at that rate — before it can make any
-    /// progress of its own. Negligible against two hours. Arming on first progress instead is
-    /// rejected because a funded cycle that is never served must still be caught.
+    /// The clock starts when the cycle reaches the paid transport front. That is deliberately later
+    /// than merely becoming the earliest unrecovered record: the predecessor's buffered surplus tail
+    /// can still occupy ~4096 packets, ~23 s at that rate, and remains bounded by the predecessor's
+    /// original hard clock. Starting the successor at the FIFO boundary prevents that pipeline delay
+    /// from being charged twice. A funded cycle that reaches the front and is never served is still
+    /// caught.
     ///
     /// `HoprProtocolConfig::validate` checks this against the dimensions the node will actually
     /// accept, so a raised `quota_range` that outgrows it is refused at load rather than discovered
@@ -695,7 +706,9 @@ pub struct SupervisorConfig {
     ///
     /// A ceiling enforced by `ServiceGate::acquire` while the current front is funded. A
     /// [`crate::HoprSessionInPixEvent::RecoveryProgress`] snapshot resets it only for that funded
-    /// front; progress on an unfunded or queued cycle does not grant service.
+    /// front. The sole recovered predecessor temporarily remains that paid front while its
+    /// per-polynomial negotiated remainder drains; progress on an unfunded, queued, older, or
+    /// over-budget cycle does not grant service.
     ///
     /// Those events now follow `shares_seen` rather than `useful_shares`, which is what makes a flat
     /// 2048 safe at any dimensions. Keyed on useful shares, this had to exceed
@@ -713,9 +726,10 @@ pub struct SupervisorConfig {
     #[default(2048)]
     pub max_served_without_progress: u64,
 
-    /// How long to retain recovered-SSA tombstones for late events.
+    /// How long to retain recovered-SSA diagnostic records and observer ownership.
     ///
-    /// Must be >= the reconstructor's `max_ack_await_time`.
+    /// Must be >= the reconstructor's `max_ack_await_time`. The compact paid-tail receipt is separate
+    /// and may outlive this record; expiring a tombstone therefore does not truncate a FIFO drain.
     ///
     /// Default: 30 s.
     #[default(Duration::from_secs(30))]
@@ -735,10 +749,9 @@ pub struct SupervisorConfig {
 /// onto the shared type with it.
 ///
 /// That shared type is now the one the two nodes actually negotiate, down to the byte layout it is
-/// packed into — so it carries a third field, the surplus, which the supervisor does not read. The
-/// supervisor's own arithmetic is unchanged: the surplus is by definition the shares that arrive
-/// after a polynomial is already complete, so it never enters
-/// [`target_useful_shares`](PixParams::target_useful_shares).
+/// packed into — so it carries a third field, the surplus. The supervisor never puts surplus into
+/// [`target_useful_shares`](PixParams::target_useful_shares), because it advances no payment, but it
+/// does use `threshold + surplus` to cap the recovered FIFO tail independently of the reconstructor.
 pub use hopr_protocol_pix::PixParams;
 
 // ---------------------------------------------------------------------------

@@ -24,7 +24,8 @@ enum SsaPhase {
     AwaitingDeposit,
     /// Deposit confirmed; recovering shares.
     Recovering,
-    /// SSA fully recovered; tombstone until `tombstone_until`.
+    /// SSA fully recovered; diagnostic tombstone until `tombstone_until`.
+    /// Any paid FIFO remainder lives separately in [`PaidRecoveryTail`].
     Recovered { tombstone_until: Instant },
     /// Phase that will produce a close action on next deadline check.
     Closing,
@@ -113,6 +114,21 @@ impl PerSsaState {
     }
 }
 
+/// Bounded handoff for SURBs minted against the cycle that has just recovered.
+///
+/// Cryptographic recovery and transport-buffer exhaustion are different instants. The former frees
+/// the reconstructor's heavy state; this small receipt keeps the paid service front on the recovered
+/// predecessor until either its negotiated tail is exhausted or any progress proves the successor
+/// has reached the head of the FIFO. The latter need not be funded: observing an unfunded successor
+/// is precisely when the predecessor's receipt must stop authorizing service.
+struct PaidRecoveryTail {
+    ssa_id: SsaId<HoprPseudonym>,
+    largest_shares_seen: u64,
+    served_total_at_last_progress: u64,
+    idle_deadline: Option<Instant>,
+    hard_deadline: Option<Instant>,
+}
+
 // ---------------------------------------------------------------------------
 // SessionPixSupervisor
 // ---------------------------------------------------------------------------
@@ -146,6 +162,12 @@ pub struct SessionPixSupervisor {
     /// A front cycle became paid and terminal in one event, so an unfunded successor still earns a
     /// freshly restored predeposit allowance even though the gate never entered funded mode.
     paid_front_handoff: bool,
+    /// The sole recovered predecessor authorized to report buffered liveness.
+    ///
+    /// This never becomes a set: accepting arbitrary recovered tombstones would let the Entry replay
+    /// old cycle tags to keep service open. Replacement on each in-order recovery is the supervisor's
+    /// independent bound behind the reconstructor's per-polynomial surplus counters.
+    paid_recovery_tail: Option<PaidRecoveryTail>,
     /// A successor batch was earned but could not yet fit the two-generation reservation.
     successor_request_deferred: bool,
     /// Ordered SSAs (oldest first, newest last), including short-lived recovered tombstones.
@@ -194,6 +216,7 @@ impl SessionPixSupervisor {
             service_open: false,
             service_front: None,
             paid_front_handoff: false,
+            paid_recovery_tail: None,
             successor_request_deferred: false,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
@@ -221,7 +244,7 @@ impl SessionPixSupervisor {
             SessionPixEvent::DepositObserverClosed(ssa_id) => self.on_deposit_observer_closed(ssa_id, now),
             SessionPixEvent::RecoveryProgress(progress) => self.on_recovery_progress(progress, now, served_total),
             SessionPixEvent::AlmostRecovered(ssa_id) => self.on_almost_recovered(ssa_id, now),
-            SessionPixEvent::Recovered(ssa_id) => self.on_recovered(ssa_id, now),
+            SessionPixEvent::Recovered(ssa_id) => self.on_recovered(ssa_id, now, served_total),
             SessionPixEvent::UnverifiableShares { ssa_id, observed_total } => {
                 self.on_unverifiable_shares(ssa_id, *observed_total, now)
             }
@@ -229,6 +252,7 @@ impl SessionPixSupervisor {
 
         let mut lifecycle_actions = actions;
         lifecycle_actions.extend(self.retry_deferred_successor_request(now));
+        self.consume_paid_tail_at_observed_boundary();
         self.arm_recovery_clocks_for_earliest(now, served_total);
         let mut actions = if lifecycle_actions
             .iter()
@@ -266,6 +290,37 @@ impl SessionPixSupervisor {
             .map(|(i, _)| i)
     }
 
+    /// Consumes the predecessor receipt once the current live front has reported any share.
+    ///
+    /// This check is centralized rather than tied only to `RecoveryProgress`: a previously queued
+    /// cycle can become the front because a sibling is retired or because its deposit arrives after
+    /// its first snapshot. In every case the observation proves the transport crossed the cycle
+    /// boundary. Keeping the old funded receipt beyond it would let an unfunded successor spend the
+    /// predecessor's remaining allowance.
+    fn consume_paid_tail_at_observed_boundary(&mut self) {
+        let Some(front_idx) = self.earliest_live_idx() else {
+            return;
+        };
+        let front_id = self.ssas[front_idx].ssa_id;
+        if self.ssas[front_idx].largest_shares_seen == 0 {
+            return;
+        }
+
+        if let Some(predecessor) = self
+            .paid_recovery_tail
+            .as_ref()
+            .map(|tail| tail.ssa_id)
+            .filter(|predecessor| predecessor.ssa_index() < front_id.ssa_index())
+        {
+            tracing::debug!(
+                %predecessor,
+                successor = %front_id,
+                "successor progress consumed the paid FIFO-tail handoff"
+            );
+            self.paid_recovery_tail = None;
+        }
+    }
+
     /// Keeps the service gate aligned with the funding state of the earliest live cycle.
     ///
     /// A funded-to-unfunded handoff restores the configured predeposit allowance. A
@@ -278,9 +333,14 @@ impl SessionPixSupervisor {
         }
 
         let front = self.earliest_live_idx();
-        let front_id = front.map(|idx| self.ssas[idx].ssa_id.ssa_index());
+        let front_id = self
+            .paid_recovery_tail
+            .as_ref()
+            .map(|tail| tail.ssa_id.ssa_index())
+            .or_else(|| front.map(|idx| self.ssas[idx].ssa_id.ssa_index()));
         let front_changed = front_id != self.service_front;
-        let front_funded = front.is_some_and(|idx| self.ssas[idx].phase == SsaPhase::Recovering);
+        let front_funded =
+            self.paid_recovery_tail.is_some() || front.is_some_and(|idx| self.ssas[idx].phase == SsaPhase::Recovering);
         let paid_front_handoff = std::mem::take(&mut self.paid_front_handoff);
         self.service_front = front_id;
 
@@ -373,6 +433,12 @@ impl SessionPixSupervisor {
         if self.closed {
             return;
         }
+        // The packets being served still carry the recovered predecessor's shares. Starting the
+        // successor now would charge that pipeline delay against both its idle and hard recovery
+        // budgets even though no successor share can possibly arrive yet.
+        if self.paid_recovery_tail.is_some() {
+            return;
+        }
         let Some(idx) = self.earliest_live_idx() else {
             return;
         };
@@ -396,6 +462,36 @@ impl SessionPixSupervisor {
 
         let mut actions = Vec::new();
         let max_recovery_idle = self.cfg.max_recovery_idle;
+
+        // While the recovered predecessor still owns the service front, its original recovery
+        // clocks remain the resource bound. Progress refreshes only the idle clock; the hard clock
+        // is never extended. Thus a large but paid surplus may drain, while an Entry that declares
+        // one and then feeds neither tail nor successor cannot hold the Session forever.
+        if let Some(tail) = self.paid_recovery_tail.as_mut() {
+            let expired = if tail.hard_deadline.is_some_and(|deadline| now >= deadline) {
+                Some(SessionPixCloseReason::RecoveryDeadline)
+            } else if tail.idle_deadline.is_some_and(|deadline| now >= deadline) {
+                Some(SessionPixCloseReason::RecoveryIdle)
+            } else {
+                None
+            };
+
+            if let Some(reason) = expired {
+                if reason == SessionPixCloseReason::RecoveryIdle && served_total <= tail.served_total_at_last_progress {
+                    tail.idle_deadline = now.checked_add(max_recovery_idle);
+                } else {
+                    tracing::warn!(
+                        ssa_id = %tail.ssa_id,
+                        ?reason,
+                        largest_shares_seen = tail.largest_shares_seen,
+                        served_total_at_last_progress = tail.served_total_at_last_progress,
+                        "closing PIX Session while its paid recovery tail is stalled"
+                    );
+                    self.closed = true;
+                    return vec![SessionPixAction::Close(reason)];
+                }
+            }
+        }
 
         let mut i = 0;
         while i < self.ssas.len() {
@@ -454,6 +550,7 @@ impl SessionPixSupervisor {
         // the replacement request in the action stream so the reconstructor drops the old guard
         // before allocating the successor.
         actions.extend(self.retry_deferred_successor_request(now));
+        self.consume_paid_tail_at_observed_boundary();
 
         // If no SSAs remain, close.
         // Note: a successor request may still be in flight here (RequestSsa
@@ -483,11 +580,12 @@ impl SessionPixSupervisor {
 
     /// Returns the earliest deadline across all live SSAs, or `None`.
     pub fn next_deadline(&self) -> Option<Instant> {
-        if self.closed || self.ssas.is_empty() {
+        if self.closed || (self.ssas.is_empty() && self.paid_recovery_tail.is_none()) {
             return None;
         }
 
-        self.ssas
+        let ssa_deadline = self
+            .ssas
             .iter()
             .filter_map(|ssa| {
                 if ssa.is_terminal() {
@@ -504,7 +602,13 @@ impl SessionPixSupervisor {
                     .chain(ssa.recovery_hard_deadline)
                     .min()
             })
-            .min()
+            .min();
+        let tail_deadline = self
+            .paid_recovery_tail
+            .as_ref()
+            .and_then(|tail| tail.idle_deadline.into_iter().chain(tail.hard_deadline).min());
+
+        ssa_deadline.into_iter().chain(tail_deadline).min()
     }
 
     /// Feed back the result of executing an action.
@@ -655,7 +759,7 @@ impl SessionPixSupervisor {
             if was_front {
                 self.paid_front_handoff = true;
             }
-            actions.extend(self.perform_recovered_transition(idx, now));
+            actions.extend(self.perform_recovered_transition(idx, now, served_total));
         }
 
         if pending {
@@ -687,6 +791,14 @@ impl SessionPixSupervisor {
         now: Instant,
         served_total: u64,
     ) -> Vec<SessionPixAction> {
+        if self
+            .paid_recovery_tail
+            .as_ref()
+            .is_some_and(|tail| tail.ssa_id == progress.ssa_id)
+        {
+            return self.on_recovered_tail_progress(progress, now, served_total);
+        }
+
         let idx = match self.find_ssa_idx(&progress.ssa_id) {
             Some(i) => i,
             None => return Vec::new(),
@@ -698,8 +810,18 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Validate target consistency before mutating.
-        if progress.target_useful_shares != self.dims.target_useful_shares() {
+        // Validate every dimension-derived bound before mutating. Progress is produced locally, but
+        // all of its source fields ultimately came from peer-tagged shares. Keeping the supervisor
+        // as an independent backstop means a reconstructor regression cannot turn an oversized
+        // counter into unbounded service.
+        let target = self.dims.target_useful_shares();
+        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
+        if progress.target_useful_shares != target
+            || progress.useful_shares > target
+            || progress.shares_seen < progress.useful_shares
+            || progress.shares_seen > max_shares_seen
+            || progress.recovered_polynomials > self.dims.polys_per_ssa()
+        {
             return vec![SessionPixAction::Close(SessionPixCloseReason::CounterRegression)];
         }
 
@@ -748,14 +870,87 @@ impl SessionPixSupervisor {
             }
         }
 
+        let is_front = self.earliest_live_idx() == Some(idx);
+
         // Only funded progress on the cycle service is currently charged against may reopen the
         // Session-wide ceiling. Unfunded progress is the H11 bypass; off-front progress belongs to a
-        // queued cycle and must not buy service for the front either.
-        if self.ssas[idx].phase == SsaPhase::Recovering && self.earliest_live_idx() == Some(idx) {
+        // queued cycle and must not buy service for the front either. The outer event transition
+        // consumes any predecessor tail before synchronizing the gate, even for unfunded progress.
+        if self.ssas[idx].phase == SsaPhase::Recovering && is_front {
             vec![SessionPixAction::ProgressNotification]
         } else {
             Vec::new()
         }
+    }
+
+    /// Applies a progress snapshot from the sole recovered predecessor authorized to drain.
+    ///
+    /// The reconstructor enforces the strong per-polynomial budget. These aggregate checks are a
+    /// second security boundary: even if that component regresses, the Entry cannot make a recovered
+    /// cycle report more than `polys × (threshold + surplus)` packets, change its terminal useful
+    /// count, or revive any older tombstone.
+    fn on_recovered_tail_progress(
+        &mut self,
+        progress: &SsaRecoveryProgress<HoprPseudonym>,
+        now: Instant,
+        served_total: u64,
+    ) -> Vec<SessionPixAction> {
+        let target = self.dims.target_useful_shares();
+        let expected_polynomials = self.dims.polys_per_ssa();
+        let max_shares_seen = expected_polynomials as u64 * self.dims.emitted_shares_per_poly() as u64;
+
+        if progress.target_useful_shares != target
+            || progress.useful_shares > target
+            || progress.recovered_polynomials > expected_polynomials
+            || progress.shares_seen < progress.useful_shares
+            || progress.shares_seen > max_shares_seen
+        {
+            tracing::warn!(
+                ssa_id = %progress.ssa_id,
+                useful_shares = progress.useful_shares,
+                shares_seen = progress.shares_seen,
+                recovered_polynomials = progress.recovered_polynomials,
+                "rejected impossible progress from a recovered PIX tail"
+            );
+            return vec![SessionPixAction::Close(SessionPixCloseReason::CounterRegression)];
+        }
+
+        // Absolute snapshots from concurrent acknowledgement batches may arrive after the
+        // `Recovered` event that overtook them. A non-terminal snapshot cannot buy liveness here,
+        // but it is not evidence of peer misconduct either. Ignore it exactly as the live path
+        // ignores an older absolute counter. Only a terminal snapshot can touch the paid receipt.
+        if progress.useful_shares != target || progress.recovered_polynomials != expected_polynomials {
+            return Vec::new();
+        }
+
+        let exhausted = {
+            let tail = self
+                .paid_recovery_tail
+                .as_mut()
+                .expect("caller matched the paid recovery tail");
+            if progress.shares_seen <= tail.largest_shares_seen {
+                return Vec::new();
+            }
+
+            tail.largest_shares_seen = progress.shares_seen;
+            tail.served_total_at_last_progress = served_total;
+            tail.idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
+            progress.shares_seen == max_shares_seen
+        };
+
+        // Keep the tombstone's diagnostics monotone while it is retained, but do not require the
+        // record: tombstone cleanup is intentionally shorter than a Session's possible FIFO drain.
+        if let Some(idx) = self.find_ssa_idx(&progress.ssa_id) {
+            self.ssas[idx].largest_useful_shares = target;
+            self.ssas[idx].largest_shares_seen = progress.shares_seen;
+            self.ssas[idx].recovered_polynomials = expected_polynomials;
+            self.ssas[idx].served_total_at_last_progress = served_total;
+        }
+
+        if exhausted {
+            self.paid_recovery_tail = None;
+        }
+        vec![SessionPixAction::ProgressNotification]
     }
 
     /// Attributes `delta` useful shares to the front of the batch or behind it, and judges the ratio.
@@ -850,7 +1045,12 @@ impl SessionPixSupervisor {
         }
     }
 
-    fn on_recovered(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
+    fn on_recovered(
+        &mut self,
+        ssa_id: &SsaId<HoprPseudonym>,
+        now: Instant,
+        served_total: u64,
+    ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
             Some(i) => i,
             None => return Vec::new(),
@@ -865,7 +1065,7 @@ impl SessionPixSupervisor {
         match self.ssas[idx].phase {
             SsaPhase::Recovering => {
                 // Normal path — transition to tombstone directly.
-                self.perform_recovered_transition(idx, now)
+                self.perform_recovered_transition(idx, now, served_total)
             }
             SsaPhase::AwaitingDeposit => {
                 // Recovery completed before deposit confirmed. Record the
@@ -897,8 +1097,38 @@ impl SessionPixSupervisor {
     /// Called from `on_recovered` (normal Recovering path) and replayed from
     /// `on_deposit_confirmed`/`on_commitment_verified` when `recovered_pending`
     /// was set earlier.
-    fn perform_recovered_transition(&mut self, idx: usize, now: Instant) -> Vec<SessionPixAction> {
+    fn perform_recovered_transition(&mut self, idx: usize, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
         let next_requested = self.ssas[idx].next_requested;
+        let was_front = self.earliest_live_idx() == Some(idx);
+
+        // `Recovered` is a local cryptographic fact, so it supplies the lower bound even if its
+        // final absolute Progress snapshot is delivered just afterwards by a concurrent worker.
+        // Every later tail snapshot must keep these terminal fields exact.
+        let target = self.dims.target_useful_shares();
+        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
+        self.ssas[idx].largest_useful_shares = target;
+        self.ssas[idx].largest_shares_seen = self.ssas[idx].largest_shares_seen.max(target);
+        self.ssas[idx].recovered_polynomials = self.dims.polys_per_ssa();
+
+        if was_front {
+            // Replacing rather than accumulating is intentional. Only the immediate recovered
+            // predecessor can occupy a FIFO immediately ahead of the live front; accepting an
+            // arbitrary tombstone here would turn old-cycle replay into gate liveness.
+            self.paid_recovery_tail =
+                (self.ssas[idx].largest_shares_seen < max_shares_seen).then(|| PaidRecoveryTail {
+                    ssa_id: self.ssas[idx].ssa_id,
+                    largest_shares_seen: self.ssas[idx].largest_shares_seen,
+                    served_total_at_last_progress: served_total,
+                    // Recovery itself is fresh, cryptographic progress. Reusing the prior idle
+                    // instant would let delayed/dropped progress snapshots make an honest tail
+                    // expire immediately after recovery. Refresh this clock once; unlike the hard
+                    // deadline below, it is the clock progress is meant to extend.
+                    idle_deadline: now.checked_add(self.cfg.max_recovery_idle),
+                    hard_deadline: self.ssas[idx]
+                        .recovery_hard_deadline
+                        .or_else(|| now.checked_add(self.cfg.max_recovery_time)),
+                });
+        }
 
         // Transition to tombstone.
         self.ssas[idx].phase = SsaPhase::Recovered {
@@ -913,6 +1143,16 @@ impl SessionPixSupervisor {
         self.ssas[idx].recovered_pending = false;
 
         let mut actions = Vec::new();
+        if was_front {
+            // `Recovered` is stronger evidence than an ordinary progress snapshot. Emit this even
+            // though the reconstructor normally sends the final snapshot first: progress delivery
+            // is deliberately lossy under command-channel pressure, and without this reset a gate
+            // already at its served-without-progress ceiling cannot spend the first buffered SURB
+            // needed to produce tail liveness. If the successor is unfunded, `sync_service_gate`
+            // prepends `WithholdService`; notifying afterwards changes only the dormant funded
+            // watermark and cannot restore service.
+            actions.push(SessionPixAction::ProgressNotification);
+        }
         // Full recovery is the fallback trigger for the early signal, so it carries the same
         // successor gate: a non-last cycle of a batch is tombstoned without asking for anything.
         if !next_requested && self.ssas[idx].is_batch_last {
@@ -1254,9 +1494,9 @@ mod tests {
 
     /// Test dimensions, with a deliberately non-zero surplus.
     ///
-    /// The supervisor must ignore the surplus entirely — it counts *useful* shares, and a surplus
-    /// share is by definition one that arrives after its polynomial is already complete. A non-zero
-    /// value here is what would make a leak into `target_useful_shares` visible; zero would hide it.
+    /// Surplus never enters the payment target, but it does bound the paid FIFO tail after recovery.
+    /// A non-zero value makes both properties visible: `target_useful_shares` stays threshold-only,
+    /// while accepted liveness cannot pass the emitted cycle volume.
     fn dims(polys: u16, threshold: u8) -> PixParams {
         PixParams::try_new(polys, threshold, 7, crate::types::LOCAL_PIX_SUITE).expect("test dimensions must be valid")
     }
@@ -1295,6 +1535,24 @@ mod tests {
             target_useful_shares: target,
             recovered_polynomials: recovered_polys,
         }
+    }
+
+    fn make_recovered_tail_progress(
+        sup: &SessionPixSupervisor,
+        ssa_id: SsaId<HoprPseudonym>,
+        shares_seen: u64,
+    ) -> SsaRecoveryProgress<HoprPseudonym> {
+        SsaRecoveryProgress {
+            ssa_id,
+            useful_shares: sup.dims.target_useful_shares(),
+            shares_seen,
+            target_useful_shares: sup.dims.target_useful_shares(),
+            recovered_polynomials: sup.dims.polys_per_ssa(),
+        }
+    }
+
+    fn max_cycle_shares(sup: &SessionPixSupervisor) -> u64 {
+        sup.dims.polys_per_ssa() as u64 * sup.dims.emitted_shares_per_poly() as u64
     }
 
     fn sufficient_balance() -> HoprBalance {
@@ -1646,16 +1904,64 @@ mod tests {
     fn a_funded_successor_gets_a_fresh_service_ceiling_when_it_reaches_the_front() {
         let mut cfg = default_cfg();
         cfg.ssas_per_request = 2;
+        cfg.max_served_without_progress = 2;
         let p = pseudonym();
         let now = Instant::now();
         let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
 
         fund_batch(&mut sup, p, 2, now);
         let actions = sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), now, 0);
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "recovery resets the existing gate but is not the FIFO boundary: {actions:?}"
+        );
+
+        let successor = sup.ssas.iter().find(|ssa| ssa.ssa_id == ssa_id(p, 2)).unwrap();
+        assert_eq!(
+            (successor.recovery_idle_deadline, successor.recovery_hard_deadline),
+            (None, None),
+            "successor clocks must not run while every served SURB still belongs to its predecessor"
+        );
+
+        let target = sup.dims.target_useful_shares();
+        let max_seen = max_cycle_shares(&sup);
+        for (offset, seen) in ((target + 1)..=max_seen).enumerate() {
+            let at = now + Duration::from_secs(offset as u64 + 1);
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, ssa_id(p, 1), seen)),
+                at,
+                offset as u64 + 1,
+            );
+            assert!(
+                actions
+                    .iter()
+                    .any(|action| matches!(action, SessionPixAction::ProgressNotification)),
+                "buffered paid share {seen} must refresh liveness: {actions:?}"
+            );
+            assert!(
+                actions
+                    .iter()
+                    .all(|action| !matches!(action, SessionPixAction::Close(_))),
+                "a tail longer than the gate ceiling must not close an honest Session: {actions:?}"
+            );
+            if seen == max_seen {
+                assert!(
+                    actions
+                        .iter()
+                        .any(|action| matches!(action, SessionPixAction::ReleaseService)),
+                    "the funded successor must receive a fresh service ceiling at the exact FIFO boundary: {actions:?}"
+                );
+            }
+        }
 
         assert!(
-            matches!(actions.as_slice(), [SessionPixAction::ReleaseService]),
-            "a funded-to-funded handoff must rebaseline the ceiling, got {actions:?}"
+            sup.paid_recovery_tail.is_none(),
+            "the exact negotiated tail bound must finish the handoff"
+        );
+        let successor = sup.ssas.iter().find(|ssa| ssa.ssa_id == ssa_id(p, 2)).unwrap();
+        assert!(
+            successor.recovery_idle_deadline.is_some() && successor.recovery_hard_deadline.is_some(),
+            "successor clocks start only after the final predecessor-bound SURB"
         );
     }
 
@@ -1776,13 +2082,13 @@ mod tests {
         );
     }
 
-    /// A cycle that funds and goes terminal in the same call must re-arm rather than open service.
+    /// A cycle that funds and goes terminal in the same call must release only its own paid tail.
     ///
     /// `Recovered` can arrive while the cycle is still `AwaitingDeposit` — the Exit finishes
     /// reconstructing before the chain observer reports the deposit — and is deferred until the
-    /// deposit lands. That one call then both funds the cycle and retires it. Opening the gate at
-    /// that point would serve against its unfunded successor; withholding restores the successor's
-    /// allowance, and its own deposit opens the gate normally.
+    /// deposit lands. That one call then both funds the cycle and retires its heavy state, but the
+    /// buffered SURBs were included in its paid quota. The gate stays funded only through that
+    /// bounded tail, then restores the unfunded successor's predeposit allowance.
     #[test]
     fn a_cycle_that_funds_and_recovers_at_once_rearms_for_its_unfunded_successor() {
         let mut cfg = default_cfg();
@@ -1805,8 +2111,8 @@ mod tests {
             "recovering an unfunded cycle must not release service"
         );
 
-        // The deposit lands: the cycle funds and is retired in the same call. Its successor remains
-        // unfunded, so the next allowance is restored without opening funded service.
+        // The deposit lands: the cycle funds and drops its heavy state in the same call. The compact
+        // predecessor receipt may now release only the SURBs already paid by that deposit.
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: front,
@@ -1816,8 +2122,24 @@ mod tests {
             0,
         );
         assert!(
-            matches!(actions.as_slice(), [SessionPixAction::WithholdService]),
-            "the paid handoff must re-arm without opening service, got {actions:?}"
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::ReleaseService, SessionPixAction::ProgressNotification]
+            ),
+            "the paid handoff must open only the bounded predecessor tail, got {actions:?}"
+        );
+
+        let max_seen = max_cycle_shares(&sup);
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, front, max_seen)),
+            now,
+            max_seen,
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::WithholdService)),
+            "exhausting the paid tail must restore the unfunded successor's allowance: {actions:?}"
         );
 
         let actions = sup.handle_event(
@@ -1875,6 +2197,16 @@ mod tests {
                 .iter()
                 .all(|action| !matches!(action, SessionPixAction::ProgressNotification)),
             "an unfunded front must not reopen the funded service ceiling, got {actions:?}"
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::WithholdService)),
+            "the first successor-bound packet must close the predecessor's funded gate: {actions:?}"
+        );
+        assert!(
+            sup.paid_recovery_tail.is_none(),
+            "an unfunded successor must not trick the Exit into spending its predecessor's remaining allowance"
         );
     }
 
@@ -2951,24 +3283,38 @@ mod tests {
         }
         assert_eq!(sup.ssas.len(), BATCH as usize, "the whole batch must still be live");
 
-        // Cycle 1 recovers, so cycle 2 reaches the front and only then goes on the clock.
+        // Cycle 1 recovers cryptographically, but its already-minted SURBs still own the FIFO and
+        // cycle 2 must remain off the clock until that paid tail drains.
         let handover = start + Duration::from_secs(60);
         sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), handover, 10_000);
-        assert_eq!(armed(&sup, 2), (true, true), "cycle 2 is at the front now");
+        assert_eq!(
+            armed(&sup, 2),
+            (false, false),
+            "cycle 2 is still behind the paid FIFO tail"
+        );
         assert_eq!(
             armed(&sup, 3),
             (false, false),
             "cycle 3 is still queued and must stay off the clock"
         );
 
+        let fifo_boundary = handover + Duration::from_secs(5);
+        let max_seen = max_cycle_shares(&sup);
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, ssa_id(p, 1), max_seen)),
+            fifo_boundary,
+            10_100,
+        );
+        assert_eq!(armed(&sup, 2), (true, true), "cycle 2 starts only at the FIFO boundary");
+
         let ssa2 = sup.ssas.iter().find(|s| s.ssa_id == ssa_id(p, 2)).expect("cycle 2");
         assert_eq!(
             ssa2.recovery_hard_deadline,
-            handover.checked_add(Duration::from_secs(3600)),
+            fifo_boundary.checked_add(Duration::from_secs(3600)),
             "cycle 2's ceiling must be measured from its own turn, not from its deposit"
         );
         assert_eq!(
-            ssa2.served_total_at_last_progress, 10_000,
+            ssa2.served_total_at_last_progress, 10_100,
             "the idle gate's baseline must be re-based at the handover, or the queue wait is charged to it"
         );
     }
@@ -3372,8 +3718,8 @@ mod tests {
         );
 
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), now, 0);
-        assert_eq!(actions.len(), 2);
-        assert!(matches!(actions[0], SessionPixAction::WithholdService));
+        assert_eq!(actions.len(), 2, "expected gate reset followed by the fallback request");
+        assert!(matches!(actions[0], SessionPixAction::ProgressNotification));
         match &actions[1] {
             SessionPixAction::RequestSsa { ssa_ids, .. } => {
                 assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(2).unwrap());
@@ -3402,7 +3748,10 @@ mod tests {
 
         sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), now, 0);
-        assert!(matches!(actions.as_slice(), [SessionPixAction::WithholdService]));
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "the existing gate is reset and now belongs to the predecessor's bounded tail: {actions:?}"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -3663,6 +4012,19 @@ mod tests {
             1,
             "the successor must survive its predecessor's retirement"
         );
+
+        let seen = sup.dims.target_useful_shares() + 1;
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, id, seen)),
+            start + Duration::from_secs(12),
+            6,
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::ProgressNotification)),
+            "short tombstone cleanup must not truncate a longer paid FIFO drain: {actions:?}"
+        );
     }
 
     #[test]
@@ -3727,6 +4089,14 @@ mod tests {
             0,
         );
         sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        // Finish the paid FIFO tail; this test is about tombstone scheduling, not drain liveness.
+        let max_seen = max_cycle_shares(&sup);
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, id, max_seen)),
+            start,
+            max_seen,
+        );
 
         // While tombstone is alive, next_deadline returns the tombstone_until.
         assert!(sup.next_deadline().is_some());
@@ -3793,8 +4163,8 @@ mod tests {
     /// session being closed with `RecoveryIdle`. The `Recovered` event
     /// arriving during `AwaitingDeposit` is deferred via `recovered_pending`
     /// — once the deposit confirms and the SSA enters `Recovering`, the
-    /// deferred tombstone transition fires immediately, retiring the SSA
-    /// deadlines cleanly so the idle deadline can never fire.
+    /// deferred tombstone transition fires immediately. Its recovery clocks then bound only the
+    /// compact paid tail: with no service consumed, idle expiry re-arms rather than closing.
     #[test]
     fn recovered_before_deposit_then_funded_session_survives() {
         let p = pseudonym();
@@ -3837,14 +4207,10 @@ mod tests {
             "expected RequestSsa for SSA 2, got actions: {actions:?}"
         );
 
-        // The idle deadline fires well past max_recovery_idle. Since SSA 1
-        // is a tombstone (deadlines are None), it should not trigger any
-        // close. (No successor SSA state exists yet since the driver hasn't
-        // sent back SsaRequestSent, so the drain path would retire the
-        // tombstone and close with NoSsaRemaining — but that's a separate
-        // concern from the bug we're fixing: the supervisor must not close
-        // with RecoveryIdle.)
-        let deadline_actions = sup.handle_deadline(start + Duration::from_secs(61), 100);
+        // No packet was served after the handoff baseline, so the tail idle clock re-arms. Service
+        // consumption without a corresponding old-tail or successor signal would close instead;
+        // that is the bound preventing a declared surplus from becoming indefinite free service.
+        let deadline_actions = sup.handle_deadline(start + Duration::from_secs(61), 10);
         assert!(
             !deadline_actions
                 .iter()
@@ -3854,7 +4220,7 @@ mod tests {
     }
 
     #[test]
-    fn late_tombstone_progress_is_absorbed() {
+    fn the_immediate_recovered_tail_reports_bounded_liveness() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let start = Instant::now();
@@ -3872,13 +4238,233 @@ mod tests {
         );
         sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
 
-        // Late progress on tombstone — should be absorbed.
+        let seen = sup.dims.target_useful_shares() + 1;
         let actions = sup.handle_event(
-            &SessionPixEvent::RecoveryProgress(make_progress(id, 50, 50, 10)),
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, id, seen)),
             start,
             100,
         );
-        assert!(actions.is_empty(), "late tombstone progress should be absorbed");
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::ProgressNotification)),
+            "the authorized predecessor must keep the gate alive while its FIFO tail drains: {actions:?}"
+        );
+    }
+
+    /// A concurrent acknowledgement batch can publish an older absolute snapshot after the
+    /// terminal event. It must not be accepted as tail liveness, but neither may it close an honest
+    /// Session merely because `Recovered` overtook it.
+    #[test]
+    fn a_pre_recovery_snapshot_overtaken_by_recovered_is_absorbed() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let recovered = ssa_id(p, 1);
+        fund_batch(&mut sup, p, 2, start);
+        sup.handle_event(&SessionPixEvent::Recovered(recovered), start, 0);
+
+        let target = sup.dims.target_useful_shares();
+        let stale = SsaRecoveryProgress {
+            ssa_id: recovered,
+            useful_shares: target - 1,
+            shares_seen: target + 1,
+            target_useful_shares: target,
+            recovered_polynomials: sup.dims.polys_per_ssa() - 1,
+        };
+        let actions = sup.handle_event(&SessionPixEvent::RecoveryProgress(stale), start, 1);
+        assert!(
+            actions.is_empty(),
+            "an overtaken non-terminal snapshot must be stale noise, not liveness or a close: {actions:?}"
+        );
+        assert_eq!(
+            sup.paid_recovery_tail.as_ref().map(|tail| tail.largest_shares_seen),
+            Some(target),
+            "the stale snapshot must not consume any paid tail"
+        );
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, recovered, target + 2)),
+            start,
+            2,
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::ProgressNotification)),
+            "a later terminal snapshot must still consume the legitimate tail: {actions:?}"
+        );
+    }
+
+    /// `Recovered` is itself proof of fresh progress, even if its immediately preceding progress
+    /// snapshot was dropped. The tail gets a new idle interval, while retaining the original hard
+    /// deadline.
+    #[test]
+    fn recovery_refreshes_the_tail_idle_clock_once() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_recovery_idle = Duration::from_secs(10);
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let recovered = ssa_id(p, 1);
+        fund_batch(&mut sup, p, 2, start);
+
+        let recovered_at = start + Duration::from_secs(9);
+        sup.handle_event(&SessionPixEvent::Recovered(recovered), recovered_at, 5);
+        let actions = sup.handle_deadline(start + Duration::from_secs(11), 6);
+        assert!(
+            actions
+                .iter()
+                .all(|action| !matches!(action, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle))),
+            "the pre-recovery idle instant must not expire a freshly recovered tail: {actions:?}"
+        );
+
+        let actions = sup.handle_deadline(start + Duration::from_secs(20), 6);
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle)]
+            ),
+            "the one-time refresh must not weaken the ordinary stalled-tail bound: {actions:?}"
+        );
+    }
+
+    /// Defense in depth: even a forged local snapshot cannot exceed the negotiated cycle volume.
+    #[test]
+    fn a_recovered_tail_cannot_report_more_service_than_the_entry_paid_for() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let recovered = ssa_id(p, 1);
+        fund_batch(&mut sup, p, 2, start);
+        sup.handle_event(&SessionPixEvent::Recovered(recovered), start, 0);
+
+        let impossible = max_cycle_shares(&sup) + 1;
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, recovered, impossible)),
+            start,
+            1,
+        );
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::CounterRegression)]
+            ),
+            "over-budget recovered progress must fail closed, never become gate liveness: {actions:?}"
+        );
+        assert_eq!(
+            sup.paid_recovery_tail.as_ref().map(|tail| tail.largest_shares_seen),
+            Some(sup.dims.target_useful_shares()),
+            "the rejected snapshot must not mutate the authorized absolute watermark"
+        );
+    }
+
+    /// Declaring a paid remainder is not itself liveness: silence while consuming service closes.
+    #[test]
+    fn a_stalled_recovered_tail_cannot_hold_the_session_open() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_recovery_idle = Duration::from_secs(10);
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let recovered = ssa_id(p, 1);
+        fund_batch(&mut sup, p, 2, start);
+        sup.handle_event(&SessionPixEvent::Recovered(recovered), start, 0);
+
+        let actions = sup.handle_deadline(start + Duration::from_secs(11), 1);
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle)]
+            ),
+            "the Entry cannot turn an unspent declared surplus into indefinite funded service: {actions:?}"
+        );
+    }
+
+    /// Valid tail traffic may refresh the idle timer, but it cannot stretch the paid predecessor's
+    /// original absolute resource deadline.
+    #[test]
+    fn a_trickling_recovered_tail_cannot_extend_the_hard_deadline() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_recovery_idle = Duration::from_secs(10);
+        cfg.max_recovery_time = Duration::from_secs(20);
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let recovered = ssa_id(p, 1);
+        fund_batch(&mut sup, p, 2, start);
+        sup.handle_event(
+            &SessionPixEvent::Recovered(recovered),
+            start + Duration::from_secs(1),
+            0,
+        );
+
+        let target = sup.dims.target_useful_shares();
+        for (at, seen, served) in [(9, target + 1, 1), (18, target + 2, 2)] {
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, recovered, seen)),
+                start + Duration::from_secs(at),
+                served,
+            );
+            assert!(
+                actions
+                    .iter()
+                    .all(|action| !matches!(action, SessionPixAction::Close(_))),
+                "legitimate tail progress before the hard limit must remain live: {actions:?}"
+            );
+        }
+
+        let actions = sup.handle_deadline(start + Duration::from_secs(21), 3);
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::RecoveryDeadline)]
+            ),
+            "tail trickle must not move the predecessor's absolute deadline: {actions:?}"
+        );
+    }
+
+    /// Recovered does not mean replayable: only the immediate predecessor owns the one tail slot.
+    #[test]
+    fn an_older_recovered_cycle_cannot_reopen_service() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_off_front_share_fraction = 1.0;
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, start);
+        let first = ssa_id(p, 1);
+        let second = ssa_id(p, 2);
+        fund_batch(&mut sup, p, 2, start);
+
+        sup.handle_event(&SessionPixEvent::Recovered(first), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(second, 1, sup.dims.target_useful_shares(), 0)),
+            start,
+            1,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(second), start, 1);
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(
+                &sup,
+                first,
+                sup.dims.target_useful_shares() + 1,
+            )),
+            start,
+            2,
+        );
+        assert!(
+            actions.is_empty(),
+            "an obsolete recovered-cycle tag must not refresh or reopen the Exit's service gate: {actions:?}"
+        );
     }
 
     #[test]

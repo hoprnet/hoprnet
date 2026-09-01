@@ -9,7 +9,7 @@ use hopr_types::{
     },
     internal::prelude::Acknowledgement,
 };
-use utils::{AddShareOutcome, SsaCommitmentBuilder, SsaCycle};
+use utils::{AddShareOutcome, RecoveredSsaTail, RecoveredTailCredit, SsaCommitmentBuilder, SsaCycle};
 use validator::Validate;
 
 use crate::{
@@ -34,6 +34,13 @@ struct RetirementFrontier {
     highest_retired: Option<SsaIndex>,
     registered: HashSet<SsaIndex>,
     retriable: HashSet<SsaIndex>,
+    /// The most recently recovered cycle's bounded liveness tail.
+    ///
+    /// One slot is sufficient and security-critical: the Entry emits cycles in index order, so
+    /// only the immediate recovered predecessor can legitimately remain in the Exit's FIFO. A
+    /// newer recovered cycle replaces it, preventing old shares from buying service indefinitely
+    /// while keeping retirement memory constant over the Session's lifetime.
+    recovered_tail: Option<RecoveredSsaTail>,
 }
 
 impl RetirementFrontier {
@@ -75,6 +82,15 @@ impl RetirementFrontier {
             Some(highest) if highest >= index => highest,
             _ => index,
         });
+        true
+    }
+
+    fn retire_recovered(&mut self, index: SsaIndex, tail: RecoveredSsaTail) -> bool {
+        if !self.retire(index) {
+            return false;
+        }
+        debug_assert_eq!(index, tail.ssa_index());
+        self.recovered_tail = Some(tail);
         true
     }
 }
@@ -288,9 +304,10 @@ pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 
 /// Per-polynomial live heap a cycle holds that `size_of` cannot account for, in bytes.
 ///
-/// [`peak_cycle_bytes`] reads the two large per-polynomial terms — the part builder and the
-/// commitment map entry retained behind it — straight from the types, so they track the curve and
-/// the structs without anyone maintaining a number. This covers what is left:
+/// [`peak_cycle_bytes`] reads the structural per-polynomial terms — the part builder, the shared
+/// surplus counter, and the commitment map entry retained behind them — straight from the types,
+/// so they track the curve and the structs without anyone maintaining a number. This covers what
+/// is left:
 ///
 /// * `SsaBuilder`'s received-index set, sized at `num_polys` on construction;
 /// * the `Box<[_]>` header the part builders live in, and allocator rounding on both collections;
@@ -375,6 +392,10 @@ pub fn peak_cycle_bytes<S: PixSpec>(params: &PixParams) -> u64 {
     // factor of two is hashbrown's power-of-two bucket count at its 87.5 % load factor, and the
     // extra byte is the control byte beside each one.
     let per_poly = size_of::<parking_lot::Mutex<utils::SsaPartBuilder<S>>>() as u64
+        // This allocation is shared with the compact recovered tail. It used to be the
+        // `surplus_seen` field inside each part builder; keeping it explicit here preserves the
+        // admission bound when the counter moves behind an Arc to span recovery.
+        + size_of::<std::sync::atomic::AtomicUsize>() as u64
         + 2 * (size_of::<(PolynomialIndex, PixGroup<S>)>() as u64 + 1)
         + PART_BUILDER_OVERHEAD_BYTES as u64;
 
@@ -633,8 +654,8 @@ enum ProcessedAckResult<S: PixSpec> {
     InvalidShare(SsaId<<S as PixSpec>::Pseudonym>, u64),
     /// The early recovery threshold was crossed.
     EarlyRecovery(SsaRecoveryProgress<<S as PixSpec>::Pseudonym>),
-    /// Full SSA was recovered. Carries the cycle's final progress, captured before its state was
-    /// released — afterwards there is nothing left to read it from.
+    /// Full SSA was recovered. Carries the progress at the recovery instant; later buffered shares
+    /// may advance only the compact tail's liveness counter.
     FullRecovery(
         RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>,
         SsaRecoveryProgress<<S as PixSpec>::Pseudonym>,
@@ -844,7 +865,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.ssa_cycles.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
-    /// Removes all reconstructor state for a single SSA cycle.
+    /// Removes the heavyweight reconstructor state for a single SSA cycle.
+    ///
+    /// A successfully recovered cycle's compact accounting tail is owned by the Session retirement
+    /// frontier, not by these caches, and intentionally survives this operation while paid SURBs
+    /// drain.
     ///
     /// Idempotent: invalidating an absent key is a no-op.
     fn remove_cycle(&self, ssa_id: SsaId<S::Pseudonym>) {
@@ -860,10 +885,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Retirement is recorded *before* the removal, so a commitment completing concurrently sees
     /// the retirement and undoes its own publication rather than resurrecting the cycle.
     ///
-    /// This is the operation for a cycle that went **live** and is now finished, however it
-    /// finished — recovered, or failed terminally. It is deliberately *not* the operation for a
-    /// commitment released before going live: that index is retried at the same value by design, and
-    /// retirement would block the retry permanently.
+    /// This is the operation for a cycle that went **live** and failed terminally. Successful
+    /// recovery uses [`retire_recovered_cycle`](Self::retire_recovered_cycle), which performs the
+    /// same heavyweight teardown but installs a bounded liveness tail. It is deliberately *not* the
+    /// operation for a commitment released before going live: that index is retried at the same
+    /// value by design, and retirement would block the retry permanently.
     /// [`release_abandoned_commitment`](Self::release_abandoned_commitment) draws exactly that line,
     /// and escalates to this for the live case.
     fn retire_cycle(&self, ssa_id: SsaId<S::Pseudonym>, retirement: &SharedRetirementFrontier) {
@@ -872,6 +898,22 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         // then be mistaken for the state this call intended to tear down.
         let mut frontier = retirement.lock();
         frontier.retire(ssa_id.ssa_index());
+        self.remove_cycle(ssa_id);
+    }
+
+    /// Retires the heavyweight recovery state while retaining only the bounded allowance needed by
+    /// SURBs that were minted before recovery and are still queued in the Exit's FIFO.
+    fn retire_recovered_cycle(
+        &self,
+        ssa_id: SsaId<S::Pseudonym>,
+        retirement: &SharedRetirementFrontier,
+        tail: RecoveredSsaTail,
+    ) {
+        // Publication and retirement use this same lock. Installing the tail before invalidating
+        // the live cache leaves no miss window in which a legitimate trailing acknowledgement is
+        // mistaken for a not-yet-published cycle and deferred.
+        let mut frontier = retirement.lock();
+        frontier.retire_recovered(ssa_id.ssa_index(), tail);
         self.remove_cycle(ssa_id);
     }
 
@@ -905,16 +947,48 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // dead entries per cycle, and — the part that actually costs something — keep their
             // shares in `awaiting_acks`, whose budget is global. There they crowd out live cycles
             // rather than merely wasting space.
-            if self
-                .existing_retirement_frontier(spi.pseudonym())
-                .is_some_and(|frontier| frontier.lock().is_retired(spi.ssa_index()))
+            if let Some(frontier) = self.existing_retirement_frontier(spi.pseudonym())
+                && frontier.lock().is_retired(spi.ssa_index())
             {
                 // Frees the buffer entry: the per-peer cache's eviction listener decrements the
                 // global count on an explicit removal, which is what the redeeming path below
                 // relies on too.
                 awaiting_ack_from_peer.remove(&ack_challenge);
-                tracing::trace!(%spi, "ack for a retired cycle — dropped rather than deferred");
-                return Ok(ProcessedAckResult::NoProgress);
+
+                // Decrypt before taking the short Session frontier lock below. The tail itself is
+                // immutable apart from atomics, but matching and crediting happen under that lock
+                // so a newer recovered cycle cannot replace the one slot between those operations.
+                let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
+                let ssa_id = *spi.as_ref();
+                let frontier = frontier.lock();
+                let Some(tail) = frontier
+                    .recovered_tail
+                    .as_ref()
+                    .filter(|tail| tail.ssa_index() == spi.ssa_index())
+                else {
+                    tracing::trace!(%spi, "ack for a retired cycle outside the active recovered tail — dropped");
+                    return Ok(ProcessedAckResult::NoProgress);
+                };
+
+                return match tail.credit_share::<S>(ssa_id, spi.poly_index(), share.nonce, &partial_share) {
+                    Ok(RecoveredTailCredit::Credited(progress)) => {
+                        tracing::trace!(%spi, "credited buffered surplus against recovered cycle tail");
+                        Ok(ProcessedAckResult::Progressed(progress))
+                    }
+                    Ok(RecoveredTailCredit::OverBudget) => {
+                        tracing::debug!(%spi, "buffered share is past the recovered polynomial's negotiated surplus");
+                        Ok(ProcessedAckResult::NoProgress)
+                    }
+                    Ok(RecoveredTailCredit::InvalidPolynomial) => {
+                        tracing::error!(%spi, "buffered share names a polynomial outside its recovered cycle");
+                        Err(PixError::InvalidInput)
+                    }
+                    Ok(RecoveredTailCredit::InvalidShare(observed_total)) => {
+                        tracing::error!(%spi, observed_total, "invalid buffered share addressed to a recovered polynomial");
+                        Ok(ProcessedAckResult::InvalidShare(ssa_id, observed_total))
+                    }
+                    Err(error) => Err(error),
+                };
             }
             // Not an error: the constant-term set is still incomplete, so no part builder exists
             // yet. Leave the share in `awaiting_acks` and hand the caller the key it needs to
@@ -971,18 +1045,28 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
             // moves, `useful_shares` does not.
             Ok(AddShareOutcome::Surplus) => {
-                tracing::trace!(%spi, "share arrived after its polynomial was reconstructed");
-                cycle.record_surplus_share();
-                return Ok(ProcessedAckResult::Progressed(cycle.progress()));
-            }
-            // Past the negotiated surplus the peer is emitting more for this polynomial than it said
-            // it would, and reconstruction has already released the share set, so these cannot even
-            // be told apart as duplicates. Withholding the snapshot is the whole point: crediting
-            // them would let one completed polynomial refresh the Exit's gate and idle deadline
-            // indefinitely while the rest of the cycle is never touched.
-            Ok(AddShareOutcome::SurplusOverBudget) => {
-                tracing::debug!(%spi, "share arrived past the peer's negotiated surplus for this polynomial");
-                return Ok(ProcessedAckResult::NoProgress);
+                match cycle.credit_surplus(spi.poly_index()) {
+                    Some(true) => {
+                        tracing::trace!(%spi, "share arrived after its polynomial was reconstructed");
+                        cycle.record_surplus_share();
+                        return Ok(ProcessedAckResult::Progressed(cycle.progress()));
+                    }
+                    Some(false) => {
+                        // Past the negotiated surplus the peer is emitting more for this polynomial
+                        // than it said it would, and reconstruction has already released the share
+                        // set, so these cannot even be told apart as duplicates. Withholding the
+                        // snapshot prevents one completed polynomial from refreshing the Exit's
+                        // gate indefinitely while the rest of the cycle is untouched.
+                        tracing::debug!(%spi, "share arrived past the peer's negotiated surplus for this polynomial");
+                        return Ok(ProcessedAckResult::NoProgress);
+                    }
+                    None => {
+                        // `cycle.part` performed the same checked lookup above, so this can only be
+                        // an internal disagreement between the part and budget dimensions.
+                        tracing::error!(%spi, "surplus budget does not contain the cycle's polynomial");
+                        return Err(PixError::InvalidInput);
+                    }
+                }
             }
             Ok(AddShareOutcome::Duplicate) => {
                 tracing::trace!(%spi, "duplicate evaluation identifier");
@@ -1026,8 +1110,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         };
         match ssa {
             Some(scalar) => {
-                // Read the final progress while the cycle is still live: `retire_cycle` below drops
-                // the counters along with everything else, so this is the last chance to report them.
+                // Capture the recovery instant before retirement. The counters survive in the
+                // compact tail, but any later movement is buffered liveness and must not be folded
+                // backwards into the terminal recovery event.
                 let progress = cycle.progress();
                 // Release the accumulator lock before retiring, so `retire_cycle` — which drops
                 // the last `Arc` to this very cycle — does not run while it is held.
@@ -1037,10 +1122,12 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                     self.retire_cycle(ssa_id, &cycle.registration.retirement);
                     return Err(PixError::InvalidSsa);
                 };
-                // Full recovery: this cycle's state is no longer needed. Recorded in the Session
-                // frontier rather than merely removed, so the surplus run that follows every
-                // recovered cycle is dropped instead of deferred against a cycle that cannot return.
-                self.retire_cycle(ssa_id, &cycle.registration.retirement);
+                // Full recovery releases every heavyweight builder immediately. Only the shared
+                // counters and per-polynomial remainder survive, so SURBs already queued with this
+                // cycle's shares can drain as bounded liveness without retaining the recovered key
+                // or giving the Entry a replayable cycle-wide allowance.
+                let tail = cycle.recovered_tail();
+                self.retire_recovered_cycle(ssa_id, &cycle.registration.retirement, tail);
                 tracing::info!(%ssa_id, "ssa recovered");
                 Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }, progress))
             }
@@ -1573,11 +1660,16 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     }
 
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
-        // Every key is the SsaId itself, so there is nothing to enumerate and no way for part of a
-        // cycle to survive the removal of the rest. The frontier-before-removal ordering the
+        // Every heavyweight key is the SsaId itself, so there is nothing to enumerate and no way for
+        // one builder to survive the removal of the rest. The frontier-before-removal ordering the
         // commitment completion path depends on lives in `retire_cycle`, which the terminal
-        // acknowledgement paths share with this one. An entirely unknown id has no frontier to
-        // advance and remains the documented idempotent no-op.
+        // acknowledgement paths share with this one.
+        //
+        // A successfully recovered id is already retired, so `RetirementFrontier::retire` returns
+        // false and deliberately leaves its compact tail intact. The Session tombstone is a short
+        // diagnostic record; the FIFO can take longer to drain. The one-slot tail is replaced by
+        // the next successful recovery and finally released with the Session retirement scope. An
+        // entirely unknown id has no frontier to advance and remains the documented idempotent no-op.
         if let Some(retirement) = self.retirement_frontier_for(&ssa_id) {
             self.retire_cycle(ssa_id, &retirement);
         } else {
@@ -3046,9 +3138,9 @@ mod tests {
         // Shares are emitted polynomial-major, so the useful ones are shares 1,2 and 4,5 — the
         // third share of each polynomial arrives after that polynomial is already reconstructed.
         assert_eq!(
-            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4, 4, 4],
             snapshots.iter().map(|p| p.useful_shares).collect::<Vec<_>>(),
-            "each snapshot must advance by exactly one, and surplus shares must emit none at all"
+            "the first four snapshots advance reconstruction; the buffered tail reports liveness only"
         );
         let last = snapshots.last().ok_or(anyhow::anyhow!("no progress emitted"))?;
         assert_eq!(
@@ -3063,6 +3155,11 @@ mod tests {
         assert_eq!(
             POLYS, last.recovered_polynomials,
             "every polynomial must be accounted for"
+        );
+        assert_eq!(
+            POLYS as u64 * (THRESHOLD as u64 + 1),
+            last.shares_seen,
+            "every negotiated share, including the post-recovery tail, must be visible as liveness"
         );
 
         Ok(())
@@ -3112,10 +3209,10 @@ mod tests {
 
         assert!(recovered, "the cycle must still reconstruct from its own shares");
         assert_eq!(
-            vec![(1, 1), (2, 2), (2, 3), (3, 4), (4, 5)],
+            vec![(1, 1), (2, 2), (2, 3), (3, 4), (4, 5), (4, 6)],
             snapshots,
             "(useful, seen): the third entry is the surplus share — seen advances, useful holds. The sixth share \
-             arrives after full recovery removed the cycle, so it reports nothing."
+             arrives after full recovery removed the heavy cycle, and its compact tail still reports liveness."
         );
 
         Ok(())
@@ -3236,9 +3333,9 @@ mod tests {
         let peer = OffchainKeypair::random();
         // The negotiated surplus must be non-zero, and that is the whole reason this test can fail.
         // At a surplus of zero `max_credited_surplus` is zero too, so a share arriving for a
-        // completed polynomial is refused as `SurplusOverBudget` whichever side of the
-        // `reconstructed` check the zero-coordinate validation sits on — and the assertion below
-        // would hold even with the laundering channel wide open.
+        // completed polynomial is refused because no per-polynomial credit remains, whichever side
+        // of the `reconstructed` check the zero-coordinate validation sits on — and the assertion
+        // below would hold even with the laundering channel wide open.
         let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(2, 2, 1, &peer)?;
 
         // Emission alternates polynomials, so the even positions are polynomial zero's shares. Only
@@ -4451,20 +4548,20 @@ mod tests {
         Ok(())
     }
 
-    /// Acknowledgements trailing a fully recovered cycle must be dropped, not deferred.
+    /// Acknowledgements trailing a fully recovered cycle must use the compact tail, not be deferred.
     ///
     /// A missing cycle means one of two opposite things, and the acknowledgement path cannot tell
     /// them apart from the cache miss alone: a cycle not yet published, whose acks are worth
-    /// bucketing, or one already retired, whose acks are worth nothing. Advancing the Session
-    /// frontier at recovery is what separates them.
+    /// bucketing, or one already retired. Advancing the Session frontier at recovery separates
+    /// them, and the one recovered-tail slot preserves only the latter cycle's paid remainder.
     ///
     /// This is the common case rather than an edge: a conforming Entry emits `threshold + surplus`
     /// per polynomial, so the run of shares that advance nothing lands *after* the last polynomial
-    /// completes — every recovered cycle is followed by acks in this state. Deferring them costs a
-    /// bucket that can never be redeemed and, more expensively, holds their shares in
-    /// `awaiting_acks`, whose budget is global and shared with live cycles.
+    /// completes — every recovered cycle is followed by acks in this state. Dropping their liveness
+    /// makes the Session supervisor charge the FIFO drain to the successor; deferring them costs a
+    /// bucket that can never be redeemed and holds the global acknowledgement budget.
     #[test]
-    fn acks_trailing_a_recovered_cycle_are_dropped_rather_than_deferred() -> anyhow::Result<()> {
+    fn acks_trailing_a_recovered_cycle_report_liveness_without_deferral() -> anyhow::Result<()> {
         // A single polynomial, so its recovery *is* the SSA's and the surplus shares are
         // unambiguously post-recovery. With more, emission interleaves and which shares land after
         // the last completion stops being obvious from the dimensions.
@@ -4488,18 +4585,42 @@ mod tests {
         // One at a time: the two shares after the recovering one are the subject, and feeding the
         // batch whole would let a single dropped resolution hide which of them did what.
         let mut recovered_after = None;
+        let mut tail_progress = Vec::new();
         for (i, ack) in acks.into_iter().enumerate() {
+            let already_recovered = recovered_after.is_some();
+            let mut recovered_now = false;
             for resolution in reconstructor.acknowledge_shares(*peer.public(), vec![ack])? {
-                if let ShareResolution::RecoveredSsa(r) = resolution {
-                    assert_eq!(ssa_id, r.ssa_id);
-                    recovered_after = Some(i + 1);
+                match resolution {
+                    ShareResolution::Progress(progress) if already_recovered => {
+                        tail_progress.push((progress.useful_shares, progress.shares_seen));
+                    }
+                    ShareResolution::RecoveredSsa(r) => {
+                        assert_eq!(ssa_id, r.ssa_id);
+                        recovered_after = Some(i + 1);
+                        recovered_now = true;
+                    }
+                    _ => {}
                 }
+            }
+            if recovered_now {
+                // Mirrors supervisor tombstone cleanup. The compact Session tail deliberately
+                // outlives that short diagnostic record; otherwise a buffer taking longer than the
+                // retention window to drain would recreate the same liveness hole later.
+                reconstructor.retire_ssa(ssa_id);
             }
         }
         assert_eq!(
             Some(THRESHOLD as usize),
             recovered_after,
             "the SSA must recover on the threshold-th share, leaving the surplus to trail it"
+        );
+        assert_eq!(
+            vec![
+                (THRESHOLD as u64, THRESHOLD as u64 + 1),
+                (THRESHOLD as u64, THRESHOLD as u64 + 2)
+            ],
+            tail_progress,
+            "each negotiated post-recovery share must advance only the liveness counter"
         );
 
         assert_eq!(
@@ -4511,12 +4632,131 @@ mod tests {
             !reconstructor.pending_acks.contains_key(&ssa_id),
             "no bucket may be created for a cycle that cannot come back"
         );
-        // The load-bearing one: without the retirement frontier the trailing shares stay here until
-        // `max_ack_await_time`, holding a global budget against a cycle that is gone.
+        // The load-bearing memory property: the tail consumes the encrypted entries immediately;
+        // it does not retain the heavyweight cycle or park acknowledgements until their TTL.
         assert_eq!(
             0,
             reconstructor.count_ack_buffer_entries(),
-            "the trailing shares must leave the acknowledgement buffer on arrival"
+            "the trailing shares must leave the acknowledgement buffer after bounded accounting"
+        );
+
+        Ok(())
+    }
+
+    /// A recovered tail must retain the live path's *per-polynomial* security boundary.
+    ///
+    /// A cycle-wide remainder is not equivalent. Once reconstruction releases duplicate state, an
+    /// Entry can replay one completed polynomial; with an aggregate allowance, that one polynomial
+    /// could spend the paid surplus belonging to every other polynomial and keep the Exit serving
+    /// without ever presenting their buffered SURBs. Each polynomial therefore owns exactly its
+    /// negotiated remainder before and after retirement.
+    #[test]
+    fn a_recovered_polynomial_cannot_borrow_another_polynomials_surplus_budget() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u8 = 4;
+        const DECLARED_SURPLUS: u8 = 1;
+        const EMITTED_SURPLUS: u8 = 4;
+
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, mut acks) =
+            cycle_with_declared_surplus(POLYS, THRESHOLD, EMITTED_SURPLUS, DECLARED_SURPLUS, &peer)?;
+
+        // Round-robin emission puts the first `polys × threshold` acknowledgements entirely in the
+        // useful prefix. Its last acknowledgement recovers the cycle; every remaining one exercises
+        // the compact tail rather than an `SsaPartBuilder`.
+        let tail = acks.split_off(POLYS as usize * THRESHOLD as usize);
+        let prefix = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        assert!(
+            prefix
+                .iter()
+                .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(recovered) if recovered.ssa_id == ssa_id)),
+            "the useful prefix must recover the cycle before the attack starts"
+        );
+
+        let (polynomial_zero, polynomial_one): (Vec<_>, Vec<_>) =
+            tail.into_iter().enumerate().partition(|(index, _)| index % 2 == 0);
+        let mut zero_snapshots = Vec::new();
+        for (_, ack) in polynomial_zero {
+            zero_snapshots.extend(
+                reconstructor
+                    .acknowledge_shares(*peer.public(), vec![ack])?
+                    .into_iter()
+                    .filter_map(|resolution| match resolution {
+                        ShareResolution::Progress(progress) => Some(progress.shares_seen),
+                        _ => None,
+                    }),
+            );
+        }
+        assert_eq!(
+            vec![POLYS as u64 * THRESHOLD as u64 + 1],
+            zero_snapshots,
+            "replaying one recovered polynomial may consume only its own single negotiated slot"
+        );
+
+        let (_, other_ack) = polynomial_one.into_iter().next().expect("second polynomial has a tail");
+        let other_progress = reconstructor
+            .acknowledge_shares(*peer.public(), vec![other_ack])?
+            .into_iter()
+            .find_map(|resolution| match resolution {
+                ShareResolution::Progress(progress) => Some(progress.shares_seen),
+                _ => None,
+            });
+        assert_eq!(
+            Some(POLYS as u64 * THRESHOLD as u64 + 2),
+            other_progress,
+            "the attack must not consume the independent allowance of the untouched polynomial"
+        );
+
+        Ok(())
+    }
+
+    /// Malformed shares cannot be laundered through a recovered polynomial as paid liveness.
+    #[test]
+    fn an_invalid_recovered_tail_share_is_neither_liveness_nor_budget_spend() -> anyhow::Result<()> {
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, mut acks) = cycle_with_pending_acks(1, 2, 1, &peer)?;
+        let legitimate_tail = acks.pop().expect("one negotiated surplus acknowledgement");
+
+        let prefix = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        assert!(
+            prefix
+                .iter()
+                .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(recovered) if recovered.ssa_id == ssa_id)),
+            "the threshold prefix must recover the cycle"
+        );
+
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+        let ack = HalfKey::random();
+        let challenge = ack.to_challenge()?;
+        let encrypted = PartialSsaShare::<TestSpec>::default().encrypt(&spi, &ack)?;
+        let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge,
+            TaggedEncryptedPartialSsaShare::new(*spi.pseudonym(), &msg, encrypted)?,
+        )?;
+
+        let invalid =
+            reconstructor.acknowledge_shares(*peer.public(), vec![VerifiedAcknowledgement::new(ack, &peer).leak()])?;
+        assert!(
+            invalid
+                .iter()
+                .all(|resolution| !matches!(resolution, ShareResolution::Progress(_))),
+            "a zero share addressed to the recovered tail must not reopen service: {invalid:?}"
+        );
+        assert!(
+            invalid.iter().any(
+                |resolution| matches!(resolution, ShareResolution::InvalidShares { ssa_id: id, .. } if *id == ssa_id)
+            ),
+            "the malformed share must reach validation and be reported: {invalid:?}"
+        );
+
+        let legitimate = reconstructor.acknowledge_shares(*peer.public(), vec![legitimate_tail])?;
+        assert!(
+            legitimate.iter().any(
+                |resolution| matches!(resolution, ShareResolution::Progress(progress) if progress.shares_seen == 3)
+            ),
+            "rejecting malformed traffic must not consume the paid slot of a legitimate buffered SURB: {legitimate:?}"
         );
 
         Ok(())

@@ -5,8 +5,8 @@ use vsss_rs::{
 
 use crate::{
     CONSTANT_TERM_COEFFICIENT, CoefficientIndex, CompletedShare, PartialSsaShare, PixGroup, PixGroupRepr, PixParams,
-    PixScalar, PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPartCommitment, SsaPolynomialId, SsaRecoveryProgress,
-    errors, into_completed_share, types::SsaId,
+    PixScalar, PixSpec, PolynomialIndex, SsaCommitmentProof, SsaIndex, SsaPartCommitment, SsaPolynomialId,
+    SsaRecoveryProgress, errors, into_completed_share, types::SsaId,
 };
 
 /// Relaxed ordering suffices for every progress counter in [`SsaCycle`].
@@ -17,6 +17,166 @@ use crate::{
 /// state it describes, and a snapshot taken while a concurrent batch is mid-flight is allowed to
 /// straddle it.
 const PROGRESS_ORDERING: std::sync::atomic::Ordering = std::sync::atomic::Ordering::Relaxed;
+
+/// Progress counters whose lifetime can outlast the reconstruction buffers that produced them.
+///
+/// Full recovery releases the accumulator and every polynomial builder immediately, but shares are
+/// bound into SURBs before that point and can still be waiting in the Exit's FIFO buffer. Keeping
+/// only these counters lets those already-paid shares report liveness without retaining any secret
+/// reconstruction material.
+struct RecoveryCounters {
+    useful_shares: std::sync::atomic::AtomicU64,
+    shares_seen: std::sync::atomic::AtomicU64,
+    recovered_polynomials: std::sync::atomic::AtomicU32,
+    invalid_shares: std::sync::atomic::AtomicU64,
+    target_useful_shares: u64,
+}
+
+impl RecoveryCounters {
+    fn new(target_useful_shares: u64) -> Self {
+        Self {
+            useful_shares: Default::default(),
+            shares_seen: Default::default(),
+            recovered_polynomials: Default::default(),
+            invalid_shares: Default::default(),
+            target_useful_shares,
+        }
+    }
+
+    fn record_useful_share(&self) {
+        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
+        self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    fn record_surplus_share(&self) {
+        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    fn record_completed_part(&self) {
+        self.recovered_polynomials.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    fn record_invalid_share(&self) -> u64 {
+        self.invalid_shares.fetch_add(1, PROGRESS_ORDERING) + 1
+    }
+
+    fn snapshot<P>(&self, ssa_id: SsaId<P>) -> SsaRecoveryProgress<P> {
+        let useful_shares = self.useful_shares.load(PROGRESS_ORDERING);
+        SsaRecoveryProgress {
+            ssa_id,
+            useful_shares,
+            shares_seen: self.shares_seen.load(PROGRESS_ORDERING).max(useful_shares),
+            target_useful_shares: self.target_useful_shares,
+            recovered_polynomials: self.recovered_polynomials.load(PROGRESS_ORDERING).min(u16::MAX as u32) as u16,
+        }
+    }
+}
+
+/// Per-polynomial post-reconstruction allowance shared by a live cycle and its compact recovered
+/// tail.
+///
+/// The shared atomics close the retirement race: an acknowledgement that acquired the live cycle
+/// just before recovery and one that acquired the recovered tail just after it contend for the same
+/// slot. Snapshotting ordinary integers at retirement would let that race credit one surplus share
+/// twice.
+#[derive(Clone)]
+struct SurplusBudget {
+    seen: std::sync::Arc<[std::sync::atomic::AtomicUsize]>,
+    max_per_polynomial: usize,
+}
+
+impl SurplusBudget {
+    fn new(num_polys: usize, max_per_polynomial: usize) -> Self {
+        let seen = (0..num_polys)
+            .map(|_| std::sync::atomic::AtomicUsize::new(0))
+            .collect::<Vec<_>>();
+        Self {
+            seen: seen.into(),
+            max_per_polynomial,
+        }
+    }
+
+    fn try_credit(&self, poly_index: PolynomialIndex) -> Option<bool> {
+        let seen = self.seen.get(poly_index as usize)?;
+        Some(
+            seen.fetch_update(PROGRESS_ORDERING, PROGRESS_ORDERING, |current| {
+                (current < self.max_per_polynomial).then_some(current + 1)
+            })
+            .is_ok(),
+        )
+    }
+}
+
+/// Result of validating a share against a recovered cycle's compact tail.
+pub(crate) enum RecoveredTailCredit<P> {
+    /// A structurally valid share consumed one negotiated per-polynomial surplus slot.
+    Credited(SsaRecoveryProgress<P>),
+    /// The polynomial has already consumed every surplus slot the Entry paid for.
+    OverBudget,
+    /// The peer named a polynomial outside the recovered cycle.
+    InvalidPolynomial,
+    /// A structurally invalid share, with the cycle's aggregate fault total.
+    InvalidShare(u64),
+}
+
+/// Minimal state retained after cryptographic recovery so buffered, already-paid SURBs can finish
+/// draining.
+///
+/// There is no polynomial, commitment, share set, or recovered secret here. The only mutable state
+/// is an absolute progress counter and one bounded counter per polynomial. The latter is
+/// security-critical: a cycle-wide allowance would let an Entry replay one completed polynomial and
+/// spend the surplus budget belonging to every other polynomial.
+///
+/// The polynomial commitment is deliberately not retained, so this path cannot prove that a new
+/// evaluation belongs to the recovered polynomial. It therefore grants **liveness only**, never
+/// useful/payment progress, and only from the per-polynomial allowance already included in the
+/// cycle's paid quota. The supervisor independently caps the aggregate at the negotiated full-cycle
+/// volume. Those bounds, rather than an authentication claim this compact state cannot make, are
+/// what prevent an Entry-selected non-zero evaluation from buying unbounded service.
+#[derive(Clone)]
+pub(crate) struct RecoveredSsaTail {
+    ssa_index: SsaIndex,
+    num_polys: usize,
+    counters: std::sync::Arc<RecoveryCounters>,
+    surplus_budget: SurplusBudget,
+}
+
+impl RecoveredSsaTail {
+    pub(crate) fn ssa_index(&self) -> SsaIndex {
+        self.ssa_index
+    }
+
+    pub(crate) fn credit_share<S: PixSpec>(
+        &self,
+        ssa_id: SsaId<S::Pseudonym>,
+        poly_index: PolynomialIndex,
+        msg: PixScalar<S>,
+        share: &PartialSsaShare<S>,
+    ) -> errors::Result<RecoveredTailCredit<S::Pseudonym>, S::Pseudonym> {
+        if poly_index as usize >= self.num_polys {
+            return Ok(RecoveredTailCredit::InvalidPolynomial);
+        }
+
+        // Validate before touching the budget. A malformed share must neither become liveness nor
+        // burn a slot that a later conforming buffered SURB is entitled to use.
+        match checked_completed_share(msg, share) {
+            Ok(_) => {}
+            Err(errors::PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
+                return Ok(RecoveredTailCredit::InvalidShare(self.counters.record_invalid_share()));
+            }
+            Err(error) => return Err(error),
+        }
+
+        match self.surplus_budget.try_credit(poly_index) {
+            Some(true) => {
+                self.counters.record_surplus_share();
+                Ok(RecoveredTailCredit::Credited(self.counters.snapshot(ssa_id)))
+            }
+            Some(false) => Ok(RecoveredTailCredit::OverBudget),
+            None => Ok(RecoveredTailCredit::InvalidPolynomial),
+        }
+    }
+}
 
 /// All post-commitment state of one SSA cycle, held as a single unit.
 ///
@@ -44,33 +204,11 @@ pub struct SsaCycle<S: PixSpec> {
     builder: parking_lot::Mutex<SsaBuilder<S>>,
     /// Part builders indexed by [`PolynomialIndex`]; length is always `num_polys`.
     parts: Box<[parking_lot::Mutex<SsaPartBuilder<S>>]>,
-    /// Shares that advanced reconstruction: new, distinct, and below their part's threshold when
-    /// they arrived. Duplicates, surplus shares and shares absorbed by a failed part are excluded,
-    /// so this is the numerator of a progress ratio rather than a received-packet count.
-    ///
-    /// This is the *payment* counter. For liveness — whether the Entry is feeding this cycle at all —
-    /// see `shares_seen`, and do not substitute one for the other.
-    useful_shares: std::sync::atomic::AtomicU64,
-    /// Shares that reached a part builder and were accepted as this cycle's, useful or not.
-    ///
-    /// The *liveness* counter, and always at least `useful_shares`. A conforming Entry emits
-    /// `threshold + surplus` shares per polynomial, so a whole emission window ends with
-    /// `surplus × window` consecutive shares that advance nothing — and a consumer watching
-    /// `useful_shares` alone cannot tell that from an Entry that has stopped sending.
-    shares_seen: std::sync::atomic::AtomicU64,
-    /// Parts whose constant term has been reconstructed and opened its commitment.
-    recovered_polynomials: std::sync::atomic::AtomicU32,
-    /// Shares that failed verification, aggregated across every peer that relayed for this cycle.
-    ///
-    /// A failure is charged once per offending share, not once per polynomial: a part reports its
-    /// failure exactly once and absorbs everything after it as
-    /// [`AddShareOutcome::Absorbed`].
-    invalid_shares: std::sync::atomic::AtomicU64,
-    /// `num_polys × poly_threshold` — the useful-share count that constitutes full recovery.
-    ///
-    /// Fixed at construction, and must equal the dimensions negotiated at session establishment:
-    /// the consumer treats a mismatch as a protocol violation rather than as drift.
-    target_useful_shares: u64,
+    /// Shared payment, liveness, completed-part, and fault counters. They remain reachable from
+    /// [`RecoveredSsaTail`] after the heavyweight cycle is released.
+    counters: std::sync::Arc<RecoveryCounters>,
+    /// Per-polynomial surplus accounting shared with the compact post-recovery tail.
+    surplus_budget: SurplusBudget,
 }
 
 impl<S: PixSpec> SsaCycle<S> {
@@ -126,6 +264,14 @@ impl<S: PixSpec> SsaCycle<S> {
             return Err(errors::PixError::InvalidInput);
         };
 
+        let max_credited_surplus = first_part.max_credited_surplus();
+        if parts
+            .iter()
+            .any(|part| part.max_credited_surplus() != max_credited_surplus)
+        {
+            return Err(errors::PixError::InvalidInput);
+        }
+
         // The old derivation, kept as a cross-check rather than deleted: every part builder was
         // handed the same `SsaCommitmentBuilder::poly_threshold`, so any of them reports the
         // negotiated threshold, and the product must match what the params said. Debug-only because
@@ -142,11 +288,8 @@ impl<S: PixSpec> SsaCycle<S> {
             id,
             builder: parking_lot::Mutex::new(builder),
             parts: parts.into_iter().map(parking_lot::Mutex::new).collect(),
-            useful_shares: Default::default(),
-            shares_seen: Default::default(),
-            recovered_polynomials: Default::default(),
-            invalid_shares: Default::default(),
-            target_useful_shares,
+            counters: std::sync::Arc::new(RecoveryCounters::new(target_useful_shares)),
+            surplus_budget: SurplusBudget::new(num_polys, max_credited_surplus),
         })
     }
 
@@ -164,8 +307,7 @@ impl<S: PixSpec> SsaCycle<S> {
     /// alone does not settle what another thread observes — [`progress`](Self::progress) clamps for
     /// that — but it removes the window rather than only papering over it.
     pub fn record_useful_share(&self) {
-        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
-        self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
+        self.counters.record_useful_share();
     }
 
     /// Records a share that arrived for an already-reconstructed polynomial.
@@ -174,23 +316,23 @@ impl<S: PixSpec> SsaCycle<S> {
     /// that the Entry is serving this cycle, which is what the Exit's egress gate and recovery-idle
     /// deadline are asking about.
     pub fn record_surplus_share(&self) {
-        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
+        self.counters.record_surplus_share();
     }
 
     /// Records a polynomial part that reconstructed and opened its commitment.
     pub fn record_completed_part(&self) {
-        self.recovered_polynomials.fetch_add(1, PROGRESS_ORDERING);
+        self.counters.record_completed_part();
     }
 
     /// Records a share that failed verification, returning the cycle's total afterwards.
     pub fn record_invalid_share(&self) -> u64 {
-        self.invalid_shares.fetch_add(1, PROGRESS_ORDERING) + 1
+        self.counters.record_invalid_share()
     }
 
     /// Shares that have failed verification for this cycle so far, across all peers.
     #[cfg(test)]
     pub fn invalid_shares(&self) -> u64 {
-        self.invalid_shares.load(PROGRESS_ORDERING)
+        self.counters.invalid_shares.load(PROGRESS_ORDERING)
     }
 
     /// Absolute recovery progress for this cycle.
@@ -203,15 +345,25 @@ impl<S: PixSpec> SsaCycle<S> {
     /// clamp is engaged only for the instant a concurrent [`record_useful_share`](Self::record_useful_share)
     /// is mid-flight, and overstates `shares_seen` by at most the number of such writers.
     pub fn progress(&self) -> SsaRecoveryProgress<S::Pseudonym> {
-        let useful_shares = self.useful_shares.load(PROGRESS_ORDERING);
-        SsaRecoveryProgress {
-            ssa_id: self.id,
-            useful_shares,
-            shares_seen: self.shares_seen.load(PROGRESS_ORDERING).max(useful_shares),
-            target_useful_shares: self.target_useful_shares,
-            // Bounded by `num_polys`, itself bounded by `MAX_POLYS_PER_SSA`, so the saturation
-            // below is unreachable rather than lossy.
-            recovered_polynomials: self.recovered_polynomials.load(PROGRESS_ORDERING).min(u16::MAX as u32) as u16,
+        self.counters.snapshot(self.id)
+    }
+
+    /// Consumes one negotiated surplus slot for `poly_index`.
+    ///
+    /// Called only after [`SsaPartBuilder::add_share`] has decoded and validated the share as a
+    /// post-reconstruction candidate. `None` means the untrusted polynomial index is out of range;
+    /// `Some(false)` means the Entry has exhausted this polynomial's own budget.
+    pub fn credit_surplus(&self, poly_index: PolynomialIndex) -> Option<bool> {
+        self.surplus_budget.try_credit(poly_index)
+    }
+
+    /// Produces the compact state that survives full recovery while buffered SURBs drain.
+    pub(crate) fn recovered_tail(&self) -> RecoveredSsaTail {
+        RecoveredSsaTail {
+            ssa_index: self.id.ssa_index(),
+            num_polys: self.parts.len(),
+            counters: self.counters.clone(),
+            surplus_budget: self.surplus_budget.clone(),
         }
     }
 
@@ -321,24 +473,16 @@ impl<S: PixSpec> SsaBuilder<S> {
 
 /// What a share contributed to its polynomial.
 ///
-/// The four non-contributing outcomes are kept apart from one another because they are not
-/// equivalent to a caller counting progress: a `Duplicate` says the peer re-sent an evaluation
-/// point, a `Surplus` says it is still emitting for a polynomial that is already done (expected —
-/// the Entry sends `threshold + surplus` shares per polynomial), a `SurplusOverBudget` says it has
-/// emitted more of those than it negotiated, and `Absorbed` says the polynomial has already failed
-/// and nothing can change that.
+/// The non-contributing outcomes are kept apart because they are not equivalent to a caller
+/// counting progress: a `Duplicate` says the peer re-sent an evaluation point, a `Surplus` is a
+/// structurally valid candidate for the cycle's bounded post-reconstruction allowance, and
+/// `Absorbed` says the polynomial has already failed and nothing can change that.
 pub enum AddShareOutcome<S: PixSpec> {
     /// Same evaluation identifier as a share already collected for this polynomial.
     Duplicate,
-    /// Arrived after the polynomial was already reconstructed, within the negotiated surplus.
+    /// Arrived after the polynomial was already reconstructed and passed structural validation.
+    /// The cycle's shared per-polynomial counter decides whether budget remains.
     Surplus,
-    /// Arrived after the polynomial was already reconstructed, past the negotiated surplus.
-    ///
-    /// Distinct from [`Surplus`](Self::Surplus) because only the latter is evidence the Entry is
-    /// conforming. Once a peer is past its own budget, further shares for the same polynomial say
-    /// nothing about whether it is still working on the cycle — see
-    /// `SsaPartBuilder::max_credited_surplus`.
-    SurplusOverBudget,
     /// Arrived after the polynomial failed to open its commitment, and was discarded.
     Absorbed,
     /// New and distinct, but the threshold is not reached yet.
@@ -374,10 +518,9 @@ pub struct SsaPartBuilder<S: PixSpec> {
     /// because [`SsaBuilder`] needs every polynomial. Both failure paths must therefore set this
     /// *and* release the share buffer, or the "exactly once" only holds for one of them.
     failed: bool,
-    /// Post-reconstruction shares credited as liveness so far, bounded by
-    /// [`Self::max_credited_surplus`].
-    surplus_seen: usize,
     /// How many post-reconstruction shares this polynomial may contribute as liveness evidence.
+    /// [`SsaCycle::new`] verifies that every part received the same negotiated value, then builds
+    /// the shared per-polynomial counters that enforce it across the retirement boundary.
     ///
     /// The negotiated `surplus_shares`, i.e. exactly what a conforming Entry emits per polynomial
     /// once the threshold is met — and, since `20845807ae`, exactly what the per-SSA quota charges
@@ -401,7 +544,6 @@ impl<S: PixSpec> SsaPartBuilder<S> {
             shares: Vec::new(),
             reconstructed: None,
             failed: false,
-            surplus_seen: 0,
             max_credited_surplus,
         }
     }
@@ -416,6 +558,10 @@ impl<S: PixSpec> SsaPartBuilder<S> {
     /// Shares needed to interpolate this polynomial — the negotiated threshold.
     pub(crate) fn min_shares(&self) -> usize {
         self.min_shares
+    }
+
+    pub(crate) fn max_credited_surplus(&self) -> usize {
+        self.max_credited_surplus
     }
 
     /// Frees the collected shares, which are only needed until the part is reconstructed.
@@ -455,29 +601,9 @@ impl<S: PixSpec> SsaPartBuilder<S> {
             return Ok(AddShareOutcome::Absorbed);
         }
 
-        let share = into_completed_share(msg, &share)?;
-
-        // A zero x-coordinate evaluates the polynomial at its constant term and would divide by
-        // zero in the Lagrange basis; a zero y is degenerate in the same way. These used to be the
-        // opening lines of the per-share Feldman check, and they are the part worth keeping —
-        // unlike the check itself, they cost nothing.
-        //
-        // Ahead of the `reconstructed` check below, so that a share which could never have come
-        // from the committed polynomial is rejected whether or not that polynomial is already done.
-        // The other order made a completed polynomial into a laundering channel: every malformed
-        // share addressed to it returned `Surplus`, which the Exit credits as evidence the Entry is
-        // alive.
-        if (share.value().is_zero() | share.identifier().is_zero()).into() {
-            return Err(vsss_rs::Error::InvalidShare.into());
-        }
+        let share = checked_completed_share(msg, &share)?;
 
         if self.reconstructed.is_some() {
-            // Past the budget the share is real but no longer evidence of anything: see
-            // `max_credited_surplus`.
-            if self.surplus_seen >= self.max_credited_surplus {
-                return Ok(AddShareOutcome::SurplusOverBudget);
-            }
-            self.surplus_seen += 1;
             return Ok(AddShareOutcome::Surplus);
         }
 
@@ -523,6 +649,29 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         self.reconstructed = Some(reconstructed);
         Ok(AddShareOutcome::Completed(reconstructed))
     }
+}
+
+/// Decodes a partial share and enforces the inexpensive structural checks that must precede both
+/// live-cycle and recovered-tail liveness accounting.
+fn checked_completed_share<S: PixSpec>(
+    msg: PixScalar<S>,
+    share: &PartialSsaShare<S>,
+) -> errors::Result<CompletedShare<S>, S::Pseudonym> {
+    let share = into_completed_share(msg, share)?;
+
+    // A zero x-coordinate evaluates the polynomial at its constant term and would divide by zero
+    // in the Lagrange basis; a zero y is degenerate in the same way. These used to be the opening
+    // lines of the per-share Feldman check, and they are the part worth keeping — unlike the check
+    // itself, they cost nothing.
+    //
+    // This must run before either post-reconstruction path consumes a surplus slot. Otherwise a
+    // completed polynomial becomes a laundering channel: malformed shares addressed to it count as
+    // evidence that the Entry is alive.
+    if (share.value().is_zero() | share.identifier().is_zero()).into() {
+        return Err(vsss_rs::Error::InvalidShare.into());
+    }
+
+    Ok(share)
 }
 
 /// Incremental outcome of feeding coefficient commitments into an [`SsaCommitmentBuilder`].
@@ -815,5 +964,37 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         progress.full_commitment = self.full_ssa_commitment.as_ref().map(|(c, _)| *c);
 
         Ok(progress)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SurplusBudget;
+
+    /// The live-cycle and recovered-tail views are clones of this same allocation. Even if an
+    /// acknowledgement races retirement, exactly one view may spend the final paid slot.
+    #[test]
+    fn surplus_budget_clones_cannot_double_spend_a_slot() {
+        const CONTENDERS: usize = 32;
+        let budget = SurplusBudget::new(1, 1);
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(CONTENDERS));
+        let contenders = (0..CONTENDERS)
+            .map(|_| {
+                let budget = budget.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    budget.try_credit(0) == Some(true)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let credited = contenders
+            .into_iter()
+            .map(|contender| contender.join().expect("surplus-budget contender must not panic"))
+            .filter(|credited| *credited)
+            .count();
+        assert_eq!(1, credited, "a retirement race must not duplicate paid liveness");
+        assert_eq!(Some(false), budget.try_credit(0), "the shared slot must remain spent");
     }
 }

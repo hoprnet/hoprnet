@@ -150,9 +150,11 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         false
     }
 
-    /// Releases all reconstructor state for a finished or torn-down SSA cycle.
+    /// Releases heavyweight reconstructor state for a finished or torn-down SSA cycle.
     ///
-    /// Called on full recovery and on session closure. Implementations must be
+    /// An implementation may retain bounded, non-secret post-recovery accounting for SURBs minted
+    /// before recovery and still draining through the transport. Such state must be constant-bounded
+    /// per Session and must never restore a retired verifier or commitment. Implementations must be
     /// idempotent — retiring an unknown or already-retired cycle is a no-op.
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>);
 

@@ -347,7 +347,7 @@ mod tests {
         HoprBalance,
         types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym},
     };
-    use hopr_protocol_pix::{SsaId, SsaIndex};
+    use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
     use super::*;
 
@@ -419,6 +419,9 @@ mod tests {
     async fn zero_predeposit_config_reaches_the_gate_as_strict_prepay() {
         let cfg = SupervisorConfig {
             max_predeposit_packets: 0,
+            // Fill the funded ceiling immediately before recovery. `Recovered` itself must reset
+            // it even if the final progress snapshot was dropped.
+            max_served_without_progress: 1,
             ..default_cfg()
         };
         let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
@@ -515,10 +518,36 @@ mod tests {
         assert!(handle.gate.try_acquire_sync()?);
 
         // The receiver remains alive but deliberately unread, modeling an action driver blocked on
-        // RequestSsa I/O. The worker must close the gate locally when this recovery rotates to the
-        // already-registered, unfunded successor.
+        // RequestSsa I/O. Cryptographic recovery alone must keep the gate funded for the bounded
+        // predecessor tail.
         handle
             .send_event(SessionPixEvent::Recovered(first))
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        poll_until("the recovered predecessor keeps its paid tail open", || {
+            handle.gate.funded()
+        })
+        .await;
+        assert!(
+            handle.gate.try_acquire_sync()?,
+            "cryptographic recovery must reopen a gate whose final progress notification was lost"
+        );
+
+        // The first successor-bound share is the actual FIFO boundary. Even though that successor
+        // is unfunded, the worker must synchronously consume the predecessor receipt and restore
+        // strict prepay; waiting for the stalled action driver would leak new service.
+        let successor = SsaId::new(
+            p,
+            SsaIndex::new(2).ok_or_else(|| anyhow::anyhow!("SSA index 2 must be valid"))?,
+        );
+        handle
+            .send_event(SessionPixEvent::RecoveryProgress(SsaRecoveryProgress {
+                ssa_id: successor,
+                useful_shares: 1,
+                shares_seen: 1,
+                target_useful_shares: dims().target_useful_shares(),
+                recovered_polynomials: 0,
+            }))
             .await
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;
         poll_until("the unfunded successor closes the gate", || !handle.gate.funded()).await;
