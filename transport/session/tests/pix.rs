@@ -32,15 +32,29 @@ use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 use tokio::time as tokio_time;
 
+/// What one SSA cycle at these dimensions costs, mirroring the Exit's own accounting:
+/// `polys × (threshold + surplus) × PAYLOAD_SIZE`.
+///
+/// Derived per test rather than pinned to a round number, because `quota_range` has to satisfy two
+/// bounds at once and a literal only ever satisfies one on purpose: wide enough to accept what the
+/// Entry offers, and narrow enough that `SessionManager::start`'s cross-field check can still cover
+/// one cycle at its top inside `max_recovery_time`. A range derived from the dimensions the test
+/// actually runs is inside both by construction.
+fn cycle_quota(params: &PixParams) -> u64 {
+    params.polys_per_ssa() as u64
+        * params.emitted_shares_per_poly() as u64
+        * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64
+}
+
 /// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
 ///
-/// Unlike the vanilla lifecycle test, Bob is configured with a generous PIX quota and both peers
+/// Unlike the vanilla lifecycle test, Bob is configured to accept Alice's PIX quota and both peers
 /// are given a `PixToolbox` so that the SSA (Secret Sharing Agreement) handshake runs as part of
 /// session establishment.
 ///
 /// ## Steps
-/// 1. Alice's manager has no PIX config (initiator, no quota enforcement). Bob's manager accepts quotas up to 2 GiB via
-///    `IncomingSessionPixConfig`.
+/// 1. Alice's manager has no PIX config (initiator, no quota enforcement). Bob's manager accepts quotas up to exactly
+///    what Alice's dimensions cost, via `IncomingSessionPixConfig`.
 /// 2. Both managers receive a `PixToolbox` seeded with a `SsaShareGenerator` and `SsaReconstructor`.
 /// 3. Alice calls `new_session` with `Capability::UsePIX` and a quota of `(64, 64)`. The mock intercepts the outbound
 ///    messages in sequence:
@@ -59,20 +73,20 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
-    let alice_mgr = SessionManager::new(Default::default());
-    let bob_mgr = SessionManager::new(SessionManagerConfig {
-        pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
     let ssa_gen_config = SsaGeneratorConfig {
         polynomials_per_ssa: 64,
         threshold: 64,
         surplus_shares: 16,
     };
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
     // One commitment per polynomial — the constant term — chunked into packet-sized messages.
     // Every message carries the proof of knowledge, so the per-message budget loses its size.
@@ -426,13 +440,9 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let alice_mgr = SessionManager::new(Default::default());
-    let bob_mgr = SessionManager::new(SessionManagerConfig {
-        pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
+    // Bob's `pix_config` is left at its default: nothing here offers PIX, so a widened `quota_range`
+    // would only be a claim about a path this test never takes.
+    let bob_mgr = SessionManager::new(Default::default());
 
     let mut alice_transport = MockMsgSender::new();
     let mut bob_transport = MockMsgSender::new();
@@ -557,7 +567,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
+            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
             supervision: SupervisorConfig {
                 ssas_per_request: BATCH,
                 ..Default::default()
@@ -826,7 +836,7 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
+            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
             supervision: SupervisorConfig {
                 ssas_per_request: 3,
                 // Deadlines left at their defaults, so the scaled commitment window is 3 × 20 s and the
