@@ -41,6 +41,14 @@ pub enum StartErrorReason {
     Busy = 2,
     /// The recipient requires incentivization or the incentivization parameters are not acceptable.
     UnacceptablePixParams = 3,
+    /// The recipient does not serve this Session's target, or does not serve it on the offered
+    /// terms.
+    ///
+    /// Distinct from [`UnacceptablePixParams`](Self::UnacceptablePixParams) because the two call for
+    /// different responses: those parameters could be re-offered differently, whereas this target
+    /// will not be served by this recipient however the request is phrased. Distinct from
+    /// [`Busy`](Self::Busy) because that one is transient and worth retrying.
+    TargetNotAdmitted = 4,
 }
 
 /// Identifies which entity a [`StartErrorType`] refers to.
@@ -1142,6 +1150,31 @@ mod tests {
         let (tag, msg) = msg_3.clone().encode()?;
         let msg_4 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_3, msg_4);
+
+        Ok(())
+    }
+
+    /// The reason travels as a single byte read back through `from_repr`, so a variant that does not
+    /// survive the round trip is one a peer cannot be told about at all.
+    #[test]
+    fn every_session_error_reason_survives_the_round_trip() -> anyhow::Result<()> {
+        for reason in [
+            StartErrorReason::Unknown,
+            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::Busy,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            let sent = StartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason,
+            });
+
+            let (tag, msg) = sent.clone().encode()?;
+            let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+            assert_eq!(sent, received, "round trip of {reason}");
+        }
 
         Ok(())
     }

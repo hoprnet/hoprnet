@@ -446,6 +446,24 @@ impl<T: futures::AsyncWrite + futures::AsyncRead + Send + Unpin> AsyncReadWrite 
 /// concrete [`HoprSession`] byte-stream.
 pub type IncomingSession = hopr_api::node::IncomingSession<HoprSession>;
 
+/// Where a [`SessionAdmissionRequest`](hopr_api::node::SessionAdmissionRequest)'s answer is delivered.
+///
+/// The error is a string rather than the session server's own type because that type is chosen by
+/// whoever installs the server and is unnameable from here — the same erasure the session-server
+/// wiring already performs when it logs a processing failure. The message is for the Exit's own
+/// operator; the peer is told only [`StartErrorReason::TargetNotAdmitted`].
+///
+/// [`StartErrorReason::TargetNotAdmitted`]: hopr_protocol_start::StartErrorReason::TargetNotAdmitted
+pub type SessionAdmissionReply =
+    futures::channel::oneshot::Sender<Result<hopr_api::node::SessionAdmissionDecision, String>>;
+
+/// How the [`SessionManager`](crate::SessionManager) reaches whoever decides admission.
+///
+/// Bounded, and deliberately so: an unanswered request is a refused Session rather than an
+/// unbounded queue of peers waiting on a session server that has stopped keeping up.
+pub type SessionAdmissionSink =
+    futures::channel::mpsc::Sender<(hopr_api::node::SessionAdmissionRequest, SessionAdmissionReply)>;
+
 /// Configures the Session protocol socket over HOPR.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {

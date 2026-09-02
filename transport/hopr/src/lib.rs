@@ -85,7 +85,7 @@ use hopr_transport_session::{
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
-    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    SessionAdmissionReply, SessionAdmissionSink, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 #[cfg(feature = "telemetry")]
@@ -467,6 +467,7 @@ where
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -491,6 +492,7 @@ where
             ticket_factory,
             exit_ack_share,
             Some(on_incoming_session),
+            on_session_admission,
         )
         .await
     }
@@ -502,6 +504,10 @@ where
     ///
     /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
     /// to decrypt PIX shares.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "each argument is a distinct wiring point supplied by hopr-lib"
+    )]
     pub async fn run_exit<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
@@ -510,6 +516,7 @@ where
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -532,6 +539,7 @@ where
             ticket_factory,
             pix_events,
             Some(on_incoming_session),
+            on_session_admission,
         )
         .await
     }
@@ -570,6 +578,7 @@ where
             ticket_factory,
             pix_events,
             None,
+            None,
         )
         .await
     }
@@ -591,6 +600,7 @@ where
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
         on_incoming_session: Option<Sender<IncomingSession>>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -969,10 +979,17 @@ where
                     HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
                 })?,
                 pix_toolbox,
+                on_session_admission,
             )
         } else {
-            self.smgr
-                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain(), pix_toolbox)
+            // An Entry establishes Sessions rather than admitting them, so there is nothing to ask
+            // about even if the caller installed a session server.
+            self.smgr.start(
+                unresolved_routing_msg_tx.clone(),
+                futures::sink::drain(),
+                pix_toolbox,
+                None,
+            )
         };
 
         smgr_start_res

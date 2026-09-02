@@ -4098,9 +4098,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f004332014f2739746ff6428b01f6308791528ec0bc5b692e2c4837fa27c87c"
+version = "4.3.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fsession-admission-hook#9f2f3c8e63baaa50e669116a30f56d934de21739"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4922,7 +4921,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -7221,7 +7220,7 @@ dependencies = [
  "quinn-udp 0.5.15",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -7261,7 +7260,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7274,7 +7273,7 @@ checksum = "76150b617afc75e6e21ac5f39bc196e80b65415ae48d62dbef8e2519d040ce42"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 

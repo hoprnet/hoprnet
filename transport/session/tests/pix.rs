@@ -257,13 +257,18 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
     assert!(alice_mgr.is_started());
 
     // Start Bob
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
     assert!(bob_mgr.is_started());
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -395,7 +400,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
         while let Some(_session) = new_session_rx.next().await {}
     });
     let (sender, handle) = mock_packet_planning(transport);
-    mgr.start(sender.clone(), new_session_tx, None)?;
+    mgr.start(sender.clone(), new_session_tx, None, None)?;
     assert!(mgr.is_started());
 
     let unknown_pseudonym = HoprPseudonym::random();
@@ -490,10 +495,10 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
 
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1);
-    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1);
-    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -653,11 +658,16 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -916,11 +926,16 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
 
     let _notifications = tokio::spawn(async move {
         pin_mut!(new_session_rx_bob);

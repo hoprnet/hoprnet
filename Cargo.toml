@@ -231,3 +231,10 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+# Temporary, for the duration of #8376: `HoprSessionServer::admit` is not published yet. A `[patch]`
+# rather than a git dependency because `hopr-api` also reaches this workspace through several
+# crates.io crates; a git dep would leave two distinct `hopr-api` packages in the graph whose traits
+# do not unify. Reverted once 4.3.0 is on crates.io.
+[patch.crates-io]
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/session-admission-hook" }

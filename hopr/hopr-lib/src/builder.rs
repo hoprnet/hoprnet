@@ -82,6 +82,16 @@ const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 type PeerDiscoveryRx =
     Arc<parking_lot::Mutex<Option<futures::stream::BoxStream<'static, (hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
 
+/// What `into_parts` hands to the shared build path: the configured builder, the two channels the
+/// transport is wired to, and the tasks already spawned for them. The admission sink is optional
+/// because a node built without a session server has nobody to ask.
+type BuildParts<Chain, Graph, Net, Ct> = (
+    HoprBuilderConfigured<Chain, Graph, Net, Ct>,
+    futures::channel::mpsc::Sender<IncomingSession>,
+    Option<hopr_transport::SessionAdmissionSink>,
+    AbortableList<HoprLibProcess>,
+);
+
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
 type AsyncFactory<T> = Box<dyn FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = T> + Send>> + Send>;
@@ -255,17 +265,64 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     ///
     /// Eagerly spawns the server task and returns a [`HoprBuilderWithSession`]
     /// that has the `build_edge` / `build_full` methods.
+    ///
+    /// Two tasks are spawned, not one, because the server is consulted at two different points in a
+    /// Session's life. `admit` is asked while the peer's request is still being negotiated and no
+    /// Session exists yet; `process` is handed the established byte-stream. Sharing one channel
+    /// would put a long-lived `process` in front of the admission decisions queued behind it.
     #[cfg(feature = "session-server")]
     pub fn with_session_server(
         self,
+        // `Sync` on top of what `process` alone needed: the server is now driven from two
+        // independent tasks, and `admit` carries a default body, which `async_trait` can only make
+        // `Send` by requiring `&Self` to cross threads.
         server: impl hopr_api::node::HoprSessionServer<Session = IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
+        + Sync
         + 'static,
     ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
         let incoming_session_capacity = self.ctx.cfg.incoming_session_capacity.max(1);
 
         let (session_tx, session_rx) = futures::channel::mpsc::channel::<IncomingSession>(incoming_session_capacity);
+
+        // Sized like the incoming-session channel: an admission request is in flight only for as
+        // long as one Start negotiation, so this bounds concurrent negotiations rather than live
+        // Sessions. Overflowing refuses the Session as busy rather than queueing its peer.
+        let (admission_tx, admission_rx) = futures::channel::mpsc::channel(incoming_session_capacity);
+
+        let admission_server = server.clone();
+        let admission_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_admission_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let admission_handle = hopr_utils::spawn_as_abortable_named!(
+            "hopr_lib_session_admission",
+            admission_rx
+                .for_each_concurrent(
+                    None,
+                    move |(request, reply): (_, hopr_transport::SessionAdmissionReply)| {
+                        let server = admission_server.clone();
+                        let admission_diag = admission_diag.clone();
+                        admission_diag.wrap(|| async move {
+                            // Concurrently rather than in sequence: the transport gives each request its
+                            // own deadline, so one slow decision must not spend another's.
+                            let decision = server.admit(request).await.map_err(|error| error.to_string());
+                            if reply.send(decision).is_err() {
+                                // The transport stopped waiting — its own timeout fired, or the peer
+                                // went away. Nothing to do but note it; it already refused the Session.
+                                tracing::debug!("session admission decided after the transport stopped waiting");
+                            }
+                        })
+                    }
+                )
+                .inspect(|_| tracing::warn!(
+                    task = %HoprLibProcess::SessionServer,
+                    "long-running background task finished"
+                ))
+        );
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
         let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -299,7 +356,9 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         HoprBuilderWithSession {
             inner: self,
             session_tx,
+            admission_tx,
             session_handle: handle,
+            admission_handle,
         }
     }
 }
@@ -315,7 +374,9 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
 pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = ()> {
     inner: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    admission_tx: hopr_transport::SessionAdmissionSink,
     session_handle: hopr_utils::runtime::AbortHandle,
+    admission_handle: hopr_utils::runtime::AbortHandle,
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +401,7 @@ struct PreHopr<Chain, Graph, Net, Ct> {
     ),
     processes: AbortableList<HoprLibProcess>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    admission_tx: Option<hopr_transport::SessionAdmissionSink>,
     cover_traffic: Ct,
     network: Net,
     network_process: BoxedProcessFn,
@@ -370,6 +432,7 @@ async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
 async fn pre_build_inner<Chain, Graph, Net, Ct>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
+    admission_tx: Option<hopr_transport::SessionAdmissionSink>,
     mut processes: AbortableList<HoprLibProcess>,
 ) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
 where
@@ -708,6 +771,7 @@ where
         pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
         processes,
         session_tx,
+        admission_tx,
         cover_traffic,
         network,
         network_process,
@@ -728,8 +792,8 @@ macro_rules! impl_build_methods {
         where
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, processes).await?;
+            let (configured, session_tx, admission_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
 
             tracing::info!("starting transport for edge (entry) node");
             let (socket, transport_processes) = pre
@@ -787,8 +851,8 @@ macro_rules! impl_build_methods {
         where
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, processes).await?;
+            let (configured, session_tx, admission_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
 
             tracing::info!("starting transport for entry node");
             let (socket, transport_processes) = pre
@@ -846,8 +910,8 @@ macro_rules! impl_build_methods {
         where
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, processes).await?;
+            let (configured, session_tx, admission_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
 
             tracing::info!("starting transport for exit node");
             let (socket, transport_processes) = pre
@@ -859,6 +923,7 @@ macro_rules! impl_build_methods {
                     ticket_factory,
                     Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                     pre.session_tx,
+                    pre.admission_tx,
                 )
                 .await?;
 
@@ -905,8 +970,8 @@ macro_rules! impl_build_methods {
             TMgr: TicketManagement + Clone + Send + Sync + 'static,
             TFact: TicketFactory + Clone + Send + Sync + 'static,
         {
-            let (configured, session_tx, processes) = self.into_parts();
-            let pre = pre_build_inner(configured, session_tx, processes).await?;
+            let (configured, session_tx, admission_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, admission_tx, processes).await?;
             let mut processes = pre.processes;
 
             tracing::info!("starting ticket events processor");
@@ -1011,6 +1076,7 @@ macro_rules! impl_build_methods {
                     ticket_factory,
                     Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                     pre.session_tx,
+                    pre.admission_tx,
                 )
                 .await?;
             // Drain unrelated packets to avoid missing blackhole
@@ -1072,16 +1138,11 @@ where
 {
     impl_build_methods!();
 
-    fn into_parts(
-        self,
-    ) -> (
-        HoprBuilderConfigured<Chain, Graph, Net, Ct>,
-        futures::channel::mpsc::Sender<IncomingSession>,
-        AbortableList<HoprLibProcess>,
-    ) {
+    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct> {
         let mut processes = AbortableList::<HoprLibProcess>::default();
         processes.insert(HoprLibProcess::SessionServer, self.session_handle);
-        (self.inner, self.session_tx, processes)
+        processes.insert(HoprLibProcess::SessionAdmission, self.admission_handle);
+        (self.inner, self.session_tx, Some(self.admission_tx), processes)
     }
 }
 
@@ -1099,15 +1160,9 @@ where
 {
     impl_build_methods!();
 
-    fn into_parts(
-        self,
-    ) -> (
-        HoprBuilderConfigured<Chain, Graph, Net, Ct>,
-        futures::channel::mpsc::Sender<IncomingSession>,
-        AbortableList<HoprLibProcess>,
-    ) {
+    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct> {
         let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
         let processes = AbortableList::<HoprLibProcess>::default();
-        (self, tx, processes)
+        (self, tx, None, processes)
     }
 }
