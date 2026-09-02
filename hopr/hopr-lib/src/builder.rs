@@ -319,7 +319,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
                     }
                 )
                 .inspect(|_| tracing::warn!(
-                    task = %HoprLibProcess::SessionServer,
+                    task = %HoprLibProcess::SessionAdmission,
                     "long-running background task finished"
                 ))
         );

@@ -807,8 +807,15 @@ where
                     };
                     StartProtocol::SessionError(StartErrorType {
                         identifier,
-                        reason: StartErrorReason::from_repr(body[reason_start])
-                            .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
+                        // An unrecognized reason is read as [`StartErrorReason::Unknown`] rather
+                        // than failing the message, which is the whole purpose of that variant.
+                        // The alternative loses the error entirely: a peer that added a reason this
+                        // build predates would have its `SessionError` rejected as malformed, and
+                        // the Session it was closing would die on a timeout instead of being
+                        // reported. Refusing to parse tells this node *less* than reading the byte
+                        // it does not recognize as "some reason", so a reason may be added without
+                        // a protocol version bump.
+                        reason: StartErrorReason::from_repr(body[reason_start]).unwrap_or(StartErrorReason::Unknown),
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
@@ -1175,6 +1182,41 @@ mod tests {
 
             assert_eq!(sent, received, "round trip of {reason}");
         }
+
+        Ok(())
+    }
+
+    /// A reason byte this build does not know must still decode, as `Unknown`.
+    ///
+    /// Otherwise adding a reason is a protocol break in one direction: the older peer rejects the
+    /// whole `SessionError` as malformed and loses the close it was being told about, so the
+    /// Session dies on a timeout instead. Reading the byte as "some reason" tells it strictly more.
+    #[test]
+    fn a_session_error_reason_this_build_does_not_know_decodes_as_unknown() -> anyhow::Result<()> {
+        let sent =
+            StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason: StartErrorReason::TargetNotAdmitted,
+            });
+        let (tag, msg) = sent.encode()?;
+
+        // Stand in for a reason added after this build: the last byte is the reason.
+        let mut msg = msg.into_vec();
+        let reason_byte = msg.len() - 1;
+        msg[reason_byte] = u8::MAX;
+
+        let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+        assert!(
+            matches!(
+                received,
+                StartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(10),
+                    reason: StartErrorReason::Unknown,
+                })
+            ),
+            "an unknown reason must survive as Unknown, got {received:?}"
+        );
 
         Ok(())
     }

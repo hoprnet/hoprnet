@@ -235,6 +235,7 @@ ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 # Temporary, for the duration of #8376: `HoprSessionServer::admit` is not published yet. A `[patch]`
 # rather than a git dependency because `hopr-api` also reaches this workspace through several
 # crates.io crates; a git dep would leave two distinct `hopr-api` packages in the graph whose traits
-# do not unify. Reverted once 4.3.0 is on crates.io.
+# do not unify. Pinned by `rev` rather than by branch so the resolved commit cannot move under
+# CI while the PR is open. Reverted once 4.3.0 is on crates.io.
 [patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/session-admission-hook" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "9f2f3c8e63baaa50e669116a30f56d934de21739" }

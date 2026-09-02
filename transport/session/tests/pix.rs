@@ -1068,9 +1068,14 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
     let ssa_requests = Arc::new(AtomicUsize::new(0));
 
     // `dispatch_message` needs the pseudonym of the Session a message belongs to, and the relay
-    // closures outlive both Sessions, so the current one is shared rather than captured. The two
-    // Sessions run in sequence, so a single cell is enough.
-    let live_pseudonym = Arc::new(hopr_utils::runtime::prelude::Mutex::new(HoprPseudonym::random()));
+    // closures outlive both Sessions, so the current one is shared rather than captured.
+    //
+    // Read *synchronously, as the message is produced*, not inside the future that delivers it. The
+    // two phases below swap this cell between them, and reading it at delivery time would tag a
+    // first-Session message still in flight with the second Session's pseudonym. Reading at
+    // production time pins each message to the phase that created it, whatever order they arrive
+    // in — a sync mutex, held for the read alone and never across an await.
+    let live_pseudonym = Arc::new(std::sync::Mutex::new(HoprPseudonym::random()));
 
     let bob_mgr_relay = Arc::new(bob_mgr.clone());
     let alice_relay_pseudonym = live_pseudonym.clone();
@@ -1080,9 +1085,8 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
         .times(1..)
         .returning(move |_, data| {
             let bob_mgr_relay = bob_mgr_relay.clone();
-            let alice_relay_pseudonym = alice_relay_pseudonym.clone();
+            let pseudonym = *alice_relay_pseudonym.lock().expect("relay pseudonym lock");
             Box::pin(async move {
-                let pseudonym = *alice_relay_pseudonym.lock().await;
                 let _ = bob_mgr_relay.dispatch_message(
                     pseudonym,
                     ApplicationDataIn {
@@ -1106,9 +1110,8 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
                 ssa_requests_seen.fetch_add(1, Ordering::Relaxed);
             }
             let alice_mgr_relay = alice_mgr_relay.clone();
-            let bob_relay_pseudonym = bob_relay_pseudonym.clone();
+            let pseudonym = *bob_relay_pseudonym.lock().expect("relay pseudonym lock");
             Box::pin(async move {
-                let pseudonym = *bob_relay_pseudonym.lock().await;
                 let _ = alice_mgr_relay.dispatch_message(
                     pseudonym,
                     ApplicationDataIn {
@@ -1139,7 +1142,7 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
 
     // ── 1. The waived target establishes, on an offer carrying no PIX at all ──────────────────
     let free_pseudonym = HoprPseudonym::random();
-    *live_pseudonym.lock().await = free_pseudonym;
+    *live_pseudonym.lock().expect("relay pseudonym lock") = free_pseudonym;
 
     let (alice_session, bob_incoming) = tokio_time::timeout(
         Duration::from_secs(2),
@@ -1161,7 +1164,7 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
     .await
     .map_err(|e| anyhow::anyhow!("the waived target should have established: {e}"))?;
 
-    let _alice_session = alice_session?;
+    let mut alice_session = alice_session?;
     let bob_incoming = bob_incoming.ok_or_else(|| anyhow::anyhow!("bob must get an incoming session"))?;
     assert_eq!(
         bob_incoming.target, free_target,
@@ -1172,10 +1175,18 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
         0,
         "a waived session must cost the entry no deposit round trip"
     );
+    let bob_sessions_after_admission = bob_mgr.num_active_sessions();
+    assert_eq!(bob_sessions_after_admission, 1, "the waived target must hold one slot");
+
+    // Closed rather than dropped, as the tests above do, so the first phase leaves nothing sending.
+    // Bob's slot survives its Entry's close and is reclaimed on idle, which is why the refusal below
+    // is judged against the count taken here rather than against zero.
+    alice_session.close().await?;
+    drop(bob_incoming);
 
     // ── 2. The same offer to another target is refused ────────────────────────────────────────
     let paid_pseudonym = HoprPseudonym::random();
-    *live_pseudonym.lock().await = paid_pseudonym;
+    *live_pseudonym.lock().expect("relay pseudonym lock") = paid_pseudonym;
 
     let refusal = tokio_time::timeout(
         Duration::from_secs(2),
@@ -1202,6 +1213,20 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
             ))
         ),
         "the entry must be told its offer was unacceptable for that target, got {refusal:?}"
+    );
+
+    // The Entry's error alone would also be produced by an Exit that allocated the Session and only
+    // then refused it, which leaks a slot. Both halves of that are checked here.
+    assert!(
+        tokio_time::timeout(Duration::from_millis(200), new_session_rx_bob.next())
+            .await
+            .is_err(),
+        "a refused target must not reach the exit as an incoming session"
+    );
+    assert_eq!(
+        bob_mgr.num_active_sessions(),
+        bob_sessions_after_admission,
+        "the refusal must allocate no slot of its own"
     );
 
     // ── 3. Only the Exit was ever asked ───────────────────────────────────────────────────────
