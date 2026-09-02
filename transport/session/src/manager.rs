@@ -1520,7 +1520,13 @@ pub struct SessionManager<S> {
     ///
     /// Unset on a node that runs no session server — an Entry, or a relay — where there is nobody to
     /// ask and every Session is admitted on this node's own terms.
-    admission_tx: Arc<OnceLock<SessionAdmissionSink>>,
+    /// Behind a `Mutex` so every request goes through *one* sender.
+    ///
+    /// `futures::channel::mpsc` gives each cloned `Sender` its own guaranteed slot on top of the
+    /// buffer, so sending through a fresh clone each time would let the queue grow with the number
+    /// of concurrent initiations — the bound would not bound. `try_send` never blocks, so the lock
+    /// is held only for the enqueue itself.
+    admission_tx: Arc<OnceLock<parking_lot::Mutex<SessionAdmissionSink>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -1817,7 +1823,7 @@ where
 
         if let Some(admission) = admission {
             self.admission_tx
-                .set(admission)
+                .set(parking_lot::Mutex::new(admission))
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
         }
 
@@ -3339,7 +3345,7 @@ where
         // `try_send` rather than an awaited send: waiting for room in the queue would hold this
         // initiation past the peer's own timeout, and the queue being full is exactly the condition
         // the bound exists to report.
-        if let Err(error) = admission_tx.clone().try_send((request, reply_tx)) {
+        if let Err(error) = admission_tx.lock().try_send((request, reply_tx)) {
             warn!(
                 %session_id,
                 %error,
@@ -6487,6 +6493,225 @@ mod tests {
             lax.effective_for(&SessionAdmissionDecision::default().with_enforce_pix(true))
                 .enforce_pix
         );
+    }
+
+    /// The feature itself: one Exit, one Entry offering the same thing, two targets, two answers.
+    ///
+    /// Every other test here fixes the decision and varies the offer; this one fixes the offer and
+    /// varies the target, which is the only thing #8376 actually asks for.
+    #[test_log::test(tokio::test)]
+    async fn two_targets_on_one_exit_are_admitted_on_different_terms() -> anyhow::Result<()> {
+        let free_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:80".parse()?));
+        let paid_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.2:80".parse()?));
+
+        let free_for = free_target.clone();
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            Ok(if request.target == free_for {
+                SessionAdmissionDecision::default().with_enforce_pix(false)
+            } else {
+                SessionAdmissionDecision::default().with_enforce_pix(true)
+            })
+        });
+
+        // The node demands PIX; only the rule for `free_target` waives it.
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), true, Some(admission))?;
+
+        // Same Entry offer both times — no PIX at all.
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                target: free_target,
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+        assert_eq!(mgr.num_active_sessions(), 1, "the waived target must be served");
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                target: paid_target,
+                challenge: MIN_CHALLENGE + 1,
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+        assert_eq!(
+            mgr.num_active_sessions(),
+            1,
+            "the second target must be refused, leaving only the first session"
+        );
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(
+            err.identifier,
+            ErrorIdentifier::Challenge(MIN_CHALLENGE + 1),
+            "the refusal must name the second initiation, not the admitted first"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A queue with no reader is the third transient failure, beside the timeout and the dropped
+    /// reply. It is `Busy` for the same reason: nothing about the target was decided.
+    ///
+    /// Reachable only because every request goes through one shared sender — sending through a
+    /// fresh clone would hand each call its own guaranteed slot and the queue would never be full.
+    #[test_log::test(tokio::test)]
+    async fn a_full_admission_queue_refuses_the_session_as_busy() -> anyhow::Result<()> {
+        // No receiver task at all, so nothing is ever drained. `_rx` is held rather than dropped:
+        // a closed channel is a different failure from a full one.
+        let (admission, _rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(0);
+
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        // The first request takes the sender's guaranteed slot; the second finds the queue full.
+        for challenge in [MIN_CHALLENGE, MIN_CHALLENGE + 1] {
+            mgr.handle_incoming_session_initiation(
+                HoprPseudonym::random(),
+                StartInitiation {
+                    challenge,
+                    ..pix_offer()
+                },
+            )
+            .await?;
+        }
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::Busy);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// The empty-intersection case is a misconfiguration; this is the ordinary one. The narrowed
+    /// window is a real range that simply sits above what the Entry offered, and the refusal must
+    /// look the same.
+    #[test_log::test(tokio::test)]
+    async fn a_narrowed_window_that_excludes_the_offer_refuses_without_being_empty() -> anyhow::Result<()> {
+        let quota = small_params_quota();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            Ok(SessionAdmissionDecision::default().with_pix_quota_range(quota + 1..=2 * quota))
+        });
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=2 * quota, false, Some(admission))?;
+
+        // The intersection is `quota+1..=2*quota` — non-empty, and above the offer.
+        let effective = mgr
+            .cfg
+            .pix_config
+            .effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(quota + 1..=2 * quota));
+        assert!(!effective.quota_range.is_empty(), "this case must not be the empty one");
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// Narrowing does not only accept or reject — with dynamic batching it moves the batch the Exit
+    /// asks for, which is what the Entry pays per deposit round trip.
+    #[test]
+    fn a_narrowed_window_can_change_the_selected_batch_size() {
+        let cfg = IncomingSessionPixConfig {
+            quota_range: 100..=400,
+            supervision: SupervisorConfig {
+                ssas_per_request: 4,
+                allow_dynamic_ssa_batches: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // The node's own window accepts a single SSA of 100.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default())
+                .ssa_batch_size_for_quota(100),
+            Some(1)
+        );
+
+        // Narrowed to a floor of 250, the smallest batch that reaches it is three.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(250..=400))
+                .ssa_batch_size_for_quota(100),
+            Some(3)
+        );
+
+        // Narrowed to a window every multiple of the offer jumps over — three total 300 and four
+        // total 400, with nothing in between — so no batch fits and the Session is refused.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(310..=390))
+                .ssa_batch_size_for_quota(100),
+            None
+        );
+    }
+
+    /// Admission is an Exit-side question. An Entry establishing a Session decided its own target,
+    /// so putting it to the local session server would be asking a node to vet itself.
+    #[test_log::test(tokio::test)]
+    async fn an_outgoing_session_is_never_put_to_the_admission_hook() -> anyhow::Result<()> {
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_by_handler = asked.clone();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            asked_by_handler.fetch_add(1, Ordering::Relaxed);
+            Ok(SessionAdmissionDecision::default())
+        });
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(50),
+            ..Default::default()
+        });
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (sender, transport_handle) = mock_packet_planning(transport);
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None, Some(admission))?;
+
+        // No peer answers, so this times out — which is fine: the assertion is about what was asked
+        // before the attempt died, not about it succeeding.
+        let _ = mgr
+            .new_session(
+                (&hopr_api::types::crypto::keypairs::ChainKeypair::random()).into(),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: Some(HoprPseudonym::random()),
+                    capabilities: Capability::Segmentation.into(),
+                    surb_management: None,
+                    pix_ssa_quota: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert_eq!(
+            asked.load(Ordering::Relaxed),
+            0,
+            "an outgoing session must not consult the admission hook"
+        );
+
+        sender.close_channel();
+        transport_handle.await??;
+        handler.abort();
+        Ok(())
     }
 
     /// The issue's first case: a target served without payment on a node that otherwise demands it.
