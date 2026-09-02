@@ -12,8 +12,8 @@ use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
-    MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    ASSUMED_SESSION_PACKET_RATE, DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA,
+    DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -200,6 +200,7 @@ pub struct TransitLatencyConfig {
     derive(serde::Serialize, serde::Deserialize),
     serde(deny_unknown_fields)
 )]
+#[validate(schema(function = "validate_pix_supervision_pairing", skip_on_field_errors = false))]
 pub struct HoprProtocolConfig {
     /// Libp2p-related transport configuration
     #[validate(nested)]
@@ -264,31 +265,59 @@ pub struct HoprProtocolConfig {
     pub surb_flush_interval: Duration,
 }
 
-/// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything, or whose
-/// SSA batch size is outside what the protocol supports.
+/// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
+///
+/// The deadlines the Exit-side supervisor derives from `incoming_session_pix_config` have to agree
+/// with the reconstructor's lifetimes: a supervisor that waits longer than the reconstructor keeps
+/// state is waiting on an SSA that can no longer be completed.
+///
+/// It lives on [`HoprProtocolConfig`] rather than beside the other `incoming_session_pix_config`
+/// checks because the two halves are *siblings*, and a field validator sees only its own field. The
+/// reconstructor became operator-settable under `pix.reconstructor`, and validating the supervisor
+/// against `SsaReconstructorConfig::default()` from inside the sibling would then certify a pairing
+/// the node does not run — passing for every operator who changed `unused_verifier_lifetime` or
+/// `max_ack_await_time`, which are precisely the values this check is about. Reaching both is the
+/// whole point, so the check has to sit where both are in scope.
+///
+/// [`ssa_reconstructor`](crate::ssa_reconstructor) builds from the same field, so what is validated
+/// here is what the node installs.
+fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), ValidationError> {
+    hopr_transport_session::validate_pix_supervision(
+        &cfg.incoming_session_pix_config.supervisor_config(),
+        &cfg.pix.reconstructor.into(),
+    )
+    .map_err(|error| {
+        let mut e = ValidationError::new("pix supervision deadlines conflict with the reconstructor's lifetimes");
+        e.message = Some(error.to_string().into());
+        e
+    })
+}
+
+/// Rejects an [`IncomingSessionPixConfig`] that cannot work.
+///
+/// Three independent failures, all of which would otherwise only show up at runtime:
 ///
 /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
 /// `UnacceptablePixParams` errors at Session establishment time.
 ///
-/// `ssas_per_request` is checked here rather than with a `range` attribute because
-/// `IncomingSessionPixConfig` lives in `hopr-transport-session` and carries no `Validate` derive of
-/// its own. Zero would mean no `SsaRequest` is ever sent, and above [`MAX_SSA_BATCH_SIZE`] the
-/// per-cycle reconstructor state and the Start protocol channel pre-allocation both grow past what
-/// that ceiling exists to bound. `SessionManager::new` clamps rather than trusting this check, since
-/// nothing forces a programmatically built config through it.
+/// `max_recovery_time` has to cover a whole cycle at the widest dimensions this Exit will
+/// *accept*, or it closes honest Sessions partway through one. That check is possible at all only
+/// because the quota now counts the surplus: `quota_range.end()` is the number of bytes a cycle
+/// actually puts on the wire, so the packet count follows by division with nothing left to guess.
+/// While the surplus was unpriced this needed the peer's `additional_shares`, which never travelled.
+///
+/// And `max_live_cycle_bytes` has to admit at least one Session at those same widest dimensions,
+/// or the Exit advertises a `quota_range` whose top it will always refuse for want of budget —
+/// again as a Start error the operator cannot attribute. Deliberately *one* Session and not
+/// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
+/// number no node holds, so checking it here would only ever reject the shipping defaults.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
-    if cfg.quota_range.is_empty() {
-        return Err(ValidationError::new(
-            "pix quota_range must be non-empty (start must not exceed end)",
-        ));
-    }
-    if !(1..=MAX_SSA_BATCH_SIZE).contains(&cfg.ssas_per_request) {
-        return Err(ValidationError::new(
-            "pix ssas_per_request must be between 1 and MAX_SSA_BATCH_SIZE",
-        ));
-    }
-    Ok(())
+    hopr_transport_session::validate_incoming_session_pix_config(cfg, ASSUMED_SESSION_PACKET_RATE).map_err(|error| {
+        let mut e = ValidationError::new("invalid incoming PIX configuration");
+        e.message = Some(error.to_string().into());
+        e
+    })
 }
 
 /// Headroom over the profiled dimension product that [`PixGlobalConfig`] will accept.
@@ -301,7 +330,8 @@ const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
 ///
 /// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
 /// 16192 × 255 = 4 128 960 commitments, about 8× the profiled operating point of 8192 × 64 =
-/// 524 288 (≈49 MiB of peak reconstructor state and ≈1.25 s of commitment ingest per cycle). Nothing
+/// 524 288 (worst case ≈41 MiB of peak reconstructor state per cycle, per
+/// `hopr_protocol_pix::peak_cycle_bytes`, and ≈1.25 s of commitment ingest). Nothing
 /// downstream catches that: the product *is* the per-cycle quota, and the only guard on it is the
 /// peer Exit's `quota_range` rejection — which protects the Exit, and arrives after this node has
 /// already generated the cycle.
@@ -336,6 +366,7 @@ fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), Validatio
              redundancy than payload",
         ));
     }
+
     Ok(())
 }
 
@@ -1010,13 +1041,17 @@ pub struct SessionGlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use hopr_protocol_pix::SHARE_EMISSION_WINDOW;
+    use hopr_transport_session::{MAX_SSA_BATCH_SIZE, SupervisorConfig};
+
     use super::*;
 
     /// The Exit computes the offered quota as `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`
-    /// and rejects the Session when it falls outside `quota_range`. An Entry running the default
-    /// `PixGlobalConfig` must therefore always be acceptable to an Exit running the default
-    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and
-    /// before both structs became `serde(default)` there was no way for an operator to fix it.
+    /// and rejects the Session when neither that quota nor an allowed dynamic batch falls inside
+    /// `quota_range`. The default batch ceiling is one, so an Entry running the default
+    /// `PixGlobalConfig` must itself be acceptable to an Exit running the default
+    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and before
+    /// both structs became `serde(default)` there was no way for an operator to fix it.
     ///
     /// The surplus is in that product, so this also guards the alias that gives the two crates one
     /// default surplus: if `additional_shares` and `hopr-protocol-pix`'s own default drift apart
@@ -1058,6 +1093,62 @@ mod tests {
         HoprProtocolConfig::default()
             .validate()
             .expect("default HoprProtocolConfig must be valid");
+    }
+
+    /// At the end of each emission-window block, every polynomial emits all of its surplus shares
+    /// after it has already reached the reconstruction threshold.  None of those packets advances
+    /// `useful_shares`, so the funded service gate must admit that whole run plus the first useful
+    /// share of the next block.  Otherwise the gate parks the writer waiting for progress that only
+    /// the parked writer can create.
+    ///
+    /// **The gate no longer counts `useful_shares`.** It counts every share the cycle accepts, via
+    /// `SsaRecoveryProgress::shares_seen`, so the surplus run resets it exactly like the useful
+    /// shares around it and the inequality this test used to assert — ceiling above
+    /// `additional_shares × min(polys, window)` — constrains nothing. Sizing a static ceiling
+    /// against the run was never sound anyway: the run's length comes from the dimensions negotiated
+    /// per Session, and this value is fixed at config load.
+    ///
+    /// What is asserted instead is the shipping-default property the deferral path relies on: a
+    /// polynomial's whole emission fits one peer deferral bucket, so no acknowledgement for it can
+    /// ever be dropped for want of room. This is a *sufficient* condition for "never dropped", not a
+    /// requirement — the bucket only holds shares that arrive before the cycle's commitments
+    /// install, which is a prefix, so larger dimensions merely lose the guarantee rather than break.
+    /// That is why it is asserted on the defaults here and not enforced in `validate`, where it
+    /// would reject legitimate re-splits such as `4096 x 128`.
+    ///
+    /// The behavioural half of the original concern is pinned where it can actually be exercised:
+    /// `a_surplus_only_snapshot_is_liveness_without_payment` in the supervisor, which drives a
+    /// surplus-only run through the gate and the idle deadline.
+    #[test]
+    fn default_pix_emission_fits_one_deferral_bucket() {
+        let cfg = HoprProtocolConfig::default();
+
+        let emitted_per_poly = cfg.pix.ssa_part_size + cfg.pix.surplus_shares();
+        assert!(
+            emitted_per_poly <= hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+            "default emission of {emitted_per_poly} shares per polynomial should fit one deferral bucket ({}), so \
+             that no acknowledgement can be dropped for want of room",
+            hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL
+        );
+
+        // The ceiling still has to bound *something* — it is what stops an Entry consuming service
+        // while returning nothing at all — so a zero would disable the anti-drip rule outright.
+        assert!(
+            cfg.incoming_session_pix_config.supervision.max_served_without_progress > 0,
+            "the gate ceiling still bounds silence, and zero would disable it"
+        );
+
+        // The surplus run is quoted rather than bounded: it is what the block-structured emission
+        // produces, and the liveness counter is what absorbs it.
+        let surplus_run = cfg.pix.surplus_shares() as u64 * cfg.pix.num_ssa_parts.min(SHARE_EMISSION_WINDOW) as u64;
+        assert_eq!(
+            4096, surplus_run,
+            "the shipped dimensions produce a 4096-packet run of non-useful shares. This is a tripwire on the product \
+             of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` (which \
+             sets the surplus at a quarter of it), `PixGlobalConfig::num_ssa_parts`, or \
+             `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive the run, then re-check that nothing \
+             has started keying liveness on useful shares again"
+        );
     }
 
     /// The operator-facing mirror must round-trip to the protocol type it stands for.
@@ -1177,6 +1268,117 @@ mod tests {
         assert!(past_ceiling.validate().is_err(), "past the ceiling must be rejected");
     }
 
+    /// The hard recovery deadline must clear one whole cycle at the widest quota this Exit accepts.
+    ///
+    /// At the shipping defaults a cycle is 655 360 packets of full emission, about 61 minutes at the
+    /// documented 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped was 41
+    /// seconds short of the accepted quota and closed an honest, fully saturated Session just before
+    /// recovery, which is worth nothing since the SSA is the sum of every polynomial's constant term.
+    ///
+    /// Full emission is the right count *here* because it is what `quota_range` prices, which is
+    /// what the assertion below derives the requirement from. `SupervisorConfig::max_recovery_time`
+    /// documents the same deadline against 651 264 — where the last *useful* share lands — because
+    /// that argument is about when the cycle becomes payable rather than about what was sold.
+    #[test]
+    fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() {
+        let cfg = IncomingSessionPixConfig::default();
+        let packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+        let needed = Duration::from_secs(packets.div_ceil(ASSUMED_SESSION_PACKET_RATE));
+
+        assert!(
+            needed > Duration::from_secs(3600),
+            "the previous 1 h default must be demonstrably too short ({needed:?} needed), or this test proves nothing"
+        );
+        assert!(
+            cfg.supervision.max_recovery_time >= needed,
+            "default max_recovery_time ({:?}) must cover one cycle at the top of the accepted quota ({needed:?})",
+            cfg.supervision.max_recovery_time
+        );
+        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+    }
+
+    /// And an operator who shortens it, or widens the quota past it, must be told at load time.
+    #[test]
+    fn a_recovery_deadline_below_one_cycle_is_rejected() {
+        let too_short = IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                max_recovery_time: Duration::from_secs(3600),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&too_short).is_err(),
+            "an hour cannot cover the 61-minute accepted quota and must be refused"
+        );
+
+        // The other way round: the deadline is fine, the operator widened what they accept.
+        let widened = IncomingSessionPixConfig {
+            quota_range: 1..=(*IncomingSessionPixConfig::default().quota_range.end() * 4),
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&widened).is_err(),
+            "accepting 4x the default quota needs a deadline raised to match"
+        );
+    }
+
+    /// The live-cycle budget must admit at least one Session at the widest quota this Exit accepts.
+    ///
+    /// Otherwise the Exit advertises a `quota_range` whose top it will always refuse for want of
+    /// memory, and the peer sees only a `NoSlotsAvailable` it cannot attribute to a dimension it
+    /// chose. Deliberately *one* Session: the whole reason this budget exists is that the product
+    /// with `maximum_managed_sessions` is a number no node holds, so checking that product here
+    /// would only ever reject the shipping defaults.
+    #[test]
+    fn a_live_cycle_budget_too_small_for_the_accepted_quota_is_rejected() {
+        let cfg = IncomingSessionPixConfig::default();
+        let widest = hopr_transport_session::max_cycle_budget_for_quota(
+            *cfg.quota_range.end(),
+            cfg.supervision.ssas_per_request,
+        );
+
+        assert!(
+            cfg.max_live_cycle_bytes >= widest,
+            "the shipping default budget ({}) must admit one session at the top of its own quota range ({widest})",
+            cfg.max_live_cycle_bytes
+        );
+        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+
+        let starved = IncomingSessionPixConfig {
+            max_live_cycle_bytes: widest - 1,
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&starved).is_err(),
+            "a budget one byte short of a single session must be refused"
+        );
+
+        // The other way round: the operator asked for more cycles per request. This rather than a
+        // widened `quota_range`, because widening the quota does *not* scale the reservation without
+        // limit — `MAX_POLYS_PER_SSA` caps the polynomial count, so past a point a larger quota only
+        // buys a bigger threshold. The batch size has no such ceiling below `MAX_SSA_BATCH_SIZE`,
+        // and it multiplies the whole figure.
+        //
+        // Measured against the single-cycle figure rather than the shipping default, because the
+        // multiplication is the invariant and whether 3 GiB happens to be exceeded is not: at
+        // `MAX_SSA_BATCH_SIZE` the default budget covers the whole legal range, so a batched config
+        // left on the default would validate and prove nothing.
+        let batched = IncomingSessionPixConfig {
+            max_live_cycle_bytes: widest,
+            supervision: SupervisorConfig {
+                ssas_per_request: hopr_transport_session::MAX_SSA_BATCH_SIZE,
+                ..cfg.supervision.clone()
+            },
+            ..cfg.clone()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&batched).is_err(),
+            "a batch of {} live cycles per session needs a budget raised past the {widest} one cycle needs",
+            hopr_transport_session::MAX_SSA_BATCH_SIZE
+        );
+    }
+
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an
     // inverted range is reachable from a config file and must be rejected by validation rather
     // than silently matching nothing.
@@ -1202,11 +1404,16 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn pix_configs_are_reachable_from_serialized_config() {
-        // Regression guard: these two fields used to be `serde(skip)`, which pinned them to
-        // their defaults and made PIX unconfigurable.
+        // Regression guard: these fields used to be `serde(skip)`, which pinned them to their
+        // defaults and made PIX unconfigurable. The supervision block is checked here too, since
+        // `deny_unknown_fields` on both levels means a rename on either side fails this loudly
+        // rather than silently ignoring an operator's setting.
         let json = r#"{
             "pix": { "num_ssa_parts": 2048 },
-            "incoming_session_pix_config": { "enforce_pix": true, "max_deposit_wait": "90s" }
+            "incoming_session_pix_config": {
+                "enforce_pix": true,
+                "supervision": { "max_deposit_wait": "90s" }
+            }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
 
@@ -1220,29 +1427,52 @@ mod tests {
         assert!(cfg.incoming_session_pix_config.enforce_pix);
         assert_eq!(
             Duration::from_secs(90),
-            cfg.incoming_session_pix_config.max_deposit_wait
+            cfg.incoming_session_pix_config.supervision.max_deposit_wait
+        );
+        assert_eq!(
+            hopr_transport_session::SupervisorConfig::default().max_recovery_time,
+            cfg.incoming_session_pix_config.supervision.max_recovery_time,
+            "unspecified supervision fields must fall back to their defaults"
+        );
+        assert!(
+            cfg.incoming_session_pix_config.supervision.allow_dynamic_ssa_batches,
+            "omitting allow_dynamic_ssa_batches must retain its true default"
         );
         assert_eq!(
             IncomingSessionPixConfig::default().quota_range,
             cfg.incoming_session_pix_config.quota_range
         );
 
-        // Both SSA batch knobs must be settable from a config file too, since raising one without the
-        // other is a silently fatal misconfiguration and an operator needs to be able to do both.
+        // Both SSA batch knobs and the fixed-mode opt-out must be settable from a config file too.
+        // Raising the Exit's ceiling past the Entry's is a silently fatal misconfiguration, and an
+        // operator who needs the old exact-batch policy must be able to select it explicitly.
         let json = r#"{
             "pix": { "max_ssas_per_request": 5 },
-            "incoming_session_pix_config": { "ssas_per_request": 5 }
+            "incoming_session_pix_config": {
+                "supervision": {
+                    "ssas_per_request": 5,
+                    "allow_dynamic_ssa_batches": false
+                }
+            }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("SSA batch config must deserialize");
         assert_eq!(5, cfg.pix.max_ssas_per_request);
-        assert_eq!(5, cfg.incoming_session_pix_config.ssas_per_request);
+        assert_eq!(5, cfg.incoming_session_pix_config.supervision.ssas_per_request);
+        assert!(!cfg.incoming_session_pix_config.supervision.allow_dynamic_ssa_batches);
         cfg.validate().expect("a matched pair of batch knobs must validate");
 
         // Same defect one struct down: every Exit-side reconstructor dial used to be unreachable
         // because both production constructors took `SsaReconstructorConfig::default()`. The
         // durations must come through `humantime_serde` rather than as a struct of secs/nanos.
+        //
+        // `tombstone_retention_window` is raised in the same document because it has to be: the
+        // supervisor must outlive the reconstructor's ack window, and 45 s of ack window against the
+        // default 30 s tombstone is the conflict `validate_pix_supervision_pairing` exists to
+        // reject. Setting one without the other is what an operator must not be able to do quietly,
+        // so this doubles as the round trip proving both halves are reachable from one file.
         let json = r#"{
-            "pix": { "reconstructor": { "max_ack_await_time": "45s", "max_tracked_peers": 500 } }
+            "pix": { "reconstructor": { "max_ack_await_time": "45s", "max_tracked_peers": 500 } },
+            "incoming_session_pix_config": { "supervision": { "tombstone_retention_window": "60s" } }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("reconstructor config must deserialize");
         assert_eq!(Duration::from_secs(45), cfg.pix.reconstructor.max_ack_await_time);
@@ -1253,6 +1483,16 @@ mod tests {
             "unspecified reconstructor fields must fall back to their defaults"
         );
         cfg.validate().expect("a narrowed reconstructor must validate");
+
+        // And the pairing is enforced, not merely satisfiable: the same reconstructor without the
+        // matching supervision key is rejected.
+        let unpaired = r#"{ "pix": { "reconstructor": { "max_ack_await_time": "45s" } } }"#;
+        let unpaired: HoprProtocolConfig = serde_json::from_str(unpaired).expect("must deserialize");
+        assert!(
+            unpaired.validate().is_err(),
+            "a 45 s ack window against the default 30 s tombstone must be rejected, not silently accepted against the \
+             reconstructor defaults the node no longer uses"
+        );
 
         // And it must reach the reconstructor, not merely parse: the conversion is what the two
         // production constructors consume.
@@ -1419,36 +1659,110 @@ mod tests {
             "an Entry accepting zero SSAs per request would reject every request"
         );
 
-        for ssas_per_request in [0, MAX_SSA_BATCH_SIZE + 1] {
-            let cfg = IncomingSessionPixConfig {
-                ssas_per_request,
+        // The Exit-side knob now lives on `SupervisorConfig`, so it is `validate_pix_supervision`
+        // that has to reject an out-of-range batch — reached through `HoprProtocolConfig`'s schema
+        // validator rather than the incoming-config one, because the pairing needs the sibling
+        // `pix.reconstructor` field that only the parent can see.
+        // The budget is raised with the batch size, because the two are coupled: a batch of `n`
+        // holds `n` live reconstructor cycles, and `validate_incoming_session_pix_config` refuses a
+        // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
+        // 2 GiB here would make every case below fail on memory rather than on the batch range this
+        // test is about.
+        let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
+            incoming_session_pix_config: IncomingSessionPixConfig {
+                max_live_cycle_bytes: u64::MAX,
+                supervision,
                 ..Default::default()
-            };
-            assert!(
-                validate_incoming_session_pix_config(&cfg).is_err(),
-                "ssas_per_request of {ssas_per_request} is outside 1..={MAX_SSA_BATCH_SIZE} and must be rejected"
-            );
+            },
+            ..Default::default()
+        };
 
-            let cfg = HoprProtocolConfig {
-                incoming_session_pix_config: IncomingSessionPixConfig {
+        for ssas_per_request in [0, MAX_SSA_BATCH_SIZE + 1] {
+            assert!(
+                with_supervision(SupervisorConfig {
                     ssas_per_request,
                     ..Default::default()
-                },
-                ..Default::default()
-            };
-            assert!(
-                cfg.validate().is_err(),
-                "an out-of-range ssas_per_request must fail the whole protocol config"
+                })
+                .validate()
+                .is_err(),
+                "ssas_per_request of {ssas_per_request} is outside 1..={MAX_SSA_BATCH_SIZE} and must be rejected"
             );
         }
 
         assert!(
-            validate_incoming_session_pix_config(&IncomingSessionPixConfig {
+            with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
                 ..Default::default()
             })
+            .validate()
             .is_ok(),
             "the ceiling itself must be accepted"
+        );
+
+        // The scaled deadlines are what the supervisor actually arms, so the 24 h cap has to be
+        // applied to the product. A per-cycle duration that is fine alone must be rejected once the
+        // batch multiplies it past the cap.
+        //
+        // Derived from the ceiling rather than written out, so this keeps testing the multiplication
+        // if `MAX_SSA_BATCH_SIZE` moves again: just over `cap / n` is legal on its own at any `n`,
+        // and always over the cap once `n` of them are chained.
+        const SUPERVISOR_DURATION_CAP: Duration = Duration::from_secs(24 * 3600);
+        let per_cycle = SUPERVISOR_DURATION_CAP / MAX_SSA_BATCH_SIZE as u32 + Duration::from_secs(1);
+        assert!(
+            with_supervision(SupervisorConfig {
+                ssas_per_request: MAX_SSA_BATCH_SIZE,
+                max_deposit_wait: per_cycle,
+                ..Default::default()
+            })
+            .validate()
+            .is_err(),
+            "{MAX_SSA_BATCH_SIZE} x {per_cycle:?} of deposit wait exceeds the supervisor duration cap and must be \
+             rejected"
+        );
+    }
+
+    /// The supervisor must be validated against the reconstructor this node will actually build.
+    ///
+    /// The pairing check used to read `SsaReconstructorConfig::default()` from inside a validator
+    /// that could see only `incoming_session_pix_config`. Once `pix.reconstructor` became
+    /// operator-settable that made the check certify a pairing the node does not run: the two halves
+    /// are siblings, and the one doing the checking could not see the other.
+    ///
+    /// `max_recovery_idle` must not exceed the reconstructor's `unused_verifier_lifetime` — a
+    /// supervisor waiting past the point where reconstructor state is dropped is waiting on a cycle
+    /// that can no longer complete. Shortening the *reconstructor* is therefore enough to invalidate
+    /// a supervisor that was valid at the defaults, and that is exactly what a validator reading the
+    /// default cannot notice.
+    #[test]
+    fn supervision_is_validated_against_the_configured_reconstructor_not_the_default() {
+        let shortened = HoprProtocolConfig {
+            pix: PixGlobalConfig {
+                reconstructor: PixReconstructorConfig {
+                    unused_verifier_lifetime: Duration::from_secs(30),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert!(
+            shortened.pix.validate().is_ok(),
+            "the shortened lifetime is valid on its own — the conflict is with its sibling"
+        );
+        assert!(
+            validate_incoming_session_pix_config(&shortened.incoming_session_pix_config).is_ok(),
+            "and the supervisor is valid on its own too, which is why neither field validator catches this"
+        );
+        assert!(
+            shortened.validate().is_err(),
+            "a 30 s verifier lifetime cannot support the default 60 s max_recovery_idle, and only the parent-level \
+             check can see both"
+        );
+
+        assert!(
+            HoprProtocolConfig::default().validate().is_ok(),
+            "the shipping defaults must still pair"
         );
     }
 

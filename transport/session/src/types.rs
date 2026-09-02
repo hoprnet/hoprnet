@@ -20,7 +20,7 @@ use hopr_crypto_packet::{
     prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
-use hopr_protocol_pix::{PixParams, PixSpec, SsaId};
+use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -199,9 +199,10 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
 /// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
 /// Both must be derived from it so the two cannot drift apart: the Exit computes the
-/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if it falls
-/// outside its configured range, so a hard-coded range that no longer matches the
-/// dimension defaults makes every PIX Session fail to establish.
+/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if neither
+/// it nor an allowed dynamic batch brings the total inside the configured range. At the default
+/// batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
+/// every PIX Session fail to establish.
 ///
 /// ## Choosing the split
 ///
@@ -351,7 +352,21 @@ pub enum HoprSessionInPixEvent {
     /// for an SSA — the next SSA request can be made.
     SsaAlmostRecovered(SsaId<HoprPseudonym>),
     /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
-    UnverifiableShare(SsaId<HoprPseudonym>),
+    ///
+    /// Carries the reconstructor's running total for the SSA rather than a delta: shares for one
+    /// cycle reach the Exit over whichever return path is available, so no single relayer's count is
+    /// the whole story, and an absolute total makes a duplicated or reordered report harmless.
+    UnverifiableShares {
+        ssa_id: SsaId<HoprPseudonym>,
+        observed_total: u64,
+    },
+    /// Reports how far an SSA has got towards recovery.
+    ///
+    /// Unlike the others this is paced by traffic rather than by lifecycle transitions, and it is
+    /// what keeps a funded Session's egress flowing — the gate stops serving a cycle that shows no
+    /// progress. Delivered without backpressure for that reason; see
+    /// `SessionPixSupervisorHandle::try_send_progress`.
+    RecoveryProgress(SsaRecoveryProgress<HoprPseudonym>),
 }
 
 impl HoprSessionInPixEvent {
@@ -360,7 +375,8 @@ impl HoprSessionInPixEvent {
         match self {
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
-            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShares { ssa_id, .. } => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::RecoveryProgress(progress) => progress.ssa_id.pseudonym(),
         }
     }
 }
@@ -409,6 +425,14 @@ pub enum ClosureReason {
     /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
     /// the outside — a PIX Session that stopped — and point at opposite nodes.
     MissingDepositData,
+    /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
+    /// verification, or the supervisor itself became unavailable.
+    ///
+    /// Distinct from [`UnrealizedDeposit`](Self::UnrealizedDeposit) and
+    /// [`MissingDepositData`](Self::MissingDepositData), which name the two PIX failures an operator
+    /// can act on directly; the rest are collapsed here and distinguished in telemetry by the
+    /// supervisor's own close reason.
+    PixFailure,
 }
 
 /// Helper trait to allow Box aliasing
@@ -1026,7 +1050,24 @@ mod tests {
             ClosureReason::Eviction,
             ClosureReason::UnrealizedDeposit,
             ClosureReason::MissingDepositData,
+            ClosureReason::PixFailure,
         ];
+
+        // The array above is hand-maintained, and a snapshot that silently stops covering a variant
+        // is worse than no snapshot: it reads as a guarantee it no longer gives. `PixFailure` was
+        // missing for exactly that reason. This match is exhaustive and wildcard-free, so adding a
+        // variant to `ClosureReason` fails to compile *here*, which is where the array is.
+        for reason in reasons {
+            match reason {
+                ClosureReason::WriteClosed
+                | ClosureReason::EmptyRead
+                | ClosureReason::Eviction
+                | ClosureReason::UnrealizedDeposit
+                | ClosureReason::MissingDepositData
+                | ClosureReason::PixFailure => {}
+            }
+        }
+
         insta::assert_debug_snapshot!(reasons);
     }
 

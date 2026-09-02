@@ -329,6 +329,18 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
+        // Validated at the constructor boundary, because this is the boundary. The shared node
+        // builder does validate before all four of its build methods reach here, but this function is
+        // `pub`, and a direct caller then skips every relational check on the way in — including
+        // `validate_pix_supervision_pairing`, which is a schema-level validator on
+        // `HoprProtocolConfig` and so is not reached by validating any single field.
+        //
+        // `run_inner` validates `self.cfg.pix` alone, which is the narrower of the two: it cannot see
+        // the supervisor-against-reconstructor pairing, and it runs at Session establishment rather
+        // than at construction — long after a caller could have been told.
+        validator::Validate::validate(&cfg)
+            .map_err(|error| HoprTransportError::Api(format!("invalid protocol configuration: {error}")))?;
+
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(
@@ -1402,10 +1414,9 @@ pub(crate) fn recovered_ssa_to_pix_event(
 
 /// How many PIX share resolutions may be dispatched into the [`SessionManager`] at once.
 ///
-/// A dispatch is not cheap: `SsaAlmostRecovered` / `SsaRecovered` reach `request_next_ssa`, which
-/// acquires a per-session lock (with a 30 s timeout), generates an Exit commitment on the blocking
-/// pool and sends an `SsaRequest` over the network. All sessions share this one stream, so
-/// dispatching sequentially lets a single slow or stalled session hold up PIX progress — and
+/// A dispatch can block: lifecycle events are delivered to a per-session supervisor over a bounded
+/// channel, so a session whose supervisor is busy backpressures its sender. All sessions share this
+/// one stream, so dispatching sequentially would let one such session hold up PIX progress — and
 /// therefore the pipelined next-SSA request — for every other session on the node.
 const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
 
@@ -1484,27 +1495,31 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
             if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
             None
         }
-        // Nothing consumes recovery progress yet — the Exit-side PIX supervisor is what will, and it
-        // is the only thing that can act on a running total. Dropped here rather than suppressed at
-        // the reconstructor so that the emission contract (and its tests) live with the producer.
-        //
-        // Cheap to discard: this branch awaits nothing, so the resolution channel is drained faster
-        // than the acknowledgement path can fill it.
+        // Feeds the supervisor's recovery deadlines and the egress gate's progress ceiling. A funded
+        // Session that stops making progress stops being served, so dropping these outright would
+        // stall a healthy Session rather than merely lose a statistic.
         ShareResolution::Progress(progress) => {
             tracing::trace!(
                 ssa_id = %progress.ssa_id,
                 useful_shares = progress.useful_shares,
+                shares_seen = progress.shares_seen,
                 target = progress.target_useful_shares,
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
             );
+            if let Err(error) = smgr
+                .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))
+                .await
+            {
+                tracing::trace!(%error, ssa_id = %progress.ssa_id, "recovery progress for an unsupervised session");
+            }
             None
         }
     }
@@ -1527,6 +1542,36 @@ fn ssa_reconstructor(cfg: &PixGlobalConfig) -> errors::Result<Arc<hopr_protocol_
     hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::try_new(cfg.reconstructor.into())
         .map(Arc::new)
         .map_err(|error| HoprTransportError::Api(format!("invalid SSA reconstructor configuration: {error}")))
+}
+
+/// Turns the reconstructor's synchronous resolution wake-up into an asynchronous stream.
+///
+/// The one-slot channel carries only wake-ups, never resolutions. A full channel therefore means a
+/// wake-up is already pending and can be safely coalesced; the resolutions themselves remain in the
+/// reconstructor until this stream or the acknowledgement fallback atomically takes them.
+fn commitment_resolution_stream(
+    ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
+) -> impl futures::Stream<Item = HoprShareResolution> + Send + 'static {
+    let (ready_tx, ready_rx) = bounded_sink_channel::<()>(1);
+    let registered = ssa_reconstructor.set_ready_resolution_notifier(move || match ready_tx.try_send(()) {
+        Ok(()) | Err(crossfire::TrySendError::Full(())) => {}
+        Err(crossfire::TrySendError::Disconnected(())) => {
+            tracing::error!("PIX commitment-resolution notification stream is disconnected");
+        }
+    });
+    if !registered {
+        tracing::error!("PIX reconstructor already has a commitment-resolution notification stream");
+    }
+
+    let ssa_reconstructor = Arc::downgrade(&ssa_reconstructor);
+    ready_rx.flat_map(move |_| {
+        futures::stream::iter(
+            ssa_reconstructor
+                .upgrade()
+                .map(|reconstructor| reconstructor.take_ready_resolutions())
+                .unwrap_or_default(),
+        )
+    })
 }
 
 /// Wires the Exit-side PIX machinery: [`PixToolbox`], the recovered-share channel and the
@@ -1572,14 +1617,19 @@ where
     PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
     PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
 {
+    let commitment_resolutions = commitment_resolution_stream(ssa_reconstructor.clone());
     let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator, ssa_reconstructor.clone());
     let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
     processes.insert(
         HoprTransportProcess::PixEvents,
         hopr_utils::spawn_as_abortable!(
-            pix_event_stream(session_pix_events, ssa_share_resolution_events_rx, smgr)
-                .map(Ok)
-                .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
+            pix_event_stream(
+                session_pix_events,
+                ssa_share_resolution_events_rx.merge(commitment_resolutions),
+                smgr,
+            )
+            .map(Ok)
+            .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
         ),
     );
 
@@ -1595,10 +1645,11 @@ where
 /// the packet pipeline. Share resolutions are dispatched into the `SessionManager` concurrently
 /// (see [`PIX_EVENT_DISPATCH_CONCURRENCY`]).
 ///
-/// Concurrency does not require ordering guarantees here: `request_next_ssa` serializes on a
-/// per-session lock and re-checks the SSA index under it, so of the events belonging to one cycle
-/// exactly one advances the index and the rest are recognised as stale and become no-ops,
-/// regardless of the order in which they arrive.
+/// Concurrency does not require ordering guarantees here: events for one session converge on that
+/// session's supervisor, which is a single-threaded state machine whose handlers are idempotent per
+/// phase and whose counters are absolute rather than incremental. Of the events belonging to one
+/// cycle exactly one advances it and the rest are recognised as stale, whatever order they arrive
+/// in.
 fn pix_event_stream(
     session_pix_events: impl futures::Stream<Item = HoprSessionOutPixEvent> + Send + 'static,
     ssa_share_resolutions: impl futures::Stream<Item = HoprShareResolution> + Send + 'static,
@@ -1703,6 +1754,9 @@ pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::
 
 #[cfg(test)]
 mod pix_recovery_event_tests {
+    use std::{sync::Arc, time::Duration};
+
+    use futures::StreamExt;
     use hopr_api::{
         node::{PixAddressId, PixEvent},
         types::{
@@ -1716,35 +1770,42 @@ mod pix_recovery_event_tests {
     };
     use hopr_crypto_packet::HoprPixSpec;
     use hopr_protocol_pix::{
-        EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, SsaGeneratorConfig, SsaId, SsaIndex,
-        SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+        EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaGeneratorConfig, SsaId,
+        SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
     };
 
-    use super::recovered_ssa_to_pix_event;
+    use super::{commitment_resolution_stream, recovered_ssa_to_pix_event};
 
-    #[test]
-    fn recovered_ssa_maps_to_private_key_event_with_correct_secret_and_id() -> anyhow::Result<()> {
+    /// A commitment that redeems the final deferred acknowledgement must deliver the recovered key
+    /// without waiting for another acknowledgement batch that may never arrive.
+    #[test_log::test(tokio::test)]
+    async fn commitment_recovery_reaches_the_private_key_event_without_a_later_ack() -> anyhow::Result<()> {
         let cfg = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
         };
         let generator = SsaShareGenerator::<HoprPixSpec>::new(cfg);
-        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {
+        let reconstructor = Arc::new(SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {
             early_recovery_threshold: 1.0,
             ..Default::default()
-        });
+        }));
+        let mut commitment_resolutions = Box::pin(commitment_resolution_stream(reconstructor.clone()));
 
         let pseudonym = SimplePseudonym::random();
         let peer = OffchainKeypair::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let client = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-        let server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let server_commitment = reconstructor.new_exit_commitment(
+            ssa_id,
+            hopr_protocol_pix::PixParams::try_new_for::<HoprPixSpec>(2, 2, 0)?,
+        )?;
         let expected_addr = HoprPixSpec::group_to_deposit_address(client.ssa_commitment + server_commitment)
             .ok_or_else(|| anyhow::anyhow!("deposit address"))?;
-        client.process_into_reconstructor(&reconstructor)?;
 
+        // Every share and acknowledgement arrives before the client commitment, so all of them
+        // defer waiting for their verifier and this acknowledgement call returns no resolution.
         let mut acks = Vec::new();
         while let Some((msg, share)) = {
             let msg = random_bytes::<20>();
@@ -1760,11 +1821,32 @@ mod pix_recovery_event_tests {
             acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
         }
 
-        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
-        let rec = resolutions
-            .into_iter()
-            .find_map(|r| r.try_as_recovered_ssa())
+        assert!(
+            reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty(),
+            "acknowledgements must remain deferred until the commitment installs their verifiers"
+        );
+
+        // This is the final input. In particular, there is no acknowledge_shares call below to
+        // pull a parked resolution out of the reconstructor.
+        client.process_into_reconstructor(reconstructor.as_ref())?;
+
+        let progress = tokio::time::timeout(Duration::from_secs(1), commitment_resolutions.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("timed out waiting for commitment-side recovery progress"))?
+            .ok_or_else(|| anyhow::anyhow!("commitment resolution stream ended before reporting progress"))?;
+        assert!(matches!(progress, ShareResolution::Progress(_)));
+
+        let recovered = tokio::time::timeout(Duration::from_secs(1), commitment_resolutions.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("timed out waiting for commitment-side SSA recovery"))?
+            .ok_or_else(|| anyhow::anyhow!("commitment resolution stream ended before SSA recovery"))?;
+        let rec = recovered
+            .try_as_recovered_ssa()
             .ok_or_else(|| anyhow::anyhow!("expected a RecoveredSsa resolution"))?;
+
+        // The wake-up is coalesced and the buffer is atomically taken, so the same recovery cannot
+        // be emitted a second time.
+        assert!(futures::poll!(commitment_resolutions.next()).is_pending());
 
         assert_eq!(<HoprPixSpec as PixSpec>::DepositAddress::from(&rec.ssa), expected_addr);
 

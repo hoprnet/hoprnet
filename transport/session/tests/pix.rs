@@ -25,22 +25,36 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
-    SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    SessionManager, SessionManagerConfig, SessionTarget, SupervisorConfig, SurbBalancerConfig,
     testing::{answering_deposit_pool, mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 use tokio::time as tokio_time;
 
+/// What one SSA cycle at these dimensions costs, mirroring the Exit's own accounting:
+/// `polys × (threshold + surplus) × PAYLOAD_SIZE`.
+///
+/// Derived per test rather than pinned to a round number, because `quota_range` has to satisfy two
+/// bounds at once and a literal only ever satisfies one on purpose: wide enough to accept what the
+/// Entry offers, and narrow enough that `SessionManager::start`'s cross-field check can still cover
+/// one cycle at its top inside `max_recovery_time`. A range derived from the dimensions the test
+/// actually runs is inside both by construction.
+fn cycle_quota(params: &PixParams) -> u64 {
+    params.polys_per_ssa() as u64
+        * params.emitted_shares_per_poly() as u64
+        * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64
+}
+
 /// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
 ///
-/// Unlike the vanilla lifecycle test, Bob is configured with a generous PIX quota and both peers
+/// Unlike the vanilla lifecycle test, Bob is configured to accept Alice's PIX quota and both peers
 /// are given a `PixToolbox` so that the SSA (Secret Sharing Agreement) handshake runs as part of
 /// session establishment.
 ///
 /// ## Steps
-/// 1. Alice's manager has no PIX config (initiator, no quota enforcement). Bob's manager accepts quotas up to 2 GiB via
-///    `IncomingSessionPixConfig`.
+/// 1. Alice's manager has no PIX config (initiator, no quota enforcement). Bob's manager accepts quotas up to exactly
+///    what Alice's dimensions cost, via `IncomingSessionPixConfig`.
 /// 2. Both managers receive a `PixToolbox` seeded with a `SsaShareGenerator` and `SsaReconstructor`.
 /// 3. Alice calls `new_session` with `Capability::UsePIX` and a quota of `(64, 64)`. The mock intercepts the outbound
 ///    messages in sequence:
@@ -59,20 +73,20 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
-    let alice_mgr = SessionManager::new(Default::default());
-    let bob_mgr = SessionManager::new(SessionManagerConfig {
-        pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
     let ssa_gen_config = SsaGeneratorConfig {
         polynomials_per_ssa: 64,
         threshold: 64,
         surplus_shares: 16,
     };
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
     // One commitment per polynomial — the constant term — chunked into packet-sized messages.
     // Every message carries the proof of knowledge, so the per-message budget loses its size.
@@ -386,7 +400,10 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 
     let unknown_pseudonym = HoprPseudonym::random();
     let ssa_id = SsaId::new(unknown_pseudonym, SsaIndex::new(1).expect("ssa index must be non-zero"));
-    let event = HoprSessionInPixEvent::UnverifiableShare(ssa_id);
+    let event = HoprSessionInPixEvent::UnverifiableShares {
+        ssa_id,
+        observed_total: 1,
+    };
 
     let result = mgr.dispatch_pix_event(event).await;
     assert!(result.is_err());
@@ -423,13 +440,9 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let alice_mgr = SessionManager::new(Default::default());
-    let bob_mgr = SessionManager::new(SessionManagerConfig {
-        pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
+    // Bob's `pix_config` is left at its default: nothing here offers PIX, so a widened `quota_range`
+    // would only be a claim about a path this test never takes.
+    let bob_mgr = SessionManager::new(Default::default());
 
     let mut alice_transport = MockMsgSender::new();
     let mut bob_transport = MockMsgSender::new();
@@ -524,8 +537,8 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
 /// per cycle.
 ///
 /// ## Steps
-/// 1. Bob (Exit) is configured with `ssas_per_request: 3`; Alice (Entry) with a matching `max_ssas_per_ssa_request: 3`,
-///    without which the request would be rejected wholesale.
+/// 1. Bob (Exit) accepts only three times the Entry's per-SSA quota and allows a dynamic batch up to 3; Alice (Entry)
+///    has a matching `max_ssas_per_ssa_request: 3`, without which the derived request would be rejected wholesale.
 /// 2. Both transports relay every Start protocol message to the peer manager, counting how many of them are
 ///    `SsaRequest`s.
 /// 3. Exactly one `SsaRequest` goes out — the batch is one message, not three.
@@ -547,6 +560,9 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         threshold: 2,
         surplus_shares: 2,
     };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+    let quota_per_ssa = cycle_quota(&params);
+    let accepted_batch_quota = quota_per_ssa * BATCH as u64;
 
     let alice_mgr = SessionManager::new(SessionManagerConfig {
         max_ssas_per_ssa_request: BATCH,
@@ -554,8 +570,11 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ssas_per_request: BATCH,
+            quota_range: accepted_batch_quota..=accepted_batch_quota,
+            supervision: SupervisorConfig {
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -710,14 +729,22 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         "the whole batch must travel in a single SsaRequest"
     );
 
-    // Contiguous indices starting at 1, and the two sides agree on every cycle.
+    // The Entry publishes a batch in index order, and that *is* pinned: it is the same ordering the
+    // emission window depends on, and the Entry alone decides it.
     let entry_indices: Vec<_> = entry_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
-    let exit_indices: Vec<_> = exit_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
     assert_eq!(
         entry_indices,
         (1..=BATCH as u32).collect::<Vec<_>>(),
-        "the batch must cover contiguous SSA indices"
+        "the batch must cover contiguous SSA indices, in order"
     );
+
+    // The Exit's ordering is *not* pinned, and must not be. `SsaCommit` messages are processed under
+    // `for_each_concurrent`, so a batch arriving as one burst can finish its cycles in any order —
+    // nothing downstream cares, since every consumer keys by `ssa_id` rather than by arrival
+    // position. It looked ordered only while the Entry generated and sent one cycle at a time, which
+    // paced the burst; making the batch atomic removed that incidental pacing.
+    let mut exit_indices: Vec<_> = exit_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
+    exit_indices.sort_unstable();
     assert_eq!(
         entry_indices, exit_indices,
         "Entry and Exit must agree on which SSAs the batch covered"
@@ -739,15 +766,22 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         );
     }
 
-    // Distinct deposit addresses: each entry of the batch is its own cycle, hence its own deposit.
+    // So the two sides are matched by index, not by position. Distinct deposit addresses too: each
+    // entry of the batch is its own cycle, hence its own deposit.
     for (i, entry) in entry_cycles.iter().enumerate() {
+        let exit = exit_cycles
+            .iter()
+            .find(|e| e.ssa_id == entry.ssa_id)
+            .unwrap_or_else(|| panic!("the Exit must have a cycle for {}", entry.ssa_id));
         assert_eq!(
-            entry.deposit_address, exit_cycles[i].deposit_address,
-            "Entry and Exit must derive the same deposit address for cycle {i}"
+            entry.deposit_address, exit.deposit_address,
+            "Entry and Exit must derive the same deposit address for {}",
+            entry.ssa_id
         );
         assert_eq!(
-            entry.quota_per_ssa, exit_cycles[i].quota_per_ssa,
-            "Entry and Exit must agree on the quota for cycle {i}"
+            entry.quota_per_ssa, exit.quota_per_ssa,
+            "Entry and Exit must agree on the quota for {}",
+            entry.ssa_id
         );
         for (j, other) in entry_cycles.iter().enumerate().skip(i + 1) {
             assert_ne!(
@@ -780,7 +814,8 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// and then blame the deposit.
 ///
 /// ## Steps
-/// 1. Bob (Exit) batches 3 SSAs per request; Alice (Entry) accepts at most 1, so the very first request is refused.
+/// 1. Bob (Exit) derives a batch of 3 SSAs from its accepted quota range; Alice (Entry) accepts at most 1, so the very
+///    first request is refused.
 /// 2. Both transports relay Start protocol messages to the peer manager, counting `SessionError`s.
 /// 3. Alice sends exactly one `SessionError` and drops her half of the Session.
 /// 4. Bob's `handle_session_error` closes his half too. The 2 s bound is the whole point: Bob's kill-switch window is
@@ -797,6 +832,9 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
         threshold: 2,
         surplus_shares: 2,
     };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+    let quota_per_ssa = cycle_quota(&params);
+    let accepted_batch_quota = 3 * quota_per_ssa;
 
     // Alice accepts 1, Bob asks for 3 — the mismatch this test is about.
     let alice_mgr = SessionManager::new(SessionManagerConfig {
@@ -805,10 +843,14 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     });
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
-            quota_range: 0..=2048 * 1024 * 1024,
-            ssas_per_request: 3,
-            // Left at the defaults (60 s + 20 s), so the kill-switch window is 3 × 80 s = 240 s and
-            // cannot be what closes the Session inside the assertions below.
+            quota_range: accepted_batch_quota..=accepted_batch_quota,
+            supervision: SupervisorConfig {
+                ssas_per_request: 3,
+                // Deadlines left at their defaults, so the scaled commitment window is 3 × 20 s and the
+                // scaled deposit window 3 × 60 s — neither can be what closes the Session inside the
+                // assertions below.
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
