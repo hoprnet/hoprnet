@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use common::TestSpec;
 use hopr_protocol_pix::{
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaCommitment,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixParams, PixSpec, ShareResolution, SsaCommitment,
     SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
     TaggedEncryptedPartialSsaShare,
 };
@@ -46,7 +46,8 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
-    let server_commitment = reconstructor.new_exit_commitment(ssa_id, 10, 10)?;
+    let server_commitment =
+        reconstructor.new_exit_commitment(ssa_id, PixParams::try_from_config::<TestSpec>(generator.config())?)?;
 
     let full_ssa_deposit_address = TestSpec::group_to_deposit_address(client_commitment + server_commitment)
         .ok_or(anyhow::anyhow!("Failed to convert to address"))?;
@@ -152,7 +153,8 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
-    let server_commitment = reconstructor.new_exit_commitment(ssa_id, 10, 10)?;
+    let server_commitment =
+        reconstructor.new_exit_commitment(ssa_id, PixParams::try_from_config::<TestSpec>(generator.config())?)?;
 
     let full_ssa_deposit_address =
         TestSpec::group_to_deposit_address(client_commitment_msg.ssa_commitment + server_commitment)

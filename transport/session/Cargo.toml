@@ -115,13 +115,16 @@ hopr-protocol-session = { workspace = true, features = [
   "runtime-tokio",
   "hashbrown",
 ] }
+# Also a normal dependency; repeated here so `benches/supervisor_bench.rs`, which is its own crate,
+# can name `SsaId`/`SsaIndex`/`SsaRecoveryProgress` when it builds the supervisor's input events.
+hopr-protocol-pix = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes", "serde_with", "humantime-serde"]
+ignored = ["serde_bytes", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"
@@ -130,6 +133,11 @@ required-features = ["benchmark"]
 
 [[bench]]
 name = "dispatch_bench"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "supervisor_bench"
 harness = false
 required-features = ["benchmark"]
 

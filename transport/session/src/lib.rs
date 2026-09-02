@@ -12,6 +12,9 @@ pub mod counters;
 pub mod errors;
 pub mod flow_control;
 mod manager;
+/// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
+/// worker that drives them.
+pub(crate) mod supervision;
 #[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
@@ -22,10 +25,20 @@ use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
 pub use manager::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult,
-    DropReason, IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
-    SessionManagerConfig,
+    ASSUMED_SESSION_PACKET_RATE, DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST,
+    DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult, DropReason, IncomingSessionPixConfig, MAX_OVERLAPPING_BATCHES,
+    MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, cycle_budget_for,
+    max_cycle_budget_for_quota, validate_incoming_session_pix_config,
 };
+/// The supervisor state machine and its event/action vocabulary, for `benches/supervisor_bench.rs`.
+///
+/// Behind the same `benchmark` gate as
+/// [`SessionManager::pre_populate_session`](crate::SessionManager::pre_populate_session), and for
+/// the same reason: a criterion bench is a separate crate, so a path that is `pub(crate)` is a path
+/// it cannot measure. Nothing here is part of the crate's supported surface.
+#[cfg(any(feature = "benchmark", test))]
+pub use supervision::{SessionPixAction, SessionPixEvent, SessionPixSupervisor};
+pub use supervision::{SupervisorConfig, validate_pix_supervision};
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
