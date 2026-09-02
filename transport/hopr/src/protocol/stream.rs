@@ -1267,7 +1267,27 @@ mod tests {
 
         let msg = BytesMut::from(&b"hello"[..]);
 
-        // Overflow the stalled peer: under the old code each excess packet costs the loop a full timeout.
+        // Establish the ready-and-full precondition first: prime the stalled peer with a single
+        // packet and wait until its write pump has actually attempted a write. `ready` is set before
+        // the pump's first poll, so a `poll_write` on the gated-shut writer proves `ready == true`
+        // and the pump is parked on the wire. Without this, the burst below could race the still-
+        // opening stream (`ready == false`), where a full channel drops packets on the fast path and
+        // the head-of-line block never forms — the test would then pass even on the unfixed code.
+        tx_out
+            .send((stalled_peer, msg.clone()))
+            .await
+            .context("egress queue must accept priming stalled-peer packet")?;
+        assert!(
+            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
+            "no stream was ever opened"
+        );
+        assert!(
+            wait_for(2, || stalled_io.poll_writes() >= 1).await,
+            "stalled write pump never attempted a write — ready-and-full precondition not established"
+        );
+
+        // Now overflow the ready+full stalled channel: under the old code each excess packet costs
+        // the shared loop a full backpressure timeout, starving the healthy peer behind it.
         for _ in 0..OVERFLOW {
             tx_out
                 .send((stalled_peer, msg.clone()))
@@ -1279,11 +1299,6 @@ mod tests {
             .send((healthy_peer, msg.clone()))
             .await
             .context("egress queue must accept healthy-peer packet")?;
-
-        assert!(
-            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
-            "no stream was ever opened"
-        );
 
         let delivered = wait_for(3, || healthy_io.written() >= msg.len()).await;
 
@@ -1477,6 +1492,10 @@ mod tests {
     struct GatedWriteIo {
         open: Arc<std::sync::atomic::AtomicBool>,
         written: Arc<AtomicUsize>,
+        /// Number of `poll_write` calls, whether or not they accepted bytes. A non-zero count on a
+        /// gated-shut writer proves its write pump is running (`ready == true`) and parked on the
+        /// wire — used to establish the ready-and-full precondition deterministically.
+        poll_writes: Arc<AtomicUsize>,
         waker: Arc<Mutex<Option<Waker>>>,
     }
 
@@ -1491,6 +1510,10 @@ mod tests {
         fn written(&self) -> usize {
             self.written.load(Ordering::Relaxed)
         }
+
+        fn poll_writes(&self) -> usize {
+            self.poll_writes.load(Ordering::Relaxed)
+        }
     }
 
     impl AsyncRead for GatedWriteIo {
@@ -1501,6 +1524,7 @@ mod tests {
 
     impl AsyncWrite for GatedWriteIo {
         fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            self.poll_writes.fetch_add(1, Ordering::Relaxed);
             if self.open.load(Ordering::Relaxed) {
                 self.written.fetch_add(buf.len(), Ordering::Relaxed);
                 Poll::Ready(Ok(buf.len()))
