@@ -1,4 +1,10 @@
-use std::time::Duration;
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll, Waker},
+    time::Duration,
+};
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_api::types::internal::routing::DestinationRouting;
@@ -20,6 +26,150 @@ use crate::{
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
+
+/// Runtime-agnostic multi-waker notification primitive.
+///
+/// Uses a generation counter to detect notification events: [`notify_waiters`](SlotNotify::notify_waiters)
+/// bumps the generation, and [`notified`](SlotNotify::notified) futures compare the generation at
+/// creation time against the current one on each `poll()`. This prevents two
+/// race conditions a simple waker-vector approach cannot handle:
+///
+/// 1. **Latent wake.** A [`notified`](SlotNotify::notified) future registers its waker on first `poll()`. If
+///    [`notify_waiters`](SlotNotify::notify_waiters) fires between the creation of the future and that first `poll`,
+///    the waker-vector is empty and the notification is lost. With a generation counter, `gen_at_creation` already
+///    captures the pre-notification value, so the first `poll()` sees the advanced generation and returns `Ready`.
+///
+/// 2. **Spurious `Ready`.** A second `poll()` of an already-registered future can return `Ready` unconditionally if the
+///    notification check is only done on registration. Generation re-check on every `poll()` prevents this.
+///
+/// Uses unique IDs per waiter so that dropping a future cleanly
+/// removes its waker from the vector — no waker leak on cancellation.
+/// No tokio dependency — works with any async runtime.
+///
+/// Clone is cheap (clones the inner `Arc`).
+#[derive(Clone)]
+pub struct SlotNotify {
+    inner: Arc<parking_lot::Mutex<SlotNotifyInner>>,
+}
+
+struct SlotNotifyInner {
+    wakers: Vec<(u64, Waker)>,
+    next_id: u64,
+    generation: u64,
+}
+
+impl SlotNotify {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(parking_lot::Mutex::new(SlotNotifyInner {
+                wakers: Vec::new(),
+                next_id: 0,
+                generation: 0,
+            })),
+        }
+    }
+
+    /// Wake all parked waiters.
+    ///
+    /// Bumps the generation counter **before** draining wakers so that
+    /// futures created between this call and their first `poll()` see the
+    /// advanced generation and return `Ready` immediately.
+    ///
+    /// The guard is released before any waker runs. `Waker::wake` executes arbitrary executor code,
+    /// and an executor that polls the woken task inline re-enters [`SlotNotifyFuture::poll`] — or its
+    /// `Drop` — both of which lock this same non-reentrant mutex. Waking under the guard is therefore
+    /// a self-deadlock against exactly the runtimes this type advertises support for; tokio only
+    /// enqueues, so the shipped path never hit it. Draining into a local buffer costs one allocation
+    /// per notification that actually has waiters to wake, and nothing at all when it does not.
+    pub fn notify_waiters(&self) {
+        let woken = {
+            let mut inner = self.inner.lock();
+            inner.generation += 1;
+            // `drain` rather than `mem::take`: an empty drain allocates nothing and the inner
+            // `Vec` keeps its capacity, which is the common case on a gate that rarely parks.
+            inner.wakers.drain(..).collect::<Vec<_>>()
+        };
+        for (_, waker) in woken {
+            waker.wake();
+        }
+    }
+
+    /// Return a future that completes the next time `notify_waiters` is called.
+    ///
+    /// The future captures the current generation at creation time. A
+    /// concurrent [`notify_waiters`](SlotNotify::notify_waiters) call that fires before the first
+    /// `poll()` will have bumped the generation, so the future still
+    /// completes — no notification is lost.
+    pub fn notified(&self) -> SlotNotifyFuture {
+        let generation = self.inner.lock().generation;
+        SlotNotifyFuture {
+            inner: self.inner.clone(),
+            waker_id: 0,
+            registered: false,
+            gen_at_creation: generation,
+        }
+    }
+}
+
+/// Future returned by [`SlotNotify::notified`].
+///
+/// On cancellation (drop without completion), the registered waker is
+/// automatically removed from [`SlotNotify`] so stale entries are never
+/// left behind.
+pub struct SlotNotifyFuture {
+    inner: Arc<parking_lot::Mutex<SlotNotifyInner>>,
+    waker_id: u64,
+    registered: bool,
+    gen_at_creation: u64,
+}
+
+impl Drop for SlotNotifyFuture {
+    fn drop(&mut self) {
+        if self.registered {
+            self.inner.lock().wakers.retain(|(id, _)| *id != self.waker_id);
+        }
+    }
+}
+
+impl Future for SlotNotifyFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.get_mut();
+        let mut inner = this.inner.lock();
+
+        // If the generation advanced past our creation snapshot, a
+        // notification happened — we are done.
+        if inner.generation != this.gen_at_creation {
+            return Poll::Ready(());
+        }
+
+        if this.registered {
+            // Already registered but generation hasn't advanced — this is a
+            // spurious wake (or a replaced waker). Update the stored waker
+            // and stay Pending.
+            if let Some((_, w)) = inner.wakers.iter_mut().find(|(id, _)| *id == this.waker_id) {
+                // `will_wake` first: a re-poll of the same task is the common case here — the gate
+                // parks callers that are then polled spuriously — and the clone costs a refcount
+                // bump, or an allocation for a waker that is not `Arc`-backed. Replacing only when
+                // the target actually changed keeps the correctness property that matters, which is
+                // that the *latest* waker is the one stored: `will_wake` returning true means
+                // waking the stored one wakes the same task.
+                if !w.will_wake(cx.waker()) {
+                    *w = cx.waker().clone();
+                }
+            }
+            return Poll::Pending;
+        }
+
+        // First poll: register.
+        this.waker_id = inner.next_id;
+        inner.next_id += 1;
+        inner.wakers.push((this.waker_id, cx.waker().clone()));
+        this.registered = true;
+        Poll::Pending
+    }
+}
 
 /// This function will use the given generator to generate an initial seeding key.
 /// It will check whether the given cache already contains a value for that key, and if not,
@@ -186,7 +336,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use anyhow::anyhow;
+    use futures::FutureExt;
 
     use super::*;
 
@@ -263,5 +416,275 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    fn noop_waker() -> std::task::Waker {
+        futures::task::noop_waker()
+    }
+
+    // -------------------------------------------------------------------
+    // Generation-counter wake detection
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn notification_after_first_poll_completes_future() {
+        let n = Arc::new(SlotNotify::new());
+        let mut fut = n.notified();
+
+        let waker = noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        // First poll registers and returns Pending.
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending);
+
+        n.notify_waiters();
+
+        // Second poll sees the advanced generation -> Ready.
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Ready(()));
+    }
+
+    #[test]
+    fn notify_after_creation_before_first_poll_completes() {
+        let n = Arc::new(SlotNotify::new());
+        let mut fut = n.notified();
+
+        // Notify AFTER creation but BEFORE first poll.
+        n.notify_waiters();
+
+        let waker = noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        // First poll should see the advanced generation -> Ready.
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Ready(()));
+    }
+
+    #[test]
+    fn spurious_repoll_stays_pending_without_notification() {
+        let n = Arc::new(SlotNotify::new());
+        let mut fut = n.notified();
+
+        let waker = noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        // First poll returns Pending.
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending);
+
+        // Second poll without any notify -> spurious wake, stays Pending.
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending);
+    }
+
+    #[test]
+    fn multiple_notifications_bump_generation() {
+        let n = Arc::new(SlotNotify::new());
+        let mut fut = n.notified();
+
+        let waker = noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending);
+
+        n.notify_waiters();
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Ready(()));
+
+        // A new future should also work for the next notification cycle.
+        let mut fut2 = n.notified();
+        assert_eq!(fut2.poll_unpin(&mut cx), Poll::Pending);
+
+        n.notify_waiters();
+        assert_eq!(fut2.poll_unpin(&mut cx), Poll::Ready(()));
+    }
+
+    #[test]
+    fn drop_uncompleted_future_removes_waker() {
+        let n = Arc::new(SlotNotify::new());
+        {
+            let mut fut = n.notified();
+
+            let waker = noop_waker();
+            let mut cx = std::task::Context::from_waker(&waker);
+
+            assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending);
+            // fut drops here -> waker should be removed.
+        }
+        // After the future is dropped, the inner waker list should be empty.
+        assert!(n.inner.lock().wakers.is_empty());
+    }
+
+    /// `notify_waiters` must have released the lock by the time any waker runs.
+    ///
+    /// `Waker::wake` runs arbitrary executor code, and an executor that polls the woken task inline
+    /// re-enters this type: both [`SlotNotifyFuture::poll`] and its `Drop` take the same
+    /// `parking_lot::Mutex`, which is not reentrant. Waking under the guard self-deadlocks against
+    /// precisely the runtime-agnostic contract this type advertises. Tokio only enqueues, so no
+    /// shipped caller ever exercised it and no test could have caught it.
+    ///
+    /// The waker below stands in for such an executor. Note the failure mode: on a regression this
+    /// test does not fail, it *hangs*, and surfaces as a timeout. That is the only observable a
+    /// deadlock has.
+    #[test]
+    fn notify_waiters_releases_the_lock_before_waking() {
+        struct ReentrantWaker(SlotNotify);
+
+        impl std::task::Wake for ReentrantWaker {
+            fn wake(self: Arc<Self>) {
+                // What an inline-polling executor does: re-enter the notifier from inside `wake`.
+                // `notified` takes the very lock `notify_waiters` is in the middle of.
+                drop(self.0.notified());
+            }
+        }
+
+        let n = SlotNotify::new();
+        let mut fut = n.notified();
+        let waker = std::task::Waker::from(Arc::new(ReentrantWaker(n.clone())));
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        assert_eq!(
+            fut.poll_unpin(&mut cx),
+            Poll::Pending,
+            "the first poll registers the waker"
+        );
+
+        n.notify_waiters();
+
+        assert_eq!(
+            fut.poll_unpin(&mut cx),
+            Poll::Ready(()),
+            "the generation advanced, so the waiter is done"
+        );
+    }
+
+    /// One `notify_waiters` call must wake *every* parked waiter, not just one.
+    ///
+    /// `wakers` is a `Vec` and the type calls itself a multi-waker primitive, but every other test
+    /// here drives a single future, so the vector never holds more than one entry and a `pop()` in
+    /// place of `drain(..)` would pass all of them.
+    ///
+    /// Asserted on the wakes rather than on the futures completing, which is the part that is easy
+    /// to get wrong: the generation counter makes `poll` return `Ready` after any notification
+    /// whether or not *that* waiter was woken, so polling every future to completion would pass with
+    /// a single-waker regression. What a real executor needs is the wake itself — without it the
+    /// future is never polled again and the generation is never read.
+    #[test]
+    fn one_notification_wakes_every_parked_waiter() {
+        struct CountingWaker(std::sync::atomic::AtomicUsize);
+
+        impl std::task::Wake for CountingWaker {
+            fn wake(self: Arc<Self>) {
+                self.wake_by_ref();
+            }
+
+            fn wake_by_ref(self: &Arc<Self>) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+
+        const WAITERS: usize = 4;
+
+        let n = SlotNotify::new();
+        let counters: Vec<Arc<CountingWaker>> = (0..WAITERS)
+            .map(|_| Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0))))
+            .collect();
+        let mut futures: Vec<_> = (0..WAITERS).map(|_| n.notified()).collect();
+
+        for (i, (fut, counter)) in futures.iter_mut().zip(&counters).enumerate() {
+            let waker = std::task::Waker::from(counter.clone());
+            let mut cx = std::task::Context::from_waker(&waker);
+            assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending, "waiter {i} must park");
+        }
+        assert_eq!(
+            WAITERS,
+            n.inner.lock().wakers.len(),
+            "every waiter must have registered"
+        );
+
+        n.notify_waiters();
+
+        for (i, counter) in counters.iter().enumerate() {
+            assert_eq!(
+                1,
+                counter.0.load(std::sync::atomic::Ordering::Relaxed),
+                "waiter {i} must be woken exactly once by the single notification"
+            );
+        }
+    }
+
+    /// Re-polling with a *different* waker must replace the stored one.
+    ///
+    /// The `will_wake` guard in `poll` skips the clone when the stored waker would wake the same
+    /// task, which is the common case and the point of the guard. Getting its polarity backwards
+    /// would keep the first waker forever: the future would then be parked against a task that is no
+    /// longer polling it, and nothing would wake the one that is — a hang, not a slowdown. This is
+    /// the half of that guard worth pinning; the skipped clone is unobservable by design.
+    #[test]
+    fn repolling_with_a_new_waker_replaces_the_stored_one() {
+        struct CountingWaker(std::sync::atomic::AtomicUsize);
+
+        impl std::task::Wake for CountingWaker {
+            fn wake(self: Arc<Self>) {
+                self.wake_by_ref();
+            }
+
+            fn wake_by_ref(self: &Arc<Self>) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+
+        let n = SlotNotify::new();
+        let mut fut = n.notified();
+
+        let first = Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0)));
+        let second = Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0)));
+
+        let w1 = std::task::Waker::from(first.clone());
+        assert_eq!(
+            fut.poll_unpin(&mut std::task::Context::from_waker(&w1)),
+            Poll::Pending,
+            "the first poll registers"
+        );
+
+        // A distinct task, so `will_wake` is false and the replacement must happen.
+        let w2 = std::task::Waker::from(second.clone());
+        assert_eq!(
+            fut.poll_unpin(&mut std::task::Context::from_waker(&w2)),
+            Poll::Pending,
+            "no notification has happened, so the future stays parked"
+        );
+
+        n.notify_waiters();
+
+        assert_eq!(
+            0,
+            first.0.load(std::sync::atomic::Ordering::Relaxed),
+            "the superseded waker must not be the one woken"
+        );
+        assert_eq!(
+            1,
+            second.0.load(std::sync::atomic::Ordering::Relaxed),
+            "the waker from the most recent poll must be woken exactly once"
+        );
+    }
+
+    // -------------------------------------------------------------------
+    // Async tests (tokio runtime)
+    // -------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn notified_awaited_completes_on_notify() {
+        let n = Arc::new(SlotNotify::new());
+        let n2 = n.clone();
+
+        let handle = tokio::spawn(async move {
+            n2.notified().await;
+            42u32
+        });
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        n.notify_waiters();
+
+        let result = tokio::time::timeout(Duration::from_secs(1), handle)
+            .await
+            .expect("timeout")
+            .expect("task panicked");
+        assert_eq!(result, 42);
     }
 }

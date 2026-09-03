@@ -219,11 +219,25 @@ impl BalancerStateValues {
             .fetch_max(until, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Whether production should currently ignore the counterparty buffer estimate.
+    /// Whether [`buffer_level`](Self::buffer_level) is currently an instruction rather than a
+    /// measurement.
     ///
-    /// Both the opt-in and live evidence are required: without the opt-in this is not our
-    /// behaviour to change, and without evidence there is nothing to distinguish a dead return path
-    /// from an idle one.
+    /// While this holds, the controller deliberately writes `0` into the level to drive production
+    /// to its maximum. That zero says "produce flat out", not "the counterparty holds nothing", so
+    /// anything reading the level as a *supply ceiling* must consult this first or it will read the
+    /// instruction as an order to send nothing.
+    ///
+    /// True only when both the opt-in (`sustain_on_return_path_loss`) and live evidence
+    /// ([`mark_return_path_degraded`](Self::mark_return_path_degraded), within its window) are
+    /// present: without the opt-in this is not our behaviour to change, and without evidence there
+    /// is nothing to tell a dead return path from an idle one.
+    ///
+    /// `pub` because it is not only the controller's business — hence the emphasis above on what
+    /// the flag does *not* mean. It is not a general "the return path is degraded" signal.
+    pub fn return_path_estimate_is_stale(&self) -> bool {
+        self.should_sustain_through_return_path_loss()
+    }
+
     fn should_sustain_through_return_path_loss(&self) -> bool {
         let deadline = self
             .return_path_degraded_until_ms
@@ -442,6 +456,8 @@ where
                 believed = current,
                 "return path degraded; ignoring the counterparty buffer estimate"
             );
+            // Reads as "produce flat out" to the controller below. `SurbSupply` must not read it
+            // as "the buffer is empty, admit nothing" -- see `return_path_estimate_is_stale`.
             current = 0;
         }
 
@@ -1142,5 +1158,53 @@ mod tests {
             levels.last().is_some_and(|last| *last < 5_000),
             "expected at least one decay step: {levels:?}"
         );
+    }
+
+    // --- return-path-degraded deadline primitive (Test C, gap 1) ---------------------------------
+    //
+    // The behavioural loop tests above (sustain / ignore-unless-opted-in / return-to-closed-loop /
+    // refill) already cover how the balancer *reacts* to the signal. What they do not isolate are
+    // three edge cases of the `mark_return_path_degraded` / `return_path_estimate_is_stale`
+    // deadline primitive itself, each guarding a specific correctness invariant.
+
+    /// The zero-guard: never marked is never degraded. `return_path_degraded_until_ms == 0` means
+    /// "never marked", not "marked at the epoch" — without the explicit `deadline > 0` check every
+    /// opted-in session would believe its return path was dead from the first packet.
+    #[test]
+    fn return_path_should_not_be_stale_before_it_is_ever_marked() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        assert!(!state.return_path_estimate_is_stale());
+    }
+
+    /// The window expires on its own, independently of any recovery signal. The behavioural tests
+    /// clear the degraded state by resuming replies; this pins the other exit — a marker nobody
+    /// ever withdraws must still lapse, bounding over-production to the grace window. Marking with a
+    /// zero grace sets the deadline to "now"; the monotonic clock only moves forward, so the
+    /// subsequent read is already past it — no sleep, no flake.
+    #[test]
+    fn an_expired_degraded_window_should_no_longer_be_stale() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::ZERO);
+        assert!(!state.return_path_estimate_is_stale());
+    }
+
+    /// Re-marking extends the window: an already-expired deadline followed by a fresh mark is stale
+    /// again. Guards the `fetch_max` in `mark_return_path_degraded`.
+    #[test]
+    fn re_marking_should_reopen_an_expired_window() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::ZERO);
+        assert!(!state.return_path_estimate_is_stale());
+        state.mark_return_path_degraded(Duration::from_secs(10));
+        assert!(state.return_path_estimate_is_stale());
     }
 }

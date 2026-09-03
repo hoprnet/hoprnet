@@ -21,6 +21,18 @@ pub fn session_inbox_drop_count() -> usize {
     SESSION_INBOX_DROPS.load(Ordering::Relaxed)
 }
 
+/// Cumulative count of application data packets dropped because the session inbox
+/// channel was closed (`try_send` returned `TrySendError::Disconnected`): the session
+/// data sink was dropped while the slot was still registered — a benign teardown race,
+/// not the backpressure that [`SESSION_INBOX_DROPS`] counts.
+pub static SESSION_INBOX_CLOSED_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative count of packets dropped because the session inbox was closed.
+#[inline]
+pub fn session_inbox_closed_drop_count() -> usize {
+    SESSION_INBOX_CLOSED_DROPS.load(Ordering::Relaxed)
+}
+
 /// Cumulative count of data packets dropped because no matching session slot was
 /// found in the session manager (`UnknownData` / unestablished-session path).
 pub static SESSION_UNKNOWN_DATA_DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -39,6 +51,21 @@ pub static SESSION_UNRELATED_DATA_DISPATCHES: AtomicUsize = AtomicUsize::new(0);
 #[inline]
 pub fn session_unrelated_dispatch_count() -> usize {
     SESSION_UNRELATED_DATA_DISPATCHES.load(Ordering::Relaxed)
+}
+
+/// Cumulative count of outgoing packets dropped because their return route still had no SURB
+/// when the resolution wait ran out.
+///
+/// Separate from [`ROUTING_RESOLUTION_FAILURES`] because it means something different and
+/// actionable: a counterparty has stopped replenishing SURBs and is not coming back, rather than a
+/// route that could not be computed. A non-zero and growing value names the condition that used to
+/// stall a node's entire egress indefinitely.
+pub static ROUTING_RESOLUTION_SURB_TIMEOUTS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative count of packets dropped after waiting in vain for a return SURB.
+#[inline]
+pub fn routing_resolution_surb_timeout_count() -> usize {
+    ROUTING_RESOLUTION_SURB_TIMEOUTS.load(Ordering::Relaxed)
 }
 
 /// Cumulative count of packets that failed path/routing resolution before encoding.

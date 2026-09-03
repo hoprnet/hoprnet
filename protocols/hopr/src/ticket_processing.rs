@@ -271,56 +271,15 @@ where
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
     ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
-        // Check if we're even expecting an acknowledgement from this peer:
-        // We need to first do a check that does not update the popularity estimator of `peer` in this cache,
-        // so we actually allow the entry to time out eventually. However, this comes at the cost
-        // double-lookup.
-        if !self.unacknowledged_tickets.contains_key(&peer) {
-            tracing::trace!("not awaiting any acknowledgement from peer");
+        let Some((awaiting_ack_from_peer, half_keys_challenges)) =
+            hopr_protocol_pix::ack_verify::verify_expected_acknowledgements(
+                peer,
+                acks,
+                &self.unacknowledged_tickets,
+                self.cfg.use_batch_verification,
+            )
+        else {
             return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
-        }
-        let Some(awaiting_ack_from_peer) = self.unacknowledged_tickets.get(&peer) else {
-            tracing::trace!("not awaiting any acknowledgement from peer");
-            return Err(TicketAcknowledgementError::UnexpectedAcknowledgement);
-        };
-
-        // Verify all the acknowledgements and compute challenges from half-keys
-        let use_batch_verify = self.cfg.use_batch_verification;
-        let half_keys_challenges = if use_batch_verify {
-            // Uses regular verifications for small batches but switches to a more effective
-            // batch verification algorithm for larger ones.
-            let acks = Acknowledgement::verify_batch(acks.into_iter().map(|ack| (peer, ack)));
-
-            #[cfg(feature = "rayon")]
-            let iter = acks.into_par_iter();
-
-            #[cfg(not(feature = "rayon"))]
-            let iter = acks.into_iter();
-
-            iter.map(|verified| {
-                verified.and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-            })
-            .filter_map(|res| {
-                res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                    .ok()
-            })
-            .collect::<Vec<_>>()
-        } else {
-            #[cfg(feature = "rayon")]
-            let iter = acks.into_par_iter();
-
-            #[cfg(not(feature = "rayon"))]
-            let iter = acks.into_iter();
-
-            iter.map(|ack| {
-                ack.verify(&peer)
-                    .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
-            })
-            .filter_map(|res| {
-                res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
-                    .ok()
-            })
-            .collect::<Vec<_>>()
         };
 
         // Find all the tickets that we're awaiting acknowledgement for

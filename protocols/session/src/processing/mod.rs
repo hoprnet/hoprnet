@@ -17,7 +17,7 @@ pub(crate) mod types;
 
 pub(crate) use reassembly::ReassemblerExt;
 pub(crate) use segmenter::SegmenterExt;
-pub(crate) use sequencer::SequencerExt;
+pub(crate) use sequencer::{SequencerConfig, SequencerExt};
 
 #[cfg(test)]
 mod tests {

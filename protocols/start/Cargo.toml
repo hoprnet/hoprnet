@@ -1,7 +1,7 @@
 [package]
 name = "hopr-protocol-start"
+version = "1.2.0"
 description = "Contains implementation of Start protocol for Session initiation according to HOPR RFC-0009"
-version = "1.1.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -23,7 +23,12 @@ thiserror = { workspace = true }
 
 hopr-protocol-app = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-protocol-pix = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-types = { workspace = true, features = ["crypto"] }
+
+[lib]
+doctest = false

@@ -27,7 +27,7 @@ struct PathCostWithMetrics {
     total_latency_ms: Option<u32>,
     min_probe_success_rate: Option<f64>,
     min_ack_rate: Option<f64>,
-    capacity_floor: Option<u128>,
+    fundable_tickets_floor: Option<u128>,
 }
 
 impl PartialOrd for PathCostWithMetrics {
@@ -50,7 +50,7 @@ impl From<(PathCostWithMetrics, Vec<OffchainPublicKey>)> for PathWithMetrics {
             total_latency_ms: metrics.total_latency_ms,
             min_probe_success_rate: metrics.min_probe_success_rate,
             min_ack_rate: metrics.min_ack_rate,
-            capacity_floor: metrics.capacity_floor,
+            fundable_tickets_floor: metrics.fundable_tickets_floor,
         }
     }
 }
@@ -71,6 +71,12 @@ fn opt_min<T: PartialOrd>(a: Option<T>, b: Option<T>) -> Option<T> {
 /// available during DFS, so no extra graph lookups are needed.
 struct MetricsValueFn<W: EdgeObservableRead> {
     inner: EdgeValueFn<f64, W>,
+    /// Face value used to express each edge's balance as a count of single-hop tickets.
+    ///
+    /// Read once per query rather than stored on any edge: deriving a count at query time is
+    /// safe, whereas deriving it at edge-update time is what made a price change stale the
+    /// whole graph.
+    ticket_face_value: Option<hopr_api::graph::traits::Balance>,
 }
 
 impl<W> ValueFn for MetricsValueFn<W>
@@ -86,7 +92,7 @@ where
             total_latency_ms: Some(0),
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor: None,
+            fundable_tickets_floor: None,
         }
     }
 
@@ -96,12 +102,13 @@ where
             total_latency_ms: None,
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor: None,
+            fundable_tickets_floor: None,
         })
     }
 
     fn into_value_fn(self) -> BasicValueFn<Self::Value, Self::Weight> {
         let inner = self.inner.into_value_fn();
+        let ticket_face_value = self.ticket_face_value;
         Arc::new(move |prev: PathCostWithMetrics, observed: &W, idx: usize| {
             let cost = inner(prev.cost, observed, idx);
 
@@ -116,26 +123,51 @@ where
 
             // Probe rate: taking the min of immediate and intermediate guards against nodes that
             // look good on direct probes but degrade under multi-hop load.
+            // `and_then`, not `map`: a stream with no observations contributes nothing to the min
+            // rather than contributing a zero it never measured.
             let edge_probe = observed
                 .immediate_qos()
-                .map(|m| m.average_probe_rate())
+                .and_then(|m| m.average_probe_rate())
                 .into_iter()
-                .chain(observed.intermediate_qos().map(|m| m.average_probe_rate()))
+                .chain(observed.intermediate_qos().and_then(|m| m.average_probe_rate()))
                 .reduce(f64::min);
             let min_probe_success_rate = opt_min(prev.min_probe_success_rate, edge_probe);
 
             let edge_ack = observed.immediate_qos().and_then(|m| m.ack_rate());
             let min_ack_rate = opt_min(prev.min_ack_rate, edge_ack);
 
-            let edge_cap = observed.intermediate_qos().and_then(|m| m.capacity());
-            let capacity_floor = opt_min(prev.capacity_floor, edge_cap);
+            // Expressed in single-hop tickets, not base units: the weighting factor below is a
+            // log ratio, and a base-unit balance would compress every realistic channel into a
+            // sliver of its output range.
+            //
+            // `zip`, not a fallback: an absent face value means the price is unknown, not that it
+            // is one. Dividing a base-unit balance by `1` yields a ticket count that saturates to
+            // `u128::MAX` and reads downstream as unlimited capacity — the opposite of what not
+            // knowing should imply. Contribute nothing to the floor until pricing arrives.
+            let edge_tickets = observed
+                .intermediate_qos()
+                .and_then(|m| m.balance())
+                .zip(ticket_face_value)
+                .map(|(balance, face_value)| {
+                    let tickets = if face_value.is_zero() {
+                        hopr_api::graph::traits::Balance::zero()
+                    } else {
+                        balance / face_value
+                    };
+                    if tickets > hopr_api::graph::traits::Balance::from(u128::MAX) {
+                        u128::MAX
+                    } else {
+                        tickets.low_u128()
+                    }
+                });
+            let fundable_tickets_floor = opt_min(prev.fundable_tickets_floor, edge_tickets);
 
             PathCostWithMetrics {
                 cost,
                 total_latency_ms,
                 min_probe_success_rate,
                 min_ack_rate,
-                capacity_floor,
+                fundable_tickets_floor,
             }
         })
     }
@@ -153,7 +185,7 @@ where
 ///
 /// A path is "fully measured" — and therefore preferred over unmeasured alternatives —
 /// when `total_latency_ms` is known AND either `hops == 0` (direct path, no channel
-/// expected) OR `capacity_floor` is also known.  This prevents 0-hop direct paths from
+/// expected) OR `fundable_tickets_floor` is also known.  This prevents 0-hop direct paths from
 /// being demoted simply because they carry no channel-capacity data.
 pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hops: usize) -> Vec<PathWithMetrics> {
     // floor == 0 means "no pruning" — caller opts out entirely.
@@ -162,7 +194,7 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
     }
 
     let fully_measured =
-        |p: &PathWithMetrics| p.total_latency_ms.is_some() && (hops == 0 || p.capacity_floor.is_some());
+        |p: &PathWithMetrics| p.total_latency_ms.is_some() && (hops == 0 || p.fundable_tickets_floor.is_some());
 
     let (mut populated, unpopulated): (Vec<_>, Vec<_>) = candidates.into_iter().partition(|p| fully_measured(p));
 
@@ -335,9 +367,17 @@ where
         shorter_length: std::num::NonZeroUsize,
         take: usize,
         existing: &[PathWithMetrics],
+        // The caller's snapshot, so both phases of one query cost against the same face value.
+        ticket_face_value: Option<hopr_api::graph::traits::Balance>,
     ) -> Vec<PathWithMetrics> {
         let value_fn = MetricsValueFn {
-            inner: EdgeValueFn::forward_without_self_loopback(self.edge_penalty, self.min_ack_rate),
+            inner: EdgeValueFn::forward_without_self_loopback(
+                shorter_length,
+                self.edge_penalty,
+                self.min_ack_rate,
+                ticket_face_value,
+            ),
+            ticket_face_value,
         };
         let raw = self
             .graph
@@ -404,6 +444,11 @@ where
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
 
+        // One read for the whole query. A concurrent `set_ticket_face_value` between two reads
+        // would let the traversal cost and the fundable-ticket floor come from different snapshots
+        // of the same graph, so `composite_weight` would rank a candidate against itself.
+        let ticket_face_value = self.graph.ticket_face_value();
+
         let paths = if src == self.me {
             // Phase 1: search for full-length forward paths to dest.
             let mut found = compute_paths(
@@ -413,7 +458,8 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate),
+                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    ticket_face_value,
                 },
             );
             tracing::debug!(
@@ -429,7 +475,8 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                let extended = self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found);
+                let extended =
+                    self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found, ticket_face_value);
                 tracing::debug!(
                     direction,
                     phase = 2,
@@ -448,7 +495,8 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate),
+                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    ticket_face_value,
                 },
             );
             tracing::debug!(direction, count = found.len(), "[return] candidates");
@@ -486,7 +534,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::{
         graph::{
-            NetworkGraphWrite,
+            NetworkGraphUpdate, NetworkGraphWrite,
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -533,7 +581,9 @@ mod tests {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(1000)));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                1000u64,
+            ))));
         });
     }
 
@@ -977,18 +1027,18 @@ mod tests {
             total_latency_ms: latency_ms,
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor: None,
+            fundable_tickets_floor: None,
         }
     }
 
-    fn make_path_with_capacity(latency_ms: Option<u32>, capacity_floor: Option<u128>) -> PathWithMetrics {
+    fn make_path_with_tickets(latency_ms: Option<u32>, fundable_tickets_floor: Option<u128>) -> PathWithMetrics {
         PathWithMetrics {
             path: vec![],
             cost: 1.0,
             total_latency_ms: latency_ms,
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor,
+            fundable_tickets_floor,
         }
     }
 
@@ -1003,7 +1053,7 @@ mod tests {
             total_latency_ms: Some(latency_ms),
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor: Some(1000),
+            fundable_tickets_floor: Some(1000),
         }
     }
 
@@ -1069,7 +1119,7 @@ mod tests {
     fn prune_drops_high_latency_first() {
         // 30 paths with strictly increasing latency, floor=8 → keep lowest 8
         let candidates: Vec<_> = (0..30u32)
-            .map(|i| make_path_with_capacity(Some(i * 10), Some(1_000_000)))
+            .map(|i| make_path_with_tickets(Some(i * 10), Some(1_000_000)))
             .collect();
         let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
@@ -1084,9 +1134,9 @@ mod tests {
         // total=9 > floor=8: all 3 populated are kept (populated always preferred),
         // then 5 unpopulated fill the remaining slots.
         let mut candidates: Vec<_> = vec![
-            make_path_with_capacity(Some(10), Some(1_000)),
-            make_path_with_capacity(Some(30), Some(1_000)),
-            make_path_with_capacity(Some(20), Some(1_000)),
+            make_path_with_tickets(Some(10), Some(1_000)),
+            make_path_with_tickets(Some(30), Some(1_000)),
+            make_path_with_tickets(Some(20), Some(1_000)),
         ];
         candidates.extend((0..6).map(|_| make_path_with_latency(None)));
         let result = prune_for_consistency(candidates, 8, 1);
@@ -1113,8 +1163,8 @@ mod tests {
         // Old formula: target_populated = 8.saturating_sub(10) = 0 → both populated dropped.
         // Correct: keep up to 8 populated (only 2 exist), fill 6 remaining with unpopulated.
         let mut candidates: Vec<_> = vec![
-            make_path_with_capacity(Some(10), Some(1_000)),
-            make_path_with_capacity(Some(20), Some(1_000)),
+            make_path_with_tickets(Some(10), Some(1_000)),
+            make_path_with_tickets(Some(20), Some(1_000)),
         ];
         candidates.extend((0..10).map(|_| make_path_with_latency(None)));
         let result = prune_for_consistency(candidates, 8, 1);
@@ -1128,7 +1178,7 @@ mod tests {
     #[test]
     fn prune_exact_floor_is_unchanged() {
         let candidates: Vec<_> = (0..8)
-            .map(|i| make_path_with_capacity(Some(i * 10), Some(1_000)))
+            .map(|i| make_path_with_tickets(Some(i * 10), Some(1_000)))
             .collect();
         let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
@@ -1136,10 +1186,10 @@ mod tests {
 
     #[test]
     fn prune_0_hop_with_measured_latency_and_no_capacity_is_populated() {
-        // 0-hop: capacity_floor = None is expected; path should be treated as "fully measured"
+        // 0-hop: fundable_tickets_floor = None is expected; path should be treated as "fully measured"
         // if latency is known.
         let mut candidates: Vec<_> = vec![
-            make_path_with_capacity(Some(50), None), // 0-hop: no capacity, latency known
+            make_path_with_tickets(Some(50), None), // 0-hop: no capacity, latency known
         ];
         candidates.extend((0..10).map(|_| make_path_with_latency(None)));
         let result = prune_for_consistency(candidates, 8, 0);
@@ -1150,27 +1200,27 @@ mod tests {
     }
 
     #[test]
-    fn prune_multi_hop_without_capacity_floor_is_unpopulated() {
+    fn prune_multi_hop_without_fundable_tickets_floor_is_unpopulated() {
         // A 1-hop path with measured latency but NO capacity is unmeasured (unpopulated).
         // It should be demoted below paths that have both latency and capacity.
         let candidates: Vec<_> = vec![
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
-            make_path_with_capacity(Some(40), None),        // missing capacity → unpopulated
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(50), Some(1_000)), // fully measured
+            make_path_with_tickets(Some(40), None),        // missing capacity → unpopulated
         ];
         let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
         // The path with missing capacity should not survive when all 8 slots are filled
         // by fully measured paths.
-        let has_missing_cap = result.iter().any(|p| p.capacity_floor.is_none());
+        let has_missing_balance = result.iter().any(|p| p.fundable_tickets_floor.is_none());
         assert!(
-            !has_missing_cap,
+            !has_missing_balance,
             "path without capacity floor must be pruned when fully-measured paths fill the floor"
         );
     }
@@ -1179,9 +1229,9 @@ mod tests {
     fn prune_for_consistency_floor_zero_returns_all() {
         // floor == 0 must be treated as "no pruning" — all candidates survive unchanged.
         let candidates = vec![
-            make_path_with_capacity(Some(10), Some(1_000)),
-            make_path_with_capacity(Some(20), None),
-            make_path_with_capacity(None, None),
+            make_path_with_tickets(Some(10), Some(1_000)),
+            make_path_with_tickets(Some(20), None),
+            make_path_with_tickets(None, None),
         ];
         let result = prune_for_consistency(candidates, 0, 1);
         assert_eq!(result.len(), 3, "floor=0 must return all candidates");
@@ -1206,7 +1256,9 @@ mod tests {
             graph.upsert_edge(src, dst, |obs| {
                 obs.record(EdgeWeightType::Connected(true));
                 obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(lat_ms))));
-                obs.record(EdgeWeightType::Capacity(Some(1000)));
+                obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                    1000u64,
+                ))));
             });
         };
 
@@ -1235,7 +1287,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn path_metrics_capacity_floor_is_min() -> anyhow::Result<()> {
+    async fn path_metrics_fundable_tickets_floor_is_min() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let hop = pubkey(&SECRET_1);
         let dest = pubkey(&SECRET_2);
@@ -1243,15 +1295,24 @@ mod tests {
         graph.add_node(hop);
         graph.add_node(dest);
 
+        // Stated, not assumed. A face value of one makes the ticket count equal the balance, which
+        // is what keeps the numbers below readable — but it has to be pushed, because without a
+        // price the floor is now `None` rather than silently dividing by one.
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
+
         graph.upsert_edge(&me, &hop, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(500)));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                500u64,
+            ))));
         });
         graph.upsert_edge(&hop, &dest, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(200)));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                200u64,
+            ))));
         });
         graph.add_edge(&me, &hop).unwrap();
         graph.add_edge(&hop, &dest).unwrap();
@@ -1260,15 +1321,15 @@ mod tests {
         let paths = selector.select_path(me, dest, 1).context("1-hop path")?;
         assert!(!paths.is_empty());
         assert_eq!(
-            paths[0].capacity_floor,
+            paths[0].fundable_tickets_floor,
             Some(200),
             "floor must be the smaller of 500 and 200"
         );
         Ok(())
     }
 
-    // NOTE: a test for capacity_floor=None is omitted intentionally.
-    // The forward cost function requires intermediate capacity on all non-last edges, so
+    // NOTE: a test for fundable_tickets_floor=None is omitted intentionally.
+    // The forward cost function requires a funding balance on all non-last edges, so
     // every path the selector returns has capacity data on at least one edge, making
-    // capacity_floor always Some for reachable paths.
+    // fundable_tickets_floor always Some for reachable paths.
 }
