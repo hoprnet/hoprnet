@@ -537,31 +537,20 @@ where
         }
 
         let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
-        let relayers = distinct_first_relayers(&pruned);
+        let relayer_set = pruned
+            .iter()
+            .filter_map(|p| p.path.first())
+            .collect::<std::collections::HashSet<_>>();
         tracing::debug!(
             %src,
             %dest,
             hops,
             direction,
             survived = pruned.len(),
-            distinct_relayers = relayers,
+            distinct_relayers = relayer_set.len(),
+            first_relayers = ?relayer_set,
             "pruned candidate paths",
         );
-
-        // A return path that resolves to a single relayer is the blind spot the degradation
-        // detector cannot escape: with no sibling relayer to the same destination, sustained
-        // silence is indistinguishable from a quiet peer, so a dead return relayer is never
-        // attributed and never re-planned. Surface it as the leading indicator it is. Runs only on
-        // a candidate (re)build, so the path cache rate-limits it per destination.
-        if direction == "return" && hops > 0 && relayers <= 1 {
-            tracing::warn!(
-                %dest,
-                distinct_relayers = relayers,
-                candidates = pruned.len(),
-                "return-path relayer diversity collapsed to a single relayer; degradation detection \
-                 cannot corroborate a dead relayer for this destination",
-            );
-        }
 
         Ok(pruned)
     }

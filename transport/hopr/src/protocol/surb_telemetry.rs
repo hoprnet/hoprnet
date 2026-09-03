@@ -330,6 +330,7 @@ impl SurbRoundTripRegistry {
             tracing::debug!(
                 degraded = degraded.len(),
                 blind_spot = blind_spot.len(),
+                blind_spot_destinations = ?blind_spot,
                 delivering_destinations = delivering.len(),
                 delivering_relayers = delivering_relayers.len(),
                 "surb return-path degradation scan",
