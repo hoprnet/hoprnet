@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport-session"
 description = "Session functionality providing session abstraction over the HOPR transport"
-version = "0.26.2"
+version = "0.29.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -21,16 +21,29 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []
 all-benchmarks = []
 benchmark = []
+# Test scaffolding: the manual `MsgSender` mock and the packet-planning driver, exposed as
+# `hopr_transport_session::testing`.
+#
+# Behind a feature because it is the only reason `mockall` and `tokio` would be needed at all: with
+# the module compiled unconditionally both had to be non-optional, so a release build linked a
+# mocking framework and `tokio` fell out of `runtime-tokio`, taking the crate's runtime-agnostic
+# boundary with it.
+#
+# The dev-dependency on this crate below is what makes `cargo test` work: `#[cfg(test)]` alone
+# enables no features, so the module would compile without its dependencies — which is exactly the
+# state `hopr-lib`'s `testing` module is stuck in.
+testing = ["dep:mockall", "dep:tokio"]
 runtime-tokio = [
+  "dep:tokio",
   "crossfire/tokio",
   "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
-  "dep:tokio",
 ]
 telemetry = [
   "hopr-utils/network-types-telemetry",
@@ -59,12 +72,14 @@ parking_lot = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 serde_repr = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
+mockall = { workspace = true, optional = true }
 
 hopr-api = { workspace = true, features = [
   "types-random",
@@ -76,11 +91,17 @@ hopr-utils = { workspace = true, features = [
 ] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
+hopr-protocol-pix = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
+# Self dev-dependency, so the `testing` feature is on for the lib's own test target and for the
+# integration tests in `tests/`. Without it `#[cfg(test)]` would compile the module while `mockall`
+# and `tokio` stayed disabled.
+hopr-transport-session = { path = ".", features = ["testing"] }
 criterion = { workspace = true }
+futures-time = { workspace = true }
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-utils = { workspace = true, features = [
   "runtime-tokio",
@@ -94,14 +115,16 @@ hopr-protocol-session = { workspace = true, features = [
   "runtime-tokio",
   "hashbrown",
 ] }
+# Also a normal dependency; repeated here so `benches/supervisor_bench.rs`, which is its own crate,
+# can name `SsaId`/`SsaIndex`/`SsaRecoveryProgress` when it builds the supervisor's input events.
+hopr-protocol-pix = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true }
-tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_with", "humantime-serde"]
+ignored = ["serde_bytes", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"
@@ -110,6 +133,11 @@ required-features = ["benchmark"]
 
 [[bench]]
 name = "dispatch_bench"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "supervisor_bench"
 harness = false
 required-features = ["benchmark"]
 

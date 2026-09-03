@@ -1,3 +1,4 @@
+use hopr_api::types::crypto::prelude::SimplePseudonym;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.
@@ -32,6 +33,9 @@ pub enum TransportSessionError {
 
     #[error("session is closed")]
     Closed,
+
+    #[error("invalid configuration: {0}")]
+    InvalidConfig(String),
 }
 
 impl TransportSessionError {
@@ -60,6 +64,14 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
+    #[error("received a Start protocol message that is not supported")]
+    UnsupportedMessage,
+    #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
+    Unacceptable(String),
+    #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
+    MissingDepositData(String),
+    #[error(transparent)]
+    PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
     #[error(transparent)]
     Other(anyhow::Error),
 }

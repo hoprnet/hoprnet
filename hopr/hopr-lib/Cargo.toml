@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "4.0.2-rc.11"
+version = "4.0.4"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -15,6 +15,7 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [[test]]
 name = "api_general"
@@ -49,6 +50,10 @@ name = "transport_session-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_session_pix"
+required-features = ["testing"]
+
+[[test]]
 name = "transport_tickets"
 required-features = ["testing"]
 
@@ -67,7 +72,23 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = ["transport-announce-quic"]
+default = ["pix-bjj", "transport-announce-quic"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
+pix-bjj = ["hopr-transport/pix-bjj"]
+# Overrides `pix-bjj`, giving Ethereum deposit addresses that a plain transfer can reach.
+#
+# **This is what a consumer settling PIX deposits on-chain should enable.** Turning `pix-bjj` off
+# with `default-features = false` is not sufficient and never was: features are additive, so
+# the moment any crate in the graph pulls `hopr-lib` with defaults — a transitive dependency,
+# or this workspace's own declaration — `pix-bjj` comes back on for everyone and the opt-out is
+# silently undone. `pix-secp256k1` wins on addition instead, so it cannot be undone that way.
+#
+# **It is still a decision about the whole network, not about this node.** Curve choice sets the
+# width of every curve-sized PIX field, so a node built this way cannot run a PIX Session with a
+# `pix-bjj` peer: the Exit reads the announced `PixSuite` and refuses with `UnacceptablePixParams`.
+# Nothing is negotiated, so choosing secp256k1 for settlement means choosing it for every peer the
+# node exchanges PIX with. See `hopr-crypto-packet`'s feature comments for the full rule.
+pix-secp256k1 = ["hopr-transport/pix-secp256k1"]
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-network-graph?/telemetry",
@@ -202,6 +223,7 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+hopr-ct-full-network = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 
@@ -209,3 +231,6 @@ hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 # humantime-serde: used via serde attribute macros, not a direct import.
 # pprof: used only behind #[cfg(feature = "profiling")], which machete may not scan.
 ignored = ["humantime-serde", "pprof"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde"]

@@ -23,16 +23,21 @@ use std::net::SocketAddr;
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use futures::StreamExt;
 use hopr_api::types::{
+    crypto::{keypairs::ChainKeypair, prelude::Keypair},
     crypto_random::Randomizable,
-    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+    internal::{
+        prelude::HoprPseudonym,
+        routing::{DestinationRouting, RoutingOptions},
+    },
+    primitive::prelude::Address,
 };
 use hopr_protocol_app::{
-    prelude::ApplicationDataOut,
-    v1::{ApplicationData, ApplicationDataIn, Tag},
+    prelude::{ApplicationDataOut, Tag::Reserved},
+    v1::{ApplicationData, ApplicationDataIn, ReservedTag, Tag},
 };
 use hopr_protocol_start::{StartChallenge, StartInitiation, StartProtocol};
 use hopr_transport_session::{
-    ByteCapabilities, IncomingSession, SESSION_APPLICATION_TAG, SessionId, SessionManager, SessionManagerConfig,
+    HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig,
     SessionTarget,
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -69,10 +74,10 @@ const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(3);
 fn make_start_protocol_data() -> ApplicationDataIn {
     let challenge = StartChallenge::MAX;
     let target = SessionTarget::UdpStream(SealedHost::Plain(SocketAddr::from(([127, 0, 0, 1], 13301)).into()));
-    let msg = StartProtocol::<SessionId, SessionTarget, ByteCapabilities>::StartSession(StartInitiation {
+    let msg = HoprStartProtocol::StartSession(StartInitiation {
         challenge,
         target,
-        capabilities: ByteCapabilities::try_from(0u8).unwrap(),
+        capabilities: HoprSessionCapabilities::try_from(0u8).unwrap(),
         additional_data: 0,
     });
     let (tag, bytes) = msg.encode().unwrap();
@@ -86,7 +91,7 @@ fn make_start_protocol_data() -> ApplicationDataIn {
 /// Builds valid `ApplicationDataIn` with the Session protocol tag and fixed payload.
 fn make_session_data(size: usize) -> ApplicationDataIn {
     ApplicationDataIn {
-        data: ApplicationData::new(SESSION_APPLICATION_TAG, vec![0u8; size]).unwrap(),
+        data: ApplicationData::new(ReservedTag::Session, vec![0u8; size]).unwrap(),
         packet_info: Default::default(),
     }
 }
@@ -105,9 +110,32 @@ type BenchSink = futures::channel::mpsc::UnboundedSender<(DestinationRouting, Ap
 /// Application data type sent over session channels.
 type BenchSessionData = hopr_protocol_app::v1::ApplicationDataIn;
 
+/// An outgoing (Entry-side) slot's routing.
+///
+/// The destination is never read — `dispatch_message` only matches on the *variant*, because what
+/// it is asking is which side of the Session this node is on. A random address is therefore as
+/// faithful as a real one and does not drag a peer fixture into the benchmark.
+fn forward_routing(session_id: SessionId) -> DestinationRouting {
+    let destination: Address = (&ChainKeypair::random()).into();
+    DestinationRouting::Forward {
+        destination: Box::new(destination.into()),
+        pseudonym: Some(session_id),
+        forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+        return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
+    }
+}
+
 /// Creates a [`SessionManager`] with one session pre-populated in the cache.
+///
+/// `routing` receives the freshly minted [`SessionId`] because the id is created here, and both
+/// routing variants want to name it: `Return` carries it directly, `Forward` carries it as the
+/// Session's fixed pseudonym. Which variant the slot holds decides whether `dispatch_message`
+/// credits Start-protocol traffic to `returned_packets`, so it is a parameter rather than a
+/// constant.
 #[allow(clippy::type_complexity)]
-fn make_manager_with_session() -> (
+fn make_manager_with_session(
+    routing: impl FnOnce(SessionId) -> DestinationRouting,
+) -> (
     std::mem::ManuallyDrop<futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>>,
     std::mem::ManuallyDrop<futures::channel::mpsc::Receiver<IncomingSession>>,
     SessionManager<BenchSink>,
@@ -132,12 +160,11 @@ fn make_manager_with_session() -> (
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier)
+            .start(msg_sender, session_notifier, None)
             .expect("manager.start() must succeed");
     });
 
-    let session_rx =
-        manager.pre_populate_session_with_receiver(session_id, DestinationRouting::Return(session_id.into()));
+    let session_rx = manager.pre_populate_session_with_receiver(session_id, routing(session_id));
 
     // Background drain task: keeps the pre-populated session's tx channel from filling up.
     // `pre_populate_session_with_receiver` provides the rx end so the benchmark can drive it.
@@ -179,7 +206,7 @@ fn make_manager_without_session() -> (
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier)
+            .start(msg_sender, session_notifier, None)
             .expect("manager.start() must succeed");
     });
 
@@ -193,27 +220,90 @@ fn make_manager_without_session() -> (
 
 /// Benchmark: dispatching a Start protocol message.
 ///
-/// Exercises the `start_protocol_tx.try_send()` path.
+/// Exercises the `start_protocol_tx.try_send()` path — and, since the Exit's Start-protocol
+/// traffic is credited to the Entry's `returned_packets`, the session lookup that credit needs.
+///
+/// # Why three ids and not one
+///
+/// `dispatch_message` runs a `sessions.get()` on *every* Start message so an Exit → Entry packet
+/// can be counted: it consumed a return SURB and therefore unlocked a PIX share, which is what the
+/// Entry's successor gate is denominated in. The lookup's cost depends on two things this
+/// benchmark used to fix silently, both at their cheapest:
+///
+/// * whether the session is in the cache. `single` **misses**, which is the empty-manager case and no longer the
+///   production one — an Entry Session receiving Start traffic is by definition registered.
+/// * which side of the Session the slot is. Only `DestinationRouting::Forward` — the Entry — reaches the counter; a
+///   `Return` slot is the Exit receiving its own peer's traffic and is deliberately not credited.
+///
+/// So `single` stays as the miss control and the two `session_hit_*` ids measure the arms that
+/// actually run. Read each against `single` — that gap is what a registered session costs the
+/// Start path over an empty manager, which is the comparison the miss-only fixture could not make.
+///
+/// Do **not** read the gap *between* the two hit ids as the cost of the credit. They are not a
+/// controlled pair: the slot each clones carries a different `routing_opts` payload —
+/// `Forward` boxes a `NodeId` and holds two `RoutingOptions`, `Return` holds a `SurbMatcher` — so
+/// any difference mixes that with the `fetch_add`. Isolating the credit would need two `Forward`
+/// slots differing only in whether the counter fires, which is not constructible from outside the
+/// crate. In practice the two sit inside each other's run-to-run spread, which is the useful
+/// finding: at this scale the lookup dominates and neither the payload nor the increment is
+/// separable from it.
 pub fn dispatch_start_protocol(c: &mut Criterion) {
-    let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
-    let id = HoprPseudonym::random();
-    let in_data = make_start_protocol_data();
-
     let mut group = c.benchmark_group("dispatch_start_protocol");
     group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
-    group.bench_function("single", |b| {
-        b.iter(|| {
-            let _ = manager.dispatch_message(id, in_data.clone()).ok();
-        });
-    });
-    group.finish();
+    // Cache miss: no session registered, so the lookup is the shortest it can be.
+    {
+        let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
+        let id = HoprPseudonym::random();
+        let in_data = make_start_protocol_data();
 
-    // Drop receivers first so channels close and processing tasks get EOF.
-    drop(std::mem::ManuallyDrop::into_inner(msg_rx));
-    drop(std::mem::ManuallyDrop::into_inner(sn_rx));
-    // Explicit shutdown prevents the tokio runtime's Drop from blocking forever.
-    runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+        group.bench_function("single", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(id, in_data.clone()).ok();
+            });
+        });
+
+        // Drop receivers first so channels close and processing tasks get EOF.
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        // Explicit shutdown prevents the tokio runtime's Drop from blocking forever.
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    // Cache hit on an outgoing (Entry) session: lookup, slot clone, and the credit.
+    {
+        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session(forward_routing);
+        let in_data = make_start_protocol_data();
+
+        group.bench_function("session_hit_forward", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    // Cache hit on an incoming (Exit) session: lookup and slot clone, no credit.
+    {
+        let (msg_rx, sn_rx, manager, session_id, runtime) =
+            make_manager_with_session(|id| DestinationRouting::Return(id.into()));
+        let in_data = make_start_protocol_data();
+
+        group.bench_function("session_hit_return", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    group.finish();
 }
 
 /// Benchmark: dispatching a Session data message where the session exists in the cache.
@@ -235,7 +325,10 @@ pub fn dispatch_session_hit(c: &mut Criterion) {
     group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
     for &size in payload_sizes() {
-        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session();
+        // `Return`, i.e. the Exit side, which is the side that receives Session *data*. Held
+        // deliberately at the value this fixture always used, so the id stays comparable.
+        let (msg_rx, sn_rx, manager, session_id, runtime) =
+            make_manager_with_session(|id| DestinationRouting::Return(id.into()));
         let in_data = make_session_data(size);
 
         group.bench_with_input(BenchmarkId::new("cache_hit", size), &size, |b, _| {

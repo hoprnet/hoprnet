@@ -1,6 +1,6 @@
 use std::{
     convert::Into,
-    fmt::{Debug, Formatter},
+    fmt::Debug,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -8,8 +8,19 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_api::types::{internal::routing::DestinationRouting, primitive::errors::GeneralError};
+use hopr_api::{
+    node::PixDepositData,
+    types::{
+        internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+        primitive::errors::GeneralError,
+    },
+};
+use hopr_crypto_packet::{
+    HoprPixSpec,
+    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
+};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
+use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -19,20 +30,26 @@ use hopr_protocol_session::{
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::{
     Capabilities, Capability,
     balancer::BalancerStateValues,
-    errors::TransportSessionError,
+    errors::{SessionManagerError, TransportSessionError},
     flow_control::{PacedWriter, SurbSupply},
 };
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ByteCapabilities(pub Capabilities);
+pub struct HoprSessionCapabilities(pub Capabilities);
 
-impl TryFrom<u8> for ByteCapabilities {
+impl HoprSessionCapabilities {
+    pub fn empty() -> Self {
+        Self(Capabilities::empty())
+    }
+}
+
+impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -42,32 +59,327 @@ impl TryFrom<u8> for ByteCapabilities {
     }
 }
 
-impl From<ByteCapabilities> for u8 {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for u8 {
+    fn from(value: HoprSessionCapabilities) -> Self {
         *value.0.as_ref()
     }
 }
 
-impl From<ByteCapabilities> for Capabilities {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for Capabilities {
+    fn from(value: HoprSessionCapabilities) -> Self {
         value.0
     }
 }
 
-impl From<Capabilities> for ByteCapabilities {
+impl From<Capabilities> for HoprSessionCapabilities {
     fn from(value: Capabilities) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<Capabilities> for ByteCapabilities {
+impl AsRef<Capabilities> for HoprSessionCapabilities {
     fn as_ref(&self) -> &Capabilities {
         &self.0
     }
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
+pub type HoprStartProtocol = StartProtocol<
+    SessionId,
+    SessionTarget,
+    HoprSessionCapabilities,
+    HoprPixGroupElement,
+    HoprPixCommitmentProof,
+    HoprPixDepositPayload,
+>;
+
+/// The deposit data a [deposit pool](hopr_api::chain::DepositPool) produced for one batch of SSAs.
+///
+/// This is what the Exit *collects*, not what it sends: the pool answers a
+/// [`PixDepositDataRequest`](hopr_api::node::PixDepositDataRequest) with one
+/// [`PixDepositData`] per requested [`PixAddressId`](hopr_api::node::PixAddressId), delivered one at
+/// a time over the `deposit_data_created` channel, so a batch arrives as a flat list rather than as
+/// anything keyed. [`deposit_data_for_batch`] turns it into the per-SSA map an `SsaRequest` carries.
+pub type HoprPixDepositData = Vec<PixDepositData>;
+
+/// The deposit data for a *single* SSA, as it travels inside an `SsaRequest`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct HoprPixDepositPayload(#[serde(with = "serde_bytes")] pub Box<[u8]>);
+
+/// Turns the deposit data a pool produced for a batch into the per-SSA map an `SsaRequest` carries.
+///
+/// Every SSA in the batch must come out of this with an entry, and the absence of one is fatal — see
+/// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) for why the batch
+/// cannot simply travel short. An *empty* entry is not an absent one: a pool with nothing to attach
+/// says so by answering with empty data, which is a value
+/// ([`PixDepositData::is_empty`]) and travels fine.
+///
+/// Entries the batch has no place for — another Session's, an SSA outside this batch, a second answer
+/// for an index already answered — are dropped and reported. They are not themselves fatal: what they
+/// are evidence of is, and the gap they leave behind is what fails.
+pub(crate) fn deposit_data_for_batch(
+    session_id: &SessionId,
+    batch: &[hopr_protocol_pix::SsaIndex],
+    deposit_data: HoprPixDepositData,
+) -> Result<std::collections::HashMap<hopr_protocol_pix::SsaIndex, HoprPixDepositPayload>, SessionManagerError> {
+    let mut out = std::collections::HashMap::with_capacity(batch.len());
+    let (mut foreign, mut duplicate) = (0usize, 0usize);
+
+    for entry in deposit_data {
+        let ssa_index = entry.id.ssa_index();
+        if &entry.id.session_id() != session_id || !batch.contains(&ssa_index) {
+            foreign += 1;
+            continue;
+        }
+        if out.insert(ssa_index, HoprPixDepositPayload(entry.data)).is_some() {
+            duplicate += 1;
+        }
+    }
+
+    if foreign > 0 || duplicate > 0 {
+        warn!(
+            %session_id,
+            requested = batch.len(),
+            usable = out.len(),
+            foreign,
+            duplicate,
+            "deposit pool answered with entries this batch has no place for"
+        );
+    }
+
+    let missing = batch.iter().filter(|i| !out.contains_key(i)).collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(SessionManagerError::MissingDepositData(format!(
+            "session {session_id} is missing deposit data for {} of {} SSAs in the batch: {missing:?} ({foreign} \
+             entries were for other SSAs, {duplicate} were repeats)",
+            missing.len(),
+            batch.len(),
+        )));
+    }
+
+    Ok(out)
+}
+
+/// Quota per single SSA in bytes.
+///
+/// The quota in bytes has only informative value for the user - the volume of Exit -> Entry data
+/// one SSA cycle carries, which is what a single deposit pays for.
+///
+/// Not the volume at which the Exit *recovers* the SSA private key: recovery needs
+/// `polys × threshold` useful shares, and so happens before the cycle drains. The quota covers the
+/// whole cycle, surplus included — see [`pix_params_to_quota`].
+///
+/// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
+pub type SsaQuota = u64;
+
+/// What a single SSA deposit buys: every Exit → Entry payload byte the cycle carries.
+///
+/// Counts [`PixParams::emitted_shares_per_poly`], i.e. `threshold + surplus`, and not the threshold
+/// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
+/// shares (`SsaShareGenerator::next_share`), whether or not any were lost, and each share rides back
+/// on one Exit → Entry data packet — so this is exactly the traffic the Exit serves per cycle.
+/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.25× factor is a
+/// fifth of all Exit → Entry traffic.
+///
+/// The surplus is insurance the Entry buys against share loss, and it is billed like insurance: on
+/// purchase, not on claim. One deposit per cycle at this rate is what makes paid-for equal served.
+///
+/// The other half of that equality lives in the generator's own tests
+/// (`drain_shares_by_polynomial` in `hopr-protocol-pix`), which pin a cycle's emission at
+/// `polys × (threshold + surplus)`. Change either expression and the other has to move with it.
+pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
+    params.polys_per_ssa() as SsaQuota
+        * params.emitted_shares_per_poly() as SsaQuota
+        * HoprPacket::PAYLOAD_SIZE as SsaQuota
+}
+
+/// Default number of polynomials ("SSA parts") a single SSA is split into.
+///
+/// This is the single source of truth for the Entry-side generator dimension
+/// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
+/// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
+/// Both must be derived from it so the two cannot drift apart: the Exit computes the
+/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if neither
+/// it nor an allowed dynamic batch brings the total inside the configured range. At the default
+/// batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
+/// every PIX Session fail to establish.
+///
+/// ## Choosing the split
+///
+/// For a fixed useful-share count `U = polys × threshold` the *product* is pinned, so the split
+/// between the two is free — but the costs scale differently, and dropping the non-constant
+/// coefficient commitments (see [`hopr_protocol_pix::SsaPartCommitment`]) changed which way they
+/// pull:
+///
+/// * Commitment wire volume and Exit ingest are one commitment per polynomial — **linear in `polys`**, and formerly
+///   `polys × threshold`. Ingest is dominated by point decompression plus the cofactor-8 subgroup check.
+/// * Reconstructor commitment memory is likewise `polys`, no longer `U`.
+/// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `U ×
+///   threshold` and is now simply `polys`.
+/// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `U × threshold`,
+///   **linear in `threshold`**, and it is field arithmetic rather than curve arithmetic.
+/// * Detection of a dishonest Entry takes `threshold` return packets, since a share set is only checked once it
+///   interpolates.
+/// * On the **Entry**, `SsaShareGenerator::next_share` evaluates a `threshold`-wide polynomial by Horner for every
+///   share it emits — `U × threshold` again. This is much the smaller of the two per-share terms, but it is not zero,
+///   and describing the Entry as threshold-free (as this list once did) is wrong.
+///
+/// So raising `threshold` (and lowering `polys`) buys a proportionally smaller commitment phase at
+/// the cost of more interpolation, later fault detection and more Entry evaluation.
+///
+/// Both sides have since been measured, and `8192 × 64` stands — see
+/// [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the tables. The objective is **Exit
+/// reconstruction capacity**, because the Exit serves 10–30 clients while an Entry serves only
+/// itself: on that measure the deployed threshold is within 0.4 % of the optimum, and the fixed
+/// per-polynomial cost the Exit amortises over `threshold` shares means a *lower* threshold is
+/// worse, not better. Summing Entry and Exit per-share cost instead would favour 48 by about 3 %;
+/// that reading is recorded there and deliberately not acted on.
+///
+/// The quota is fixed by `polys × (threshold + surplus)`, so the split can be re-tuned without
+/// touching session negotiation as long as that product holds.
+///
+/// ## Why this is an alias
+///
+/// The generator that produces the shares lives in `hopr-protocol-pix` and carries its own
+/// defaults, so the split existed as two independent literals — and they drifted: this side was
+/// re-tuned to `8192 × 64` while the pix crate stayed at a threshold of 128, which made
+/// [`hopr_protocol_pix::SsaGeneratorConfig::default`] imply a 1.01 GiB quota, outside the very
+/// range derived below. Four benchmarks had grown comments explaining which of the two to
+/// believe. Aliasing removes the choice.
+pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = hopr_protocol_pix::DEFAULT_POLYS_PER_SSA;
+
+/// Default number of shares required to reconstruct a single SSA part.
+///
+/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, why it is kept
+/// small relative to the polynomial count, and why it is an alias rather than a literal.
+pub const DEFAULT_PIX_SHARES_PER_POLY: u8 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
+
+/// Default number of shares emitted per SSA part beyond [`DEFAULT_PIX_SHARES_PER_POLY`].
+///
+/// An alias for the same reason as its two siblings, and with more riding on it than they have: the
+/// surplus is part of [`DEFAULT_PIX_SSA_QUOTA`], so a second, disagreeing default would not merely
+/// mis-describe a cycle — it would price one.
+pub const DEFAULT_PIX_SURPLUS_SHARES: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
+
+/// The elliptic curve suite this build instantiates PIX over, as announced to peers.
+///
+/// A property of how the node was compiled — `pix-bjj` or `pix-secp256k1` on `hopr-crypto-packet`
+/// — not of its configuration, so it is read off the spec rather than named again here. Peers that
+/// disagree about it cannot exchange PIX commitments at all, because every curve-sized field on the
+/// wire changes width with it; announcing it is what turns that into a refused Session instead of
+/// undecodable traffic.
+pub const LOCAL_PIX_SUITE: hopr_protocol_pix::PixSuite = <HoprPixSpec as PixSpec>::PIX_SUITE;
+
+/// The three defaults and the local curve suite, as the single set both nodes must agree on.
+///
+/// The `match` is a compile-time range check: defaults that fall outside what
+/// [`PixParams::try_new`] accepts fail the build rather than every Session.
+pub(crate) const DEFAULT_PIX_PARAMS: PixParams = match PixParams::try_new(
+    DEFAULT_PIX_POLYS_PER_SSA,
+    DEFAULT_PIX_SHARES_PER_POLY,
+    DEFAULT_PIX_SURPLUS_SHARES,
+    LOCAL_PIX_SUITE,
+) {
+    Ok(params) => params,
+    Err(_) => panic!("default PIX dimensions must be within the protocol ranges"),
+};
+
+/// Nominal per-SSA data quota implied by the default PIX dimensions.
+///
+/// This is the amount of Exit → Entry data covered by a single SSA deposit when both
+/// nodes run the default PIX configuration.
+pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
+
+/// Divisor applied to [`DEFAULT_PIX_SSA_QUOTA`] to obtain the lower bound of the default
+/// [`quota_range`](crate::IncomingSessionPixConfig::quota_range).
+///
+/// Preserves the 4× span the range had when its bounds were hard-coded.
+pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
+
+/// Representation of a data quota per SSA agreed upon during the Session establishment.
+///
+/// No longer `Copy`: [`deposit_data`](Self::deposit_data) owns its bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgreedSsaQuota {
+    /// ID of the SSA.
+    pub ssa_id: SsaId<HoprPseudonym>,
+    /// Deposit address of the SSA.
+    pub deposit_address: <HoprPixSpec as PixSpec>::DepositAddress,
+    /// Quota of the SSA in bytes.
+    pub quota_per_ssa: SsaQuota,
+    /// Deposit data the pool produced for this SSA.
+    ///
+    /// Both nodes end up holding the same value by different routes: the Entry rebuilds it from the
+    /// `SsaRequest` it just decoded, the Exit recalls what it sent for this index. Empty when the pool
+    /// produced nothing for this SSA — the field is not optional, because a pool that has no deposit
+    /// data to attach and one that failed to attach it are the same thing to a reader, and
+    /// [`PixDepositData::is_empty`] already says which it is.
+    pub deposit_data: PixDepositData,
+}
+
+/// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
+#[derive(Debug)]
+pub enum HoprSessionOutPixEvent {
+    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
+    /// agreed data quota.
+    ReadyToDeposit(AgreedSsaQuota),
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
+    /// funds to be deposited.
+    ///
+    /// The attached sender is used to deliver updates once the deposit is completed.
+    DepositNeeded(AgreedSsaQuota, hopr_api::node::DepositUpdated),
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node before it requests
+    /// commitments for a batch of SSAs, asking the deposit pool for the data to attach to them.
+    ///
+    /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
+    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
+    /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
+    /// is closed with [`ClosureReason::MissingDepositData`]. A pool with nothing to attach must
+    /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
+    ///
+    /// A listener that cannot answer at all should drop the attached sender: that ends the wait
+    /// immediately and fails the request now, whereas holding it costs every SSA request the full
+    /// timeout before failing anyway.
+    DepositDataRequest(hopr_api::node::PixDepositDataRequest),
+}
+
+/// Events received by the [`crate::manager::SessionManager`] in reaction to received shares from the packet pipeline.
+#[derive(Debug, Clone)]
+pub enum HoprSessionInPixEvent {
+    /// Informs the [`crate::manager::SessionManager`] that an SSA was fully recovered.
+    SsaRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
+    /// for an SSA — the next SSA request can be made.
+    SsaAlmostRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
+    ///
+    /// Carries the reconstructor's running total for the SSA rather than a delta: shares for one
+    /// cycle reach the Exit over whichever return path is available, so no single relayer's count is
+    /// the whole story, and an absolute total makes a duplicated or reordered report harmless.
+    UnverifiableShares {
+        ssa_id: SsaId<HoprPseudonym>,
+        observed_total: u64,
+    },
+    /// Reports how far an SSA has got towards recovery.
+    ///
+    /// Unlike the others this is paced by traffic rather than by lifecycle transitions, and it is
+    /// what keeps a funded Session's egress flowing — the gate stops serving a cycle that shows no
+    /// progress. Delivered without backpressure for that reason; see
+    /// `SessionPixSupervisorHandle::try_send_progress`.
+    RecoveryProgress(SsaRecoveryProgress<HoprPseudonym>),
+}
+
+impl HoprSessionInPixEvent {
+    /// Extracts the pseudonym of the SSA that might map to an existing Session.
+    pub fn pseudonym(&self) -> &HoprPseudonym {
+        match self {
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShares { ssa_id, .. } => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::RecoveryProgress(progress) => progress.ssa_id.pseudonym(),
+        }
+    }
+}
 
 /// Constant application tag used for all sessions.
 /// Previously tags were dynamically allocated per session.
@@ -93,6 +405,10 @@ pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
 }
 
 /// Indicates the closure reason of a [`HoprSession`].
+///
+/// Delivered to the `on_close` callback a Session is constructed with — see
+/// [`HoprSession::new`] — and to the `SessionManager`'s closure notifier, so a caller has to be able
+/// to name this type to write either.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 pub enum ClosureReason {
     /// Write-half of the Session has been closed.
@@ -101,6 +417,22 @@ pub enum ClosureReason {
     EmptyRead,
     /// Session has been evicted from the cache due to inactivity or capacity reasons.
     Eviction,
+    /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
+    UnrealizedDeposit,
+    /// The local deposit pool did not supply the deposit data an SSA batch needs.
+    ///
+    /// Exit-side and locally caused, unlike [`UnrealizedDeposit`](Self::UnrealizedDeposit) which is
+    /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
+    /// the outside — a PIX Session that stopped — and point at opposite nodes.
+    MissingDepositData,
+    /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
+    /// verification, or the supervisor itself became unavailable.
+    ///
+    /// Distinct from [`UnrealizedDeposit`](Self::UnrealizedDeposit) and
+    /// [`MissingDepositData`](Self::MissingDepositData), which name the two PIX failures an operator
+    /// can act on directly; the rest are collapsed here and distinguished in telemetry by the
+    /// supervisor's own close reason.
+    PixFailure,
 }
 
 /// Helper trait to allow Box aliasing
@@ -139,6 +471,12 @@ pub struct HoprSessionConfig {
     /// Default is 0.
     #[default(0)]
     pub max_buffered_segments: usize,
+    /// Abandon the frame due next once this many later frames are waiting behind it.
+    ///
+    /// Head-of-line bound, distinct from [`Self::frame_timeout`]: that one waits for a frame that
+    /// may still arrive, this bounds how much already-received data is held while it waits. `None`
+    /// keeps the timeout as the only rule.
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -243,6 +581,13 @@ impl HoprSession {
                 // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
                 // also where the honest clock that observes the resulting loss lives.
                 max_frame_age: flow_control.and_then(|c| c.max_frame_age),
+                // Head-of-line bound, and deliberately *not* gated on flow control the way
+                // `max_frame_age` is. The reasoning there runs backwards for this one: a session
+                // that can retransmit may still recover a missing frame, so waiting is
+                // productive, while a session without retransmission is waiting for something
+                // that is never coming and holds everything already received behind it. The
+                // sessions that need this bound most are exactly the ones flow control excludes.
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
                 ..Default::default()
             };
 
@@ -361,7 +706,7 @@ impl HoprSession {
 }
 
 impl std::fmt::Debug for HoprSession {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
             .field("routing", &self.routing)
@@ -458,14 +803,185 @@ mod tests {
 
     use super::*;
 
+    fn deposit_entry(session_id: &SessionId, ssa_index: u32, data: &[u8]) -> PixDepositData {
+        PixDepositData {
+            id: hopr_api::node::PixAddressId::new(
+                session_id,
+                hopr_protocol_pix::SsaIndex::new(ssa_index).expect("non-zero"),
+            ),
+            data: data.into(),
+        }
+    }
+
+    /// The pool answers a batch as a flat list, in whatever order it produced the entries, so the
+    /// transform has to key them itself — and pair each payload with the index its own `id` names,
+    /// not with the position it arrived in.
+    #[test]
+    fn deposit_data_for_batch_should_key_payloads_by_their_own_ssa_index() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [
+            hopr_protocol_pix::SsaIndex::new(7).expect("non-zero"),
+            hopr_protocol_pix::SsaIndex::new(8).expect("non-zero"),
+        ];
+
+        // Deliberately not in batch order: nothing promises the channel delivers them sorted.
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![
+                deposit_entry(&session_id, 8, b"eight"),
+                deposit_entry(&session_id, 7, b"seven"),
+            ],
+        )?;
+
+        assert_eq!(2, out.len());
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"seven".as_slice().into())),
+            out.get(&batch[0])
+        );
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"eight".as_slice().into())),
+            out.get(&batch[1])
+        );
+
+        Ok(())
+    }
+
+    /// An answer must not be credited to an SSA it does not name, even when the index alone matches:
+    /// a `PixAddressId` is the pseudonym *and* the index, and only both together identify the SSA.
+    #[test]
+    fn deposit_data_for_batch_should_drop_entries_outside_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [hopr_protocol_pix::SsaIndex::new(7).expect("non-zero")];
+
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![
+                // Right Session, index the batch does not contain.
+                deposit_entry(&session_id, 9, b"not in batch"),
+                // Right index, but belonging to another Session.
+                deposit_entry(&other_session, 7, b"wrong session"),
+                deposit_entry(&session_id, 7, b"good"),
+            ],
+        )?;
+
+        assert_eq!(1, out.len());
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"good".as_slice().into())),
+            out.get(&batch[0])
+        );
+
+        Ok(())
+    }
+
+    /// An SSA with no answer fails the batch: the data only ever travels in the `SsaRequest` that
+    /// carries the commitments, so an Entry that needed it would have no way to obtain it later.
+    #[test]
+    fn deposit_data_for_batch_should_reject_a_short_answer() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [
+            hopr_protocol_pix::SsaIndex::new(1).expect("non-zero"),
+            hopr_protocol_pix::SsaIndex::new(2).expect("non-zero"),
+        ];
+
+        // One of two answered.
+        assert!(matches!(
+            deposit_data_for_batch(&session_id, &batch, vec![deposit_entry(&session_id, 2, b"only one")]),
+            Err(SessionManagerError::MissingDepositData(_))
+        ));
+
+        // Nothing answered at all — the no-pool case.
+        assert!(matches!(
+            deposit_data_for_batch(&session_id, &batch, Vec::new()),
+            Err(SessionManagerError::MissingDepositData(_))
+        ));
+
+        // An entry that is present but *empty* is an answer, not an absence: a pool with nothing to
+        // attach says so this way, and the batch travels.
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![deposit_entry(&session_id, 1, b""), deposit_entry(&session_id, 2, b"")],
+        )?;
+        assert_eq!(2, out.len());
+        assert!(out.values().all(|payload| payload.0.is_empty()));
+
+        Ok(())
+    }
+
+    // --- PIX quota tests ---
+
+    /// The quota must count what the generator emits, not what the Exit needs to recover.
+    ///
+    /// This is one half of "paid-for equals served". The other half is
+    /// `drain_shares_by_polynomial` in `hopr-protocol-pix`, which pins a cycle's emission at
+    /// `polys × (threshold + surplus)` — the same expression. If one moves without the other, the
+    /// Exit is either serving unpaid traffic or charging for traffic it never sends.
+    #[test]
+    fn quota_must_price_every_share_a_cycle_emits() -> anyhow::Result<()> {
+        for (polys, threshold, surplus) in [(1u16, 2u8, 0u8), (8, 2, 2), (8192, 64, 32), (16192, 255, 255)] {
+            let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
+            assert_eq!(
+                polys as u64 * (threshold as u64 + surplus as u64) * HoprPacket::PAYLOAD_SIZE as u64,
+                pix_params_to_quota(&params),
+                "the quota must cover every share the cycle emits"
+            );
+        }
+        Ok(())
+    }
+
+    /// A non-zero surplus must cost something. Before it was priced, these two were equal — which
+    /// is exactly the state this guards against returning to.
+    #[test]
+    fn a_surplus_must_raise_the_quota_above_the_threshold_alone() -> anyhow::Result<()> {
+        let threshold_only = pix_params_to_quota(&PixParams::try_new(8192, 64, 0, LOCAL_PIX_SUITE)?);
+        let with_surplus = pix_params_to_quota(&PixParams::try_new(8192, 64, 32, LOCAL_PIX_SUITE)?);
+
+        assert!(
+            with_surplus > threshold_only,
+            "a surplus of 32 must be charged for, got {with_surplus} against {threshold_only}"
+        );
+        assert_eq!(
+            threshold_only * 3 / 2,
+            with_surplus,
+            "a surplus of half the threshold must cost half the threshold's quota again"
+        );
+
+        // And the same, at the surplus this node actually defaults to: `threshold / 4`, i.e. a
+        // deployed factor of 1.25x rather than the 1.5x this test used to describe as "deployed".
+        let deployed = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
+        assert_eq!(threshold_only * 5 / 4, deployed, "the deployed surplus factor is 1.25x");
+        Ok(())
+    }
+
+    /// The defaults the Exit's `quota_range` is anchored on are the ones an Entry actually runs.
+    #[test]
+    fn default_quota_must_follow_the_default_dimensions() {
+        assert_eq!(
+            DEFAULT_PIX_POLYS_PER_SSA as u64
+                * (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64)
+                * HoprPacket::PAYLOAD_SIZE as u64,
+            DEFAULT_PIX_SSA_QUOTA
+        );
+        // Anchored on the ratio function rather than on a restatement of it. This line used to read
+        // `DEFAULT_PIX_SHARES_PER_POLY / 2`, which was the ratio before it became `threshold / 4`;
+        // restating it is precisely how it came to disagree with the constant it checks.
+        assert_eq!(
+            DEFAULT_PIX_SURPLUS_SHARES,
+            hopr_protocol_pix::default_surplus_for(DEFAULT_PIX_SHARES_PER_POLY)
+        );
+    }
+
     // --- ByteCapabilities tests ---
 
     #[test]
     fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
         let flags: Capabilities = Capability::Segmentation.into();
-        let caps = ByteCapabilities::from(flags);
+        let caps = HoprSessionCapabilities::from(flags);
         let byte_val: u8 = caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(caps, restored);
         Ok(())
     }
@@ -473,12 +989,12 @@ mod tests {
     #[test]
     fn byte_capabilities_invalid_bits_are_rejected() {
         // 0xFF has bits set that don't correspond to any Capability
-        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+        assert!(HoprSessionCapabilities::try_from(0xFF_u8).is_err());
     }
 
     #[test]
     fn byte_capabilities_empty_is_zero() {
-        let caps = ByteCapabilities::from(Capabilities::empty());
+        let caps = HoprSessionCapabilities::from(Capabilities::empty());
         let byte_val: u8 = caps.into();
         assert_eq!(byte_val, 0);
     }
@@ -486,9 +1002,9 @@ mod tests {
     #[test]
     fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
         let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
-        let byte_caps = ByteCapabilities::from(caps);
+        let byte_caps = HoprSessionCapabilities::from(caps);
         let byte_val: u8 = byte_caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
         Ok(())
     }
@@ -532,7 +1048,26 @@ mod tests {
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
+            ClosureReason::UnrealizedDeposit,
+            ClosureReason::MissingDepositData,
+            ClosureReason::PixFailure,
         ];
+
+        // The array above is hand-maintained, and a snapshot that silently stops covering a variant
+        // is worse than no snapshot: it reads as a guarantee it no longer gives. `PixFailure` was
+        // missing for exactly that reason. This match is exhaustive and wildcard-free, so adding a
+        // variant to `ClosureReason` fails to compile *here*, which is where the array is.
+        for reason in reasons {
+            match reason {
+                ClosureReason::WriteClosed
+                | ClosureReason::EmptyRead
+                | ClosureReason::Eviction
+                | ClosureReason::UnrealizedDeposit
+                | ClosureReason::MissingDepositData
+                | ClosureReason::PixFailure => {}
+            }
+        }
+
         insta::assert_debug_snapshot!(reasons);
     }
 

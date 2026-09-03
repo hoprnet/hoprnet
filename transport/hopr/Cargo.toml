@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.44.0"
+version = "0.48.1"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -22,16 +22,38 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+# Matches the other library crates in this workspace. Not accidental: the crate's documentation is
+# prose and diagrams rather than runnable examples — the only fenced block in `src/` is ```text — and
+# a runnable one here would need a live runtime, a chain connector and a network to reach anything
+# interesting. If a genuinely executable example is ever added, drop this line rather than marking
+# that one example `no_run`.
+doctest = false
 
 [features]
-default = ["p2p-announce-quic"]
+default = ["pix-bjj", "p2p-announce-quic"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
+# Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
+# production settles.
+#
+# Forwarded from here rather than pinned on the workspace dependency, so that the choice
+# stays expressible at all: Cargo features are additive, and a hard-enabled
+# `hopr-crypto-packet/pix-bjj` could never be turned off downstream.
+#
+# The curve is a network-wide build invariant: peers built for different curves cannot run a PIX
+# Session, and the Exit refuses a mismatched client with `UnacceptablePixParams` rather than
+# negotiating. See `hopr-crypto-packet`'s `pix-bjj` for the wire sizes this decides.
+pix-bjj = ["hopr-crypto-packet/pix-bjj"]
+# Overrides `pix-bjj`; see `hopr-crypto-packet`'s `pix-secp256k1` for why it is an override rather
+# than a peer. This is the supported way for a consumer to get Ethereum deposit addresses —
+# `default-features = false` is not, because it only holds while every crate in the graph
+# agrees to it.
+pix-secp256k1 = ["hopr-crypto-packet/pix-secp256k1"]
 all-benchmarks = []
 capture = ["dep:pcap-file"]
 # Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
 # Exposes `hopr_transport::testing::{stubs, harness}` for use by benches and integration tests.
 testing = [
   "dep:bimap",
-  "dep:futures-concurrency",
   "dep:hex-literal",
   "dep:hopr-chain-connector",
   "dep:hopr-ticket-manager",
@@ -75,6 +97,7 @@ cfg-if = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
 futures-timer = { workspace = true }
 halfbrown = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
@@ -85,6 +108,7 @@ multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
@@ -111,17 +135,19 @@ hopr-utils = { workspace = true, features = [
   "statistics-types",
   "statistics-types-weighted",
 ] }
-hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
+hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
+hopr-protocol-pix = { workspace = true, features = ["rayon"] }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 # Optional deps enabled by the `testing` feature.
+# NOTE: `futures-concurrency` is a non-optional dependency (see above) because
+# `ConcurrentStreamExt::merge` is used on the PIX event path in `src/lib.rs`.
 bimap = { workspace = true, optional = true }
-futures-concurrency = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
@@ -142,6 +168,10 @@ hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 rstest = { workspace = true }
+serde_json = { workspace = true }
+# Only for the config round-trip test: the same YAML reader hoprd parses its config file with, so
+# the test exercises the form an operator would actually write.
+serde-saphyr = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 
@@ -215,4 +245,4 @@ path = "tests/mixer_shared_heap.rs"
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde", "hopr-transport-probe"]
+ignored = ["humantime-serde"]

@@ -141,7 +141,7 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
                     .inner()
                     .transport()
                     .network_peer_observations(peer)
-                    .and_then(|obs| obs.immediate_qos().map(|imm| imm.average_probe_rate()));
+                    .and_then(|obs| obs.immediate_qos().and_then(|imm| imm.average_probe_rate()));
                 (peer.to_string(), rate)
             })
             .collect();
@@ -161,7 +161,13 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
             .network_peer_observations(peer)
             .context("peer should have observations in the graph")?;
 
-        assert!(obs.score() > 0.0, "score should be positive for {peer}");
+        // `score` is `Option<f64>` since hopr-api 2.0.0: `None` is unobserved, `Some(0.0)` is
+        // measured and unusable. A probed neighbour must be the former of neither.
+        assert!(
+            obs.score().is_some_and(|score| score > 0.0),
+            "score should be observed and positive for {peer}, got {:?}",
+            obs.score()
+        );
     }
 
     Ok(())
@@ -191,10 +197,13 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
             .context("failed to get all network peers")?;
 
         Ok(
-            if peers.len() == expected_count && peers.iter().all(|(_, obs)| obs.score() > 0.0) {
+            if peers.len() == expected_count
+                && peers.iter().all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
+            {
                 Probe::Ready(peers)
             } else {
-                let scores: Vec<(String, f64)> = peers.iter().map(|(id, obs)| (id.to_string(), obs.score())).collect();
+                let scores: Vec<(String, Option<f64>)> =
+                    peers.iter().map(|(id, obs)| (id.to_string(), obs.score())).collect();
                 Probe::Pending(format!("{}/{expected_count} scored peers: {scores:?}", peers.len()))
             },
         )
@@ -202,7 +211,11 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
     .await?;
 
     for (peer_id, obs) in &all_peers {
-        assert!(obs.score() > 0.0, "peer {peer_id} score should be positive");
+        assert!(
+            obs.score().is_some_and(|score| score > 0.0),
+            "peer {peer_id} score should be observed and positive, got {:?}",
+            obs.score()
+        );
         assert!(
             obs.last_update().as_millis() > 0,
             "peer {peer_id} should have a last_update timestamp"
