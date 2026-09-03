@@ -138,7 +138,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "4.1.0" }
+hopr-api = { version = "4.3.0" }
 hopr-types = { version = "4.0.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.13.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
@@ -165,7 +165,7 @@ hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-alloca
 hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.3.0", default-features = false }
+hopr-session-server-forwarder = { version = "0.4.0", default-features = false }
 hopr-transport-p2p = { version = "0.11.0", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.6.0", default-features = false }
 hopr-network-graph = { version = "0.7.0", default-features = false }
@@ -231,11 +231,3 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
-
-# Temporary, for the duration of #8376: `HoprSessionServer::admit` is not published yet. A `[patch]`
-# rather than a git dependency because `hopr-api` also reaches this workspace through several
-# crates.io crates; a git dep would leave two distinct `hopr-api` packages in the graph whose traits
-# do not unify. Pinned by `rev` rather than by branch so the resolved commit cannot move under
-# CI while the PR is open. Reverted once 4.3.0 is on crates.io.
-[patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "8818e6ca00ffa3618b002b97ce004c6deca426a3" }
