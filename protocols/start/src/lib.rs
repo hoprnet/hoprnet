@@ -41,6 +41,14 @@ pub enum StartErrorReason {
     Busy = 2,
     /// The recipient requires incentivization or the incentivization parameters are not acceptable.
     UnacceptablePixParams = 3,
+    /// The recipient does not serve this Session's target, or does not serve it on the offered
+    /// terms.
+    ///
+    /// Distinct from [`UnacceptablePixParams`](Self::UnacceptablePixParams) because the two call for
+    /// different responses: those parameters could be re-offered differently, whereas this target
+    /// will not be served by this recipient however the request is phrased. Distinct from
+    /// [`Busy`](Self::Busy) because that one is transient and worth retrying.
+    TargetNotAdmitted = 4,
 }
 
 /// Identifies which entity a [`StartErrorType`] refers to.
@@ -799,8 +807,15 @@ where
                     };
                     StartProtocol::SessionError(StartErrorType {
                         identifier,
-                        reason: StartErrorReason::from_repr(body[reason_start])
-                            .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
+                        // An unrecognized reason is read as [`StartErrorReason::Unknown`] rather
+                        // than failing the message, which is the whole purpose of that variant.
+                        // The alternative loses the error entirely: a peer that added a reason this
+                        // build predates would have its `SessionError` rejected as malformed, and
+                        // the Session it was closing would die on a timeout instead of being
+                        // reported. Refusing to parse tells this node *less* than reading the byte
+                        // it does not recognize as "some reason", so a reason may be added without
+                        // a protocol version bump.
+                        reason: StartErrorReason::from_repr(body[reason_start]).unwrap_or(StartErrorReason::Unknown),
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
@@ -1142,6 +1157,66 @@ mod tests {
         let (tag, msg) = msg_3.clone().encode()?;
         let msg_4 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_3, msg_4);
+
+        Ok(())
+    }
+
+    /// The reason travels as a single byte read back through `from_repr`, so a variant that does not
+    /// survive the round trip is one a peer cannot be told about at all.
+    #[test]
+    fn every_session_error_reason_survives_the_round_trip() -> anyhow::Result<()> {
+        for reason in [
+            StartErrorReason::Unknown,
+            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::Busy,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            let sent = StartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason,
+            });
+
+            let (tag, msg) = sent.clone().encode()?;
+            let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+            assert_eq!(sent, received, "round trip of {reason}");
+        }
+
+        Ok(())
+    }
+
+    /// A reason byte this build does not know must still decode, as `Unknown`.
+    ///
+    /// Otherwise adding a reason is a protocol break in one direction: the older peer rejects the
+    /// whole `SessionError` as malformed and loses the close it was being told about, so the
+    /// Session dies on a timeout instead. Reading the byte as "some reason" tells it strictly more.
+    #[test]
+    fn a_session_error_reason_this_build_does_not_know_decodes_as_unknown() -> anyhow::Result<()> {
+        let sent =
+            StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason: StartErrorReason::TargetNotAdmitted,
+            });
+        let (tag, msg) = sent.encode()?;
+
+        // Stand in for a reason added after this build: the last byte is the reason.
+        let mut msg = msg.into_vec();
+        let reason_byte = msg.len() - 1;
+        msg[reason_byte] = u8::MAX;
+
+        let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+        assert!(
+            matches!(
+                received,
+                StartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(10),
+                    reason: StartErrorReason::Unknown,
+                })
+            ),
+            "an unknown reason must survive as Unknown, got {received:?}"
+        );
 
         Ok(())
     }

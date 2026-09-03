@@ -96,6 +96,7 @@ pub async fn build_edge_with_chain<
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
+        + Sync
         + 'static,
 >(
     chain_key: &ChainKeypair,
@@ -135,6 +136,7 @@ pub async fn build_full_with_chain<
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
+        + Sync
         + 'static,
 >(
     chain_key: &ChainKeypair,
@@ -180,6 +182,7 @@ pub async fn build_entry_with_chain<
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
+        + Sync
         + 'static,
 >(
     chain_key: &ChainKeypair,
@@ -222,6 +225,7 @@ pub async fn build_exit_with_chain<
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
         + Send
+        + Sync
         + 'static,
 >(
     chain_key: &ChainKeypair,
