@@ -25,8 +25,6 @@ macro_rules! forward {
             $ty::Uniform($inner) => $call,
             #[cfg(feature = "poisson")]
             $ty::Poisson($inner) => $call,
-            #[cfg(feature = "poisson-shared")]
-            $ty::PoissonShared($inner) => $call,
         }
     };
 }
@@ -37,8 +35,6 @@ pub enum AnySender<T> {
     Uniform(crate::channel::Sender<T>),
     #[cfg(feature = "poisson")]
     Poisson(crate::poisson::Sender<T>),
-    #[cfg(feature = "poisson-shared")]
-    PoissonShared(crate::poisson_shared::Sender<T>),
 }
 
 impl<T> Clone for AnySender<T> {
@@ -48,8 +44,6 @@ impl<T> Clone for AnySender<T> {
             AnySender::Uniform(s) => AnySender::Uniform(s.clone()),
             #[cfg(feature = "poisson")]
             AnySender::Poisson(s) => AnySender::Poisson(s.clone()),
-            #[cfg(feature = "poisson-shared")]
-            AnySender::PoissonShared(s) => AnySender::PoissonShared(s.clone()),
         }
     }
 }
@@ -80,8 +74,6 @@ pub enum AnyReceiver<T> {
     Uniform(crate::channel::Receiver<T>),
     #[cfg(feature = "poisson")]
     Poisson(crate::poisson::Receiver<T>),
-    #[cfg(feature = "poisson-shared")]
-    PoissonShared(crate::poisson_shared::Receiver<T>),
 }
 
 impl<T: Unpin> Stream for AnyReceiver<T> {
@@ -105,11 +97,6 @@ pub fn create<T: Send + Unpin + 'static>(cfg: MixerConfig) -> (AnySender<T>, Any
         MixerType::Poisson(_) => {
             let (tx, rx) = crate::poisson::poisson_channel(cfg);
             (AnySender::Poisson(tx), AnyReceiver::Poisson(rx))
-        }
-        #[cfg(feature = "poisson-shared")]
-        MixerType::PoissonShared(_) => {
-            let (tx, rx) = crate::poisson_shared::poisson_shared_channel(cfg);
-            (AnySender::PoissonShared(tx), AnyReceiver::PoissonShared(rx))
         }
     }
 }

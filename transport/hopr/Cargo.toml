@@ -120,7 +120,6 @@ hopr-transport-mixer = { workspace = true, features = [
   "uniform-channel",
   "uniform-adapter",
   "poisson",
-  "poisson-shared",
 ] }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }

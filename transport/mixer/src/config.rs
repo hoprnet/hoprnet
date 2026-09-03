@@ -4,54 +4,45 @@ use validator::{Validate, ValidationError};
 
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
 pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
-pub const HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS: u64 = 20;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 /// The average-delay metric window is sized to this many times the active engine's nominal max
 /// delay (in ms), so a larger configured delay smooths the EMA over proportionally more packets.
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR: u64 = 5;
 
-/// Default fraction of packets released before the Poisson hard cap. Fixes the cap:mean ratio
-/// (`mean = cap / ln(1 / (1 - p))`), so at the default 20 ms cap the mean is ~4.3 ms.
-pub const HOPR_MIXER_CAP_PERCENTILE: f64 = 0.99;
-pub const HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS: u64 = 2;
-pub const HOPR_MIXER_DEFAULT_MIN_MIX_OCCUPANCY: usize = 5;
-pub const HOPR_MIXER_DEFAULT_TICK_FLOOR_IN_MS: u64 = 1;
-pub const HOPR_MIXER_DEFAULT_SATURATION_MIN_MEAN_IN_MS: u64 = 1;
+/// Default hard latency bound. Bounded-latency mode (the default, `target_occupancy = 0`) holds
+/// mean delay to `max_delay / ln(1/miss_probability)` regardless of load; constant-privacy mode
+/// (`target_occupancy > 0`) uses this only as an anti-starvation ceiling and typically releases
+/// well below it.
+pub const HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS: u64 = 20;
+/// Default target `P(delay > max_delay)`. Fixes `g_max = ln(1/miss_probability)`, the per-entry
+/// release-tag ceiling; at the default this gives `g_max ≈ 4.6` and, at the default `max_delay`,
+/// a mean delay of `max_delay/g_max · E[g] ≈ 4.14 ms`.
+pub const HOPR_MIXER_DEFAULT_MISS_PROBABILITY: f64 = 0.01;
+/// Default `target_occupancy`: `0` disables the arrival term entirely (bounded-latency mode).
+pub const HOPR_MIXER_DEFAULT_TARGET_OCCUPANCY: usize = 0;
 
 #[cfg(feature = "serde")]
-fn default_cap_percentile() -> f64 {
-    HOPR_MIXER_CAP_PERCENTILE
+fn default_max_delay() -> Duration {
+    Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS)
 }
-/// Reject a release percentile outside the open interval `(0, 1)`; the endpoints make the
-/// cap:mean ratio zero or infinite.
-fn validate_cap_percentile(percentile: f64) -> Result<(), ValidationError> {
-    if percentile > 0.0 && percentile < 1.0 {
+#[cfg(feature = "serde")]
+fn default_miss_probability() -> f64 {
+    HOPR_MIXER_DEFAULT_MISS_PROBABILITY
+}
+/// Reject a miss probability outside the open interval `(0, 0.5)`: the lower bound excludes an
+/// infinite `g_max`, and the upper bound keeps it a minority tail rather than most of the mass.
+fn validate_miss_probability(miss_probability: f64) -> Result<(), ValidationError> {
+    if miss_probability > 0.0 && miss_probability < 0.5 {
         Ok(())
     } else {
         Err(ValidationError::new(
-            "cap_percentile must be in the open interval (0, 1)",
+            "miss_probability must be in the open interval (0, 0.5)",
         ))
     }
 }
 #[cfg(feature = "serde")]
-fn default_cap_jitter() -> Duration {
-    Duration::from_millis(HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS)
-}
-#[cfg(feature = "serde")]
-fn default_min_mix_occupancy() -> usize {
-    HOPR_MIXER_DEFAULT_MIN_MIX_OCCUPANCY
-}
-#[cfg(feature = "serde")]
-fn default_high_watermark() -> usize {
-    HOPR_MIXER_CAPACITY / 2
-}
-#[cfg(feature = "serde")]
-fn default_tick_floor() -> Duration {
-    Duration::from_millis(HOPR_MIXER_DEFAULT_TICK_FLOOR_IN_MS)
-}
-#[cfg(feature = "serde")]
-fn default_saturation_min_mean() -> Duration {
-    Duration::from_millis(HOPR_MIXER_DEFAULT_SATURATION_MIN_MEAN_IN_MS)
+fn default_target_occupancy() -> usize {
+    HOPR_MIXER_DEFAULT_TARGET_OCCUPANCY
 }
 
 /// Mixer configuration shared by every implementation.
@@ -82,32 +73,26 @@ impl MixerConfig {
         }
     }
 
-    /// Config selecting the dedicated-thread Poisson engine with the given delay anchor.
+    /// Config selecting the Poisson timing-wheel engine with the given hard bound and miss
+    /// probability, in bounded-latency mode (`target_occupancy = 0`: load-invariant mean delay).
     #[cfg(feature = "poisson")]
-    pub fn new_poisson(delay: PoissonDelay, cap_percentile: f64) -> Self {
-        Self {
-            mixer_type: MixerType::Poisson(Self::poisson_config(delay, cap_percentile)),
-            ..Self::default()
-        }
+    pub fn new_poisson(max_delay: Duration, miss_probability: f64) -> Self {
+        Self::new_poisson_constant_privacy(max_delay, miss_probability, 0)
     }
 
-    /// Config selecting the shared-pool Poisson engine with the given delay anchor.
-    #[cfg(feature = "poisson-shared")]
-    pub fn new_poisson_shared(delay: PoissonDelay, cap_percentile: f64) -> Self {
-        Self {
-            mixer_type: MixerType::PoissonShared(Self::poisson_config(delay, cap_percentile)),
-            ..Self::default()
-        }
-    }
-
-    /// The shared [`PoissonConfig`] body for both Poisson engine constructors (defaults except the
-    /// given anchor and percentile), so the two variants cannot drift apart.
+    /// Config selecting the Poisson timing-wheel engine in constant-privacy mode: the arrival
+    /// term locks occupancy toward `target_occupancy` once load clears the crossover
+    /// `target_occupancy / mu_max`, trading load-dependent latency (capped at `max_delay`) for a
+    /// load-invariant anonymity set.
     #[cfg(feature = "poisson")]
-    fn poisson_config(delay: PoissonDelay, cap_percentile: f64) -> PoissonConfig {
-        PoissonConfig {
-            delay,
-            cap_percentile,
-            ..PoissonConfig::default()
+    pub fn new_poisson_constant_privacy(max_delay: Duration, miss_probability: f64, target_occupancy: usize) -> Self {
+        Self {
+            mixer_type: MixerType::Poisson(PoissonConfig {
+                max_delay,
+                miss_probability,
+                target_occupancy,
+            }),
+            ..Self::default()
         }
     }
 
@@ -118,16 +103,14 @@ impl MixerConfig {
         (HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR * self.nominal_max_delay().as_millis() as u64).max(1)
     }
 
-    /// The active engine's nominal maximum delay: the Poisson hard cap, or the uniform
-    /// `min_delay + delay_range`.
+    /// The active engine's nominal maximum delay: the timing-wheel hard bound `max_delay`, or the
+    /// uniform `min_delay + delay_range`.
     fn nominal_max_delay(&self) -> Duration {
         match self.mixer_type {
             #[cfg(feature = "uniform-channel")]
             MixerType::Uniform(uniform) => uniform.min_delay.saturating_add(uniform.delay_range),
             #[cfg(feature = "poisson")]
-            MixerType::Poisson(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
-            #[cfg(feature = "poisson-shared")]
-            MixerType::PoissonShared(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
+            MixerType::Poisson(poisson) => poisson.max_delay,
             #[allow(unreachable_patterns)]
             _ => Duration::ZERO,
         }
@@ -157,33 +140,24 @@ pub enum MixerType {
     /// Uniform-delay min-heap channel.
     #[cfg(feature = "uniform-channel")]
     Uniform(UniformConfig),
-    /// Exponential (Poisson) release engine on a dedicated thread.
+    /// Virtual-clock timing-wheel release engine, pool shared on the consumer task.
     #[cfg(feature = "poisson")]
     Poisson(PoissonConfig),
-    /// Exponential (Poisson) release engine sharing the pool on the consumer task.
-    #[cfg(feature = "poisson-shared")]
-    PoissonShared(PoissonConfig),
 }
 
 impl Default for MixerType {
     fn default() -> Self {
-        #[cfg(feature = "poisson-shared")]
-        return MixerType::PoissonShared(PoissonConfig::default());
-        #[cfg(all(feature = "poisson", not(feature = "poisson-shared")))]
+        #[cfg(feature = "poisson")]
         return MixerType::Poisson(PoissonConfig::default());
-        #[cfg(all(
-            feature = "uniform-channel",
-            not(feature = "poisson"),
-            not(feature = "poisson-shared")
-        ))]
+        #[cfg(all(feature = "uniform-channel", not(feature = "poisson")))]
         return MixerType::Uniform(UniformConfig::default());
-        #[cfg(not(any(feature = "uniform-channel", feature = "poisson", feature = "poisson-shared")))]
+        #[cfg(not(any(feature = "uniform-channel", feature = "poisson")))]
         compile_error!("at least one mixer implementation feature must be enabled");
     }
 }
 
 // Hand-written because `validator::Validate` does not derive on enums; delegates to the nested
-// `PoissonConfig` for the Poisson variants.
+// `PoissonConfig` for the Poisson variant.
 impl validator::Validate for MixerType {
     fn validate(&self) -> Result<(), validator::ValidationErrors> {
         match self {
@@ -191,8 +165,6 @@ impl validator::Validate for MixerType {
             MixerType::Uniform(uniform) => uniform.validate(),
             #[cfg(feature = "poisson")]
             MixerType::Poisson(poisson) => poisson.validate(),
-            #[cfg(feature = "poisson-shared")]
-            MixerType::PoissonShared(poisson) => poisson.validate(),
             #[allow(unreachable_patterns)]
             _ => Ok(()),
         }
@@ -234,94 +206,53 @@ impl UniformConfig {
     }
 }
 
-/// Which of the two bound quantities (hard cap / mean) the operator fixes; the other is derived
-/// from it and [`PoissonConfig::cap_percentile`] via `mean = cap / ln(1 / (1 - percentile))`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PoissonDelay {
-    /// Hard latency cap; the mean is derived so `cap_percentile` of packets release before it.
-    Cap(#[cfg_attr(feature = "serde", serde(with = "humantime_serde"))] Duration),
-    /// Mean holding delay; the hard cap is derived so `cap_percentile` of packets release before it.
-    Mean(#[cfg_attr(feature = "serde", serde(with = "humantime_serde"))] Duration),
-}
-
-impl Default for PoissonDelay {
-    fn default() -> Self {
-        PoissonDelay::Cap(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS))
-    }
-}
-
-impl PoissonDelay {
-    /// Resolve to `(hard_cap, mean)`, deriving the unspecified quantity at `percentile`.
-    /// A non-`(0, 1)` percentile (rejected by validation) degrades gracefully to zeros.
-    pub fn resolve(&self, percentile: f64) -> (Duration, Duration) {
-        let factor = (1.0 / (1.0 - percentile)).ln();
-        if !factor.is_finite() || factor <= 0.0 {
-            return match *self {
-                PoissonDelay::Cap(cap) => (cap, Duration::ZERO),
-                PoissonDelay::Mean(mean) => (Duration::ZERO, mean),
-            };
-        }
-        match *self {
-            PoissonDelay::Cap(cap) => (cap, Duration::from_secs_f64(cap.as_secs_f64() / factor)),
-            PoissonDelay::Mean(mean) => (Duration::from_secs_f64(mean.as_secs_f64() * factor), mean),
-        }
-    }
-}
-
-/// Tuning parameters for the exponential (Poisson) release engines.
+/// Tuning parameters for the virtual-clock timing-wheel release engine.
+///
+/// Every entry is tagged once, at enqueue, with a release threshold in dimensionless virtual
+/// time; the pool's virtual clock advances from wall-clock time and, when `target_occupancy > 0`,
+/// from arrivals. See `hopr_transport_mixer::pool` for the mechanism and its derivation.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PoissonConfig {
-    /// Fixes either the hard cap or the mean; the other is derived (see [`PoissonDelay`]).
-    #[default(_code = "PoissonDelay::default()")]
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub delay: PoissonDelay,
-    /// Fraction of packets released before the hard cap, fixing the cap:mean ratio. Must be in
-    /// `(0, 1)`.
-    #[default(HOPR_MIXER_CAP_PERCENTILE)]
-    #[cfg_attr(feature = "serde", serde(default = "default_cap_percentile"))]
-    #[validate(custom(function = "validate_cap_percentile"))]
-    pub cap_percentile: f64,
-    /// Width of the window over which hard-cap force-releases are smeared, removing the
-    /// deterministic release instant at exactly the cap.
-    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS))]
-    #[cfg_attr(feature = "serde", serde(default = "default_cap_jitter", with = "humantime_serde"))]
-    pub cap_jitter: Duration,
-    /// Occupancy at or below which the coin is replaced by a deterministic minimum dwell of one
-    /// mean, so a tiny buffer's packets overlap and mix instead of escaping the fast tail.
-    #[default(HOPR_MIXER_DEFAULT_MIN_MIX_OCCUPANCY)]
-    #[cfg_attr(feature = "serde", serde(default = "default_min_mix_occupancy"))]
-    pub min_mix_occupancy: usize,
-    /// Occupancy above which the overload valve shrinks the effective mean toward
-    /// `saturation_min_mean` as the buffer nears `capacity`.
-    #[default(HOPR_MIXER_CAPACITY / 2)]
-    #[cfg_attr(feature = "serde", serde(default = "default_high_watermark"))]
-    #[validate(range(min = 1))]
-    pub high_watermark: usize,
-    /// Lower bound on the adaptive wake interval, keeping the tick frequency low under load.
-    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_TICK_FLOOR_IN_MS))]
-    #[cfg_attr(feature = "serde", serde(default = "default_tick_floor", with = "humantime_serde"))]
-    pub tick_floor: Duration,
-    /// Floor the overload valve shrinks the mean toward, preserving a minimum mixing delay at
-    /// saturation instead of collapsing to pass-through.
-    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_SATURATION_MIN_MEAN_IN_MS))]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "default_saturation_min_mean", with = "humantime_serde")
-    )]
-    pub saturation_min_mean: Duration,
+    /// Hard latency bound: no entry can be held longer than `max_delay`, by construction of the
+    /// release tag (see [`Self::miss_probability`]) — not a force-release rule. `max_delay = 0`
+    /// disables mixing entirely (passthrough, FIFO order).
+    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS))]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_delay", with = "humantime_serde"))]
+    pub max_delay: Duration,
+    /// Target `P(delay > max_delay)`. Must be in the open interval `(0, 0.5)`; fixes the
+    /// per-entry tag ceiling `g_max = ln(1/miss_probability)` and, with it,
+    /// `mu_max = max_delay / g_max` — the slowest the release clock ever holds an entry via
+    /// wall-clock time alone.
+    #[default(HOPR_MIXER_DEFAULT_MISS_PROBABILITY)]
+    #[cfg_attr(feature = "serde", serde(default = "default_miss_probability"))]
+    #[validate(custom(function = "validate_miss_probability"))]
+    pub miss_probability: f64,
+    /// Buffer occupancy the release clock's arrival term targets.
+    ///
+    /// `0` (the default) disables the arrival term: **bounded-latency mode**, mean delay is
+    /// load-invariant and capped at `max_delay`.
+    ///
+    /// `> 0` blends in load: **constant-privacy mode**. Once the arrival rate `lambda` clears the
+    /// crossover `lambda ≈ target_occupancy / mu_max`, occupancy locks toward `target_occupancy`
+    /// and mean delay falls as load rises to sustain it — trading load-dependent latency (still
+    /// capped at `max_delay`, now typically anti-starvation headroom rather than the working
+    /// bound) for a load-invariant anonymity set. Below the crossover it degrades gracefully
+    /// rather than stalling: occupancy sags below target and mean delay rises toward, but never
+    /// past, `max_delay`.
+    #[default(HOPR_MIXER_DEFAULT_TARGET_OCCUPANCY)]
+    #[cfg_attr(feature = "serde", serde(default = "default_target_occupancy"))]
+    pub target_occupancy: usize,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "poisson-shared")]
-    #[cfg(feature = "poisson-shared")]
+    #[cfg(feature = "poisson")]
     #[test]
-    fn default_mixer_type_should_be_poisson_shared() {
-        assert!(matches!(MixerType::default(), MixerType::PoissonShared(_)));
+    fn default_mixer_type_should_be_poisson() {
+        assert!(matches!(MixerType::default(), MixerType::Poisson(_)));
     }
 
     #[test]
@@ -337,5 +268,24 @@ mod tests {
             ..MixerConfig::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn miss_probability_outside_open_interval_should_fail_validation() {
+        for miss_probability in [0.0, 0.5, -0.1, 1.0] {
+            let cfg = PoissonConfig {
+                miss_probability,
+                ..PoissonConfig::default()
+            };
+            assert!(
+                cfg.validate().is_err(),
+                "miss_probability {miss_probability} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn default_target_occupancy_should_select_bounded_latency_mode() {
+        assert_eq!(PoissonConfig::default().target_occupancy, 0);
     }
 }

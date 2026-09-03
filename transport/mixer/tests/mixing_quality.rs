@@ -1,13 +1,10 @@
-//! End-to-end mixing-quality checks for the exponential (Poisson) release engine.
+//! End-to-end mixing-quality checks for the shared-pool virtual-clock timing-wheel mixer.
 //!
-//! Drives a steady packet stream through the assembled `poisson_channel` (dedicated thread +
-//! adaptive timer) and asserts the realized end-to-end delay distribution matches the configured
-//! anchor: exponential mean, cap-truncation fraction, and that reordering actually happens. These
-//! are the enforced counterparts of the earlier throwaway measurement scenarios — proofs that
-//! must hold, not numbers to eyeball.
-//!
-//! Assertions are deliberately loose (wide absolute bands plus robust cross-scenario ordering) so
-//! they enforce the design intent without flaking on OS-scheduling jitter in the realized delays.
+//! `src/pool.rs` unit-tests the release mechanism directly against pure functions; this suite
+//! drives the real `poisson_channel` API (real tokio tasks, real wall-clock sends) so a
+//! wiring bug in `poisson.rs` itself — the `enqueue`/`sweep`/`next_wake` call sites, the
+//! lock discipline, the wake scheduling — has somewhere to be caught that the pure-function tests
+//! cannot see.
 
 #![cfg(feature = "poisson")]
 
@@ -15,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use futures::StreamExt;
 use futures_timer::Delay;
-use hopr_transport_mixer::{MixerConfig, MixerType, PoissonConfig, PoissonDelay, poisson_channel};
+use hopr_transport_mixer::{MixerConfig, poisson_channel};
 
 const COUNT: usize = 5_000;
 /// ~10k msg/s ingress — the top of the target regime.
@@ -29,50 +26,34 @@ fn percentile(sorted_ms: &[f64], p: f64) -> f64 {
     sorted_ms[idx]
 }
 
-/// A dedicated-thread Poisson config with the given delay anchor, percentile, and jitter.
-fn poisson_cfg(delay: PoissonDelay, cap_percentile: f64, cap_jitter: Duration) -> MixerConfig {
-    MixerConfig {
-        mixer_type: MixerType::Poisson(PoissonConfig {
-            delay,
-            cap_percentile,
-            cap_jitter,
-            ..PoissonConfig::default()
-        }),
-        ..MixerConfig::default()
-    }
+fn mean(xs: &[f64]) -> f64 {
+    xs.iter().sum::<f64>() / xs.len() as f64
 }
 
-/// Realized-delay statistics measured end-to-end through the channel.
+fn poisson_cfg(max_delay: Duration, miss_probability: f64, target_occupancy: usize) -> MixerConfig {
+    MixerConfig::new_poisson_constant_privacy(max_delay, miss_probability, target_occupancy)
+}
+
+/// Realized-delay statistics measured end-to-end through the channel, at a fixed send spacing.
 struct Stats {
-    cap_ms: f64,
-    observed_mean: f64,
-    p99: f64,
-    /// Fraction of packets whose realized delay landed at or above the cap.
-    at_or_over_cap_frac: f64,
-    /// Fraction of packets that arrived out of send order (evidence of mixing).
+    delays_ms: Vec<f64>,
     out_of_order_frac: f64,
 }
 
-fn run_scenario(cfg: MixerConfig) -> Stats {
-    let cap_ms = match cfg.mixer_type {
-        MixerType::Poisson(pc) => pc.delay.resolve(pc.cap_percentile).0.as_secs_f64() * 1000.0,
-        #[allow(unreachable_patterns)]
-        _ => unreachable!("scenario configs are always the dedicated-thread Poisson variant"),
-    };
-
+fn run_scenario(cfg: MixerConfig, count: usize, spacing: Duration) -> Stats {
     let (mut delays_ms, out_of_order) = futures::executor::block_on(async move {
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         let sender = async move {
-            for seq in 0..COUNT as u32 {
+            for seq in 0..count as u32 {
                 tx.send((seq, Instant::now())).expect("send must succeed");
-                Delay::new(SEND_SPACING).await;
+                Delay::new(spacing).await;
             }
             // Dropping `tx` here closes the ingress so the receiver eventually sees `None`.
         };
 
         let receiver = async move {
-            let mut delays_ms = Vec::with_capacity(COUNT);
+            let mut delays_ms = Vec::with_capacity(count);
             let mut max_seq_seen: i64 = -1;
             let mut out_of_order = 0usize;
             while let Some((seq, sent_at)) = rx.next().await {
@@ -90,94 +71,98 @@ fn run_scenario(cfg: MixerConfig) -> Stats {
     });
 
     let n = delays_ms.len();
-    assert_eq!(n, COUNT, "every enqueued packet must be delivered before close");
-
-    // Sum and cap-count are order-independent; fold them in one pass, then sort in place for the
-    // percentile (no second copy of the delay vector needed).
-    let (sum, at_or_over_cap) = delays_ms
-        .iter()
-        .fold((0.0, 0usize), |(s, c), d| (s + d, c + (*d >= cap_ms - 1e-6) as usize));
+    assert_eq!(n, count, "every enqueued packet must be delivered before close");
     delays_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     Stats {
-        cap_ms,
-        observed_mean: sum / n as f64,
-        p99: percentile(&delays_ms, 0.99),
-        at_or_over_cap_frac: at_or_over_cap as f64 / n as f64,
+        delays_ms,
         out_of_order_frac: out_of_order as f64 / n as f64,
     }
 }
 
-/// The realized end-to-end delay distribution must track the configured anchor across the three
-/// canonical regimes, and mixing (reordering) must actually occur.
+/// The hard bound holds end-to-end, and mixing (reordering) actually occurs, in bounded-latency
+/// mode (`target_occupancy = 0`, the shipped default).
 #[test]
-fn poisson_channel_delay_distribution_should_match_configuration() {
-    let mean = Duration::from_millis(10);
-    let jitter = Duration::from_millis(2);
+fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() {
+    let max_delay = Duration::from_millis(20);
+    let cfg = poisson_cfg(max_delay, 0.01, 0);
+    let stats = run_scenario(cfg, COUNT, SEND_SPACING);
 
-    // Mean 10 ms, cap ~20 ms (86.5th percentile): the baseline regime.
-    let tight = run_scenario(poisson_cfg(PoissonDelay::Mean(mean), 0.865, jitter));
-    // Mean 10 ms, cap ~100 ms (99.995th percentile): the cap is far out, so truncation is
-    // negligible and the distribution is essentially untruncated exponential.
-    let relaxed = run_scenario(poisson_cfg(PoissonDelay::Mean(mean), 0.99995, jitter));
-    // Cap 20 ms at the 98th percentile ⇒ mean ~5.11 ms, ~2% force-released. Jitter off so the
-    // truncated mass lands exactly at the cap and is countable.
-    let capped = run_scenario(poisson_cfg(
-        PoissonDelay::Cap(Duration::from_millis(20)),
-        0.98,
-        Duration::ZERO,
-    ));
-
-    // Mixing happens: a steady stream must be reordered on the way out.
     assert!(
-        tight.out_of_order_frac > 0.1,
+        stats.out_of_order_frac > 0.1,
         "expected substantial reordering, got {:.1}%",
-        100.0 * tight.out_of_order_frac
+        100.0 * stats.out_of_order_frac
     );
 
-    // Observed mean tracks the 10 ms target (wide band absorbs scheduling overhead).
+    let max_delay_ms = max_delay.as_secs_f64() * 1000.0;
+    let max = stats.delays_ms.last().copied().unwrap_or(0.0);
+    // Generous scheduling slack: this is real wall-clock tokio scheduling, not the pure-function
+    // simulation in `pool.rs`, which asserts the bound far more tightly.
     assert!(
-        (5.0..=20.0).contains(&tight.observed_mean),
-        "mean-anchored observed mean {:.2} ms outside [5, 20]",
-        tight.observed_mean
-    );
-    assert!(
-        (5.0..=20.0).contains(&relaxed.observed_mean),
-        "relaxed observed mean {:.2} ms outside [5, 20]",
-        relaxed.observed_mean
+        max < max_delay_ms + 100.0,
+        "max realized delay {max:.2} ms should stay within {max_delay_ms} ms plus scheduling slack"
     );
 
-    // A far-out cap truncates far less than a tight one.
+    let observed_mean = mean(&stats.delays_ms);
     assert!(
-        relaxed.at_or_over_cap_frac < 0.02,
-        "relaxed cap should barely truncate, got {:.2}%",
-        100.0 * relaxed.at_or_over_cap_frac
+        (2.0..=20.0).contains(&observed_mean),
+        "bounded-latency mean {observed_mean:.2} ms outside the expected [2, 20] ms band"
     );
+}
+
+/// Constant-privacy mode (`target_occupancy > 0`) hits the design target end-to-end: ~10 ms mean
+/// at 1000 pkt/s with `target_occupancy = 14`, `max_delay = 200 ms`.
+#[test]
+fn constant_privacy_channel_should_hit_the_design_target_at_1000_pps() {
+    let cfg = poisson_cfg(Duration::from_millis(200), 0.01, 14);
+    // 1000 pkt/s => 1ms spacing.
+    let stats = run_scenario(cfg, 4_000, Duration::from_millis(1));
+    let observed_mean = mean(&stats.delays_ms);
     assert!(
-        relaxed.at_or_over_cap_frac < tight.at_or_over_cap_frac,
-        "relaxed cap ({:.2}%) must truncate less than the tight cap ({:.2}%)",
-        100.0 * relaxed.at_or_over_cap_frac,
-        100.0 * tight.at_or_over_cap_frac
+        (5.0..=17.0).contains(&observed_mean),
+        "constant-privacy mean at 1000 pkt/s should be near 10ms (target_occupancy=14, max_delay=200ms), got \
+         {observed_mean:.2}ms"
+    );
+}
+
+/// A far looser bound truncates less than a tight one, at the same mean-anchoring approach used
+/// throughout the design — a sanity check that `max_delay`/`miss_probability` actually drive the
+/// observed tail rather than being ignored by the wiring.
+#[test]
+fn a_tighter_bound_should_truncate_the_tail_more_than_a_looser_one() {
+    let tight = run_scenario(poisson_cfg(Duration::from_millis(20), 0.01, 0), COUNT, SEND_SPACING);
+    let loose = run_scenario(poisson_cfg(Duration::from_millis(100), 0.01, 0), COUNT, SEND_SPACING);
+
+    let tight_p99 = percentile(&tight.delays_ms, 0.99);
+    let loose_p99 = percentile(&loose.delays_ms, 0.99);
+    assert!(
+        tight_p99 < loose_p99,
+        "tight-bound p99 {tight_p99:.2} ms should be below loose-bound p99 {loose_p99:.2} ms"
     );
 
-    // A cap anchored at the 98th percentile derives a smaller mean than the 10 ms anchor, and its
-    // force-release fraction sits near the configured 2% (loose band for scheduling noise).
+    // Nothing is delivered meaningfully past either bound.
+    let tight_max = tight.delays_ms.last().copied().unwrap_or(0.0);
     assert!(
-        capped.observed_mean < tight.observed_mean,
-        "cap@98% mean {:.2} ms should be below the 10 ms-anchored mean {:.2} ms",
-        capped.observed_mean,
-        tight.observed_mean
+        tight_max <= 20.0 + 100.0,
+        "p100 {tight_max:.2} ms should not exceed the 20ms bound by more than scheduling slack"
     );
-    assert!(
-        (0.002..=0.10).contains(&capped.at_or_over_cap_frac),
-        "cap@98% force-release fraction {:.2}% outside [0.2%, 10%]",
-        100.0 * capped.at_or_over_cap_frac
-    );
-    // Nothing is delivered meaningfully past the hard cap.
-    assert!(
-        capped.p99 <= capped.cap_ms + 5.0,
-        "p99 {:.2} ms should not exceed cap {:.2} ms by more than 5 ms slack",
-        capped.p99,
-        capped.cap_ms
-    );
+}
+
+/// Passthrough (`max_delay = Duration::ZERO`) preserves FIFO order end-to-end, the one case where
+/// reordering must NOT occur.
+#[test]
+fn passthrough_channel_should_preserve_order() {
+    const ITERATIONS: usize = 40;
+    let cfg = poisson_cfg(Duration::ZERO, 0.01, 0);
+
+    futures::executor::block_on(async move {
+        let (tx, rx) = poisson_channel(cfg);
+        let input: Vec<u32> = (0..ITERATIONS as u32).collect();
+        for i in &input {
+            tx.send(*i).expect("send must succeed");
+        }
+        drop(tx);
+        let output: Vec<u32> = rx.take(ITERATIONS).collect().await;
+        assert_eq!(input, output, "pass-through must preserve FIFO order");
+    });
 }

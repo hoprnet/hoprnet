@@ -4428,7 +4428,6 @@ name = "hopr-transport-mixer"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "async-channel 2.5.0",
  "bytesize",
  "criterion",
  "futures",

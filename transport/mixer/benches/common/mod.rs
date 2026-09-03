@@ -1,27 +1,27 @@
 //! Shared helpers for the mixer throughput benchmarks (`mixer_throughput_bench`,
-//! `poisson_shared_bench`), so the workload volumes, labels, payload and reused-channel drain
+//! `poisson_bench`), so the workload volumes, labels, payload and reused-channel drain
 //! are defined once. Included via `mod common;` in each bench (compiled per bench binary), so a
 //! bench that uses only a subset would warn — every item here is used by both current benches.
 
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig, PoissonDelay};
+use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig};
 
 pub const SAMPLE_SIZE: usize = 10;
 
 /// 512 characters long string of random gibberish.
 pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
-/// A near-passthrough Poisson config (1 ms cap) so the Poisson-engine benchmarks measure the
-/// per-message overhead rather than the mixing delay. Read by both Poisson engines via
-/// `PoissonParams::from_mixer`. The uniform-engine benchmarks use their own zero-delay
-/// `MixerConfig::new_uniform` config instead of relying on this one.
+/// A near-passthrough timing-wheel config (1 ms bound) so the Poisson-engine benchmark measures
+/// per-message overhead rather than the mixing delay. Read by `PoissonParams::from_mixer`. The
+/// uniform-engine benchmarks use their own zero-delay `MixerConfig::new_uniform` config instead
+/// of relying on this one.
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
     MixerConfig {
         mixer_type: MixerType::Poisson(PoissonConfig {
-            delay: PoissonDelay::Cap(std::time::Duration::from_millis(1)),
+            max_delay: std::time::Duration::from_millis(1),
             ..PoissonConfig::default()
         }),
         ..MixerConfig::default()

@@ -4,12 +4,7 @@ expression: cfg
 ---
 capacity: 20000
 mixer_type:
-  PoissonShared:
-    delay:
-      Cap: 20ms
-    cap_percentile: 0.99
-    cap_jitter: 2ms
-    min_mix_occupancy: 5
-    high_watermark: 10000
-    tick_floor: 1ms
-    saturation_min_mean: 1ms
+  Poisson:
+    max_delay: 20ms
+    miss_probability: 0.01
+    target_occupancy: 0

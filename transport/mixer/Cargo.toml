@@ -23,13 +23,11 @@ include = [
 crate-type = ["rlib"]
 
 [features]
-# The shared-pool Poisson engine is the default mixer implementation.
-default = ["poisson-shared"]
-# Exponential (Poisson) release engine — `poisson_channel`.
-poisson = ["dep:async-channel", "futures/executor"]
-# Opt-in shared-pool Poisson engine: pool behind Arc<Mutex>, sweep runs on the consumer (no
-# dedicated thread or relay channels). Faster than `poisson`, but without thread isolation.
-poisson-shared = ["poisson", "dep:parking_lot"]
+# The shared-pool timing-wheel engine is the default mixer implementation.
+default = ["poisson"]
+# Virtual-clock timing-wheel release engine: pool behind Arc<Mutex>, sweep runs on the consumer
+# (no dedicated thread or relay channels) — `poisson_channel`.
+poisson = ["dep:parking_lot"]
 # Uniform-delay min-heap channel — `channel`.
 uniform-channel = ["dep:parking_lot"]
 # Uniform-delay `Sink` adapter — `MixerSink`.
@@ -38,7 +36,6 @@ telemetry = ["hopr-types/telemetry", "dep:lazy_static"]
 serde = ["dep:serde", "dep:humantime-serde"]
 
 [dependencies]
-async-channel = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
@@ -67,10 +64,10 @@ ignored = ["humantime-serde"]
 [[bench]]
 name = "mixer_throughput_bench"
 harness = false
-# Compares all three implementations, so it needs every mixer feature enabled.
-required-features = ["poisson", "uniform-channel", "uniform-adapter"]
+# Compares the uniform-engine variants (sink + channel); poisson has its own bench.
+required-features = ["uniform-channel", "uniform-adapter"]
 
 [[bench]]
-name = "poisson_shared_bench"
+name = "poisson_bench"
 harness = false
-required-features = ["poisson-shared"]
+required-features = ["poisson"]
