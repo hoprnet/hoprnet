@@ -238,4 +238,4 @@ ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 # do not unify. Pinned by `rev` rather than by branch so the resolved commit cannot move under
 # CI while the PR is open. Reverted once 4.3.0 is on crates.io.
 [patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "9f2f3c8e63baaa50e669116a30f56d934de21739" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "8818e6ca00ffa3618b002b97ce004c6deca426a3" }

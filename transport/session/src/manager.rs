@@ -9,7 +9,10 @@ use anyhow::anyhow;
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
-    node::{PixAddressId, PixDepositData, PixDepositDataRequest, SessionAdmissionDecision, SessionAdmissionRequest},
+    node::{
+        OfferedIncentivization, PixAddressId, PixDepositData, PixDepositDataRequest, SessionAdmissionDecision,
+        SessionAdmissionRequest,
+    },
     types::{
         crypto_random::Randomizable,
         internal::{
@@ -905,6 +908,52 @@ impl EffectivePixAdmission {
                 .is_some_and(|batch_quota| self.quota_range.contains(&batch_quota))
         })
     }
+}
+
+/// Decodes the incentivization the Entry offered, before anyone is asked what to do about it.
+///
+/// `Ok(None)` is a peer that offered none. `Err` is one whose offer this node cannot read or
+/// cannot share a curve with, which is refused on its own — no policy could rescue it, and both
+/// questions are cheaper than the round trip to the session server that follows.
+///
+/// Split out from `SessionManager::check_pix_params` so the session server can be
+/// told what was offered: it decides the terms, and terms relative to an offer need the offer.
+fn decode_pix_offer(
+    req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+) -> Result<Option<PixParams>, StartErrorReason> {
+    if !req.capabilities.0.contains(Capability::UsePIX) {
+        return Ok(None);
+    }
+
+    // Unpacking is what enforces the protocol ranges on the three dimensions, and what rejects a
+    // suite identifier no curve claims — leaving only "a known curve, but not ours" below.
+    let params = PixParams::try_from_additional_data(req.additional_data).map_err(|error| {
+        debug!(
+            challenge = req.challenge,
+            %error,
+            "client offered PIX parameters outside the protocol ranges"
+        );
+        StartErrorReason::UnacceptablePixParams
+    })?;
+
+    // The Exit decides the curve, and it decides it by refusing anything else: nothing here
+    // is negotiated, because there is nothing to negotiate — the suite is fixed at build
+    // time on both sides. Checked before the quota because it is the cheaper question and
+    // because a suite mismatch makes the dimensions meaningless anyway, and checked at all
+    // because every later PIX field is sized by it. Refusing here means the Exit's own
+    // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
+    // that would read their boundaries in the wrong place.
+    if params.suite() != LOCAL_PIX_SUITE {
+        warn!(
+            challenge = req.challenge,
+            offered = %params.suite(),
+            ours = %LOCAL_PIX_SUITE,
+            "refusing a client offering a PIX curve suite this node was not built for"
+        );
+        return Err(StartErrorReason::UnacceptablePixParams);
+    }
+
+    Ok(Some(params))
 }
 
 /// Validates the incoming-PIX invariants that span quota, supervision and memory settings.
@@ -3333,14 +3382,26 @@ where
     async fn request_admission(
         &self,
         session_id: SessionId,
-        target: &SessionTarget,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        offered: Option<PixParams>,
     ) -> Result<SessionAdmissionDecision, StartErrorReason> {
         let Some(admission_tx) = self.admission_tx.get() else {
             return Ok(SessionAdmissionDecision::default());
         };
 
         let (reply_tx, reply_rx) = oneshot::channel();
-        let request = SessionAdmissionRequest::new(session_id, target.clone());
+        // The capability bits travel as the peer sent them; the offer travels decoded, since the
+        // wire encoding is this crate's to read and the server has no business unpacking it.
+        let request = SessionAdmissionRequest::new(session_id, req.target.clone(), req.capabilities.0.bits());
+        let request = match offered {
+            Some(params) => request.with_offer(OfferedIncentivization::new(
+                params.polys_per_ssa(),
+                params.shares_per_poly(),
+                params.surplus_shares(),
+                pix_params_to_quota(&params),
+            )),
+            None => request,
+        };
 
         // `try_send` rather than an awaited send: waiting for room in the queue would hold this
         // initiation past the peer's own timeout, and the queue being full is exactly the condition
@@ -3383,55 +3444,29 @@ where
         }
     }
 
-    /// Checks the PIX parameters offered by the Entry during the Session Initiation.
+    /// Checks the offer against the terms this Session was admitted on.
     ///
     /// Judged against `policy` — the node's configuration as narrowed by the session server's
     /// decision for this Session — rather than against the node's configuration directly, which is
     /// what makes the accepted quota a property of the target as well as of the node.
     ///
+    /// `offered` is what [`decode_pix_offer`](Self::decode_pix_offer) read, so this is only the
+    /// policy question; the wire has already been judged.
+    ///
     /// Returns the validated parameters and selected SSA batch size, or `None` if the offer cannot
     /// satisfy that policy.
     fn check_pix_params(
         &self,
-        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        challenge: StartChallenge,
+        offered: Option<PixParams>,
         policy: &EffectivePixAdmission,
     ) -> Option<(PixParams, usize)> {
-        if req.capabilities.0.contains(Capability::UsePIX) {
-            // Client offered PIX, so validate the offered parameters. Unpacking is what enforces the
-            // protocol ranges on the three dimensions, and what rejects a suite identifier no curve
-            // claims — leaving only "a known curve, but not ours" for the check below.
-            let params = PixParams::try_from_additional_data(req.additional_data)
-                .inspect_err(|error| {
-                    debug!(
-                        challenge = req.challenge,
-                        %error,
-                        "client offered PIX parameters outside the protocol ranges"
-                    )
-                })
-                .ok()?;
-
-            // The Exit decides the curve, and it decides it by refusing anything else: nothing here
-            // is negotiated, because there is nothing to negotiate — the suite is fixed at build
-            // time on both sides. Checked before the quota because it is the cheaper question and
-            // because a suite mismatch makes the dimensions meaningless anyway, and checked at all
-            // because every later PIX field is sized by it. Refusing here means the Exit's own
-            // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
-            // that would read their boundaries in the wrong place.
-            if params.suite() != LOCAL_PIX_SUITE {
-                warn!(
-                    challenge = req.challenge,
-                    offered = %params.suite(),
-                    ours = %LOCAL_PIX_SUITE,
-                    "refusing a client offering a PIX curve suite this node was not built for"
-                );
-                return None;
-            }
-
+        if let Some(params) = offered {
             let quota_per_ssa = pix_params_to_quota(&params);
             let ssas_per_request = policy.ssa_batch_size_for_quota(quota_per_ssa);
             let accepted_quota = ssas_per_request.and_then(|batch_size| quota_per_ssa.checked_mul(batch_size as u64));
             debug!(
-                challenge = req.challenge,
+                challenge,
                 %params,
                 acceptable_range = ?policy.quota_range,
                 node_range = ?self.cfg.pix_config.quota_range,
@@ -3449,7 +3484,7 @@ where
             // Session rather than leaving it to look like a rejected client.
             if ssas_per_request.is_none() && policy.quota_range.is_empty() {
                 warn!(
-                    challenge = req.challenge,
+                    challenge,
                     admitted_range = ?policy.quota_range,
                     node_range = ?self.cfg.pix_config.quota_range,
                     "the admitted quota range for this target is empty, so no offer can be accepted"
@@ -3507,8 +3542,36 @@ where
         // anything is allocated for the Session. This is the only place the target can influence
         // admission: the transport cannot read a sealed target, and by the time the server sees the
         // established Session the terms have already been fixed.
+        // Read the offer before anyone is asked about it: an offer this node cannot read, or whose
+        // curve it does not share, is refused without a round trip to the session server, and the
+        // server is told what was offered rather than having to unpack the wire itself.
+        let offered = match decode_pix_offer(&session_req) {
+            Ok(offered) => offered,
+            Err(reason) => {
+                error!(
+                    challenge = session_req.challenge,
+                    "client offered unacceptable PIX parameters"
+                );
+                let data = HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                    reason,
+                });
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    data,
+                    "session error message due to unacceptable PIX parameters",
+                )
+                .await?;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                return Ok(());
+            }
+        };
+
         let session_id: SessionId = pseudonym;
-        let admission = match self.request_admission(session_id, &session_req.target).await {
+        let admission = match self.request_admission(session_id, &session_req, offered).await {
             Ok(decision) => decision,
             Err(reason) => {
                 let data = HoprStartProtocol::SessionError(StartErrorType {
@@ -3530,8 +3593,10 @@ where
         };
         let pix_policy = self.cfg.pix_config.effective_for(&admission);
 
-        // Verify if the client offered the right parameters for PIX
-        let Some((client_params, ssas_per_request)) = self.check_pix_params(&session_req, &pix_policy) else {
+        // Verify the offer against the terms this Session was admitted on.
+        let Some((client_params, ssas_per_request)) =
+            self.check_pix_params(session_req.challenge, offered, &pix_policy)
+        else {
             error!(
                 challenge = session_req.challenge,
                 "client offered unacceptable PIX parameters"
@@ -6495,6 +6560,128 @@ mod tests {
         );
     }
 
+    /// Runs an initiation through the same two steps admission does — read the offer off the wire,
+    /// then judge it against the node's own terms. `None` is a refusal from either.
+    fn decode_and_check(
+        mgr: &SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> Option<(PixParams, usize)> {
+        let policy = mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default());
+        decode_pix_offer(req)
+            .ok()
+            .and_then(|offered| mgr.check_pix_params(req.challenge, offered, &policy))
+    }
+
+    /// The offer must reach the session server decoded, and the capability bits verbatim.
+    ///
+    /// Without it the server can only price a target blind: it names a window with no idea whether
+    /// the peer is anywhere near it, and cannot hold a *dimension* to a floor, since the quota is
+    /// their product and the same product admits many splits.
+    #[test_log::test(tokio::test)]
+    async fn the_admission_request_carries_the_decoded_offer_and_capability_bits() -> anyhow::Result<()> {
+        let (seen_tx, seen_rx) = oneshot::channel();
+        let seen_tx = Arc::new(std::sync::Mutex::new(Some(seen_tx)));
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            if let Some(tx) = seen_tx.lock().unwrap().take() {
+                let _ = tx.send((request.capabilities, request.offered));
+            }
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let (capabilities, offered) = seen_rx.await.context("admission was never asked")?;
+        let offered = offered.context("an offer was made, so one must have been reported")?;
+
+        let params = small_pix_params();
+        assert_eq!(offered.parts_per_ssa, params.polys_per_ssa());
+        assert_eq!(offered.shares_per_part, params.shares_per_poly());
+        assert_eq!(
+            offered.surplus_shares,
+            params.surplus_shares(),
+            "the surplus is priced in, so a server judging the quota needs it"
+        );
+        assert_eq!(offered.quota_per_ssa, small_params_quota());
+        assert_eq!(
+            capabilities,
+            pix_offer().capabilities.0.bits(),
+            "the capability bits travel as the peer sent them"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A peer offering nothing must be reported as offering nothing, not as offering zero: the two
+    /// are different answers, and only one of them means "this Session is free if you allow it".
+    #[test_log::test(tokio::test)]
+    async fn a_peer_offering_no_incentivization_reports_no_offer() -> anyhow::Result<()> {
+        let (seen_tx, seen_rx) = oneshot::channel();
+        let seen_tx = Arc::new(std::sync::Mutex::new(Some(seen_tx)));
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            if let Some(tx) = seen_tx.lock().unwrap().take() {
+                let _ = tx.send(request.offered);
+            }
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), no_pix_offer())
+            .await?;
+
+        assert!(
+            seen_rx.await.context("admission was never asked")?.is_none(),
+            "no offer must read as no offer"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// An offer this node cannot read is refused before the session server is troubled with it: no
+    /// decision could rescue it, and the round trip would be spent to reach the same answer.
+    #[test_log::test(tokio::test)]
+    async fn an_unreadable_offer_is_refused_without_asking_the_session_server() -> anyhow::Result<()> {
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_by_handler = asked.clone();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            asked_by_handler.fetch_add(1, Ordering::Relaxed);
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        // Zero polynomials is outside the protocol range, so unpacking refuses it outright.
+        let unreadable = StartInitiation {
+            additional_data: ((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40),
+            ..pix_offer()
+        };
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), unreadable)
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(
+            asked.load(Ordering::Relaxed),
+            0,
+            "an offer that cannot be read must not cost an admission round trip"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
     /// The feature itself: one Exit, one Entry offering the same thing, two targets, two answers.
     ///
     /// Every other test here fixes the decision and varies the offer; this one fixes the offer and
@@ -8463,11 +8650,7 @@ mod tests {
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
         assert!(
-            mgr.check_pix_params(
-                &req,
-                &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-            )
-            .is_some(),
+            decode_and_check(&mgr, &req).is_some(),
             "the offered dimensions must be acceptable, or the refusal cannot be attributed to the guard"
         );
 
@@ -11010,11 +11193,7 @@ mod tests {
         // polys_per_ssa > MAX_POLYS_PER_SSA (16192), and zero, with a valid quota -> should reject
         for polys in [0, MAX_POLYS_PER_SSA + 1, u16::MAX] {
             assert!(
-                mgr.check_pix_params(
-                    &offer(packed(polys, 128, 0)),
-                    &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-                )
-                .is_none(),
+                decode_and_check(&mgr, &offer(packed(polys, 128, 0))).is_none(),
                 "should reject polys_per_ssa {polys}"
             );
         }
@@ -11024,23 +11203,15 @@ mod tests {
         // cannot be exceeded by anything a peer is able to send.
         for shares in [0, 1] {
             assert!(
-                mgr.check_pix_params(
-                    &offer(packed(8192, shares, 0)),
-                    &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-                )
-                .is_none(),
+                decode_and_check(&mgr, &offer(packed(8192, shares, 0))).is_none(),
                 "should reject shares_per_poly {shares}"
             );
         }
 
         // Valid params should still be accepted, and arrive intact — including the surplus, which
         // no other check looks at and which would therefore be free to go missing.
-        let (accepted, batch_size) = mgr
-            .check_pix_params(
-                &offer(packed(8192, 128, 37)),
-                &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default()),
-            )
-            .context("should accept valid params")?;
+        let (accepted, batch_size) =
+            decode_and_check(&mgr, &offer(packed(8192, 128, 37))).context("should accept valid params")?;
         assert_eq!(PixParams::try_new(8192, 128, 37, LOCAL_PIX_SUITE)?, accepted);
         assert_eq!(1, batch_size);
 
@@ -11048,10 +11219,7 @@ mod tests {
         for surplus in [0, 1, u8::MAX] {
             assert_eq!(
                 Some((PixParams::try_new(8192, 128, surplus, LOCAL_PIX_SUITE)?, 1)),
-                mgr.check_pix_params(
-                    &offer(packed(8192, 128, surplus)),
-                    &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-                )
+                decode_and_check(&mgr, &offer(packed(8192, 128, surplus)))
             );
         }
 
@@ -11093,19 +11261,11 @@ mod tests {
         };
 
         assert!(
-            mgr.check_pix_params(
-                &offer(foreign),
-                &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-            )
-            .is_none(),
+            decode_and_check(&mgr, &offer(foreign)).is_none(),
             "a client offering {foreign} must be refused by a {LOCAL_PIX_SUITE} Exit"
         );
         assert!(
-            mgr.check_pix_params(
-                &offer(LOCAL_PIX_SUITE),
-                &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-            )
-            .is_some(),
+            decode_and_check(&mgr, &offer(LOCAL_PIX_SUITE)).is_some(),
             "and the same dimensions on this build's own curve must still be accepted"
         );
 
@@ -11117,11 +11277,7 @@ mod tests {
             additional_data: (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
         };
         assert!(
-            mgr.check_pix_params(
-                &unknown,
-                &mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default())
-            )
-            .is_none(),
+            decode_and_check(&mgr, &unknown).is_none(),
             "an unknown suite identifier must be refused"
         );
 
