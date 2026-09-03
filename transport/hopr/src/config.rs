@@ -137,6 +137,11 @@ pub struct StreamProtocolConfig {
     /// dropped and the drain moves on. Healthy peers drain far faster than this, so the timeout is not
     /// hit in normal operation.
     ///
+    /// It doubles as the per-peer write-pump stall timeout: if the pump makes no progress writing to
+    /// a peer's stream for this long (a remote that stopped reading parks quinn's `poll_write`
+    /// forever), the pump fails and its cache entry is evicted so the next send reopens the stream,
+    /// rather than the pump parking indefinitely and the drain serialising on it.
+    ///
     /// Defaults to 2 seconds. Must be at least 1 ms — a zero value would defeat the feature.
     #[validate(custom(function = "validate_egress_backpressure_timeout"))]
     #[default(default_egress_backpressure_timeout())]
