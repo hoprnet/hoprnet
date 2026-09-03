@@ -3450,7 +3450,7 @@ where
     /// decision for this Session — rather than against the node's configuration directly, which is
     /// what makes the accepted quota a property of the target as well as of the node.
     ///
-    /// `offered` is what [`decode_pix_offer`](Self::decode_pix_offer) read, so this is only the
+    /// `offered` is what [`decode_pix_offer`] read, so this is only the
     /// policy question; the wire has already been judged.
     ///
     /// Returns the validated parameters and selected SSA batch size, or `None` if the offer cannot
