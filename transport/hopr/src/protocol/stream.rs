@@ -1193,13 +1193,15 @@ mod tests {
             .expect("a sink that recovers before the timeout must not be failed as Stalled");
     }
 
-    /// One peer gets a writer gated shut forever, everyone else one that accepts immediately.
+    /// The stalled peer's stream opens exactly once (then its writer is gated shut by the test); any
+    /// reopen fails. Every other peer opens a writer that accepts immediately.
     #[derive(Clone, Debug)]
     struct HeadOfLineControl {
         stalled_peer: PeerId,
         stalled_io: GatedWriteIo,
         healthy_io: GatedWriteIo,
         open_calls: Arc<AtomicUsize>,
+        stalled_opens: Arc<AtomicUsize>,
     }
 
     #[async_trait]
@@ -1213,11 +1215,19 @@ mod tests {
 
         async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
             self.open_calls.fetch_add(1, Ordering::Relaxed);
-            Ok::<_, std::io::Error>(if peer == self.stalled_peer {
-                self.stalled_io.clone()
+            if peer == self.stalled_peer {
+                // Only the first open establishes the stream. A permanently-shut peer that could
+                // reopen would re-stall for another full timeout each cycle, making the burst take an
+                // unbounded number of ~timeout cycles; failing the reopen bounds the fix's side to a
+                // single eviction cycle, while the unfixed pump never evicts and so never reopens.
+                if self.stalled_opens.fetch_add(1, Ordering::Relaxed) == 0 {
+                    Ok::<GatedWriteIo, std::io::Error>(self.stalled_io.clone())
+                } else {
+                    Err(std::io::Error::other("stalled peer refuses reopen"))
+                }
             } else {
-                self.healthy_io.clone()
-            })
+                Ok(self.healthy_io.clone())
+            }
         }
     }
 
@@ -1254,6 +1264,7 @@ mod tests {
             stalled_io: stalled_io.clone(),
             healthy_io: healthy_io.clone(),
             open_calls: open_calls.clone(),
+            stalled_opens: Arc::new(AtomicUsize::new(0)),
         };
 
         let (mut tx_out, _rx_in) = process_stream_protocol(
