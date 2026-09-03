@@ -257,13 +257,18 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
     assert!(alice_mgr.is_started());
 
     // Start Bob
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
     assert!(bob_mgr.is_started());
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -395,7 +400,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
         while let Some(_session) = new_session_rx.next().await {}
     });
     let (sender, handle) = mock_packet_planning(transport);
-    mgr.start(sender.clone(), new_session_tx, None)?;
+    mgr.start(sender.clone(), new_session_tx, None, None)?;
     assert!(mgr.is_started());
 
     let unknown_pseudonym = HoprPseudonym::random();
@@ -490,10 +495,10 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
 
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1);
-    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1);
-    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -653,11 +658,16 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -916,11 +926,16 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
 
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
 
     let _notifications = tokio::spawn(async move {
         pin_mut!(new_session_rx_bob);
@@ -978,6 +993,260 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     bob_sender.close_channel();
     alice_handle.await??;
     bob_handle.await??;
+
+    Ok(())
+}
+
+/// End-to-end proof of the feature in #8376: one Exit, one Entry, the same offer both times, and
+/// the **Session target** deciding whether the Session is served.
+///
+/// The unit tests around `handle_incoming_session_initiation` fix the decision and vary the offer.
+/// This runs the whole Start exchange between two managers instead, so it also covers the parts
+/// those cannot reach: that the Exit asks before it replies, that a waived target establishes with
+/// no SSA exchange at all, and that a refused one reaches the *Entry* as a `Rejected` error rather
+/// than as a timeout.
+///
+/// ## Steps
+/// 1. Bob (Exit) enforces PIX node-wide, and installs an admission handler that waives it for one target and leaves the
+///    node's terms in place for every other.
+/// 2. Alice (Entry) opens a Session to the waived target offering no PIX. It establishes, and Bob emits no `SsaRequest`
+///    — a waived Session must cost the Entry no deposit round trip.
+/// 3. Alice opens a second Session, byte-for-byte the same offer, to a different target. Bob refuses it and Alice's
+///    `new_session` returns `Rejected(UnacceptablePixParams)`.
+/// 4. Alice is asked nothing throughout: admission is an Exit-side question, and Alice runs the same handler to prove
+///    her own outgoing Sessions never reach it.
+#[test(tokio::test)]
+async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use hopr_api::node::{SessionAdmissionDecision, SessionAdmissionRequest};
+    use hopr_transport_session::SessionAdmissionReply;
+
+    let free_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:80".parse()?));
+    let paid_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.2:80".parse()?));
+
+    // Alice enforces nothing and admits nothing — she is the Entry.
+    let alice_mgr = SessionManager::new(SessionManagerConfig::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            enforce_pix: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // One handler, driven by the target alone.
+    let free_for_handler = free_target.clone();
+    let bob_admissions = Arc::new(AtomicUsize::new(0));
+    let bob_admissions_in_handler = bob_admissions.clone();
+    let (bob_admission_tx, mut bob_admission_rx) =
+        futures::channel::mpsc::channel::<(SessionAdmissionRequest, SessionAdmissionReply)>(4);
+    let bob_admission_task = tokio::task::spawn(async move {
+        while let Some((request, reply)) = bob_admission_rx.next().await {
+            bob_admissions_in_handler.fetch_add(1, Ordering::Relaxed);
+            let decision = if request.target == free_for_handler {
+                SessionAdmissionDecision::default().with_enforce_pix(false)
+            } else {
+                SessionAdmissionDecision::default()
+            };
+            let _: Result<_, _> = reply.send(Ok(decision));
+        }
+    });
+
+    // Installed on Alice too, purely to assert it is never consulted for an outgoing Session.
+    let alice_admissions = Arc::new(AtomicUsize::new(0));
+    let alice_admissions_in_handler = alice_admissions.clone();
+    let (alice_admission_tx, mut alice_admission_rx) =
+        futures::channel::mpsc::channel::<(SessionAdmissionRequest, SessionAdmissionReply)>(4);
+    let alice_admission_task = tokio::task::spawn(async move {
+        while let Some((_request, reply)) = alice_admission_rx.next().await {
+            alice_admissions_in_handler.fetch_add(1, Ordering::Relaxed);
+            let _: Result<_, _> = reply.send(Ok(SessionAdmissionDecision::default()));
+        }
+    });
+
+    let ssa_requests = Arc::new(AtomicUsize::new(0));
+
+    // `dispatch_message` needs the pseudonym of the Session a message belongs to, and the relay
+    // closures outlive both Sessions, so the current one is shared rather than captured.
+    //
+    // Read *synchronously, as the message is produced*, not inside the future that delivers it. The
+    // two phases below swap this cell between them, and reading it at delivery time would tag a
+    // first-Session message still in flight with the second Session's pseudonym. Reading at
+    // production time pins each message to the phase that created it, whatever order they arrive
+    // in — a sync mutex, held for the read alone and never across an await.
+    let live_pseudonym = Arc::new(std::sync::Mutex::new(HoprPseudonym::random()));
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let alice_relay_pseudonym = live_pseudonym.clone();
+    let mut alice_transport = MockMsgSender::new();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let bob_mgr_relay = bob_mgr_relay.clone();
+            let pseudonym = *alice_relay_pseudonym.lock().expect("relay pseudonym lock");
+            Box::pin(async move {
+                let _ = bob_mgr_relay.dispatch_message(
+                    pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let ssa_requests_seen = ssa_requests.clone();
+    let bob_relay_pseudonym = live_pseudonym.clone();
+    let mut bob_transport = MockMsgSender::new();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            if msg_type(&data, StartProtocolDiscriminants::SsaRequest) {
+                ssa_requests_seen.fetch_add(1, Ordering::Relaxed);
+            }
+            let alice_mgr_relay = alice_mgr_relay.clone();
+            let pseudonym = *bob_relay_pseudonym.lock().expect("relay pseudonym lock");
+            Box::pin(async move {
+                let _ = alice_mgr_relay.dispatch_message(
+                    pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+
+    let (new_session_tx_alice, _alice_incoming) = futures::channel::mpsc::channel(1);
+    alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        None,
+        Some(alice_admission_tx),
+    )?;
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1);
+    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, Some(bob_admission_tx))?;
+
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+    pin_mut!(new_session_rx_bob);
+
+    // ── 1. The waived target establishes, on an offer carrying no PIX at all ──────────────────
+    let free_pseudonym = HoprPseudonym::random();
+    *live_pseudonym.lock().expect("relay pseudonym lock") = free_pseudonym;
+
+    let (alice_session, bob_incoming) = tokio_time::timeout(
+        Duration::from_secs(2),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                free_target.clone(),
+                SessionClientConfig {
+                    pseudonym: free_pseudonym.into(),
+                    capabilities: Capability::Segmentation.into(),
+                    surb_management: None,
+                    pix_ssa_quota: None,
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("the waived target should have established: {e}"))?;
+
+    let mut alice_session = alice_session?;
+    let bob_incoming = bob_incoming.ok_or_else(|| anyhow::anyhow!("bob must get an incoming session"))?;
+    assert_eq!(
+        bob_incoming.target, free_target,
+        "bob must be handed the target he admitted"
+    );
+    assert_eq!(
+        ssa_requests.load(Ordering::Relaxed),
+        0,
+        "a waived session must cost the entry no deposit round trip"
+    );
+    let bob_sessions_after_admission = bob_mgr.num_active_sessions();
+    assert_eq!(bob_sessions_after_admission, 1, "the waived target must hold one slot");
+
+    // Closed rather than dropped, as the tests above do, so the first phase leaves nothing sending.
+    // Bob's slot survives its Entry's close and is reclaimed on idle, which is why the refusal below
+    // is judged against the count taken here rather than against zero.
+    alice_session.close().await?;
+    drop(bob_incoming);
+
+    // ── 2. The same offer to another target is refused ────────────────────────────────────────
+    let paid_pseudonym = HoprPseudonym::random();
+    *live_pseudonym.lock().expect("relay pseudonym lock") = paid_pseudonym;
+
+    let refusal = tokio_time::timeout(
+        Duration::from_secs(2),
+        alice_mgr.new_session(
+            bob_peer,
+            paid_target,
+            SessionClientConfig {
+                pseudonym: paid_pseudonym.into(),
+                capabilities: Capability::Segmentation.into(),
+                surb_management: None,
+                pix_ssa_quota: None,
+                ..Default::default()
+            },
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("a refusal must reach the entry rather than time out: {e}"))?;
+
+    assert!(
+        matches!(
+            refusal,
+            Err(hopr_transport_session::errors::TransportSessionError::Rejected(
+                hopr_protocol_start::StartErrorReason::UnacceptablePixParams
+            ))
+        ),
+        "the entry must be told its offer was unacceptable for that target, got {refusal:?}"
+    );
+
+    // The Entry's error alone would also be produced by an Exit that allocated the Session and only
+    // then refused it, which leaks a slot. Both halves of that are checked here.
+    assert!(
+        tokio_time::timeout(Duration::from_millis(200), new_session_rx_bob.next())
+            .await
+            .is_err(),
+        "a refused target must not reach the exit as an incoming session"
+    );
+    assert_eq!(
+        bob_mgr.num_active_sessions(),
+        bob_sessions_after_admission,
+        "the refusal must allocate no slot of its own"
+    );
+
+    // ── 3. Only the Exit was ever asked ───────────────────────────────────────────────────────
+    assert_eq!(
+        bob_admissions.load(Ordering::Relaxed),
+        2,
+        "the exit must be asked once per incoming session"
+    );
+    assert_eq!(
+        alice_admissions.load(Ordering::Relaxed),
+        0,
+        "an entry must never put its own outgoing session to the hook"
+    );
+
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+    bob_admission_task.abort();
+    alice_admission_task.abort();
 
     Ok(())
 }
