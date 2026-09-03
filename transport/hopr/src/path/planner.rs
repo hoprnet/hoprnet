@@ -262,10 +262,12 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
 /// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
 /// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
 /// alone. `Err` is reserved for a selector that actually failed.
+#[allow(clippy::too_many_arguments)]
 async fn rebuild_candidates<R, S>(
     resolver: &R,
     selector: &S,
     weighting: WeightingParams,
+    me: OffchainPublicKey,
     src_key: OffchainPublicKey,
     dest_key: OffchainPublicKey,
     hops: usize,
@@ -289,6 +291,26 @@ where
                 path_metrics.push(pwc);
             }
             Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
+        }
+    }
+
+    // A return path that resolves to a single relayer is the blind spot the degradation detector
+    // cannot escape: with no sibling relayer to the same destination, sustained silence is
+    // indistinguishable from a quiet peer, so a dead return relayer is never attributed and never
+    // re-planned. Checked here, after validation, rather than in the selector: validation can reject
+    // every candidate through one of several relayers the selector saw, so only the survivors here
+    // reflect what a session can actually draw from.
+    if src_key != me && hops > 0 && !path_metrics.is_empty() {
+        let relayers = super::selector::distinct_first_relayers(&path_metrics);
+        if relayers <= 1 {
+            tracing::warn!(
+                src = %src_key,
+                kind,
+                distinct_relayers = relayers,
+                candidates = path_metrics.len(),
+                "return-path relayer diversity collapsed to a single relayer; degradation detection \
+                 cannot corroborate a dead relayer for this destination",
+            );
         }
     }
 
@@ -529,16 +551,19 @@ where
         let resolver = self.resolver.clone();
         let selector = self.selector.clone();
         let weighting = self.weighting;
+        let me = self.me;
 
         self.cache
             .try_get_with(cache_key, async move {
                 trace!(hops = hops_usize, "path cache miss, querying selector");
-                rebuild_candidates(&*resolver, &*selector, weighting, src_key, dest_key, hops_usize, "fill")
-                    .await?
-                    .map(Arc::new)
-                    .ok_or_else(|| {
-                        PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
-                    })
+                rebuild_candidates(
+                    &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
+                )
+                .await?
+                .map(Arc::new)
+                .ok_or_else(|| {
+                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                })
             })
             .await
             .map_err(PathPlannerError::CacheError)
@@ -574,6 +599,7 @@ where
                 &*self.resolver,
                 &*self.selector,
                 self.weighting,
+                self.me,
                 src_key,
                 dest_key,
                 hops as usize,
@@ -656,15 +682,30 @@ where
             )));
         }
 
+        // Distinct first relayers in the candidate pool: the return-relayer diversity actually
+        // available for this destination. A value of 1 is the corroboration blind spot (a dead
+        // relayer cannot be told from a quiet peer) — the same condition `rebuild_candidates` WARNs
+        // on. This draw runs per-packet, so both sets below are built only when DEBUG is actually
+        // recorded -- not on every call.
+        let log_relayer_diversity = tracing::enabled!(tracing::Level::DEBUG);
+        let candidate_relayers = log_relayer_diversity.then(|| {
+            items
+                .iter()
+                .filter_map(|item| item.0.first())
+                .collect::<std::collections::HashSet<_>>()
+        });
+
         tracing::debug!(
             %destination,
             count,
             candidates = items.len(),
+            distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
             temper = self.return_path_weight_temper,
+            exploration = self.return_path_exploration,
             "drawing return paths from tempered weights"
         );
 
-        Ok((0..count)
+        let drawn = (0..count)
             .filter_map(|_| {
                 if should_explore(self.return_path_exploration) {
                     pick_uniform_index(items.len())
@@ -673,7 +714,26 @@ where
                 }
                 .map(|i| items[i].0.clone())
             })
-            .collect())
+            .collect::<Vec<_>>();
+
+        // How many distinct relayers the actual SURBs went to. Fewer than the candidate pool means
+        // the weighting concentrated the stream — expected — but a persistent 1 here while
+        // `candidates` > 1 says the draw itself is starving the siblings the detector relies on.
+        let drawn_relayers = log_relayer_diversity.then(|| {
+            drawn
+                .iter()
+                .filter_map(|vp| vp.first())
+                .collect::<std::collections::HashSet<_>>()
+        });
+        tracing::debug!(
+            %destination,
+            drawn = drawn.len(),
+            distinct_relayers = drawn_relayers.as_ref().map_or(0, |r| r.len()),
+            of_candidates = candidate_relayers.as_ref().map_or(0, |r| r.len()),
+            "drew return paths"
+        );
+
+        Ok(drawn)
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -768,6 +828,7 @@ where
         let selector = self.selector.clone();
         let refresh_period = self.refresh_period;
         let weighting = self.weighting;
+        let me = self.me;
 
         // run at a non-zero interval
         futures_time::stream::interval(futures_time::time::Duration::from_millis(
@@ -796,6 +857,7 @@ where
                         &*resolver,
                         &*selector,
                         weighting,
+                        me,
                         src_key,
                         dest_key,
                         hops_u32 as usize,
@@ -1664,6 +1726,12 @@ mod tests {
     /// the evidence *under* an already-populated cache -- which is the whole point of the primitive
     /// under test.
     fn two_relayer_return_planner() -> (TestPlanner, ChannelGraph) {
+        two_relayer_return_planner_with_floor(small_config().min_paths_anonymity_floor)
+    }
+
+    /// A `me <- {a,b} <- dest` return topology with the given anonymity floor, so a test can watch
+    /// the cap collapse the two relayers to one (or, at floor 0, keep both).
+    fn two_relayer_return_planner_with_floor(floor: usize) -> (TestPlanner, ChannelGraph) {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let b = pubkey(&SECRET_B);
@@ -1678,7 +1746,10 @@ mod tests {
             mark_edge_full(&graph, &src, &dst);
         }
 
-        let cfg = small_config();
+        let cfg = PathPlannerConfig {
+            min_paths_anonymity_floor: floor,
+            ..small_config()
+        };
         let selector = HoprGraphPathSelector::new(
             me,
             graph.clone(),
@@ -1688,6 +1759,60 @@ mod tests {
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr())
+            .with_open_channel(dest_addr(), b_addr())
+            .with_open_channel(b_addr(), me_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
+    /// Same `me <- {a,b} <- dest` return topology as [`two_relayer_return_planner_with_floor`], but
+    /// `unresolvable` is left out of the chain resolver's key-to-address map -- present in the graph,
+    /// so the selector still offers it as a candidate relayer, but `ValidatedPath::new` cannot map it
+    /// to a chain address and drops every path through it. Floor 0, so pruning does not also remove
+    /// it before validation gets the chance to.
+    fn two_relayer_return_planner_with_unresolvable_relayer(
+        unresolvable: OffchainPublicKey,
+    ) -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [(dest, a), (a, me), (dest, b), (b, me)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = PathPlannerConfig {
+            min_paths_anonymity_floor: 0,
+            ..small_config()
+        };
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let resolvable_peers = [(a, a_addr()), (b, b_addr()), (dest, dest_addr())]
+            .into_iter()
+            .filter(|(key, _)| *key != unresolvable)
+            .collect::<Vec<_>>();
+        let chain_api = TestChainApi::new(me, me_addr(), resolvable_peers)
             .with_open_channel(dest_addr(), a_addr())
             .with_open_channel(a_addr(), me_addr())
             .with_open_channel(dest_addr(), b_addr())
@@ -1875,6 +2000,60 @@ mod tests {
             planner.recompute_paths_from(&dest).await,
             1,
             "a collapse on one relayer must register as moved"
+        );
+    }
+
+    /// End-to-end proof of the fix: a disabled cap keeps every return relayer, a cap of one
+    /// collapses the stream onto a single relayer. The latter is the blind spot the degradation
+    /// detector cannot escape, and the shape of the 2026-08-28 outage; the former is what the
+    /// edge-client `latency_path_planner_config` now requests (`min_paths_anonymity_floor = 0`).
+    #[tokio::test]
+    async fn floor_zero_keeps_every_return_relayer_but_a_cap_of_one_collapses_it() {
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+
+        let (uncapped, _g) = two_relayer_return_planner_with_floor(0);
+        let paths = fill_return_cache(&uncapped).await;
+        assert_eq!(2, candidate_set(&paths).len(), "floor 0 keeps both return relayers");
+        assert!(
+            share_of(&paths, &a) > 0.0,
+            "relayer a carries part of the return stream"
+        );
+        assert!(
+            share_of(&paths, &b) > 0.0,
+            "relayer b carries part of the return stream"
+        );
+
+        let (capped, _g) = two_relayer_return_planner_with_floor(1);
+        let paths = fill_return_cache(&capped).await;
+        assert_eq!(1, candidate_set(&paths).len(), "floor 1 collapses to a single relayer");
+    }
+
+    /// Regression for the diversity check firing on the wrong set: the selector's raw candidates
+    /// see both relayers, but chain validation rejects every path through `b` (its key never
+    /// resolves to a chain address), so what a session can actually draw from has collapsed to `a`
+    /// alone. A diversity check computed on the selector's pre-validation output would have missed
+    /// this entirely -- it must be computed on the validated survivors, which is what
+    /// `rebuild_candidates` now does.
+    #[tokio::test]
+    async fn validation_rejecting_one_relayer_should_collapse_diversity_even_though_the_selector_saw_two() {
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+
+        let (planner, _g) = two_relayer_return_planner_with_unresolvable_relayer(b);
+        let paths = fill_return_cache(&planner).await;
+
+        assert_eq!(
+            1,
+            candidate_set(&paths).len(),
+            "only the relayer that resolves on-chain should survive validation"
+        );
+        assert!(
+            share_of(&paths, &a) > 0.0,
+            "the resolvable relayer must carry the whole return stream"
+        );
+        assert_eq!(
+            0.0,
+            share_of(&paths, &b),
+            "the unresolvable relayer must not appear among the validated candidates"
         );
     }
 
