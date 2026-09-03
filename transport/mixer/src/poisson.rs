@@ -2,9 +2,9 @@
 //!
 //! The pool lives behind an `Arc<Mutex<_>>` and the sweep + wake timer run inline on the
 //! consumer's `poll_next` — no dedicated thread, no cross-thread channel hand-off. The pool is a
-//! flat `Vec` (see [`crate::pool`] for why not a heap); the tradeoff for the dropped thread
-//! isolation is holding the mutex across each sweep and mixing on the consumer task rather than
-//! an isolated thread.
+//! flat `Vec` (see the internal `pool` module for why not a heap); the tradeoff for the dropped
+//! thread isolation is holding the mutex across each sweep and mixing on the consumer task rather
+//! than an isolated thread.
 
 use std::{
     collections::VecDeque,

@@ -47,7 +47,6 @@ ahash = "0.8.12"
 anyhow = "1.0.104"
 aquamarine = "0.6.0"
 async-broadcast = "0.7.2"
-async-channel = "2.5.0"
 async_channel_io = "0.3.0"
 async-trait = "0.1.91"
 asynchronous-codec = { version = "0.7.0" }
