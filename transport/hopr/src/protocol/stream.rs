@@ -1193,13 +1193,15 @@ mod tests {
             .expect("a sink that recovers before the timeout must not be failed as Stalled");
     }
 
-    /// One peer gets a writer gated shut forever, everyone else one that accepts immediately.
+    /// The stalled peer's stream opens exactly once (then its writer is gated shut by the test); any
+    /// reopen fails. Every other peer opens a writer that accepts immediately.
     #[derive(Clone, Debug)]
     struct HeadOfLineControl {
         stalled_peer: PeerId,
         stalled_io: GatedWriteIo,
         healthy_io: GatedWriteIo,
         open_calls: Arc<AtomicUsize>,
+        stalled_opens: Arc<AtomicUsize>,
     }
 
     #[async_trait]
@@ -1213,11 +1215,19 @@ mod tests {
 
         async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
             self.open_calls.fetch_add(1, Ordering::Relaxed);
-            Ok::<_, std::io::Error>(if peer == self.stalled_peer {
-                self.stalled_io.clone()
+            if peer == self.stalled_peer {
+                // Only the first open establishes the stream. A permanently-shut peer that could
+                // reopen would re-stall for another full timeout each cycle, making the burst take an
+                // unbounded number of ~timeout cycles; failing the reopen bounds the fix's side to a
+                // single eviction cycle, while the unfixed pump never evicts and so never reopens.
+                if self.stalled_opens.fetch_add(1, Ordering::Relaxed) == 0 {
+                    Ok::<GatedWriteIo, std::io::Error>(self.stalled_io.clone())
+                } else {
+                    Err(std::io::Error::other("stalled peer refuses reopen"))
+                }
             } else {
-                self.healthy_io.clone()
-            })
+                Ok(self.healthy_io.clone())
+            }
         }
     }
 
@@ -1237,8 +1247,12 @@ mod tests {
         let stalled_peer = PeerId::random();
         let healthy_peer = PeerId::random();
 
-        // Gate never opens: the remote that stopped reading.
-        let stalled_io = GatedWriteIo::default();
+        // Both writers start open; the stalled peer is gated shut only after its stream is
+        // established (below), modelling a remote that stops reading mid-stream.
+        let stalled_io = GatedWriteIo {
+            open: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            ..Default::default()
+        };
         let healthy_io = GatedWriteIo {
             open: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             ..Default::default()
@@ -1250,6 +1264,7 @@ mod tests {
             stalled_io: stalled_io.clone(),
             healthy_io: healthy_io.clone(),
             open_calls: open_calls.clone(),
+            stalled_opens: Arc::new(AtomicUsize::new(0)),
         };
 
         let (mut tx_out, _rx_in) = process_stream_protocol(
@@ -1267,7 +1282,31 @@ mod tests {
 
         let msg = BytesMut::from(&b"hello"[..]);
 
-        // Overflow the stalled peer: under the old code each excess packet costs the loop a full timeout.
+        // Establish the ready precondition race-free: prime the stalled peer *while it is still
+        // open* and wait until the byte is actually written to the wire. That positively proves the
+        // stream opened and its write pump drained (`ready == true`), with no stall or eviction in
+        // play yet — unlike waiting on a stalled poll, which could race the pump's own stall timeout.
+        tx_out
+            .send((stalled_peer, msg.clone()))
+            .await
+            .context("egress queue must accept priming stalled-peer packet")?;
+        assert!(
+            wait_for(2, || stalled_io.written() >= msg.len()).await,
+            "priming packet was never written — stalled peer's stream/pump did not establish"
+        );
+        assert_eq!(
+            open_calls.load(Ordering::Relaxed),
+            1,
+            "exactly one open expected during priming"
+        );
+
+        // Now the remote stops reading: gate the writer shut so subsequent writes park. Only from
+        // here does the stall (and its eviction timer) begin.
+        stalled_io.gate_shut();
+
+        // Overflow the ready+full stalled channel. Under the old code each excess packet costs the
+        // shared drain loop a full backpressure timeout, starving the healthy peer behind it; the fix
+        // evicts the parked pump after one timeout so the loop moves on.
         for _ in 0..OVERFLOW {
             tx_out
                 .send((stalled_peer, msg.clone()))
@@ -1280,17 +1319,12 @@ mod tests {
             .await
             .context("egress queue must accept healthy-peer packet")?;
 
-        assert!(
-            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
-            "no stream was ever opened"
-        );
-
         let delivered = wait_for(3, || healthy_io.written() >= msg.len()).await;
 
         assert_eq!(
             stalled_io.written(),
-            0,
-            "precondition: stalled writer must accept nothing"
+            msg.len(),
+            "only the priming packet should reach the stalled writer; the post-shut burst must not"
         );
 
         assert!(
@@ -1469,10 +1503,10 @@ mod tests {
         Ok(())
     }
 
-    /// A writer whose `poll_write` is gated shut until [`release`](GatedWriteIo::release) is called,
-    /// counting the bytes it accepts. This deterministically holds the per-peer channel full while the
-    /// stream is open (`ready == true`), so a burst is forced onto the ready+full egress path with no
-    /// dependence on scheduler/pipe-buffer timing.
+    /// A writer whose `poll_write` accepts bytes while `open` and parks (`Pending`) while shut,
+    /// counting the bytes it accepts. Gating it shut after it has drained a packet models a remote
+    /// that stops reading only once the stream is established, so a burst can be forced onto the
+    /// ready+full egress path with no dependence on scheduler/pipe-buffer timing.
     #[derive(Clone, Default, Debug)]
     struct GatedWriteIo {
         open: Arc<std::sync::atomic::AtomicBool>,
@@ -1486,6 +1520,11 @@ mod tests {
             if let Some(waker) = self.waker.lock().take() {
                 waker.wake();
             }
+        }
+
+        /// Gate the writer shut so subsequent `poll_write`s park — models the remote ceasing to read.
+        fn gate_shut(&self) {
+            self.open.store(false, Ordering::Relaxed);
         }
 
         fn written(&self) -> usize {
