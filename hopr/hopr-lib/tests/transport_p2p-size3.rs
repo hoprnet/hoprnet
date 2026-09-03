@@ -198,7 +198,9 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
 
         Ok(
             if peers.len() == expected_count
-                && peers.iter().all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
+                && peers
+                    .iter()
+                    .all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
             {
                 Probe::Ready(peers)
             } else {
