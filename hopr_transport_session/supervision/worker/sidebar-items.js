@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["WorkerCommand"],"fn":["dispatch","is_coalescible","process_cmd","send_actions","spawn_supervisor_worker","worker_loop"],"struct":["SessionPixSupervisorHandle"],"type":["ActionChannel","ActionRx","ActionTx","CmdChannel","CmdRx","CmdTx"]};

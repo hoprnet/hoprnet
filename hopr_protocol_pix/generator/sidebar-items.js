@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SHARE_EMISSION_WINDOW"],"fn":["min_emission_for_early_recovery","new_polynomial_with_commitment","surplus_must_not_exceed_threshold","transposed_constant_terms"],"struct":["EmissionProgress","IndexedPolynomial","SsaGeneratorConfig","SsaPseudonymEntry","SsaShareGenerator"],"type":["RawPolynomial"]};

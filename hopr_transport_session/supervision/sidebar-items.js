@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_SUPERVISOR_DURATION"],"enum":["SessionPixAction","SessionPixCloseReason","SessionPixEvent"],"fn":["scaled_deadline","validate_pix_supervision"],"mod":["gate","supervisor","worker"],"struct":["PixParams","SupervisorConfig"]};

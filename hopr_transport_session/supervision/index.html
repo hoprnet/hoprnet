@@ -1,0 +1,369 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session worker that drives them. PIX supervision for incoming PIX-enabled sessions."><title>hopr_transport_session::supervision - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopr_transport_session" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module supervision</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../hopr_transport_session/index.html">hopr_<wbr>transport_<wbr>session</a><span class="version">0.29.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module supervision</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-supervision-is-needed" title="Why supervision is needed">Why supervision is needed</a></li><li><a href="#architecture" title="Architecture">Architecture</a><ul><li><a href="#the-sessionpixsupervisor-state-machine" title="The `SessionPixSupervisor` state machine">The <code>SessionPixSupervisor</code> state machine</a></li><li><a href="#the-servicegate--egress-gating" title="The `ServiceGate` — egress gating">The <code>ServiceGate</code> — egress gating</a></li><li><a href="#the-worker--bridging-pure-logic-to-async" title="The Worker — bridging pure logic to async">The Worker — bridging pure logic to async</a></li><li><a href="#integration-with-sessionmanager" title="Integration with `SessionManager`">Integration with <code>SessionManager</code></a></li><li><a href="#lifecycle-sketch-exit-side" title="Lifecycle sketch (Exit side)">Lifecycle sketch (Exit side)</a></li></ul></li><li><a href="#configuration" title="Configuration">Configuration</a><ul><li><a href="#what-each-parameter-prevents" title="What each parameter prevents">What each parameter prevents</a></li><li><a href="#what-is-not-here-the-price-of-a-cycle" title="What is not here: the price of a cycle">What is not here: the price of a cycle</a></li><li><a href="#the-one-fault-with-no-dial-unverifiable-shares" title="The one fault with no dial: unverifiable shares">The one fault with no dial: unverifiable shares</a></li><li><a href="#constraints-between-parameters" title="Constraints between parameters">Constraints between parameters</a></li><li><a href="#worked-example" title="Worked example">Worked example</a></li></ul></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate hopr_<wbr>transport_<wbr>session</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">hopr_transport_session</a></div><h1>Module <span>supervision</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/hopr_transport_session/supervision/mod.rs.html#1-1635">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
+worker that drives them.
+PIX supervision for incoming PIX-enabled sessions.</p>
+<p>This module implements the <strong>Exit-side</strong> supervision logic for sessions
+using the Protocol for Incentivization of eXits (PIX).  The Exit node
+runs a deterministic supervisor that tracks each <em>Secret Sharing Aggregate</em>
+(SSA) through a well-defined lifecycle, enforcing timeouts, deposit
+sufficiency, recovery progress, and fault tolerances.  Egress data
+packets are gated behind a concurrent <code>ServiceGate</code> that follows the
+front cycle: bounded predeposit service while it is unfunded and a
+ceiling-limited path after it funds.</p>
+<h2 id="why-supervision-is-needed"><a class="doc-anchor" href="#why-supervision-is-needed">§</a>Why supervision is needed</h2>
+<p>PIX sessions use SSAs: cryptographic aggregates that distribute the
+cost of a deposit across many packets sent from the Entry to the Exit.
+Each SSA requires:</p>
+<ol>
+<li>A <strong>commitment</strong> from the Entry (polynomial coefficients) that the Exit can verify.</li>
+<li>A <strong>deposit</strong> to an SSA-specific on-chain address before the Exit fully trusts the SSA.</li>
+<li><strong>Recovery</strong> of the SSA shares from data packets as they arrive.</li>
+</ol>
+<p>Without supervision, a misbehaving or stalled Entry can hold a session
+slot indefinitely without ever funding or completing recovery — a
+resource-exhaustion vector.  The supervisor enforces hard per-SSA and
+per-session bounds so the Exit can reclaim resources deterministically.</p>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2>
+<p>The module is split into three components:</p>
+<div><table><thead><tr><th>Component</th><th>File</th><th>Role</th></tr></thead><tbody>
+<tr><td><code>SessionPixSupervisor</code></td><td><code>supervisor</code></td><td>Pure state machine — no I/O, no async, no spawning.  Driven by explicit <code>Instant</code> timestamps and service-gate snapshots.</td></tr>
+<tr><td><code>ServiceGate</code></td><td><code>gate</code></td><td>Concurrent, lock-free egress gate.  Before the front funds: bounded predeposit budget.  After it funds: ceiling on packets served without that cycle’s recovery progress.  Callers park on a generation-counter waker.</td></tr>
+<tr><td>Worker loop</td><td><code>worker</code></td><td>Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, applies gate actions synchronously, and forwards actions to the caller.</td></tr>
+</tbody></table>
+</div>
+<p>The <a href="../utils/struct.SlotNotify.html" title="struct hopr_transport_session::utils::SlotNotify"><code>SlotNotify</code></a> multi-waker primitive is shared from <a href="../utils/index.html" title="mod hopr_transport_session::utils"><code>utils</code></a> and used
+by <code>ServiceGate</code> to park and wake callers without a tokio dependency.</p>
+<h3 id="the-sessionpixsupervisor-state-machine"><a class="doc-anchor" href="#the-sessionpixsupervisor-state-machine">§</a>The <code>SessionPixSupervisor</code> state machine</h3>
+<p>The supervisor tracks each SSA through these phases:</p>
+<div class="example-wrap"><pre class="language-text"><code>RequestSsa  ──►  SsaRequestSent  ──►  AwaitingCommitment
+                                         │
+                                    CommitmentVerified
+                                         │
+                                     AwaitingDeposit
+                                         │
+                                    DepositConfirmed (≥ expected)
+                                         │
+                                       Recovering
+                                         ├── (idle re-arms when no service)
+                                         ├── hard deadline is immutable
+                                         └── progress resets idle timer
+                                         │
+                                    Recovered
+                                         ├── bounded paid FIFO drain
+                                         ├── successor progress → handoff
+                                         └── diagnostic tombstone expiry → RetireSsa</code></pre></div>
+<p><strong>Key deadlines</strong> (all configurable via <a href="../struct.SupervisorConfig.html" title="struct hopr_transport_session::SupervisorConfig"><code>SupervisorConfig</code></a>):</p>
+<ul>
+<li><strong>Commitment timeout</strong> — time from <code>SsaRequestSent</code> to <code>CommitmentVerified</code>.</li>
+<li><strong>Deposit timeout</strong> — time from <code>CommitmentVerified</code> to a sufficient deposit.</li>
+<li><strong>Recovery idle</strong> — time without <em>any share arriving</em> while service is being consumed. <strong>Service-gated</strong>: if no
+packets were served since the last progress snapshot, the timer re-arms instead of closing (prevents a
+slow-but-honest Entry from being disconnected). Deliberately not “useful progress”: a conforming Entry emits a
+whole window’s surplus in one run, none of it useful, and treating that as silence closes honest Sessions.</li>
+<li><strong>Recovery hard deadline</strong> — absolute per-SSA backstop, never extended. This is a resource guard (session slot +
+reconstructor memory), not a liveliness mechanism.</li>
+</ul>
+<p>Both recovery clocks start when the cycle reaches the <strong>paid transport front</strong>, not when its
+deposit confirms. A batch is served in index order, and the final SURBs buffered for a recovered
+predecessor still carry that predecessor’s shares. The predecessor keeps its original immutable
+hard clock while this bounded tail drains; the successor’s clocks start only when the negotiated
+remainder is exhausted or funded successor progress proves the FIFO boundary. A queued cycle is
+therefore not charged for either its batch wait or its predecessor’s pipeline delay.</p>
+<p><strong>Fault tracking</strong> — an <code>UnverifiableShares</code> event closes the Session on arrival, with no
+tolerance to configure and no running totals to keep: the event means a polynomial’s share set
+failed to open its commitment, which permanently dooms the cycle. Late fault reports against an
+already terminal SSA are absorbed. Progress is the one narrow exception: the sole immediate
+recovered predecessor may report its bounded, already-paid FIFO tail. See the configuration
+section below for why this is not a dial.</p>
+<p><strong>Rolling SSAs</strong> — to maintain continuity, the supervisor requests the <em>next</em> batch when the
+current one is “almost recovered” (early threshold reached) or fully recovered, so the commitment
+and deposit work for the next cycle overlaps the tail of the current one. With a batch, only its
+<strong>last</strong> cycle may ask: the request flags are per-cycle, so without that gate every member would
+answer its own early signal with a batch of its own, compounding into <code>ssas_per_request</code> batches
+per batch. The last rather than the first, because a batch is served in index order and gating on
+the first would ask a whole batch too early. Retiring the cycle holding the gate hands it to the
+newest survivor, or a batch whose last cycle lost its deposit would strand with no successor.</p>
+<p>Allocation independently enforces the reservation: at most
+<code>MAX_OVERLAPPING_BATCHES</code> generations and
+<code>MAX_OVERLAPPING_BATCHES × ssas_per_request</code> live cycles may own reconstructor state. If the
+early signal arrives while both generations are still live, the supervisor records the owed
+request and retries it only after one generation releases its heavyweight cycle state. Recovered
+supervisor tombstones do not count because full recovery removes their heavyweight reconstructor
+state; one constant-bounded per-Session tail receipt is tracked separately.</p>
+<h3 id="the-servicegate--egress-gating"><a class="doc-anchor" href="#the-servicegate--egress-gating">§</a>The <code>ServiceGate</code> — egress gating</h3>
+<p>Every egress data packet from the Exit back to the Entry must pass
+through the <code>ServiceGate</code> via <code>acquire</code>:</p>
+<h4 id="pre-funding-predeposit"><a class="doc-anchor" href="#pre-funding-predeposit">§</a>Pre-funding (predeposit)</h4>
+<p>While the current front cycle is unfunded, a provisional budget lets the Exit answer the Entry
+for a bounded number of packets, so that the application is not held up for as long as an
+on-chain deposit takes to confirm. The initial front starts with this allowance; a successor gets
+a fresh allowance after its predecessor was funded and leaves the front, whether by recovery or a
+tolerated failure. A failed funded cycle has already cost the Entry its full deposit, and
+<code>max_failed_cycles</code> bounds how often that can happen. Losing an unfunded front does not mint
+another grant. The budget is
+<code>min(target_useful_shares - 1, max_predeposit_packets)</code>; at production dimensions the first term
+is in the hundreds of thousands, so the configured cap is what binds and the <code>min</code> only matters
+for the small dimensions used in tests.</p>
+<p>When the budget is exhausted, <code>acquire</code> parks the caller on a
+<code>SlotNotify</code> future. A concurrent <code>release_service</code>, <code>withhold_service</code>,
+<code>notify_progress</code>, or <code>poison</code>
+wakes all parkers.</p>
+<h4 id="strict-prepay-max_predeposit_packets--0"><a class="doc-anchor" href="#strict-prepay-max_predeposit_packets--0">§</a>Strict prepay (<code>max_predeposit_packets = 0</code>)</h4>
+<p>Zero is a supported setting, and it means the Exit serves nothing against any unfunded front:
+the first egress data packet parks, and the Entry has to commit and fund that cycle before a
+single payload byte flows back to it. The rule is restored on every paid rotation rather than
+applying only to the Session’s first SSA.</p>
+<p>This does not deadlock, because nothing on the path to funding passes through the gate:</p>
+<ul>
+<li>The <code>SsaRequest</code> goes out on the <a href="../struct.SessionManager.html" title="struct hopr_transport_session::SessionManager"><code>SessionManager</code></a>’s own message sender, not the Session’s gated sink.</li>
+<li>The Entry’s commitment travels Entry→Exit, and the deposit is on-chain.</li>
+<li>The SURB-level keep-alive stream is deliberately left ungated, precisely so an exhausted budget cannot silence the
+signal that keeps the Session fundable. Under strict prepay this carries more weight than it does at a non-zero
+budget: with no egress at all, the keep-alives are the <em>only</em> traffic reaching the Entry, and therefore the only
+thing resetting the idle timer on the Entry’s own session slot. An operator who both sets this budget to zero and
+disables <code>surb_balance_notify_period</code> gives the Entry nothing to stay alive on, and it will evict the Session
+before a deposit can land.</li>
+</ul>
+<p>So the Entry can always be asked for a deposit and can always answer, whatever the budget is.
+What a zero budget costs is latency, not liveness: the application stalls until the deposit
+confirms, instead of proceeding optimistically. If the deposit never arrives, the deposit
+deadline closes the Session and <code>poison</code> fails the parked writer rather
+than leaving it pending.</p>
+<h4 id="post-funding-ceiling"><a class="doc-anchor" href="#post-funding-ceiling">§</a>Post-funding (ceiling)</h4>
+<p>Once the current front’s deposit is confirmed and the supervisor emits <code>ReleaseService</code>, the
+gate flips to funded mode. It then enforces <code>max_served_without_progress</code>: a
+ceiling on how many packets may be served between SSA recovery progress
+events, as a defense-in-depth backstop even when the supervisor’s
+service-gated idle timer is alive. Only progress from that funded front—or from its sole bounded
+recovered predecessor while the FIFO drains—emits <code>ProgressNotification</code> and resets the
+watermark; unfunded, off-front, older, or over-budget progress cannot buy service. A rotation to
+an unfunded successor emits <code>WithholdService</code> and restores the bounded allowance. A funded
+successor stays open, but another <code>ReleaseService</code> rebaselines its ceiling.</p>
+<p>The gate is implemented with lock-free atomics and CAS loops.  It uses
+the generation-counter <code>SlotNotify</code> to avoid the two classic
+race conditions of waker-vector approaches:</p>
+<ol>
+<li><strong>Latent wake</strong> — notification between future creation and first <code>poll()</code> is caught because the generation was
+captured at creation time and compared on <code>poll()</code>.</li>
+<li><strong>Spurious <code>Ready</code></strong> — a second <code>poll()</code> of an already-registered future re-checks the generation; if unchanged
+it stays <code>Pending</code>.</li>
+</ol>
+<h3 id="the-worker--bridging-pure-logic-to-async"><a class="doc-anchor" href="#the-worker--bridging-pure-logic-to-async">§</a>The Worker — bridging pure logic to async</h3>
+<p><code>spawn_supervisor_worker</code> creates the <code>SessionPixSupervisor</code>,
+the <code>ServiceGate</code>, and a bounded async command channel.  It returns
+a <code>SessionPixSupervisorHandle</code> (cloneable, for sending events) and an
+<code>ActionRx</code> receiver (for driving actions).</p>
+<p>The worker loop:</p>
+<ol>
+<li>Reads the next deadline from the supervisor.</li>
+<li>If the deadline has already expired, calls <code>handle_deadline</code> immediately.</li>
+<li>Otherwise, waits on the command channel with a timeout set to the remaining deadline duration.</li>
+<li>On command received → calls <code>handle_event</code> or <code>action_result</code>.</li>
+<li>On timeout → calls <code>handle_deadline</code>.</li>
+<li>Applies gate-control actions immediately, then forwards all actions to the action channel (non-blocking
+<code>try_send</code>).</li>
+</ol>
+<p><strong>Coalescing</strong> — <code>ProgressNotification</code> actions are coalescible: when
+the action channel is transiently full, they are dropped rather than
+blocking or failing the worker. The gate has already consumed the notification locally, and the
+next forwarded notification replaces it for observers.</p>
+<p>All other actions (<code>RequestSsa</code>, <code>ReleaseService</code>, <code>WithholdService</code>, <code>RetireSsa</code>, <code>Close</code>)
+are non-coalescible — if they cannot be delivered, the channel is
+genuinely wedged and the worker fails the session.</p>
+<h3 id="integration-with-sessionmanager"><a class="doc-anchor" href="#integration-with-sessionmanager">§</a>Integration with <a href="../struct.SessionManager.html" title="struct hopr_transport_session::SessionManager"><code>SessionManager</code></a></h3><h4 id="exit-side-incoming-sessions"><a class="doc-anchor" href="#exit-side-incoming-sessions">§</a>Exit side (incoming sessions)</h4>
+<p>When <code>handle_incoming_session_initiation</code> processes a session request
+with <code>Capability::UsePIX</code>:</p>
+<ol>
+<li>
+<p>Validates the offered PIX parameters (polys, threshold, quota range).</p>
+</li>
+<li>
+<p>Spawns the supervisor worker via <code>spawn_supervisor_worker</code> (this emits the initial <code>RequestSsa</code> action and
+creates the gate).</p>
+</li>
+<li>
+<p>Reads the initial action, calls <code>send_ssa_request</code> on the wire, and notifies the supervisor of <code>SsaRequestSent</code>.</p>
+</li>
+<li>
+<p>Stores the supervisor handle and gate in the session slot (via <code>OnceLock</code>).</p>
+</li>
+<li>
+<p>Constructs the <a href="../struct.HoprSession.html" title="struct hopr_transport_session::HoprSession"><code>HoprSession</code></a> — the egress adapter acquires the gate on every outgoing data packet.</p>
+</li>
+<li>
+<p>After session publication, spawns the <strong>action driver task</strong> that receives actions from <code>ActionRx</code>. Gate control
+has already happened in the worker; the driver performs I/O and records the gate-mode telemetry:</p>
+<div><table><thead><tr><th>Action</th><th>Behaviour</th></tr></thead><tbody>
+<tr><td><code>RequestSsa</code></td><td>Calls <code>send_ssa_request</code>, feeds back result to supervisor. Tracks each SSA in <code>SsaCommitmentGuard</code> for Drop-safe cleanup.</td></tr>
+<tr><td><code>ReleaseService</code></td><td>Worker calls <code>gate.release_service()</code>; driver records funded telemetry.</td></tr>
+<tr><td><code>WithholdService</code></td><td>Worker calls <code>gate.withhold_service()</code>; driver records unfunded telemetry.</td></tr>
+<tr><td><code>ProgressNotification</code></td><td>Worker calls <code>gate.notify_progress()</code>; no driver I/O.</td></tr>
+<tr><td><code>RetireSsa</code></td><td>Calls <code>share_processor.retire_ssa</code>, aborts the deposit observer task.</td></tr>
+<tr><td><code>Close</code></td><td>Poisons gate, retires all SSAs, publishes close metric, removes session slot.</td></tr>
+</tbody></table>
+</div></li>
+<li>
+<p>PIX protocol events from the packet pipeline arrive via <code>dispatch_pix_event</code> and are forwarded to the supervisor
+as <code>SessionPixEvent::RecoveryProgress</code>, <code>UnverifiableShares</code>, <code>AlmostRecovered</code>, or <code>Recovered</code>.</p>
+</li>
+<li>
+<p>When a commitment becomes verifiable, a <code>PixDepositObserver</code> task loops on deposit confirmations, forwarding each
+as <code>DepositConfirmed</code> to the supervisor.</p>
+</li>
+</ol>
+<h4 id="entry-side-outgoing-sessions"><a class="doc-anchor" href="#entry-side-outgoing-sessions">§</a>Entry side (outgoing sessions)</h4>
+<p>The Entry does <strong>not</strong> run a supervisor — the Exit is authoritative for
+lifecycle decisions.  The Entry creates a session slot when
+<code>new_session()</code> succeeds, but the slot’s <code>pix_supervisor</code> and
+<code>pix_egress_gate</code> remain unpopulated.  On receiving an <code>SsaRequest</code>
+from the Exit, the Entry generates its client commitment via the
+share generator, sends the commitment messages, and emits
+<code>ReadyToDeposit</code> so the caller can fund the deposit address.</p>
+<h3 id="lifecycle-sketch-exit-side"><a class="doc-anchor" href="#lifecycle-sketch-exit-side">§</a>Lifecycle sketch (Exit side)</h3><div class="example-wrap"><pre class="language-text"><code>Session Initiation (Entry→Exit, with UsePIX flag)
+    │
+    ▼
+handle_incoming_session_initiation
+    │  validate PIX params
+    │  spawn supervisor (emits initial RequestSsa)
+    │  send SsaRequest on the wire
+    │  install gate &amp; handle in slot
+    │  construct HoprSession (egress adaptor acquires gate)
+    │  spawn action driver
+    ▼
+┌────────────────────────────────────────────────────┐
+│  Ongoing lifecycle (concurrent)                    │
+│                                                    │
+│  Entry → CommitmentVerified  → supervisor          │
+│  Entry → DepositConfirmed    → supervisor (via     │
+│                                PixDepositObserver) │
+│  Packets → share_processor   → RecoveryProgress    │
+│  Action: ReleaseService       → gate.release_service│
+│  Action: WithholdService      → gate.withhold_service│
+│  Action: ProgressNotification → gate.notify_progress│
+│  Action: RequestSsa (next)   → send on wire        │
+│  Action: RetireSsa           → reconstructor.retire│
+│  Action: Close               → poison + teardown   │
+└────────────────────────────────────────────────────┘</code></pre></div><h2 id="configuration"><a class="doc-anchor" href="#configuration">§</a>Configuration</h2><h3 id="what-each-parameter-prevents"><a class="doc-anchor" href="#what-each-parameter-prevents">§</a>What each parameter prevents</h3>
+<p>Every field of <a href="../struct.SupervisorConfig.html" title="struct hopr_transport_session::SupervisorConfig"><code>SupervisorConfig</code></a>, the failure it exists to stop, and what shipping default it
+carries. Nothing here is a preference: each one is the only thing standing between the Exit and a
+specific way of taking service without paying for it.</p>
+<div><table><thead><tr><th>Parameter</th><th>Default</th><th>What it prevents</th></tr></thead><tbody>
+<tr><td><code>ssas_per_request</code></td><td>1</td><td>Nothing by itself — an exposure dial. With dynamic batching it is the largest batch the Exit may derive; otherwise it is the exact batch size. Raising it amortises the request round trip over several cycles, at the price of multiplying the <em>unfunded</em> exposure to that many quotas, and it scales the two deadlines below.</td></tr>
+<tr><td><code>allow_dynamic_ssa_batches</code></td><td>true</td><td>Lets a sub-range per-SSA offer satisfy <code>quota_range</code> by committing to the smallest batch whose total quota enters the range. Disable it to retain the fixed-batch, per-SSA admission rule.</td></tr>
+<tr><td><code>max_failed_cycles</code></td><td>1</td><td>An Entry losing one cycle per batch indefinitely while a single funded sibling holds the Session open. One loss is survivable, the second closes the Session. Only reachable above a batch of one, where the failing cycle is not always the last one standing.</td></tr>
+<tr><td><code>max_ssa_delivery_time</code></td><td>20 s</td><td>An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded.</td></tr>
+<tr><td><code>max_deposit_wait</code></td><td>60 s</td><td>An Entry that commits but never deposits — typically after it has already drawn the predeposit budget.</td></tr>
+<tr><td><code>max_recovery_idle</code></td><td>60 s</td><td>An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished.</td></tr>
+<tr><td><code>max_recovery_time</code></td><td>2 h</td><td>A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, <em>not</em> the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets of <em>full emission</em>, ~61 min, at the defaults — or it closes honest Sessions instead. That is the quantity <code>quota_range</code> prices and <code>validate_incoming_session_pix_config</code> enforces; the <em>last useful share</em> lands earlier, at 651 264, which is the figure the “why two hours” argument on <a href="../struct.SupervisorConfig.html#structfield.max_recovery_time" title="field hopr_transport_session::SupervisorConfig::max_recovery_time"><code>SupervisorConfig::max_recovery_time</code></a> uses.</td></tr>
+<tr><td><code>max_off_front_share_fraction</code></td><td>0.25</td><td>An Entry spreading a batch’s shares across all of its cycles, taking <code>ssas_per_request</code> quotas of service while completing none of them — and a cycle short of completion pays nothing at all.</td></tr>
+<tr><td><code>min_share_order_sample</code></td><td>16384</td><td>Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight.</td></tr>
+<tr><td><code>max_predeposit_packets</code></td><td>10000</td><td>Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; <code>0</code> means strict prepay on every rotation.</td></tr>
+<tr><td><code>max_served_without_progress</code></td><td>2048</td><td>Packets served with no share of <em>any</em> kind coming back — in <em>packets</em>, so unlike the idle timer the bound does not move with the Session’s rate. Counts <code>shares_seen</code>, so a conforming Entry’s surplus resets it; see below.</td></tr>
+<tr><td><code>tombstone_retention_window</code></td><td>30 s</td><td>Bounds how long recovered-cycle diagnostics and observer ownership remain; the separately bounded FIFO-tail receipt may outlive it.</td></tr>
+</tbody></table>
+</div><h3 id="what-is-not-here-the-price-of-a-cycle"><a class="doc-anchor" href="#what-is-not-here-the-price-of-a-cycle">§</a>What is <em>not</em> here: the price of a cycle</h3>
+<p>No parameter above says what a quota costs, and none should. The Exit’s deposit pool is handed the
+<a href="hopr_api::node::DepositUpdated"><code>DepositUpdated</code></a> sender along with
+<a href="../struct.AgreedSsaQuota.html" title="struct hopr_transport_session::AgreedSsaQuota"><code>AgreedSsaQuota</code></a> when the deposit address arrives, and it is the component
+that knows both the byte quota and the price it charges for one. It sends on that channel once the
+deposit clears that price; the supervisor’s <code>DepositConfirmed</code> handler acts on the verdict rather
+than recomputing it. The Entry side mirrors this — its own strategy prices the <code>quota</code> carried by
+<code>PixEvent::NewDepositAddress</code> and decides what to pay.</p>
+<p>There was briefly a <code>min_deposit</code> here, and a per-SSA <code>expected_deposit</code> on the commitment event to
+go with it. Both are gone. The Session layer has no price for a byte to derive one from, and a
+configured floor would not be a backstop but a second authority behind the first: set above the
+pool’s price it kills a cycle the pool has already been paid for, on <code>max_deposit_wait</code>, with
+nothing on either side able to break the tie.</p>
+<h3 id="the-one-fault-with-no-dial-unverifiable-shares"><a class="doc-anchor" href="#the-one-fault-with-no-dial-unverifiable-shares">§</a>The one fault with no dial: unverifiable shares</h3>
+<p>An <code>UnverifiableShares</code> report closes the Session immediately, and there is no configuration for
+it. This used to be a pair of tolerances, per-SSA and per-Session, both shipped at zero.</p>
+<p>Shares are not checked on arrival — the non-constant coefficient commitments that made per-share
+verification possible were dropped — so a report means a whole <em>polynomial’s</em> share set failed to
+open its commitment. The reconstructor marks that part failed, releases its shares, and never
+clears the flag; the SSA is the sum of every polynomial’s constant term, so from that moment the
+cycle cannot be reconstructed by any means and will never pay. A tolerance would therefore not buy
+recovery, only unpaid service — including in the case it looks written for, a false positive from
+a verification bug, where the part is just as permanently failed. Closing on the first report also
+caps the exposure at the <code>threshold</code> packets already served when the failure surfaces, rather than
+a multiple of it.</p>
+<p>What the tolerances bought instead was machinery: absolute cross-peer totals, per-SSA and
+per-Session running sums, and delta accounting against the maximum seen so far to keep concurrent
+ack batches from double-counting. None of it is observable at a limit of zero, since the first
+report ends the Session.</p>
+<h3 id="constraints-between-parameters"><a class="doc-anchor" href="#constraints-between-parameters">§</a>Constraints between parameters</h3>
+<p><a href="../fn.validate_pix_supervision.html" title="fn hopr_transport_session::validate_pix_supervision"><code>validate_pix_supervision</code></a> enforces, at config-load time and against the reconstructor config
+actually in use: <code>max_recovery_idle &gt;= max_ack_await_time</code>; <code>tombstone_retention_window &gt;= max_ack_await_time</code>; <code>max_recovery_idle &lt; unused_verifier_lifetime</code>; <code>ssas_per_request</code> in
+<code>1..=MAX_SSA_BATCH_SIZE</code>; both scaled deadlines under 24 h; non-zero durations; a share fraction in
+<code>0.0..=1.0</code>; and non-zero <code>max_served_without_progress</code>, <code>min_share_order_sample</code> and
+<code>max_failed_cycles</code>.</p>
+<h4 id="the-surplus-run-and-why-it-no-longer-constrains-anything"><a class="doc-anchor" href="#the-surplus-run-and-why-it-no-longer-constrains-anything">§</a>The surplus run, and why it no longer constrains anything</h4>
+<p>Emission is round-robin over a window of up to <code>hopr_protocol_pix::SHARE_EMISSION_WINDOW</code> (256)
+polynomials advancing in lockstep. They reach <code>threshold</code> on the same pass and then take their
+surplus shares together, so every block ends with <code>surplus_shares × window</code> consecutive packets
+carrying no <em>useful</em> share — <strong>4096 at the shipped dimensions</strong>, against a
+<code>max_served_without_progress</code> of 2048.</p>
+<p>That used to be a live constraint on two parameters, and an unmeetable one: the ceiling and the
+idle timer both counted useful shares, so the run looked exactly like an Entry gone silent. The
+gate would park the writer partway through, a parked writer spends no SURBs, and the idle rule
+could not rescue it — its re-arm branch needs <em>no service consumed</em> since the last progress, and
+2048 packets were. An honest Session closed with <code>RecoveryIdle</code> one emission block into a cycle.</p>
+<p>Both now read <a href="../../hopr_protocol_pix/types/struct.SsaRecoveryProgress.html#structfield.shares_seen" title="field hopr_protocol_pix::types::SsaRecoveryProgress::shares_seen"><code>SsaRecoveryProgress::shares_seen</code></a>,
+which counts every share the cycle accepts — surplus included, up to the negotiated budget per
+polynomial. Full cryptographic recovery no longer cuts that signal off: the reconstructor drops
+its heavy state but retains one shared per-polynomial remainder, and the supervisor keeps that
+recovered predecessor as the paid front until the tail is exhausted or successor progress proves
+the FIFO boundary. The run therefore resets the ceiling and refreshes the idle deadline exactly
+like the useful shares around it, even across recovery, so <strong>neither parameter has to be sized
+against the dimensions any more.</strong> What <code>max_served_without_progress</code> still bounds is genuine
+silence: packets served with no share of any kind coming back.</p>
+<p>The one dimension-dependent property that remains is not a supervisor parameter at all: a
+polynomial’s whole emission, <code>threshold + surplus</code>, should fit one peer deferral bucket
+(<code>hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL</code>, 128), or acknowledgements arriving before
+the cycle’s commitments install can be dropped. The shipped 96 fits; both halves are a byte wide
+on the wire, so the sum can reach 510. It is a sufficient condition rather than a required one —
+only the pre-install prefix is deferred — which is why it is asserted on the defaults rather than
+enforced.</p>
+<h3 id="worked-example"><a class="doc-anchor" href="#worked-example">§</a>Worked example</h3>
+<p>A profile of <strong>5 Mbps sustained per direction</strong> and <strong>5–6 s on-chain settlement</strong> for an SSA
+deposit. <code>HoprPacket::PAYLOAD_SIZE</code> is 1038 B, so 5 Mbps is ~602 packets/s of return traffic —
+one SURB and one share each.</p>
+<p><strong>Dimensions first</strong>, because every supervisor value derives from them. <code>2048 × 64</code> with the
+derived surplus of 16 gives 131 072 useful shares out of 163 840 emitted, and a cycle of 163 840
+packets — about <strong>4.5 min</strong> at this rate. The quota is priced on all of them, surplus included, so
+it is <code>2048 × 80 × 1038 B</code> = <strong>162.2 MiB</strong>, which is exactly the bottom of the default
+<code>quota_range</code> (a quarter of the 648.8 MiB the default dimensions imply), so no range change is
+needed. The default <code>8192 × 64</code> would make that 18.1 min per cycle, which at 6 s settlement is a
+long time to leave one cycle’s traffic unsettled for no benefit. Keep it a multiple of 256 so the
+emission window never narrows.</p>
+<div><table><thead><tr><th>Parameter</th><th>Value</th><th>Why, at this profile</th></tr></thead><tbody>
+<tr><td><code>PixGlobalConfig::num_ssa_parts</code> (Entry)</td><td>2048</td><td>162.2 MiB quota, 4.5 min cycle; multiple of the emission window</td></tr>
+<tr><td><code>PixGlobalConfig::ssa_part_size</code> (Entry)</td><td>64</td><td>Shipped threshold; with the surplus below, it is what fixes the quota</td></tr>
+<tr><td><code>PixGlobalConfig::additional_shares</code> (Entry)</td><td>unset</td><td>Derives to 16 — a quarter of the threshold, i.e. a 1.25× surplus factor and a fifth of the quota. Setting it explicitly buys loss tolerance and charges the Entry for it. Keep <code>ssa_part_size + additional_shares</code> inside one deferral bucket (128)</td></tr>
+<tr><td><code>ssas_per_request</code></td><td><strong>1</strong></td><td>The 85 % early signal leaves a 24 627-packet runway — <strong>41 s</strong> — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of <code>n</code> would multiply the unfunded exposure to <code>n × 162.2 MiB</code></td></tr>
+<tr><td><code>max_ssa_delivery_time</code></td><td>20 s</td><td>2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation</td></tr>
+<tr><td><code>max_deposit_wait</code></td><td>30 s</td><td>5× the 6 s settlement, leaving room for the Entry to notice <code>ReadyToDeposit</code>, submit, and the observer to see it</td></tr>
+<tr><td><code>max_predeposit_packets</code></td><td>4096</td><td>~6.8 s of service, matching expected settlement rather than the deadline. This is the most exposed against an unfunded front after the initial grant or a paid handoff — 4.2 MB. Use <code>0</code> for strict prepay at every rotation; normal overlap usually funds the successor before it reaches the front</td></tr>
+<tr><td><code>max_served_without_progress</code></td><td>2048</td><td>Shipped value, and no longer dimension-dependent: the surplus run resets it like any other share, so this bounds genuine silence only</td></tr>
+<tr><td><code>max_recovery_idle</code></td><td>60 s</td><td>Shipped value. Satisfies <code>&gt;= max_ack_await_time</code> and <code>&lt; unused_verifier_lifetime</code>. It no longer has to cover the surplus run — that resets it — so what it now implies is only that a Session returning <em>nothing at all</em> for a minute is closed</td></tr>
+<tr><td><code>max_recovery_time</code></td><td>2 h</td><td>Resource backstop only. A cycle needs 272 s at full rate, so 2 h implies a floor of ~23 packets/s (~0.19 Mbps) — deliberately far below the idle rule, which is the instrument that should bind</td></tr>
+<tr><td><code>max_off_front_share_fraction</code></td><td>0.25</td><td>Shipped value. A conforming Entry sits near 0; two-way spreading is 0.5</td></tr>
+<tr><td><code>min_share_order_sample</code></td><td>16384</td><td>Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling</td></tr>
+<tr><td><code>tombstone_retention_window</code></td><td>60 s</td><td>2× the reconstructor’s 30 s ack window</td></tr>
+<tr><td><code>max_failed_cycles</code></td><td>1</td><td>Shipped value, and inert at this batch size of one — the failing cycle is always the last one standing, which closes the Session first</td></tr>
+</tbody></table>
+</div>
+<p>What one cycle costs is not in this table, because it is not in this configuration: the 162.2 MiB
+quota is priced by the deposit pool, which is also what decides that a deposit has cleared it.</p>
+<p>Related settings outside <a href="../struct.SupervisorConfig.html" title="struct hopr_transport_session::SupervisorConfig"><code>SupervisorConfig</code></a> that this profile also pins:</p>
+<div><table><thead><tr><th>Parameter</th><th>Value</th><th>Why</th></tr></thead><tbody>
+<tr><td><code>SurbStoreConfig::rb_capacity</code></td><td>100 000</td><td>An overwritten SURB is a permanently lost share, so the buffer must clear the balancer’s target with room for overshoot — 14× here</td></tr>
+<tr><td><code>SurbBalancerConfig::target_surb_buffer_size</code></td><td>7 000</td><td>~11.6 s of return traffic at 5 Mbps; must cover the forward round trip or the Exit starves mid-cycle</td></tr>
+<tr><td><code>SessionManagerConfig::maximum_surb_buffer_size</code></td><td>10 000</td><td>Ceiling the balancer may be steered to</td></tr>
+<tr><td><code>SsaReconstructorConfig::max_ack_await_time</code></td><td>30 s</td><td>Bounds how long an unacknowledged share is held; both <code>max_recovery_idle</code> and <code>tombstone_retention_window</code> must clear it</td></tr>
+<tr><td><code>SsaReconstructorConfig::unused_verifier_lifetime</code></td><td>1800 s</td><td>Must exceed <code>max_recovery_idle</code>, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish</td></tr>
+<tr><td><code>SsaReconstructorConfig::early_recovery_threshold</code></td><td>0.85</td><td>Sets the pipelining runway derived for <code>ssas_per_request</code> above — 24 627 packets, 41 s. Bounded below by <code>MIN_EARLY_RECOVERY_THRESHOLD</code> and equal to it today: the Entry’s successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway</td></tr>
+<tr><td><code>PixGlobalConfig::max_ssas_per_request</code> (Entry)</td><td>2</td><td>Must be ≥ every peer Exit’s <code>ssas_per_request</code>; not negotiated, and an over-cap batch is refused in full</td></tr>
+<tr><td><code>IncomingSessionPixConfig::max_live_cycle_bytes</code></td><td>3 GiB</td><td>Shipped value. At <code>2048 × 64 + 16</code> a Session reserves ≈20.5 MiB, so this profile admits ≈150 concurrent PIX Sessions rather than the ≈37 the default dimensions imply. It is the ceiling on live reconstructor state, and it — not <code>maximum_managed_sessions</code> — is what decides how many PIX Sessions this Exit accepts</td></tr>
+</tbody></table>
+</div></div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.GateClosed"><code>pub use gate::<a class="struct" href="gate/struct.GateClosed.html" title="struct hopr_transport_session::supervision::gate::GateClosed">GateClosed</a>;</code></dt><dt id="reexport.ServiceGate"><code>pub use gate::<a class="struct" href="gate/struct.ServiceGate.html" title="struct hopr_transport_session::supervision::gate::ServiceGate">ServiceGate</a>;</code></dt><dt id="reexport.ActionRx"><code>pub use worker::<a class="type" href="worker/type.ActionRx.html" title="type hopr_transport_session::supervision::worker::ActionRx">ActionRx</a>;</code></dt><dt id="reexport.SessionPixSupervisorHandle"><code>pub use worker::<a class="struct" href="worker/struct.SessionPixSupervisorHandle.html" title="struct hopr_transport_session::supervision::worker::SessionPixSupervisorHandle">SessionPixSupervisorHandle</a>;</code></dt><dt id="reexport.spawn_supervisor_worker"><code>pub use worker::<a class="fn" href="worker/fn.spawn_supervisor_worker.html" title="fn hopr_transport_session::supervision::worker::spawn_supervisor_worker">spawn_supervisor_worker</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="gate/index.html" title="mod hopr_transport_session::supervision::gate">gate</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd><a href="gate/struct.ServiceGate.html" title="struct hopr_transport_session::supervision::gate::ServiceGate"><code>ServiceGate</code></a> — bounded predeposit egress gate for PIX sessions.</dd><dt><a class="mod" href="supervisor/index.html" title="mod hopr_transport_session::supervision::supervisor">supervisor</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Deterministic <a href="supervisor/struct.SessionPixSupervisor.html" title="struct hopr_transport_session::supervision::supervisor::SessionPixSupervisor"><code>SessionPixSupervisor</code></a> — the pure state machine for PIX
+session lifecycle.</dd><dt><a class="mod" href="worker/index.html" title="mod hopr_transport_session::supervision::worker">worker</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Per-session actor for the <a href="supervisor/struct.SessionPixSupervisor.html" title="struct hopr_transport_session::supervision::supervisor::SessionPixSupervisor"><code>SessionPixSupervisor</code></a>.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.PixParams.html" title="struct hopr_transport_session::supervision::PixParams">PixParams</a></dt><dd>PIX dimensions agreed upon during session negotiation.</dd><dt><a class="struct" href="struct.SupervisorConfig.html" title="struct hopr_transport_session::supervision::SupervisorConfig">Supervisor<wbr>Config</a></dt><dd>Configuration for the <code>SessionPixSupervisor</code>.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.SessionPixAction.html" title="enum hopr_transport_session::supervision::SessionPixAction">Session<wbr>PixAction</a></dt><dd>Actions emitted by the <a href="supervisor/struct.SessionPixSupervisor.html" title="struct hopr_transport_session::supervision::supervisor::SessionPixSupervisor"><code>SessionPixSupervisor</code></a> for the caller to execute.</dd><dt><a class="enum" href="enum.SessionPixCloseReason.html" title="enum hopr_transport_session::supervision::SessionPixCloseReason">Session<wbr>PixClose<wbr>Reason</a></dt><dd>Internal close reasons emitted by the supervisor.</dd><dt><a class="enum" href="enum.SessionPixEvent.html" title="enum hopr_transport_session::supervision::SessionPixEvent">Session<wbr>PixEvent</a></dt><dd>Events consumed by the <a href="supervisor/struct.SessionPixSupervisor.html" title="struct hopr_transport_session::supervision::supervisor::SessionPixSupervisor"><code>SessionPixSupervisor</code></a>.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.MAX_SUPERVISOR_DURATION.html" title="constant hopr_transport_session::supervision::MAX_SUPERVISOR_DURATION">MAX_<wbr>SUPERVISOR_<wbr>DURATION</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Upper bound on any supervisor duration, as it is actually armed.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.scaled_deadline.html" title="fn hopr_transport_session::supervision::scaled_deadline">scaled_<wbr>deadline</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A per-cycle deadline duration as it is actually armed for a batch of <code>ssas_per_request</code>.</dd><dt><a class="fn" href="fn.validate_pix_supervision.html" title="fn hopr_transport_session::supervision::validate_pix_supervision">validate_<wbr>pix_<wbr>supervision</a></dt><dd>Validates that <a href="../struct.SupervisorConfig.html" title="struct hopr_transport_session::SupervisorConfig"><code>SupervisorConfig</code></a> and <a href="../../hopr_protocol_pix/reconstructor/struct.SsaReconstructorConfig.html" title="struct hopr_protocol_pix::reconstructor::SsaReconstructorConfig"><code>SsaReconstructorConfig</code></a> are
+mutually consistent.</dd></dl></section></div></main></body></html>

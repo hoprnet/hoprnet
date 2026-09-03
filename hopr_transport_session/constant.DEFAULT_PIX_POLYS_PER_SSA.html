@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Default number of polynomials (“SSA parts”) a single SSA is split into."><title>DEFAULT_PIX_POLYS_PER_SSA in hopr_transport_session - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_transport_session" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">DEFAULT_PIX_POLYS_PER_SSA</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_transport_session/index.html">hopr_<wbr>transport_<wbr>session</a><span class="version">0.29.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">DEFAULT_<wbr>PIX_<wbr>POLYS_<wbr>PER_<wbr>SSA</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#choosing-the-split" title="Choosing the split">Choosing the split</a></li><li><a href="#why-this-is-an-alias" title="Why this is an alias">Why this is an alias</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate hopr_<wbr>transport_<wbr>session</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">hopr_transport_session</a></div><h1>Constant <span class="constant">DEFAULT_<wbr>PIX_<wbr>POLYS_<wbr>PER_<wbr>SSA</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_transport_session/types.rs.html#249">Source</a> </span></div><pre class="rust item-decl"><code>pub const DEFAULT_PIX_POLYS_PER_SSA: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u16.html">u16</a> = hopr_protocol_pix::DEFAULT_POLYS_PER_SSA; // 8_192u16</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Default number of polynomials (“SSA parts”) a single SSA is split into.</p>
+<p>This is the single source of truth for the Entry-side generator dimension
+(<code>PixGlobalConfig::num_ssa_parts</code>) and for the Exit-side acceptance policy
+(<a href="struct.IncomingSessionPixConfig.html#structfield.quota_range" title="field hopr_transport_session::IncomingSessionPixConfig::quota_range"><code>IncomingSessionPixConfig::quota_range</code></a>).
+Both must be derived from it so the two cannot drift apart: the Exit computes the
+offered quota as <code>polys × (shares + surplus) × PAYLOAD_SIZE</code> and rejects the Session if neither
+it nor an allowed dynamic batch brings the total inside the configured range. At the default
+batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
+every PIX Session fail to establish.</p>
+<h3 id="choosing-the-split"><a class="doc-anchor" href="#choosing-the-split">§</a>Choosing the split</h3>
+<p>For a fixed useful-share count <code>U = polys × threshold</code> the <em>product</em> is pinned, so the split
+between the two is free — but the costs scale differently, and dropping the non-constant
+coefficient commitments (see <a href="../hopr_protocol_pix/struct.SsaPartCommitment.html" title="struct hopr_protocol_pix::SsaPartCommitment"><code>hopr_protocol_pix::SsaPartCommitment</code></a>) changed which way they
+pull:</p>
+<ul>
+<li>Commitment wire volume and Exit ingest are one commitment per polynomial — <strong>linear in <code>polys</code></strong>, and formerly
+<code>polys × threshold</code>. Ingest is dominated by point decompression plus the cofactor-8 subgroup check.</li>
+<li>Reconstructor commitment memory is likewise <code>polys</code>, no longer <code>U</code>.</li>
+<li>Share verification is one scalar multiplication per <em>polynomial</em>, not <code>O(threshold)</code> per share. It used to be <code>U × threshold</code> and is now simply <code>polys</code>.</li>
+<li>Interpolating a polynomial is <code>O(threshold²)</code> field operations, and there are <code>polys</code> of them — <code>U × threshold</code>,
+<strong>linear in <code>threshold</code></strong>, and it is field arithmetic rather than curve arithmetic.</li>
+<li>Detection of a dishonest Entry takes <code>threshold</code> return packets, since a share set is only checked once it
+interpolates.</li>
+<li>On the <strong>Entry</strong>, <code>SsaShareGenerator::next_share</code> evaluates a <code>threshold</code>-wide polynomial by Horner for every
+share it emits — <code>U × threshold</code> again. This is much the smaller of the two per-share terms, but it is not zero,
+and describing the Entry as threshold-free (as this list once did) is wrong.</li>
+</ul>
+<p>So raising <code>threshold</code> (and lowering <code>polys</code>) buys a proportionally smaller commitment phase at
+the cost of more interpolation, later fault detection and more Entry evaluation.</p>
+<p>Both sides have since been measured, and <code>8192 × 64</code> stands — see
+<a href="../hopr_protocol_pix/constant.DEFAULT_POLY_THRESHOLD.html" title="constant hopr_protocol_pix::DEFAULT_POLY_THRESHOLD"><code>hopr_protocol_pix::DEFAULT_POLY_THRESHOLD</code></a> for the tables. The objective is <strong>Exit
+reconstruction capacity</strong>, because the Exit serves 10–30 clients while an Entry serves only
+itself: on that measure the deployed threshold is within 0.4 % of the optimum, and the fixed
+per-polynomial cost the Exit amortises over <code>threshold</code> shares means a <em>lower</em> threshold is
+worse, not better. Summing Entry and Exit per-share cost instead would favour 48 by about 3 %;
+that reading is recorded there and deliberately not acted on.</p>
+<p>The quota is fixed by <code>polys × (threshold + surplus)</code>, so the split can be re-tuned without
+touching session negotiation as long as that product holds.</p>
+<h3 id="why-this-is-an-alias"><a class="doc-anchor" href="#why-this-is-an-alias">§</a>Why this is an alias</h3>
+<p>The generator that produces the shares lives in <code>hopr-protocol-pix</code> and carries its own
+defaults, so the split existed as two independent literals — and they drifted: this side was
+re-tuned to <code>8192 × 64</code> while the pix crate stayed at a threshold of 128, which made
+<a href="../hopr_protocol_pix/generator/struct.SsaGeneratorConfig.html#method.default" title="associated function hopr_protocol_pix::generator::SsaGeneratorConfig::default"><code>hopr_protocol_pix::SsaGeneratorConfig::default</code></a> imply a 1.01 GiB quota, outside the very
+range derived below. Four benchmarks had grown comments explaining which of the two to
+believe. Aliasing removes the choice.</p>
+</div></details></section></div></main></body></html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Per-polynomial live heap a cycle holds that `size_of` cannot account for, in bytes."><title>PART_BUILDER_OVERHEAD_BYTES in hopr_protocol_pix::reconstructor - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopr_protocol_pix" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">PART_BUILDER_OVERHEAD_BYTES</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../hopr_protocol_pix/index.html">hopr_<wbr>protocol_<wbr>pix</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"><h2><a href="index.html">In hopr_<wbr>protocol_<wbr>pix::<wbr>reconstructor</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">hopr_protocol_pix</a>::<wbr><a href="index.html">reconstructor</a></div><h1>Constant <span class="constant">PART_<wbr>BUILDER_<wbr>OVERHEAD_<wbr>BYTES</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/hopr_protocol_pix/reconstructor/mod.rs.html#342">Source</a> </span></div><pre class="rust item-decl"><code>pub const PART_BUILDER_OVERHEAD_BYTES: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a> = 704;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Per-polynomial live heap a cycle holds that <code>size_of</code> cannot account for, in bytes.</p>
+<p><a href="../fn.peak_cycle_bytes.html" title="fn hopr_protocol_pix::peak_cycle_bytes"><code>peak_cycle_bytes</code></a> reads the structural per-polynomial terms — the part builder, the shared
+surplus counter, and the commitment map entry retained behind them — straight from the types,
+so they track the curve and the structs without anyone maintaining a number. This covers what
+is left:</p>
+<ul>
+<li><code>SsaBuilder</code>’s received-index set, sized at <code>num_polys</code> on construction;</li>
+<li>the <code>Box&lt;[_]&gt;</code> header the part builders live in, and allocator rounding on both collections;</li>
+<li>the acknowledgement-path residue a cycle drags along while it fills. <code>awaiting_acks</code> is bounded globally by
+<a href="../struct.SsaReconstructorConfig.html#structfield.max_ack_buffer_bytes" title="field hopr_protocol_pix::SsaReconstructorConfig::max_ack_buffer_bytes"><code>max_ack_buffer_bytes</code></a> rather than per cycle, but <code>moka</code> applies
+removals on a later maintenance pass, so a cycle being fed at line rate carries a backlog of redeemed-but-not-yet
+-reclaimed entries. Charging a slice of it twice is deliberate: it is the difference between a model that is a
+ceiling and one that is merely a good estimate.</li>
+</ul>
+<p><strong>Measured, not derived</strong>, like <a href="../constant.AWAITING_ACK_ENTRY_BYTES.html" title="constant hopr_protocol_pix::AWAITING_ACK_ENTRY_BYTES"><code>AWAITING_ACK_ENTRY_BYTES</code></a>:
+<code>exit_reconstructor_worst_case_share_order</code> in <code>tests/memory_profile.rs</code> prints the modelled and
+measured per-polynomial figures side by side with the share buffers subtracted, which is exactly
+this number. Run it to re-derive every figure below.</p>
+<p>The arithmetic, at the time of writing and at the deployed dimensions:</p>
+<ul>
+<li>measured per polynomial, share buffers excluded: <strong>~880–905 B</strong>. A range because it is a range: the
+acknowledgement residue is a scheduling artefact, and two runs of the same test on the same machine gave 876 B and
+904 B. That variance is the reason this constant is set with headroom rather than at the measurement;</li>
+<li>of which <code>size_of</code> accounts for <strong>458 B</strong>, leaving a <strong>~420–450 B</strong> residue the types cannot see;</li>
+<li>this constant is <strong>704 B</strong>, ~1.6× that residue, so the model charges 458 + 704 = <strong>1162 B</strong> per polynomial — ~30 %
+above the measurement;</li>
+<li>across a whole cycle that dilutes to ~6 %, because the share buffers are modelled exactly and dominate: <strong>41.1
+MiB</strong> modelled against <strong>38.8 MiB</strong> measured, of which 32.0 MiB is share buffers.</li>
+</ul>
+<p>Both headroom figures are worth keeping straight, because they answer different questions: ~30 %
+is the margin on the term this constant actually sets, and ~6 % is the margin on the number the
+Session layer’s live-cycle budget is denominated in.</p>
+<p>Headroom rather than the measured figure for the variance above, and because understating this
+would let that budget be exceeded.</p>
+</div></details></section></div></main></body></html>

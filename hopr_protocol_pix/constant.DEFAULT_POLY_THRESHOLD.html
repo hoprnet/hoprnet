@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Minimum number of shares needed to recover one polynomial of an SSA."><title>DEFAULT_POLY_THRESHOLD in hopr_protocol_pix - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_protocol_pix" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">DEFAULT_POLY_THRESHOLD</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_protocol_pix/index.html">hopr_<wbr>protocol_<wbr>pix</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">DEFAULT_<wbr>POLY_<wbr>THRESHOLD</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#what-64-optimises" title="What 64 optimises">What 64 optimises</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate hopr_<wbr>protocol_<wbr>pix</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">hopr_protocol_pix</a></div><h1>Constant <span class="constant">DEFAULT_<wbr>POLY_<wbr>THRESHOLD</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_protocol_pix/lib.rs.html#111">Source</a> </span></div><pre class="rust item-decl"><code>pub const DEFAULT_POLY_THRESHOLD: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a> = 64;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Minimum number of shares needed to recover one polynomial of an SSA.</p>
+<p>64 rather than the 128 this was before the split was re-tuned. Dropping the non-constant
+coefficient commitments (see <a href="struct.SsaPartCommitment.html" title="struct hopr_protocol_pix::SsaPartCommitment"><code>SsaPartCommitment</code></a>) put every commitment-side cost — wire
+volume, ingest, reconstructor memory, share verification — on <code>polys</code> alone. What still grows
+with the threshold is Exit interpolation (<code>O(threshold²)</code> per polynomial), fault-detection
+latency (<code>threshold</code> return packets) and, on the Entry, the per-packet
+<a href="struct.SsaShareGenerator.html#method.next_share" title="method hopr_protocol_pix::SsaShareGenerator::next_share"><code>SsaShareGenerator::next_share</code></a>, which evaluates a <code>threshold</code>-wide polynomial by Horner for
+every share it emits. The full cost model is documented on <code>DEFAULT_PIX_POLYS_PER_SSA</code> in
+<code>hopr-transport-session</code>.</p>
+<h2 id="what-64-optimises"><a class="doc-anchor" href="#what-64-optimises">§</a>What 64 optimises</h2>
+<p><strong>Exit reconstruction capacity, deliberately, and not total network CPU.</strong> The two sides do not
+deserve equal weight: an Exit is a shared resource serving 10–30 concurrent clients while each
+Entry generates only its own shares, so the Exit is the side that saturates first and the one
+whose per-share cost sets what the network can carry. Both were measured (48 cores,
+<code>acknowledge_shares/interpolation</code> and <code>SsaShareGenerator::next_share</code>, µs/share):</p>
+<div><table><thead><tr><th>threshold</th><th>Exit</th><th>Entry</th><th>total</th></tr></thead><tbody>
+<tr><td>16</td><td>13.15</td><td>0.90</td><td>14.05</td></tr>
+<tr><td>32</td><td>11.12</td><td>1.20</td><td>12.32</td></tr>
+<tr><td>48</td><td>10.62</td><td>1.51</td><td>12.13</td></tr>
+<tr><td>64</td><td>10.68</td><td>1.82</td><td>12.50</td></tr>
+</tbody></table>
+</div>
+<p>The Exit curve <em>falls</em> and then flattens: fitting µs/polynomial = <code>A + B·t + C·t²</code> gives
+<code>A ≈ 81 µs</code>, <code>B ≈ 7.61</code>, <code>C ≈ 0.028</code>, so per share it is <code>A/t + B + C·t</code> — the fixed
+per-polynomial commitment opening is amortised over <code>threshold</code> shares and punishes <em>low</em>
+thresholds harder than interpolation punishes high ones. The Exit-only optimum is
+<code>t = √(A/C) ≈ 54</code>, flat within 0.5 % from 48 to 64, and 64 sits within 0.4 % of it.</p>
+<p>Under the total column 48 is about 3 % cheaper. That reading is recorded rather than acted on:
+it weights one Entry’s share generation equally with the Exit work of the 10–30 clients that
+Exit serves, which is not where the capacity limit is. Moving the split also moves the
+negotiated per-SSA quota and everything derived from it, which is not worth 3 % of a model that
+does not describe the bottleneck.</p>
+</div></details></section></div></main></body></html>
