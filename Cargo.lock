@@ -4505,7 +4505,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -4524,6 +4524,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+ "validator",
 ]
 
 [[package]]

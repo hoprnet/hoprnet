@@ -107,7 +107,7 @@ impl hopr_api::node::HoprSessionServer for EchoServer {
     }
 }
 
-/// A [`HoprSessionServer`] that captures the first incoming [`IncomingSession`]
+/// A [`hopr_api::node::HoprSessionServer`] that captures the first incoming [`IncomingSession`]
 /// into a shared `Arc<Mutex<Option<IncomingSession>>>` for test access.
 ///
 /// After capturing, it holds the session open indefinitely via `futures::future::pending()`
