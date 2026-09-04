@@ -96,11 +96,19 @@ pub trait PacketEncoder {
     ///
     /// The `data` MUST be already correctly sized for HOPR packets, otherwise the operation
     /// must fail.
+    ///
+    /// `generation` is the SURB-batch generation to stamp onto SURBs minted for a forward packet's
+    /// return paths, captured when those return paths were resolved (see
+    /// [`PathPlanner::resolve_routing`](../../../hopr_transport/path/planner)). It must be captured
+    /// with the plan rather than read here, so a concurrent return-path re-plan cannot label an
+    /// already-chosen batch with a newer generation. `None` (no return path, or a non-forward
+    /// packet) falls back to the store's current generation.
     fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
+        generation: Option<u8>,
     ) -> Result<OutgoingPacket, Self::Error>;
 
     /// Encodes the given vector of [`VerifiedAcknowledgements`](VerifiedAcknowledgement) as an outgoing packet to be
