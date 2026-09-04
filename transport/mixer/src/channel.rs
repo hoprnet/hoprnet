@@ -18,7 +18,10 @@ use tracing::trace;
 pub use crate::error::SenderError;
 #[cfg(all(feature = "telemetry", not(test)))]
 use crate::metrics::METRIC_QUEUE_SIZE;
-use crate::{config::MixerConfig, data::DelayedData};
+use crate::{
+    config::{MixerConfig, UniformConfig},
+    data::DelayedData,
+};
 
 /// Mixing and delaying channel using random delay function.
 ///
@@ -42,7 +45,10 @@ struct Channel<T> {
     /// Buffer holding the data with a timestamp ordering to ensure the min heap behavior.
     buffer: BinaryHeap<Reverse<DelayedData<T>>>,
     waker: Option<std::task::Waker>,
-    cfg: MixerConfig,
+    uniform: UniformConfig,
+    // Read only by the telemetry path, so it is dead in non-telemetry / test builds.
+    #[allow(dead_code)]
+    metric_delay_window: u64,
 }
 
 /// Channel with sender and receiver counters allowing closure tracking.
@@ -101,7 +107,7 @@ impl<T> Sender<T> {
 
         let mut channel = self.channel.channel.lock();
 
-        let random_delay = channel.cfg.uniform_config().random_delay();
+        let random_delay = channel.uniform.random_delay();
 
         trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
 
@@ -115,7 +121,7 @@ impl<T> Sender<T> {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_QUEUE_SIZE.increment(1.0f64);
-            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, channel.cfg.metric_delay_window());
+            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, channel.metric_delay_window);
         }
 
         Ok(())
@@ -146,14 +152,6 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
         // The channel can only be closed by the receiver. The sender can be dropped at any point.
         Poll::Ready(Ok(()))
     }
-}
-
-/// Error returned by the [`Receiver`].
-#[derive(Debug, thiserror::Error)]
-pub enum ReceiverError {
-    /// The channel is closed due to receiver being dropped.
-    #[error("Channel is closed")]
-    Closed,
 }
 
 /// Receiver object interacting with the mixer channel.
@@ -264,7 +262,7 @@ impl<T> Receiver<T> {
 }
 
 /// Instantiate a mixing channel and return the sender and receiver end of the channel.
-pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
+pub fn channel<T>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
     #[cfg(all(feature = "telemetry", not(test)))]
     {
         // Initialize the lazy statics here
@@ -275,12 +273,15 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
 
     let mut buffer = BinaryHeap::new();
     buffer.reserve(cfg.capacity);
+    let uniform = cfg.uniform_config();
+    let metric_delay_window = cfg.metric_delay_window();
 
     let channel = TrackedChannel {
         channel: Arc::new(Mutex::new(Channel::<T> {
             buffer,
             waker: None,
-            cfg,
+            uniform,
+            metric_delay_window,
         })),
         sender_count: Arc::new(AtomicUsize::new(1)),
         receiver_active: Arc::new(AtomicBool::new(true)),

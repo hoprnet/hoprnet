@@ -12,7 +12,10 @@ use tracing::trace;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 use crate::metrics::METRIC_QUEUE_SIZE;
-use crate::{config::MixerConfig, data::DelayedData};
+use crate::{
+    config::{MixerConfig, UniformConfig},
+    data::DelayedData,
+};
 
 /// A [`Sink`] adapter that applies random delays to items before forwarding them to an inner sink.
 ///
@@ -28,6 +31,10 @@ pub struct MixerSink<S, T> {
     heap: BinaryHeap<Reverse<DelayedData<T>>>,
     timer: Delay,
     cfg: MixerConfig,
+    uniform: UniformConfig,
+    // Read only by the telemetry path, so it is dead in non-telemetry / test builds.
+    #[allow(dead_code)]
+    metric_delay_window: u64,
 }
 
 impl<S, T> MixerSink<S, T> {
@@ -38,6 +45,8 @@ impl<S, T> MixerSink<S, T> {
             inner,
             heap,
             timer: Delay::new(Duration::ZERO),
+            uniform: cfg.uniform_config(),
+            metric_delay_window: cfg.metric_delay_window(),
             cfg,
         }
     }
@@ -62,7 +71,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let this = Pin::into_inner(self);
-        let random_delay = this.cfg.uniform_config().random_delay();
+        let random_delay = this.uniform.random_delay();
 
         trace!(delay_ms = random_delay.as_millis(), "mixer: delaying item");
 
@@ -72,7 +81,7 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_QUEUE_SIZE.increment(1.0f64);
-            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, this.cfg.metric_delay_window());
+            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, this.metric_delay_window);
         }
 
         Ok(())
