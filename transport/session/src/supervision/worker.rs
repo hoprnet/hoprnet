@@ -357,6 +357,7 @@ mod tests {
             allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
+            commitment_recommit_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(10),
             max_recovery_time: Duration::from_secs(3600),

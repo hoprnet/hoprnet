@@ -172,6 +172,32 @@ pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLY_THRESHOL
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
 
+/// Retransmission requests the Entry answers for one SSA cycle.
+///
+/// A cycle's commitment ships as hundreds of packets, and a single lost one strands the whole cycle
+/// (see [`SsaShareGenerator::recommit`]), so the Exit must be able to ask again for the pieces it
+/// never received. This bounds how often it may: one request can legally name every polynomial of
+/// the cycle, and an answer is the entire burst again, so an unbounded count is a packet
+/// amplification lever available to a peer that has already been served.
+///
+/// Eight, because the Exit re-asks on an idle timer rather than once. At the shipped Exit settings
+/// — a 3 s re-request interval inside a 20 s commitment deadline — a cycle can produce about six
+/// attempts, and a peer batching several SSAs per request produces proportionally more against a
+/// scaled deadline. The excess is simply refused: an unanswered request costs the Exit one packet
+/// and this node nothing, which is why the two sides are not required to agree on the figure.
+pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
+
+/// Cycles per pseudonym whose commitment material the [`SsaShareGenerator`] retains for
+/// retransmission.
+///
+/// The retained material is dropped as soon as a cycle can no longer be served at all — see
+/// [`SsaShareGenerator::recommit`] — so this cap only binds for a pseudonym that commits to cycles
+/// without ever emitting a share of them, where nothing has yet drained. Eighteen is what
+/// `hopr-transport-session` can have live at once, `MAX_OVERLAPPING_BATCHES` (2) generations of
+/// `MAX_SSA_BATCH_SIZE` (9) cycles each; the constants are not visible from here, so the derivation
+/// is written down rather than imported.
+pub const MAX_RETAINED_COMMITMENT_CYCLES: usize = 18;
+
 /// Minimum SSA polynomial threshold.
 ///
 /// A threshold of 1 would make every single share reconstruct its polynomial on its own, so the

@@ -380,6 +380,279 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     Ok(())
 }
 
+/// Verifies that a commitment burst which loses a message still completes, because the Exit asks for
+/// the missing polynomials and the Entry re-sends exactly those.
+///
+/// This is the failure the retransmission exists for. A cycle's commitment ships as several
+/// `SsaCommit` messages and the Exit can use none of it until every one lands, so before this a
+/// single dropped packet stranded the cycle until `max_ssa_delivery_time` closed the Session — by
+/// which point the Entry had already emitted `ReadyToDeposit` and been told to fund an address that
+/// could never pay out.
+///
+/// ## Steps
+/// 1. Alice and Bob are set up as in the lifecycle test above, but Bob's supervisor gets a 200 ms
+///    `commitment_recommit_interval` so the repair happens inside the test's patience.
+/// 2. Alice's mock transport **drops** her first `SsaCommit` instead of delivering it, and records the polynomial
+///    indices it carried. Everything else is relayed.
+/// 3. Bob's reconstructor is left one chunk short, so it derives no deposit address and reports no verifiable
+///    commitment. Each message that *did* arrive re-armed his re-request timer.
+/// 4. On the timer, Bob sends a second `SsaRequest` whose `missing` scope names the dropped run.
+/// 5. Alice answers it from the bytes she sent the first time, and only for the indices asked for.
+/// 6. Bob completes the commitment and emits `DepositNeeded`; Alice emits `ReadyToDeposit` exactly once, since the
+///    repair must not invite a second deposit against one quota.
+#[test(tokio::test)]
+async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result<()> {
+    use std::sync::Mutex;
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 64,
+        surplus_shares: 16,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+
+    // More than one message, or there is no "one of them" to drop.
+    let expected_ssa_commits = (ssa_gen_config.polynomials_per_ssa as usize)
+        .div_ceil(HoprStartProtocol::ssa_commit_chunking(&alice_pseudonym)?.max_constant_terms_per_message);
+    assert!(
+        expected_ssa_commits > 1,
+        "the commitment must span several messages for this test to mean anything"
+    );
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            supervision: SupervisorConfig {
+                // Short, so the stall is noticed and repaired within the test's timeouts. Everything
+                // else is left at its shipping value, including the delivery deadline this races.
+                commitment_recommit_interval: Duration::from_millis(200),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    /// Polynomial indices one `SsaCommit` carries, sorted, or `None` for any other message.
+    fn committed_polynomials(data: &ApplicationData) -> Option<Vec<u16>> {
+        match HoprStartProtocol::try_from(data.clone()) {
+            Ok(HoprStartProtocol::SsaCommit(commit)) => {
+                let mut indices: Vec<u16> = commit.coefficient_commitments.into_keys().collect();
+                indices.sort_unstable();
+                Some(indices)
+            }
+            _ => None,
+        }
+    }
+
+    // Every `SsaCommit` Alice sends, in order, and the one the transport swallowed.
+    let sent_commits: Arc<Mutex<Vec<Vec<u16>>>> = Arc::new(Mutex::new(Vec::new()));
+    let dropped_commit: Arc<Mutex<Option<Vec<u16>>>> = Arc::new(Mutex::new(None));
+    // The scope of every retransmission request Bob sends, flattened to plain polynomial indices.
+    type RequestedScopes = Arc<Mutex<Vec<(SsaIndex, Vec<u16>)>>>;
+    let requested_scopes: RequestedScopes = Arc::new(Mutex::new(Vec::new()));
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let sent_commits_relay = sent_commits.clone();
+    let dropped_commit_relay = dropped_commit.clone();
+    // A single catch-all expectation rather than one per message kind: the repair is a *second*
+    // exchange over the same channel, so the message counts are not known in advance — which is what
+    // the assertions below establish instead.
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let bob_mgr = bob_mgr_relay.clone();
+            let sent_commits = sent_commits_relay.clone();
+            let dropped_commit = dropped_commit_relay.clone();
+            Box::pin(async move {
+                if let Some(indices) = committed_polynomials(&data.data) {
+                    sent_commits.lock().unwrap().push(indices.clone());
+                    let mut dropped = dropped_commit.lock().unwrap();
+                    if dropped.is_none() {
+                        // The loss this test is about: the first chunk never reaches Bob.
+                        tracing::info!(?indices, "dropping alice's first SsaCommit");
+                        *dropped = Some(indices);
+                        return Ok(());
+                    }
+                }
+                bob_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let requested_scopes_relay = requested_scopes.clone();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let alice_mgr = alice_mgr_relay.clone();
+            let requested_scopes = requested_scopes_relay.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(req)) = HoprStartProtocol::try_from(data.data.clone()) {
+                    for (ssa_index, runs) in req.missing {
+                        let indices = runs.into_iter().flat_map(|(first, last)| first..=last).collect();
+                        tracing::info!(%ssa_index, ?indices, "bob asks for the missing commitment parts");
+                        requested_scopes.lock().unwrap().push((ssa_index, indices));
+                    }
+                }
+                alice_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        Duration::from_secs(5),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target.clone()),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    pix_ssa_quota: Some(params),
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+
+    let mut alice_session = alice_session?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    pin_mut!(pix_alice_rx);
+    pin_mut!(pix_bob_rx);
+
+    // Alice announces her deposit as soon as the burst is *sent*, so this does not wait on the repair
+    // — it is what makes the loss expensive and the repair worth having.
+    let alice_event = tokio_time::timeout(Duration::from_secs(5), pix_alice_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for alice's ReadyToDeposit: {e}"))?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?;
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_quota) = &alice_event else {
+        panic!("expected ReadyToDeposit, got {alice_event:?}");
+    };
+
+    // Bob's, on the other hand, can only arrive once the missing chunk has been asked for and
+    // answered. Before the retransmission this timed out and the Session died on the delivery
+    // deadline.
+    let bob_event = tokio_time::timeout(Duration::from_secs(5), pix_bob_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for bob's DepositNeeded — the repair did not complete: {e}"))?
+        .ok_or(anyhow::anyhow!("bob must get a pix event"))?;
+    let HoprSessionOutPixEvent::DepositNeeded(bob_quota, _) = &bob_event else {
+        panic!("expected DepositNeeded, got {bob_event:?}");
+    };
+    assert_eq!(
+        alice_quota.ssa_id, bob_quota.ssa_id,
+        "the repaired cycle must be the one Alice committed to"
+    );
+    assert_eq!(alice_quota.deposit_address, bob_quota.deposit_address);
+
+    let dropped = dropped_commit
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or(anyhow::anyhow!("the test must have dropped an SsaCommit"))?;
+
+    // Bob asked for exactly what went missing, and asked at all — the scope is derived from what his
+    // reconstructor holds, so this pins the whole detection path.
+    let scopes = requested_scopes.lock().unwrap().clone();
+    assert_eq!(
+        vec![(alice_quota.ssa_id.ssa_index(), dropped.clone())],
+        scopes,
+        "bob must ask once, for the dropped run and nothing else"
+    );
+
+    // And Alice answered with exactly those, rather than re-sending the whole burst.
+    let commits = sent_commits.lock().unwrap().clone();
+    assert_eq!(
+        expected_ssa_commits + 1,
+        commits.len(),
+        "the burst plus one repair message, got {commits:?}"
+    );
+    assert_eq!(
+        Some(&dropped),
+        commits.last(),
+        "the repair must carry the dropped indices and no others"
+    );
+
+    // Exactly one deposit for the cycle: the address is fixed when it is first committed, so a repair
+    // that announced it again would invite a second deposit against one quota.
+    assert!(
+        tokio_time::timeout(Duration::from_millis(300), pix_alice_rx.next())
+            .await
+            .is_err(),
+        "the repair must not make Alice announce a second deposit"
+    );
+
+    alice_session.close().await?;
+    tokio_time::sleep(Duration::from_millis(100)).await;
+
+    for ah in ahs {
+        ah.abort();
+    }
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+
+    Ok(())
+}
+
 /// Verifies that dispatching a PIX event to a session that does not exist returns a
 /// `NonExistingSession` error.
 ///

@@ -10,8 +10,8 @@ use vsss_rs::{
 
 use crate::{
     CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, DEFAULT_SURPLUS_SHARES,
-    MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MIN_POLY_THRESHOLD, PixGroup, PixParams, PixScalar, PixSpec,
-    PolynomialIndex, SsaPartCommitment, errors,
+    MAX_COMMITMENT_RETRANSMISSIONS, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MAX_RETAINED_COMMITMENT_CYCLES,
+    MIN_POLY_THRESHOLD, PixGroup, PixGroupRepr, PixParams, PixScalar, PixSpec, PolynomialIndex, errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{
@@ -37,9 +37,47 @@ impl<S: PixSpec> IndexedPolynomial<S> {
     }
 }
 
+/// Everything needed to re-send part of one cycle's commitment, minus the polynomials themselves.
+///
+/// A cycle's commitment ships as hundreds of packets and the peer can only use it once *every* one
+/// has landed, so it must be able to ask for the pieces a lost packet took with it. Answering that
+/// needs the same bytes again, and neither half can be recovered from what
+/// [`SsaShareGenerator`] otherwise keeps: the proof opens the *sum* of the sub-secrets, which is not
+/// retained, and a polynomial exhausted by emission is dropped from the queue along with its
+/// constant term — so an Entry that recomputed would fail exactly when the peer has been waiting
+/// longest.
+///
+/// The cost is the compressed commitments, `polynomials_per_ssa × 33 B` — 270 kB at the deployed
+/// dimensions, against the ~33 MB of polynomial state the same cycle already holds.
+struct RetainedCommitment<S: PixSpec> {
+    ssa_index: SsaIndex,
+    /// Client commitment to the whole SSA, i.e. the sum of every constant term.
+    ssa_commitment: PixGroup<S>,
+    /// The proof of knowledge that opens [`Self::ssa_commitment`].
+    ///
+    /// Kept rather than re-proven, and re-sent verbatim: it is a non-interactive proof of a public
+    /// statement about a public commitment, so a second copy of the same proof discloses nothing a
+    /// fresh one would not, and re-proving would need the sum of the sub-secrets.
+    proof: SsaCommitmentProof<S>,
+    /// Wire-ready constant-term commitments, indexed by polynomial index.
+    constant_terms: Vec<PixGroupRepr<S>>,
+    /// Retransmission requests already answered for this cycle.
+    ///
+    /// Bounded by [`MAX_COMMITMENT_RETRANSMISSIONS`]: one request may name every polynomial, so an
+    /// answer is the whole burst again.
+    attempts_served: u8,
+}
+
 struct SsaPseudonymEntry<S: PixSpec> {
     ssa_index: SsaIndex,
     poly_queue: VecDeque<IndexedPolynomial<S>>,
+    /// Commitment material of the cycles this pseudonym can still serve, oldest first.
+    ///
+    /// Pruned in [`EntryShareGenerator::next_share`] as cycles drain out of `poly_queue`: a cycle
+    /// with no polynomial left can emit no further share, so no retransmission of its commitment
+    /// could make it recoverable. [`MAX_RETAINED_COMMITMENT_CYCLES`] caps it for a pseudonym that
+    /// commits without ever emitting, where nothing has yet drained.
+    retained_commitments: VecDeque<RetainedCommitment<S>>,
     /// Position within the emission window, i.e. into the first
     /// [`SHARE_EMISSION_WINDOW`] entries of `poly_queue`.
     cursor: usize,
@@ -388,6 +426,70 @@ impl<S: PixSpec> SsaShareGenerator<S> {
                 * (self.cfg.threshold as u64 + self.cfg.surplus_shares as u64),
         })
     }
+
+    /// Rebuilds the commitment of an already-committed cycle, restricted to the polynomial indices
+    /// the peer says it never received.
+    ///
+    /// A cycle's commitment ships as hundreds of packets and the peer can use it only once every one
+    /// of them has landed. Nothing else in the protocol repairs a lost packet: the peer cannot
+    /// reconstruct the missing commitment, and this side cannot tell which one went missing — so
+    /// without this a single drop costs a cycle the peer has usually already been told to fund. The
+    /// peer names the gaps, this fills them.
+    ///
+    /// The result is shaped exactly like [`new_ssa_commitment`](EntryShareGenerator::new_ssa_commitment)'s,
+    /// so the caller re-sends it through the same message splitting, carrying the *same* bytes and the
+    /// same proof. It advances no state the peer is charged for: no new index, no new polynomial, and
+    /// no second deposit — the caller must not announce one, since the address is unchanged and was
+    /// announced when the cycle was first committed.
+    ///
+    /// Each run is an inclusive `(first, last)` polynomial-index pair, expected ascending and
+    /// disjoint. Indices this cycle does not have are skipped.
+    ///
+    /// # Errors
+    /// * [`PixError::MissingSsaCommitment`] — nothing retained for `ssa_index`. Either it was never committed, or its
+    ///   last polynomial has been exhausted and the cycle can no longer be served at all, in which case a
+    ///   retransmission could not save it either.
+    /// * [`PixError::InvalidInput`] — [`MAX_COMMITMENT_RETRANSMISSIONS`] answers have already been given for this
+    ///   cycle, or `runs` selects nothing. The cap is what keeps a peer that has already been served from farming whole
+    ///   bursts out of this node; a request that selects nothing still spends an attempt, so malformed scopes are not
+    ///   free either.
+    pub fn recommit(
+        &self,
+        pseudonym: &S::Pseudonym,
+        ssa_index: SsaIndex,
+        runs: impl IntoIterator<Item = (PolynomialIndex, PolynomialIndex)>,
+    ) -> errors::Result<SsaCommitment<S>, S::Pseudonym> {
+        let entry = self.polynomials.get(pseudonym).ok_or(PixError::MissingSsaCommitment)?;
+        let mut entry = entry.lock();
+        let retained = entry
+            .retained_commitments
+            .iter_mut()
+            .find(|retained| retained.ssa_index == ssa_index)
+            .ok_or(PixError::MissingSsaCommitment)?;
+
+        if retained.attempts_served >= MAX_COMMITMENT_RETRANSMISSIONS {
+            return Err(PixError::InvalidInput);
+        }
+        // Spent before the scope is judged, so a peer cannot probe with cheap malformed asks.
+        retained.attempts_served += 1;
+
+        let selected = selected_constant_terms::<S>(&retained.constant_terms, runs);
+        if selected.is_empty() {
+            return Err(PixError::InvalidInput);
+        }
+
+        tracing::debug!(
+            %pseudonym, %ssa_index, count = selected.len(), attempt = retained.attempts_served,
+            "re-sending part of an ssa commitment"
+        );
+
+        Ok(SsaCommitment {
+            ssa_id: SsaId::new(*pseudonym, ssa_index),
+            ssa_commitment: retained.ssa_commitment,
+            commitment_proof: retained.proof,
+            verifiers: transposed_constant_terms::<S>(selected),
+        })
+    }
 }
 
 impl<S: PixSpec> Default for SsaShareGenerator<S> {
@@ -420,6 +522,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         let mut entry = entry.lock();
         let SsaPseudonymEntry {
             poly_queue,
+            retained_commitments,
             cursor,
             highest_emitted,
             front_run,
@@ -446,6 +549,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 // A new cycle takes the front, so the emission counter restarts with it. This is the
                 // only place it is cleared, which is what keeps it measuring the front cycle alone.
                 *front_emitted = 0;
+                // A cycle behind the new front has no polynomial left, so it can emit no further
+                // share and re-sending its commitment could not make it recoverable. This is the one
+                // place a cycle becomes unservable, so it is where its retained commitment goes.
+                let front_ssa_index = poly_queue[0].spi.as_ref().ssa_index();
+                retained_commitments.retain(|retained| retained.ssa_index >= front_ssa_index);
             }
 
             let window = (*front_run).min(SHARE_EMISSION_WINDOW).min(poly_queue.len()).max(1);
@@ -537,48 +645,61 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             .into_iter()
             .unzip();
 
-        let mut commitments: Vec<SsaPartCommitment<S>> = Vec::with_capacity(raw_commitments.len());
+        // Compressed exactly once, here. The same bytes go on the wire now and again if the peer
+        // asks for a piece it never received, so the retained copy *is* the wire form rather than
+        // something re-derived from the group elements — compression is the dominant per-commitment
+        // cost, and two derivations of the same bytes are two chances to disagree.
+        let constant_terms: Vec<PixGroupRepr<S>> = raw_commitments.iter().map(|c| c.to_bytes()).collect();
+
+        // Built from the parameters rather than read back off the commitments: every element above
+        // was constructed with exactly this `SsaId`, and indexing would have made the whole function
+        // depend on `polynomials_per_ssa >= 1` holding — which is a validation invariant enforced
+        // three call layers away, not something visible here.
+        let ssa_id = SsaId::new(*pseudonym, ssa_index);
+        let ssa_commitment = PixGroup::<S>::generator() * our_commitment_secret;
+        // Proves we know the sum of the sub-secrets. The recipient adds its own commitment to ours
+        // to get the deposit key, and this is what stops us from having chosen our half so that we —
+        // rather than nobody — know that sum. See `SsaCommitmentProof`.
+        let commitment_proof = SsaCommitmentProof::prove(&ssa_id, &our_commitment_secret, &ssa_commitment)?;
+
+        // Cloned rather than moved: the caller gets these bytes to put on the wire, and the entry
+        // keeps them to answer a request for the pieces that never arrived. 270 kB at the deployed
+        // dimensions — see `RetainedCommitment`.
+        let retained = RetainedCommitment {
+            ssa_index,
+            ssa_commitment,
+            proof: commitment_proof,
+            constant_terms: constant_terms.clone(),
+            attempts_served: 0,
+        };
 
         self.polynomials
             .entry_by_ref(pseudonym)
             .and_try_compute_with(|entry| match entry {
-                None => {
-                    commitments.extend(
-                        raw_commitments
+                None => Ok::<_, PixError<S::Pseudonym>>(moka::ops::compute::Op::Put(std::sync::Arc::new(
+                    parking_lot::Mutex::new(SsaPseudonymEntry {
+                        ssa_index,
+                        cursor: 0,
+                        highest_emitted: None,
+                        // Picked up lazily by `next_share`, like every later cycle's.
+                        front_run: 0,
+                        front_emitted: 0,
+                        retained_commitments: VecDeque::from([retained]),
+                        poly_queue: raw_polynomials
                             .into_iter()
                             .enumerate()
-                            .map(|(poly_index, constant_term)| SsaPartCommitment {
+                            .map(|(poly_index, raw)| IndexedPolynomial {
                                 spi: SsaPolynomialId::new(
                                     SsaId::new(*pseudonym, ssa_index),
                                     poly_index as PolynomialIndex,
                                 ),
-                                constant_term,
-                            }),
-                    );
-                    Ok::<_, PixError<S::Pseudonym>>(moka::ops::compute::Op::Put(std::sync::Arc::new(
-                        parking_lot::Mutex::new(SsaPseudonymEntry {
-                            ssa_index,
-                            cursor: 0,
-                            highest_emitted: None,
-                            // Picked up lazily by `next_share`, like every later cycle's.
-                            front_run: 0,
-                            front_emitted: 0,
-                            poly_queue: raw_polynomials
-                                .into_iter()
-                                .enumerate()
-                                .map(|(poly_index, raw)| IndexedPolynomial {
-                                    spi: SsaPolynomialId::new(
-                                        SsaId::new(*pseudonym, ssa_index),
-                                        poly_index as PolynomialIndex,
-                                    ),
-                                    raw,
-                                    shares_generated: 0,
-                                    t: self.cfg.threshold as usize,
-                                })
-                                .collect(),
-                        }),
-                    )))
-                }
+                                raw,
+                                shares_generated: 0,
+                                t: self.cfg.threshold as usize,
+                            })
+                            .collect(),
+                    }),
+                ))),
                 Some(value) => {
                     let value = value.into_value();
                     {
@@ -588,15 +709,14 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                         }
                         entry.ssa_index = ssa_index;
 
-                        commitments.extend(raw_commitments.into_iter().enumerate().map(
-                            |(poly_index, constant_term)| SsaPartCommitment {
-                                spi: SsaPolynomialId::new(
-                                    SsaId::new(*pseudonym, ssa_index),
-                                    poly_index as PolynomialIndex,
-                                ),
-                                constant_term,
-                            },
-                        ));
+                        entry.retained_commitments.push_back(retained);
+                        // Only reachable for a pseudonym that keeps committing without emitting, so
+                        // nothing has drained and the pruning in `next_share` has not run. Dropping
+                        // the oldest gives up retransmission for the cycle least likely to still be
+                        // awaited.
+                        while entry.retained_commitments.len() > MAX_RETAINED_COMMITMENT_CYCLES {
+                            entry.retained_commitments.pop_front();
+                        }
 
                         entry
                             .poly_queue
@@ -617,22 +737,39 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 }
             })?;
 
-        // Built from the parameters rather than read back off `commitments[0]`: every element above
-        // was constructed with exactly this `SsaId`, and indexing would have made the whole function
-        // depend on `polynomials_per_ssa >= 1` holding — which is a validation invariant enforced
-        // three call layers away, not something visible here.
-        let ssa_id = SsaId::new(*pseudonym, ssa_index);
-        let ssa_commitment = PixGroup::<S>::generator() * our_commitment_secret;
         Ok(SsaCommitment {
             ssa_id,
             ssa_commitment,
-            // Proves we know the sum of the sub-secrets. The recipient adds its own commitment to
-            // ours to get the deposit key, and this is what stops us from having chosen our half so
-            // that we — rather than nobody — know that sum. See `SsaCommitmentProof`.
-            commitment_proof: SsaCommitmentProof::prove(&ssa_id, &our_commitment_secret, &ssa_commitment)?,
-            verifiers: transposed_constant_terms(commitments),
+            commitment_proof,
+            verifiers: transposed_constant_terms::<S>(selected_constant_terms::<S>(
+                &constant_terms,
+                [(0, constant_terms.len().saturating_sub(1) as PolynomialIndex)],
+            )),
         })
     }
+}
+
+/// Picks out the constant-term commitments covered by `runs`, in ascending polynomial-index order.
+///
+/// Each run is an inclusive `(first, last)` polynomial-index pair. Runs are expected ascending and
+/// disjoint — which is what the wire decoder enforces and what the Exit's own scope produces — so
+/// this concatenates rather than deduplicating, and a caller passing overlapping runs merely repeats
+/// entries the peer then discards as re-deliveries.
+///
+/// Indices past the end are skipped rather than refused: a peer naming a polynomial this cycle does
+/// not have is asking for something that cannot exist, and there is nothing to send for it.
+fn selected_constant_terms<S: PixSpec>(
+    constant_terms: &[PixGroupRepr<S>],
+    runs: impl IntoIterator<Item = (PolynomialIndex, PolynomialIndex)>,
+) -> Vec<(PolynomialIndex, PixGroupRepr<S>)> {
+    runs.into_iter()
+        .flat_map(|(first, last)| first..=last)
+        .filter_map(|poly_index| {
+            constant_terms
+                .get(poly_index as usize)
+                .map(|commitment| (poly_index, *commitment))
+        })
+        .collect()
 }
 
 /// Lays the per-polynomial constant-term commitments out in the coefficient-major form the wire
@@ -642,15 +779,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
 /// rather than flattened to a plain `Vec` because it is what `SsaClientCommitmentMessage` splits
 /// into packets, and the wire format still admits higher coefficient indices even though PIX no
 /// longer produces any.
-pub(crate) fn transposed_constant_terms<S: PixSpec>(commitments: Vec<SsaPartCommitment<S>>) -> TransposedVerifiers<S> {
+fn transposed_constant_terms<S: PixSpec>(
+    constant_terms: Vec<(PolynomialIndex, PixGroupRepr<S>)>,
+) -> TransposedVerifiers<S> {
     let mut transposed = TransposedVerifiers::<S>::new();
-    transposed.insert(
-        CONSTANT_TERM_COEFFICIENT,
-        commitments
-            .into_iter()
-            .map(|c| (c.spi.poly_index(), c.constant_term.to_bytes()))
-            .collect(),
-    );
+    transposed.insert(CONSTANT_TERM_COEFFICIENT, constant_terms);
     transposed
 }
 
@@ -664,6 +797,144 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// A retransmission answers only what was asked for, only for a cycle that was committed, and
+    /// only a bounded number of times.
+    ///
+    /// The cap is the load-bearing part: one request may name every polynomial of the cycle, so an
+    /// answer is the whole commitment burst again, and a peer that has already been served would
+    /// otherwise be able to farm bursts out of this node indefinitely.
+    #[test]
+    fn recommit_answers_the_named_scope_a_bounded_number_of_times() -> anyhow::Result<()> {
+        const POLYS: u16 = 8;
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+
+        // Nothing is retained for a pseudonym that has never committed, nor for an index it has not.
+        assert!(matches!(
+            generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)]),
+            Err(PixError::MissingSsaCommitment)
+        ));
+
+        let original = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        assert!(matches!(
+            generator.recommit(&pseudonym, 2.try_into()?, [(0, 0)]),
+            Err(PixError::MissingSsaCommitment)
+        ));
+
+        let row_of = |commitment: &SsaCommitment<TestSpec>| {
+            commitment
+                .verifiers
+                .get(&CONSTANT_TERM_COEFFICIENT)
+                .cloned()
+                .unwrap_or_default()
+        };
+        let full = row_of(&original);
+
+        // The scope is honoured exactly, and answered with the bytes that went out the first time.
+        let repair = generator.recommit(&pseudonym, SsaIndex::MIN, [(1, 2), (5, 5)])?;
+        assert_eq!(original.ssa_id, repair.ssa_id);
+        assert_eq!(original.ssa_commitment, repair.ssa_commitment);
+        assert_eq!(
+            original.commitment_proof, repair.commitment_proof,
+            "the proof opens the same public commitment, so the same one is re-sent"
+        );
+        assert_eq!(
+            vec![1, 2, 5],
+            row_of(&repair).iter().map(|(index, _)| *index).collect::<Vec<_>>()
+        );
+        for (poly_index, resent) in row_of(&repair) {
+            assert_eq!(
+                Some(&resent),
+                full.iter().find(|(index, _)| *index == poly_index).map(|(_, o)| o)
+            );
+        }
+
+        // Indices this cycle does not have are skipped; a scope of nothing but those is refused, and
+        // still spends an attempt, so malformed asks are not a free probe.
+        assert_eq!(
+            vec![POLYS as PolynomialIndex - 1],
+            row_of(&generator.recommit(&pseudonym, SsaIndex::MIN, [(POLYS - 1, POLYS + 4)])?)
+                .iter()
+                .map(|(index, _)| *index)
+                .collect::<Vec<_>>()
+        );
+        assert!(matches!(
+            generator.recommit(&pseudonym, SsaIndex::MIN, [(POLYS, POLYS)]),
+            Err(PixError::InvalidInput)
+        ));
+
+        // Three answers spent above, including the refused scope. Spend the rest of the budget, then
+        // find it closed.
+        for attempt in 3..MAX_COMMITMENT_RETRANSMISSIONS {
+            generator
+                .recommit(&pseudonym, SsaIndex::MIN, [(0, 0)])
+                .map_err(|error| anyhow::anyhow!("attempt {attempt} must be answered: {error}"))?;
+        }
+        assert!(
+            matches!(
+                generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)]),
+                Err(PixError::InvalidInput)
+            ),
+            "the {MAX_COMMITMENT_RETRANSMISSIONS}-answer budget must be spent"
+        );
+
+        Ok(())
+    }
+
+    /// Retained commitment material is released with the cycle it belongs to.
+    ///
+    /// A cycle whose last polynomial has been exhausted can emit no further share, so re-sending its
+    /// commitment could not make it recoverable — and holding the material past that point would make
+    /// the retention grow with the number of cycles a Session completes.
+    #[test]
+    fn a_drained_cycle_stops_being_retransmittable() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u8 = 2;
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+
+        generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        generator.new_ssa_commitment(&pseudonym, 2.try_into()?)?;
+
+        // Both are retransmittable while both are queued: a successor's commitment can be lost just
+        // as easily as the front's, and it is not being served yet.
+        generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)])?;
+        generator.recommit(&pseudonym, 2.try_into()?, [(0, 0)])?;
+
+        // Exhaust the first cycle, then take one more share so the front rotates. Pruning is lazy:
+        // it happens where the new front is picked up, not where the last polynomial is removed.
+        let per_cycle = POLYS as u32 * THRESHOLD as u32;
+        for msg in 0..=per_cycle {
+            let share = generator
+                .next_share(&pseudonym, &msg.to_be_bytes())?
+                .ok_or_else(|| anyhow::anyhow!("share {msg} must be available"))?;
+            if msg == per_cycle {
+                assert_eq!(2, share.id.ssa_index().get(), "the front must have rotated");
+            }
+        }
+
+        assert!(
+            matches!(
+                generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)]),
+                Err(PixError::MissingSsaCommitment)
+            ),
+            "a drained cycle must not retain its commitment"
+        );
+        generator
+            .recommit(&pseudonym, 2.try_into()?, [(0, 0)])
+            .map_err(|error| anyhow::anyhow!("the cycle now at the front must stay retransmittable: {error}"))?;
+
+        Ok(())
+    }
 
     /// No share for a cycle may be emitted while any polynomial of an earlier cycle is unexhausted.
     ///
