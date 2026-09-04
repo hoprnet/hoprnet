@@ -1460,6 +1460,22 @@ impl PixToolbox {
 /// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signaling that
 /// funds can be deposited at the computed address.
 ///
+/// "One or more" is hundreds at the deployed dimensions — one commitment per polynomial, chunked to
+/// packet size — and the Exit can use *none* of it until every message has landed, since the SSA
+/// commitment is the sum of them all. A single lost packet therefore used to cost the whole Session
+/// on `max_ssa_delivery_time`, typically after the Entry had already been told to fund the address.
+///
+/// So a partially delivered commitment is repaired rather than waited out. Each arriving message
+/// reports `SessionPixEvent::CommitmentProgress`, which arms (and re-arms) the supervisor's
+/// [`commitment_recommit_interval`](crate::SupervisorConfig::commitment_recommit_interval); if
+/// delivery then goes quiet with the set incomplete, `RequestCommitmentRetransmission` has
+/// `send_commitment_retransmission_request` ask the Entry — via an `SsaRequest` whose
+/// [`missing`](hopr_protocol_start::SsaServerCommitmentMessage::missing) scope names the polynomial
+/// runs the reconstructor never received — to re-send exactly those. The Entry answers in
+/// `handle_ssa_recommit` from the bytes it sent the first time, advancing nothing and announcing no
+/// second deposit. A cycle for which *nothing* arrived never asks: it has no scope to name, and the
+/// delivery deadline remains what ends it.
+///
 /// ### 4. Deposit Awaiting (Exit Side)
 ///
 /// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
@@ -2768,6 +2784,19 @@ where
                             }
                         }
                     }
+                    SessionPixAction::RequestCommitmentRetransmission { ssa_id, params } => {
+                        // Failure is logged and dropped rather than reported back. Unlike
+                        // `RequestSsa` this action is not a step the Session depends on: it repeats
+                        // on its own interval, and the commitment deadline is still the backstop, so
+                        // a dropped ask costs one interval rather than the Session.
+                        if let Some(slot) = myself.sessions.get(&session_id)
+                            && let Err(error) = myself
+                                .send_commitment_retransmission_request(session_id, &slot, ssa_id, params)
+                                .await
+                        {
+                            error!(%session_id, %ssa_id, %error, "failed to re-request ssa commitment parts");
+                        }
+                    }
                     SessionPixAction::ReleaseService => {
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::set_pix_gate_mode(&session_id, true);
@@ -2993,6 +3022,74 @@ where
         .map_err(TransportSessionError::packet_sending)?;
 
         Ok(guards)
+    }
+
+    /// Asks the Entry to re-send the parts of one SSA's commitment that never arrived.
+    ///
+    /// The Entry's answer to an `SsaRequest` is hundreds of packets and the reconstructor can use
+    /// none of it until every one has landed, so a single drop used to cost the Session on
+    /// `max_ssa_delivery_time` — after the Entry had already been told to fund the cycle. This is the
+    /// repair: the reconstructor says which polynomial runs are missing, and the Entry re-sends
+    /// exactly those.
+    ///
+    /// Deliberately *not* built on [`send_ssa_request`](Self::send_ssa_request), whose every step is
+    /// wrong here. It registers no Exit commitment — the cycle already has one, and registering a
+    /// second for the same index is refused as a duplicate — allocates no index, and asks the deposit
+    /// pool for nothing, since the deposit data of this cycle travelled with the request that created
+    /// it. Nothing it does can earn the Entry a deposit, which is what makes it safe to repeat.
+    ///
+    /// The scope is read here rather than carried in the action: what is missing changes as the burst
+    /// continues to arrive, and the freshest answer is both smaller and the one that converges.
+    async fn send_commitment_retransmission_request(
+        &self,
+        session_id: SessionId,
+        slot: &SessionSlot,
+        ssa_id: SsaId<HoprPseudonym>,
+        params: PixParams,
+    ) -> errors::Result<()> {
+        let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        // Asked of the encoder, so the scope cannot be sized against a restated layout — see
+        // `StartProtocol::max_missing_runs`.
+        let max_runs = HoprStartProtocol::max_missing_runs(&session_id).map_err(SessionManagerError::other)?;
+
+        let Some(runs) = pix_toolbox.share_processor.missing_commitment_runs(&ssa_id, max_runs) else {
+            // The registration is gone — retired, or expired after
+            // `incomplete_commitment_lifetime` — so there is nothing left for a retransmission to
+            // complete. The commitment deadline is what ends the Session; saying so here is the only
+            // way an operator learns which of the two it was.
+            warn!(%session_id, %ssa_id, "cannot re-request commitment parts for a cycle the reconstructor no longer holds");
+            return Ok(());
+        };
+
+        if runs.is_empty() {
+            // The commitment completed between the timer firing and this running. Its
+            // `CommitmentVerified` is already on its way to the supervisor, which clears the timer.
+            debug!(%session_id, %ssa_id, "commitment completed before its parts could be re-requested");
+            return Ok(());
+        }
+
+        let missing_polynomials: u32 = runs.iter().map(|(first, last)| (last - first) as u32 + 1).sum();
+        info!(
+            %session_id, %ssa_id, runs = runs.len(), missing_polynomials,
+            "re-requesting the SSA commitment parts that did not arrive"
+        );
+
+        send_via_msg_sender(
+            &mut msg_sender,
+            slot.routing_opts.clone(),
+            HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
+                session_id,
+                params,
+                [(ssa_id.ssa_index(), runs)],
+            )),
+            "ssa commitment retransmission request",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
+
+        Ok(())
     }
 
     /// Returns the current number of active sessions.
@@ -4170,14 +4267,21 @@ where
 
         // A verifiable commitment is what starts the deposit clock, so tell the supervisor before
         // the observer below can report anything against it.
-        if ssa_client_commitment_state.is_verifiable
-            && let Some(supervisor) = session_slot.pix_supervisor.get()
-            && supervisor
-                .send_event(SessionPixEvent::CommitmentVerified(ssa_id))
-                .await
-                .is_err()
-        {
-            error!(%session_id, %ssa_id, "pix supervisor is no longer accepting events");
+        //
+        // An *incomplete* one is reported too, and per message: that is what arms the supervisor's
+        // re-request timer and keeps pushing it out while the burst is still arriving, so it fires
+        // only once delivery has actually stalled. It is also the only evidence that the Entry
+        // answered at all, which is what separates a cycle worth re-asking for from one where
+        // nothing was ever delivered and there is no scope to name.
+        if let Some(supervisor) = session_slot.pix_supervisor.get() {
+            let event = if ssa_client_commitment_state.is_verifiable {
+                SessionPixEvent::CommitmentVerified(ssa_id)
+            } else {
+                SessionPixEvent::CommitmentProgress(ssa_id)
+            };
+            if supervisor.send_event(event).await.is_err() {
+                error!(%session_id, %ssa_id, "pix supervisor is no longer accepting events");
+            }
         }
 
         if ssa_client_commitment_state.deposit_address_first_encountered
@@ -4280,6 +4384,66 @@ where
         if self.close_session(&session_id) {
             error!(%session_id, "closed session after refusing the Exit's SSA request");
         }
+    }
+
+    /// Handled by the Entry, when the Exit says it never received parts of a commitment this node
+    /// already published.
+    ///
+    /// Re-sends the named polynomial commitments and nothing else. Emits no
+    /// [`ReadyToDeposit`](HoprSessionOutPixEvent::ReadyToDeposit): the deposit address of a cycle is
+    /// fixed when it is first committed, and the caller was told it then, so announcing it again
+    /// would invite a second deposit against one quota.
+    ///
+    /// A failure here is reported to the caller of the Start-message dispatcher and otherwise
+    /// dropped. It is deliberately not [`refuse_ssa_request`](Self::refuse_ssa_request), which closes
+    /// the Session: an Exit that asks for a cycle this node cannot serve is asking for something
+    /// already lost, and its own commitment deadline ends the Session either way — whereas closing on
+    /// a request that merely raced our own state would throw away a Session that was about to work.
+    ///
+    /// The generator bounds how often it answers per cycle
+    /// ([`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)), which
+    /// is what keeps this from being a packet-amplification lever: one request may name a whole
+    /// cycle's polynomials, and the answer to that is the entire commitment burst again.
+    async fn handle_ssa_recommit(
+        &self,
+        pseudonym: HoprPseudonym,
+        session_slot: &SessionSlot,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositPayload>,
+    ) -> errors::Result<()> {
+        let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let session_id = msg.session_id;
+
+        for (ssa_index, runs) in msg.missing {
+            // Rebuilt from the bytes that went out the first time, so the peer's already-filled slots
+            // see a re-delivery rather than a contradiction.
+            let pix_toolbox_clone = pix_toolbox.clone();
+            let commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || pix_toolbox_clone.share_generator.recommit(&pseudonym, ssa_index, runs),
+                "client_ssa_recommitment",
+            )
+            .await
+            .map_err(SessionManagerError::other)?
+            .map_err(SessionManagerError::PixError)?;
+
+            let commitment_msgs =
+                SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
+            let num_messages = commitment_msgs.len();
+
+            for commitment_msg in commitment_msgs {
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    session_slot.routing_opts.clone(),
+                    HoprStartProtocol::SsaCommit(commitment_msg),
+                    "re-sent client SSA commitment message",
+                )
+                .await?;
+            }
+
+            info!(%session_id, %ssa_index, num_messages, "re-sent the requested SSA commitment parts");
+        }
+
+        Ok(())
     }
 
     /// Handled by the Entry, when the Exit sends PIX initiation request
@@ -4432,6 +4596,19 @@ where
                 .await;
             return Err(error.into());
         }
+        // A request naming missing commitment parts asks for nothing new — see
+        // `SsaServerCommitmentMessage` — and none of what follows may run for it.
+        //
+        // That placement is the whole safety argument for reusing this message. The successor gate
+        // below would refuse an index that is *already* being served, which is every index a
+        // retransmission can name; the served-packet gate prices service against a batch nobody is
+        // asking for; and `new_ssa_commitment` rejects an index at or below the watermark, which
+        // again is every index this can name. Above this line is what a retransmission does need:
+        // the pseudonym check, the session slot, and the parameter comparison.
+        if !msg.missing.is_empty() {
+            return self.handle_ssa_recommit(pseudonym, &session_slot, msg).await;
+        }
+
         let quota_per_ssa = pix_params_to_quota(&our_params);
 
         // Everything from here to the end of the batch is serialised per pseudonym. Start messages run
@@ -11000,6 +11177,10 @@ mod tests {
                 supervision: SupervisorConfig {
                     // Short, so the deadline under test fires quickly.
                     max_ssa_delivery_time: Duration::from_millis(50),
+                    // Scaled with it, since it has to stay under the delivery deadline. Nothing arms
+                    // it here — the Entry sends no commitment at all, so there is no scope to
+                    // re-request and the deadline under test is the only one that can fire.
+                    commitment_recommit_interval: Duration::from_millis(10),
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()

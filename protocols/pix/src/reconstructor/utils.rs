@@ -794,6 +794,47 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         self.full_ssa_commitment.as_ref().map(|(_, a)| a)
     }
 
+    /// Polynomial-index runs whose constant-term commitment has not arrived, lowest first.
+    ///
+    /// Empty once the set is complete. The runs are what the Exit puts on the wire to ask the peer
+    /// to re-send the pieces a lost packet took with it: loss is chunk-shaped, because the sender
+    /// splits the set into packet-sized slices of *consecutive* polynomial indices, so one lost
+    /// packet is one run of a couple of dozen indices and "nothing arrived at all" is a single run.
+    ///
+    /// Truncated to `max_runs`, which is how many the asking message can carry. Lowest-first rather
+    /// than an arbitrary subset so that successive asks converge on the same prefix instead of
+    /// interleaving, and so the answer to one is never a subset of the answer to the next.
+    ///
+    /// An empty result therefore means the set is *complete*, and nothing else — `max_runs` is raised
+    /// to one rather than honoured at zero, so a caller that branches on emptiness cannot be told
+    /// "nothing is missing" by its own budget.
+    pub fn missing_runs(&self, max_runs: usize) -> Vec<(PolynomialIndex, PolynomialIndex)> {
+        // Not merely an optimisation: the map is drained when the part builders are handed out, so
+        // reading it after completion would report every polynomial as missing.
+        if self.complete {
+            return Vec::new();
+        }
+
+        let max_runs = max_runs.max(1);
+        let mut runs: Vec<(PolynomialIndex, PolynomialIndex)> = Vec::new();
+        for index in 0..self.num_polys as PolynomialIndex {
+            if self.committed_polynomials.contains_key(&index) {
+                continue;
+            }
+            match runs.last_mut() {
+                // Extends the open run rather than starting a new one; `index` only ever grows.
+                Some((_, last)) if *last + 1 == index => *last = index,
+                _ => {
+                    if runs.len() == max_runs {
+                        break;
+                    }
+                    runs.push((index, index));
+                }
+            }
+        }
+        runs
+    }
+
     pub fn add_transposed(
         &mut self,
         coeff_index: CoefficientIndex,
@@ -824,9 +865,20 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             });
         }
 
-        // Cannot add more commitments if we already have all
+        // Every slot is already filled, so nothing this message carries can change the outcome.
+        //
+        // Reported as the completed state rather than as a duplicate: the peer re-sends parts of the
+        // set on request (see `missing_runs`), and a re-sent copy travels the same mixed path as the
+        // original it repairs, so it can arrive after the set completed. The per-slot check below
+        // cannot speak for these — the map is drained at completion — which is the only reason this
+        // guard exists at all.
         if self.complete {
-            return Err(errors::PixError::DuplicateCommitment);
+            tracing::trace!(id = %self.id, "ignoring commitments for an already complete ssa");
+            return Ok(CommitmentProgress {
+                full_commitment: self.full_ssa_commitment.as_ref().map(|(c, _)| *c),
+                fully_committed: true,
+                ..CommitmentProgress::empty()
+            });
         }
 
         // Retain the first proof offered. It cannot be checked yet: the commitment it opens is the
@@ -858,24 +910,44 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             ));
         }
 
-        // Check for duplicate occupancy before any insertion (transactional).
+        // Classify every entry against the slots before any insertion (transactional).
         //
-        // A repeat *within* the batch counts. Testing only against `committed_polynomials` would let
-        // two entries sharing a polynomial index both see a vacant slot: the second insert would
-        // silently rebind the first — the single-assignment invariant this two-phase check exists to
-        // enforce — and `total_committed` would count two occupants of one slot, so a batch of
-        // `num_polys` entries containing a repeat could never complete the set and every retry would
-        // be rejected as a duplicate against the slots it did fill. The wire decoder rejects
-        // intra-message duplicates today, but this builder is not meant to depend on that.
-        let mut seen = std::collections::HashSet::with_capacity(validated.len());
-        for (polynomial_index, _) in &validated {
-            if self.committed_polynomials.contains_key(polynomial_index) || !seen.insert(*polynomial_index) {
-                return Err(errors::PixError::DuplicateCommitment);
+        // A slot re-offered the commitment it already holds is *skipped*, not rejected. The peer
+        // re-sends parts of the set on request (see `missing_runs`), and those travel the same mixed
+        // path as the burst they repair, so a re-sent copy and its original can overtake one another;
+        // refusing the whole message over one such overlap would drop the very entries the ask was
+        // for. Only a *different* commitment for an occupied slot is an error, which is exactly the
+        // single-assignment invariant this two-phase check exists to enforce — a slot that has been
+        // decoded and accepted can never be rebound.
+        //
+        // A repeat *within* the batch is classified the same way, and against `seen` rather than only
+        // against `committed_polynomials`: two entries sharing an index would both see a vacant slot,
+        // the second insert would silently rebind the first, and `total_committed` would count two
+        // occupants of one slot — so a batch of `num_polys` entries containing a repeat could never
+        // complete the set. The wire decoder rejects intra-message duplicates today, but this builder
+        // is not meant to depend on that.
+        let mut seen: std::collections::HashMap<PolynomialIndex, PixGroup<S>> =
+            std::collections::HashMap::with_capacity(validated.len());
+        let mut fresh: Vec<(PolynomialIndex, PixGroup<S>)> = Vec::with_capacity(validated.len());
+        for (polynomial_index, commitment) in validated {
+            let occupant = self
+                .committed_polynomials
+                .get(&polynomial_index)
+                .or_else(|| seen.get(&polynomial_index));
+            match occupant {
+                Some(held) if *held == commitment => {
+                    tracing::trace!(id = %self.id, polynomial_index, "ignoring a re-delivered commitment");
+                }
+                Some(_) => return Err(errors::PixError::DuplicateCommitment),
+                None => {
+                    seen.insert(polynomial_index, commitment);
+                    fresh.push((polynomial_index, commitment));
+                }
             }
         }
 
         // Second phase: insert into confirmed-vacant slots, maintaining the progress counter.
-        for (polynomial_index, polynomial_coeff_commitment) in validated {
+        for (polynomial_index, polynomial_coeff_commitment) in fresh {
             self.committed_polynomials
                 .insert(polynomial_index, polynomial_coeff_commitment);
             self.total_committed += 1;

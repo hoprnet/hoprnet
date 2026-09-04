@@ -865,6 +865,34 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.ssa_cycles.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
+    /// Polynomial-index runs of `ssa_id` whose constant-term commitment never arrived, so the caller
+    /// can ask the peer to re-send exactly those.
+    ///
+    /// A cycle's commitment ships as hundreds of packets and completes only when every one of them
+    /// has landed, so without this a single lost packet is a lost Session — nothing else in the
+    /// protocol can repair it, since the peer has no way to learn which piece went missing.
+    ///
+    /// * `None` — no registration for `ssa_id`. It was retired, or it went unanswered for longer than
+    ///   [`incomplete_commitment_lifetime`](SsaReconstructorConfig::incomplete_commitment_lifetime), and either way
+    ///   there is nothing left for a retransmission to complete.
+    /// * `Some([])` — the commitment is complete; there is nothing to ask for. This is the *only* thing an empty vector
+    ///   means: a `max_runs` of zero is read as one rather than honoured.
+    /// * `Some(runs)` — at most `max_runs` runs, lowest first. A caller that gets exactly `max_runs` back has not seen
+    ///   the whole shortfall and should ask again once these are answered.
+    // `SsaCommitmentBuilder` is crate-private, so an intra-doc link from this public method trips
+    // `rustdoc::private_intra_doc_links`, which the `nix build .#docs` job builds as an error.
+    /// `max_runs` is the asking message's capacity, which this crate cannot know, so the caller
+    /// supplies it; `SsaCommitmentBuilder::missing_runs` documents how the runs are chosen.
+    pub fn missing_commitment_runs(
+        &self,
+        ssa_id: &SsaId<S::Pseudonym>,
+        max_runs: usize,
+    ) -> Option<Vec<(PolynomialIndex, PolynomialIndex)>> {
+        self.commitment_builder
+            .get(ssa_id)
+            .map(|registration| registration.lock().missing_runs(max_runs))
+    }
+
     /// Removes the heavyweight reconstructor state for a single SSA cycle.
     ///
     /// A successfully recovered cycle's compact accounting tail is owned by the Session retirement
@@ -2522,8 +2550,17 @@ mod tests {
         Ok(())
     }
 
+    /// Commitments arriving after the set is complete are absorbed, and still report the cycle as
+    /// complete.
+    ///
+    /// This is what makes retransmission safe. The peer re-sends parts of the set on request, and a
+    /// re-sent copy travels the same mixed path as the original it repairs — so it can arrive after
+    /// the gap it was asked for was filled by the original showing up late. Refusing those as
+    /// duplicates would turn every successful repair into an error on the next packet. Nothing can
+    /// change at this point anyway: every slot is filled, and the per-slot check cannot even speak
+    /// for these, because the map is drained when the part builders are handed out.
     #[test]
-    fn reconstructor_duplicate_commitments() -> anyhow::Result<()> {
+    fn commitments_arriving_after_completion_are_absorbed() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
@@ -2537,13 +2574,18 @@ mod tests {
         }
         reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(identity_proof(&ssa_id)), poly_map.into_iter())?;
 
-        // Now adding more should fail with DuplicateCommitment
-        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, HashMap::new().into_iter());
-        assert!(matches!(result, Err(PixError::DuplicateCommitment)));
+        // A re-delivery of a slot that is already filled, which is what a repair racing its own
+        // original looks like.
+        let mut resent = HashMap::new();
+        resent.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let absorbed = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, resent.into_iter())?;
+        assert!(
+            absorbed.is_verifiable,
+            "absorbing a re-delivery must not make a completed cycle look incomplete"
+        );
 
-        // A trailing non-constant coefficient, on the other hand, is simply ignored: a peer that
-        // still emits the full Feldman matrix sends the bulk of it *after* the constant-term pass
-        // has completed, and that must not read as a duplicate-commitment attack.
+        // A trailing non-constant coefficient is ignored for its own reason: a peer that still emits
+        // the full Feldman matrix sends the bulk of it *after* the constant-term pass has completed.
         let mut trailing = HashMap::new();
         trailing.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         let ignored = reconstructor.insert_coefficient_commitments(ssa_id, 1, None, trailing.into_iter())?;
@@ -2555,11 +2597,15 @@ mod tests {
         Ok(())
     }
 
+    /// A slot re-offered the commitment it holds is a no-op; re-offered a *different* one, it is
+    /// still refused.
+    ///
+    /// The single-assignment invariant is the one that matters: a slot that has been decoded and
+    /// accepted can never be rebound, or a peer could displace a commitment the deposit address was
+    /// derived from. Re-delivering the *same* bytes cannot do that, and has to be tolerated because
+    /// retransmission produces exactly that case.
     #[test]
-    fn reconstructor_duplicate_per_polynomial_commitment() -> anyhow::Result<()> {
-        // Regression test for the per-polynomial duplicate check inside add_transposed.
-        // Previously the same polynomial's slot silently overwrote; now it returns
-        // DuplicateCommitment.
+    fn a_slot_tolerates_its_own_commitment_and_refuses_a_different_one() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
@@ -2571,20 +2617,159 @@ mod tests {
         poly_map_1.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_1.into_iter())?;
 
-        // Insert the constant term of poly 0 again — must fail
-        let mut poly_map_2 = HashMap::new();
-        poly_map_2.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
-        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_2.into_iter());
+        // The same commitment for the same slot: absorbed, and it must not consume the slot twice —
+        // proven below by the set still completing on poly 1 alone.
+        let mut resent = HashMap::new();
+        resent.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let absorbed = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, resent.into_iter())?;
+        assert!(!absorbed.is_verifiable, "poly 1 has still not been committed");
+
+        // A *different* commitment for that slot is a contradiction and must be refused.
+        let mut conflicting = HashMap::new();
+        conflicting.insert(0 as PolynomialIndex, PixGroup::<TestSpec>::generator().to_bytes());
+        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, conflicting.into_iter());
         assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
-        // Poly 1's constant term is a different slot and must still be accepted
+        // Poly 1's constant term is a different slot and must still complete the set.
         let mut poly_map_3 = HashMap::new();
         poly_map_3.insert(1 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let completed = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            Some(identity_proof(&ssa_id)),
+            poly_map_3.into_iter(),
+        )?;
         assert!(
-            reconstructor
-                .insert_coefficient_commitments(ssa_id, 0, Some(identity_proof(&ssa_id)), poly_map_3.into_iter())
-                .is_ok()
+            completed.is_verifiable,
+            "the absorbed re-delivery must not have consumed poly 1's slot"
         );
+
+        Ok(())
+    }
+
+    /// The missing-commitment scope is what the Exit puts on the wire to repair a lost packet, so it
+    /// has to name the gaps exactly, compactly, and within one message.
+    #[test]
+    fn missing_commitment_runs_report_the_gaps_and_nothing_else() -> anyhow::Result<()> {
+        const POLYS: u16 = 8;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+
+        // An unregistered cycle is distinguishable from a complete one: there is nothing left for a
+        // retransmission to complete, which the caller has to treat differently from "ask again".
+        assert_eq!(None, reconstructor.missing_commitment_runs(&ssa_id, 8));
+
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, 2))?;
+        assert_eq!(
+            Some(vec![(0, POLYS as PolynomialIndex - 1)]),
+            reconstructor.missing_commitment_runs(&ssa_id, 8),
+            "before anything arrives the whole set is one run"
+        );
+
+        // Two chunk-shaped holes: 2..=3 and 6..=6. Each is what one lost packet leaves behind, since
+        // the sender slices the set into consecutive polynomial indices.
+        let arrived: HashMap<PolynomialIndex, PixGroupRepr<TestSpec>> = [0, 1, 4, 5, 7]
+            .into_iter()
+            .map(|poly| (poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default()))
+            .collect();
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, None, arrived.into_iter())?;
+        assert_eq!(
+            Some(vec![(2, 3), (6, 6)]),
+            reconstructor.missing_commitment_runs(&ssa_id, 8),
+            "consecutive gaps must coalesce into one run each"
+        );
+
+        // A scope larger than the asking message can carry is truncated lowest-first, so successive
+        // asks converge on a prefix instead of interleaving.
+        assert_eq!(
+            Some(vec![(2, 3)]),
+            reconstructor.missing_commitment_runs(&ssa_id, 1),
+            "the run budget must bound the reported scope"
+        );
+
+        // Filling the gaps completes the set, and a complete set has nothing to ask for. Note the map
+        // is *drained* at completion, so reporting emptiness here is not incidental.
+        let repaired: HashMap<PolynomialIndex, PixGroupRepr<TestSpec>> = [2, 3, 6]
+            .into_iter()
+            .map(|poly| (poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default()))
+            .collect();
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            Some(identity_proof(&ssa_id)),
+            repaired.into_iter(),
+        )?;
+        assert!(state.is_verifiable);
+        assert_eq!(Some(Vec::new()), reconstructor.missing_commitment_runs(&ssa_id, 8));
+
+        Ok(())
+    }
+
+    /// The whole point of the feature: a commitment burst that lost a slice still completes, because
+    /// the Exit can name the slice and the Entry can re-send exactly it.
+    ///
+    /// Without this a single dropped packet costs the cycle — and by then the Entry has usually
+    /// already been told to fund its deposit address.
+    #[test]
+    fn a_lost_slice_of_a_commitment_is_repaired_by_a_scoped_retransmission() -> anyhow::Result<()> {
+        const POLYS: u16 = 16;
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, 2))?;
+
+        // Deliver every constant term except one packet's worth, the middle quarter of the set.
+        let full = coefficient_of(&commitment, 0, None)?;
+        let lost: std::collections::HashSet<PolynomialIndex> = (4..8).collect();
+        let delivered: Vec<_> = full
+            .iter()
+            .copied()
+            .filter(|(poly_index, _)| !lost.contains(poly_index))
+            .collect();
+        let partial =
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&commitment, 0), delivered.into_iter())?;
+        assert!(
+            !partial.is_verifiable && partial.ssa_deposit_address.is_none(),
+            "a set one packet short yields no deposit address — this is the failure being repaired"
+        );
+
+        // The Exit names the gap; the Entry answers it from the same bytes it sent the first time.
+        let runs = reconstructor
+            .missing_commitment_runs(&ssa_id, 64)
+            .expect("the registration must still be live");
+        assert_eq!(vec![(4, 7)], runs);
+
+        let repair = generator.recommit(&pseudonym, SsaIndex::MIN, runs)?;
+        let repaired = coefficient_of(&repair, 0, None)?;
+        assert_eq!(
+            lost,
+            repaired.iter().map(|(poly_index, _)| *poly_index).collect(),
+            "the retransmission must carry exactly the missing polynomials"
+        );
+        for (poly_index, resent) in &repaired {
+            assert_eq!(
+                Some(resent),
+                full.iter()
+                    .find(|(index, _)| index == poly_index)
+                    .map(|(_, original)| original),
+                "the retransmission must repeat the original bytes rather than derive new ones"
+            );
+        }
+
+        let completed =
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&repair, 0), repaired.into_iter())?;
+        assert!(
+            completed.is_verifiable && completed.ssa_deposit_address.is_some(),
+            "the repaired set must complete the commitment and yield the deposit address"
+        );
+        assert!(completed.deposit_address_first_encountered);
 
         Ok(())
     }
@@ -3626,21 +3811,24 @@ mod tests {
         Ok(())
     }
 
-    /// **L2 regression.** A polynomial index repeated inside one batch must be rejected, not merely
-    /// one repeated across batches.
+    /// **L2 regression.** A polynomial index repeated inside one batch must not consume its slot
+    /// twice, and a repeat carrying a *different* commitment must be refused.
     ///
     /// The two-phase check tested each entry against `committed_polynomials`, which holds only what
     /// earlier calls inserted, so two entries sharing an index both found the slot vacant. The
     /// second insert then rebound the first — the single-assignment invariant the two phases exist
     /// to enforce — and `total_committed` counted two occupants of one slot. The practical bite:
-    /// a batch carrying every polynomial with a repeat among them can never complete the set, and
-    /// the peer has no way to supply the one it displaced, because every retry is rejected as a
-    /// duplicate against the slots the batch did fill.
+    /// a batch carrying every polynomial with a repeat among them could never complete the set, and
+    /// the peer had no way to supply the one it displaced.
+    ///
+    /// Both halves are checked here because they now take different paths: an identical repeat is
+    /// *absorbed*, since retransmission legitimately produces one, while a conflicting one is still
+    /// an error. Either way the slot is occupied exactly once, which is the invariant.
     ///
     /// The wire decoder rejects intra-message duplicates today. This builder is not meant to depend
     /// on that, which is why the check is here.
     #[test]
-    fn a_polynomial_repeated_within_one_batch_is_rejected() -> anyhow::Result<()> {
+    fn a_polynomial_repeated_within_one_batch_occupies_its_slot_once() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -3653,27 +3841,39 @@ mod tests {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
         reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
-        // Polynomial 0 twice, and polynomial 1 not at all — the shape that would otherwise leave the
-        // set permanently one short while reporting two commitments received.
-        let mut batch = coefficient_of(&commitment, 0, Some(0))?;
-        batch.push(batch[0]);
+        // Polynomial 0 twice with conflicting commitments: a contradiction, refused outright.
+        let mut conflicting = coefficient_of(&commitment, 0, Some(0))?;
+        conflicting.push((conflicting[0].0, PixGroup::<TestSpec>::generator().to_bytes()));
         let result =
-            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&commitment, 0), batch.into_iter());
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&commitment, 0), conflicting.into_iter());
         assert!(
             matches!(&result, Err(crate::errors::PixError::DuplicateCommitment)),
-            "a repeat inside the batch must be rejected, got {result:?}"
+            "a conflicting repeat inside the batch must be rejected, got {result:?}"
         );
 
-        // Rejected transactionally: neither entry was written, so the honest batch still lands.
+        // Rejected transactionally: neither entry was written, so polynomial 0 is still vacant. Now
+        // the same index twice with the *same* commitment — accepted, occupying one slot, which is
+        // the shape that would otherwise leave the set permanently one short while reporting two
+        // commitments received.
+        let mut repeated = coefficient_of(&commitment, 0, Some(0))?;
+        repeated.push(repeated[0]);
+        let partial =
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&commitment, 0), repeated.into_iter())?;
+        assert!(
+            !partial.is_verifiable,
+            "two entries for one polynomial must not stand in for the other one"
+        );
+
+        // ...and the set completes on the polynomial the repeat did not cover.
         let retry = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
             proof_of(&commitment, 0),
-            coefficient_of(&commitment, 0, None)?.into_iter(),
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
         )?;
         assert!(
             retry.is_verifiable && retry.ssa_deposit_address.is_some(),
-            "the corrected batch must complete the commitment"
+            "the remaining polynomial must complete the commitment"
         );
 
         Ok(())

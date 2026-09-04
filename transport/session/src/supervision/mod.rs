@@ -43,6 +43,8 @@
 //!
 //! ```text
 //! RequestSsa  ──►  SsaRequestSent  ──►  AwaitingCommitment
+//!                                          ├── (CommitmentProgress arms/re-arms the re-request timer)
+//!                                          ├── (its expiry → RequestCommitmentRetransmission, bounded)
 //!                                          │
 //!                                     CommitmentVerified
 //!                                          │
@@ -64,6 +66,12 @@
 //! **Key deadlines** (all configurable via [`SupervisorConfig`]):
 //!
 //! * **Commitment timeout** — time from `SsaRequestSent` to `CommitmentVerified`.
+//! * **Commitment re-request** — time a *partially* delivered commitment may go quiet before the missing parts are
+//!   asked for again. The one deadline here that is not a deadline: it emits a repair and re-arms, never a close, and
+//!   the commitment timeout above remains the bound. It is armed only by `CommitmentProgress`, so a commitment nothing
+//!   was ever delivered for never asks — there is no scope for it to name. Bounded by count, at
+//!   [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), which is what the Entry
+//!   will answer.
 //! * **Deposit timeout** — time from `CommitmentVerified` to a sufficient deposit.
 //! * **Recovery idle** — time without *any share arriving* while service is being consumed. **Service-gated**: if no
 //!   packets were served since the last progress snapshot, the timer re-arms instead of closing (prevents a
@@ -193,9 +201,9 @@
 //! blocking or failing the worker. The gate has already consumed the notification locally, and the
 //! next forwarded notification replaces it for observers.
 //!
-//! All other actions (`RequestSsa`, `ReleaseService`, `WithholdService`, `RetireSsa`, `Close`)
-//! are non-coalescible — if they cannot be delivered, the channel is
-//! genuinely wedged and the worker fails the session.
+//! All other actions (`RequestSsa`, `RequestCommitmentRetransmission`, `ReleaseService`,
+//! `WithholdService`, `RetireSsa`, `Close`) are non-coalescible — if they cannot be delivered, the
+//! channel is genuinely wedged and the worker fails the session.
 //!
 //! ## Integration with [`SessionManager`]
 //!
@@ -216,6 +224,7 @@
 //!    | Action | Behaviour |
 //!    |---|---|
 //!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor. Tracks each SSA in `SsaCommitmentGuard` for Drop-safe cleanup. |
+//!    | `RequestCommitmentRetransmission` | Calls `send_commitment_retransmission_request`, which reads the missing scope from the reconstructor and asks the Entry for it. Registers nothing and reports nothing back: it repeats on its own interval and the commitment deadline is the backstop. |
 //!    | `ReleaseService` | Worker calls `gate.release_service()`; driver records funded telemetry. |
 //!    | `WithholdService` | Worker calls `gate.withhold_service()`; driver records unfunded telemetry. |
 //!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; no driver I/O. |
@@ -281,6 +290,7 @@
 //! | `allow_dynamic_ssa_batches` | true | Lets a sub-range per-SSA offer satisfy `quota_range` by committing to the smallest batch whose total quota enters the range. Disable it to retain the fixed-batch, per-SSA admission rule. |
 //! | `max_failed_cycles` | 1 | An Entry losing one cycle per batch indefinitely while a single funded sibling holds the Session open. One loss is survivable, the second closes the Session. Only reachable above a batch of one, where the failing cycle is not always the last one standing. |
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
+//! | `commitment_recommit_interval` | 3 s | A *single lost packet* costing the whole Session. A commitment set ships as hundreds of messages and is unusable until every one lands, so without this a drop stranded the cycle on the deadline above — after the Entry had already been told to fund it. The one parameter here that buys liveness rather than bounding an attack; it bounds nothing itself. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
 //! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets of *full emission*, ~61 min, at the defaults — or it closes honest Sessions instead. That is the quantity `quota_range` prices and `validate_incoming_session_pix_config` enforces; the *last useful share* lands earlier, at 651 264, which is the figure the "why two hours" argument on [`SupervisorConfig::max_recovery_time`] uses. |
@@ -330,7 +340,8 @@
 //!
 //! [`validate_pix_supervision`] enforces, at config-load time and against the reconstructor config
 //! actually in use: `max_recovery_idle >= max_ack_await_time`; `tombstone_retention_window >=
-//! max_ack_await_time`; `max_recovery_idle < unused_verifier_lifetime`; `ssas_per_request` in
+//! max_ack_await_time`; `max_recovery_idle < unused_verifier_lifetime`;
+//! `commitment_recommit_interval < max_ssa_delivery_time`; `ssas_per_request` in
 //! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
 //! `0.0..=1.0`; and non-zero `max_served_without_progress`, `min_share_order_sample` and
 //! `max_failed_cycles`.
@@ -526,6 +537,33 @@ pub struct SupervisorConfig {
     #[default(Duration::from_secs(20))]
     #[serde(with = "humantime_serde")]
     pub max_ssa_delivery_time: Duration,
+
+    /// How long a *partially* delivered commitment may go quiet before the missing parts are
+    /// re-requested.
+    ///
+    /// The Entry's answer to an `SsaRequest` is not one message but hundreds of them, and the Exit
+    /// can use none of it until every one has landed — so a single lost packet used to cost the whole
+    /// Session on [`max_ssa_delivery_time`](Self::max_ssa_delivery_time), typically after the Entry
+    /// had already been told to fund the cycle's deposit address. This is the timer that repairs it:
+    /// on expiry the Exit asks the Entry to re-send the polynomial commitments it never received.
+    ///
+    /// An *idle* timer, armed and re-armed by each arriving commitment message, so it measures
+    /// silence rather than elapsed time and the first ask cannot land in the middle of the burst.
+    /// It is only ever armed once something has arrived: a commitment nothing was delivered for has
+    /// no scope to name, and there is nothing the Exit could ask for.
+    ///
+    /// It bounds nothing on its own — `max_ssa_delivery_time` remains the absolute deadline, so the
+    /// unincentivized exposure of a cycle is unchanged however often this fires. How many asks a
+    /// cycle makes is bounded by count rather than by this interval:
+    /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), which
+    /// is also exactly how many the Entry will answer, so shortening this buys promptness and never
+    /// a flood of wasted packets.
+    ///
+    /// Default: 3 s — well clear of the time a full burst takes to arrive, and short enough that a
+    /// repair completes several times over inside the delivery deadline.
+    #[default(Duration::from_secs(3))]
+    #[serde(with = "humantime_serde")]
+    pub commitment_recommit_interval: Duration,
 
     /// Maximum time to wait for a deposit after the commitment is verifiable.
     ///
@@ -763,6 +801,13 @@ pub use hopr_protocol_pix::PixParams;
 pub enum SessionPixEvent {
     /// The initial or next SSA request was successfully sent on the wire.
     SsaRequestSent(SsaId<HoprPseudonym>),
+    /// Part of an SSA commitment arrived, but the set is still incomplete.
+    ///
+    /// Reported per message, which is what makes the re-request timer an *idle* timer: the burst
+    /// keeps pushing it out, and it only expires once delivery has actually stalled. It is also the
+    /// only evidence that the Entry answered at all, which is what distinguishes a cycle worth
+    /// re-asking for from one where nothing was ever delivered and there is no scope to name.
+    CommitmentProgress(SsaId<HoprPseudonym>),
     /// A verifiable commitment was installed in the reconstructor.
     CommitmentVerified(SsaId<HoprPseudonym>),
     /// The Exit's deposit pool reported a sufficient deposit for this SSA.
@@ -805,6 +850,20 @@ pub enum SessionPixAction {
     /// registration it made.
     RequestSsa {
         ssa_ids: Vec<SsaId<HoprPseudonym>>,
+        params: PixParams,
+    },
+    /// Ask the Entry to re-send the parts of one SSA's commitment that never arrived.
+    ///
+    /// Emitted when a partially delivered commitment has been quiet for
+    /// [`SupervisorConfig::commitment_recommit_interval`], and repeated on that interval until the
+    /// commitment verifies or the absolute delivery deadline closes the Session. The scope is not
+    /// carried here: what is missing is the reconstructor's to say, and it can change between this
+    /// action being emitted and being carried out, so the carrier reads it at the point of sending.
+    ///
+    /// Unlike [`RequestSsa`](Self::RequestSsa) this asks for nothing new and its failure is not
+    /// terminal — the delivery deadline remains the backstop, so a dropped ask costs one interval.
+    RequestCommitmentRetransmission {
+        ssa_id: SsaId<HoprPseudonym>,
         params: PixParams,
     },
     /// Put the service gate in funded mode for the front cycle, or rebaseline a funded successor.
@@ -913,6 +972,23 @@ pub fn validate_pix_supervision(
         return Err(TransportSessionError::InvalidConfig(
             "max_ssa_delivery_time must be non-zero".into(),
         ));
+    }
+    // Both halves are dead config rather than merely odd. A zero interval fires the re-request timer
+    // on the same instant it is armed, so every arriving commitment message answers itself with an
+    // ask; an interval at or above the delivery deadline never fires before the deadline closes the
+    // Session, which is exactly the failure the timer exists to prevent — and neither is visible to
+    // the operator anywhere but here.
+    if cfg.commitment_recommit_interval.is_zero() {
+        return Err(TransportSessionError::InvalidConfig(
+            "commitment_recommit_interval must be non-zero".into(),
+        ));
+    }
+    if cfg.commitment_recommit_interval >= cfg.max_ssa_delivery_time {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "commitment_recommit_interval ({:?}) must be shorter than max_ssa_delivery_time ({:?}), or a partially \
+             delivered commitment is never re-requested before the Session closes",
+            cfg.commitment_recommit_interval, cfg.max_ssa_delivery_time
+        )));
     }
     if cfg.max_deposit_wait.is_zero() {
         return Err(TransportSessionError::InvalidConfig(
@@ -1116,6 +1192,7 @@ mod tests {
             allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
+            commitment_recommit_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
@@ -1157,6 +1234,36 @@ mod tests {
         let mut cfg = valid_cfg();
         cfg.max_deposit_wait = Duration::ZERO;
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    /// Both ends of the re-request interval are dead config, and invisible anywhere but here.
+    ///
+    /// Asserts on the messages: a zero interval also trips nothing else, but an interval at or above
+    /// the delivery deadline would stay green under `is_err()` if the branch naming it were deleted,
+    /// since a lone `is_err()` cannot see which guard fired.
+    #[test]
+    fn validation_rejects_a_recommit_interval_that_cannot_fire() {
+        let message_of = |cfg: &SupervisorConfig| match validate_pix_supervision(cfg, &valid_rcn_cfg()) {
+            Err(TransportSessionError::InvalidConfig(message)) => message,
+            other => panic!("expected an invalid-config error, got {other:?}"),
+        };
+
+        let mut zero = valid_cfg();
+        zero.commitment_recommit_interval = Duration::ZERO;
+        assert!(
+            message_of(&zero).contains("commitment_recommit_interval must be non-zero"),
+            "a zero interval fires on the instant it is armed, so every arriving part answers itself"
+        );
+
+        let mut too_long = valid_cfg();
+        too_long.commitment_recommit_interval = too_long.max_ssa_delivery_time;
+        assert!(
+            message_of(&too_long).contains("must be shorter than max_ssa_delivery_time"),
+            "an interval at the deadline never fires before the Session closes"
+        );
+
+        // And the shipping default satisfies it, which is what makes the rule safe to enforce.
+        assert!(validate_pix_supervision(&SupervisorConfig::default(), &SsaReconstructorConfig::default()).is_ok());
     }
 
     /// Unlike its siblings, this one has to assert on the message.
