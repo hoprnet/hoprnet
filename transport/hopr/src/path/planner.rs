@@ -685,7 +685,7 @@ where
         size_hint: usize,
         max_surbs: usize,
         routing: DestinationRouting,
-    ) -> Result<(ResolvedTransportRouting<HoprSurb>, Option<usize>)> {
+    ) -> Result<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)> {
         match routing {
             DestinationRouting::Forward {
                 destination,
@@ -725,13 +725,26 @@ where
 
                 trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
+                let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
+                // Capture the SURB-batch generation here, adjacent to return-path resolution, rather
+                // than at encode time. The replying side supersedes SURBs by generation, so a batch's
+                // generation must match the return-path plan it was minted for. Reading it here — with
+                // no `await` between choosing the return paths and this read — means a concurrent
+                // `bump_generation` (return-path re-plan, on the flush-loop task) cannot re-stamp an
+                // already-chosen plan; the window it could slip into is a couple of instructions
+                // instead of the whole resolve->encode pipeline hop. `None` when there is no return
+                // path (no SURBs are minted).
+                let generation =
+                    (!return_paths.is_empty()).then(|| self.surb_store.current_generation(&resolved_pseudonym));
+
                 Ok((
                     ResolvedTransportRouting::Forward {
-                        pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
+                        pseudonym: resolved_pseudonym,
                         forward_path,
                         return_paths,
                     },
                     None,
+                    generation,
                 ))
             }
 
@@ -744,7 +757,7 @@ where
                     .surb_store
                     .find_surb(matcher)
                     .ok_or_else(|| PathPlannerError::Surb(format!("no surb for pseudonym {}", matcher.pseudonym())))?;
-                Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
+                Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining), None))
             }
         }
     }
@@ -1251,7 +1264,7 @@ mod tests {
         let result = planner.resolve_routing(100, 0, routing).await;
         assert!(result.is_ok(), "zero-hop should succeed: {:?}", result.err());
 
-        let (resolved, rem) = result.unwrap();
+        let (resolved, rem, _) = result.unwrap();
         assert!(rem.is_none());
         if let ResolvedTransportRouting::Forward { forward_path, .. } = resolved {
             assert_eq!(
@@ -1307,7 +1320,7 @@ mod tests {
         let result = planner.resolve_routing(100, 0, routing).await;
         assert!(result.is_ok(), "1-hop routing should succeed: {:?}", result.err());
 
-        let (resolved, _) = result.unwrap();
+        let (resolved, ..) = result.unwrap();
         if let ResolvedTransportRouting::Forward { forward_path, .. } = resolved {
             assert_eq!(
                 forward_path.num_hops(),
@@ -1357,7 +1370,7 @@ mod tests {
         let result = planner.resolve_routing(100, 0, routing).await;
         assert!(result.is_ok(), "explicit path should succeed: {:?}", result.err());
 
-        let (resolved, _) = result.unwrap();
+        let (resolved, ..) = result.unwrap();
         if let ResolvedTransportRouting::Forward { forward_path, .. } = resolved {
             assert_eq!(forward_path.num_hops(), 2, "one intermediate + destination = 2 hops");
         } else {
@@ -1612,8 +1625,8 @@ mod tests {
             return_options: None,
         };
 
-        let (r1, _) = planner.resolve_routing(100, 0, make_routing()).await.expect("call 1");
-        let (r2, _) = planner.resolve_routing(100, 0, make_routing()).await.expect("call 2");
+        let (r1, ..) = planner.resolve_routing(100, 0, make_routing()).await.expect("call 1");
+        let (r2, ..) = planner.resolve_routing(100, 0, make_routing()).await.expect("call 2");
 
         let hops1 = if let ResolvedTransportRouting::Forward { forward_path, .. } = r1 {
             forward_path.num_hops()
@@ -1627,6 +1640,69 @@ mod tests {
         };
         assert_eq!(hops1, 2);
         assert_eq!(hops2, 2);
+    }
+
+    /// `resolve_routing` must capture the sending-side SURB generation for the packet's pseudonym at
+    /// resolution time (adjacent to choosing the return paths), so the batch is later stamped with
+    /// the generation of the plan it was minted for rather than one re-read at encode time.
+    #[tokio::test]
+    async fn resolve_routing_should_capture_the_current_surb_generation() {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(dest);
+        // Forward path me -> a -> dest, and a return path dest -> a -> me.
+        graph.add_edge(&me, &a).unwrap();
+        graph.add_edge(&a, &dest).unwrap();
+        graph.add_edge(&dest, &a).unwrap();
+        graph.add_edge(&a, &me).unwrap();
+        mark_edge_full(&graph, &me, &a);
+        mark_edge_full(&graph, &a, &dest);
+        mark_edge_full(&graph, &dest, &a);
+        mark_edge_full(&graph, &a, &me);
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr());
+        let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
+        let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
+
+        let pseudonym = HoprPseudonym::random();
+        // Advance the sending-side generation, as return-path re-plans would.
+        planner.surb_store.bump_generation(&pseudonym);
+        let expected = planner.surb_store.bump_generation(&pseudonym);
+
+        let routing = DestinationRouting::Forward {
+            destination: Box::new(NodeId::Offchain(dest)),
+            pseudonym: Some(pseudonym),
+            forward_options: RoutingOptions::Hops(1.try_into().expect("valid 1")),
+            return_options: Some(RoutingOptions::Hops(1.try_into().expect("valid 1"))),
+        };
+
+        let (_resolved, _rem, generation) = planner
+            .resolve_routing(100, 1, routing)
+            .await
+            .expect("resolution should succeed");
+
+        assert_eq!(
+            generation,
+            Some(expected),
+            "resolve_routing must capture the store's current generation for the pseudonym"
+        );
     }
 
     #[tokio::test]

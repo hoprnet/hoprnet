@@ -155,6 +155,7 @@ where
         data: D,
         routing: ResolvedTransportRouting<HoprSurb>,
         signals: Sig,
+        generation: Option<u8>,
     ) -> Result<OutgoingPacket, Self::Error> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -169,10 +170,12 @@ where
                 PacketRouting::ForwardPath {
                     forward_path,
                     return_paths,
-                    // Stamp the current SURB-batch generation for this pseudonym so the replying side
-                    // can drop SURBs left over from a superseded return path. Bumped on a re-plan
-                    // via `SurbStore::bump_generation`.
-                    generation: self.surb_store.current_generation(&pseudonym),
+                    // Stamp the SURB-batch generation captured when these return paths were resolved,
+                    // so the replying side drops SURBs left over from a superseded return path. It is
+                    // captured with the plan (not read here) so a concurrent re-plan/bump cannot
+                    // label this already-chosen batch with a newer generation; falling back to the
+                    // store's current value only when a caller did not supply one.
+                    generation: generation.unwrap_or_else(|| self.surb_store.current_generation(&pseudonym)),
                 },
             ),
             ResolvedTransportRouting::Return(sender_id, surb) => {
