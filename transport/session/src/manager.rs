@@ -9,7 +9,10 @@ use anyhow::anyhow;
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
-    node::{PixAddressId, PixDepositData, PixDepositDataRequest},
+    node::{
+        OfferedIncentivization, PixAddressId, PixDepositData, PixDepositDataRequest, SessionAdmissionDecision,
+        SessionAdmissionRequest,
+    },
     types::{
         crypto_random::Randomizable,
         internal::{
@@ -57,7 +60,8 @@ use crate::{
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
         HoprPixDepositPayload, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-        LOCAL_PIX_SUITE, SESSION_APPLICATION_TAG, SsaQuota, deposit_data_for_batch, pix_params_to_quota,
+        LOCAL_PIX_SUITE, SESSION_APPLICATION_TAG, SessionAdmissionSink, SsaQuota, deposit_data_for_batch,
+        pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -835,15 +839,66 @@ pub struct IncomingSessionPixConfig {
 }
 
 impl IncomingSessionPixConfig {
+    /// The terms one Session is judged on, once the session server has had its say.
+    ///
+    /// The configured [`quota_range`](Self::quota_range) is an envelope, not a default: it is what
+    /// [`validate_incoming_session_pix_config`] checked the deadlines and memory ceiling against,
+    /// and what [`start_protocol_channel_capacity`] sized a preallocated ring from, both once at
+    /// startup. So a decision's range is *intersected* with it rather than replacing it — a Session
+    /// may be held to less than the node advertises, never to more than it was configured to
+    /// honour. An operator wanting a wider class configures a wider envelope and narrows the rest.
+    ///
+    /// [`enforce_pix`](Self::enforce_pix) carries no such coupling and is simply overridden.
+    fn effective_for(&self, decision: &SessionAdmissionDecision) -> EffectivePixAdmission {
+        let quota_range = match &decision.pix_quota_range {
+            Some(narrowed) => {
+                *self.quota_range.start().max(narrowed.start())..=*self.quota_range.end().min(narrowed.end())
+            }
+            None => self.quota_range.clone(),
+        };
+
+        EffectivePixAdmission {
+            enforce_pix: decision.enforce_pix.unwrap_or(self.enforce_pix),
+            quota_range,
+            allow_dynamic_ssa_batches: self.supervision.allow_dynamic_ssa_batches,
+            ssas_per_request: self.supervision.ssas_per_request,
+        }
+    }
+
+    /// The supervisor configuration for Sessions accepted under these settings.
+    pub fn supervisor_config(&self) -> SupervisorConfig {
+        self.supervision.clone()
+    }
+}
+
+/// The PIX terms a single incoming Session is admitted on.
+///
+/// Lighter than the whole [`IncomingSessionPixConfig`] because only these four fields vary per
+/// Session: everything else the supervisor enforces is validated as a set at startup and stays
+/// node-wide. Narrowing the quota only makes those deadlines more generous, which is why they need
+/// not travel with it.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct EffectivePixAdmission {
+    /// Whether this Session must offer PIX at all.
+    enforce_pix: bool,
+    /// Quota window this Session's offer must land in, already intersected with the node's envelope.
+    quota_range: std::ops::RangeInclusive<SsaQuota>,
+    /// Whether a batch may be derived from the offer, rather than taken as configured.
+    allow_dynamic_ssa_batches: bool,
+    /// Largest batch the Exit will ask for.
+    ssas_per_request: usize,
+}
+
+impl EffectivePixAdmission {
     /// Selects the batch size with which an Entry's per-SSA quota is acceptable.
     ///
     /// Dynamic mode walks from one upwards so it asks for no more Entry work, deposits or Exit
     /// reconstructor state than necessary. Fixed mode is the legacy rule: validate one SSA against
     /// the range, then request exactly the configured batch size.
     fn ssa_batch_size_for_quota(&self, quota_per_ssa: SsaQuota) -> Option<usize> {
-        let configured_batch = self.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
+        let configured_batch = self.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
 
-        if !self.supervision.allow_dynamic_ssa_batches {
+        if !self.allow_dynamic_ssa_batches {
             return self.quota_range.contains(&quota_per_ssa).then_some(configured_batch);
         }
 
@@ -853,11 +908,52 @@ impl IncomingSessionPixConfig {
                 .is_some_and(|batch_quota| self.quota_range.contains(&batch_quota))
         })
     }
+}
 
-    /// The supervisor configuration for Sessions accepted under these settings.
-    pub fn supervisor_config(&self) -> SupervisorConfig {
-        self.supervision.clone()
+/// Decodes the incentivization the Entry offered, before anyone is asked what to do about it.
+///
+/// `Ok(None)` is a peer that offered none. `Err` is one whose offer this node cannot read or
+/// cannot share a curve with, which is refused on its own — no policy could rescue it, and both
+/// questions are cheaper than the round trip to the session server that follows.
+///
+/// Split out from `SessionManager::check_pix_params` so the session server can be
+/// told what was offered: it decides the terms, and terms relative to an offer need the offer.
+fn decode_pix_offer(
+    req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+) -> Result<Option<PixParams>, StartErrorReason> {
+    if !req.capabilities.0.contains(Capability::UsePIX) {
+        return Ok(None);
     }
+
+    // Unpacking is what enforces the protocol ranges on the three dimensions, and what rejects a
+    // suite identifier no curve claims — leaving only "a known curve, but not ours" below.
+    let params = PixParams::try_from_additional_data(req.additional_data).map_err(|error| {
+        debug!(
+            challenge = req.challenge,
+            %error,
+            "client offered PIX parameters outside the protocol ranges"
+        );
+        StartErrorReason::UnacceptablePixParams
+    })?;
+
+    // The Exit decides the curve, and it decides it by refusing anything else: nothing here
+    // is negotiated, because there is nothing to negotiate — the suite is fixed at build
+    // time on both sides. Checked before the quota because it is the cheaper question and
+    // because a suite mismatch makes the dimensions meaningless anyway, and checked at all
+    // because every later PIX field is sized by it. Refusing here means the Exit's own
+    // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
+    // that would read their boundaries in the wrong place.
+    if params.suite() != LOCAL_PIX_SUITE {
+        warn!(
+            challenge = req.challenge,
+            offered = %params.suite(),
+            ours = %LOCAL_PIX_SUITE,
+            "refusing a client offering a PIX curve suite this node was not built for"
+        );
+        return Err(StartErrorReason::UnacceptablePixParams);
+    }
+
+    Ok(Some(params))
 }
 
 /// Validates the incoming-PIX invariants that span quota, supervision and memory settings.
@@ -1079,6 +1175,20 @@ pub struct SessionManagerConfig {
     /// Defaults to [`DEFAULT_MAX_SSAS_PER_SSA_REQUEST`] (2).
     #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
     pub max_ssas_per_ssa_request: usize,
+
+    /// How long the Exit waits for the session server to say whether a Session is admitted.
+    ///
+    /// The wait sits inside the peer's own initiation timeout, so it has to be comfortably shorter
+    /// than [`initiation_timeout_base`](Self::initiation_timeout_base): a server slower than the
+    /// peer is patient refuses every Session it is asked about, and does so after the peer has
+    /// already given up. [`SessionManager::new`] rejects a configuration where it is not.
+    ///
+    /// Expiring refuses the Session — the alternative, admitting on the node's own terms, would let
+    /// an overloaded or wedged server silently disable every rule the operator wrote.
+    ///
+    /// Default is 2 seconds.
+    #[default(Duration::from_secs(2))]
+    pub session_admission_timeout: Duration,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -1455,6 +1565,17 @@ pub struct SessionManager<S> {
     /// peer offered. Charged in `handle_incoming_session_initiation` and returned by
     /// [`CycleBudgetReservation`]'s `Drop`, so no removal path has to remember to decrement it.
     live_cycle_bytes: Arc<std::sync::atomic::AtomicU64>,
+    /// Where incoming Sessions are put to the session server for an admission decision.
+    ///
+    /// Unset on a node that runs no session server — an Entry, or a relay — where there is nobody to
+    /// ask and every Session is admitted on this node's own terms.
+    /// Behind a `Mutex` so every request goes through *one* sender.
+    ///
+    /// `futures::channel::mpsc` gives each cloned `Sender` its own guaranteed slot on top of the
+    /// buffer, so sending through a fresh clone each time would let the queue grow with the number
+    /// of concurrent initiations — the bound would not bound. `try_send` never blocks, so the lock
+    /// is held only for the enqueue itself.
+    admission_tx: Arc<OnceLock<parking_lot::Mutex<SessionAdmissionSink>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -1471,6 +1592,7 @@ impl<S> Clone for SessionManager<S> {
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
             ssa_request_locks: self.ssa_request_locks.clone(),
+            admission_tx: self.admission_tx.clone(),
         }
     }
 }
@@ -1625,6 +1747,17 @@ where
             sup.max_recovery_idle = sup.max_recovery_idle.min(idle_cap);
         }
 
+        // The admission wait is spent inside the peer's initiation timeout, so a value at or above
+        // it buys nothing: the peer has already given up by the time the wait expires, and the
+        // Session was refused anyway. Clamped to one leg of that budget, leaving the other for the
+        // Start exchange the decision is part of. Clamped rather than rejected because every other
+        // cross-field rule in this constructor normalizes, and because the ceiling is derived from a
+        // field the caller may also have left at its default.
+        cfg.session_admission_timeout = cfg.session_admission_timeout.min(initiation_timeout_max_one_way(
+            cfg.initiation_timeout_base,
+            RoutingOptions::MAX_INTERMEDIATE_HOPS,
+        ));
+
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -1674,6 +1807,7 @@ where
             ssa_request_locks: moka::future::Cache::builder()
                 .time_to_idle(Duration::from_secs(1800))
                 .build(),
+            admission_tx: Arc::new(OnceLock::new()),
         }
     }
 
@@ -1683,6 +1817,11 @@ where
     /// Optionally, the PIX processor and event sink can be provided for handling PIX protocol.
     /// If not specified, the `SessionManager` will not handle PIX protocol.
     ///
+    /// `admission` is where incoming Sessions are put to the session server for a per-Session
+    /// decision before they are established. Without it — an Entry, or a relay, or any caller that
+    /// installed no session server — every Session is admitted on this node's own configured terms,
+    /// which is the behaviour of a node that does not distinguish between targets.
+    ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
     pub fn start<T>(
@@ -1690,6 +1829,7 @@ where
         msg_sender: S,
         new_session_notifier: T,
         pix: Option<PixToolbox>,
+        admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<Vec<AbortHandle>>
     where
         T: futures::Sink<IncomingSession> + Send + 'static,
@@ -1727,6 +1867,12 @@ where
         if let Some(pix) = pix {
             self.pix_toolbox
                 .set(pix)
+                .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        }
+
+        if let Some(admission) = admission {
+            self.admission_tx
+                .set(parking_lot::Mutex::new(admission))
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
         }
 
@@ -3219,63 +3365,134 @@ where
             })
     }
 
-    /// Checks the PIX parameters offered by the Entry during the Session Initiation.
+    /// Asks the session server on what terms this Session may be admitted.
+    ///
+    /// Fails closed. A refusal, a server that does not answer in time, a full request channel and a
+    /// dropped reply all end the Session here rather than falling back to the node's own terms:
+    /// falling back would mean an overloaded or wedged server silently disables every rule the
+    /// operator wrote, and the peer would be served on terms nobody chose.
+    ///
+    /// The two failure kinds are reported differently because they call for different responses. A
+    /// server that answered `Err` has decided, and re-asking will not change the answer, so the peer
+    /// is told [`StartErrorReason::TargetNotAdmitted`]. Everything else is this node being unable to
+    /// ask right now, which is transient, so the peer is told [`StartErrorReason::Busy`] and may
+    /// retry.
+    ///
+    /// A node with no session server has nobody to ask, and admits on its own terms.
+    async fn request_admission(
+        &self,
+        session_id: SessionId,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        offered: Option<PixParams>,
+    ) -> Result<SessionAdmissionDecision, StartErrorReason> {
+        let Some(admission_tx) = self.admission_tx.get() else {
+            return Ok(SessionAdmissionDecision::default());
+        };
+
+        let (reply_tx, reply_rx) = oneshot::channel();
+        // The capability bits travel as the peer sent them; the offer travels decoded, since the
+        // wire encoding is this crate's to read and the server has no business unpacking it.
+        let request = SessionAdmissionRequest::new(session_id, req.target.clone(), req.capabilities.0.bits());
+        let request = match offered {
+            Some(params) => request.with_offer(OfferedIncentivization::new(
+                params.polys_per_ssa(),
+                params.shares_per_poly(),
+                params.surplus_shares(),
+                pix_params_to_quota(&params),
+            )),
+            None => request,
+        };
+
+        // `try_send` rather than an awaited send: waiting for room in the queue would hold this
+        // initiation past the peer's own timeout, and the queue being full is exactly the condition
+        // the bound exists to report.
+        if let Err(error) = admission_tx.lock().try_send((request, reply_tx)) {
+            warn!(
+                %session_id,
+                %error,
+                "cannot ask the session server to admit this session; refusing it as busy"
+            );
+            return Err(StartErrorReason::Busy);
+        }
+
+        match reply_rx
+            .timeout(futures_time::time::Duration::from(self.cfg.session_admission_timeout))
+            .await
+        {
+            Ok(Ok(Ok(decision))) => Ok(decision),
+            Ok(Ok(Err(error))) => {
+                debug!(%session_id, %error, "the session server refused this session's target");
+                Err(StartErrorReason::TargetNotAdmitted)
+            }
+            // The server dropped the reply without answering, which is a bug in it rather than a
+            // decision, so it is reported as transient like the timeout it resembles.
+            Ok(Err(_)) => {
+                error!(
+                    %session_id,
+                    "the session server dropped an admission request without answering it"
+                );
+                Err(StartErrorReason::Busy)
+            }
+            Err(_) => {
+                warn!(
+                    %session_id,
+                    timeout = ?self.cfg.session_admission_timeout,
+                    "the session server did not decide in time; refusing the session as busy"
+                );
+                Err(StartErrorReason::Busy)
+            }
+        }
+    }
+
+    /// Checks the offer against the terms this Session was admitted on.
+    ///
+    /// Judged against `policy` — the node's configuration as narrowed by the session server's
+    /// decision for this Session — rather than against the node's configuration directly, which is
+    /// what makes the accepted quota a property of the target as well as of the node.
+    ///
+    /// `offered` is what [`decode_pix_offer`] read, so this is only the
+    /// policy question; the wire has already been judged.
     ///
     /// Returns the validated parameters and selected SSA batch size, or `None` if the offer cannot
-    /// satisfy this Exit's PIX policy.
+    /// satisfy that policy.
     fn check_pix_params(
         &self,
-        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        challenge: StartChallenge,
+        offered: Option<PixParams>,
+        policy: &EffectivePixAdmission,
     ) -> Option<(PixParams, usize)> {
-        // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
-        if req.capabilities.0.contains(Capability::UsePIX) {
-            // Client offered PIX, so validate the offered parameters. Unpacking is what enforces the
-            // protocol ranges on the three dimensions, and what rejects a suite identifier no curve
-            // claims — leaving only "a known curve, but not ours" for the check below.
-            let params = PixParams::try_from_additional_data(req.additional_data)
-                .inspect_err(|error| {
-                    debug!(
-                        challenge = req.challenge,
-                        %error,
-                        "client offered PIX parameters outside the protocol ranges"
-                    )
-                })
-                .ok()?;
-
-            // The Exit decides the curve, and it decides it by refusing anything else: nothing here
-            // is negotiated, because there is nothing to negotiate — the suite is fixed at build
-            // time on both sides. Checked before the quota because it is the cheaper question and
-            // because a suite mismatch makes the dimensions meaningless anyway, and checked at all
-            // because every later PIX field is sized by it. Refusing here means the Exit's own
-            // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
-            // that would read their boundaries in the wrong place.
-            if params.suite() != LOCAL_PIX_SUITE {
-                warn!(
-                    challenge = req.challenge,
-                    offered = %params.suite(),
-                    ours = %LOCAL_PIX_SUITE,
-                    "refusing a client offering a PIX curve suite this node was not built for"
-                );
-                return None;
-            }
-
+        if let Some(params) = offered {
             let quota_per_ssa = pix_params_to_quota(&params);
-            let ssas_per_request = self.cfg.pix_config.ssa_batch_size_for_quota(quota_per_ssa);
+            let ssas_per_request = policy.ssa_batch_size_for_quota(quota_per_ssa);
             let accepted_quota = ssas_per_request.and_then(|batch_size| quota_per_ssa.checked_mul(batch_size as u64));
             debug!(
-                challenge = req.challenge,
+                challenge,
                 %params,
-                acceptable_range = ?self.cfg.pix_config.quota_range,
-                dynamic_batches = self.cfg.pix_config.supervision.allow_dynamic_ssa_batches,
-                configured_max_ssas_per_request = self.cfg.pix_config.supervision.ssas_per_request,
+                acceptable_range = ?policy.quota_range,
+                node_range = ?self.cfg.pix_config.quota_range,
+                dynamic_batches = policy.allow_dynamic_ssa_batches,
+                configured_max_ssas_per_request = policy.ssas_per_request,
                 selected_ssas_per_request = ?ssas_per_request,
                 offered_quota_mb_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
                 accepted_quota_mb = ?accepted_quota.map(|quota| quota as f64 / (1024.0 * 1024.0)),
                 "client offered PIX SSA quota"
             );
 
+            // A window narrowed to nothing means the session server's rule and this node's envelope
+            // do not overlap, which is a misconfiguration rather than a peer offering badly: no
+            // offer whatsoever could have been accepted, so it is worth saying out loud once per
+            // Session rather than leaving it to look like a rejected client.
+            if ssas_per_request.is_none() && policy.quota_range.is_empty() {
+                warn!(
+                    challenge,
+                    admitted_range = ?policy.quota_range,
+                    node_range = ?self.cfg.pix_config.quota_range,
+                    "the admitted quota range for this target is empty, so no offer can be accepted"
+                );
+            }
+
             ssas_per_request.map(|batch_size| (params, batch_size))
-        } else if self.cfg.pix_config.enforce_pix {
+        } else if policy.enforce_pix {
             // Client didn't offer PIX, but PIX is enforced
             None
         } else {
@@ -3321,8 +3538,65 @@ where
             return Ok(());
         }
 
-        // Verify if the client offered the right parameters for PIX
-        let Some((client_params, ssas_per_request)) = self.check_pix_params(&session_req) else {
+        // Ask whoever runs the session server on what terms this target may be served, before
+        // anything is allocated for the Session. This is the only place the target can influence
+        // admission: the transport cannot read a sealed target, and by the time the server sees the
+        // established Session the terms have already been fixed.
+        // Read the offer before anyone is asked about it: an offer this node cannot read, or whose
+        // curve it does not share, is refused without a round trip to the session server, and the
+        // server is told what was offered rather than having to unpack the wire itself.
+        let offered = match decode_pix_offer(&session_req) {
+            Ok(offered) => offered,
+            Err(reason) => {
+                error!(
+                    challenge = session_req.challenge,
+                    "client offered unacceptable PIX parameters"
+                );
+                let data = HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                    reason,
+                });
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    data,
+                    "session error message due to unacceptable PIX parameters",
+                )
+                .await?;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                return Ok(());
+            }
+        };
+
+        let session_id: SessionId = pseudonym;
+        let admission = match self.request_admission(session_id, &session_req, offered).await {
+            Ok(decision) => decision,
+            Err(reason) => {
+                let data = HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                    reason,
+                });
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    data,
+                    "session error due to a refused admission",
+                )
+                .await?;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                return Ok(());
+            }
+        };
+        let pix_policy = self.cfg.pix_config.effective_for(&admission);
+
+        // Verify the offer against the terms this Session was admitted on.
+        let Some((client_params, ssas_per_request)) =
+            self.check_pix_params(session_req.challenge, offered, &pix_policy)
+        else {
             error!(
                 challenge = session_req.challenge,
                 "client offered unacceptable PIX parameters"
@@ -3397,8 +3671,6 @@ where
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
-
-        let session_id = pseudonym;
 
         let (session_tx, session_rx) =
             crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
@@ -4863,7 +5135,7 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
         assert!(alice_mgr.is_started());
 
         let alice_session = alice_mgr
@@ -4936,13 +5208,13 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
         assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
         assert!(bob_mgr.is_started());
 
         let result = alice_mgr
@@ -4984,7 +5256,7 @@ mod tests {
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -5036,7 +5308,7 @@ mod tests {
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
         let (sender, handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -5112,7 +5384,7 @@ mod tests {
         let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
         // Held, not dropped: dropping it would fail the establishment notification instead.
         let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
-        mgr.start(msg_tx, new_session_tx, None)?;
+        mgr.start(msg_tx, new_session_tx, None, None)?;
 
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -5422,13 +5694,13 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
         assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
         assert!(bob_mgr.is_started());
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -5581,7 +5853,7 @@ mod tests {
             }
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        bob_mgr.start(sender.clone(), new_session_tx, None)?;
+        bob_mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(bob_mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -5657,7 +5929,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -5695,7 +5967,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -5726,7 +5998,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -5760,7 +6032,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -5798,7 +6070,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -5841,7 +6113,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Spawn new_session so it is blocked waiting for the session establishment response.
@@ -5930,7 +6202,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // First session - should succeed
@@ -6030,7 +6302,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let offer = |pseudonym| {
             (
@@ -6128,19 +6400,774 @@ mod tests {
         Ok(())
     }
 
+    /// Runs an admission handler against `mgr`'s request channel for the duration of one test.
+    ///
+    /// Mirrors what `hopr-lib` spawns beside the session server, minus the concurrency: these tests
+    /// drive one initiation at a time.
+    fn spawn_admission_handler(
+        handler: impl Fn(SessionAdmissionRequest) -> Result<SessionAdmissionDecision, String> + Send + 'static,
+    ) -> (SessionAdmissionSink, tokio::task::JoinHandle<()>) {
+        let (tx, mut rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(4);
+        let handle = tokio::task::spawn(async move {
+            while let Some((request, reply)) = rx.next().await {
+                let _ = reply.send(handler(request));
+            }
+        });
+        (tx, handle)
+    }
+
+    /// What [`started_manager_admitting_small_params`] hands back: the manager, its message sender
+    /// and the task draining it, the first `SessionError` it replies with, and the incoming-session
+    /// receiver — which the test must hold, since an admitted Session is published on it and a
+    /// dropped receiver would turn every success into a send failure.
+    type AdmissionFixture = (
+        SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
+        oneshot::Receiver<StartErrorType<SessionId>>,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+    );
+
+    /// A started manager that accepts an Entry offering [`small_pix_params`], with `admission`
+    /// installed as its session server, so that any refusal is attributable to the decision rather
+    /// than to the dimensions or to a missing toolbox.
+    fn started_manager_admitting_small_params(
+        quota_range: std::ops::RangeInclusive<SsaQuota>,
+        enforce_pix: bool,
+        admission: Option<SessionAdmissionSink>,
+    ) -> anyhow::Result<AdmissionFixture> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                enforce_pix,
+                quota_range,
+                ..Default::default()
+            },
+            session_admission_timeout: Duration::from_millis(200),
+            ..Default::default()
+        });
+
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: TEST_SURPLUS_SHARES,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mut transport = MockMsgSender::new();
+        let (err_tx, err_rx) = oneshot::channel();
+        let err_tx = Arc::new(std::sync::Mutex::new(Some(err_tx)));
+        transport.expect_send_message().returning(move |_, data| {
+            let err_tx = err_tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = err_tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (sender, handle) = mock_packet_planning(transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox), admission)?;
+
+        Ok((mgr, sender, handle, err_rx, new_session_rx))
+    }
+
+    /// An Entry offering [`small_pix_params`], i.e. an offer the fixture's node accepts.
+    fn pix_offer() -> StartInitiation<SessionTarget, HoprSessionCapabilities> {
+        StartInitiation {
+            challenge: MIN_CHALLENGE,
+            target: SessionTarget::TcpStream(SealedHost::Plain(
+                "127.0.0.1:80".parse().expect("test target must parse"),
+            )),
+            capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
+            additional_data: small_pix_additional_data(),
+        }
+    }
+
+    /// The same target from an Entry that offered no incentivization at all.
+    fn no_pix_offer() -> StartInitiation<SessionTarget, HoprSessionCapabilities> {
+        StartInitiation {
+            capabilities: HoprSessionCapabilities(Capability::Segmentation.into()),
+            additional_data: 0,
+            ..pix_offer()
+        }
+    }
+
+    /// The quota an Entry offering [`small_pix_params`] asks for.
+    fn small_params_quota() -> SsaQuota {
+        pix_params_to_quota(&small_pix_params())
+    }
+
+    /// A node's configured window is an envelope, not a default: a decision may take less of it, but
+    /// asking for more of it than was configured — and validated, and preallocated against — leaves
+    /// the envelope's own bounds in place.
+    #[test]
+    fn an_admission_decision_narrows_the_configured_quota_window_and_never_widens_it() {
+        let cfg = IncomingSessionPixConfig {
+            quota_range: 100..=200,
+            ..Default::default()
+        };
+
+        let narrowed = cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(120..=180));
+        assert_eq!(narrowed.quota_range, 120..=180);
+
+        let widened = cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(1..=1000));
+        assert_eq!(widened.quota_range, 100..=200, "neither bound may leave the envelope");
+
+        let one_end = cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(150..=u64::MAX));
+        assert_eq!(one_end.quota_range, 150..=200, "an open end leaves that bound alone");
+
+        let disjoint = cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(500..=600));
+        assert!(
+            disjoint.quota_range.is_empty(),
+            "a rule that does not overlap the envelope admits nothing, rather than silently picking one"
+        );
+    }
+
+    /// Unlike the quota window, `enforce_pix` is coupled to nothing validated at startup, so a
+    /// decision simply replaces it — in either direction.
+    #[test]
+    fn an_admission_decision_overrides_enforce_pix_in_both_directions() {
+        let strict = IncomingSessionPixConfig {
+            enforce_pix: true,
+            ..Default::default()
+        };
+        let lax = IncomingSessionPixConfig {
+            enforce_pix: false,
+            ..Default::default()
+        };
+
+        assert!(strict.effective_for(&SessionAdmissionDecision::default()).enforce_pix);
+        assert!(
+            !strict
+                .effective_for(&SessionAdmissionDecision::default().with_enforce_pix(false))
+                .enforce_pix
+        );
+        assert!(!lax.effective_for(&SessionAdmissionDecision::default()).enforce_pix);
+        assert!(
+            lax.effective_for(&SessionAdmissionDecision::default().with_enforce_pix(true))
+                .enforce_pix
+        );
+    }
+
+    /// Runs an initiation through the same two steps admission does — read the offer off the wire,
+    /// then judge it against the node's own terms. `None` is a refusal from either.
+    fn decode_and_check(
+        mgr: &SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> Option<(PixParams, usize)> {
+        let policy = mgr.cfg.pix_config.effective_for(&SessionAdmissionDecision::default());
+        decode_pix_offer(req)
+            .ok()
+            .and_then(|offered| mgr.check_pix_params(req.challenge, offered, &policy))
+    }
+
+    /// The offer must reach the session server decoded, and the capability bits verbatim.
+    ///
+    /// Without it the server can only price a target blind: it names a window with no idea whether
+    /// the peer is anywhere near it, and cannot hold a *dimension* to a floor, since the quota is
+    /// their product and the same product admits many splits.
+    #[test_log::test(tokio::test)]
+    async fn the_admission_request_carries_the_decoded_offer_and_capability_bits() -> anyhow::Result<()> {
+        let (seen_tx, seen_rx) = oneshot::channel();
+        let seen_tx = Arc::new(std::sync::Mutex::new(Some(seen_tx)));
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            if let Some(tx) = seen_tx.lock().unwrap().take() {
+                let _ = tx.send((request.capabilities, request.offered));
+            }
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let (capabilities, offered) = seen_rx.await.context("admission was never asked")?;
+        let offered = offered.context("an offer was made, so one must have been reported")?;
+
+        let params = small_pix_params();
+        assert_eq!(offered.parts_per_ssa, params.polys_per_ssa());
+        assert_eq!(offered.shares_per_part, params.shares_per_poly());
+        assert_eq!(
+            offered.surplus_shares,
+            params.surplus_shares(),
+            "the surplus is priced in, so a server judging the quota needs it"
+        );
+        assert_eq!(offered.quota_per_ssa, small_params_quota());
+        assert_eq!(
+            capabilities,
+            pix_offer().capabilities.0.bits(),
+            "the capability bits travel as the peer sent them"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A peer offering nothing must be reported as offering nothing, not as offering zero: the two
+    /// are different answers, and only one of them means "this Session is free if you allow it".
+    #[test_log::test(tokio::test)]
+    async fn a_peer_offering_no_incentivization_reports_no_offer() -> anyhow::Result<()> {
+        let (seen_tx, seen_rx) = oneshot::channel();
+        let seen_tx = Arc::new(std::sync::Mutex::new(Some(seen_tx)));
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            if let Some(tx) = seen_tx.lock().unwrap().take() {
+                let _ = tx.send(request.offered);
+            }
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), no_pix_offer())
+            .await?;
+
+        assert!(
+            seen_rx.await.context("admission was never asked")?.is_none(),
+            "no offer must read as no offer"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// An offer this node cannot read is refused before the session server is troubled with it: no
+    /// decision could rescue it, and the round trip would be spent to reach the same answer.
+    #[test_log::test(tokio::test)]
+    async fn an_unreadable_offer_is_refused_without_asking_the_session_server() -> anyhow::Result<()> {
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_by_handler = asked.clone();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            asked_by_handler.fetch_add(1, Ordering::Relaxed);
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        // Zero polynomials is outside the protocol range, so unpacking refuses it outright.
+        let unreadable = StartInitiation {
+            additional_data: ((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40),
+            ..pix_offer()
+        };
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), unreadable)
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(
+            asked.load(Ordering::Relaxed),
+            0,
+            "an offer that cannot be read must not cost an admission round trip"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// The feature itself: one Exit, one Entry offering the same thing, two targets, two answers.
+    ///
+    /// Every other test here fixes the decision and varies the offer; this one fixes the offer and
+    /// varies the target, which is the only thing #8376 actually asks for.
+    #[test_log::test(tokio::test)]
+    async fn two_targets_on_one_exit_are_admitted_on_different_terms() -> anyhow::Result<()> {
+        let free_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.1:80".parse()?));
+        let paid_target = SessionTarget::TcpStream(SealedHost::Plain("10.0.0.2:80".parse()?));
+
+        let free_for = free_target.clone();
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            Ok(if request.target == free_for {
+                SessionAdmissionDecision::default().with_enforce_pix(false)
+            } else {
+                SessionAdmissionDecision::default().with_enforce_pix(true)
+            })
+        });
+
+        // The node demands PIX; only the rule for `free_target` waives it.
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), true, Some(admission))?;
+
+        // Same Entry offer both times — no PIX at all.
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                target: free_target,
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+        assert_eq!(mgr.num_active_sessions(), 1, "the waived target must be served");
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                target: paid_target,
+                challenge: MIN_CHALLENGE + 1,
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+        assert_eq!(
+            mgr.num_active_sessions(),
+            1,
+            "the second target must be refused, leaving only the first session"
+        );
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(
+            err.identifier,
+            ErrorIdentifier::Challenge(MIN_CHALLENGE + 1),
+            "the refusal must name the second initiation, not the admitted first"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A queue with no reader is the third transient failure, beside the timeout and the dropped
+    /// reply. It is `Busy` for the same reason: nothing about the target was decided.
+    ///
+    /// Reachable only because every request goes through one shared sender — sending through a
+    /// fresh clone would hand each call its own guaranteed slot and the queue would never be full.
+    #[test_log::test(tokio::test)]
+    async fn a_full_admission_queue_refuses_the_session_as_busy() -> anyhow::Result<()> {
+        // No receiver task at all, so nothing is ever drained. `_rx` is held rather than dropped:
+        // a closed channel is a different failure from a full one.
+        let (admission, _rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(0);
+
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        // The first request takes the sender's guaranteed slot; the second finds the queue full.
+        for challenge in [MIN_CHALLENGE, MIN_CHALLENGE + 1] {
+            mgr.handle_incoming_session_initiation(
+                HoprPseudonym::random(),
+                StartInitiation {
+                    challenge,
+                    ..pix_offer()
+                },
+            )
+            .await?;
+        }
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::Busy);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// The empty-intersection case is a misconfiguration; this is the ordinary one. The narrowed
+    /// window is a real range that simply sits above what the Entry offered, and the refusal must
+    /// look the same.
+    #[test_log::test(tokio::test)]
+    async fn a_narrowed_window_that_excludes_the_offer_refuses_without_being_empty() -> anyhow::Result<()> {
+        let quota = small_params_quota();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            Ok(SessionAdmissionDecision::default().with_pix_quota_range(quota + 1..=2 * quota))
+        });
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=2 * quota, false, Some(admission))?;
+
+        // The intersection is `quota+1..=2*quota` — non-empty, and above the offer.
+        let effective = mgr
+            .cfg
+            .pix_config
+            .effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(quota + 1..=2 * quota));
+        assert!(!effective.quota_range.is_empty(), "this case must not be the empty one");
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// Narrowing does not only accept or reject — with dynamic batching it moves the batch the Exit
+    /// asks for, which is what the Entry pays per deposit round trip.
+    #[test]
+    fn a_narrowed_window_can_change_the_selected_batch_size() {
+        let cfg = IncomingSessionPixConfig {
+            quota_range: 100..=400,
+            supervision: SupervisorConfig {
+                ssas_per_request: 4,
+                allow_dynamic_ssa_batches: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // The node's own window accepts a single SSA of 100.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default())
+                .ssa_batch_size_for_quota(100),
+            Some(1)
+        );
+
+        // Narrowed to a floor of 250, the smallest batch that reaches it is three.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(250..=400))
+                .ssa_batch_size_for_quota(100),
+            Some(3)
+        );
+
+        // Narrowed to a window every multiple of the offer jumps over — three total 300 and four
+        // total 400, with nothing in between — so no batch fits and the Session is refused.
+        assert_eq!(
+            cfg.effective_for(&SessionAdmissionDecision::default().with_pix_quota_range(310..=390))
+                .ssa_batch_size_for_quota(100),
+            None
+        );
+    }
+
+    /// Admission is an Exit-side question. An Entry establishing a Session decided its own target,
+    /// so putting it to the local session server would be asking a node to vet itself.
+    #[test_log::test(tokio::test)]
+    async fn an_outgoing_session_is_never_put_to_the_admission_hook() -> anyhow::Result<()> {
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_by_handler = asked.clone();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            asked_by_handler.fetch_add(1, Ordering::Relaxed);
+            Ok(SessionAdmissionDecision::default())
+        });
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(50),
+            ..Default::default()
+        });
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (sender, transport_handle) = mock_packet_planning(transport);
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None, Some(admission))?;
+
+        // No peer answers, so this times out — which is fine: the assertion is about what was asked
+        // before the attempt died, not about it succeeding.
+        let _ = mgr
+            .new_session(
+                (&hopr_api::types::crypto::keypairs::ChainKeypair::random()).into(),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: Some(HoprPseudonym::random()),
+                    capabilities: Capability::Segmentation.into(),
+                    surb_management: None,
+                    pix_ssa_quota: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert_eq!(
+            asked.load(Ordering::Relaxed),
+            0,
+            "an outgoing session must not consult the admission hook"
+        );
+
+        sender.close_channel();
+        transport_handle.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// The issue's first case: a target served without payment on a node that otherwise demands it.
+    #[test_log::test(tokio::test)]
+    async fn a_decision_waiving_pix_admits_a_client_that_offered_none() -> anyhow::Result<()> {
+        let (admission, handler) =
+            spawn_admission_handler(|_| Ok(SessionAdmissionDecision::default().with_enforce_pix(false)));
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), true, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), no_pix_offer())
+            .await?;
+
+        assert_eq!(
+            mgr.num_active_sessions(),
+            1,
+            "a waived target must be admitted even though the node enforces PIX"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        assert!(
+            err_rx.await.is_err(),
+            "no SessionError may be sent for an admitted session"
+        );
+        handler.abort();
+        Ok(())
+    }
+
+    /// And its mirror: a target that must pay on a node that otherwise does not ask.
+    #[test_log::test(tokio::test)]
+    async fn a_decision_demanding_pix_refuses_a_client_that_offered_none() -> anyhow::Result<()> {
+        let (admission, handler) =
+            spawn_admission_handler(|_| Ok(SessionAdmissionDecision::default().with_enforce_pix(true)));
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), no_pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(mgr.num_active_sessions(), 0, "no slot may be created for a refusal");
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A window narrowed past the client's offer refuses it even though the node's own window would
+    /// have accepted it, which is the whole point of parameterizing admission by target.
+    #[test_log::test(tokio::test)]
+    async fn a_decision_narrowing_the_quota_past_the_offer_refuses_it() -> anyhow::Result<()> {
+        let quota = small_params_quota();
+        let (admission, handler) = spawn_admission_handler(move |_| {
+            Ok(SessionAdmissionDecision::default().with_pix_quota_range(quota + 1..=u64::MAX))
+        });
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=quota, false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// The same offer, and the same node, admitted once the decision leaves the window alone —
+    /// which is what makes the refusal above attributable to the narrowing and nothing else.
+    #[test_log::test(tokio::test)]
+    async fn the_same_offer_is_admitted_when_the_decision_leaves_the_window_alone() -> anyhow::Result<()> {
+        let quota = small_params_quota();
+        let (admission, handler) = spawn_admission_handler(|_| Ok(SessionAdmissionDecision::default()));
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=quota, false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        assert_eq!(mgr.num_active_sessions(), 1);
+
+        sender.close_channel();
+        transport.await??;
+        assert!(
+            err_rx.await.is_err(),
+            "no SessionError may be sent for an admitted session"
+        );
+        handler.abort();
+        Ok(())
+    }
+
+    /// A refusal is permanent and says so, so the peer does not retry a target this Exit will not
+    /// serve however the request is phrased.
+    #[test_log::test(tokio::test)]
+    async fn a_refused_admission_is_reported_as_a_target_that_is_not_admitted() -> anyhow::Result<()> {
+        let (admission, handler) = spawn_admission_handler(|_| Err("this exit does not serve that".into()));
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::TargetNotAdmitted);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0, "no slot may be created for a refusal");
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A server that does not answer must not become a server that admits everything: the Session is
+    /// refused, and as `Busy` rather than `TargetNotAdmitted`, since nothing about the target was
+    /// decided and a retry may well succeed.
+    #[test_log::test(tokio::test)]
+    async fn an_admission_that_never_answers_refuses_the_session_as_busy() -> anyhow::Result<()> {
+        // Holds every request without replying, which is what a wedged session server looks like.
+        let (admission, mut rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(4);
+        let handler = tokio::task::spawn(async move {
+            let mut held = Vec::new();
+            while let Some(request) = rx.next().await {
+                held.push(request);
+            }
+        });
+
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::Busy);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// Same outcome when the server drops the reply instead of answering: a bug in it is still not a
+    /// decision, and must not be read as one.
+    #[test_log::test(tokio::test)]
+    async fn an_admission_whose_reply_is_dropped_refuses_the_session_as_busy() -> anyhow::Result<()> {
+        let (admission, mut rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(4);
+        let handler = tokio::task::spawn(async move {
+            while let Some((_request, reply)) = rx.next().await {
+                drop(reply);
+            }
+        });
+
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        let err = err_rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::Busy);
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// A node that installed no session server has nobody to ask, so it must behave exactly as it
+    /// did before this hook existed rather than failing closed on an absent decision.
+    #[test_log::test(tokio::test)]
+    async fn a_manager_without_an_admission_sink_admits_on_its_own_terms() -> anyhow::Result<()> {
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), pix_offer())
+            .await?;
+
+        assert_eq!(
+            mgr.num_active_sessions(),
+            1,
+            "an offer the node's own policy accepts must be admitted with no session server present"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        assert!(
+            err_rx.await.is_err(),
+            "no SessionError may be sent for an admitted session"
+        );
+        Ok(())
+    }
+
+    /// The request the session server is handed must name the target it is being asked about, or the
+    /// hook cannot do the one job it exists for.
+    #[test_log::test(tokio::test)]
+    async fn the_admission_request_carries_the_session_target() -> anyhow::Result<()> {
+        let (seen_tx, seen_rx) = oneshot::channel();
+        let seen_tx = Arc::new(std::sync::Mutex::new(Some(seen_tx)));
+        let (admission, handler) = spawn_admission_handler(move |request| {
+            if let Some(tx) = seen_tx.lock().unwrap().take() {
+                let _ = tx.send((request.session_id, request.target.clone()));
+            }
+            Ok(SessionAdmissionDecision::default())
+        });
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        let pseudonym = HoprPseudonym::random();
+        let offer = pix_offer();
+        let expected_target = offer.target.clone();
+        mgr.handle_incoming_session_initiation(pseudonym, offer).await?;
+
+        let (seen_id, seen_target) = seen_rx.await.context("admission was never asked")?;
+        assert_eq!(seen_target, expected_target);
+        assert_eq!(seen_id, pseudonym, "the request must name the session it would become");
+
+        sender.close_channel();
+        transport.await??;
+        handler.abort();
+        Ok(())
+    }
+
+    /// The wait is spent inside the peer's own initiation timeout, so a configuration that outlasts
+    /// it is normalized rather than left to expire after the peer has already given up.
+    #[test]
+    fn the_admission_timeout_is_clamped_below_the_initiation_budget() {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                initiation_timeout_base: Duration::from_millis(100),
+                session_admission_timeout: Duration::from_secs(3600),
+                ..Default::default()
+            });
+
+        assert_eq!(
+            mgr.cfg.session_admission_timeout,
+            initiation_timeout_max_one_way(Duration::from_millis(100), RoutingOptions::MAX_INTERMEDIATE_HOPS)
+        );
+    }
+
     /// Dynamic admission chooses the least expensive batch that brings the Entry's total offer into
     /// the accepted range. A cap is still a cap: it may leave the offer unsatisfiable, and checked
     /// multiplication must make an overflowing candidate a refusal rather than a wrapped match.
     #[test]
     fn dynamic_ssa_batches_choose_the_smallest_satisfying_batch() {
-        let config = |quota_range, ssas_per_request| IncomingSessionPixConfig {
-            quota_range,
-            supervision: SupervisorConfig {
-                ssas_per_request,
-                allow_dynamic_ssa_batches: true,
+        // Through `effective_for` with an empty decision, which is the no-session-server path and
+        // so yields exactly the node's configured policy.
+        let config = |quota_range, ssas_per_request| {
+            IncomingSessionPixConfig {
+                quota_range,
+                supervision: SupervisorConfig {
+                    ssas_per_request,
+                    allow_dynamic_ssa_batches: true,
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
+            }
+            .effective_for(&SessionAdmissionDecision::default())
         };
 
         assert_eq!(Some(1), config(100..=350, 4).ssa_batch_size_for_quota(100));
@@ -6163,14 +7190,17 @@ mod tests {
     /// is compared with `quota_range`, and an accepted offer uses the configured batch exactly.
     #[test]
     fn disabling_dynamic_ssa_batches_preserves_fixed_batch_admission() {
-        let fixed = |quota_range| IncomingSessionPixConfig {
-            quota_range,
-            supervision: SupervisorConfig {
-                ssas_per_request: 3,
-                allow_dynamic_ssa_batches: false,
+        let fixed = |quota_range| {
+            IncomingSessionPixConfig {
+                quota_range,
+                supervision: SupervisorConfig {
+                    ssas_per_request: 3,
+                    allow_dynamic_ssa_batches: false,
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
+            }
+            .effective_for(&SessionAdmissionDecision::default())
         };
 
         assert_eq!(
@@ -6245,7 +7275,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
 
         mgr.handle_incoming_session_initiation(
             HoprPseudonym::random(),
@@ -6295,7 +7325,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Fill the cache with two incoming sessions (Exits).
@@ -6357,7 +7387,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(tx, new_session_tx, None)?;
+        mgr.start(tx, new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Verify that sending fails because the receiver is gone.
@@ -6411,12 +7441,12 @@ mod tests {
 
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
         assert!(alice_mgr.is_started());
 
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
         assert!(bob_mgr.is_started());
 
         // Record how many entries are in `session_initiations` before the call.
@@ -6577,7 +7607,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Create a session
@@ -6642,7 +7672,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
@@ -6757,7 +7787,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
@@ -6863,7 +7893,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Create first session
@@ -6931,7 +7961,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         // Create first session
@@ -7001,7 +8031,7 @@ mod tests {
 
         let (sender, _handle) = mock_packet_planning(transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(sender.clone(), new_session_tx, None)?;
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let result = mgr
@@ -7075,7 +8105,7 @@ mod tests {
 
         let (sender, _handle) = mock_packet_planning(transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
         assert!(mgr.is_started());
 
         let result = mgr
@@ -7255,7 +8285,7 @@ mod tests {
 
         let (tx, _rx) = futures::channel::mpsc::unbounded();
         let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
-        let started = mgr.start(tx, new_session_tx, Some(pix_toolbox));
+        let started = mgr.start(tx, new_session_tx, Some(pix_toolbox), None);
 
         assert!(
             matches!(started, Err(TransportSessionError::InvalidConfig(_))),
@@ -7315,7 +8345,7 @@ mod tests {
             let (tx, _rx) = futures::channel::mpsc::unbounded();
             let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
 
-            match mgr.start(tx, new_session_tx, Some(pix_toolbox)) {
+            match mgr.start(tx, new_session_tx, Some(pix_toolbox), None) {
                 Err(TransportSessionError::InvalidConfig(message)) => assert!(
                     message.contains(expected_field),
                     "{case} should identify {expected_field}, got: {message}"
@@ -7364,7 +8394,7 @@ mod tests {
         let (first_tx, _first_rx) = futures::channel::mpsc::unbounded();
         let (first_notifier, _first_notifications) = futures::channel::mpsc::channel(1);
         assert!(matches!(
-            mgr.start(first_tx, first_notifier, Some(invalid_pix)),
+            mgr.start(first_tx, first_notifier, Some(invalid_pix), None),
             Err(TransportSessionError::InvalidConfig(_))
         ));
         assert!(
@@ -7374,7 +8404,7 @@ mod tests {
 
         let (retry_tx, _retry_rx) = futures::channel::mpsc::unbounded();
         let (retry_notifier, _retry_notifications) = futures::channel::mpsc::channel(1);
-        let retry = mgr.start(retry_tx, retry_notifier, None);
+        let retry = mgr.start(retry_tx, retry_notifier, None, None);
         assert!(
             retry.is_ok(),
             "a configuration error must leave the manager retryable, got {retry:?}"
@@ -7470,7 +8500,7 @@ mod tests {
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -7540,7 +8570,7 @@ mod tests {
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+        mgr.start(bob_sender.clone(), new_session_tx, None, None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -7609,7 +8639,7 @@ mod tests {
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
         // No toolbox — the third argument is what a relay that does not participate in PIX gets.
-        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+        mgr.start(bob_sender.clone(), new_session_tx, None, None)?;
 
         let req = StartInitiation {
             challenge: MIN_CHALLENGE,
@@ -7620,7 +8650,7 @@ mod tests {
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
         assert!(
-            mgr.check_pix_params(&req).is_some(),
+            decode_and_check(&mgr, &req).is_some(),
             "the offered dimensions must be acceptable, or the refusal cannot be attributed to the guard"
         );
 
@@ -7689,7 +8719,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -7780,7 +8810,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -7905,7 +8935,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -8005,7 +9035,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -8086,7 +9116,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -8185,7 +9215,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -8348,7 +9378,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -8927,11 +9957,11 @@ mod tests {
 
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         let (new_session_tx_alice, _alice_rx) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
         let _bob_notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx_bob);
             while let Some(_session) = new_session_rx_bob.next().await {}
@@ -9062,7 +10092,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -9253,7 +10283,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -9410,7 +10440,7 @@ mod tests {
                 pin_mut!(new_session_rx);
                 while let Some(_session) = new_session_rx.next().await {}
             });
-            mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+            mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
             let alice_pseudonym = HoprPseudonym::random();
 
@@ -9565,7 +10595,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -9833,7 +10863,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -9994,7 +11024,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 
@@ -10081,7 +11111,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -10163,7 +11193,7 @@ mod tests {
         // polys_per_ssa > MAX_POLYS_PER_SSA (16192), and zero, with a valid quota -> should reject
         for polys in [0, MAX_POLYS_PER_SSA + 1, u16::MAX] {
             assert!(
-                mgr.check_pix_params(&offer(packed(polys, 128, 0))).is_none(),
+                decode_and_check(&mgr, &offer(packed(polys, 128, 0))).is_none(),
                 "should reject polys_per_ssa {polys}"
             );
         }
@@ -10173,16 +11203,15 @@ mod tests {
         // cannot be exceeded by anything a peer is able to send.
         for shares in [0, 1] {
             assert!(
-                mgr.check_pix_params(&offer(packed(8192, shares, 0))).is_none(),
+                decode_and_check(&mgr, &offer(packed(8192, shares, 0))).is_none(),
                 "should reject shares_per_poly {shares}"
             );
         }
 
         // Valid params should still be accepted, and arrive intact — including the surplus, which
         // no other check looks at and which would therefore be free to go missing.
-        let (accepted, batch_size) = mgr
-            .check_pix_params(&offer(packed(8192, 128, 37)))
-            .context("should accept valid params")?;
+        let (accepted, batch_size) =
+            decode_and_check(&mgr, &offer(packed(8192, 128, 37))).context("should accept valid params")?;
         assert_eq!(PixParams::try_new(8192, 128, 37, LOCAL_PIX_SUITE)?, accepted);
         assert_eq!(1, batch_size);
 
@@ -10190,7 +11219,7 @@ mod tests {
         for surplus in [0, 1, u8::MAX] {
             assert_eq!(
                 Some((PixParams::try_new(8192, 128, surplus, LOCAL_PIX_SUITE)?, 1)),
-                mgr.check_pix_params(&offer(packed(8192, 128, surplus)))
+                decode_and_check(&mgr, &offer(packed(8192, 128, surplus)))
             );
         }
 
@@ -10232,11 +11261,11 @@ mod tests {
         };
 
         assert!(
-            mgr.check_pix_params(&offer(foreign)).is_none(),
+            decode_and_check(&mgr, &offer(foreign)).is_none(),
             "a client offering {foreign} must be refused by a {LOCAL_PIX_SUITE} Exit"
         );
         assert!(
-            mgr.check_pix_params(&offer(LOCAL_PIX_SUITE)).is_some(),
+            decode_and_check(&mgr, &offer(LOCAL_PIX_SUITE)).is_some(),
             "and the same dimensions on this build's own curve must still be accepted"
         );
 
@@ -10248,7 +11277,7 @@ mod tests {
             additional_data: (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
         };
         assert!(
-            mgr.check_pix_params(&unknown).is_none(),
+            decode_and_check(&mgr, &unknown).is_none(),
             "an unknown suite identifier must be refused"
         );
 
@@ -10299,7 +11328,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
 

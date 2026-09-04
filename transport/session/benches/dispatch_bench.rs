@@ -160,7 +160,7 @@ fn make_manager_with_session(
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier, None)
+            .start(msg_sender, session_notifier, None, None)
             .expect("manager.start() must succeed");
     });
 
@@ -206,7 +206,7 @@ fn make_manager_without_session() -> (
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier, None)
+            .start(msg_sender, session_notifier, None, None)
             .expect("manager.start() must succeed");
     });
 
