@@ -41,4 +41,9 @@ pub use pipeline::{
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
 pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
-pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.1.0";
+// Bumped 1.1.0 -> 1.2.0 for the generation-tagged SURB: the SURB grew by one byte (401 -> 402)
+// while the fixed HOPR packet frame size is unchanged, so a pre-bump node would negotiate the same
+// protocol and silently misparse the trailing generation byte. The exact-string match on this
+// identifier makes the wire-format boundary explicit — nodes across it simply find no common `mix`
+// protocol instead of exchanging incompatible payloads.
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.2.0";

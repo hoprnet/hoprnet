@@ -78,7 +78,7 @@ where
                 nb.build(
                     &ctx.packet_key,
                     multiaddresses,
-                    "/hopr/mix/1.1.0",
+                    hopr_transport::protocol::CURRENT_HOPR_MSG_PROTOCOL,
                     ctx.cfg.protocol.transport.prefer_local_addresses,
                 )
                 .await

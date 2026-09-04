@@ -3157,19 +3157,34 @@ where
     /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
     /// their counterparty buffer estimate for `grace`.
     ///
-    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
+    /// Returns the pseudonyms of the Sessions that were marked (empty when nothing routes there).
+    ///
+    /// The caller uses these to advance each Session's SURB generation: the return path to
+    /// `destination` has just been re-planned, so the fresh SURB batch must supersede the SURBs the
+    /// counterparty still holds for the dead path.
     pub fn mark_return_path_degraded(
         &self,
         destination: &hopr_api::types::internal::NodeId,
         grace: std::time::Duration,
-    ) -> usize {
+    ) -> Vec<HoprPseudonym> {
         self.sessions
             .iter()
             .filter(|(_, slot)| {
-                matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
+                // Only sessions that actually run a return path are affected: with `return_options:
+                // None` the session mints no return SURBs, so the counterparty holds none to
+                // supersede and there is nothing to mark or bump.
+                matches!(
+                    &slot.routing_opts,
+                    DestinationRouting::Forward { destination: d, return_options: Some(_), .. }
+                    if d.as_ref() == destination
+                )
             })
-            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
-            .count()
+            .map(|(pseudonym, slot)| {
+                slot.surb_mgmt.mark_return_path_degraded(grace);
+                // The session cache is keyed by pseudonym, which is exactly the SURB-generation key.
+                *pseudonym.as_ref()
+            })
+            .collect()
     }
 
     /// The main method to be called whenever data are received.
@@ -7638,6 +7653,64 @@ mod tests {
         // Cleanup: close sender and await handle
         sender.close_channel();
         _handle.await??;
+
+        Ok(())
+    }
+
+    /// `mark_return_path_degraded` must mark exactly the Sessions routed to the given destination
+    /// **that run a return path**, and return their pseudonyms (the SURB-generation keys the caller
+    /// bumps), leaving Sessions bound for other destinations — and one-way Sessions with no return
+    /// path — untouched.
+    #[test_log::test(tokio::test)]
+    async fn session_manager_mark_return_path_degraded_should_return_the_marked_pseudonyms() -> anyhow::Result<()> {
+        use std::collections::HashSet;
+
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let dest_a: Address = (&ChainKeypair::random()).into();
+        let dest_b: Address = (&ChainKeypair::random()).into();
+
+        let hops = || RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN);
+        let forward_to =
+            |addr: Address, ps: HoprPseudonym, return_options: Option<RoutingOptions>| DestinationRouting::Forward {
+                destination: Box::new(addr.into()),
+                pseudonym: Some(ps),
+                forward_options: hops(),
+                return_options,
+            };
+
+        // Two Sessions route to `dest_a` with a return path, one to `dest_b`, and one one-way Session
+        // (no return path) to `dest_a` that must be skipped.
+        let (ps_a1, ps_a2, ps_b, ps_a_oneway) = (
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+        );
+        mgr.pre_populate_session(ps_a1, forward_to(dest_a, ps_a1, Some(hops())));
+        mgr.pre_populate_session(ps_a2, forward_to(dest_a, ps_a2, Some(hops())));
+        mgr.pre_populate_session(ps_b, forward_to(dest_b, ps_b, Some(hops())));
+        mgr.pre_populate_session(ps_a_oneway, forward_to(dest_a, ps_a_oneway, None));
+        mgr.sessions.run_pending_tasks();
+
+        let node_a = hopr_api::types::internal::NodeId::Chain(dest_a);
+        let marked: HashSet<_> = mgr
+            .mark_return_path_degraded(&node_a, Duration::from_secs(30))
+            .into_iter()
+            .collect();
+        assert_eq!(
+            marked,
+            HashSet::from([ps_a1, ps_a2]),
+            "only return-path Sessions routed to dest_a must be marked; the one-way Session is skipped"
+        );
+
+        // A destination nothing routes to marks nothing.
+        let node_c = hopr_api::types::internal::NodeId::Chain((&ChainKeypair::random()).into());
+        assert!(
+            mgr.mark_return_path_degraded(&node_c, Duration::from_secs(30))
+                .is_empty(),
+            "a destination with no Sessions must return no pseudonyms"
+        );
 
         Ok(())
     }
