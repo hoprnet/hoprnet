@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-rust-version = "1.91"
+rust-version = "1.94.1"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 license = "GPL-3.0-only"
