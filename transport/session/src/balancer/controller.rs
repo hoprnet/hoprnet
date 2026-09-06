@@ -819,6 +819,15 @@ mod tests {
         assert_eq!(1, state.organic_surbs_per_packet());
     }
 
+    /// Sessions opened without SURB management hold a default state and route their outgoing packets
+    /// through the same policy as balanced ones, relying on it to answer 1. A `Default` that ever
+    /// gained a non-zero target would silently stop those sessions producing organic SURBs, with
+    /// nothing at the call site to show why.
+    #[test]
+    fn a_default_state_should_keep_producing_organic_surbs() {
+        assert_eq!(1, BalancerStateValues::default().organic_surbs_per_packet());
+    }
+
     /// Mirror image of `a_degraded_return_path_should_not_zero_the_supply_ceiling` in `flow_control`:
     /// there, the degraded-path `0` must be suppressed because it would read as "admit no bytes";
     /// here it must be honoured, because it reads as "below target, keep producing" — which is

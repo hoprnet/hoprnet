@@ -2482,6 +2482,12 @@ where
                     let returned_packets = Arc::new(std::sync::atomic::AtomicU64::new(0));
                     let returned_packets_for_rx = returned_packets.clone();
 
+                    // Disabled SURB management: a default state has a zero target, which reads as
+                    // `is_disabled()` and so caps organic SURBs at one per packet — this branch's
+                    // behaviour, expressed through the same policy the balancing branch uses rather
+                    // than restated as a literal below.
+                    let surb_mgmt: Arc<BalancerStateValues> = Default::default();
+
                     // Insert the slot and obtain a guard that rolls it back if any
                     // subsequent setup step fails.
                     let mut slot_guard = self
@@ -2491,7 +2497,7 @@ where
                                 session_tx,
                                 routing_opts: forward_routing.clone(),
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
-                                surb_mgmt: Default::default(), // Disabled SURB management
+                                surb_mgmt: surb_mgmt.clone(),
                                 surb_estimator: Default::default(), // No SURB estimator needed
                                 current_ssa_state,
                                 // Entry side: the Exit is authoritative for the PIX lifecycle.
@@ -2515,16 +2521,10 @@ where
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
                     let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let surb_mgmt_for_tx = surb_mgmt.clone();
                     let reduced_surb_sender =
                         msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            if !max_out_organic_surbs {
-                                data.packet_info
-                                    .get_or_insert_with(|| OutgoingPacketInfo {
-                                        max_surbs_in_packet: 1,
-                                        ..Default::default()
-                                    })
-                                    .max_surbs_in_packet = 1;
-                            }
+                            cap_organic_surbs(&mut data, max_out_organic_surbs, &surb_mgmt_for_tx);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
