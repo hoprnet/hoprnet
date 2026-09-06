@@ -190,12 +190,24 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// Cycles per pseudonym whose commitment material the [`SsaShareGenerator`] retains for
 /// retransmission.
 ///
-/// The retained material is dropped as soon as a cycle can no longer be served at all — see
-/// [`SsaShareGenerator::recommit`] — so this cap only binds for a pseudonym that commits to cycles
-/// without ever emitting a share of them, where nothing has yet drained. Eighteen is what
-/// `hopr-transport-session` can have live at once, `MAX_OVERLAPPING_BATCHES` (2) generations of
-/// `MAX_SSA_BATCH_SIZE` (9) cycles each; the constants are not visible from here, so the derivation
-/// is written down rather than imported.
+/// The newest this many are kept and the oldest is evicted, and that is the *only* thing that
+/// releases them — emission deliberately does not enter into it. Whether a re-sent commitment is
+/// still worth anything is a question about what the peer holds, and none of that is visible from
+/// this side: it completes a cycle out of the shares it has already buffered plus the commitment it
+/// is still missing, on its own delivery deadline. Releasing on drain instead would give up the
+/// repair exactly where it is worth most, a cycle whose every share has gone out and whose only
+/// missing piece is the one a lost packet took.
+///
+/// Eighteen is `MAX_OVERLAPPING_BATCHES` (2) generations of `MAX_SSA_BATCH_SIZE` (9) cycles, the
+/// figures `hopr-transport-session` is built to; they are not visible from here, so the derivation is
+/// written down rather than imported. It leaves a cycle covered for the whole of its own batch plus
+/// one further generation, and the successor gate makes that second generation expensive — a peer
+/// cannot reach it without draining nearly every cycle of the first, by which point it has been
+/// asking for far longer than [`MAX_COMMITMENT_RETRANSMISSIONS`] attempts on any sane re-request
+/// interval allow.
+///
+/// Costs `polynomials_per_ssa × 33 B` per cycle — 4.8 MB per pseudonym with the cap full at the
+/// deployed dimensions, against the ~33 MB a single *undrained* cycle's polynomials occupy.
 pub const MAX_RETAINED_COMMITMENT_CYCLES: usize = 18;
 
 /// Minimum SSA polynomial threshold.

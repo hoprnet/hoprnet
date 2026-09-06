@@ -48,7 +48,8 @@ impl<S: PixSpec> IndexedPolynomial<S> {
 /// longest.
 ///
 /// The cost is the compressed commitments, `polynomials_per_ssa × 33 B` — 270 kB at the deployed
-/// dimensions, against the ~33 MB of polynomial state the same cycle already holds.
+/// dimensions, against the ~33 MB of polynomial state a cycle holds while it is still being served.
+/// [`MAX_RETAINED_COMMITMENT_CYCLES`] bounds how many are held at once.
 struct RetainedCommitment<S: PixSpec> {
     ssa_index: SsaIndex,
     /// Client commitment to the whole SSA, i.e. the sum of every constant term.
@@ -71,12 +72,15 @@ struct RetainedCommitment<S: PixSpec> {
 struct SsaPseudonymEntry<S: PixSpec> {
     ssa_index: SsaIndex,
     poly_queue: VecDeque<IndexedPolynomial<S>>,
-    /// Commitment material of the cycles this pseudonym can still serve, oldest first.
+    /// Commitment material of the cycles most recently committed for this pseudonym, oldest first.
     ///
-    /// Pruned in [`EntryShareGenerator::next_share`] as cycles drain out of `poly_queue`: a cycle
-    /// with no polynomial left can emit no further share, so no retransmission of its commitment
-    /// could make it recoverable. [`MAX_RETAINED_COMMITMENT_CYCLES`] caps it for a pseudonym that
-    /// commits without ever emitting, where nothing has yet drained.
+    /// Bounded by [`MAX_RETAINED_COMMITMENT_CYCLES`] and by nothing else — in particular not by
+    /// emission, which is not a proxy for the peer's need: the peer completes a cycle out of the
+    /// shares it has already buffered and the commitment it is still missing, on its own deadline,
+    /// whether or not the polynomials that produced those shares are still queued here. Releasing on
+    /// drain would take the material away exactly where the repair is worth most, since a fully
+    /// emitted cycle is one whose every share has gone out and whose only missing piece is the one a
+    /// dropped packet took.
     retained_commitments: VecDeque<RetainedCommitment<S>>,
     /// Position within the emission window, i.e. into the first
     /// [`SHARE_EMISSION_WINDOW`] entries of `poly_queue`.
@@ -260,7 +264,7 @@ pub const SHARE_EMISSION_WINDOW: usize = 256;
 ///
 /// Only the constant term is committed to. The higher coefficients still exist — they are what
 /// makes the shares hide the secret — but no commitment to them is published, so the Exit cannot
-/// (and no longer needs to) check an individual share. See [`SsaPartCommitment`].
+/// (and no longer needs to) check an individual share. See [`crate::SsaPartCommitment`].
 ///
 /// This is also why the Entry's per-cycle cost collapsed: committing to every coefficient was
 /// `polys × threshold` fixed-base multiplications against an untabulated generator, over half a
@@ -322,7 +326,7 @@ pub struct SsaGeneratorConfig {
     /// that reach it, so any of the surplus can stand in for one that never arrives. It does not
     /// cover *corrupt* shares — nothing checks a share on arrival any more, so a bad one is only
     /// noticed once it has already poisoned the interpolation. See
-    /// [`SsaPartCommitment`].
+    /// [`crate::SsaPartCommitment`].
     ///
     /// Emitting them is unconditional: a polynomial leaves the queue at `threshold + surplus`
     /// shares, whether or not any were lost, so the Exit serves this many packets per polynomial in
@@ -446,9 +450,10 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     /// disjoint. Indices this cycle does not have are skipped.
     ///
     /// # Errors
-    /// * [`PixError::MissingSsaCommitment`] — nothing retained for `ssa_index`. Either it was never committed, or its
-    ///   last polynomial has been exhausted and the cycle can no longer be served at all, in which case a
-    ///   retransmission could not save it either.
+    /// * [`PixError::MissingSsaCommitment`] — nothing retained for `ssa_index`. Either it was never committed, or
+    ///   [`MAX_RETAINED_COMMITMENT_CYCLES`] newer cycles have pushed it out. Having exhausted a cycle's polynomials
+    ///   does *not* put it here: whether a repair still helps depends on what the peer holds, not on what this side can
+    ///   still emit.
     /// * [`PixError::InvalidInput`] — [`MAX_COMMITMENT_RETRANSMISSIONS`] answers have already been given for this
     ///   cycle, or `runs` selects nothing. The cap is what keeps a peer that has already been served from farming whole
     ///   bursts out of this node; a request that selects nothing still spends an attempt, so malformed scopes are not
@@ -522,7 +527,6 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         let mut entry = entry.lock();
         let SsaPseudonymEntry {
             poly_queue,
-            retained_commitments,
             cursor,
             highest_emitted,
             front_run,
@@ -549,11 +553,6 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 // A new cycle takes the front, so the emission counter restarts with it. This is the
                 // only place it is cleared, which is what keeps it measuring the front cycle alone.
                 *front_emitted = 0;
-                // A cycle behind the new front has no polynomial left, so it can emit no further
-                // share and re-sending its commitment could not make it recoverable. This is the one
-                // place a cycle becomes unservable, so it is where its retained commitment goes.
-                let front_ssa_index = poly_queue[0].spi.as_ref().ssa_index();
-                retained_commitments.retain(|retained| retained.ssa_index >= front_ssa_index);
             }
 
             let window = (*front_run).min(SHARE_EMISSION_WINDOW).min(poly_queue.len()).max(1);
@@ -710,10 +709,10 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                         entry.ssa_index = ssa_index;
 
                         entry.retained_commitments.push_back(retained);
-                        // Only reachable for a pseudonym that keeps committing without emitting, so
-                        // nothing has drained and the pruning in `next_share` has not run. Dropping
-                        // the oldest gives up retransmission for the cycle least likely to still be
-                        // awaited.
+                        // The only thing that releases retained material, so this runs on the
+                        // ordinary path rather than only for a pathological peer. The index is
+                        // strictly increasing — enforced just above — so the front is the oldest
+                        // cycle, i.e. the one least likely to still be awaited.
                         while entry.retained_commitments.len() > MAX_RETAINED_COMMITMENT_CYCLES {
                             entry.retained_commitments.pop_front();
                         }
@@ -886,13 +885,16 @@ mod tests {
         Ok(())
     }
 
-    /// Retained commitment material is released with the cycle it belongs to.
+    /// A cycle stays retransmittable once its own emission has finished, and is released only by the
+    /// retention cap.
     ///
-    /// A cycle whose last polynomial has been exhausted can emit no further share, so re-sending its
-    /// commitment could not make it recoverable — and holding the material past that point would make
-    /// the retention grow with the number of cycles a Session completes.
+    /// Emission progress says nothing about whether a repair still helps. The peer completes a cycle
+    /// out of the shares it has already buffered plus the commitment it is missing, on its own
+    /// deadline — so a fully emitted cycle is the *likeliest* one to be asked about, every share
+    /// having gone out and the only missing piece being the one a dropped packet took. Releasing the
+    /// material on drain made the repair fail exactly there.
     #[test]
-    fn a_drained_cycle_stops_being_retransmittable() -> anyhow::Result<()> {
+    fn a_drained_cycle_stays_retransmittable_until_the_cap_evicts_it() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
         const THRESHOLD: u8 = 2;
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -910,8 +912,7 @@ mod tests {
         generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)])?;
         generator.recommit(&pseudonym, 2.try_into()?, [(0, 0)])?;
 
-        // Exhaust the first cycle, then take one more share so the front rotates. Pruning is lazy:
-        // it happens where the new front is picked up, not where the last polynomial is removed.
+        // Exhaust the first cycle, then take one more share so the front rotates onto the second.
         let per_cycle = POLYS as u32 * THRESHOLD as u32;
         for msg in 0..=per_cycle {
             let share = generator
@@ -922,16 +923,24 @@ mod tests {
             }
         }
 
+        generator
+            .recommit(&pseudonym, SsaIndex::MIN, [(0, 0)])
+            .map_err(|error| anyhow::anyhow!("a fully emitted cycle must stay retransmittable: {error}"))?;
+
+        // Two are already retained, so committing up to one past the cap is what pushes the first out.
+        for index in 3..=MAX_RETAINED_COMMITMENT_CYCLES as u32 + 1 {
+            generator.new_ssa_commitment(&pseudonym, index.try_into()?)?;
+        }
         assert!(
             matches!(
                 generator.recommit(&pseudonym, SsaIndex::MIN, [(0, 0)]),
                 Err(PixError::MissingSsaCommitment)
             ),
-            "a drained cycle must not retain its commitment"
+            "retention must stay bounded at {MAX_RETAINED_COMMITMENT_CYCLES} cycles"
         );
         generator
             .recommit(&pseudonym, 2.try_into()?, [(0, 0)])
-            .map_err(|error| anyhow::anyhow!("the cycle now at the front must stay retransmittable: {error}"))?;
+            .map_err(|error| anyhow::anyhow!("the oldest cycle still inside the cap must be retained: {error}"))?;
 
         Ok(())
     }

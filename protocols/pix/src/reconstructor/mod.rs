@@ -879,10 +879,12 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     ///   means: a `max_runs` of zero is read as one rather than honoured.
     /// * `Some(runs)` — at most `max_runs` runs, lowest first. A caller that gets exactly `max_runs` back has not seen
     ///   the whole shortfall and should ask again once these are answered.
-    // `SsaCommitmentBuilder` is crate-private, so an intra-doc link from this public method trips
-    // `rustdoc::private_intra_doc_links`, which the `nix build .#docs` job builds as an error.
+    ///
     /// `max_runs` is the asking message's capacity, which this crate cannot know, so the caller
     /// supplies it; `SsaCommitmentBuilder::missing_runs` documents how the runs are chosen.
+    // That name is deliberately unlinked: `SsaCommitmentBuilder` is crate-private, so an intra-doc
+    // link from this public method trips `rustdoc::private_intra_doc_links`, which the
+    // `nix build .#docs` job builds as an error.
     pub fn missing_commitment_runs(
         &self,
         ssa_id: &SsaId<S::Pseudonym>,
