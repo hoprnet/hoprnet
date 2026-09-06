@@ -4,7 +4,7 @@ use hopr_crypto_packet::prelude::*;
 
 pub use crate::{
     errors::IncomingPacketError,
-    types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
+    types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement, SurbInsertOutcome},
 };
 
 /// A trait defining the operations required to store and retrieve SURBs (Single Use Reply Blocks) and their reply
@@ -25,9 +25,11 @@ pub trait SurbStore {
     /// This is used by the replying side when it receives packets containing SURBs from the sender
     /// with the given `pseudonym`.
     ///
-    /// Returns the total number of SURBs available for that `pseudonym`, including the newly inserted
-    /// ones.
-    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize;
+    /// Returns the total number of SURBs available for that `pseudonym` including the newly inserted
+    /// ones, along with how many had to be dropped to make room. The eviction count must not be
+    /// discarded lightly: it is the only evidence that the sender is over-producing, and each
+    /// evicted SURB takes an undelivered PIX share with it.
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome;
 
     /// Stores the given [`opener`](ReplyOpener) for the given [`sender_id`](HoprSenderId).
     ///

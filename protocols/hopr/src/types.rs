@@ -40,6 +40,18 @@ pub struct AuxiliaryPacketInfo {
     pub packet_signals: PacketSignals,
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
+    /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
+    /// already full.
+    ///
+    /// This is the only point at which an overflow is visible, and the cost is higher than a wasted
+    /// SURB: each one carries a partial SSA share that reaches the reconstructor only when the SURB
+    /// is *used*, so an eviction destroys the share. The redundancy budget that absorbs those losses
+    /// is a fixed surplus per polynomial, and emission is windowed, so on deployed dimensions a
+    /// burst of roughly `surplus × SHARE_EMISSION_WINDOW` evictions is enough to put polynomials
+    /// below their threshold — and a cycle short of recovery is worth nothing at all. See
+    /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
+    /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
+    pub num_evicted_surbs: usize,
 }
 
 /// An incoming packet with a payload intended for us.
@@ -167,6 +179,21 @@ pub struct FoundSurb {
     pub surb: HoprSurb,
     /// Number of SURBs remaining in the ring buffer with the same pseudonym.
     pub remaining: usize,
+}
+
+/// What storing SURBs via `SurbStore::insert_surbs` did to the ring buffer.
+///
+/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops its
+/// oldest entry and the caller sees only that the insert "succeeded". That count is the only local
+/// evidence that the sender is producing faster than this side can hold, and under PIX it is also a
+/// tally of destroyed SSA shares — a share reaches the reconstructor only when its SURB is *used*,
+/// so an evicted SURB takes its share with it permanently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SurbInsertOutcome {
+    /// Number of SURBs held for the pseudonym after the insert.
+    pub retained: usize,
+    /// Number of SURBs dropped to make room during this insert, oldest first.
+    pub evicted: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

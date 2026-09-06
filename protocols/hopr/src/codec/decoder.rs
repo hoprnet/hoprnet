@@ -241,15 +241,30 @@ where
         match packet {
             HoprPacket::Final(incoming) => {
                 // Extract additional information from the packet that will be passed upwards
-                let info = AuxiliaryPacketInfo {
+                let mut info = AuxiliaryPacketInfo {
                     packet_signals: incoming.signals,
                     num_surbs: incoming.surbs.len(),
+                    num_evicted_surbs: 0,
                 };
 
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, packet_type = "final", "stored incoming surbs for pseudonym");
+                    let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
+                    info.num_evicted_surbs = outcome.evicted;
+                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
+
+                    // Warn rather than trace: an overflow is silent everywhere else, and it is not a
+                    // wasted SURB but a destroyed PIX share. Without this line the only way to learn
+                    // that a buffer is overflowing is to infer it from a balancer estimate that
+                    // outgrew the store it describes, which is how it was found the first time.
+                    if outcome.evicted > 0 {
+                        tracing::warn!(
+                            pseudonym = %incoming.sender,
+                            evicted = outcome.evicted,
+                            retained = outcome.retained,
+                            "SURB buffer full; dropped the oldest SURBs and the PIX shares they carried"
+                        );
+                    }
                 }
 
                 let result = match incoming.ack_key {

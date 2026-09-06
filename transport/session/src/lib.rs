@@ -130,6 +130,12 @@ pub struct SessionClientConfig {
     /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
     /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
     ///
+    /// It also opts out of the SURB balancer's control over organic production entirely. With the
+    /// default `false`, a data packet carries *at most* one SURB and none at all while the
+    /// counterparty is estimated to be at its target buffer size — which is what stops SURBs (and
+    /// the PIX shares they carry) being delivered into a full buffer that discards them. Setting
+    /// this to `true` keeps producing regardless of that estimate.
+    ///
     /// Set this to `true` only when the underlying traffic is highly asymmetric.
     ///
     /// Default is `false`.
