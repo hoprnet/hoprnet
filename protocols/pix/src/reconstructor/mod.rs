@@ -2689,6 +2689,16 @@ mod tests {
             "the run budget must bound the reported scope"
         );
 
+        // A budget of zero is read as one rather than honoured, and this is the branch that makes an
+        // empty result mean "complete" and nothing else. Honouring it would report an incomplete
+        // commitment as having nothing to ask for, and the caller — which branches on exactly that —
+        // would stop repairing without a word.
+        assert_eq!(
+            Some(vec![(2, 3)]),
+            reconstructor.missing_commitment_runs(&ssa_id, 0),
+            "a zero run budget must not be mistaken for a complete commitment"
+        );
+
         // Filling the gaps completes the set, and a complete set has nothing to ask for. Note the map
         // is *drained* at completion, so reporting emptiness here is not incidental.
         let repaired: HashMap<PolynomialIndex, PixGroupRepr<TestSpec>> = [2, 3, 6]

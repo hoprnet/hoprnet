@@ -344,6 +344,18 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// so a programmatically built config that never calls `validate()` cannot exceed it.
 pub const MAX_SSA_BATCH_SIZE: usize = 9;
 
+// The Entry's retention of commitment material has to outlast the batch that material belongs to.
+// `hopr-protocol-pix` cannot see this figure, so it derives its cap from it in prose; this is the
+// half of that derivation which has to hold. A cycle must stay retransmittable at least until its
+// own batch has finished being committed, or a commitment packet lost early in a large batch becomes
+// unrepairable while the rest of the batch is still arriving. Slack beyond one batch is a judgement
+// call, which is why this is an inequality and not the equality the two figures satisfy today.
+const _: () = assert!(
+    hopr_protocol_pix::MAX_RETAINED_COMMITMENT_CYCLES >= MAX_SSA_BATCH_SIZE,
+    "MAX_SSA_BATCH_SIZE exceeds MAX_RETAINED_COMMITMENT_CYCLES, so a cycle can be evicted from the Entry's retention \
+     before its own batch is fully committed and its commitment stops being repairable"
+);
+
 /// How long an Exit waits for the deposit pool to answer a
 /// [`DepositDataRequest`](HoprSessionOutPixEvent::DepositDataRequest) before sending the batch
 /// without what has not arrived.
@@ -4400,16 +4412,39 @@ where
     /// already lost, and its own commitment deadline ends the Session either way — whereas closing on
     /// a request that merely raced our own state would throw away a Session that was about to work.
     ///
-    /// The generator bounds how often it answers per cycle
-    /// ([`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)), which
-    /// is what keeps this from being a packet-amplification lever: one request may name a whole
-    /// cycle's polynomials, and the answer to that is the entire commitment burst again.
+    /// Two separate bounds keep this from being a packet-amplification lever, because one request may
+    /// name a whole cycle's polynomials and the answer to that is the entire commitment burst again.
+    /// The generator bounds how often it answers for *one* cycle
+    /// ([`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)); this
+    /// function bounds how many cycles one request may set going. Neither stands in for the other —
+    /// the first bounds repeats, the second bounds breadth.
     async fn handle_ssa_recommit(
         &self,
         pseudonym: HoprPseudonym,
         session_slot: &SessionSlot,
         msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositPayload>,
     ) -> errors::Result<()> {
+        // The wire bounds the *runs* a request carries, not the number of cycles they are spread
+        // over — one run of 8 bytes can name a whole cycle — so without this a single packet names
+        // every retained cycle and is answered with a full commitment burst for each. The generator's
+        // per-cycle attempt cap does not bound that: it bounds repeats of one cycle, not breadth
+        // across cycles.
+        //
+        // The same cap as the new-SSA path, so repairing a batch can never cost more than committing
+        // to it did, and the Exit's own requests name a single cycle. Dropped rather than refused
+        // with `refuse_ssa_request`: the peer is already inside its own commitment deadline and
+        // learns nothing from a refusal it does not learn from that, and replying at all would hand
+        // back some of the amplification the request was reaching for.
+        let max_ssas_per_request = self.cfg.max_ssas_per_ssa_request;
+        if msg.missing.len() > max_ssas_per_request {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit asked for retransmissions across {} SSA cycles in a single request, at most \
+                 {max_ssas_per_request} allowed",
+                msg.missing.len()
+            ))
+            .into());
+        }
+
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         let session_id = msg.session_id;
@@ -10708,6 +10743,156 @@ mod tests {
         assert!(
             accepted.session_alive,
             "an accepted batch must leave the Session running"
+        );
+
+        Ok(())
+    }
+
+    /// A retransmission request must be capped on the *cycles* it names, not only on the runs the
+    /// wire can carry.
+    ///
+    /// One 8-byte run names a whole cycle, so a request naming every retained cycle is answered with
+    /// a full commitment burst for each — thousands of packets out of a single packet in. The
+    /// generator's per-cycle attempt cap does not bound that: it bounds repeats of one cycle, and
+    /// each cycle here is being asked for the first time.
+    #[test_log::test(tokio::test)]
+    async fn entry_rejects_a_retransmission_request_naming_too_many_cycles() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        /// Commits `cap` cycles to an Entry capped at `cap`, then asks it to retransmit `cycles` of
+        /// them, and reports what `handle_ssa_request` made of the second request together with every
+        /// `SsaCommit` the Entry sent across both — one per cycle at these dimensions, so the
+        /// commitment alone accounts for `cap` of them.
+        ///
+        /// Committing first is what gives the assertions their teeth: an uncapped handler answers
+        /// every *retained* index it is named before it trips over the first one it does not hold, so
+        /// the packet count — not the error — is what separates a gate from an accident. The count is
+        /// read only after the send channel has drained, since the bursts are queued rather than sent
+        /// inline and a running total would race them.
+        async fn ask_for_cycles(cap: usize, cycles: u32) -> anyhow::Result<(errors::Result<()>, usize)> {
+            let (pix_toolbox, _pix_events) = PixToolbox::new(
+                SsaShareGenerator::new(SsaGeneratorConfig {
+                    polynomials_per_ssa: 2,
+                    threshold: 2,
+                    surplus_shares: 1,
+                })
+                .into(),
+                SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            );
+
+            let mgr = SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=1024 * 1024 * 1024,
+                    ..Default::default()
+                },
+                max_ssas_per_ssa_request: cap,
+                ..Default::default()
+            });
+
+            // The amplification is the thing being bounded, so count what actually goes out.
+            let commits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let commits_tx = commits.clone();
+            let mut bob_transport = MockMsgSender::new();
+            bob_transport
+                .expect_send_message()
+                .times(1..)
+                .returning(move |_, data| {
+                    if crate::testing::msg_type(&data, StartProtocolDiscriminants::SsaCommit) {
+                        commits_tx.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Box::pin(async { Ok(()) })
+                });
+
+            let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+            let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+            let _notifications = tokio::spawn(async move {
+                pin_mut!(new_session_rx);
+                while let Some(_session) = new_session_rx.next().await {}
+            });
+            mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
+
+            let alice_pseudonym = HoprPseudonym::random();
+            mgr.handle_incoming_session_initiation(
+                alice_pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                    additional_data: small_pix_additional_data(),
+                },
+            )
+            .await?;
+
+            let params = PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?;
+            let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+                .expect("identity element must be valid");
+
+            // Commit a full batch first, so there is real material for the retransmission to name.
+            let commitments: BTreeMap<_, _> = (100..100 + cap as u32)
+                .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+                .collect();
+            mgr.handle_ssa_request(
+                alice_pseudonym,
+                SsaServerCommitmentMessage::new(alice_pseudonym, params, commitments, []),
+            )
+            .await?;
+
+            // One run apiece, each covering its whole cycle: the cheapest request to send and the
+            // most expensive to answer.
+            let missing = (100..100 + cycles).map(|i| (SsaIndex::new(i).expect("non-zero"), vec![(0u16, 1u16)]));
+
+            let result = mgr
+                .handle_ssa_request(
+                    alice_pseudonym,
+                    SsaServerCommitmentMessage::recommit(alice_pseudonym, params, missing),
+                )
+                .await;
+
+            bob_sender.close_channel();
+            bob_handle.await??;
+
+            Ok((result, commits.load(Ordering::Relaxed)))
+        }
+
+        // One cycle over the cap is refused whole, and — the part that matters — answered with
+        // nothing at all, rather than with a burst for each retained cycle it managed to name first.
+        let (over_cap, over_cap_commits) = ask_for_cycles(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32 + 1,
+        )
+        .await?;
+        assert!(
+            matches!(
+                over_cap,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "a retransmission request over the cycle cap must be refused, got {over_cap:?}"
+        );
+        assert_eq!(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST, over_cap_commits,
+            "a refused request must add nothing to the {DEFAULT_MAX_SSAS_PER_SSA_REQUEST} messages the commitment \
+             itself cost"
+        );
+
+        // ...and the very same cycles are repaired once they fit the cap, so the refusal above is the
+        // cap talking and not some other validation the request also trips.
+        let (at_cap, at_cap_commits) = ask_for_cycles(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32,
+        )
+        .await?;
+        assert!(
+            at_cap.is_ok(),
+            "a request at the cycle cap must be answered, got {at_cap:?}"
+        );
+        assert_eq!(
+            2 * DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            at_cap_commits,
+            "every named cycle must be re-sent, one message each on top of the commitment's own"
         );
 
         Ok(())

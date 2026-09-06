@@ -207,7 +207,12 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// interval allow.
 ///
 /// Costs `polynomials_per_ssa × 33 B` per cycle — 4.8 MB per pseudonym with the cap full at the
-/// deployed dimensions, against the ~33 MB a single *undrained* cycle's polynomials occupy.
+/// deployed dimensions, against the ~33 MB a single *undrained* cycle's polynomials occupy. This is
+/// Entry-side state, held per pseudonym and released with the rest of that pseudonym's polynomial
+/// state, by [`SsaShareGenerator::forget`] at teardown or by the cache's own idle eviction. It is
+/// therefore bounded by the Sessions this node has itself opened, and no peer can hold more of it
+/// than the cap allows — which is why it is not charged against an Exit's incoming-Session memory
+/// budget, where nothing else the generator holds is charged either.
 pub const MAX_RETAINED_COMMITMENT_CYCLES: usize = 18;
 
 /// Minimum SSA polynomial threshold.

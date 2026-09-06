@@ -610,25 +610,36 @@ async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result
 
     // Bob asked for exactly what went missing, and asked at all — the scope is derived from what his
     // reconstructor holds, so this pins the whole detection path.
+    //
+    // How *many* times he asked is deliberately not pinned. The idle timer re-arms before the repair
+    // it triggered has been relayed, reconstructed and verified, so a slow enough round trip earns a
+    // second ask — which is correct here rather than a defect, since re-delivery is idempotent and
+    // the attempt cap bounds it. What must hold is that every ask names the gap and nothing else;
+    // the cadence and the cap are the supervisor's contract and are pinned by its own tests.
     let scopes = requested_scopes.lock().unwrap().clone();
-    assert_eq!(
-        vec![(alice_quota.ssa_id.ssa_index(), dropped.clone())],
-        scopes,
-        "bob must ask once, for the dropped run and nothing else"
-    );
+    assert!(!scopes.is_empty(), "bob must ask for the missing commitment parts");
+    for scope in &scopes {
+        assert_eq!(
+            &(alice_quota.ssa_id.ssa_index(), dropped.clone()),
+            scope,
+            "every ask must name the dropped run and nothing else, got {scopes:?}"
+        );
+    }
 
-    // And Alice answered with exactly those, rather than re-sending the whole burst.
+    // And Alice answered with exactly those, rather than re-sending the whole burst. The burst is
+    // recorded before the transport decides to swallow one of it, so it occupies the first
+    // `expected_ssa_commits` slots and everything after them is a repair.
     let commits = sent_commits.lock().unwrap().clone();
-    assert_eq!(
-        expected_ssa_commits + 1,
-        commits.len(),
-        "the burst plus one repair message, got {commits:?}"
+    assert!(
+        commits.len() > expected_ssa_commits,
+        "the burst plus at least one repair message, got {commits:?}"
     );
-    assert_eq!(
-        Some(&dropped),
-        commits.last(),
-        "the repair must carry the dropped indices and no others"
-    );
+    for repair in &commits[expected_ssa_commits..] {
+        assert_eq!(
+            &dropped, repair,
+            "every repair must carry the dropped indices and no others, got {commits:?}"
+        );
+    }
 
     // Exactly one deposit for the cycle: the address is fixed when it is first committed, so a repair
     // that announced it again would invite a second deposit against one quota.
