@@ -44,6 +44,23 @@ struct PerSsaState {
 
     // Deadlines (None means not set for this phase).
     commitment_deadline: Option<Instant>,
+    /// When to re-request the parts of this commitment that have not arrived, or `None` while there
+    /// is nothing to ask for.
+    ///
+    /// Set only once *some* of the commitment has arrived, and pushed out by every further part, so
+    /// it measures silence in the delivery rather than elapsed time. A cycle for which nothing was
+    /// ever delivered leaves it unset and dies on `commitment_deadline`, which is all the Exit can
+    /// do about one: it has no scope to name.
+    recommit_deadline: Option<Instant>,
+    /// Re-requests already made for this cycle, capped at
+    /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS).
+    ///
+    /// The cap is a count and not a duration on purpose. `commitment_deadline` bounds the asks in
+    /// *time*, which is what protects the Entry, but the packets they cost are this node's own: at a
+    /// misconfigured millisecond interval inside a 20-second deadline the time bound alone permits
+    /// twenty thousand of them. Matching the figure the Entry will answer means none of the asks is
+    /// wasted either.
+    recommit_attempts: u8,
     deposit_deadline: Option<Instant>,
     recovery_idle_deadline: Option<Instant>,
     recovery_hard_deadline: Option<Instant>,
@@ -93,6 +110,8 @@ impl PerSsaState {
             batch_id,
             phase: SsaPhase::AwaitingCommitment,
             commitment_deadline: None,
+            recommit_deadline: None,
+            recommit_attempts: 0,
             deposit_deadline: None,
             recovery_idle_deadline: None,
             recovery_hard_deadline: None,
@@ -237,6 +256,7 @@ impl SessionPixSupervisor {
 
         let actions = match ev {
             SessionPixEvent::SsaRequestSent(ssa_id) => self.on_ssa_request_sent(ssa_id, now),
+            SessionPixEvent::CommitmentProgress(ssa_id) => self.on_commitment_progress(ssa_id, now),
             SessionPixEvent::CommitmentVerified(ssa_id) => self.on_commitment_verified(ssa_id, now),
             SessionPixEvent::DepositConfirmed { ssa_id, amount } => {
                 self.on_deposit_confirmed(ssa_id, *amount, now, served_total)
@@ -508,6 +528,32 @@ impl SessionPixSupervisor {
                 ssa.check_deadlines(now)
             };
 
+            // A stalled commitment is re-requested rather than given up on, and the timer re-arms so
+            // a repair that is itself lost is asked for again. This yields no close reason and is
+            // bounded by nothing of its own: the absolute `commitment_deadline` still ends the cycle,
+            // which is why it can repeat freely — and why it is skipped once that deadline has gone,
+            // rather than putting an ask on the wire for a Session about to close.
+            if expired.is_none()
+                && self.ssas[i].phase == SsaPhase::AwaitingCommitment
+                && self.ssas[i].recommit_deadline.is_some_and(|deadline| now >= deadline)
+            {
+                let ssa = &mut self.ssas[i];
+                ssa.recommit_attempts += 1;
+                // Disarmed rather than re-armed at the cap, so the worker stops waking for a timer
+                // that would produce nothing. Further arriving parts cannot re-arm it either.
+                ssa.recommit_deadline = (ssa.recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)
+                    .then(|| now.checked_add(self.cfg.commitment_recommit_interval))
+                    .flatten();
+                tracing::debug!(
+                    ssa_id = %ssa.ssa_id, attempt = ssa.recommit_attempts,
+                    "commitment delivery stalled — re-requesting the parts that did not arrive"
+                );
+                actions.push(SessionPixAction::RequestCommitmentRetransmission {
+                    ssa_id: ssa.ssa_id,
+                    params: self.dims,
+                });
+            }
+
             if let Some(reason) = expired {
                 // Service-gated idle: if no service consumed since last progress,
                 // re-arm instead of closing.
@@ -594,9 +640,13 @@ impl SessionPixSupervisor {
                     }
                     return None;
                 }
-                // Return the earliest set deadline.
+                // Return the earliest set deadline. The re-request timer belongs here like the rest:
+                // it is shorter than every other deadline of the phase it runs in, so leaving it out
+                // would mean the worker slept past it and only re-requested when something else woke
+                // it up.
                 ssa.commitment_deadline
                     .into_iter()
+                    .chain(ssa.recommit_deadline)
                     .chain(ssa.deposit_deadline)
                     .chain(ssa.recovery_idle_deadline)
                     .chain(ssa.recovery_hard_deadline)
@@ -675,6 +725,27 @@ impl SessionPixSupervisor {
         Vec::new()
     }
 
+    /// Arms — or re-arms — the re-request timer on a commitment that is under way but not complete.
+    ///
+    /// This is where the issue's rule lives: a cycle that received *nothing* never reaches here, so
+    /// it never asks, which is correct because there is no scope for it to name. And because every
+    /// arriving part pushes the timer out, the first ask cannot land in the middle of the burst —
+    /// what the timer measures is a stall in delivery.
+    ///
+    /// Unscaled by the batch size, unlike the two absolute deadlines: this is a per-cycle stall
+    /// detector, and a batch's commitment sets do not queue behind one another in a way that would
+    /// make one cycle's silence expected.
+    fn on_commitment_progress(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
+        if let Some(idx) = self.find_ssa_idx(ssa_id)
+            && self.ssas[idx].phase == SsaPhase::AwaitingCommitment
+            && self.ssas[idx].recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS
+        {
+            self.ssas[idx].recommit_deadline = now.checked_add(self.cfg.commitment_recommit_interval);
+        }
+
+        Vec::new()
+    }
+
     fn on_commitment_verified(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
             Some(i) => i,
@@ -692,6 +763,8 @@ impl SessionPixSupervisor {
         ssa.phase = SsaPhase::AwaitingDeposit;
         ssa.deposit_deadline = deposit_deadline;
         ssa.commitment_deadline = None;
+        // Nothing is missing any more, so nothing is to be asked for.
+        ssa.recommit_deadline = None;
 
         Vec::new()
     }
@@ -1481,6 +1554,7 @@ mod tests {
             allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
+            commitment_recommit_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
@@ -2380,6 +2454,174 @@ mod tests {
             actions[0],
             SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
         ));
+    }
+
+    /// A commitment that is under way but has gone quiet is re-requested, repeatedly, without ever
+    /// being closed for it — and the absolute deadline is still what ends the cycle.
+    #[test]
+    fn a_stalled_commitment_is_re_requested_until_the_delivery_deadline() {
+        let p = pseudonym();
+        let cfg = default_cfg();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+
+        // Nothing has arrived, so there is no scope to ask for and no timer to expire.
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval * 3, 0)
+                .is_empty(),
+            "a commitment nothing was delivered for must not be re-requested"
+        );
+
+        // The first part arrives; the timer is armed from *that* instant.
+        let first_part = start + Duration::from_secs(1);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), first_part, 0);
+        assert!(
+            sup.handle_deadline(first_part + cfg.commitment_recommit_interval / 2, 0)
+                .is_empty(),
+            "the interval must be measured from the last part that arrived"
+        );
+
+        // More of the burst lands, pushing the timer out again: the first ask must not land in the
+        // middle of delivery.
+        let last_part = first_part + cfg.commitment_recommit_interval;
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), last_part, 0);
+        assert!(
+            sup.handle_deadline(last_part + cfg.commitment_recommit_interval / 2, 0)
+                .is_empty(),
+            "an arriving part must re-arm the timer"
+        );
+
+        // Delivery stalls. Every interval from here produces one ask, and no close, for as long as
+        // the delivery deadline has room — at the shipped 3 s inside 20 s that is five of them, so
+        // the count cap is not what binds at the defaults.
+        let delivery_deadline =
+            start + crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let mut now = last_part;
+        let mut asks = 0;
+        while now + cfg.commitment_recommit_interval < delivery_deadline {
+            now += cfg.commitment_recommit_interval;
+            let actions = sup.handle_deadline(now, 0);
+            assert!(
+                matches!(
+                    actions.as_slice(),
+                    [SessionPixAction::RequestCommitmentRetransmission { ssa_id, params }]
+                        if *ssa_id == id && *params == dims(10, 5)
+                ),
+                "ask {} must name the missing parts, got {actions:?}",
+                asks + 1
+            );
+            asks += 1;
+        }
+        assert!(asks > 1, "the interval must fit several asks inside the deadline");
+
+        // The delivery deadline is untouched by any of it, and remains the only thing that ends the
+        // cycle.
+        let actions = sup.handle_deadline(delivery_deadline, 0);
+        assert!(matches!(
+            actions.as_slice(),
+            [SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)]
+        ));
+    }
+
+    /// Asks stop at [`MAX_COMMITMENT_RETRANSMISSIONS`], which is what the Entry will answer.
+    ///
+    /// The delivery deadline bounds the asks in *time*, and that is what protects the Entry — but the
+    /// packets they cost are the Exit's own, and a short interval inside a long deadline leaves time
+    /// for far more of them than any Entry answers. Hence a count.
+    #[test]
+    fn asks_for_a_stalled_commitment_are_capped_by_count() {
+        let p = pseudonym();
+        // Short enough that the whole budget is spent well inside the delivery deadline, so it is the
+        // count and not the clock that stops it.
+        let cfg = SupervisorConfig {
+            commitment_recommit_interval: Duration::from_secs(1),
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), start, 0);
+
+        let mut now = start;
+        for attempt in 1..=hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            now += cfg.commitment_recommit_interval;
+            let actions = sup.handle_deadline(now, 0);
+            assert!(
+                matches!(
+                    actions.as_slice(),
+                    [SessionPixAction::RequestCommitmentRetransmission { ssa_id, .. }] if *ssa_id == id
+                ),
+                "attempt {attempt} must ask for the missing parts, got {actions:?}"
+            );
+        }
+
+        now += cfg.commitment_recommit_interval;
+        assert!(
+            sup.handle_deadline(now, 0).is_empty(),
+            "the ask budget must be spent, with the delivery deadline still far off"
+        );
+        assert_eq!(
+            Some(start + crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request)),
+            sup.next_deadline(),
+            "a spent budget must leave no timer for the worker to wake on"
+        );
+
+        // Further parts of the burst cannot buy more asks either.
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), now, 0);
+        assert!(
+            sup.handle_deadline(now + cfg.commitment_recommit_interval * 2, 0)
+                .is_empty(),
+            "an arriving part must not re-open a spent budget"
+        );
+    }
+
+    /// The re-request timer is the earliest deadline of the phase it runs in, so the worker has to be
+    /// woken by it — and it must stop existing the moment the commitment completes.
+    #[test]
+    fn the_re_request_timer_leads_the_deadlines_and_ends_with_the_commitment() {
+        let p = pseudonym();
+        let cfg = default_cfg();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), start, 0);
+        assert_eq!(
+            Some(start + cfg.commitment_recommit_interval),
+            sup.next_deadline(),
+            "the worker must wake for the re-request before the delivery deadline"
+        );
+
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
+        assert_eq!(
+            Some(start + crate::supervision::scaled_deadline(cfg.max_deposit_wait, cfg.ssas_per_request)),
+            sup.next_deadline(),
+            "a completed commitment leaves only the deposit clock"
+        );
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval, 0)
+                .is_empty(),
+            "nothing may be re-requested once the commitment verified"
+        );
+
+        // A straggling part of the burst arrives after completion — which retransmission makes
+        // routine — and must not resurrect the timer.
+        sup.handle_event(
+            &SessionPixEvent::CommitmentProgress(id),
+            start + cfg.commitment_recommit_interval,
+            0,
+        );
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval * 3, 0)
+                .is_empty(),
+            "a late part must not re-arm a timer the phase has left"
+        );
     }
 
     #[test]
