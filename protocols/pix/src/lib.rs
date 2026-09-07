@@ -190,8 +190,9 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// Cycles per pseudonym whose commitment material the [`SsaShareGenerator`] retains for
 /// retransmission.
 ///
-/// The newest this many are kept and the oldest is evicted, and that is the *only* thing that
-/// releases them — emission deliberately does not enter into it. Whether a re-sent commitment is
+/// The newest this many are kept and the oldest is evicted, and within a live cache entry that is
+/// the only thing that releases them — emission deliberately does not enter into it. (The entry as a
+/// whole goes on idle eviction, which is a separate lifetime; see below.) Whether a re-sent commitment is
 /// still worth anything is a question about what the peer holds, and none of that is visible from
 /// this side: it completes a cycle out of the shares it has already buffered plus the commitment it
 /// is still missing, on its own delivery deadline. Releasing on drain instead would give up the
@@ -212,8 +213,9 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// and nothing else the generator holds is charged there either.
 ///
 /// It lives as long as the pseudonym's entry in the generator's cache, which idle eviction alone
-/// releases — closing a Session clears nothing here. So a node holds this for every Entry Session it
-/// closed within that window, and churn accumulates it rather than tracking the live Session count.
+/// releases — closing a Session clears nothing here. So a node holds this for every pseudonym it has
+/// committed a cycle for within that window, Sessions long closed included, and churn accumulates it
+/// rather than it tracking the live Session count.
 /// What bounds the consequence is that the same entry keeps its polynomial state under exactly the
 /// same rule, and that term is larger by two orders of magnitude: 270 kB here against ~33 MB there,
 /// per cycle. A Session whose cycles are still queued when it closes — the ordinary case, since
