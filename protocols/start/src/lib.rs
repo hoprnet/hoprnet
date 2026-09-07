@@ -824,8 +824,23 @@ where
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: KeepAliveFlags::new(body[0])
-                            .map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
+                        // Unknown bits are dropped rather than failing the message, for the same
+                        // reason [`StartErrorReason::Unknown`] exists above: a peer that sets a flag
+                        // this build predates would otherwise have its whole keep-alive rejected as
+                        // malformed, and a keep-alive is not a message a Session can afford to lose.
+                        // It carries the Exit's SURB level to the Entry's balancer, it is what keeps
+                        // an otherwise silent Session alive, and on a PIX Session it is one packet of
+                        // the service the Entry's successor gate prices — the gate that decides
+                        // whether the next deposit is admitted at all. Refusing to parse tells this
+                        // node *less* than reading the bits it does recognize, so a flag may be added
+                        // without a protocol version bump.
+                        //
+                        // Truncating is safe because the flags only ever *select* a meaning for
+                        // `additional_data`, and every handler tests for the bit it acts on rather
+                        // than matching the set as a whole. An unknown bit therefore selects no
+                        // behaviour, which is what an older node should do with a meaning it has
+                        // never heard of.
+                        flags: KeepAliveFlags::new_truncated(body[0]),
                         additional_data: u64::from_be_bytes(
                             body[1..1 + size_of::<u64>()]
                                 .try_into()
@@ -1571,6 +1586,64 @@ mod tests {
         let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    /// A keep-alive carrying a flag this build does not know must still decode.
+    ///
+    /// The flags are the one field of this message that a later protocol version can extend without
+    /// changing its layout, so strict decoding here is a forward-compatibility trap rather than a
+    /// safety property: an Exit that sets a new bit would have every keep-alive rejected by an older
+    /// Entry as malformed. That Entry then loses the SURB level the message reports, the liveness it
+    /// provides on an otherwise silent Session, and — on a PIX Session — the credit for one packet of
+    /// service against its successor gate, which is what decides whether the next deposit is made.
+    ///
+    /// The unknown bit itself must not survive: it selects no behaviour on this node, and letting it
+    /// through would make `flags.contains(..)` answer for a meaning this build cannot implement.
+    #[test]
+    fn a_keep_alive_with_an_unknown_flag_decodes_without_the_unknown_bit() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let known: KeepAliveFlags = KeepAliveFlag::BalancerState.into();
+        let msg = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
+            session_id: 10_i32,
+            flags: known,
+            additional_data: 0xffffffff,
+        });
+
+        let (tag, mut encoded) = msg.encode()?;
+
+        // The flag byte is the first byte of the body, which starts after the version, the
+        // discriminant and the two-byte length. `0x80` is the highest bit and no flag this build
+        // knows about, so it stands in for one a later protocol version adds.
+        const FLAGS_AT: usize = 4;
+        assert_eq!(
+            known.bits(),
+            encoded[FLAGS_AT],
+            "the flag byte must be where this test patches it"
+        );
+        encoded[FLAGS_AT] |= 0x80;
+
+        let decoded = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &encoded)
+            .context("a keep-alive carrying an unknown flag bit must still decode")?;
+
+        match decoded {
+            StartProtocol::KeepAlive(ka) => {
+                assert_eq!(10_i32, ka.session_id);
+                assert_eq!(0xffffffff, ka.additional_data);
+                assert!(
+                    ka.flags.contains(KeepAliveFlag::BalancerState),
+                    "the known flag must survive the unknown one"
+                );
+                assert_eq!(
+                    known.bits(),
+                    ka.flags.bits(),
+                    "the unknown bit must be dropped, not carried into a flag test"
+                );
+            }
+            other => anyhow::bail!("expected KeepAlive, got {other:?}"),
+        }
+
         Ok(())
     }
 

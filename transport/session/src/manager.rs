@@ -608,6 +608,22 @@ pub(crate) struct SessionSlot {
     /// balancer, and it is only wired when `surb_management` is enabled; this one decides whether
     /// money is spent and must be neither. Carrying the increment twice is the cheaper mistake: a
     /// receive path that forgets this counter makes the gate stricter, never laxer.
+    ///
+    /// Credited from exactly two places, and both of them have to stay:
+    ///
+    /// * the `session_rx` inspectors in `new_session`, once per Session data packet handed to the reader — one in each
+    ///   of the balanced and unbalanced branches;
+    /// * the Start-protocol branch of [`dispatch_message`](SessionManager::dispatch_message), which credits every
+    ///   Start-protocol message arriving on an outgoing Session because that traffic bypasses `session_rx` entirely.
+    ///
+    /// The second is what makes the Exit's keep-alives count, and the gate depends on it: an Exit
+    /// whose application has nothing to say can still complete a funded cycle by keep-alive alone, and
+    /// if those packets earned nothing here its successor would be refused as under-served and the
+    /// Session would die on `CommitmentTimeout` with neither side able to name the cause. It is
+    /// credited at the dispatch level rather than inside a per-message handler on purpose — the credit
+    /// is owed for the SURB the packet consumed, which is true whatever the message turns out to be,
+    /// including one this build fails to parse. Adding a second increment inside
+    /// [`handle_keep_alive`](SessionManager::handle_keep_alive) would double-count it.
     returned_packets: Arc<std::sync::atomic::AtomicU64>,
     /// This Session's share of the node's live reconstructor-cycle budget.
     ///
@@ -10028,6 +10044,115 @@ mod tests {
         bob_sender.close_channel();
         let _ = alice_handle.await?;
         let _ = bob_handle.await?;
+        Ok(())
+    }
+
+    /// Re-points the fixture's slot at `Forward` routing, the way a real Entry's slot is built.
+    ///
+    /// [`entry_with_pix_session`] establishes through `handle_incoming_session_initiation` because
+    /// that is the path which installs the PIX state the successor gate needs, and it stores the
+    /// Exit's `Return` reply routing. The gate is an Entry-side rule, and the counter it reads is
+    /// only credited on Sessions this node *initiated* — Start-protocol traffic on an incoming
+    /// Session comes from the Entry over the forward path and must not be paid for. So the routing is
+    /// what decides whether the keep-alives below are read as service arriving or as service being
+    /// asked for, and the fixture has to be put on the side the rule is about.
+    ///
+    /// Re-inserting rather than mutating: the slot lives in a `moka` cache by value, and its routing
+    /// is a plain field rather than a cell, because nothing in production ever changes it.
+    fn make_session_outgoing<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym, destination: Address)
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+    {
+        let mut slot = mgr.sessions.get(pseudonym).expect("session must exist");
+        slot.routing_opts = DestinationRouting::Forward {
+            destination: Box::new(destination.into()),
+            pseudonym: Some(*pseudonym),
+            forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+            return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
+        };
+        mgr.sessions.insert(*pseudonym, slot);
+    }
+
+    /// A cycle served only by the Exit's keep-alives must still buy its successor.
+    ///
+    /// This is the property that lets the Exit finish a funded cycle whose application has fallen
+    /// silent: it sends its own Exit → Entry keep-alives, each one consuming a return SURB and
+    /// therefore unlocking one share, and the cycle completes on those alone. If they earned nothing
+    /// at this gate the Session would die at exactly the moment it succeeded — the Exit's `RequestSsa`
+    /// for the successor is emitted once and never retried, so a refusal here leaves it in
+    /// `AwaitingCommitment` until `max_ssa_delivery_time` and then closes the Session as
+    /// `CommitmentTimeout`, naming a timer rather than the rule that fired.
+    ///
+    /// Driven through [`dispatch_message`](SessionManager::dispatch_message) with real encoded
+    /// keep-alives rather than by touching the counter, because the credit lives on that path and
+    /// nowhere else: the message never reaches `session_rx`, so the receive-path inspector that
+    /// [`returned_packets_are_counted_on_the_entry_receive_path`] pins cannot cover for it.
+    #[test_log::test(tokio::test)]
+    async fn keep_alives_alone_can_carry_a_cycle_to_its_successor() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        // Emission reaches the boundary, so service is the only thing left for the gate to weigh.
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        make_session_outgoing(&mgr, &pseudonym, (&ChainKeypair::random()).into());
+
+        let counter = mgr
+            .sessions
+            .get(&pseudonym)
+            .expect("session must exist")
+            .returned_packets;
+        assert_eq!(
+            0,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "the fixture must start with nothing served"
+        );
+
+        // Exactly what the gate demands, and every packet of it a keep-alive.
+        let required = required_returned_packets(&params, 1);
+        for level in 0..required {
+            let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: pseudonym,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: level,
+            })
+            .try_into()?;
+            mgr.dispatch_message(
+                pseudonym,
+                ApplicationDataIn {
+                    data: keep_alive,
+                    packet_info: Default::default(),
+                },
+            )?;
+        }
+        assert_eq!(
+            required,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "every keep-alive consumed a return SURB and must be credited as service"
+        );
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("a cycle served entirely by keep-alives must still buy its successor")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
         Ok(())
     }
 
