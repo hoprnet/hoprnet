@@ -497,13 +497,7 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
     /// Fixed [`Tag`] of every protocol message.
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
-    ///
-    /// Bumped to 4 by the [`missing`](SsaServerCommitmentMessage::missing) run table, which sits
-    /// between an `SsaRequest`'s commitment entries and its trailing CBOR session id. A version-3
-    /// decoder reads that trailer as "everything left", so it would take the run count for part of
-    /// the session id rather than noticing the table at all; the bump turns a silent misparse into an
-    /// [`InvalidVersion`](errors::StartProtocolError::InvalidVersion).
-    pub const START_PROTOCOL_VERSION: u8 = 0x04;
+    pub const START_PROTOCOL_VERSION: u8 = 0x03;
 
     /// How many commitment entries one [`SsaCommit`](StartProtocol::SsaCommit) message can carry,
     /// for each of the two delivery phases.
