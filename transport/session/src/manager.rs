@@ -1002,6 +1002,41 @@ pub fn validate_incoming_session_pix_config(
         )));
     }
 
+    // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs, or
+    // the mechanism that exists to complete idle cycles cannot complete the very ones it admits. The
+    // arithmetic is the planner's own, taken at the moment fill starts: the whole cycle remains, the
+    // aim point sits `finish_fraction` of the way through `max_recovery_time`, and the loss margin is
+    // paid on top. `max_recovery_time` is the *configured* per-cycle budget rather than a deadline
+    // observed at run time, so this is a property of the configuration and can be decided here.
+    //
+    // Checked only when fill is enabled: an Exit that has turned it off is choosing the pre-fill
+    // behaviour, where the cap is inert and refusing a Session over it would be refusing it over a
+    // value nothing reads.
+    if cfg.supervision.fill.enabled {
+        let fill = &cfg.supervision.fill;
+        let horizon = cfg.supervision.max_recovery_time.mul_f64(fill.finish_fraction);
+        // Guarded rather than assumed non-zero: both factors are validated elsewhere, and a divide by
+        // zero here would report an infinite requirement for a configuration whose real fault is
+        // named by its own validator.
+        let floor = if horizon.is_zero() {
+            u64::MAX
+        } else {
+            (worst_cycle_packets as f64 * (1.0 + fill.loss_margin) / horizon.as_secs_f64()).ceil() as u64
+        };
+        if (fill.max_rate as u64) < floor {
+            return Err(TransportSessionError::InvalidConfig(
+                format!(
+                    "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
+                     packets                  and needs at least {floor} packets/s to finish inside {horizon:?} with \
+                     a {} loss margin",
+                    fill.max_rate,
+                    cfg.quota_range.end(),
+                    fill.loss_margin,
+                ),
+            ));
+        }
+    }
+
     let widest = max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
     if cfg.max_live_cycle_bytes < widest {
         return Err(TransportSessionError::InvalidConfig(format!(
@@ -1761,6 +1796,15 @@ where
                 .saturating_sub(Duration::from_secs(1))
                 .min(cap);
             sup.max_recovery_idle = sup.max_recovery_idle.min(idle_cap);
+
+            // The fill heartbeat is armed as a deadline like the rest, so it takes the same cap. The
+            // rate ceiling is clamped for a different reason: `RateController::MIN_DELAY` makes
+            // anything above `MAX_FILL_RATE` unrepresentable, and a controller that silently ignores
+            // the one bound on this node's self-generated egress is worse than one that is loud about
+            // refusing it — which is what `validate_pix_supervision` does for a config that was
+            // validated. This branch is for the programmatic ones that never were.
+            sup.fill.heartbeat = sup.fill.heartbeat.min(cap);
+            sup.fill.max_rate = sup.fill.max_rate.clamp(1, crate::supervision::MAX_FILL_RATE);
         }
 
         // The admission wait is spent inside the peer's initiation timeout, so a value at or above
@@ -2795,6 +2839,18 @@ where
                     // Gate control is applied synchronously by the supervisor worker. The action
                     // reaches this I/O driver only to preserve observability and ordering.
                     SessionPixAction::ProgressNotification => {}
+                    // TODO(pix-fill): drive the Exit's own keep-alive stream from this rate. The
+                    // planner and the action land first so the supervisor can be reviewed and tested
+                    // on their own; until that stream exists there is nothing on this node to apply a
+                    // rate to, and an Exit that only logs it is exactly the Exit that does not fill.
+                    SessionPixAction::SetFillRate(rate) => {
+                        debug!(
+                            %session_id,
+                            packets = rate.packets,
+                            per = ?rate.per,
+                            "pix supervisor planned a fill rate"
+                        );
+                    }
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));

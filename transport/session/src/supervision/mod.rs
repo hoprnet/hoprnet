@@ -289,6 +289,7 @@
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
 //! | `max_served_without_progress` | 2048 | Packets served with no share of *any* kind coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. Counts `shares_seen`, so a conforming Entry's surplus resets it; see below. |
 //! | `tombstone_retention_window` | 30 s | Bounds how long recovered-cycle diagnostics and observer ownership remain; the separately bounded FIFO-tail receipt may outlive it. |
+//! | `fill` | on | The one rule here that *sends* rather than stops: a funded cycle only recovers once its whole emission has ridden back to the Entry, so an idle Session strands the deposit it has already been paid. See [`PixFillConfig`]. |
 //!
 //! ## What is *not* here: the price of a cycle
 //!
@@ -334,6 +335,13 @@
 //! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
 //! `0.0..=1.0`; and non-zero `max_served_without_progress`, `min_share_order_sample` and
 //! `max_failed_cycles`.
+//!
+//! For [`fill`](SupervisorConfig::fill) it enforces a non-zero `heartbeat` under the same 24 h cap, a
+//! finite `finish_fraction` in `(0, 1]`, a finite `loss_margin` in `[0, 1)`, a `max_rate` inside
+//! `1..=MAX_FILL_RATE`, and a non-zero `min_surb_reserve`. One further constraint cannot be decided
+//! here because it spans the quota: `validate_incoming_session_pix_config` requires `max_rate` to
+//! clear the rate a cycle of the *widest accepted quota* needs to finish inside
+//! `finish_fraction × max_recovery_time`, which is 128 packets/s at the shipped defaults.
 //!
 //! ### The surplus run, and why it no longer constrains anything
 //!
@@ -422,6 +430,7 @@ use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 
 use crate::errors::TransportSessionError;
 
+mod fill;
 mod gate;
 mod supervisor;
 mod worker;
@@ -735,6 +744,195 @@ pub struct SupervisorConfig {
     #[default(Duration::from_secs(30))]
     #[serde(with = "humantime_serde")]
     pub tombstone_retention_window: Duration,
+
+    /// How the Exit keeps a funded cycle on course for its own deadline when the application is
+    /// quiet.
+    ///
+    /// Every other field above is a rule for *stopping*. This one is the single rule for *going*, and
+    /// it exists because the deadlines cannot be met by an idle Session: a funded cycle only recovers
+    /// once its whole emission has ridden back to the Entry, so at production dimensions a Session
+    /// averaging under ~46 return packets/s over a cycle loses its deposit to
+    /// [`max_recovery_time`](Self::max_recovery_time) — which is every idle or light client.
+    ///
+    /// See [`PixFillConfig`] for what it costs and what it is bounded by.
+    #[serde(default)]
+    pub fill: PixFillConfig,
+}
+
+/// How the Exit fills the return direction of a funded PIX cycle when the application will not.
+///
+/// # Why the Exit has to send anything at all
+///
+/// A PIX Exit is paid per *return* packet. Each Exit → Entry packet spends one SURB carrying one
+/// share, and a funded cycle only recovers — only unlocks the deposit it has already been paid — once
+/// `polys × (threshold + surplus)` of them have gone out. That figure is 327 680 at the shipped
+/// dimensions. Nothing in the protocol makes the *application* send them: an idle VPN client, a
+/// tunnel between keystrokes, or a client that simply reads more than it writes all leave the Exit
+/// holding a funded cycle that will never complete. `max_recovery_time` then closes it, and because
+/// the deposit address derives from client and server commitments together, the money is stranded
+/// rather than refunded.
+///
+/// So the Exit sends its own keep-alives — "fill" — at whatever rate the remaining emission needs to
+/// clear the deadline, minus whatever the application is already providing. The mechanism is
+/// deliberately the existing SURB-level keep-alive stream rather than a new message: every shipped
+/// Entry already parses it, already counts it as a consumed SURB (so its balancer refills), and
+/// already credits it as service against the successor gate.
+///
+/// # What it costs the client
+///
+/// One cycle's quota per deadline while idle, and nothing at all while the application is busier than
+/// the required rate — [`heartbeat`](Self::heartbeat) is what fill drops to when organic egress
+/// already covers the need. The client accepts this as the price of a Session that completes its
+/// cycles; it funds successors exactly as it would have.
+///
+/// # What bounds it
+///
+/// Four separate things, because a rule that *sends* is the one rule in this module that could be
+/// turned against the node running it:
+///
+/// * [`max_rate`](Self::max_rate) caps the instantaneous rate.
+/// * [`min_surb_reserve`](Self::min_surb_reserve) stops fill from spending the SURBs the Session needs for its own
+///   replies.
+/// * The stall rule holds fill at the heartbeat once the target cycle stops making progress, so a doomed cycle or a
+///   share-less SURB supply cannot burn `max_rate × max_recovery_time` SURBs.
+/// * The existing deadlines and the service gate are unchanged, and remain the backstop for a client that stops
+///   supplying SURBs at all.
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PixFillConfig {
+    /// Whether the Exit originates fill keep-alives at all.
+    ///
+    /// Disabling it restores the behaviour of an Exit that only ever answers: funded cycles then
+    /// complete if and only if the application returns enough traffic, and the ones that do not are
+    /// closed by `max_recovery_time` with their deposits stranded. That is a defensible choice only
+    /// for a deployment whose clients are known to saturate their Sessions.
+    ///
+    /// Default: `true`.
+    #[default(true)]
+    pub enabled: bool,
+
+    /// The floor fill rate: one packet per this period, sent even when nothing needs sending.
+    ///
+    /// Fill never drops to silence while a funded cycle is in flight, for two reasons that have
+    /// nothing to do with the deadline. The Entry's own idle eviction is refreshed by this traffic,
+    /// and a Session whose Exit has gone quiet is one whose SURB balancer has no level report to act
+    /// on. It is also what makes the ramp observable: a rate that is *only* ever the computed one
+    /// cannot be told apart from a planner that has stopped planning.
+    ///
+    /// Expressed as a period rather than a rate because it is far below one packet per second and
+    /// [`FillRate`] carries its own unit, so `1 / 60 s` is exact rather than a rounded fraction.
+    ///
+    /// Default: 60 s.
+    #[default(Duration::from_secs(60))]
+    #[serde(with = "humantime_serde")]
+    pub heartbeat: Duration,
+
+    /// Fraction of [`SupervisorConfig::max_recovery_time`] by which a cycle should be finished.
+    ///
+    /// The planner aims at `hard_deadline − (1 − finish_fraction) × max_recovery_time` rather than at
+    /// the deadline itself, so the last quarter of the budget is margin: for the loss the
+    /// [`loss_margin`](Self::loss_margin) does not cover, for a mixnet delay spike, and for the
+    /// round trip the successor's commitment and deposit still need after this cycle recovers. Aiming
+    /// at the deadline exactly would make every cycle a photo finish, and a cycle that misses is
+    /// worth nothing at all rather than nearly everything.
+    ///
+    /// Default: 0.75.
+    #[default(0.75)]
+    pub finish_fraction: f64,
+
+    /// Fraction by which the remaining emission is inflated to cover return-path loss.
+    ///
+    /// Fill counts packets it *sends*; the cycle advances on shares that *arrive*. The difference is
+    /// return-path loss, which the Exit cannot observe directly — it sees the reconstructor's progress
+    /// and nothing about the packets that produced none. Rather than infer a loss rate from a signal
+    /// that also moves for a dozen other reasons, the planner simply sends this much extra and lets
+    /// the ordinary re-planning each second absorb whatever the real figure turns out to be.
+    ///
+    /// Default: 0.05.
+    #[default(0.05)]
+    pub loss_margin: f64,
+
+    /// Ceiling on the fill rate, in packets per second.
+    ///
+    /// This is the value that decides how much bandwidth an idle Session may cost, and it has to
+    /// clear the floor a cycle actually needs: the largest quota this node accepts, spread over
+    /// `finish_fraction × max_recovery_time`. `validate_incoming_session_pix_config` enforces exactly
+    /// that, so a cap set below it is refused at load rather than discovered one stranded deposit at a
+    /// time.
+    ///
+    /// Default: 250 packets/s, which is ~2 Mbps at `HoprPacket::PAYLOAD_SIZE` and about twice the
+    /// 127 packets/s the shipped defaults require.
+    #[default(250)]
+    pub max_rate: u32,
+
+    /// SURBs that must remain estimated-available before a fill packet is emitted.
+    ///
+    /// Fill is the one egress on the Exit that has no application waiting on it, so it is the one
+    /// that must yield. Spending the last SURBs on fill is not merely wasteful: a return packet with
+    /// no SURB to ride holds *every* packet this node originates for the resolver's
+    /// `surb_resolution_wait`, so an over-eager filler stalls the Session it is trying to save. The
+    /// heartbeat is exempt — it is the signal that asks for more SURBs.
+    ///
+    /// Default: 500, matching `SurbStoreConfig::distress_threshold`.
+    #[default(500)]
+    pub min_surb_reserve: u64,
+}
+
+/// A rate at which the Exit originates PIX fill keep-alives.
+///
+/// A count over a period rather than a float, because it maps one-to-one onto
+/// `RateController::set_rate_per_unit` and therefore says exactly what the stream will do. The
+/// heartbeat is one packet per minute; expressing that as `0.0166… packets/s` and converting back
+/// would be a rounding error in a value whose whole purpose is to be small and exact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FillRate {
+    /// Packets to emit per [`per`](Self::per).
+    pub packets: u32,
+    /// The period [`packets`](Self::packets) is measured over. Never zero.
+    pub per: Duration,
+}
+
+impl FillRate {
+    /// Emit nothing. The rate a Session is left at once it has no funded cycle to fill for.
+    pub const ZERO: Self = Self {
+        packets: 0,
+        per: Duration::from_secs(1),
+    };
+
+    /// `packets` per second.
+    pub const fn per_second(packets: u32) -> Self {
+        Self {
+            packets,
+            per: Duration::from_secs(1),
+        }
+    }
+
+    /// One packet per `period` — the heartbeat form.
+    pub const fn once_per(period: Duration) -> Self {
+        Self {
+            packets: 1,
+            per: period,
+        }
+    }
+
+    /// Whether this rate emits nothing.
+    pub const fn is_zero(&self) -> bool {
+        self.packets == 0
+    }
+
+    /// This rate in packets per second.
+    ///
+    /// Zero for a zero period as well as for zero packets: a period that cannot be divided by is not
+    /// an infinite rate, it is a rate this planner refuses to have produced. `validate_pix_supervision`
+    /// rejects a zero heartbeat, so it is unreachable rather than merely handled.
+    pub fn as_packets_per_sec(&self) -> f64 {
+        let per = self.per.as_secs_f64();
+        if self.packets == 0 || per <= 0.0 {
+            0.0
+        } else {
+            self.packets as f64 / per
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -820,6 +1018,19 @@ pub enum SessionPixAction {
     /// Emitted when an SSA's tombstone period expires so mid-session state
     /// does not accumulate.
     RetireSsa(SsaId<HoprPseudonym>),
+    /// Set the rate at which the Exit originates its own fill keep-alives.
+    ///
+    /// Emitted only when the planned rate actually changes — see [`fill::FillPlanner`] — so the
+    /// action stream carries decisions rather than a per-second heartbeat of its own.
+    ///
+    /// Deliberately **not** coalescible, unlike [`ProgressNotification`](Self::ProgressNotification).
+    /// A dropped notification is replaced by the next one within an acknowledgement batch; a dropped
+    /// rate change is not replaced at all, because the planner's hysteresis means it will not
+    /// re-emit a value it believes is already applied. Dropping a drop to zero is the worst case:
+    /// the Session would keep spending SURBs on a cycle that no longer exists. At not more than one
+    /// per second against a 64-deep channel, treating a failure to deliver it as a wedged channel is
+    /// the correct reading.
+    SetFillRate(FillRate),
 }
 
 // ---------------------------------------------------------------------------
@@ -953,6 +1164,62 @@ pub fn validate_pix_supervision(
             "min_share_order_sample must be non-zero".into(),
         ));
     }
+    // A zero period is not a fast heartbeat, it is a division by zero in `FillRate::as_packets_per_sec`
+    // and an assertion inside `RateController::set_rate_per_unit`. Checked whether or not fill is
+    // enabled, so that turning it on later cannot fail in a way that only shows up at run time.
+    if cfg.fill.heartbeat.is_zero() {
+        return Err(TransportSessionError::InvalidConfig(
+            "fill.heartbeat must be non-zero".into(),
+        ));
+    }
+    // Finiteness first, and a range rather than a one-sided comparison, for the reason spelled out on
+    // `max_off_front_share_fraction` above: every IEEE comparison against `NaN` is false, so a
+    // one-sided test admits it — and a `NaN` here is not inert. It propagates through the aim point
+    // into the required rate, and a `NaN` rate compares false against every hysteresis threshold, so
+    // the planner would hold whatever it last emitted for the life of the Session.
+    //
+    // Zero is excluded at the low end because it puts the aim point at the instant the cycle's clock
+    // started — the planner would demand a whole cycle's emission within one sampling interval and
+    // clamp to `max_rate` forever. One is included: aiming exactly at the hard deadline is a
+    // defensible, if tight, choice.
+    if !cfg.fill.finish_fraction.is_finite() || !(0.0 < cfg.fill.finish_fraction && cfg.fill.finish_fraction <= 1.0) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "fill.finish_fraction ({}) must be a finite fraction in (0.0, 1.0]",
+            cfg.fill.finish_fraction
+        )));
+    }
+    // One is excluded at the top: a margin of 100 % doubles every cycle's emission budget, which is
+    // not loss tolerance but a second cycle's worth of traffic. Zero is allowed and means "assume a
+    // lossless return path", which is wrong but bounded — the per-second re-plan catches up.
+    if !cfg.fill.loss_margin.is_finite() || !(0.0..1.0).contains(&cfg.fill.loss_margin) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "fill.loss_margin ({}) must be a finite fraction in [0.0, 1.0)",
+            cfg.fill.loss_margin
+        )));
+    }
+    // Zero would be a disabled filler that still claims to be enabled, which is the one state an
+    // operator cannot diagnose from the metrics: the rate gauge would sit at the heartbeat and the
+    // cycles would strand anyway. `enabled` is how fill is turned off.
+    //
+    // The upper bound is where `RateController` stops being able to represent the request: its
+    // `MIN_DELAY` is 100 µs, so anything above 10 000 packets/s is silently clamped, and a silent
+    // clamp on the one parameter that bounds egress is worse than a refusal. It is also ~83 Mbps of
+    // keep-alives, which no Session should be asked to produce.
+    if !(1..=MAX_FILL_RATE).contains(&cfg.fill.max_rate) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "fill.max_rate ({}) must be between 1 and {MAX_FILL_RATE} packets/s",
+            cfg.fill.max_rate
+        )));
+    }
+    // Zero would let fill spend the Session's last SURB. That is not merely wasteful: a return packet
+    // that finds no SURB blocks every packet this node originates for the resolver's
+    // `surb_resolution_wait`, so the reserve is what keeps the filler from stalling the Session it is
+    // filling for.
+    if cfg.fill.min_surb_reserve == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "fill.min_surb_reserve must be non-zero".into(),
+        ));
+    }
     if cfg.max_recovery_idle < reconstructor_cfg.max_ack_await_time {
         return Err(TransportSessionError::InvalidConfig(
             "max_recovery_idle must be >= max_ack_await_time".into(),
@@ -1032,6 +1299,7 @@ pub fn validate_pix_supervision(
         ("max_recovery_idle", cfg.max_recovery_idle, false),
         ("max_recovery_time", cfg.max_recovery_time, false),
         ("tombstone_retention_window", cfg.tombstone_retention_window, false),
+        ("fill.heartbeat", cfg.fill.heartbeat, false),
     ] {
         if dur > MAX_SUPERVISOR_DURATION {
             let armed = if scaled {
@@ -1083,6 +1351,34 @@ pub fn validate_pix_supervision(
 /// supervisor unchecked.
 pub(crate) const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
 
+/// Upper bound on [`PixFillConfig::max_rate`], in packets per second.
+///
+/// Set where `RateController` stops being able to honour the request rather than at a bandwidth an
+/// operator would recognise: its `MIN_DELAY` of 100 µs makes 10 000 packets/s the fastest rate it can
+/// express, and anything above it is clamped without a word. A cap that is *silently* not applied is
+/// the failure this constant forecloses; that it is also ~83 Mbps of keep-alives is a second reason,
+/// not the first one.
+pub(crate) const MAX_FILL_RATE: u32 = 10_000;
+
+/// How often the fill planner re-derives the required rate.
+///
+/// One second is chosen against the two quantities it has to track. The required rate moves on the
+/// scale of the recovery deadline (hours), so nothing is lost by sampling it slowly; the *organic*
+/// rate moves on the scale of an application turning on, and a sampling interval far below the
+/// [`ORGANIC_WINDOW`] would measure scheduler jitter rather than throughput. It is also the unit the
+/// planner falls back to when the aim point is already in the past, which is why it must be a
+/// duration a rate can meaningfully be quoted over.
+pub(crate) const SAMPLING_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Time constant of the exponential average the planner keeps of organic egress.
+///
+/// The point of the average is to answer "is the application already covering the need", and to
+/// answer it without either chasing bursts or lagging a genuine start. Ten seconds is roughly the
+/// duration over which a Session's throughput is a meaningful number at all — below it a TCP-shaped
+/// workload is all bursts, above it the planner keeps filling for ten seconds after the application
+/// has stopped, which is exactly the case fill exists to catch.
+pub(crate) const ORGANIC_WINDOW: Duration = Duration::from_secs(10);
+
 /// A per-cycle deadline duration as it is actually armed for a batch of `ssas_per_request`.
 ///
 /// One place computes this so the validator and the supervisor cannot disagree about what a
@@ -1124,6 +1420,7 @@ mod tests {
             max_off_front_share_fraction: 0.25,
             min_share_order_sample: 16384,
             tombstone_retention_window: Duration::from_secs(30),
+            fill: PixFillConfig::default(),
         }
     }
 
@@ -1631,5 +1928,175 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    // ---------------------------------------------------------------
+    // PIX fill configuration
+    // ---------------------------------------------------------------
+
+    /// The shipped fill defaults must validate against the shipped reconstructor.
+    ///
+    /// Fill is on by default, so a default configuration that could not pass its own validator would
+    /// not be a misconfiguration an operator had chosen — it would be a node that refuses to start.
+    #[test]
+    fn validation_accepts_the_shipped_fill_defaults() {
+        let cfg = SupervisorConfig::default();
+        assert!(cfg.fill.enabled, "fill ships on");
+        validate_pix_supervision(&cfg, &SsaReconstructorConfig::default()).expect("the shipped defaults must validate");
+    }
+
+    /// Zero is not "fill as slowly as possible", and neither is anything the rate controller cannot
+    /// express.
+    ///
+    /// A zero cap is a filler that is on but sends nothing, which is the one broken state an operator
+    /// cannot read off the metrics: the rate gauge sits at the heartbeat and the cycles strand anyway.
+    /// Above `MAX_FILL_RATE` the controller's `MIN_DELAY` silently clamps instead, and a silent clamp
+    /// on the only bound on this node's self-generated egress is worse than a refusal.
+    #[test]
+    fn validation_rejects_a_fill_rate_ceiling_outside_what_the_controller_can_express() {
+        for max_rate in [0, MAX_FILL_RATE + 1] {
+            let cfg = SupervisorConfig {
+                fill: PixFillConfig {
+                    max_rate,
+                    ..PixFillConfig::default()
+                },
+                ..valid_cfg()
+            };
+            let msg = validate_pix_supervision(&cfg, &valid_rcn_cfg())
+                .expect_err("a ceiling outside the representable range must be rejected")
+                .to_string();
+            assert!(msg.contains("fill.max_rate"), "{msg}");
+        }
+
+        for max_rate in [1, MAX_FILL_RATE] {
+            let cfg = SupervisorConfig {
+                fill: PixFillConfig {
+                    max_rate,
+                    ..PixFillConfig::default()
+                },
+                ..valid_cfg()
+            };
+            validate_pix_supervision(&cfg, &valid_rcn_cfg())
+                .unwrap_or_else(|error| panic!("{max_rate} is inside the range and must be accepted: {error}"));
+        }
+    }
+
+    /// A `NaN` fraction is not inert, which is why finiteness is tested before the range.
+    ///
+    /// Every IEEE comparison against `NaN` is false, so a one-sided range check *admits* it. It then
+    /// propagates: a `NaN` aim point makes the required rate `NaN`, and a `NaN` rate compares false
+    /// against every hysteresis threshold — so the planner would hold whatever it last emitted for the
+    /// life of the Session, which for a Session that never emitted anything is silence.
+    #[test]
+    fn validation_rejects_non_finite_fill_fractions() {
+        for (name, fill) in [
+            (
+                "fill.finish_fraction",
+                PixFillConfig {
+                    finish_fraction: f64::NAN,
+                    ..PixFillConfig::default()
+                },
+            ),
+            (
+                "fill.loss_margin",
+                PixFillConfig {
+                    loss_margin: f64::NAN,
+                    ..PixFillConfig::default()
+                },
+            ),
+        ] {
+            let cfg = SupervisorConfig { fill, ..valid_cfg() };
+            let msg = validate_pix_supervision(&cfg, &valid_rcn_cfg())
+                .expect_err("a NaN fraction must be rejected")
+                .to_string();
+            assert!(msg.contains(name), "{msg}");
+        }
+    }
+
+    /// The two fractions have deliberately different open ends, and both must be enforced.
+    ///
+    /// A `finish_fraction` of zero puts the aim point at the instant the cycle's clock started, so the
+    /// planner demands a whole cycle's emission inside one sampling interval and pins itself to
+    /// `max_rate` forever. A `loss_margin` of one doubles every cycle's emission budget, which is not
+    /// loss tolerance but a second cycle's worth of traffic.
+    #[test]
+    fn validation_rejects_fill_fractions_outside_their_ranges() {
+        let zero_finish = SupervisorConfig {
+            fill: PixFillConfig {
+                finish_fraction: 0.0,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        assert!(validate_pix_supervision(&zero_finish, &valid_rcn_cfg()).is_err());
+
+        let whole_finish = SupervisorConfig {
+            fill: PixFillConfig {
+                finish_fraction: 1.0,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        validate_pix_supervision(&whole_finish, &valid_rcn_cfg())
+            .expect("aiming exactly at the hard deadline is tight but legal");
+
+        let whole_margin = SupervisorConfig {
+            fill: PixFillConfig {
+                loss_margin: 1.0,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        assert!(validate_pix_supervision(&whole_margin, &valid_rcn_cfg()).is_err());
+    }
+
+    /// A zero heartbeat and a zero SURB reserve are both rejected, and neither for style.
+    ///
+    /// A zero period divides by zero in `FillRate::as_packets_per_sec` and trips an assertion inside
+    /// `RateController::set_rate_per_unit`. A zero reserve lets fill spend the Session's last SURB,
+    /// and a return packet that finds no SURB holds every packet this node originates for the
+    /// resolver's whole `surb_resolution_wait` — so the filler would stall the Session it is filling
+    /// for.
+    #[test]
+    fn validation_rejects_a_zero_heartbeat_or_surb_reserve() {
+        let no_heartbeat = SupervisorConfig {
+            fill: PixFillConfig {
+                heartbeat: Duration::ZERO,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        let msg = validate_pix_supervision(&no_heartbeat, &valid_rcn_cfg())
+            .expect_err("a zero heartbeat must be rejected")
+            .to_string();
+        assert!(msg.contains("fill.heartbeat must be non-zero"), "{msg}");
+
+        let no_reserve = SupervisorConfig {
+            fill: PixFillConfig {
+                min_surb_reserve: 0,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        let msg = validate_pix_supervision(&no_reserve, &valid_rcn_cfg())
+            .expect_err("a zero SURB reserve must be rejected")
+            .to_string();
+        assert!(msg.contains("fill.min_surb_reserve must be non-zero"), "{msg}");
+    }
+
+    /// The heartbeat is armed like every other deadline, so it takes the same 24-hour cap.
+    #[test]
+    fn validation_rejects_a_heartbeat_over_the_duration_cap() {
+        let cfg = SupervisorConfig {
+            fill: PixFillConfig {
+                heartbeat: MAX_SUPERVISOR_DURATION + Duration::from_secs(1),
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        let msg = validate_pix_supervision(&cfg, &valid_rcn_cfg())
+            .expect_err("a heartbeat above the cap must be rejected")
+            .to_string();
+        assert!(msg.contains("fill.heartbeat"), "{msg}");
     }
 }
