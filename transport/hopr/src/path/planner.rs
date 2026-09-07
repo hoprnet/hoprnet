@@ -700,7 +700,26 @@ where
                     .await?;
                 tracing::debug!(direction = "forward", %destination, path = %forward_path, "resolved path");
 
-                let return_paths = if let Some(return_options) = return_options {
+                let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
+
+                // Capture the SURB-batch generation here — with the return-path plan, not at encode
+                // time — because the replying side supersedes SURBs by generation, so a batch's
+                // generation must match the plan it was minted for.
+                //
+                // Crucially, read it *before* resolving the return paths, not after. The flush loop
+                // recomputes paths and only *then* bumps the generation (`recompute_paths_from` then
+                // `bump_generation` in `HoprTransport`'s SURB-flush task), so a bump racing this
+                // resolution has, by the time it happens, already moved the planner to the new route.
+                // Reading first therefore makes any residual mislabel *under*-label — a fresh route
+                // stamped with the previous generation, which the peer merely appends and then clears
+                // on the next batch (a few wasted SURBs) — and never *over*-label — a stale route
+                // stamped with the newer generation, which would make the peer drop live SURBs and
+                // hand out dead ones. Reading after the resolve is what would allow the harmful
+                // over-label (choose old route, bump, read new generation), so the order matters and a
+                // lock on the per-packet hot path is not needed.
+                let (return_paths, generation) = if let Some(return_options) = return_options {
+                    let generation = self.surb_store.current_generation(&resolved_pseudonym);
+
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
                     trace!(
                         %destination,
@@ -710,7 +729,8 @@ where
                         "resolving packet return paths"
                     );
 
-                    self.resolve_diverse_return_paths(*destination, return_options, num_possible_surbs)
+                    let return_paths: Vec<_> = self
+                        .resolve_diverse_return_paths(*destination, return_options, num_possible_surbs)
                         .await?
                         .into_iter()
                         .enumerate()
@@ -718,24 +738,16 @@ where
                             tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
                         })
                         .map(|(_, rp)| rp)
-                        .collect()
+                        .collect();
+
+                    // Only stamp a generation if return paths (hence SURBs) were actually produced.
+                    let generation = (!return_paths.is_empty()).then_some(generation);
+                    (return_paths, generation)
                 } else {
-                    vec![]
+                    (vec![], None)
                 };
 
                 trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
-
-                let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
-                // Capture the SURB-batch generation here, adjacent to return-path resolution, rather
-                // than at encode time. The replying side supersedes SURBs by generation, so a batch's
-                // generation must match the return-path plan it was minted for. Reading it here — with
-                // no `await` between choosing the return paths and this read — means a concurrent
-                // `bump_generation` (return-path re-plan, on the flush-loop task) cannot re-stamp an
-                // already-chosen plan; the window it could slip into is a couple of instructions
-                // instead of the whole resolve->encode pipeline hop. `None` when there is no return
-                // path (no SURBs are minted).
-                let generation =
-                    (!return_paths.is_empty()).then(|| self.surb_store.current_generation(&resolved_pseudonym));
 
                 Ok((
                     ResolvedTransportRouting::Forward {
