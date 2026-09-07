@@ -918,4 +918,46 @@ mod tests {
                 .expect("the parked item must be released once a rate returns")
         );
     }
+
+    /// The same rule, reached from inside a wait rather than from a fresh read.
+    ///
+    /// Its sibling above withdraws the rate while the stream is in `Read`, so the item it parks is
+    /// one that had not been read yet and the zero is noticed on the way *out* of `Read`. The branch
+    /// this crate added is the other one: an item already in hand, its wait already armed, when the
+    /// rate goes to zero. That is exactly the shape of a Session closed mid-period — the supervisor's
+    /// zero arrives while the filler is sleeping out an interval — and releasing that packet sends it
+    /// return-routed to a pseudonym whose SURBs are being torn down.
+    ///
+    /// The minute-long period is what forces the stream through `Wait`: one poll arms it, and nothing
+    /// but the chunked re-read can then observe the withdrawal.
+    #[tokio::test]
+    async fn a_rate_withdrawn_inside_a_long_wait_parks_the_item() {
+        let stream = stream::iter(1..=2);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(1, Duration::from_secs(60));
+
+        // As in `a_rate_raised_during_a_long_wait_is_applied_within_one_chunk`: one poll reads the
+        // item and arms the wait, and dropping the timed-out future leaves that state on the stream.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(200), rate_limited.next())
+                .await
+                .is_err(),
+            "the fixture needs an item parked inside a long wait"
+        );
+
+        controller.set_rate_per_unit(0, Duration::from_secs(1));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(1500), rate_limited.next())
+                .await
+                .is_err(),
+            "an item waiting when the rate was withdrawn must not be emitted"
+        );
+
+        controller.set_rate_per_unit(100, Duration::from_secs(1));
+        assert_eq!(
+            Some(1),
+            tokio::time::timeout(Duration::from_secs(2), rate_limited.next())
+                .await
+                .expect("the parked item must be released once a rate returns")
+        );
+    }
 }

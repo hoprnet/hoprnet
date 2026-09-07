@@ -433,6 +433,12 @@ enum SessionHandles {
     Ingress,
     /// Handle to the process that sends keep-alive messages to the Session recipient (Exit).
     KeepAlive,
+    /// Handle to the one-shot timer that turns the SURB-level notification on after its first period.
+    ///
+    /// Registered rather than fired and forgotten: it holds an `Arc<PixFillControl>` for as long as
+    /// the period lasts, and no maximum is enforced on that period, so an unregistered task keeps a
+    /// closed Session's fill control alive for however long the operator configured.
+    SurbNotifyDelay,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
     /// Handle to the task that executes the PIX supervisor's actions.
@@ -452,6 +458,7 @@ impl std::fmt::Display for SessionHandles {
         match self {
             Self::Ingress => write!(f, "Ingress"),
             Self::KeepAlive => write!(f, "KeepAlive"),
+            Self::SurbNotifyDelay => write!(f, "SurbNotifyDelay"),
             Self::Balancer => write!(f, "Balancer"),
             Self::PixActionDriver => write!(f, "PixActionDriver"),
             Self::PixDepositObserver(idx) => write!(f, "PixDepositObserver({idx})"),
@@ -1257,6 +1264,13 @@ pub fn validate_incoming_session_pix_config(
     // value nothing reads.
     if cfg.supervision.fill.enabled {
         let fill = &cfg.supervision.fill;
+        // Before the arithmetic, not after it. `validate_pix_supervision` also range-checks these two,
+        // but it runs later on both paths that reach here — `SessionManager::start` calls this first,
+        // and in `HoprProtocolConfig` this is a field validator while that is a schema-level one. The
+        // `mul_f64` below panics on a `NaN` or negative fraction, so an unchecked one aborts the node
+        // at config load rather than being reported; a fraction above one silently lowers the floor.
+        crate::supervision::validate_fill_fractions(fill)?;
+
         let horizon = cfg.supervision.max_recovery_time.mul_f64(fill.finish_fraction);
         // Guarded rather than assumed non-zero: both factors are validated elsewhere, and a divide by
         // zero here would report an infinite requirement for a configuration whose real fault is
@@ -2043,7 +2057,21 @@ where
             // the one bound on this node's self-generated egress is worse than one that is loud about
             // refusing it — which is what `validate_pix_supervision` does for a config that was
             // validated. This branch is for the programmatic ones that never were.
-            sup.fill.heartbeat = sup.fill.heartbeat.min(cap);
+            //
+            // The heartbeat needs the *lower* bound for the same reason the ceiling needs its upper
+            // one, and it is the one that bites: a zero period makes `FillRate::as_packets_per_sec`
+            // report zero, so the planner's own floor is zero, every branch of `FillPlanner::bound`
+            // that returns the heartbeat returns a zero period, and `PixFillControl::apply` hands
+            // `set_rate_per_unit(1, 1µs)` to the controller — which `MIN_DELAY` turns into 10 000
+            // packets/s. The one clamp that exists to bound self-generated egress is bypassed by the
+            // one field that was left unbounded below. The floor is the exact dual of the ceiling —
+            // the period of `MAX_FILL_RATE` — rather than a new number, so the two cannot drift; an
+            // inverted heartbeat/ceiling pair is already resolved ceiling-wins inside `bound`, which
+            // is what makes any positive floor safe here.
+            sup.fill.heartbeat = sup
+                .fill
+                .heartbeat
+                .clamp(Duration::from_secs(1) / crate::supervision::MAX_FILL_RATE, cap);
             sup.fill.max_rate = sup.fill.max_rate.clamp(1, crate::supervision::MAX_FILL_RATE);
         }
 
@@ -3098,9 +3126,14 @@ where
                             && let Some(fill) = slot.pix_fill.get()
                         {
                             fill.set_fill(rate);
+                            // Inside the guard for the same reason the lookup is: `close_session`
+                            // removes this Session's metric state and *then* aborts the tasks, and
+                            // the abort is not synchronous, so a queued `SetFillRate` can still be
+                            // processed afterwards. Setting the gauge there would re-create the
+                            // `session_id` label series with nothing left to remove it again.
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::set_pix_fill_rate(&session_id, rate.as_packets_per_sec());
                         }
-                        #[cfg(feature = "telemetry")]
-                        crate::telemetry::set_pix_fill_rate(&session_id, rate.as_packets_per_sec());
                     }
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
@@ -3221,10 +3254,16 @@ where
             // Delayed by one period, as it always was: a Session that closes immediately should not
             // have sent a level report about SURBs it never used. Fill is not held behind this — the
             // supervisor's first rate applies the moment it is planned.
-            hopr_utils::runtime::prelude::spawn(async move {
+            //
+            // Registered so `close_session` can abort it. It is a one-shot, but it holds a clone of
+            // the control for the whole period, and nothing bounds how long an operator may make that.
+            let notify_delay = hopr_utils::spawn_as_abortable!(async move {
                 hopr_utils::runtime::prelude::sleep(period).await;
                 control.start_notify();
             });
+            slot.abort_handles
+                .lock()
+                .insert(SessionHandles::SurbNotifyDelay, notify_delay);
         }
 
         // An order of magnitude is the point at which the operator's intent and the Session's shape
@@ -6296,11 +6335,17 @@ mod tests {
         let window = Duration::from_millis(1500);
         let observed = keep_alives_during(&mut msg_rx, pseudonym, window).await;
 
-        let notify_only = window.as_secs_f64() / notify.as_secs_f64();
+        // Counted against the rate the notification is *promoted* at rather than against the period,
+        // for the reason `admit_at` documents: the classification window is one slack shorter than the
+        // period, so a notification-only stream produces rather more than `window / period` packets.
+        // Taking the period at face value here would set the floor too low and let a stream that had
+        // stopped filling pass.
+        let promote_every = notify - MAX_WAIT_CHUNK.min(notify / 2);
+        let notify_only = (window.as_secs_f64() / promote_every.as_secs_f64()).ceil() as usize;
         assert!(
-            observed as f64 > 2.0 * notify_only,
+            observed > notify_only,
             "a funded idle cycle produced {observed} keep-alive(s) over {window:?}, which the {notify:?} SURB-level \
-             notification alone could have produced ({notify_only})"
+             notification alone could have produced ({notify_only}, one every {promote_every:?})"
         );
 
         assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
@@ -6316,24 +6361,36 @@ mod tests {
     /// asks for the SURBs whose absence caused the backoff.
     #[test_log::test(tokio::test)]
     async fn fill_backs_off_to_the_notification_when_the_entry_supplies_no_surbs() -> anyhow::Result<()> {
-        let notify = Duration::from_millis(500);
+        // At `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, so it survives the clamp `SessionManager::new`
+        // applies. A shorter value would be raised to this one anyway, and the bound below would then
+        // be computed from a period that is not the one in effect.
+        let notify = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
         let (mgr, mut msg_rx, pseudonym) =
             recovering_exit_pix_session(Capabilities::empty(), Some(notify), 500).await?;
+        assert_eq!(
+            Some(notify),
+            mgr.cfg.surb_balance_notify_period,
+            "the fixture's notification period must be the one the manager actually runs"
+        );
 
         let _ramp = originated_during(&mut msg_rx, Duration::from_millis(1500)).await;
         let window = Duration::from_millis(1500);
         let observed = keep_alives_during(&mut msg_rx, pseudonym, window).await;
 
-        let notify_only = (window.as_secs_f64() / notify.as_secs_f64()).ceil() as usize;
+        // A notification is promoted every `period - min(MAX_WAIT_CHUNK, period / 2)`, not every
+        // period: `admit_at` opens the window a slack early so the classification does not rest on the
+        // rate limiter's scheduling latency. The ceiling has to be computed from that shorter interval,
+        // or a stream doing exactly what this test permits would be read as filling.
+        let promote_every = notify - MAX_WAIT_CHUNK.min(notify / 2);
+        let notify_only = (window.as_secs_f64() / promote_every.as_secs_f64()).ceil() as usize;
         assert!(
             observed > 0,
             "the SURB-level notification must survive the backoff — it is what asks for the SURBs"
         );
         assert!(
             observed <= notify_only + 1,
-            "with no SURBs to spend the Exit originated {observed} keep-alive(s) over {window:?}, against the {} its \
-             notification alone accounts for",
-            notify_only
+            "with no SURBs to spend the Exit originated {observed} keep-alive(s) over {window:?}, against the \
+             {notify_only} its notification alone accounts for at one every {promote_every:?}"
         );
 
         assert!(mgr.close_session(&pseudonym));
@@ -9051,6 +9108,106 @@ mod tests {
     // ---------------------------------------------------------------------------
     // PIX protocol tests
     // ---------------------------------------------------------------------------
+
+    /// The fill fractions must be range-checked before anything computes with them.
+    ///
+    /// This validator runs *before* `validate_pix_supervision` on both paths that reach it:
+    /// `SessionManager::start` calls it first, and in `HoprProtocolConfig` it is a field validator
+    /// while the other is a schema-level one. So it cannot assume the ranges have already been
+    /// checked — and it feeds `finish_fraction` straight into `Duration::mul_f64`, which panics on a
+    /// `NaN`, on a negative, and on a product the monotonic clock cannot hold. A single
+    /// `finish_fraction: .nan` in a YAML file would therefore abort the node at load instead of being
+    /// reported as the configuration error it is.
+    ///
+    /// The finite out-of-range values do not panic, which is why they are here too: they compute a
+    /// floor that is wrong in the permissive direction, and nothing downstream ever says so.
+    #[test]
+    fn fill_fractions_are_rejected_before_the_ceiling_arithmetic_runs() {
+        let with_fill = |fill: crate::supervision::PixFillConfig| IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                fill,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        for finish_fraction in [f64::NAN, -1.0, f64::INFINITY, 2.0] {
+            let cfg = with_fill(crate::supervision::PixFillConfig {
+                finish_fraction,
+                ..Default::default()
+            });
+            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.finish_fraction")),
+                "a finish_fraction of {finish_fraction} must be refused rather than multiplied, got {outcome:?}"
+            );
+        }
+
+        for loss_margin in [f64::NAN, -0.5, 1.0] {
+            let cfg = with_fill(crate::supervision::PixFillConfig {
+                loss_margin,
+                ..Default::default()
+            });
+            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.loss_margin")),
+                "a loss_margin of {loss_margin} must be refused, got {outcome:?}"
+            );
+        }
+
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), ASSUMED_SESSION_PACKET_RATE)
+            .expect("the shipped defaults must still validate");
+    }
+
+    /// The fill heartbeat is clamped at *both* ends for a programmatically assembled config.
+    ///
+    /// The upper clamp is the one every other supervisor duration takes. The lower one is what stops
+    /// a zero period, which `validate_pix_supervision` rejects and nothing in this crate calls: with
+    /// it, `FillRate::as_packets_per_sec` reports zero for the heartbeat, so the planner's floor is
+    /// zero, both heartbeat branches of `FillPlanner::bound` return a zero-period rate, and
+    /// `PixFillControl::apply` hands `set_rate_per_unit(1, 1µs)` to the controller — which
+    /// `RateController::MIN_DELAY` turns into 10 000 packets/s. The `max_rate` ceiling never sees it,
+    /// so the one bound on this node's self-generated egress would be bypassed by the one field left
+    /// unbounded below.
+    #[test]
+    fn programmatic_fill_heartbeat_is_clamped_to_a_positive_period() {
+        let normalized = |heartbeat: Duration| {
+            let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+                SessionManager::new(SessionManagerConfig {
+                    pix_config: IncomingSessionPixConfig {
+                        supervision: SupervisorConfig {
+                            fill: crate::supervision::PixFillConfig {
+                                heartbeat,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+            mgr.cfg.pix_config.supervision.fill.heartbeat
+        };
+
+        // The exact dual of the `max_rate` ceiling, so the two clamps cannot drift apart.
+        let floor = Duration::from_secs(1) / crate::supervision::MAX_FILL_RATE;
+        assert_eq!(
+            floor,
+            normalized(Duration::ZERO),
+            "a zero heartbeat must be raised to the period of MAX_FILL_RATE"
+        );
+        assert_eq!(
+            crate::supervision::MAX_SUPERVISOR_DURATION,
+            normalized(Duration::MAX),
+            "an unrepresentable heartbeat must be lowered to the same cap every other deadline takes"
+        );
+
+        // Which is the property the clamp exists for: a rate the planner can divide by.
+        assert!(
+            FillRate::once_per(normalized(Duration::ZERO)).as_packets_per_sec() > 0.0,
+            "the clamped heartbeat must be a rate the planner can compare against its ceiling"
+        );
+    }
 
     /// Supervisor durations a programmatic caller supplies must be clamped, not trusted.
     ///

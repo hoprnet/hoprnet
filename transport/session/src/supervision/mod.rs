@@ -950,7 +950,7 @@ pub struct PixFillConfig {
     /// time.
     ///
     /// Default: 250 packets/s, which is ~2 Mbps at `HoprPacket::PAYLOAD_SIZE` and about twice the
-    /// 127 packets/s the shipped defaults require.
+    /// 128 packets/s the shipped defaults require.
     #[default(250)]
     pub max_rate: u32,
 
@@ -1025,8 +1025,11 @@ impl FillRate {
     /// This rate in packets per second.
     ///
     /// Zero for a zero period as well as for zero packets: a period that cannot be divided by is not
-    /// an infinite rate, it is a rate this planner refuses to have produced. `validate_pix_supervision`
-    /// rejects a zero heartbeat, so it is unreachable rather than merely handled.
+    /// an infinite rate, it is a rate this planner refuses to have produced. Both routes by which a
+    /// heartbeat reaches the planner guard against one — `validate_pix_supervision` rejects a zero for
+    /// a config that was validated, and `SessionManager::new` raises it to a positive floor for the
+    /// programmatic ones that never are — so this arm is a last line rather than the thing doing the
+    /// work.
     pub fn as_packets_per_sec(&self) -> f64 {
         let per = self.per.as_secs_f64();
         if self.packets == 0 || per <= 0.0 {
@@ -1122,8 +1125,9 @@ pub enum SessionPixAction {
     RetireSsa(SsaId<HoprPseudonym>),
     /// Set the rate at which the Exit originates its own fill keep-alives.
     ///
-    /// Emitted only when the planned rate actually changes — see [`fill::FillPlanner`] — so the
-    /// action stream carries decisions rather than a per-second heartbeat of its own.
+    /// Emitted only when the planned rate actually changes — see `fill::FillPlanner`, which is
+    /// private to this crate — so the action stream carries decisions rather than a per-second
+    /// heartbeat of its own.
     ///
     /// Deliberately **not** coalescible, unlike [`ProgressNotification`](Self::ProgressNotification).
     /// A dropped notification is replaced by the next one within an acknowledgement batch; a dropped
@@ -1198,6 +1202,46 @@ pub use worker::{ActionRx, SessionPixSupervisorHandle, spawn_supervisor_worker};
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
+
+/// Range-checks the two [`PixFillConfig`] fractions, ahead of anything that computes with them.
+///
+/// Extracted from [`validate_pix_supervision`] because it is not the first validator to see them.
+/// `validate_incoming_session_pix_config` derives the fill floor a cycle of the widest accepted
+/// quota needs, and `SessionManager::start` calls it *before* `validate_pix_supervision` — as does
+/// `HoprProtocolConfig`, where one is a field validator and the other a schema-level one. That
+/// derivation runs `Duration::mul_f64(finish_fraction)`, which panics on a `NaN`, a negative, or a
+/// product the monotonic clock cannot represent. A single `finish_fraction: .nan` in a YAML file
+/// would therefore abort the node at load instead of being reported as the configuration error it
+/// is; values above one, or a negative `loss_margin`, would quietly compute a floor lower than the
+/// one the cycle needs. Both callers run this first so neither outcome is reachable.
+///
+/// Finiteness is tested before every range, and the ranges are two-sided, for the reason spelled out
+/// on `max_off_front_share_fraction`: every IEEE comparison against `NaN` is false, so a one-sided
+/// test admits it — and a `NaN` here is not inert. It propagates through the aim point into the
+/// required rate, and a `NaN` rate compares false against every hysteresis threshold, so the planner
+/// would hold whatever it last emitted for the life of the Session.
+pub(crate) fn validate_fill_fractions(fill: &PixFillConfig) -> Result<(), TransportSessionError> {
+    // Zero is excluded at the low end because it puts the aim point at the instant the cycle's clock
+    // started — the planner would demand a whole cycle's emission within one sampling interval and
+    // clamp to `max_rate` forever. One is included: aiming exactly at the hard deadline is a
+    // defensible, if tight, choice.
+    if !fill.finish_fraction.is_finite() || !(0.0 < fill.finish_fraction && fill.finish_fraction <= 1.0) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "fill.finish_fraction ({}) must be a finite fraction in (0.0, 1.0]",
+            fill.finish_fraction
+        )));
+    }
+    // One is excluded at the top: a margin of 100 % doubles every cycle's emission budget, which is
+    // not loss tolerance but a second cycle's worth of traffic. Zero is allowed and means "assume a
+    // lossless return path", which is wrong but bounded — the per-second re-plan catches up.
+    if !fill.loss_margin.is_finite() || !(0.0..1.0).contains(&fill.loss_margin) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "fill.loss_margin ({}) must be a finite fraction in [0.0, 1.0)",
+            fill.loss_margin
+        )));
+    }
+    Ok(())
+}
 
 /// Validates that [`SupervisorConfig`] and [`SsaReconstructorConfig`] are
 /// mutually consistent.
@@ -1274,31 +1318,9 @@ pub fn validate_pix_supervision(
             "fill.heartbeat must be non-zero".into(),
         ));
     }
-    // Finiteness first, and a range rather than a one-sided comparison, for the reason spelled out on
-    // `max_off_front_share_fraction` above: every IEEE comparison against `NaN` is false, so a
-    // one-sided test admits it — and a `NaN` here is not inert. It propagates through the aim point
-    // into the required rate, and a `NaN` rate compares false against every hysteresis threshold, so
-    // the planner would hold whatever it last emitted for the life of the Session.
-    //
-    // Zero is excluded at the low end because it puts the aim point at the instant the cycle's clock
-    // started — the planner would demand a whole cycle's emission within one sampling interval and
-    // clamp to `max_rate` forever. One is included: aiming exactly at the hard deadline is a
-    // defensible, if tight, choice.
-    if !cfg.fill.finish_fraction.is_finite() || !(0.0 < cfg.fill.finish_fraction && cfg.fill.finish_fraction <= 1.0) {
-        return Err(TransportSessionError::InvalidConfig(format!(
-            "fill.finish_fraction ({}) must be a finite fraction in (0.0, 1.0]",
-            cfg.fill.finish_fraction
-        )));
-    }
-    // One is excluded at the top: a margin of 100 % doubles every cycle's emission budget, which is
-    // not loss tolerance but a second cycle's worth of traffic. Zero is allowed and means "assume a
-    // lossless return path", which is wrong but bounded — the per-second re-plan catches up.
-    if !cfg.fill.loss_margin.is_finite() || !(0.0..1.0).contains(&cfg.fill.loss_margin) {
-        return Err(TransportSessionError::InvalidConfig(format!(
-            "fill.loss_margin ({}) must be a finite fraction in [0.0, 1.0)",
-            cfg.fill.loss_margin
-        )));
-    }
+    // Shared with `validate_incoming_session_pix_config`, which runs *earlier* and does arithmetic
+    // with both of these — see the function's own documentation.
+    validate_fill_fractions(&cfg.fill)?;
     // Zero would be a disabled filler that still claims to be enabled, which is the one state an
     // operator cannot diagnose from the metrics: the rate gauge would sit at the heartbeat and the
     // cycles would strand anyway. `enabled` is how fill is turned off.
@@ -2150,6 +2172,20 @@ mod tests {
             ..valid_cfg()
         };
         assert!(validate_pix_supervision(&whole_margin, &valid_rcn_cfg()).is_err());
+
+        // And the open end that is *included*: zero means "assume a lossless return path", which is
+        // wrong but bounded — the per-second re-plan catches up. Asserted because the two fractions
+        // have deliberately opposite open ends, and a range copied from one to the other would pass
+        // every rejection above while quietly refusing a legal configuration.
+        let no_margin = SupervisorConfig {
+            fill: PixFillConfig {
+                loss_margin: 0.0,
+                ..PixFillConfig::default()
+            },
+            ..valid_cfg()
+        };
+        validate_pix_supervision(&no_margin, &valid_rcn_cfg())
+            .expect("a zero loss margin is a lossless-path assumption, not an invalid one");
     }
 
     /// A zero heartbeat and a zero SURB reserve are both rejected, and neither for style.

@@ -349,3 +349,172 @@ impl FillPlanner {
         (new - old).abs() > 0.1 * old
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use hopr_api::types::crypto_random::Randomizable;
+    use hopr_protocol_pix::SsaIndex;
+
+    use super::*;
+
+    /// The three fields [`FillPlanner::bound`] reads, and nothing else that matters to it.
+    fn cfg(heartbeat: Duration, max_rate: u32, max_recovery_idle: Duration) -> SupervisorConfig {
+        SupervisorConfig {
+            max_recovery_idle,
+            // Only has to stay above the idle deadline; `bound` never reads it.
+            max_recovery_time: max_recovery_idle * 2,
+            fill: PixFillConfig {
+                heartbeat,
+                max_rate,
+                ..PixFillConfig::default()
+            },
+            ..SupervisorConfig::default()
+        }
+    }
+
+    /// See the identically-named helper in `super::supervisor` for why the surplus is non-zero.
+    /// `bound` reads none of it, but `FillPlanner::new` needs dimensions to size a cycle.
+    fn dims() -> PixParams {
+        PixParams::try_new(10, 5, 7, crate::types::LOCAL_PIX_SUITE).expect("test dimensions must be valid")
+    }
+
+    fn target(now: Instant) -> FillTarget {
+        FillTarget {
+            ssa_id: SsaId::new(
+                HoprPseudonym::random(),
+                SsaIndex::new(1).expect("index one is non-zero"),
+            ),
+            largest_shares_seen: 0,
+            hard_deadline: now + Duration::from_secs(3600),
+        }
+    }
+
+    /// An inverted heartbeat/ceiling pair resolves ceiling-wins rather than panicking.
+    ///
+    /// A heartbeat period shorter than `1 / max_rate` puts the floor above the ceiling, which is
+    /// nonsense rather than impossible — nothing rejects the pair, since each field is legal on its
+    /// own. `f64::clamp` panics on it. The ceiling has to be the one that survives: it is the bound
+    /// on what this node will put on the wire, and a floor that overrode it would turn the one guard
+    /// on self-generated egress into its opposite.
+    #[test]
+    fn an_inverted_heartbeat_and_ceiling_resolve_to_the_ceiling() {
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(
+            &cfg(Duration::from_millis(10), 5, Duration::from_secs(30)),
+            &dims(),
+            now,
+        );
+
+        // The heartbeat asks for 100 packets/s against a ceiling of five, from both directions: with
+        // nothing wanted, so only the floor is in play, and with more wanted than the ceiling allows.
+        for wanted in [0.0, 50.0] {
+            let rate = planner.bound(now, wanted);
+            assert_eq!(
+                FillRate::per_second(5),
+                rate,
+                "an inverted pair must resolve to the ceiling, got {rate:?} for a wanted rate of {wanted}"
+            );
+        }
+    }
+
+    /// Fractional rates round *up*, and the ceiling still binds after the rounding.
+    ///
+    /// Rounding down is the one direction that cannot be tolerated: a rate a hair below what the
+    /// cycle needs never finishes it, which is the whole outcome this mechanism exists to prevent.
+    /// The ceiling is applied before the rounding, so a `max_rate` of ten can never be rounded to
+    /// eleven.
+    #[test]
+    fn fractional_rates_round_up_and_stay_under_the_ceiling() {
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(Duration::from_secs(60), 10, Duration::from_secs(30)), &dims(), now);
+
+        assert_eq!(FillRate::per_second(5), planner.bound(now, 4.2));
+        assert_eq!(FillRate::per_second(10), planner.bound(now, 9.001));
+        assert_eq!(
+            FillRate::per_second(10),
+            planner.bound(now, 10.4),
+            "the ceiling must bind before the rounding, not after it"
+        );
+        assert_eq!(
+            FillRate::per_second(10),
+            planner.bound(now, f64::MAX),
+            "no wanted rate may produce more than the ceiling"
+        );
+    }
+
+    /// Between the heartbeat and one packet a second, the rate is a *period* rather than a rounding.
+    ///
+    /// A cycle with a few hundred packets left over an hour needs about a packet a minute. Rounding
+    /// that up to one a second is sixty times the traffic, spent on the tail of a cycle that has
+    /// nearly finished — so [`FillRate`] carries its own unit and this range uses it. The period must
+    /// never come out longer than the heartbeat, which is the floor.
+    #[test]
+    fn sub_hertz_rates_are_expressed_as_a_period_no_longer_than_the_heartbeat() {
+        let heartbeat = Duration::from_secs(60);
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(heartbeat, 250, Duration::from_secs(30)), &dims(), now);
+
+        let rate = planner.bound(now, 0.1);
+        assert_eq!(1, rate.packets, "a sub-hertz rate must stay one packet per period");
+        assert_eq!(Duration::from_secs(10), rate.per);
+
+        // Just above the heartbeat, where the `min` in that branch is closest to binding.
+        let barely = planner.bound(now, 1.0 / 50.0);
+        assert_eq!(1, barely.packets);
+        assert!(
+            barely.per <= heartbeat,
+            "a period longer than the heartbeat would put the rate under its own floor, got {:?}",
+            barely.per
+        );
+
+        // And nothing wanted at all is the heartbeat itself rather than silence.
+        assert_eq!(FillRate::once_per(heartbeat), planner.bound(now, 0.0));
+    }
+
+    /// A motionless target drops fill to the heartbeat, and to no more than the ceiling.
+    ///
+    /// This is the bound the gate-based idle rule cannot supply: fill bypasses the service gate, so a
+    /// cycle being filled and making no progress looks perfectly quiet to `max_recovery_idle` and it
+    /// re-arms forever. Without this rule a doomed cycle — a failed polynomial, or an Entry supplying
+    /// SURBs that carry no shares — would be filled at `max_rate` for the whole of
+    /// `max_recovery_time`.
+    #[test]
+    fn a_stalled_target_falls_back_to_the_heartbeat() {
+        let heartbeat = Duration::from_secs(60);
+        let idle = Duration::from_secs(30);
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(heartbeat, 250, idle), &dims(), now);
+
+        planner.observe_target(now, &target(now));
+        assert_eq!(
+            FillRate::per_second(200),
+            planner.bound(now + idle - Duration::from_secs(1), 200.0),
+            "a target that has moved inside the idle window is not stalled"
+        );
+        assert!(!planner.take_stall_onset(), "no stall has begun yet");
+
+        let stalled = planner.bound(now + idle, 200.0);
+        assert_eq!(FillRate::once_per(heartbeat), stalled);
+        assert!(
+            stalled.as_packets_per_sec() <= FillRate::once_per(heartbeat).as_packets_per_sec(),
+            "the stall fallback must never exceed the heartbeat rate"
+        );
+        assert!(planner.take_stall_onset(), "the stall must be reported exactly once");
+        assert!(!planner.take_stall_onset(), "and not once per tick thereafter");
+
+        // With an inverted pair the ceiling is below the heartbeat, and it still wins on this path.
+        let now = Instant::now();
+        let mut inverted = FillPlanner::new(&cfg(Duration::from_millis(10), 5, idle), &dims(), now);
+        inverted.observe_target(now, &target(now));
+        let stalled = inverted.bound(now + idle, 200.0);
+        assert_eq!(FillRate::per_second(5), stalled);
+        assert!(
+            stalled.as_packets_per_sec() <= 5.0,
+            "the stall fallback must never exceed the ceiling either"
+        );
+    }
+}

@@ -211,7 +211,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_SESSION_PIX_FILL_RATE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_pix_fill_rate",
-        "Rate in packets per second at which the Exit is originating its own PIX fill keep-alives",
+        "Planned rate in packets per second for the Exit's own PIX fill keep-alives; emission is bounded by the SURB reserve, so see hopr_session_pix_fill_packets_total for what went out",
         &["session_id"]
     ).unwrap();
     static ref METRIC_SESSION_PIX_FILL_PACKETS_TOTAL: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(

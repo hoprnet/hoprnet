@@ -957,7 +957,10 @@ mod tests {
         let p = HoprPseudonym::random();
         let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
 
-        let initial = next_fill_rate(&action_rx, Duration::from_millis(200)).await;
+        // Two sampling intervals, so the check spans a tick the planner could have emitted on. At
+        // 200 ms the first tick had not happened yet, so the assertion held for a Session that fills
+        // everything as readily as for one that fills nothing.
+        let initial = next_fill_rate(&action_rx, 2 * SAMPLING_INTERVAL).await;
         assert_eq!(None, initial, "an unfunded Session must not be filled");
 
         fund_first_cycle(&handle, p)

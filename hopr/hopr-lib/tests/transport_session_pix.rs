@@ -1215,46 +1215,51 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize, #[case] rat
 
     // Before the Session exists: the Exit's very first SSA request blocks on the deposit pool.
     let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
-    let session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), rate_control).await?;
+    let mut session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), rate_control).await?;
     tracing::info!(
         rate_control,
         "session established; not one application byte will be written to it"
     );
 
+    // Both milestones carry `PixAddressId::new(pseudonym, ssa_index)`, so the cycle that recovers and
+    // the deposit that funded it share one id. Correlating on that is what makes "the successor" mean
+    // a *different* cycle: counting `Funded`s instead would accept a second report about the same one,
+    // and at the default `ssas_per_request` of 1 the only other id a batch can produce is the
+    // successor's. The successor's deposit routinely lands *before* full recovery is reported, since
+    // it rides the early-recovery signal, so neither ordering may be assumed.
+    let successor_of = |seen: &[(PixMilestone, std::time::Instant)], recovered| {
+        seen.iter().find_map(|(milestone, at)| match milestone {
+            PixMilestone::Funded(id) if *id != recovered => Some(*at),
+            _ => None,
+        })
+    };
+    let recovered_in = |seen: &[(PixMilestone, std::time::Instant)]| {
+        seen.iter().find_map(|(milestone, at)| match milestone {
+            PixMilestone::Recovered(id) => Some((*id, *at)),
+            _ => None,
+        })
+    };
+
     let started = std::time::Instant::now();
     let seen = await_milestones(&mut milestones, aim_point * 2, |seen| {
         // The successor being funded is the end of the property: the first cycle recovered on fill
         // alone, and the Entry admitted the request that recovery earned.
-        seen.iter()
-            .any(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
-            && seen
-                .iter()
-                .filter(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_)))
-                .count()
-                >= 2
+        recovered_in(seen).is_some_and(|(recovered, _)| successor_of(seen, recovered).is_some())
     })
     .await;
 
-    let recovered_at = seen
-        .iter()
-        .find(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
-        .map(|(_, at)| *at)
-        .with_context(|| {
-            format!(
-                "no idle cycle was completed by fill within {:?}: {seen:?}",
-                aim_point * 2
-            )
-        })?;
-    let successor_at = seen
-        .iter()
-        .filter(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_)))
-        .nth(1)
-        .map(|(_, at)| *at)
-        .with_context(|| {
-            format!(
-                "the cycle recovered but its successor was never funded, so the completion bought nothing: {seen:?}"
-            )
-        })?;
+    let (recovered_id, recovered_at) = recovered_in(&seen).with_context(|| {
+        format!(
+            "no idle cycle was completed by fill within {:?}: {seen:?}",
+            aim_point * 2
+        )
+    })?;
+    let successor_at = successor_of(&seen, recovered_id).with_context(|| {
+        format!(
+            "cycle {recovered_id:?} recovered, but no *other* cycle was ever funded, so the completion bought \
+             nothing: {seen:?}"
+        )
+    })?;
 
     // The later of the two, because the successor's deposit rides the *early* recovery signal and so
     // routinely lands before full recovery is reported. Asserting on whichever happened to be first
@@ -1271,16 +1276,18 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize, #[case] rat
         "the idle cycle and its successor took {elapsed:?}, past the {aim_point:?} fill was planned against"
     );
 
-    // And the Session is alive rather than merely accounted for.
-    let stopped = EchoStopCell::default();
-    let echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(30));
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    // And the Session is alive rather than merely accounted for. A *completed* round trip, not an
+    // absence of failure: `spawn_echo_task` only reports a stop on a write error, a read error, or a
+    // 30 s read timeout, so watching it for ten seconds passes while the very first `read_exact` is
+    // still hanging — which is exactly the state a Session that had been kept accounted for but not
+    // alive would be in.
+    const ECHOES: usize = 3;
+    let completed = echo_n(&mut session, ECHOES, Duration::from_millis(200)).await;
     assert_eq!(
-        None,
-        stopped.get().map(|(stop, _)| stop),
-        "a Session completed by fill must still carry application traffic"
+        ECHOES, completed,
+        "a Session completed by fill must still carry application traffic, but only {completed} of {ECHOES} echo \
+         round trips finished"
     );
-    echo.abort();
     driver.abort();
 
     tracing::info!(hops, rate_control, "idle PIX fill test PASSED");
