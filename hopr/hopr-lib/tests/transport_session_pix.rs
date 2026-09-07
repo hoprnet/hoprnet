@@ -204,9 +204,10 @@ async fn establish_pix_session(
 ///   outgoing packets, so an *idle* Session hands the Exit nothing to send with — and fill has nothing to fill with.
 ///   That is a real deployment shape rather than a test artefact, which is why one of the tests below deliberately
 ///   keeps it off: the recovery deadline must still close a Session whose Entry supplies nothing.
-/// * `rate_control` selects the Exit's rate-limited egress branch instead of `NoRateControl`. The default is
-///   `NoRateControl`, matching every other test here and exercising the branch whose SURB level estimate fill's reserve
-///   depends on.
+/// * `rate_control` selects the Exit's rate-limited egress branch instead of `NoRateControl`. `NoRateControl` is the
+///   default here and what most of these tests use, but it is the rate-controlled branch that every gnosis client opens
+///   — and the only one on which the Entry announces its SURB buffer target, which is what fill's reserve is derived
+///   from. [`idle_session_is_completed_by_exit_fill`] runs over both.
 #[cfg(feature = "session-client")]
 async fn establish_pix_session_with(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
@@ -252,10 +253,14 @@ async fn establish_pix_session_with(
 /// `0.75 x 60 s` asks fill for about three quarters of a packet a second — slow enough to be
 /// unmistakably fill rather than a burst, fast enough to finish inside one test.
 ///
-/// `min_surb_reserve` is lowered from its shipped 500 because the shipped value is sized against a
-/// production SURB buffer, and this cluster's whole cycle is 32 packets. Left at 500 the reserve
-/// would refuse every fill packet until the Entry's balancer had produced half a thousand SURBs for
-/// a Session that needs thirty-two.
+/// `fill` is taken at its shipped defaults, `min_surb_reserve` included, and that is deliberate: the
+/// shipped 500 is sized against a production SURB buffer while this cluster's whole cycle is 32
+/// packets, so an *absolute* reserve would refuse every fill packet until the Entry's balancer had
+/// produced half a thousand SURBs for a Session that needs thirty-two. What makes the shipped value
+/// workable here is that it is a ceiling on a reserve derived per Session from the buffer target the
+/// Entry announced — a quarter of [`idle_surb_balancer`]'s 64 on the rate-controlled branch, and a
+/// quarter of the Exit's own fallback on the `NoRateControl` branch, which announces no target at
+/// all. Overriding it here would test the override rather than the derivation.
 #[cfg(feature = "session-client")]
 fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -> IncomingSessionPixConfig {
     IncomingSessionPixConfig {
@@ -1184,17 +1189,23 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
 ///   is refused as under-served by an Entry that does not credit them, and the Session then dies on
 ///   `max_ssa_delivery_time` blaming a timer;
 /// * an echo still round-trips afterwards, so the Session was kept alive rather than merely kept accounted for.
+///
+/// Run over both Exit egress branches. `NoRateControl` is what every other test here uses, but it is
+/// the *rate-controlled* branch that every gnosis client opens: it shapes the Exit's data egress with
+/// a SURB balancer, and it is the only branch on which the Entry announces its buffer target at all —
+/// so it is also the branch on which fill's SURB reserve is derived from something the peer said
+/// rather than from this node's own fallback. Fill itself is unaffected by the shaping, since the
+/// keep-alive stream carries its own rate controller rather than riding the data path's, and this is
+/// what says so rather than leaving it to be inferred from the code.
 #[cfg(feature = "session-client")]
 #[rstest]
-#[case(1)]
+#[case(1, false)]
+#[case(1, true)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize) -> anyhow::Result<()> {
-    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
-        min_surb_reserve: 16,
-        ..Default::default()
-    });
+async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize, #[case] rate_control: bool) -> anyhow::Result<()> {
+    let exit_pix = fill_pix_config(Default::default());
     let aim_point = exit_pix
         .supervision
         .max_recovery_time
@@ -1204,8 +1215,11 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize) -> anyhow::
 
     // Before the Session exists: the Exit's very first SSA request blocks on the deposit pool.
     let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
-    let session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), false).await?;
-    tracing::info!("session established; not one application byte will be written to it");
+    let session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), rate_control).await?;
+    tracing::info!(
+        rate_control,
+        "session established; not one application byte will be written to it"
+    );
 
     let started = std::time::Instant::now();
     let seen = await_milestones(&mut milestones, aim_point * 2, |seen| {
@@ -1269,7 +1283,7 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize) -> anyhow::
     echo.abort();
     driver.abort();
 
-    tracing::info!(hops, "idle PIX fill test PASSED");
+    tracing::info!(hops, rate_control, "idle PIX fill test PASSED");
     Ok(())
 }
 
@@ -1288,10 +1302,7 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize) -> anyhow::
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn fill_resumes_after_organic_traffic_stops(#[case] hops: usize) -> anyhow::Result<()> {
-    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
-        min_surb_reserve: 16,
-        ..Default::default()
-    });
+    let exit_pix = fill_pix_config(Default::default());
     let aim_point = exit_pix
         .supervision
         .max_recovery_time
@@ -1365,10 +1376,7 @@ async fn fill_resumes_after_organic_traffic_stops(#[case] hops: usize) -> anyhow
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn fill_yields_to_organic_traffic(#[case] hops: usize) -> anyhow::Result<()> {
-    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
-        min_surb_reserve: 16,
-        ..Default::default()
-    });
+    let exit_pix = fill_pix_config(Default::default());
     let cluster = build_pix_cluster(hops, exit_pix, Duration::from_secs(120)).await?;
 
     let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);

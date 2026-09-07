@@ -47,7 +47,7 @@ use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
     SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
+        AtomicSurbFlowEstimator, BalancerStateValues, MAX_WAIT_CHUNK, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection, SurbFlowEstimator,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
@@ -674,6 +674,10 @@ pub(crate) struct PixFillControl {
     /// which is how a PIX Session on a node with `surb_balance_notify_period: None` still fills.
     notify_period: Option<Duration>,
     /// SURBs that must remain estimated-available before a *fill* packet is let through.
+    ///
+    /// The *effective* reserve for this Session, not the configured one: the Entry decides how deep
+    /// the Exit's SURB buffer for the Session is, so a reserve above what the Entry ever intends to
+    /// supply would refuse every fill packet forever. See [`effective_surb_reserve`].
     min_surb_reserve: u64,
     /// The Session's SURB flow estimate, which is what the reserve is measured against.
     estimator: AtomicSurbFlowEstimator,
@@ -710,7 +714,8 @@ impl PixFillControl {
             notify_period,
             // Clamped rather than trusted: a `SessionManager` can be built from a config that never
             // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
-            // Session's last SURB.
+            // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
+            // load-bearing for the tests that construct a control directly.
             min_surb_reserve: min_surb_reserve.max(1),
             estimator,
             state: parking_lot::Mutex::new(PixFillState {
@@ -788,15 +793,43 @@ impl PixFillControl {
     /// holds it, and with it every packet this node originates, for the whole of
     /// `surb_resolution_wait`. An Exit filling a cycle down to its last SURB would therefore stall
     /// the Session it is filling for, and every other Session on the node with it.
+    ///
+    /// # Which packet is the notification
+    ///
+    /// Nothing about a packet says which producer it belongs to, so the notification is the first one
+    /// released no sooner than a period after the last — *less a slack of
+    /// `min(MAX_WAIT_CHUNK, period / 2)`*, which is what keeps the classification from resting on
+    /// scheduling latency. The rate limiter that releases these packets sleeps in chunks of
+    /// [`MAX_WAIT_CHUNK`], re-reads its controller on each wake, and rounds a rate into an integer
+    /// packet count, so a stream asked for one packet per period releases them a shade over or a
+    /// shade under it. Compared against the period exactly, a period the controller rounds short by a
+    /// microsecond would classify every other notification as fill — counted in
+    /// `hopr_session_pix_fill_packets_total` and, below the reserve, dropped. That is the signal
+    /// asking the Entry for the SURBs whose absence caused the drop, and it runs on every Exit
+    /// Session with a `surb_balance_notify_period` configured, PIX or not.
+    ///
+    /// The slack cannot let fill masquerade as the notification: `last_notify_at` advances to the
+    /// instant the packet actually went out, so only the *first* packet past the slack window is the
+    /// notification, and every fill packet that follows it inside the period is still fill and is
+    /// still bounded by the reserve. The cap at half the period is what stops a very short period
+    /// from having its window widened away to nothing.
     pub(crate) fn admit(&self) -> bool {
-        let now = Instant::now();
+        self.admit_at(Instant::now())
+    }
+
+    /// [`admit`](Self::admit) against a caller-supplied instant, so the classification can be tested
+    /// as the rule it is rather than by sleeping out a period and hoping the scheduler cooperates.
+    fn admit_at(&self, now: Instant) -> bool {
         let mut state = self.state.lock();
 
+        // Due *slightly early*: see the classification rule on `admit`. The slack is what keeps this
+        // from resting on the scheduling latency of the stream that releases the packet.
         let notification_due = state.notify_started
             && self.notify_period.is_some_and(|period| {
+                let slack = MAX_WAIT_CHUNK.min(period / 2);
                 state
                     .last_notify_at
-                    .is_none_or(|at| now.saturating_duration_since(at) >= period)
+                    .is_none_or(|at| now.saturating_duration_since(at) >= period.saturating_sub(slack))
             });
 
         if notification_due {
@@ -820,6 +853,32 @@ impl PixFillControl {
         telemetry::record_pix_fill_backoff(telemetry::PixFillBackoff::SurbReserve);
         false
     }
+}
+
+/// The SURB reserve one Session's fill actually respects.
+///
+/// [`PixFillConfig::min_surb_reserve`](crate::supervision::PixFillConfig::min_surb_reserve) is a
+/// *ceiling* rather than the value used, and it has to be, because the two sides of the comparison
+/// are chosen by different nodes. The reserve is measured against the Exit's estimate of its own SURB
+/// buffer for the Session, and how deep that buffer is is the *Entry's* decision — it announces its
+/// balancer target in the lower 32 bits of `StartInitiation::additional_data`. An operator sizing the
+/// reserve against a production buffer therefore also decides, unintentionally, that every Session
+/// whose Entry asks for a shallower one can never be filled at all: the estimate never reaches the
+/// reserve, every fill packet is withheld, and the funded cycle strands on `max_recovery_time` while
+/// the logs report only a backoff.
+///
+/// A quarter of the announced target is what the reserve is for expressed as a proportion: it leaves
+/// fill three quarters of whatever buffer the Entry chose and keeps the last quarter for the
+/// application, which is the side that has something waiting on it. The configured value still binds
+/// wherever it is the smaller of the two — at the shipped 500 against the worked profile's 7 000-SURB
+/// target, a quarter is 1 750, so the derivation is inert on a production-sized Session and only
+/// engages on one whose Entry asked for less than four times the configured reserve.
+///
+/// Floored at one, for the same reason the constructor clamps: a zero reserve is fill spending the
+/// Session's last SURB, and an Entry announcing a three-SURB buffer would otherwise produce exactly
+/// that.
+fn effective_surb_reserve(configured: u64, announced_target: u64) -> u64 {
+    configured.min(announced_target / 4).max(1)
 }
 
 /// One Session's reservation against the node's live reconstructor-cycle budget.
@@ -1209,13 +1268,12 @@ pub fn validate_incoming_session_pix_config(
         };
         if (fill.max_rate as u64) < floor {
             return Err(TransportSessionError::InvalidConfig(format!(
-                    "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
-                     packets                  and needs at least {floor} packets/s to finish inside {horizon:?} with \
-                     a {} loss margin",
-                    fill.max_rate,
-                    cfg.quota_range.end(),
-                    fill.loss_margin,
-                )));
+                "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} packets \
+                 and needs at least {floor} packets/s to finish inside {horizon:?} with a {} loss margin",
+                fill.max_rate,
+                cfg.quota_range.end(),
+                fill.loss_margin,
+            )));
         }
     }
 
@@ -3098,11 +3156,27 @@ where
     /// to fund the Session, turning a stall into a teardown. The bound that does apply is
     /// [`PixFillControl::admit`]'s SURB reserve, which is about this node's own ability to send at
     /// all rather than about what the peer has paid for.
-    fn spawn_exit_keep_alive(&self, session_id: SessionId, slot: &SessionSlot, msg_sender: S, is_pix: bool) {
+    ///
+    /// `announced_surb_target` is the SURB buffer target the Entry asked for, and it is what that
+    /// reserve is derived against — see [`effective_surb_reserve`]. It has to be, because the
+    /// configured reserve is an absolute count while the buffer it is measured against is the Entry's
+    /// choice; a Session whose Entry asks for a shallower buffer than the configured reserve could
+    /// otherwise never be filled at all.
+    fn spawn_exit_keep_alive(
+        &self,
+        session_id: SessionId,
+        slot: &SessionSlot,
+        msg_sender: S,
+        is_pix: bool,
+        announced_surb_target: u64,
+    ) {
         let notify_period = self.cfg.surb_balance_notify_period;
         if notify_period.is_none() && !is_pix {
             return;
         }
+
+        let configured_reserve = self.cfg.pix_config.supervision.fill.min_surb_reserve;
+        let min_surb_reserve = effective_surb_reserve(configured_reserve, announced_surb_target);
 
         // Created here and shared: the sink wrapper below has to hold the same control the stream is
         // rate-limited by, so that it can tell a notification packet from a fill packet.
@@ -3111,7 +3185,7 @@ where
             session_id,
             controller.clone(),
             notify_period,
-            self.cfg.pix_config.supervision.fill.min_surb_reserve,
+            min_surb_reserve,
             slot.surb_estimator.clone(),
         ));
 
@@ -3153,8 +3227,28 @@ where
             });
         }
 
+        // An order of magnitude is the point at which the operator's intent and the Session's shape
+        // have stopped being about the same deployment. A configured reserve of `R` is a reserve
+        // sized for a buffer of `4R`; the derivation only lowers it tenfold once the Entry announces
+        // under `4R / 10`, so this fires exactly on a Session whose buffer is an order of magnitude
+        // shallower than the one this node was configured against. Fill still runs — a derived
+        // reserve is strictly better than one that refuses every packet forever — but it is worth
+        // saying out loud once, when the stream starts, rather than once per withheld packet.
+        if min_surb_reserve.saturating_mul(10) < configured_reserve {
+            warn!(
+                %session_id,
+                configured = configured_reserve,
+                effective = min_surb_reserve,
+                announced_surb_target,
+                "the PIX fill SURB reserve was lowered by more than an order of magnitude to fit the SURB buffer \
+                 target the entry announced for this session"
+            );
+        }
+
         debug!(
             %session_id, ?notify_period, is_pix,
+            surb_reserve = min_surb_reserve,
+            announced_surb_target,
             "started the exit keep-alive stream"
         );
     }
@@ -4111,6 +4205,30 @@ where
             None
         };
 
+        // The SURB buffer target the Entry asked for, resolved once for both branches below.
+        //
+        // The Session request carries a "hint" as additional data telling what the Session initiator
+        // has configured as its target buffer size in the Balancer. The lower 32 bits contain the
+        // SURB target; the upper 32 bits carry PIX parameters and must be masked out.
+        //
+        // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
+        // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
+        // figure, and on that branch the fallback below — the same one the balancer would have used —
+        // is the only estimate of the buffer there is.
+        let announced_surb_target = {
+            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            if surb_target > 0 {
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+            } else {
+                self.cfg.initial_return_session_egress_rate as u64
+                    * self
+                        .cfg
+                        .minimum_surb_buffer_duration
+                        .max(MIN_SURB_BUFFER_DURATION)
+                        .as_secs()
+            }
+        };
+
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
                 error!(%session_id, %error, %reason, "failed to notify session closure");
@@ -4122,21 +4240,7 @@ where
             let egress_rate_control =
                 RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
-            // The Session request carries a "hint" as additional data telling what
-            // the Session initiator has configured as its target buffer size in the Balancer.
-            // The lower 32 bits contain the SURB target; the upper 32 bits carry PIX
-            // parameters and must be masked out.
-            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
-            let target_surb_buffer_size = if surb_target > 0 {
-                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
-            } else {
-                self.cfg.initial_return_session_egress_rate as u64
-                    * self
-                        .cfg
-                        .minimum_surb_buffer_duration
-                        .max(MIN_SURB_BUFFER_DURATION)
-                        .as_secs()
-            };
+            let target_surb_buffer_size = announced_surb_target;
 
             let surb_estimator_clone = slot.surb_estimator.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
@@ -4212,7 +4316,13 @@ where
 
             // Reports the SURB buffer level towards the Entry, and — on a PIX Session — carries the
             // Exit's own fill.
-            self.spawn_exit_keep_alive(session_id, &slot, msg_sender.clone(), pix.is_some());
+            self.spawn_exit_keep_alive(
+                session_id,
+                &slot,
+                msg_sender.clone(),
+                pix.is_some(),
+                announced_surb_target,
+            );
 
             session
         } else {
@@ -4254,7 +4364,13 @@ where
                 Some(closure_notifier),
             )?;
 
-            self.spawn_exit_keep_alive(session_id, &slot, msg_sender.clone(), pix.is_some());
+            self.spawn_exit_keep_alive(
+                session_id,
+                &slot,
+                msg_sender.clone(),
+                pix.is_some(),
+                announced_surb_target,
+            );
 
             session
         };
@@ -5846,8 +5962,12 @@ mod tests {
     // PIX fill — the Exit's own keep-alives
     // ---------------------------------------------------------------
 
-    /// A [`PixFillControl`] with no SURB reserve to speak of, so [`admit`](PixFillControl::admit) is
-    /// not what these tests are measuring.
+    /// A [`PixFillControl`] over a random pseudonym and an empty SURB estimate.
+    ///
+    /// `reserve` is the *effective* reserve, as [`effective_surb_reserve`] would have derived it —
+    /// these tests are about what `admit` does with one, not about where it came from. Against an
+    /// estimate that starts empty, any `reserve` above zero refuses fill outright, which is what makes
+    /// admission a usable assertion that a packet was classified as the notification.
     fn fill_control(notify_period: Option<Duration>, reserve: u64) -> PixFillControl {
         PixFillControl::new(
             HoprPseudonym::random(),
@@ -5948,6 +6068,97 @@ mod tests {
             .consumed
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         assert!(!control.admit());
+    }
+
+    /// The SURB-level notification is classified by when it was *due*, not by when the scheduler got
+    /// round to releasing it.
+    ///
+    /// The rate limiter that releases these packets does not hit the period exactly: it sleeps in
+    /// chunks of `MAX_WAIT_CHUNK`, re-reads its controller on each wake, and rounds a rate into an
+    /// integer packet count. Compared against the period exactly, a period the controller rounds
+    /// short by a microsecond would classify every other notification as fill — and, below the
+    /// reserve, drop it. That is the message that *asks* for the SURBs whose absence caused the drop,
+    /// and it runs on every Exit Session with a notification period configured, PIX or not.
+    ///
+    /// The reserve here is the instrument: the estimator is empty, so a packet the rule classifies as
+    /// fill is refused and a packet it classifies as the notification is admitted. Admission is
+    /// therefore the assertion that it was not counted as fill.
+    #[test]
+    fn a_level_notification_released_a_shade_early_is_still_the_notification() {
+        const RESERVE: u64 = 100;
+        // Two seconds, so the slack is `MAX_WAIT_CHUNK` rather than half the period, and the two
+        // bounds are distinguishable.
+        let period = Duration::from_secs(2);
+        let control = fill_control(Some(period), RESERVE);
+        control.start_notify();
+
+        let t0 = Instant::now();
+        assert!(
+            control.admit_at(t0),
+            "the first packet is the notification, whatever the estimate says"
+        );
+
+        // A shade under the period — the shape a rate rounded down by a microsecond produces.
+        let early = t0 + period - Duration::from_micros(1);
+        assert!(
+            control.admit_at(early),
+            "a notification released a microsecond early must not be reclassified as fill and dropped"
+        );
+
+        // And it is the notification rather than a free pass: the next packet is measured from when
+        // this one actually went out, so everything inside the following period is fill.
+        assert!(
+            !control.admit_at(early + Duration::from_millis(1)),
+            "the packet after the notification is fill, and there is nothing to spend"
+        );
+        assert!(
+            !control.admit_at(early + period - MAX_WAIT_CHUNK - Duration::from_millis(1)),
+            "a packet inside the slack window is still fill"
+        );
+
+        // The slack window opens `MAX_WAIT_CHUNK` before the period is up, and not earlier.
+        assert!(
+            control.admit_at(early + period - MAX_WAIT_CHUNK),
+            "at the edge of the slack window the packet is the notification again"
+        );
+
+        // A period short enough that `MAX_WAIT_CHUNK` would swallow it keeps half of itself.
+        let short = Duration::from_millis(200);
+        let control = fill_control(Some(short), RESERVE);
+        control.start_notify();
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0));
+        assert!(
+            !control.admit_at(t0 + short / 2 - Duration::from_millis(1)),
+            "the slack is capped at half the period, so it cannot widen a short period away to nothing"
+        );
+        assert!(control.admit_at(t0 + short / 2));
+    }
+
+    /// The reserve is a ceiling on a figure derived from the buffer the *Entry* asked for.
+    ///
+    /// The configured value is an absolute SURB count, while the buffer it is compared against is
+    /// sized by the peer. Left absolute, a PIX Session whose Entry targets fewer SURBs than the
+    /// reserve could never be filled at all — every fill packet withheld, the funded cycle stranded on
+    /// `max_recovery_time`, and nothing in the logs but a backoff.
+    #[test]
+    fn the_fill_surb_reserve_is_capped_at_a_quarter_of_the_entrys_announced_buffer() {
+        // The shipped reserve against the worked profile's buffer: the configured value binds and the
+        // derivation is inert, which is what keeps this from quietly weakening production.
+        assert_eq!(500, effective_surb_reserve(500, 7_000));
+        // Exactly four times the reserve is the point at which the two agree.
+        assert_eq!(500, effective_surb_reserve(500, 2_000));
+
+        // Below that, the Entry's buffer is what decides. The cluster fixtures' 64-SURB target is the
+        // case this exists for.
+        assert_eq!(16, effective_surb_reserve(500, 64));
+        assert_eq!(12, effective_surb_reserve(500, 50));
+
+        // Never zero: an Entry announcing a buffer of three would otherwise let fill spend the
+        // Session's last SURB, which is the one failure the reserve exists to prevent.
+        assert_eq!(1, effective_surb_reserve(500, 3));
+        assert_eq!(1, effective_surb_reserve(500, 0));
+        assert_eq!(1, effective_surb_reserve(0, 7_000));
     }
 
     /// Test dimensions whose cycle is large enough to need a visible fill rate.

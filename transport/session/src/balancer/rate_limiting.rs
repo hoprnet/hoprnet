@@ -96,7 +96,12 @@ enum StreamState {
 /// parked at the heartbeat wakes twice a second rather than continuously. The emitted *rate* is
 /// unaffected either way — the target instant is recomputed from when the item was read, so chunking
 /// changes when the controller is consulted, not when the item goes out.
-const MAX_WAIT_CHUNK: Duration = Duration::from_millis(500);
+///
+/// `pub(crate)` because it is also the slack the Exit's keep-alive control classifies a SURB-level
+/// notification by: the stream releases a packet up to one chunk late, and a notification that has
+/// merely been rescheduled is still the notification. Exported rather than duplicated so the two
+/// cannot drift apart.
+pub(crate) const MAX_WAIT_CHUNK: Duration = Duration::from_millis(500);
 
 /// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///

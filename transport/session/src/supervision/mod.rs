@@ -229,7 +229,7 @@
 //! | Bound | What it stops |
 //! |---|---|
 //! | [`max_rate`](PixFillConfig::max_rate) | The instantaneous cost of one Session. Validated *upwards* too — `validate_incoming_session_pix_config` refuses a ceiling below the rate the widest accepted quota needs, because a filler that cannot finish is worse than none. |
-//! | [`min_surb_reserve`](PixFillConfig::min_surb_reserve) | Fill spending the SURBs the Session needs for its own replies. Not an optimisation: a return packet that finds no SURB holds every packet this node originates for `surb_resolution_wait`, so an over-eager filler stalls the Session it is saving. The SURB-level notification is exempt, being the message that asks for more. |
+//! | [`min_surb_reserve`](PixFillConfig::min_surb_reserve) | Fill spending the SURBs the Session needs for its own replies. Not an optimisation: a return packet that finds no SURB holds every packet this node originates for `surb_resolution_wait`, so an over-eager filler stalls the Session it is saving. The SURB-level notification is exempt, being the message that asks for more. A ceiling rather than the figure used — the buffer it is measured against is the Entry's choice, so the effective reserve is never more than a quarter of the target the Entry announced. |
 //! | The stall rule | A doomed cycle, or a share-less SURB supply, burning `max_rate × max_recovery_time`. Once the target has not moved for [`max_recovery_idle`](SupervisorConfig::max_recovery_idle), fill drops to its heartbeat until the cycle moves again. |
 //! | The existing deadlines and the service gate | Unchanged. Fill is not a way around the backstop: an Exit with nothing to send strands exactly as it did before. |
 //!
@@ -494,7 +494,7 @@
 //! | `fill.loss_margin` | 0.05 | Fill counts packets sent; the cycle advances on shares that arrive. The Exit cannot observe the difference, so it sends this much extra and lets the per-second re-plan absorb whatever the real figure turns out to be |
 //! | `fill.max_rate` | 250 | An idle cycle here needs 163 840 x 1.05 / 5400 s = **32 packets/s**, so this is ~8x the requirement — headroom for a Session that fell behind, at a ceiling of ~2 Mbps. `validate_incoming_session_pix_config` enforces the floor against the *widest accepted quota*, which at the default `quota_range` is 128 packets/s |
 //! | `fill.heartbeat` | 60 s | The floor while organic egress covers the need. Not zero: the Entry's own idle eviction is refreshed by this traffic, and its balancer has no SURB-level report without it |
-//! | `fill.min_surb_reserve` | 500 | `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer target below it leaves fill 93 % of the buffer and keeps the last 7 % for the application, which is the side that has something waiting on it |
+//! | `fill.min_surb_reserve` | 500 | `SurbStoreConfig::distress_threshold`. A *ceiling*: the effective reserve is `min(500, announced_target / 4)`, floored at one, because the buffer it is measured against is sized by the Entry rather than here. At the 7 000-SURB balancer target below a quarter is 1 750, so 500 is what binds — leaving fill 93 % of the buffer and keeping the last 7 % for the application, which is the side that has something waiting on it. The derivation engages only on a Session whose Entry asked for under 2 000 SURBs, which without it could never be filled at all |
 //!
 //! What one cycle costs is not in this table, because it is not in this configuration: the 162.2 MiB
 //! quota is priced by the deposit pool, which is also what decides that a deposit has cleared it.
@@ -881,7 +881,7 @@ pub struct SupervisorConfig {
 ///
 /// * [`max_rate`](Self::max_rate) caps the instantaneous rate.
 /// * [`min_surb_reserve`](Self::min_surb_reserve) stops fill from spending the SURBs the Session needs for its own
-///   replies.
+///   replies, as a ceiling on a reserve derived per Session from the Entry's announced buffer target.
 /// * The stall rule holds fill at the heartbeat once the target cycle stops making progress, so a doomed cycle or a
 ///   share-less SURB supply cannot burn `max_rate × max_recovery_time` SURBs.
 /// * The existing deadlines and the service gate are unchanged, and remain the backstop for a client that stops
@@ -954,15 +954,28 @@ pub struct PixFillConfig {
     #[default(250)]
     pub max_rate: u32,
 
-    /// SURBs that must remain estimated-available before a fill packet is emitted.
+    /// Ceiling on the SURBs that must remain estimated-available before a fill packet is emitted.
     ///
     /// Fill is the one egress on the Exit that has no application waiting on it, so it is the one
     /// that must yield. Spending the last SURBs on fill is not merely wasteful: a return packet with
     /// no SURB to ride holds *every* packet this node originates for the resolver's
     /// `surb_resolution_wait`, so an over-eager filler stalls the Session it is trying to save. The
-    /// heartbeat is exempt — it is the signal that asks for more SURBs.
+    /// SURB-level notification is exempt — it is the signal that asks for more SURBs — but the
+    /// heartbeat is not, being fill at its floor rather than a different message.
     ///
-    /// Default: 500, matching `SurbStoreConfig::distress_threshold`.
+    /// A ceiling rather than the figure used, because the two sides of the comparison are chosen by
+    /// different nodes: the reserve is measured against the Exit's estimate of its own SURB buffer for
+    /// the Session, and how deep that buffer is is the *Entry's* decision, announced with its
+    /// initiation. The effective reserve is therefore never more than a quarter of the Entry's
+    /// announced buffer target, floored at one. Without that, an operator sizing this against a
+    /// production buffer would also be deciding — unintentionally — that every Session whose Entry
+    /// asks for a shallower one can never be filled at all: the estimate never reaches the reserve,
+    /// every fill packet is withheld, and the funded cycle strands on
+    /// [`max_recovery_time`](SupervisorConfig::max_recovery_time).
+    ///
+    /// Default: 500, matching `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer
+    /// target of the worked profile a quarter is 1 750, so the configured value is what binds there
+    /// and the derivation only engages on a Session whose Entry asked for less than four times it.
     #[default(500)]
     pub min_surb_reserve: u64,
 }
