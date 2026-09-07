@@ -82,6 +82,22 @@ enum StreamState {
     Wait,
 }
 
+/// Longest a [`RateLimitedStream`] sleeps before re-reading its controller.
+///
+/// The wait for one item used to be computed once, when the item was read, and then slept out whole.
+/// That is invisible at the rates this adapter was written for and wrong at the rates the PIX filler
+/// uses it at: a stream idling at one packet a minute that is raised to ten a second would apply the
+/// new rate up to a minute later, which is a minute of a funded cycle's deadline spent honouring a
+/// decision that has been superseded.
+///
+/// Chunking the sleep bounds that lag by this value instead of by the period. Half a second is chosen
+/// against what the lag costs rather than against precision: it is short enough that a rate change is
+/// acted on within one sampling interval of the planner that made it, and long enough that a stream
+/// parked at the heartbeat wakes twice a second rather than continuously. The emitted *rate* is
+/// unaffected either way — the target instant is recomputed from when the item was read, so chunking
+/// changes when the controller is consulted, not when the item goes out.
+const MAX_WAIT_CHUNK: Duration = Duration::from_millis(500);
+
 /// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///
 /// See [`RateLimitStreamExt::rate_limit_per_unit`].
@@ -91,6 +107,13 @@ pub struct RateLimitedStream<S: futures::Stream> {
     #[pin]
     inner: S,
     item: Option<S::Item>,
+    /// When the pending item was read, and therefore the instant the wait is measured from.
+    ///
+    /// Held separately from the sleep because the sleep is now a *chunk* of the wait rather than all
+    /// of it: each wake re-reads the controller and re-derives how much of the period is left from
+    /// this instant, so a rate raised mid-wait shortens the remaining wait instead of being applied
+    /// to the item after.
+    item_at: Option<Instant>,
     #[pin]
     delay: Option<Sleep>,
     state: StreamState,
@@ -103,6 +126,7 @@ impl<S: futures::Stream> RateLimitedStream<S> {
         Self {
             inner: stream,
             item: None,
+            item_at: None,
             delay: None,
             state: if controller.0.load(Ordering::Relaxed) > 0 {
                 StreamState::Read
@@ -135,11 +159,16 @@ where
                     let yield_start = Instant::now();
                     if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
                         *this.item = Some(item);
+                        *this.item_at = Some(yield_start);
                         let delay_time = this.delay_time.load(Ordering::Relaxed);
                         if delay_time > 0 {
+                            // The `max` keeps the original guarantee that two items are never
+                            // emitted closer together than `MIN_DELAY`; the `min` is what bounds how
+                            // stale the rate this was computed from may become.
                             let wait = Duration::from_micros(delay_time)
                                 .saturating_sub(yield_start.elapsed())
-                                .max(RateController::MIN_DELAY);
+                                .max(RateController::MIN_DELAY)
+                                .min(MAX_WAIT_CHUNK);
                             *this.delay = Some(futures_time::task::sleep(wait.into()));
                             *this.state = StreamState::Wait;
                         } else {
@@ -156,10 +185,18 @@ where
                     }
                     let delay_time = this.delay_time.load(Ordering::Relaxed);
                     if delay_time > 0 {
-                        *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
                         if this.item.is_some() {
+                            // The item was read while the stream was suspended, so the period it now
+                            // owes starts here rather than at whenever it happened to be read — an
+                            // item held through an hour of zero rate must not be released the instant
+                            // a rate appears.
+                            *this.item_at = Some(Instant::now());
+                            *this.delay = Some(futures_time::task::sleep(
+                                Duration::from_micros(delay_time).min(MAX_WAIT_CHUNK).into(),
+                            ));
                             *this.state = StreamState::Wait;
                         } else {
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
                             *this.state = StreamState::Read;
                         }
                     } else {
@@ -170,9 +207,29 @@ where
                 StreamState::Wait => {
                     if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
                         let _ = futures::ready!(delay.as_mut().poll(cx));
+                    }
+
+                    let delay_time = this.delay_time.load(Ordering::Relaxed);
+                    if delay_time == 0 {
+                        // The rate was withdrawn while this item waited. Park it rather than emitting
+                        // it: a zero rate means "emit nothing until told otherwise", and an item
+                        // already in hand is not an exception to that.
+                        *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
+                        *this.state = StreamState::NoRate;
+                        continue;
+                    }
+
+                    // Re-derived from the read instant against the *current* rate, so a rate raised
+                    // during the wait shortens what is left of it and a rate lowered extends it.
+                    let elapsed = this.item_at.map(|at| at.elapsed()).unwrap_or_default();
+                    let remaining = Duration::from_micros(delay_time).saturating_sub(elapsed);
+                    if remaining.is_zero() {
+                        *this.item_at = None;
                         *this.state = StreamState::Read;
                         return Poll::Ready(this.item.take());
                     }
+
+                    *this.delay = Some(futures_time::task::sleep(remaining.min(MAX_WAIT_CHUNK).into()));
                 }
             }
         }
@@ -787,5 +844,73 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    /// A rate raised mid-wait must take effect within a wait chunk, not at the end of the old period.
+    ///
+    /// This is what the PIX filler needs and what the adapter did not do: it computed the wait once,
+    /// when the item was read, and slept it out whole. A stream parked at one packet a minute — the
+    /// fill heartbeat — that is raised to ten a second would therefore have applied the new rate up
+    /// to a minute later, which on a funded cycle is a minute of its deadline spent honouring a
+    /// decision that had already been superseded.
+    ///
+    /// The bound asserted is [`MAX_WAIT_CHUNK`] plus scheduling slack, and deliberately far below the
+    /// 60 s period it replaces: a regression that restores the old behaviour cannot pass it by being
+    /// unlucky, only by being wrong.
+    #[tokio::test]
+    async fn a_rate_raised_during_a_long_wait_is_applied_within_one_chunk() {
+        let stream = stream::iter(1..=2);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(1, Duration::from_secs(60));
+
+        // One poll is enough to have the item read and the minute-long wait armed. Dropping the
+        // timed-out future leaves that state on the stream, which is exactly the situation the
+        // planner raises a rate into.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(200), rate_limited.next())
+                .await
+                .is_err(),
+            "the fixture needs an item parked on a long wait"
+        );
+
+        let raised_at = Instant::now();
+        controller.set_rate_per_unit(10, Duration::from_secs(1));
+
+        let first = tokio::time::timeout(Duration::from_secs(5), rate_limited.next())
+            .await
+            .expect("the stream must re-arm rather than sleeping out the minute it started with");
+        assert_eq!(Some(1), first);
+        assert!(
+            raised_at.elapsed() < MAX_WAIT_CHUNK + Duration::from_millis(500),
+            "the raised rate took {:?} to apply, against a chunk of {MAX_WAIT_CHUNK:?}",
+            raised_at.elapsed()
+        );
+    }
+
+    /// The converse: a rate withdrawn mid-wait parks the item instead of releasing it.
+    ///
+    /// Zero means "emit nothing until told otherwise", and an item already read is not an exception
+    /// — it is precisely the packet a Session that has just been closed must not send.
+    #[tokio::test]
+    async fn a_rate_withdrawn_during_a_wait_parks_the_item() {
+        let stream = stream::iter(1..=2);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(2, Duration::from_secs(1));
+
+        assert_eq!(Some(1), rate_limited.next().await);
+        controller.set_rate_per_unit(0, Duration::from_secs(1));
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(1500), rate_limited.next())
+                .await
+                .is_err(),
+            "an item waiting when the rate was withdrawn must not be emitted"
+        );
+
+        controller.set_rate_per_unit(100, Duration::from_secs(1));
+        assert_eq!(
+            Some(2),
+            tokio::time::timeout(Duration::from_secs(2), rate_limited.next())
+                .await
+                .expect("the parked item must be released once a rate returns")
+        );
     }
 }

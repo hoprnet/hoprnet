@@ -186,6 +186,7 @@ async fn worker_loop(
             let now = Instant::now();
             if now >= dl {
                 let actions = supervisor.handle_timers(now, gate.served_total());
+                report_fill_stall(&mut supervisor);
                 if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                     return;
                 }
@@ -207,6 +208,7 @@ async fn worker_loop(
                 Err(_) => {
                     let now = Instant::now();
                     let actions = supervisor.handle_timers(now, gate.served_total());
+                    report_fill_stall(&mut supervisor);
                     if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                         return;
                     }
@@ -218,6 +220,19 @@ async fn worker_loop(
                 return;
             }
         }
+    }
+}
+
+/// Counts a fill stall, if one just began.
+///
+/// The planner cannot do this itself — it is a pure function of its inputs, and a metric is neither —
+/// so the edge is latched there and drained here, in the actor that is allowed to have effects. Not
+/// folded into `dispatch`, because the stall is not an action: it produces no work for the driver,
+/// only a number for the operator.
+fn report_fill_stall(supervisor: &mut SessionPixSupervisor) {
+    if supervisor.take_fill_stall() {
+        #[cfg(feature = "telemetry")]
+        crate::telemetry::record_pix_fill_backoff(crate::telemetry::PixFillBackoff::Stalled);
     }
 }
 

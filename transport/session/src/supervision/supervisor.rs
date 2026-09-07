@@ -633,6 +633,14 @@ impl SessionPixSupervisor {
             .collect()
     }
 
+    /// Reports, once, that fill has fallen back because its target stopped progressing.
+    ///
+    /// Exposed for the worker, which is the layer that may have side effects; this state machine and
+    /// the planner behind it are pure, so neither can record the metric itself.
+    pub fn take_fill_stall(&mut self) -> bool {
+        self.fill.take_stall_onset()
+    }
+
     /// When the fill planner next wants to run, or `None` if there is nothing for it to do.
     ///
     /// `None` while no cycle is being filled for *and* the stream is already silent, which is what

@@ -89,6 +89,12 @@ pub(crate) struct FillPlanner {
     /// Whether the stall has already been reported, so a stalled cycle warns once rather than once a
     /// second for the whole of `max_recovery_time`.
     stall_warned: bool,
+    /// Set on the tick a stall begins, and taken by the worker so it can count the event.
+    ///
+    /// An edge rather than a level, because the metric it feeds counts stalls: a level would count
+    /// one per second for as long as the cycle stayed motionless, which is a measure of how long the
+    /// operator waited rather than of how often this happened.
+    stall_onset: bool,
 }
 
 impl FillPlanner {
@@ -111,12 +117,21 @@ impl FillPlanner {
             target_progress_at: None,
             last_rate: FillRate::ZERO,
             stall_warned: false,
+            stall_onset: false,
         }
     }
 
     /// Whether fill is configured on at all.
     pub(crate) fn is_enabled(&self) -> bool {
         self.cfg.enabled
+    }
+
+    /// Reports, once, that the target cycle has gone motionless and fill has fallen back.
+    ///
+    /// Consumed rather than read so the caller counts the stall rather than its duration. The caller
+    /// is the worker, which is the layer allowed to have side effects; this module stays pure.
+    pub(crate) fn take_stall_onset(&mut self) -> bool {
+        std::mem::take(&mut self.stall_onset)
     }
 
     /// Whether the stream this planner drives is currently emitting nothing.
@@ -263,6 +278,7 @@ impl FillPlanner {
         let wanted = if stalled && wanted > heartbeat_pps {
             if !self.stall_warned {
                 self.stall_warned = true;
+                self.stall_onset = true;
                 tracing::warn!(
                     ssa_id = ?self.target,
                     seen = self.target_seen,
