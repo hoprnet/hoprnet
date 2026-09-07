@@ -193,8 +193,34 @@ async fn establish_pix_session(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
 ) -> anyhow::Result<hopr_lib::HoprSession> {
+    establish_pix_session_with(cluster, hops, None, false).await
+}
+
+/// As [`establish_pix_session`], but with the Entry's SURB supply under the caller's control.
+///
+/// Two knobs, and both of them matter only to the fill tests:
+///
+/// * `surb_management` turns the Entry's SURB balancer on. Without it an Entry produces SURBs only alongside its own
+///   outgoing packets, so an *idle* Session hands the Exit nothing to send with — and fill has nothing to fill with.
+///   That is a real deployment shape rather than a test artefact, which is why one of the tests below deliberately
+///   keeps it off: the recovery deadline must still close a Session whose Entry supplies nothing.
+/// * `rate_control` selects the Exit's rate-limited egress branch instead of `NoRateControl`. The default is
+///   `NoRateControl`, matching every other test here and exercising the branch whose SURB level estimate fill's reserve
+///   depends on.
+#[cfg(feature = "session-client")]
+async fn establish_pix_session_with(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+    surb_management: Option<hopr_lib::SurbBalancerConfig>,
+    rate_control: bool,
+) -> anyhow::Result<hopr_lib::HoprSession> {
     let routing = hops.try_into()?;
     let ip = IpOrHost::from_str(":0")?;
+    let capabilities = if rate_control {
+        SessionCapability::Segmentation | SessionCapability::UsePIX
+    } else {
+        SessionCapability::Segmentation | SessionCapability::NoRateControl | SessionCapability::UsePIX
+    };
     let (session, _) = tokio::time::timeout(
         Duration::from_secs(120),
         cluster.entry.inner().connect_to(
@@ -203,11 +229,9 @@ async fn establish_pix_session(
             HoprSessionClientConfig {
                 forward_path: routing,
                 return_path: routing,
-                capabilities: SessionCapability::Segmentation
-                    | SessionCapability::NoRateControl
-                    | SessionCapability::UsePIX,
+                capabilities,
                 pseudonym: None,
-                surb_management: None,
+                surb_management,
                 always_max_out_surbs: false,
                 pix_ssa_quota: Some(PIX_PARAMS),
                 flow_control: None,
@@ -218,6 +242,203 @@ async fn establish_pix_session(
     .await
     .context("session connection timed out after 120s")??;
     Ok(session)
+}
+
+/// The Exit-side PIX configuration the fill tests share.
+///
+/// `max_recovery_time` is the budget fill plans against, and 60 s is as short as a legal pair gets
+/// here: `max_recovery_idle` must clear the reconstructor's 30 s acknowledgement window and the hard
+/// deadline must exceed it. A whole cycle is 32 packets at [`PIX_PARAMS`], so the aim point of
+/// `0.75 x 60 s` asks fill for about three quarters of a packet a second — slow enough to be
+/// unmistakably fill rather than a burst, fast enough to finish inside one test.
+///
+/// `min_surb_reserve` is lowered from its shipped 500 because the shipped value is sized against a
+/// production SURB buffer, and this cluster's whole cycle is 32 packets. Left at 500 the reserve
+/// would refuse every fill packet until the Entry's balancer had produced half a thousand SURBs for
+/// a Session that needs thirty-two.
+#[cfg(feature = "session-client")]
+fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -> IncomingSessionPixConfig {
+    IncomingSessionPixConfig {
+        quota_range: 0..=100_000,
+        enforce_pix: false,
+        max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
+        supervision: SupervisorConfig {
+            max_ssa_delivery_time: Duration::from_secs(10),
+            // Far out of reach, so a deposit that silently failed to register cannot be mistaken for
+            // the deadline under test.
+            max_deposit_wait: Duration::from_secs(600),
+            // At its floor, which puts it below the hard deadline. It does not fire here because it
+            // is service-gated and these Sessions consume no gated service at all.
+            max_recovery_idle: Duration::from_secs(30),
+            max_recovery_time: Duration::from_secs(60),
+            fill,
+            ..Default::default()
+        },
+    }
+}
+
+/// A PIX lifecycle milestone the fill tests wait on, with when it happened.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PixMilestone {
+    /// A deposit was asked for and signalled.
+    Funded(hopr_api::node::PixAddressId),
+    /// A cycle recovered its private key — the thing fill exists to make happen.
+    Recovered(hopr_api::node::PixAddressId),
+}
+
+/// Drives the Exit's PIX event stream in the background, reporting milestones as they land.
+///
+/// Started *before* the Session is established, and that ordering is load-bearing rather than tidy:
+/// the Exit blocks its first `SsaRequest` on the deposit pool with a three-second budget, while
+/// `connect_to` on a Session with a SURB balancer does not return until the balancer has filled —
+/// comfortably longer than that. A test that only begins answering once it holds the Session has
+/// already lost the first cycle to `UnacceptablePixParams`, and would report that as a fill failure.
+///
+/// Every deposit is signalled and every deposit-data request is answered with empty data, which is
+/// what the deposit pool this cluster does not have would do. The tests then only have to say which
+/// milestones they are waiting for.
+#[cfg(feature = "session-client")]
+fn spawn_exit_pix_driver(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+) -> (
+    tokio::task::JoinHandle<()>,
+    futures::channel::mpsc::UnboundedReceiver<(PixMilestone, std::time::Instant)>,
+) {
+    let mut events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let (tx, rx) = futures::channel::mpsc::unbounded();
+    let handle = tokio::spawn(async move {
+        while let Some(event) = events.next().await {
+            match event {
+                PixEvent::DepositAddressReceived(data) => {
+                    tracing::info!(id = ?data.id, "Exit: DepositAddressReceived");
+                    let mut notifier = data.deposit_updated;
+                    if notifier.send((data.id, HoprBalance::new_base(1))).await.is_err() {
+                        tracing::warn!(id = ?data.id, "the deposit notifier is gone");
+                        break;
+                    }
+                    if tx
+                        .unbounded_send((PixMilestone::Funded(data.id), std::time::Instant::now()))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                PixEvent::PrivateKeyRecovered(data) => {
+                    tracing::info!(id = ?data.id, "Exit: PrivateKeyRecovered");
+                    if tx
+                        .unbounded_send((PixMilestone::Recovered(data.id), std::time::Instant::now()))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                PixEvent::DepositDataRequest(request) => {
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        if created
+                            .send(PixDepositData {
+                                id,
+                                data: Box::default(),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            tracing::warn!("the deposit-data channel is gone");
+                            break;
+                        }
+                    }
+                }
+                other => tracing::debug!("Exit PixEvent: {other:?}"),
+            }
+        }
+        tracing::info!("exit PIX driver exited");
+    });
+    (handle, rx)
+}
+
+/// Runs exactly `count` 32-byte echo round-trips on `session`, one every `pace`.
+///
+/// Borrows the Session rather than taking it, which [`spawn_echo_task`] cannot: aborting that task
+/// *drops* the Session, which closes it. A test about what fill does once an application goes quiet
+/// needs the traffic to stop while the Session lives on, so it has to keep the Session in its own
+/// scope.
+///
+/// Counted rather than timed, and paced rather than as fast as the link allows, because the caller is
+/// choosing how much of a cycle the application contributes. An unpaced loop manages a hundred-odd
+/// round trips in a couple of seconds, which at [`PIX_PARAMS`]' 32-packet cycles is several whole
+/// cycles — enough to leave the Exit's SURB FIFO holding a run of share-less SURBs minted between one
+/// cycle and the next, which no rate of fill can get past before the idle deadline.
+#[cfg(feature = "session-client")]
+async fn echo_n(session: &mut hopr_lib::HoprSession, count: usize, pace: Duration) -> usize {
+    let mut completed = 0usize;
+    for _ in 0..count {
+        let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
+        let round_trip = async {
+            session.write_all(&msg).await?;
+            session.flush().await?;
+            let mut echoed = [0u8; 32];
+            session.read_exact(&mut echoed).await?;
+            std::io::Result::Ok(())
+        };
+        match tokio::time::timeout(Duration::from_secs(20), round_trip).await {
+            Ok(Ok(())) => completed += 1,
+            Ok(Err(error)) => {
+                tracing::warn!(%error, "echo round trip failed");
+                break;
+            }
+            Err(_) => {
+                tracing::warn!("echo round trip timed out");
+                break;
+            }
+        }
+        tokio::time::sleep(pace).await;
+    }
+    completed
+}
+
+/// Collects milestones until `done` accepts the set, or the budget expires.
+#[cfg(feature = "session-client")]
+async fn await_milestones(
+    rx: &mut futures::channel::mpsc::UnboundedReceiver<(PixMilestone, std::time::Instant)>,
+    budget: Duration,
+    mut done: impl FnMut(&[(PixMilestone, std::time::Instant)]) -> bool,
+) -> Vec<(PixMilestone, std::time::Instant)> {
+    let mut seen = Vec::new();
+    let _ = tokio::time::timeout(budget, async {
+        while let Some(milestone) = rx.next().await {
+            seen.push(milestone);
+            if done(&seen) {
+                break;
+            }
+        }
+    })
+    .await;
+    seen
+}
+
+/// The Entry-side balancer that keeps an idle Session's Exit supplied with SURBs to fill with.
+///
+/// Without it an Entry produces SURBs only alongside its own outgoing packets, so an idle Session
+/// hands the Exit nothing to fill with. What the target must *not* be is much larger than a cycle's
+/// emission, and that is a property of these dimensions rather than of production: a share rides a
+/// SURB, the Entry mints SURBs ahead of demand, and a SURB minted while no cycle is committed carries
+/// no share at all. A buffer many multiples of a cycle deep therefore parks a long run of share-less
+/// SURBs at the head of the Exit's FIFO, and the next cycle makes no progress until they are spent —
+/// which at fill's rate is minutes. Two cycles' worth keeps the queue shallow enough that this cannot
+/// dominate, while still covering the Exit between refills.
+///
+/// Production does not have the problem: the shipped 7 000 SURBs against a 655 360-packet cycle is
+/// one per cent of a cycle, so the share-less run between cycles is a rounding error rather than the
+/// whole buffer.
+#[cfg(feature = "session-client")]
+fn idle_surb_balancer() -> hopr_lib::SurbBalancerConfig {
+    hopr_lib::SurbBalancerConfig {
+        // Two cycles at PIX_PARAMS' 8 x (2 + 2) emitted shares.
+        target_surb_buffer_size: 64,
+        max_surbs_per_sec: 40,
+        ..Default::default()
+    }
 }
 
 /// Keeps 32-byte echo traffic flowing, and records into `stopped` why it stopped.
@@ -857,6 +1078,14 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
                 max_recovery_idle: Duration::from_secs(30),
                 // The deadline under test.
                 max_recovery_time: Duration::from_secs(40),
+                // Off, so that this test measures the deadline and nothing else. With fill on, an
+                // Exit that had SURBs would carry the cycle to recovery and the deadline would never
+                // fire — which is the whole point of fill, and is what
+                // `recovery_hard_deadline_closes_a_session_fill_cannot_supply` covers instead.
+                fill: hopr_lib::exports::transport::session::PixFillConfig {
+                    enabled: false,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         },
@@ -934,6 +1163,342 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     );
 
     tracing::info!(hops, "recovery hard deadline test PASSED");
+    Ok(())
+}
+
+/// The headline property: an idle funded cycle is carried to recovery by the Exit's own fill.
+///
+/// Nothing is written on this Session after it is established. Every share that reaches the Exit's
+/// reconstructor therefore rode a keep-alive the Exit originated for itself, and the cycle recovering
+/// at all is the proof — before fill existed this Session's deposit was simply lost, because a cycle
+/// only recovers once its whole emission has ridden back to the Entry and an idle application sends
+/// none of it.
+///
+/// Three assertions, in the order they matter:
+///
+/// * the cycle recovers, and does so inside the aim point fill was planned against rather than merely inside the
+///   deadline — a cycle that only just scrapes the hard deadline has no room for its successor's commitment and deposit
+///   round trip;
+/// * the *successor* is requested and funded, which is what proves the completion was not a dead end. This is the half
+///   that the Entry-side `returned_packets` fix exists for: a successor asked for on the strength of keep-alives alone
+///   is refused as under-served by an Entry that does not credit them, and the Session then dies on
+///   `max_ssa_delivery_time` blaming a timer;
+/// * an echo still round-trips afterwards, so the Session was kept alive rather than merely kept accounted for.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize) -> anyhow::Result<()> {
+    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        min_surb_reserve: 16,
+        ..Default::default()
+    });
+    let aim_point = exit_pix
+        .supervision
+        .max_recovery_time
+        .mul_f64(exit_pix.supervision.fill.finish_fraction);
+
+    let cluster = build_pix_cluster(hops, exit_pix, Duration::from_secs(120)).await?;
+
+    // Before the Session exists: the Exit's very first SSA request blocks on the deposit pool.
+    let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+    let session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), false).await?;
+    tracing::info!("session established; not one application byte will be written to it");
+
+    let started = std::time::Instant::now();
+    let seen = await_milestones(&mut milestones, aim_point * 2, |seen| {
+        // The successor being funded is the end of the property: the first cycle recovered on fill
+        // alone, and the Entry admitted the request that recovery earned.
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+            && seen
+                .iter()
+                .filter(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_)))
+                .count()
+                >= 2
+    })
+    .await;
+
+    let recovered_at = seen
+        .iter()
+        .find(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+        .map(|(_, at)| *at)
+        .with_context(|| {
+            format!(
+                "no idle cycle was completed by fill within {:?}: {seen:?}",
+                aim_point * 2
+            )
+        })?;
+    let successor_at = seen
+        .iter()
+        .filter(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_)))
+        .nth(1)
+        .map(|(_, at)| *at)
+        .with_context(|| {
+            format!(
+                "the cycle recovered but its successor was never funded, so the completion bought nothing: {seen:?}"
+            )
+        })?;
+
+    // The later of the two, because the successor's deposit rides the *early* recovery signal and so
+    // routinely lands before full recovery is reported. Asserting on whichever happened to be first
+    // would let a late completion pass.
+    let elapsed = recovered_at.max(successor_at).duration_since(started);
+    tracing::info!(
+        recovered_after = ?recovered_at.duration_since(started),
+        successor_after = ?successor_at.duration_since(started),
+        ?aim_point,
+        "idle cycle completed and its successor funded"
+    );
+    assert!(
+        elapsed < aim_point,
+        "the idle cycle and its successor took {elapsed:?}, past the {aim_point:?} fill was planned against"
+    );
+
+    // And the Session is alive rather than merely accounted for.
+    let stopped = EchoStopCell::default();
+    let echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(30));
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert_eq!(
+        None,
+        stopped.get().map(|(stop, _)| stop),
+        "a Session completed by fill must still carry application traffic"
+    );
+    echo.abort();
+    driver.abort();
+
+    tracing::info!(hops, "idle PIX fill test PASSED");
+    Ok(())
+}
+
+/// Fill picks a cycle up from wherever the application left it.
+///
+/// The deployment shape this is about is the common one — a VPN Session that transfers and then goes
+/// quiet — and the trap in it is arithmetic rather than plumbing: the planner has to re-derive its
+/// rate from the shares that are actually outstanding, not from the figure it would have asked for at
+/// the start. A planner replaying its opening rate would over-send by however much the application
+/// already contributed; one that never re-planned at all would keep filling at the heartbeat it fell
+/// to while the application was busy, and the cycle would strand.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn fill_resumes_after_organic_traffic_stops(#[case] hops: usize) -> anyhow::Result<()> {
+    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        min_surb_reserve: 16,
+        ..Default::default()
+    });
+    let aim_point = exit_pix
+        .supervision
+        .max_recovery_time
+        .mul_f64(exit_pix.supervision.fill.finish_fraction);
+
+    let cluster = build_pix_cluster(hops, exit_pix, Duration::from_secs(120)).await?;
+
+    let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+    // Held in this scope for the rest of the test: the Session must outlive its own traffic, since
+    // dropping it is what closes it.
+    let mut session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), false).await?;
+
+    // A short burst of application traffic, then silence for the rest of the Session.
+    // A quarter of a cycle of application traffic: enough that the remainder fill has to plan against
+    // is genuinely smaller than the whole, and few enough that the cycle cannot finish on the
+    // application's own packets. Then silence for the rest of the Session.
+    const ECHOED: usize = 8;
+    let echoed = echo_n(&mut session, ECHOED, Duration::from_millis(200)).await;
+    assert_eq!(
+        ECHOED, echoed,
+        "the application must actually contribute before this test can say fill finished the rest"
+    );
+
+    let mut drained = Vec::new();
+    while let Ok(Some(milestone)) = milestones.try_next() {
+        drained.push(milestone);
+    }
+    assert!(
+        !drained
+            .iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_))),
+        "the application finished the cycle by itself, so there is nothing left for fill to prove: {drained:?}"
+    );
+    tracing::info!(
+        echoed,
+        ?drained,
+        "application traffic stopped; the cycle is fill's to finish"
+    );
+
+    let started = std::time::Instant::now();
+    let seen = await_milestones(&mut milestones, aim_point, |seen| {
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+    })
+    .await;
+    driver.abort();
+
+    let recovered_at = seen
+        .iter()
+        .find(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+        .map(|(_, at)| *at)
+        .with_context(|| format!("fill did not finish the cycle the application abandoned: {seen:?}"))?;
+    tracing::info!(after = ?recovered_at.duration_since(started), "the abandoned cycle recovered on fill alone");
+    drop(session);
+
+    tracing::info!(hops, "fill resumption test PASSED");
+    Ok(())
+}
+
+/// A busy Session's cycles complete, and fill does not get in their way.
+///
+/// The unit-level property — that fill drops to its heartbeat once organic egress covers the
+/// requirement — is pinned where it is decided, in the planner. What this adds is the consequence on
+/// a real cluster: an application sending far above the required rate completes its cycles and keeps
+/// echoing throughout, so the extra stream neither starves the data path of SURBs nor wedges the
+/// egress gate behind its own traffic.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn fill_yields_to_organic_traffic(#[case] hops: usize) -> anyhow::Result<()> {
+    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        min_surb_reserve: 16,
+        ..Default::default()
+    });
+    let cluster = build_pix_cluster(hops, exit_pix, Duration::from_secs(120)).await?;
+
+    let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+    let session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), false).await?;
+
+    let stopped = EchoStopCell::default();
+    let echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(30));
+
+    let seen = await_milestones(&mut milestones, Duration::from_secs(90), |seen| {
+        seen.iter()
+            .filter(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+            .count()
+            >= 2
+    })
+    .await;
+    driver.abort();
+
+    let recovered = seen
+        .iter()
+        .filter(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_)))
+        .count();
+    assert!(
+        recovered >= 2,
+        "a busy PIX Session completed only {recovered} cycle(s): {seen:?}"
+    );
+    assert_eq!(
+        None,
+        stopped.get().map(|(stop, _)| stop),
+        "the echo must survive its own Session's fill"
+    );
+    echo.abort();
+
+    tracing::info!(hops, "fill yields to organic traffic test PASSED");
+    Ok(())
+}
+
+/// The backstop still closes a Session whose Entry supplies nothing to fill with.
+///
+/// Fill is not a way around the recovery deadline, and this is the case that proves it: no balancer
+/// on the Entry, so the Exit is handed no SURBs, so the filler — which yields to the SURB reserve
+/// precisely so that it cannot stall the node — sends nothing and the cycle strands exactly as it
+/// would have before. Its sibling above, with fill disabled outright, isolates the deadline itself;
+/// this one shows that turning fill *on* does not disarm it.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn recovery_hard_deadline_closes_a_session_fill_cannot_supply(#[case] hops: usize) -> anyhow::Result<()> {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
+            supervision: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(600),
+                max_recovery_idle: Duration::from_secs(30),
+                // The deadline under test, and fill is on.
+                max_recovery_time: Duration::from_secs(40),
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(120),
+    )
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    // No balancer: the Entry produces SURBs only alongside its own packets, and it sends none.
+    let session = establish_pix_session_with(&cluster, hops, None, false).await?;
+
+    tokio::time::timeout(Duration::from_secs(60), async {
+        while let Some(event) = exit_events.next().await {
+            match event {
+                PixEvent::DepositAddressReceived(data) => {
+                    let mut notifier = data.deposit_updated;
+                    notifier
+                        .send((data.id, HoprBalance::new_base(1)))
+                        .await
+                        .context("failed to signal deposit via notifier")?;
+                    tracing::info!(id = ?data.id, "deposit signalled, no traffic and no SURBs");
+                    return anyhow::Ok(());
+                }
+                PixEvent::DepositDataRequest(request) => {
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        created
+                            .send(PixDepositData {
+                                id,
+                                data: Box::default(),
+                            })
+                            .await
+                            .context("failed to answer the deposit data request")?;
+                    }
+                }
+                other => tracing::debug!("Exit PixEvent while awaiting the deposit request: {other:?}"),
+            }
+        }
+        anyhow::bail!("the Exit never asked for a deposit")
+    })
+    .await
+    .context("timed out waiting for the deposit request")??;
+
+    tokio::time::sleep(Duration::from_secs(50)).await;
+
+    let stopped = EchoStopCell::default();
+    let _echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(10));
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while stopped.get().is_none() {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await
+    .context("a session fill could not supply survived its absolute recovery deadline")?;
+
+    let (stop, _) = stopped.get().context("the echo task never stopped")?;
+    assert!(
+        stop.is_closure(),
+        "the Session must be observed closed after its recovery deadline, not merely quiet; got {stop:?}"
+    );
+
+    tracing::info!(hops, "recovery hard deadline with fill enabled test PASSED");
     Ok(())
 }
 
