@@ -32,7 +32,8 @@
 //! |---|---|---|
 //! | `SessionPixSupervisor` | `supervisor` | Pure state machine — no I/O, no async, no spawning.  Driven by explicit `Instant` timestamps and service-gate snapshots. |
 //! | `ServiceGate` | `gate` | Concurrent, lock-free egress gate.  Before the front funds: bounded predeposit budget.  After it funds: ceiling on packets served without that cycle's recovery progress.  Callers park on a generation-counter waker. |
-//! | Worker loop | `worker` | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, applies gate actions synchronously, and forwards actions to the caller. |
+//! | `FillPlanner` | `fill` | Pure rate law for the Exit's own keep-alives.  Answers, once a second, how fast this node must send in order for the funded cycle to complete inside its deadline — and emits nothing when the answer has not meaningfully changed. |
+//! | Worker loop | `worker` | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline and fill timers, applies gate actions synchronously, and forwards actions to the caller. |
 //!
 //! The [`SlotNotify`](crate::utils::SlotNotify) multi-waker primitive is shared from [`utils`] and used
 //! by `ServiceGate` to park and wake callers without a tokio dependency.
@@ -171,6 +172,79 @@
 //! 2. **Spurious `Ready`** — a second `poll()` of an already-registered future re-checks the generation; if unchanged
 //!    it stays `Pending`.
 //!
+//! ## Fill — keeping a funded cycle on course
+//!
+//! Everything above is a rule for *stopping*. This is the one rule for going, and it exists because
+//! the rules for stopping cannot be met by an idle Session.
+//!
+//! ### What goes wrong without it
+//!
+//! A PIX Exit is paid per **return** packet. Each Exit → Entry packet spends one SURB carrying one
+//! share, and a funded cycle recovers — unlocks the deposit key it has already been paid for — only
+//! once `polys × (threshold + surplus)` of them have gone back. That is 327 680 packets at the shipped
+//! dimensions. Nothing in the protocol makes the *application* send them:
+//!
+//! * an idle VPN client sends nothing at all;
+//! * a tunnel between keystrokes sends a handful a minute;
+//! * any client that reads more than it writes returns fewer packets than it receives, by definition.
+//!
+//! Each of those leaves the Exit holding a cycle it was paid for and cannot complete.
+//! [`max_recovery_time`](SupervisorConfig::max_recovery_time) then closes the Session, and because
+//! the deposit address derives from the client's and the server's commitments *together*, the money
+//! is stranded rather than refunded. At production geometry the boundary is about 46 return packets
+//! per second averaged over a whole cycle — which is not a light client, it is a saturated one.
+//!
+//! So the Exit sends its own. The rate is planned once per `SAMPLING_INTERVAL`:
+//!
+//! ```text
+//! E          = polys × (threshold + surplus)                          packets in one cycle
+//! target     = the recovered predecessor's paid FIFO tail if there is one, else the earliest
+//!              live cycle that is both funded and clocked, else none → rate 0
+//! remaining  = (E − shares seen on the target) × (1 + loss_margin)
+//! finish_by  = target.hard_deadline − (1 − finish_fraction) × max_recovery_time
+//! required   = remaining / max(finish_by − now, SAMPLING_INTERVAL)     packets/s
+//! organic    = EMA over ORGANIC_WINDOW of the service gate's counter   packets/s
+//! fill       = clamp(required − organic, heartbeat, max_rate)
+//! ```
+//!
+//! The tail wins over the successor whenever it exists, for two reasons that point the same way: its
+//! SURBs sit ahead of the successor's in the Exit's own buffer, so packets sent now carry *its*
+//! shares; and it holds the binding deadline, since the successor's clocks are deliberately not armed
+//! until the tail is exhausted.
+//!
+//! ### Why it is the keep-alive message
+//!
+//! Fill reuses the Exit's SURB-level keep-alive rather than introducing a message of its own, and the
+//! two share one stream and one rate controller running at the faster of the two. Every shipped Entry
+//! already parses that message, already counts it as a consumed SURB so its balancer refills, and
+//! already credits it as service against the successor gate — so an Exit that fills needs nothing new
+//! from its peer. A new flag bit would have been worse than useless: keep-alive flag decoding used to
+//! be strict, so a bit an older Entry did not recognise made the whole message fail to parse.
+//!
+//! ### What bounds it
+//!
+//! A rule that *sends* is the one rule in this module that could be turned against the node running
+//! it, so it is bounded four times over:
+//!
+//! | Bound | What it stops |
+//! |---|---|
+//! | [`max_rate`](PixFillConfig::max_rate) | The instantaneous cost of one Session. Validated *upwards* too — `validate_incoming_session_pix_config` refuses a ceiling below the rate the widest accepted quota needs, because a filler that cannot finish is worse than none. |
+//! | [`min_surb_reserve`](PixFillConfig::min_surb_reserve) | Fill spending the SURBs the Session needs for its own replies. Not an optimisation: a return packet that finds no SURB holds every packet this node originates for `surb_resolution_wait`, so an over-eager filler stalls the Session it is saving. The SURB-level notification is exempt, being the message that asks for more. |
+//! | The stall rule | A doomed cycle, or a share-less SURB supply, burning `max_rate × max_recovery_time`. Once the target has not moved for [`max_recovery_idle`](SupervisorConfig::max_recovery_idle), fill drops to its heartbeat until the cycle moves again. |
+//! | The existing deadlines and the service gate | Unchanged. Fill is not a way around the backstop: an Exit with nothing to send strands exactly as it did before. |
+//!
+//! The stall rule cannot be delegated to `max_recovery_idle` itself, and that is worth being explicit
+//! about. The idle rule re-arms whenever no *gated* service was consumed since the last progress, and
+//! fill bypasses the gate exactly as the keep-alive stream it reuses does — so a Session whose only
+//! traffic is fill looks perfectly quiet to it and it never fires. The stall rule is the bound the
+//! gate-based one cannot supply.
+//!
+//! ### What it costs the client
+//!
+//! One cycle's quota per deadline while idle, and nothing at all while the application is busier than
+//! the required rate. The client accepts that as the price of a Session whose cycles complete, and
+//! funds successors as it would have.
+//!
 //! ## The Worker — bridging pure logic to async
 //!
 //! `spawn_supervisor_worker` creates the `SessionPixSupervisor`,
@@ -180,22 +254,30 @@
 //!
 //! The worker loop:
 //!
-//! 1. Reads the next deadline from the supervisor.
-//! 2. If the deadline has already expired, calls `handle_deadline` immediately.
-//! 3. Otherwise, waits on the command channel with a timeout set to the remaining deadline duration.
+//! 1. Reads the earlier of the next deadline and the next fill tick from the supervisor.
+//! 2. If it has already passed, calls `handle_timers` immediately.
+//! 3. Otherwise, waits on the command channel with a timeout set to the remaining duration.
 //! 4. On command received → calls `handle_event` or `action_result`.
-//! 5. On timeout → calls `handle_deadline`.
+//! 5. On timeout → calls `handle_timers`, which runs the deadline sweep first and then the fill tick if one is due. The
+//!    order matters: the sweep is what arms a promoted cycle's clocks and consumes a spent FIFO tail, so a tick that
+//!    ran first would plan against a lifecycle one interval out of date.
 //! 6. Applies gate-control actions immediately, then forwards all actions to the action channel (non-blocking
 //!    `try_send`).
+//!
+//! A Session with no funded cycle to fill for schedules no tick at all, so the loop's behaviour is
+//! byte-for-byte what it was before fill existed until the first deposit confirms.
 //!
 //! **Coalescing** — `ProgressNotification` actions are coalescible: when
 //! the action channel is transiently full, they are dropped rather than
 //! blocking or failing the worker. The gate has already consumed the notification locally, and the
 //! next forwarded notification replaces it for observers.
 //!
-//! All other actions (`RequestSsa`, `ReleaseService`, `WithholdService`, `RetireSsa`, `Close`)
-//! are non-coalescible — if they cannot be delivered, the channel is
-//! genuinely wedged and the worker fails the session.
+//! All other actions (`RequestSsa`, `ReleaseService`, `WithholdService`, `RetireSsa`, `SetFillRate`,
+//! `Close`) are non-coalescible — if they cannot be delivered, the channel is
+//! genuinely wedged and the worker fails the session. `SetFillRate` belongs on that side of the line
+//! even though it arrives on a timer: the planner's hysteresis means it will not re-emit a value it
+//! believes is already applied, so a dropped change is not replaced by the next one — and the worst
+//! case is a dropped zero, which leaves a Session filling for a cycle that no longer exists.
 //!
 //! ## Integration with [`SessionManager`]
 //!
@@ -220,7 +302,8 @@
 //!    | `WithholdService` | Worker calls `gate.withhold_service()`; driver records unfunded telemetry. |
 //!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; no driver I/O. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
-//!    | `Close` | Poisons gate, retires all SSAs, publishes close metric, removes session slot. |
+//!    | `SetFillRate` | Applies the rate to the Session's shared keep-alive controller and records the gauge. |
+//!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. |
 //!
 //! 7. PIX protocol events from the packet pipeline arrive via `dispatch_pix_event` and are forwarded to the supervisor
 //!    as `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`, `AlmostRecovered`, or `Recovered`.
@@ -406,6 +489,12 @@
 //! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
 //! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
 //! | `max_failed_cycles` | 1 | Shipped value, and inert at this batch size of one — the failing cycle is always the last one standing, which closes the Session first |
+//! | `fill.enabled` | true | The cycle is 163 840 return packets and the hard deadline is 2 h, so without fill any Session averaging under **23 packets/s of return traffic** over a cycle strands its deposit. Against the 602 packets/s this profile is sized for that sounds like a wide margin; it is not, because it is a *return* rate and any client that reads more than it writes falls under it |
+//! | `fill.finish_fraction` | 0.75 | Aims 30 min before the 2 h deadline, which is the margin for loss beyond `loss_margin`, for a mixnet delay spike, and for the successor's commitment and deposit round trip. A cycle that misses is worth nothing at all rather than nearly everything, so the last quarter of the budget is not spent |
+//! | `fill.loss_margin` | 0.05 | Fill counts packets sent; the cycle advances on shares that arrive. The Exit cannot observe the difference, so it sends this much extra and lets the per-second re-plan absorb whatever the real figure turns out to be |
+//! | `fill.max_rate` | 250 | An idle cycle here needs 163 840 x 1.05 / 5400 s = **32 packets/s**, so this is ~8x the requirement — headroom for a Session that fell behind, at a ceiling of ~2 Mbps. `validate_incoming_session_pix_config` enforces the floor against the *widest accepted quota*, which at the default `quota_range` is 128 packets/s |
+//! | `fill.heartbeat` | 60 s | The floor while organic egress covers the need. Not zero: the Entry's own idle eviction is refreshed by this traffic, and its balancer has no SURB-level report without it |
+//! | `fill.min_surb_reserve` | 500 | `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer target below it leaves fill 93 % of the buffer and keeps the last 7 % for the application, which is the side that has something waiting on it |
 //!
 //! What one cycle costs is not in this table, because it is not in this configuration: the 162.2 MiB
 //! quota is priced by the deposit pool, which is also what decides that a deposit has cleared it.
@@ -415,7 +504,7 @@
 //! | Parameter | Value | Why |
 //! |---|---|---|
 //! | `SurbStoreConfig::rb_capacity` | 100 000 | An overwritten SURB is a permanently lost share, so the buffer must clear the balancer's target with room for overshoot — 14× here |
-//! | `SurbBalancerConfig::target_surb_buffer_size` | 7 000 | ~11.6 s of return traffic at 5 Mbps; must cover the forward round trip or the Exit starves mid-cycle |
+//! | `SurbBalancerConfig::target_surb_buffer_size` | 7 000 | ~11.6 s of return traffic at 5 Mbps; must cover the forward round trip or the Exit starves mid-cycle. It must also stay well *under* a cycle's emission — a SURB minted while no cycle is committed carries no share, so a buffer deeper than a cycle parks a run of share-less SURBs at the head of the Exit's FIFO that fill cannot get past. 7 000 against 163 840 is 4 %, so the run is a rounding error |
 //! | `SessionManagerConfig::maximum_surb_buffer_size` | 10 000 | Ceiling the balancer may be steered to |
 //! | `SsaReconstructorConfig::max_ack_await_time` | 30 s | Bounds how long an unacknowledged share is held; both `max_recovery_idle` and `tombstone_retention_window` must clear it |
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
