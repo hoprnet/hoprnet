@@ -172,12 +172,21 @@ async fn worker_loop(
     }
 
     loop {
-        let deadline = supervisor.next_deadline();
+        // Two independent timers, one wake-up. The deadline sweep is the lifecycle's, the fill tick
+        // is the rate planner's, and neither may starve the other — so the loop always sleeps until
+        // the earlier of the two and lets `handle_timers` decide which of them was actually due.
+        // `next_fill_tick` is `None` unless there is something to plan or something to stop, so a
+        // Session with no funded cycle waits on its command channel exactly as it did before.
+        let deadline = match (supervisor.next_deadline(), supervisor.next_fill_tick()) {
+            (Some(dl), Some(tick)) => Some(dl.min(tick)),
+            (dl, tick) => dl.or(tick),
+        };
 
         if let Some(dl) = deadline {
             let now = Instant::now();
             if now >= dl {
-                let actions = supervisor.handle_deadline(now, gate.served_total());
+                let actions = supervisor.handle_timers(now, gate.served_total());
+                report_fill_stall(&mut supervisor);
                 if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                     return;
                 }
@@ -198,7 +207,8 @@ async fn worker_loop(
                 }
                 Err(_) => {
                     let now = Instant::now();
-                    let actions = supervisor.handle_deadline(now, gate.served_total());
+                    let actions = supervisor.handle_timers(now, gate.served_total());
+                    report_fill_stall(&mut supervisor);
                     if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                         return;
                     }
@@ -210,6 +220,19 @@ async fn worker_loop(
                 return;
             }
         }
+    }
+}
+
+/// Counts a fill stall, if one just began.
+///
+/// The planner cannot do this itself — it is a pure function of its inputs, and a metric is neither —
+/// so the edge is latched there and drained here, in the actor that is allowed to have effects. Not
+/// folded into `dispatch`, because the stall is not an action: it produces no work for the driver,
+/// only a number for the operator.
+fn report_fill_stall(supervisor: &mut SessionPixSupervisor) {
+    if supervisor.take_fill_stall() {
+        #[cfg(feature = "telemetry")]
+        crate::telemetry::record_pix_fill_backoff(crate::telemetry::PixFillBackoff::Stalled);
     }
 }
 
@@ -349,7 +372,10 @@ mod tests {
     };
     use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
-    use super::*;
+    use super::{
+        super::{FillRate, PixFillConfig, SAMPLING_INTERVAL},
+        *,
+    };
 
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
@@ -366,6 +392,7 @@ mod tests {
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
+            fill: PixFillConfig::default(),
         }
     }
 
@@ -881,5 +908,117 @@ mod tests {
         let (action_tx2, action_rx2) = crossfire::mpsc::bounded_async::<SessionPixAction>(1);
         drop(action_rx2);
         assert!(!send_actions(&progress, &action_tx2));
+    }
+
+    // ---------------------------------------------------------------
+    // PIX fill
+    // ---------------------------------------------------------------
+
+    /// Drains the action channel until a `SetFillRate` arrives, or the deadline passes.
+    ///
+    /// A funded cycle also produces `ReleaseService` and a `ProgressNotification` or two, so a test
+    /// that read only the next action would be asserting on whichever one the worker happened to
+    /// emit first.
+    async fn next_fill_rate(action_rx: &ActionRx, within: Duration) -> Option<FillRate> {
+        tokio::time::timeout(within, async {
+            loop {
+                match action_rx.recv().await {
+                    Ok(SessionPixAction::SetFillRate(rate)) => break Some(rate),
+                    Ok(_) => continue,
+                    Err(_) => break None,
+                }
+            }
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// Funds cycle one through the handle, the way the action driver does.
+    async fn fund_first_cycle(handle: &SessionPixSupervisorHandle, p: HoprPseudonym) -> Result<(), ()> {
+        let id = SsaId::new(p, SsaIndex::new(1).expect("index one is non-zero"));
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await?;
+        handle.send_event(SessionPixEvent::CommitmentVerified(id)).await?;
+        handle
+            .send_event(SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(1000),
+            })
+            .await
+    }
+
+    /// The planner is only useful if the worker actually wakes for it.
+    ///
+    /// Everything else about fill is tested against a supervisor driven by hand with explicit
+    /// instants. This is the one property that cannot be: that the worker's own timer — which
+    /// previously woke only for lifecycle deadlines, none of which is due within an hour of a cycle
+    /// funding — now also wakes for the sampling interval and delivers what the planner decided.
+    #[tokio::test]
+    async fn the_worker_emits_a_fill_rate_within_two_ticks_of_funding() -> anyhow::Result<()> {
+        let p = HoprPseudonym::random();
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Two sampling intervals, so the check spans a tick the planner could have emitted on. At
+        // 200 ms the first tick had not happened yet, so the assertion held for a Session that fills
+        // everything as readily as for one that fills nothing.
+        let initial = next_fill_rate(&action_rx, 2 * SAMPLING_INTERVAL).await;
+        assert_eq!(None, initial, "an unfunded Session must not be filled");
+
+        fund_first_cycle(&handle, p)
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+
+        let rate = next_fill_rate(&action_rx, 2 * SAMPLING_INTERVAL + Duration::from_secs(1))
+            .await
+            .ok_or_else(|| anyhow::anyhow!("no fill rate was emitted within two sampling intervals of funding"))?;
+        assert!(!rate.is_zero(), "a funded cycle must be filled, got {rate:?}");
+        Ok(())
+    }
+
+    /// The worker must deliver the zero, and deliver it ahead of the close it accompanies.
+    ///
+    /// `dispatch` stops applying actions at a `Close` and the driver breaks its loop on one, so a
+    /// zero that arrived after would never be applied — the Session would be torn down with its fill
+    /// stream still running at whatever rate it was last set to.
+    #[tokio::test]
+    async fn the_worker_delivers_a_zero_fill_rate_ahead_of_the_close() -> anyhow::Result<()> {
+        let p = HoprPseudonym::random();
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        fund_first_cycle(&handle, p)
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        let rate = next_fill_rate(&action_rx, 2 * SAMPLING_INTERVAL + Duration::from_secs(1))
+            .await
+            .ok_or_else(|| anyhow::anyhow!("fill must be running before the close is meaningful"))?;
+        assert!(!rate.is_zero());
+
+        handle
+            .send_event(SessionPixEvent::UnverifiableShares {
+                ssa_id: SsaId::new(p, SsaIndex::new(1).expect("index one is non-zero")),
+                observed_total: 1,
+            })
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+
+        let mut saw_zero = false;
+        let ordering = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                match action_rx.recv().await {
+                    Ok(SessionPixAction::SetFillRate(rate)) => saw_zero |= rate.is_zero(),
+                    Ok(SessionPixAction::Close(_)) => break saw_zero,
+                    Ok(_) => continue,
+                    Err(_) => break saw_zero,
+                }
+            }
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("no close was delivered"))?;
+
+        assert!(
+            ordering,
+            "the zero fill rate must precede the close on the action channel"
+        );
+        Ok(())
     }
 }
