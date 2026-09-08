@@ -185,6 +185,16 @@ impl PixParams {
         self.shares_per_poly as u16 + self.surplus_shares as u16
     }
 
+    /// Useful shares needed to recover the whole SSA.
+    ///
+    /// A share count, unlike the byte quota those shares pay for, which the Session layer derives
+    /// from the same two fields. Excludes the surplus by construction: a surplus share is one that
+    /// arrives after its polynomial already has a full set, so it advances nothing.
+    #[inline]
+    pub const fn target_useful_shares(&self) -> u64 {
+        self.polys_per_ssa as u64 * self.shares_per_poly as u64
+    }
+
     /// The elliptic curve suite these parameters were produced under.
     #[inline]
     pub const fn suite(&self) -> PixSuite {

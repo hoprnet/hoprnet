@@ -389,6 +389,77 @@ pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
     Duration::from_mins(4)
 };
 
+/// Fraction of [`TEST_GLOBAL_TIMEOUT`] that a single convergence wait may consume.
+///
+/// A quarter: a test performs one or two waits on top of cluster bootstrap, so this leaves ample
+/// outer budget while giving each wait real headroom. Convergence takes well under 20 s on an idle
+/// machine, so this still fails fast on a genuine hang rather than running to the outer timeout —
+/// but it no longer loses to ordinary runner contention, which the previous fixed 60 s did.
+const CONVERGENCE_BUDGET_FRACTION: u32 = 4;
+
+/// Interval between convergence probes.
+const CONVERGENCE_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+/// Time a single [`wait_for_convergence`] call may spend before giving up.
+///
+/// Derived from [`TEST_GLOBAL_TIMEOUT`] rather than hardcoded, so it scales with coverage
+/// instrumentation instead of silently keeping a fixed budget while the outer timeout doubles.
+pub fn convergence_budget() -> Duration {
+    TEST_GLOBAL_TIMEOUT / CONVERGENCE_BUDGET_FRACTION
+}
+
+/// Outcome of one convergence probe.
+pub enum Probe<T> {
+    /// Converged; stop polling and yield this.
+    Ready(T),
+    /// Not yet converged, described for the failure message. Keep polling.
+    Pending(String),
+}
+
+/// Polls `probe` until it reports convergence or [`convergence_budget`] expires.
+///
+/// `probe` returns `Ok(Probe::Ready)` once converged and `Ok(Probe::Pending(state))` while it is
+/// still settling; on expiry the error carries `what`, the elapsed time and that last observed
+/// state, since a bare boolean cannot distinguish "converged slowly" from "never converged" — which
+/// is exactly what a CI log needs to be diagnosable without a re-run.
+///
+/// An `Err` from `probe` is a *hard* failure (a broken API call, say) and propagates immediately:
+/// retrying it until the budget expires would only turn a clear error into a timeout.
+pub async fn wait_for_convergence<T, F, Fut>(what: &str, mut probe: F) -> anyhow::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<Probe<T>>>,
+{
+    let budget = convergence_budget();
+    let started = tokio::time::Instant::now();
+    let deadline = started + budget;
+    let mut observed = "<never probed>".to_string();
+
+    while let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) {
+        // Bound the probe itself: an unbounded `probe().await` that blocks would sail past the
+        // budget and only stop at the outer test timeout, which is what this helper exists to avoid.
+        match tokio::time::timeout_at(deadline, probe()).await {
+            Ok(result) => match result? {
+                Probe::Ready(converged) => return Ok(converged),
+                Probe::Pending(state) => observed = state,
+            },
+            Err(_) => {
+                observed = format!("{observed} (probe still running at the deadline)");
+                break;
+            }
+        }
+
+        tracing::trace!(what, ?budget, elapsed = ?started.elapsed(), "waiting for convergence");
+        // Never sleep past the deadline, or the next probe would start after the budget expired.
+        sleep(CONVERGENCE_POLL_INTERVAL.min(remaining)).await;
+    }
+
+    anyhow::bail!(
+        "{what} did not converge within {budget:?} (elapsed {:?}); last observed: {observed}",
+        started.elapsed(),
+    )
+}
+
 lazy_static::lazy_static! {
     pub static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
         ChainKeypair::from_secret(&hex!("76a4edbc3f595d4d07671779a0055e30b2b8477ecfd5d23c37afd7b5aa83781d")).unwrap(),

@@ -6,8 +6,9 @@ use hopr_types::{
 };
 
 use crate::{
-    CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixParams, PixSpec, PolynomialIndex, RecoveredSsa,
+    SsaCommitment, SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, SsaRecoveryProgress,
+    TaggedEncryptedPartialSsaShare,
 };
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
@@ -149,19 +150,20 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         false
     }
 
-    /// Releases all reconstructor state for a finished or torn-down SSA cycle.
+    /// Releases heavyweight reconstructor state for a finished or torn-down SSA cycle.
     ///
-    /// Called on full recovery and on session closure. Implementations must be
+    /// An implementation may retain bounded, non-secret post-recovery accounting for SURBs minted
+    /// before recovery and still draining through the transport. Such state must be constant-bounded
+    /// per Session and must never restore a retired verifier or commitment. Implementations must be
     /// idempotent — retiring an unknown or already-retired cycle is a no-op.
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>);
 
     /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
-    fn new_exit_commitment(
-        &self,
-        id: SsaId<S::Pseudonym>,
-        polys_per_ssa: usize,
-        shares_per_poly: usize,
-    ) -> Result<PixGroup<S>, Self::Error>;
+    ///
+    /// Takes the negotiated triple whole. The surplus is not needed to *reconstruct* anything, but
+    /// it bounds how much post-reconstruction traffic the cycle will credit as evidence that the
+    /// peer is still working — so dropping it here is what previously left that unbounded.
+    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>, params: PixParams) -> Result<PixGroup<S>, Self::Error>;
 
     /// Adds the client commitment data.
     ///
@@ -277,6 +279,7 @@ mod tests {
         SsaRecoveryProgress {
             ssa_id: id,
             useful_shares: useful,
+            shares_seen: useful,
             target_useful_shares: 128,
             recovered_polynomials: 2,
         }
@@ -462,8 +465,7 @@ mod tests {
             fn new_exit_commitment(
                 &self,
                 _id: SsaId<SimplePseudonym>,
-                _polys_per_ssa: usize,
-                _shares_per_poly: usize,
+                _params: PixParams,
             ) -> Result<PixGroup<crate::tests::TestSpec>, Self::Error> {
                 Err(MinimalError)
             }

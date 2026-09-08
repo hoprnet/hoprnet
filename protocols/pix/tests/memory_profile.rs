@@ -29,9 +29,9 @@ use std::{
 use common::TestSpec;
 use hopr_protocol_pix::{
     AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution,
-    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
-    TaggedEncryptedPartialSsaShare,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixScalar,
+    PolynomialIndex, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig,
+    SsaShareGenerator, TaggedEncryptedPartialSsaShare, peak_cycle_bytes, peak_share_buffer_bytes,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
@@ -77,6 +77,15 @@ const SESSIONS_PER_EXIT: usize = 30;
 /// walks one cycle and multiplies, so this is the factor that was silently 1.
 const SSAS_IN_FLIGHT: usize = 3;
 
+/// Polynomial count for the full-tenancy profile.
+///
+/// Deliberately narrower than [`PROD_POLYS_PER_SSA`]: the dimension under test there is *fan-out*,
+/// not per-cycle width, and width is already measured at 8 192 by the two single-cycle profiles.
+/// Installing 90 production-width cycles would be minutes of setup for a number the sibling already
+/// reports — and the quantity that matters, whether per-cycle cost stays flat as cycles accumulate,
+/// is a property of the caches rather than of the polynomial count.
+const TENANCY_POLYS: u16 = 512;
+
 /// Acknowledgements per `acknowledge_shares` call.
 ///
 /// Production shape: the Exit ack pipeline calls it once per received acknowledgement packet,
@@ -91,6 +100,20 @@ struct TrackingAllocator;
 
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
+
+/// Serializes the three tests that measure `LIVE` or re-arm `PEAK`.
+///
+/// Both counters are process-global, so two measuring tests running as threads of one binary
+/// observe each other's allocations: one re-arms the high-water mark under the other, and each
+/// reads the other's live bytes against its own baseline. `cargo nextest` gives every test its own
+/// process and does not need this; `cargo test` runs a binary's tests as threads and does.
+///
+/// Worth guarding even though the repository standardises on nextest, because of what these tests
+/// assert. They are memory *ceilings*, so a false failure reads as a genuine regression against
+/// `peak_cycle_bytes`, which is among the most expensive things here to chase. The `#[ignore]`
+/// attributes reduce the exposure but do not remove it: these are run deliberately, and more than
+/// one at a time.
+static MEASURING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -196,6 +219,9 @@ fn stage_shares(
 #[test]
 #[ignore]
 fn awaiting_ack_entry_cost() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     /// Occupancy points to report. The last is the figure to quote.
     const POINTS: [usize; 2] = [20_000, 100_000];
 
@@ -309,6 +335,9 @@ fn awaiting_ack_entry_cost() {
 #[test]
 #[ignore]
 fn exit_reconstructor_memory_profile_at_production_dimensions() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     let polys = PROD_POLYS_PER_SSA as usize;
     let threshold = PROD_THRESHOLD as usize;
     let commitments = polys * threshold;
@@ -409,7 +438,12 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
         ..Default::default()
     });
     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
-    reconstructor.new_exit_commitment(ssa_id, polys, threshold).unwrap();
+    reconstructor
+        .new_exit_commitment(
+            ssa_id,
+            PixParams::try_from_config::<TestSpec>(generator.config()).unwrap(),
+        )
+        .unwrap();
     report("after new_exit_commitment", baseline);
 
     // The whole wire order: one constant term per polynomial. The closing message publishes the
@@ -464,6 +498,20 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
         "  at commitment install, 1 cycle   {:>9.1} MiB",
         mib(install_over_baseline)
     );
+    // The per-polynomial cost with an empty share buffer, which is what `peak_cycle_bytes` models
+    // for every polynomial of a cycle before any share arrives.
+    //
+    // The buffer term comes from the crate rather than being restated here. Restating it assumed a
+    // `CompletedShare` is two scalars and dropped the `.max(4)` clamp, so it agreed with the model
+    // only by coincidence at the deployed dimensions — and a `usize` subtraction that disagreed
+    // would underflow rather than report, making the assertion below vacuous instead of failing.
+    let params = PixParams::try_from_config::<TestSpec>(generator.config()).unwrap();
+    let modelled_per_poly = (peak_cycle_bytes::<TestSpec>(&params) as usize / polys)
+        .saturating_sub(peak_share_buffer_bytes::<TestSpec>(&params) as usize);
+    println!(
+        "  per polynomial at install        {:>9} B  (modelled as {modelled_per_poly} B)",
+        install_over_baseline / polys
+    );
     println!(
         "  per Session ({SSAS_IN_FLIGHT} cycles)             {:>9.1} MiB at install",
         mib(install_over_baseline * SSAS_IN_FLIGHT)
@@ -482,16 +530,407 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
          restart, when every Session re-establishes at once.\n\n  Note which multiplier dominates: the batch \
          ({SSAS_IN_FLIGHT}x) and the Session count ({SESSIONS_PER_EXIT}x)\n  multiply, so a batch of 3 across 30 \
          clients is {cycles} concurrent cycles — the same order as the\n  100 Sessions this profile used to model \
-         with no batch at all, reached by a different route.\n\n  CAVEAT on the intermediate decay points: the \
-         Entry-side generator pops each polynomial\n  off its queue as it is exhausted, freeing memory in the same \
-         process, so those readings\n  go negative against the baseline and understate the Exit's remaining live \
-         state. The\n  install figure is clean — no share has been consumed at that point — and so is the\n  \
-         endpoint, which is what makes the return to baseline a meaningful leak check.\n"
+         with no batch at all, reached by a different route.\n\n  Both x{cycles} figures above are extrapolations \
+         from a single cycle. `exit_reconstructor_memory_at_full_tenancy`\n  installs all {cycles} and measures them, \
+         at a narrower width; consult it before trusting the\n  multiplication, and re-run it if anything per-Session \
+         is added to the reconstructor.\n\n  CAVEAT on the intermediate decay points: the Entry-side generator pops \
+         each polynomial\n  off its queue as it is exhausted, freeing memory in the same process, so those readings\n  \
+         go negative against the baseline and understate the Exit's remaining live state. The\n  install figure is \
+         clean — no share has been consumed at that point — and so is the\n  endpoint, which is what makes the return \
+         to baseline a meaningful leak check.\n"
     );
 
     assert!(recovered, "a production-width cycle must recover the SSA");
     assert!(
         peak_over_baseline >= install_over_baseline,
         "the peak cannot be below the commitment-install figure"
+    );
+    // No share has been consumed at install, so this reading is the per-polynomial cost with an
+    // empty share buffer — exactly the term `peak_cycle_bytes` adds for every polynomial before any
+    // share arrives. It feeds the Session layer's live-cycle budget, so understating it lets that
+    // budget be exceeded.
+    assert!(
+        install_over_baseline / polys <= modelled_per_poly,
+        "the modelled per-polynomial cost ({modelled_per_poly} B) is understated at {} B — raise \
+         PART_BUILDER_OVERHEAD_BYTES",
+        install_over_baseline / polys
+    );
+}
+
+/// Walks one production-width cycle in the **worst share order an Entry can choose**, and reports
+/// the peak that order produces.
+///
+/// This is the figure `hopr_protocol_pix::peak_cycle_bytes` claims to bound, and therefore the one
+/// the Session layer's live-cycle budget is denominated in. The sibling profile above feeds shares
+/// polynomial-major, as the shipped generator emits them, so its peak is the *conforming* one — an
+/// order of magnitude lower, and no bound at all on a peer running something else.
+///
+/// The order here holds every polynomial one share short of its threshold.
+/// `SsaPartBuilder::release_verification_state` frees a share buffer when its polynomial
+/// reconstructs, and a polynomial one share short never reconstructs, so every buffer in the cycle
+/// stays live at once. Nothing in the protocol forbids it: the Entry decides which polynomial each
+/// share belongs to, and this costs it the same quota either way.
+///
+/// Ignored by default, for the same reason as its sibling: it walks a full production-width cycle.
+#[test]
+#[ignore]
+fn exit_reconstructor_worst_case_share_order() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
+    let polys = PROD_POLYS_PER_SSA as usize;
+    let threshold = PROD_THRESHOLD as usize;
+
+    // `surplus_shares: 0`, so the generator emits exactly `threshold` shares per polynomial and the
+    // withheld one below is the last of them. A surplus run would deliver the withheld share after
+    // all, reconstruct the polynomial, and release the buffer this profile exists to measure.
+    let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        threshold: PROD_THRESHOLD,
+        polynomials_per_ssa: PROD_POLYS_PER_SSA,
+        surplus_shares: 0,
+    });
+    let params = PixParams::try_from_config::<TestSpec>(generator.config()).unwrap();
+    let pseudonym = SimplePseudonym::random();
+    let peer = OffchainKeypair::random();
+    let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+    let commitment_proof = commitment.commitment_proof;
+    let mut constant_terms = commitment
+        .verifiers
+        .get(&CONSTANT_TERM_COEFFICIENT)
+        .cloned()
+        .unwrap_or_default();
+    constant_terms.sort_unstable_by_key(|(poly_index, _)| *poly_index);
+
+    // Emit the whole cycle **before** the baseline is taken, keeping only what will be delivered.
+    //
+    // Emission is round-robin over a window of polynomials, so the generator hands each polynomial's
+    // shares out interleaved with its neighbours'; counting per polynomial and dropping the last one
+    // it emits is what leaves every buffer one short. No reordering of the generator is needed —
+    // only a choice about which shares are delivered, which is exactly the choice an Entry has.
+    //
+    // Staged up front rather than pulled inside the measured region because the generator frees each
+    // polynomial as it exhausts it, in this same process. That release runs concurrently with the
+    // Exit's accumulation and cancels most of it out: measured the other way round this cycle reads
+    // as +7.5 MiB rather than the ~37 MiB it actually holds. It is the same confound the sibling
+    // profile documents for its intermediate readings, and here it would swallow the whole result.
+    let mut held = vec![0usize; polys];
+    let mut staged = Vec::with_capacity(polys * (threshold - 1));
+    for counter in 0..(polys * threshold) as u64 {
+        let msg = counter.to_be_bytes();
+        let share = generator
+            .next_share(&pseudonym, &msg)
+            .unwrap()
+            .expect("generator must not be exhausted");
+
+        let poly = usize::from(share.id.poly_index());
+        if held[poly] + 1 >= threshold {
+            // The share that would complete this polynomial: emitted, never delivered.
+            continue;
+        }
+        held[poly] += 1;
+        staged.push((msg, share));
+    }
+    // Nothing of the Entry's may be freed during the measurement.
+    drop(generator);
+    drop(held);
+
+    let baseline = live_bytes();
+    PEAK.store(baseline, Ordering::Relaxed);
+    println!("\n=== Exit reconstructor, worst-case share order ===");
+    println!("  {polys} polynomials x {} shares held, none completed", threshold - 1);
+    println!(
+        "  (baseline holds the {} staged shares, so only the Exit's state moves)",
+        staged.len()
+    );
+
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        max_ack_await_time: std::time::Duration::from_secs(7200),
+        incomplete_commitment_lifetime: std::time::Duration::from_secs(7200),
+        unused_verifier_lifetime: std::time::Duration::from_secs(7200),
+        ..Default::default()
+    });
+    let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+    reconstructor.new_exit_commitment(ssa_id, params).unwrap();
+    for chunk in constant_terms.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
+        reconstructor
+            .insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), chunk.iter().copied())
+            .unwrap();
+    }
+    report("after the constant-term pass (all verifiers)", baseline);
+
+    // Iterated by reference: consuming `staged` would free it as the Exit fills up and reintroduce
+    // exactly the confound it was staged to avoid.
+    let mut pending = Vec::with_capacity(ACK_BATCH);
+    for (msg, share) in &staged {
+        let ack = HalfKey::random();
+        let ack_challenge = ack.to_challenge().unwrap();
+        // Cloned rather than consumed: `staged` has to stay whole for the length of the measurement.
+        let enc_share = share.share.clone().encrypt(&share.id, &ack).unwrap();
+        reconstructor
+            .insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, msg, enc_share).unwrap(),
+            )
+            .unwrap();
+        pending.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+
+        if pending.len() == ACK_BATCH {
+            let batch = std::mem::replace(&mut pending, Vec::with_capacity(ACK_BATCH));
+            let resolutions = reconstructor.acknowledge_shares(*peer.public(), batch).unwrap();
+            assert!(
+                !resolutions
+                    .iter()
+                    .any(|r| matches!(r, ShareResolution::RecoveredSsa(_))),
+                "no polynomial may complete under this order, so the SSA cannot recover"
+            );
+        }
+    }
+    if !pending.is_empty() {
+        // The same assertion as the full batches above. `staged.len()` is not a multiple of
+        // `ACK_BATCH` at the deployed dimensions, so this trailing batch runs on every execution and
+        // was the one path where a recovery — which would release the very share buffers this
+        // profile measures — could have gone unnoticed.
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), pending).unwrap();
+        assert!(
+            !resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(_))),
+            "no polynomial may complete under this order, so the SSA cannot recover"
+        );
+    }
+    let delivered = staged.len();
+
+    let peak_over_baseline = PEAK.load(Ordering::Relaxed).saturating_sub(baseline);
+    let modelled = peak_cycle_bytes::<TestSpec>(&params) as usize;
+    report("with every polynomial one share short", baseline);
+
+    println!(
+        "\n  delivered                        {delivered} of {} emitted shares",
+        polys * threshold
+    );
+    println!(
+        "  worst-case peak, 1 cycle         {:>9.1} MiB",
+        mib(peak_over_baseline)
+    );
+    println!(
+        "  peak_cycle_bytes(params)         {:>9.1} MiB  ({:.0}% used)",
+        mib(modelled),
+        100.0 * peak_over_baseline as f64 / modelled as f64
+    );
+    // Taken from the crate, not restated: see the note in the sibling report above.
+    let buffer_slots = peak_share_buffer_bytes::<TestSpec>(&params) as usize;
+    println!(
+        "  of which share buffers           {:>9.1} MiB  ({polys} x {} slots x {} B)",
+        mib(polys * buffer_slots),
+        threshold.next_power_of_two(),
+        buffer_slots / threshold.next_power_of_two()
+    );
+    println!(
+        "  per polynomial, modelled         {:>9} B     measured {:>9} B",
+        modelled / polys,
+        peak_over_baseline / polys
+    );
+    println!(
+        "    minus share buffers            {:>9} B     measured {:>9} B  <- PART_BUILDER_OVERHEAD_BYTES covers the \
+         gap",
+        (modelled / polys).saturating_sub(buffer_slots),
+        (peak_over_baseline / polys).saturating_sub(buffer_slots)
+    );
+    println!(
+        "\n  Quote the model, not the measurement, in the Session layer's budget: the measurement is\n  one \
+         allocator's answer at one set of dimensions, and the model is what a Session is\n  charged for the \
+         dimensions its peer actually offered.\n"
+    );
+
+    assert_eq!(
+        polys * (threshold - 1),
+        delivered,
+        "every polynomial must end one share short"
+    );
+    assert!(
+        peak_over_baseline <= modelled,
+        "peak_cycle_bytes ({modelled} B) is understated: the worst share order reached {peak_over_baseline} B"
+    );
+}
+
+/// One cycle's worth of what the Entry actually puts on the wire towards the Exit.
+///
+/// Everything else the generator produced is dropped with it: the Exit only ever sees the constant
+/// terms and the proof, and holding more would put the Entry's state in the baseline.
+struct StagedCycle {
+    pseudonym: SimplePseudonym,
+    ssa_index: SsaIndex,
+    constant_terms: Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>,
+    proof: hopr_protocol_pix::SsaCommitmentProof<TestSpec>,
+}
+
+/// Installs every cycle an Exit holds at once and reports what they actually cost together.
+///
+/// The two profiles above walk **one** cycle and multiply by
+/// `SSAS_IN_FLIGHT × SESSIONS_PER_EXIT`. That multiplication is the largest number in this file and
+/// it rests entirely on an assumption of linearity that nothing has ever checked — and the
+/// assumption covers more than it used to, because a reconstructor now holds per-*Session* state
+/// (one retirement frontier per pseudonym, plus its map entry) that a per-*cycle* figure cannot see
+/// no matter what it is multiplied by.
+///
+/// So the readings are taken at three points rather than two, which is what separates the two
+/// costs:
+///
+/// * 1 cycle — one Session, and with it whatever the reconstructor's own caches cost when they first fill.
+/// * `SESSIONS_PER_EXIT` cycles — one per Session. Each step adds a Session *and* a cycle.
+/// * `SESSIONS_PER_EXIT × SSAS_IN_FLIGHT` cycles — the deployed batch. Each step adds only a cycle, to a Session that
+///   already exists.
+///
+/// The difference between the last two marginals is the per-Session overhead: the part of the
+/// extrapolation a per-cycle model omits by construction.
+///
+/// Every cycle is installed to the end of its constant-term pass and no further. That is the same
+/// point the sibling profile calls clean — no share has been consumed, so the Entry-side generator
+/// is not concurrently freeing memory against the Exit's accumulation — and it is where a resident
+/// cycle sits for all but the tail of its life.
+///
+/// Ignored by default: it holds 90 live cycles at once.
+#[test]
+#[ignore]
+fn exit_reconstructor_memory_at_full_tenancy() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
+
+    let polys = TENANCY_POLYS as usize;
+    let cycles = SESSIONS_PER_EXIT * SSAS_IN_FLIGHT;
+
+    let generator_cfg = SsaGeneratorConfig {
+        threshold: PROD_THRESHOLD,
+        polynomials_per_ssa: TENANCY_POLYS,
+        surplus_shares: PROD_SURPLUS,
+    };
+    let params = PixParams::try_from_config::<TestSpec>(&generator_cfg).expect("bench dimensions must be valid");
+
+    println!("\n=== Full tenancy ===");
+    println!("  sessions x cycles each        {SESSIONS_PER_EXIT} x {SSAS_IN_FLIGHT} = {cycles} live cycles");
+    println!(
+        "  polynomials x threshold          {polys} x {} (narrowed; see TENANCY_POLYS)",
+        PROD_THRESHOLD
+    );
+
+    // The whole Exit-facing wire order, generated before the baseline so the Entry side is not
+    // freeing memory while the Exit fills up — the confound the sibling profiles document. One
+    // generator per Session, dropped as soon as its batch is committed, because only the constant
+    // terms and the proof ever reach the Exit.
+    let mut staged: Vec<StagedCycle> = Vec::with_capacity(cycles);
+    for _ in 0..SESSIONS_PER_EXIT {
+        let generator = SsaShareGenerator::<TestSpec>::new(generator_cfg);
+        let pseudonym = SimplePseudonym::random();
+        for index in 1..=SSAS_IN_FLIGHT as u32 {
+            let ssa_index = SsaIndex::new(index).expect("ssa indices are one-based");
+            let commitment = generator
+                .new_ssa_commitment(&pseudonym, ssa_index)
+                .expect("a fresh generator must commit");
+            let mut constant_terms = commitment
+                .verifiers
+                .get(&CONSTANT_TERM_COEFFICIENT)
+                .cloned()
+                .unwrap_or_default();
+            constant_terms.sort_unstable_by_key(|(poly_index, _)| *poly_index);
+            assert_eq!(polys, constant_terms.len());
+            staged.push(StagedCycle {
+                pseudonym,
+                ssa_index,
+                constant_terms,
+                proof: commitment.commitment_proof,
+            });
+        }
+        drop(generator);
+    }
+    // Batch-major, so the first `SESSIONS_PER_EXIT` entries are one cycle per Session and the rest
+    // add cycles to Sessions that already exist. That ordering is what makes the two marginals
+    // below mean different things.
+    staged.sort_by_key(|cycle| cycle.ssa_index);
+
+    let baseline = live_bytes();
+    println!(
+        "  (baseline holds the staged wire order, so only the Exit's state moves)\n  baseline                         \
+         {:>9.1} MiB",
+        mib(baseline)
+    );
+
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        // Stretched so nothing expires mid-profile, as in the sibling profiles: the question here is
+        // how much state 90 live cycles hold, not when it is reclaimed.
+        max_ack_await_time: std::time::Duration::from_secs(7200),
+        incomplete_commitment_lifetime: std::time::Duration::from_secs(7200),
+        unused_verifier_lifetime: std::time::Duration::from_secs(7200),
+        ..Default::default()
+    });
+
+    let mut after_first = 0usize;
+    let mut after_one_per_session = 0usize;
+    for (installed, cycle) in staged.iter().enumerate() {
+        let ssa_id = SsaId::new(cycle.pseudonym, cycle.ssa_index);
+        reconstructor
+            .new_exit_commitment(ssa_id, params)
+            .expect("every cycle is a fresh SsaId");
+        for chunk in cycle.constant_terms.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
+            reconstructor
+                .insert_coefficient_commitments(ssa_id, 0, Some(cycle.proof), chunk.iter().copied())
+                .expect("the constant-term pass must complete");
+        }
+
+        match installed + 1 {
+            1 => {
+                after_first = live_bytes().saturating_sub(baseline);
+                report("after 1 cycle (1 session)", baseline);
+            }
+            n if n == SESSIONS_PER_EXIT => {
+                after_one_per_session = live_bytes().saturating_sub(baseline);
+                report("after 1 cycle per session", baseline);
+            }
+            _ => {}
+        }
+    }
+    let after_all = live_bytes().saturating_sub(baseline);
+    report("after the full batch on every session", baseline);
+
+    // Each of these steps added a Session and a cycle; each of those added only a cycle.
+    let per_new_session = (after_one_per_session.saturating_sub(after_first)) / (SESSIONS_PER_EXIT - 1);
+    let per_extra_cycle = (after_all.saturating_sub(after_one_per_session)) / (cycles - SESSIONS_PER_EXIT);
+    let naive = after_first * cycles;
+    let modelled = peak_cycle_bytes::<TestSpec>(&params) as usize * cycles;
+
+    println!("\n=== Where the extrapolation is right and where it is not ===");
+    println!("  first cycle (incl. fixed state)  {after_first:>9} B");
+    println!("  marginal: session + cycle        {per_new_session:>9} B");
+    println!("  marginal: cycle alone            {per_extra_cycle:>9} B");
+    println!(
+        "  per-session overhead             {:>9} B  <- what a per-cycle model cannot see",
+        per_new_session.saturating_sub(per_extra_cycle)
+    );
+    println!("\n  measured, {cycles} cycles            {:>9.1} MiB", mib(after_all));
+    println!(
+        "  naive {cycles} x first cycle         {:>9.1} MiB  (linearity ratio {:.2})",
+        mib(naive),
+        after_all as f64 / naive as f64
+    );
+    println!(
+        "  {cycles} x peak_cycle_bytes          {:>9.1} MiB  ({:.0}% used)",
+        mib(modelled),
+        100.0 * after_all as f64 / modelled as f64
+    );
+    println!(
+        "\n  A ratio near 1.0 says the sibling profiles' x{cycles} is sound. Below 1.0 means the first\n  cycle \
+         carries fixed reconstructor state the rest do not repeat, so the extrapolation is\n  conservative; above 1.0 \
+         means per-cycle cost grows with tenancy, which the Session layer's\n  live-cycle budget does not model and \
+         would have to.\n"
+    );
+
+    // The contract, not the diagnostic. `max_live_cycle_bytes` admits Sessions against
+    // `peak_cycle_bytes` per cycle, so what has to hold at full tenancy is that the sum of those
+    // per-cycle charges still covers what the Exit actually holds.
+    assert!(
+        after_all <= modelled,
+        "peak_cycle_bytes is understated at full tenancy: {cycles} cycles hold {after_all} B against a modelled \
+         {modelled} B"
     );
 }

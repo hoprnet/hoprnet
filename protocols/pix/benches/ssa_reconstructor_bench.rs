@@ -42,8 +42,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, 
 use hopr_protocol_pix::{
     CONSTANT_TERM_COEFFICIENT, CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
     ExitAcknowledgementShareProcessor, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, PixGroupRepr,
-    PolynomialIndex, ShareResolution, SsaCommitmentProof, SsaGeneratorConfig, SsaId, SsaIndex, SsaPartCommitment,
-    SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    PixParams, PolynomialIndex, ShareResolution, SsaCommitmentProof, SsaGeneratorConfig, SsaId, SsaIndex,
+    SsaPartCommitment, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -155,6 +155,26 @@ const ACK_BENCH_POLYS: u16 = 4096;
 /// cycle has — and the whole fixture is rebuilt per iteration.
 const DEFERRED_DRAIN_POLYS: u16 = 512;
 
+/// Negotiated dimensions for a benched cycle.
+///
+/// Takes `usize` because every caller here already carries the dimensions that way; the narrowing
+/// is checked by `try_new` rather than assumed.
+///
+/// The surplus is a parameter rather than `SsaGeneratorConfig::default().surplus_shares`, so that
+/// what the reconstructor is told to expect is what the fixture's generator actually emits. The two
+/// zero-surplus fixtures — the interpolation and full-SSA groups, which stage exactly `threshold`
+/// shares per polynomial — were declaring the shipping surplus against a generator configured with
+/// none. It does not move their timed path today, since neither reaches a post-threshold share, but
+/// it is the wrong boundary for any future measurement that does.
+fn bench_params(polys: usize, threshold: usize, surplus: u8) -> PixParams {
+    PixParams::try_new_for::<TestSpec>(
+        polys.try_into().expect("bench polys must fit u16"),
+        threshold.try_into().expect("bench threshold must fit u8"),
+        surplus,
+    )
+    .expect("bench dimensions must be in range")
+}
+
 /// Reconstructor configuration for benchmarks.
 ///
 /// The expiry windows are stretched far beyond their defaults on purpose. At production
@@ -172,11 +192,15 @@ fn bench_recon_cfg(use_batch_verification: bool) -> SsaReconstructorConfig {
     }
 }
 
+/// Derived from the `threshold` argument, not from [`PROD_THRESHOLD`]: this helper is called from the
+/// swept groups, where a flat [`PROD_SURPLUS`] would hold the surplus *count* fixed and so change
+/// the loss tolerance at every point of the sweep. See [`PROD_SURPLUS`] for why the ratio is the
+/// thing to keep constant.
 fn gen_cfg(polys: u16, threshold: u8) -> SsaGeneratorConfig {
     SsaGeneratorConfig {
         threshold,
         polynomials_per_ssa: polys,
-        surplus_shares: PROD_SURPLUS,
+        surplus_shares: hopr_protocol_pix::default_surplus_for(threshold),
     }
 }
 
@@ -327,12 +351,16 @@ fn bench_new_exit_commitment(c: &mut Criterion) {
 
     let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
     let (polys, threshold) = (PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize);
+    // Built once, outside the closure. `iter_batched` excludes its setup from the measurement but
+    // times the operation, so constructing the parameters in there billed two `try_into` narrowings
+    // and `try_new`'s range checks to `new_exit_commitment` on every iteration.
+    let params = bench_params(polys, threshold, PROD_SURPLUS);
 
     group.bench_function(BenchmarkId::from_parameter(format!("t{threshold}_p{polys}")), |b| {
         b.iter_batched(
             || SsaId::new(SimplePseudonym::random(), SsaIndex::MIN),
             |ssa_id| {
-                reconstructor.new_exit_commitment(ssa_id, polys, threshold).unwrap();
+                reconstructor.new_exit_commitment(ssa_id, params).unwrap();
             },
             BatchSize::SmallInput,
         );
@@ -391,7 +419,17 @@ fn bench_insert_coefficient_commitments(c: &mut Criterion) {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
                         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                         reconstructor
-                            .new_exit_commitment(ssa_id, polys as usize, threshold as usize)
+                            // Surplus from the swept threshold, matching the generator that produced
+                            // the fixture: `PROD_SURPLUS` here would negotiate a different ratio at
+                            // every point but the production one.
+                            .new_exit_commitment(
+                                ssa_id,
+                                bench_params(
+                                    polys as usize,
+                                    threshold as usize,
+                                    hopr_protocol_pix::default_surplus_for(threshold),
+                                ),
+                            )
                             .unwrap();
                         (reconstructor, ssa_id)
                     },
@@ -481,7 +519,10 @@ fn bench_acknowledge_batch(
         let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
         reconstructor
-            .new_exit_commitment(ssa_id, polys as usize, PROD_THRESHOLD as usize)
+            .new_exit_commitment(
+                ssa_id,
+                bench_params(polys as usize, PROD_THRESHOLD as usize, PROD_SURPLUS),
+            )
             .unwrap();
         install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
         (generator, pseudonym)
@@ -612,7 +653,10 @@ fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
             let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
             let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
             reconstructor
-                .new_exit_commitment(ssa_id, polys as usize, PROD_THRESHOLD as usize)
+                .new_exit_commitment(
+                    ssa_id,
+                    bench_params(polys as usize, PROD_THRESHOLD as usize, PROD_SURPLUS),
+                )
                 .unwrap();
             install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
             (generator, pseudonym)
@@ -699,7 +743,10 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
     // polynomial's threshold produced no resolution at all, so the `is_empty` guard below held for
     // the wrong reason.
     reconstructor
-        .new_exit_commitment(ssa_id, PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize)
+        .new_exit_commitment(
+            ssa_id,
+            bench_params(PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize, PROD_SURPLUS),
+        )
         .unwrap();
 
     let shares_per_commitment = PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + PROD_SURPLUS as usize);
@@ -750,8 +797,7 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
                     reconstructor
                         .new_exit_commitment(
                             SsaId::new(pseudonym, SsaIndex::MIN),
-                            PROD_POLYS_PER_SSA as usize,
-                            PROD_THRESHOLD as usize,
+                            bench_params(PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize, PROD_SURPLUS),
                         )
                         .unwrap();
                     remaining = shares_per_commitment;
@@ -805,7 +851,7 @@ fn bench_drain_deferred_acks(c: &mut Criterion) {
                     let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
                     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                     reconstructor
-                        .new_exit_commitment(ssa_id, polys, PROD_THRESHOLD as usize)
+                        .new_exit_commitment(ssa_id, bench_params(polys, PROD_THRESHOLD as usize, PROD_SURPLUS))
                         .unwrap();
 
                     // Everything but the final message, so the cycle is still incomplete and no
@@ -904,7 +950,7 @@ fn bench_acknowledge_shares_interpolation(c: &mut Criterion) {
                     let pseudonym = SimplePseudonym::random();
                     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                     reconstructor
-                        .new_exit_commitment(ssa_id, polys as usize, threshold as usize)
+                        .new_exit_commitment(ssa_id, bench_params(polys as usize, threshold as usize, 0))
                         .unwrap();
                     let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
                     let proof = commitment.commitment_proof;
@@ -980,7 +1026,7 @@ fn bench_acknowledge_shares_full_ssa(c: &mut Criterion) {
                         let pseudonym = SimplePseudonym::random();
                         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                         reconstructor
-                            .new_exit_commitment(ssa_id, polys as usize, threshold as usize)
+                            .new_exit_commitment(ssa_id, bench_params(polys as usize, threshold as usize, 0))
                             .unwrap();
                         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
                         let proof = commitment.commitment_proof;

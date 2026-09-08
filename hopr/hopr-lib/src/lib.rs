@@ -281,6 +281,9 @@ pub(crate) enum HoprLibProcess {
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionServer,
+    #[strum(to_string = "session server deciding the terms incoming sessions are admitted on")]
+    #[allow(dead_code)] // constructed only with feature = "session-server"
+    SessionAdmission,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]

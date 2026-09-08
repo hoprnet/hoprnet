@@ -8,4 +8,5 @@ expression: reasons
     Eviction,
     UnrealizedDeposit,
     MissingDepositData,
+    PixFailure,
 ]

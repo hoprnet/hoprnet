@@ -194,6 +194,35 @@ lazy_static::lazy_static! {
         "Session egress packets",
         &["session_id"]
     ).unwrap();
+    static ref METRIC_SESSION_PIX_GATE_MODE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_gate_mode",
+        "PIX egress gate mode encoded as Predeposit=0, Funded=1",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_session_pix_closures_total",
+        "Sessions closed by the PIX supervisor, by reason",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_recovery_progress",
+        "Recovery progress of a session's most recently advanced SSA, as a ratio of useful shares to target",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_FILL_RATE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_fill_rate",
+        "Planned rate in packets per second for the Exit's own PIX fill keep-alives; emission is bounded by the SURB reserve, so see hopr_session_pix_fill_packets_total for what went out",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_FILL_PACKETS_TOTAL: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_session_pix_fill_packets_total",
+        "PIX fill keep-alives originated by this Exit, above its SURB-level notification rate"
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_FILL_BACKOFF_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_session_pix_fill_backoff_total",
+        "Times PIX fill held back, by reason",
+        &["reason"]
+    ).unwrap();
     static ref SESSION_RUNTIME: parking_lot::Mutex<HashMap<SessionId, SessionRuntimeState>> = parking_lot::Mutex::new(HashMap::new());
 }
 
@@ -281,9 +310,19 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     refresh_lifetime_metrics(&session_id, now, now, now);
 }
 
-pub fn remove_session_metrics_state(session_id: &SessionId) {
+pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
+    if has_pix {
+        // Only for a Session that had a gate: setting these unconditionally would mint a
+        // `hopr_session_pix_*` series for every non-PIX Session that ever closed.
+        METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], 0.0);
+        METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], 0.0);
+        // Zeroed rather than left where it was, because this gauge is the one an operator would read
+        // as "this node is currently sending". A closed Session that kept its last rate would be
+        // indistinguishable from one that is still filling at it.
+        METRIC_SESSION_PIX_FILL_RATE.set(&[session_id_str], 0.0);
+    }
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
@@ -366,6 +405,101 @@ pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[session_id_str], by);
     touch_session_activity(session_id);
+}
+
+/// Records whether a PIX Session's current front cycle has funded service.
+///
+/// The supervisor moves this in both directions as the front rotates. An unfunded successor reports
+/// `false` while it consumes its bounded predeposit allowance; its deposit moves the gauge to `true`.
+pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], if funded { 1.0 } else { 0.0 });
+    touch_session_activity(session_id);
+}
+
+/// Reports how far a Session's most recently advanced SSA has got towards recovery.
+///
+/// Keyed by Session, not by `(session, ssa_index)`. The index rises for the lifetime of a Session
+/// and never repeats, so labelling by it would mint a new time series per SSA cycle and never
+/// retire any of them. A Session runs at most a few cycles concurrently and they advance together,
+/// so the latest snapshot is a fair summary of where recovery stands.
+///
+/// Unlike its siblings this does **not** call [`touch_session_activity`], and the asymmetry is
+/// deliberate rather than an omission. Shares reach the Exit only on data-packet acknowledgements,
+/// so a Session whose recovery is advancing is a Session passing data, and
+/// [`record_session_read`]/[`record_session_write`] have already stamped its activity on the packets
+/// that carried those shares. Stamping again here would put a second atomic on a path that runs per
+/// progress snapshot and change nothing: `hopr_session_lifetime_idle_ms` cannot climb for a Session
+/// that is making progress, because the traffic producing the progress is what keeps it down.
+pub fn set_pix_recovery_progress(session_id: &SessionId, useful_shares: u64, target_useful_shares: u64) {
+    if target_useful_shares == 0 {
+        return;
+    }
+    let session_id_str: &str = session_id.as_ref();
+    let ratio = (useful_shares as f64 / target_useful_shares as f64).clamp(0.0, 1.0);
+    METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], ratio);
+}
+
+/// Records the rate at which the Exit is currently originating PIX fill keep-alives.
+///
+/// Set from the supervisor's planned rate rather than measured at the stream, so it reports the
+/// decision. What actually goes out can be lower — the SURB reserve withholds packets, and that shows
+/// up in [`record_pix_fill_backoff`] — and the pair is more informative than either alone: a fill
+/// rate pinned at its ceiling with a climbing backoff counter is a Session whose SURB supply, not its
+/// deadline, is the thing failing.
+///
+/// Deliberately not [`touch_session_activity`]: fill is this node talking to itself about a Session
+/// the application has abandoned, and counting that as activity would make
+/// `hopr_session_lifetime_idle_ms` report the opposite of what it means.
+pub fn set_pix_fill_rate(session_id: &SessionId, packets_per_sec: f64) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_FILL_RATE.set(&[session_id_str], packets_per_sec);
+}
+
+/// Counts one PIX fill keep-alive put on the wire.
+///
+/// Node-wide rather than per Session, unlike its gauge sibling. This is the figure an operator sizes
+/// bandwidth against, and that question is about the node; per-Session totals would mint a counter
+/// series per Session that is never retired, for a number that is only interesting in aggregate.
+pub fn record_pix_fill_packet() {
+    METRIC_SESSION_PIX_FILL_PACKETS_TOTAL.increment();
+}
+
+/// Why PIX fill sent less than its planned rate.
+///
+/// A closed enum, so it can be a metric label without unbounded cardinality — the same argument as
+/// [`record_pix_closure`], and for the same reason it takes the enum rather than a string.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+pub enum PixFillBackoff {
+    /// The Session's estimated SURB level was below `fill.min_surb_reserve`, so the packet was
+    /// withheld to leave the Session able to answer its own application.
+    SurbReserve,
+    /// The cycle being filled for stopped making progress for `max_recovery_idle`, so the planner
+    /// dropped back to its heartbeat rather than spend a whole deadline's worth of SURBs on a cycle
+    /// that may never recover.
+    Stalled,
+}
+
+/// Counts one occasion on which PIX fill held back, labelled by why.
+///
+/// The two reasons are counted at different granularities on purpose, because they are different
+/// events: `SurbReserve` is per withheld packet, and `Stalled` is per stall — the planner warns and
+/// counts once when a cycle goes motionless, not once per second for as long as it stays that way.
+pub fn record_pix_fill_backoff(reason: PixFillBackoff) {
+    METRIC_SESSION_PIX_FILL_BACKOFF_TOTAL.increment(&[reason.to_string().as_str()]);
+}
+
+/// Counts a Session closed by the PIX supervisor, labelled by why.
+///
+/// Labelled by reason rather than by Session: the reasons are a closed enum, so the cardinality is
+/// bounded, which is what makes this safe to keep after the Session is gone.
+///
+/// Takes the enum rather than a `&str` so that boundedness is a property of the signature instead of
+/// a promise the doc makes on behalf of every future caller. `&'static str` would not have done it
+/// either — it admits any string literal, and a literal is exactly what an unbounded label looks
+/// like at the call site. The label is derived here, so there is one spelling of each reason.
+pub fn record_pix_closure(reason: crate::supervision::SessionPixCloseReason) {
+    METRIC_SESSION_PIX_CLOSURES_TOTAL.increment(&[reason.to_string().as_str()]);
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {
