@@ -151,6 +151,9 @@ pub struct IncomingPacketInfo {
     /// surplus was destroyed rather than queued. Under PIX each destroyed SURB also destroys the
     /// partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
     /// used — so this is not a bandwidth statistic but a loss counter.
+    ///
+    /// Reported for observability, and deliberately not fed back into the SURB flow estimator — see
+    /// the note on the field it would correct in `hopr-transport-session`'s `BalancerStateValues`.
     pub num_evicted_surbs: usize,
 }
 

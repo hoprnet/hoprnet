@@ -51,6 +51,10 @@ pub struct AuxiliaryPacketInfo {
     /// below their threshold — and a cycle short of recovery is worth nothing at all. See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
     /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
+    ///
+    /// Carried for observability. Sessions deliberately do not subtract it from their SURB level
+    /// estimate, because the imprecise estimate is the one that fails safe — see
+    /// `counterparty_buffer_capacity` in `hopr-transport-session`.
     pub num_evicted_surbs: usize,
 }
 

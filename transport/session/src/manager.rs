@@ -2424,25 +2424,16 @@ where
                     METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
-                    let surb_mgmt_for_rx = surb_mgmt.clone();
                     let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
                         session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
                         (
                             reduced_surb_scoring_sender,
-                            session_rx.inspect(move |data| {
-                                // What the Exit says about its own SURB supply overrides our estimate
-                                // of it, and is the safety valve on the organic SURB gate: our
-                                // estimate counts SURBs as delivered when they are sent, so loss on
-                                // the forward path inflates it, and this is the one input that is not
-                                // downstream of that error.
-                                //
-                                // Only Session data carries it. The Exit's keep-alives are stripped
-                                // of their packet signals before `handle_keep_alive` sees them, so a
-                                // Session that is quiet apart from keep-alives relies on the level
-                                // those keep-alives report instead.
-                                surb_mgmt_for_rx.observe_counterparty_signals(data.packet_info.signals_from_sender);
+                            session_rx.inspect(move |_| {
+                                // The Exit's SURB signals are recorded in `dispatch_message`, upstream
+                                // of this: they override the organic SURB gate, and a packet dropped
+                                // before it reaches here would take the override with it.
 
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
@@ -3220,33 +3211,6 @@ where
         pseudonym: HoprPseudonym,
         in_data: ApplicationDataIn,
     ) -> errors::Result<DispatchResult> {
-        // An evicted SURB and a spent SURB are the same event to the balancer: both leave the buffer,
-        // and `produced - consumed` nets out identically either way. Crediting the eviction is what
-        // keeps the level honest — without it the estimate counts SURBs that were destroyed on
-        // arrival, so this side believes it is stocked while it is running dry, and the level it
-        // reports to the Entry inherits the same error.
-        //
-        // Done here rather than at either counting site because this is the only place both classes
-        // of SURB-bearing traffic are still seen with their packet info attached: the Entry's
-        // keep-alives are the dominant SURB source, and the conversion below discards it.
-        if in_data.packet_info.num_evicted_surbs > 0
-            && let Some(session_slot) = self.sessions.get(&pseudonym)
-            && matches!(&session_slot.routing_opts, DestinationRouting::Return(_))
-        {
-            // Only the replying side accumulates received SURBs, so only it can evict them.
-            //
-            // `consumed` moves here while the matching `produced` is credited further downstream, so
-            // the difference can under-report for a single sampling window. That direction is the
-            // safe one: it asks the counterparty for more SURBs, never fewer.
-            session_slot.surb_estimator.consumed.fetch_add(
-                in_data.packet_info.num_evicted_surbs as u64,
-                std::sync::atomic::Ordering::Relaxed,
-            );
-
-            #[cfg(feature = "telemetry")]
-            telemetry::record_session_surb_consumed(&pseudonym, in_data.packet_info.num_evicted_surbs as u64);
-        }
-
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
             // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
@@ -3258,6 +3222,14 @@ where
                 session_slot
                     .returned_packets
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                // The only place the Exit's SURB supply can be heard from a quiet Session. The
+                // conversion below takes `in_data.data` and drops the packet info with it, so by the
+                // time `handle_keep_alive` runs the signals are gone -- and keep-alives are all a
+                // Session that has stopped exchanging data still sends.
+                session_slot
+                    .surb_mgmt
+                    .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
             }
 
             // This is a Start protocol message, so we send it to the handler
@@ -3288,6 +3260,17 @@ where
 
             return if let Some(session_slot) = self.sessions.get(&session_id) {
                 trace!(%session_id, "received data for a registered session");
+
+                // Recorded here rather than once the Session reads the packet, because the send
+                // below can drop it for local backpressure and the reader would never see it. What
+                // the counterparty says about its own SURB supply is the override on the organic
+                // SURB gate, so losing it to a full inbox would leave production shut off on an
+                // estimate the counterparty has just contradicted.
+                if matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. }) {
+                    session_slot
+                        .surb_mgmt
+                        .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
+                }
 
                 match session_slot.session_tx.try_send(in_data) {
                     Ok(_) => {
@@ -4839,11 +4822,7 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{
-        Capabilities,
-        balancer::{SurbBalancerConfig, SurbFlowEstimator},
-        types::SessionTarget,
-    };
+    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
     /// A [`PixToolbox`] whose deposit-data requests are answered, for tests that do not read the
     /// PIX event stream themselves.
@@ -7773,52 +7752,13 @@ mod tests {
     }
 
     /// A packet reporting that some of the SURBs it carried were dropped on arrival.
-    fn packet_evicting(num_evicted_surbs: usize) -> anyhow::Result<ApplicationDataIn> {
-        let mut data = session_data_packet(b"carried surbs")?;
-        data.packet_info.num_evicted_surbs = num_evicted_surbs;
-        Ok(data)
-    }
-
-    /// An evicted SURB never entered the buffer, so counting it as consumed is what keeps
-    /// `produced - consumed` describing what this side actually holds. Without it the estimate
-    /// credits SURBs that were destroyed on arrival, and both this side's own egress balancer and
-    /// the level it reports back to the Entry inherit that error.
-    #[test_log::test(tokio::test)]
-    async fn dispatching_a_packet_with_evicted_surbs_should_count_them_as_consumed() -> anyhow::Result<()> {
-        let mgr: TestManager = SessionManager::new(Default::default());
-
-        // A Return-routed slot is the replying (Exit) side — the only one that accumulates received
-        // SURBs, and therefore the only one that can evict them.
-        let pseudonym = HoprPseudonym::random();
-        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
-
-        let estimator = mgr
-            .sessions
-            .get(&pseudonym)
-            .ok_or_else(|| anyhow::anyhow!("slot must exist"))?
-            .surb_estimator
-            .clone();
-        assert_eq!(0, estimator.estimate_surbs_consumed(), "precondition");
-
-        mgr.dispatch_message(pseudonym, packet_evicting(3)?)?;
-        assert_eq!(3, estimator.estimate_surbs_consumed());
-
-        // Cumulative across packets, not a high-water mark.
-        mgr.dispatch_message(pseudonym, packet_evicting(2)?)?;
-        assert_eq!(5, estimator.estimate_surbs_consumed());
-
-        Ok(())
-    }
-
-    /// On an outgoing (Entry) Session the estimator tracks what the *counterparty* holds, so a local
-    /// eviction says nothing about it. Crediting it there would make the Entry believe the Exit had
-    /// spent SURBs it never received, and mint replacements for them.
-    #[test_log::test(tokio::test)]
-    async fn dispatching_evicted_surbs_on_an_outgoing_session_should_not_be_counted() -> anyhow::Result<()> {
-        let mgr: TestManager = SessionManager::new(Default::default());
-
-        let pseudonym = HoprPseudonym::random();
-        let _rx = mgr.pre_populate_session_with_receiver(
+    /// An Entry-side slot whose organic SURB gate is closed: a target of 100 against a believed
+    /// level of 200. Anything that reopens it in the tests below did so on the counterparty's word.
+    fn entry_slot_with_closed_gate(
+        mgr: &TestManager,
+        pseudonym: HoprPseudonym,
+    ) -> anyhow::Result<crossfire::AsyncRx<crossfire::mpsc::Array<ApplicationDataIn>>> {
+        let rx = mgr.pre_populate_session_with_receiver(
             pseudonym,
             DestinationRouting::Forward {
                 destination: Box::new(Address::from(&ChainKeypair::random()).into()),
@@ -7828,18 +7768,152 @@ mod tests {
             },
         );
 
-        let estimator = mgr
+        let slot = mgr
             .sessions
             .get(&pseudonym)
-            .ok_or_else(|| anyhow::anyhow!("slot must exist"))?
-            .surb_estimator
-            .clone();
+            .ok_or_else(|| anyhow::anyhow!("slot must exist"))?;
+        slot.surb_mgmt.update(&SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            ..Default::default()
+        });
+        slot.surb_mgmt
+            .buffer_level
+            .store(200, std::sync::atomic::Ordering::Relaxed);
+        anyhow::ensure!(
+            0 == slot.surb_mgmt.organic_surbs_per_packet(),
+            "precondition: the gate must start closed"
+        );
 
-        mgr.dispatch_message(pseudonym, packet_evicting(3)?)?;
+        Ok(rx)
+    }
+
+    /// The organic SURB cap the slot's gate currently answers.
+    fn organic_surbs(mgr: &TestManager, pseudonym: HoprPseudonym) -> Option<usize> {
+        mgr.sessions
+            .get(&pseudonym)
+            .map(|slot| slot.surb_mgmt.organic_surbs_per_packet())
+    }
+
+    fn session_packet_signalling(signals: PacketSignals) -> anyhow::Result<ApplicationDataIn> {
+        let mut data = session_data_packet(b"reply")?;
+        data.packet_info.signals_from_sender = signals;
+        Ok(data)
+    }
+
+    fn keep_alive_packet_signalling(
+        session_id: SessionId,
+        signals: PacketSignals,
+    ) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::try_from(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: 0,
+            }))?,
+            packet_info: IncomingPacketInfo {
+                signals_from_sender: signals,
+                ..Default::default()
+            },
+        })
+    }
+
+    /// The regression: a packet dropped for local backpressure still carries what the counterparty
+    /// said about its own SURB supply. Recorded only once the Session reads the packet, that word is
+    /// lost exactly when the inbox is saturated — leaving organic production shut off on an estimate
+    /// the counterparty has just contradicted, and with nothing else able to reopen it.
+    #[test_log::test(tokio::test)]
+    async fn distress_should_be_recorded_even_when_the_packet_is_dropped() -> anyhow::Result<()> {
+        // Capacity 1, so the second packet deterministically finds the inbox full.
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            session_forward_capacity: 1,
+            ..Default::default()
+        });
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+
+        // Fill the single slot; nothing reads it.
+        mgr.dispatch_message(pseudonym, session_packet_signalling(PacketSignals::default())?)?;
+
+        let dropped = mgr.dispatch_message(pseudonym, session_packet_signalling(PacketSignal::SurbDistress.into())?)?;
+        assert!(
+            matches!(dropped, DispatchResult::Dropped(DropReason::SinkFull)),
+            "the fixture must actually drop this packet, got {dropped:?}"
+        );
         assert_eq!(
-            0,
-            estimator.estimate_surbs_consumed(),
-            "the Entry's estimator tracks the Exit's buffer, not its own"
+            Some(1),
+            organic_surbs(&mgr, pseudonym),
+            "a dropped packet still spoke for the counterparty"
+        );
+
+        Ok(())
+    }
+
+    /// Keep-alives are all a Session that has stopped exchanging data still sends, and they reach
+    /// `handle_keep_alive` stripped of their packet info — so before this was recorded at dispatch,
+    /// a quiet counterparty could not report distress at all.
+    #[test_log::test(tokio::test)]
+    async fn distress_should_be_recorded_from_a_keep_alive() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+
+        // The manager is not started, so the Start-protocol worker rejects this after the signal has
+        // been taken from it. That is the property under test: the record does not depend on
+        // anything downstream succeeding.
+        let _ = mgr.dispatch_message(
+            pseudonym,
+            keep_alive_packet_signalling(pseudonym, PacketSignal::OutOfSurbs.into())?,
+        );
+
+        assert_eq!(Some(1), organic_surbs(&mgr, pseudonym));
+
+        Ok(())
+    }
+
+    /// Distress is a running state, not a latch: the counterparty recomputes it per packet and stops
+    /// setting it once its pool recovers, so a clean packet has to close the gate again.
+    #[test_log::test(tokio::test)]
+    async fn a_clean_packet_should_clear_distress() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+
+        mgr.dispatch_message(pseudonym, session_packet_signalling(PacketSignal::SurbDistress.into())?)?;
+        assert_eq!(Some(1), organic_surbs(&mgr, pseudonym), "precondition: distress is set");
+
+        mgr.dispatch_message(pseudonym, session_packet_signalling(PacketSignals::default())?)?;
+        assert_eq!(Some(0), organic_surbs(&mgr, pseudonym));
+
+        Ok(())
+    }
+
+    /// The gate governs SURBs this side mints *for* its counterparty, which only the initiator does.
+    /// On an incoming Session the same signal describes our own supply coming back to us, and acting
+    /// on it would let a peer talk this side into minting for a buffer it does not keep.
+    #[test_log::test(tokio::test)]
+    async fn distress_should_be_ignored_on_an_incoming_session() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let slot = mgr
+            .sessions
+            .get(&pseudonym)
+            .ok_or_else(|| anyhow::anyhow!("slot must exist"))?;
+        slot.surb_mgmt.update(&SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            ..Default::default()
+        });
+        slot.surb_mgmt
+            .buffer_level
+            .store(200, std::sync::atomic::Ordering::Relaxed);
+
+        mgr.dispatch_message(pseudonym, session_packet_signalling(PacketSignal::OutOfSurbs.into())?)?;
+
+        assert_eq!(
+            Some(0),
+            organic_surbs(&mgr, pseudonym),
+            "an incoming Session must not take the signal as licence to mint"
         );
 
         Ok(())

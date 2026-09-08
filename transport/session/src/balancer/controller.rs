@@ -139,6 +139,18 @@ pub struct BalancerStateValues {
     /// The counterparty's store is a ring buffer that evicts the oldest entry on overflow, so
     /// everything above its capacity was discarded on arrival and was never a real level. Measured
     /// during an outage: 51 917 believed against a 15 000-entry store.
+    ///
+    /// ## Why evictions are not subtracted from the level
+    ///
+    /// The counterparty reports its evictions (`num_evicted_surbs` on the incoming packet), so the
+    /// level could be corrected to the exact truth instead of merely bounded here. It deliberately
+    /// is not, because the clamp below is `max(capacity, target)` rather than `capacity`: a level
+    /// inflated past a full buffer still climbs to the target and shuts organic production off,
+    /// whereas an accurate level pins at the counterparty's real capacity. If that capacity is below
+    /// the target -- which nothing prevents, since this figure is the *local* store size and the
+    /// counterparty may be smaller -- the accurate level never reaches the target, production never
+    /// stops, and the buffer evicts forever. The imprecise estimate fails safe and the precise one
+    /// does not, so the eviction count stays an observability signal.
     pub counterparty_buffer_capacity: AtomicU64,
     /// Milliseconds from the crate-internal `EPOCH` monotonic origin until which the return path
     /// counts as degraded.
