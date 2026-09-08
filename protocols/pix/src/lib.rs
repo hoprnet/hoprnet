@@ -172,6 +172,63 @@ pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLY_THRESHOL
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
 
+/// Retransmission requests the Entry answers for one SSA cycle.
+///
+/// A cycle's commitment ships as hundreds of packets, and a single lost one strands the whole cycle
+/// (see [`SsaShareGenerator::recommit`]), so the Exit must be able to ask again for the pieces it
+/// never received. This bounds how often it may: one request can legally name every polynomial of
+/// the cycle, and an answer is the entire burst again, so an unbounded count is a packet
+/// amplification lever available to a peer that has already been served.
+///
+/// Eight, because the Exit re-asks on an idle timer rather than once. At the shipped Exit settings
+/// — a 3 s re-request interval inside a 20 s commitment deadline — a cycle can produce about six
+/// attempts, and a peer batching several SSAs per request produces proportionally more against a
+/// scaled deadline. The excess is simply refused: an unanswered request costs the Exit one packet
+/// and this node nothing, which is why the two sides are not required to agree on the figure.
+pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
+
+/// Cycles per pseudonym whose commitment material the [`SsaShareGenerator`] retains for
+/// retransmission.
+///
+/// The newest this many are kept and the oldest is evicted, and within a live cache entry that is
+/// the only thing that releases them — emission deliberately does not enter into it. (The entry as a
+/// whole goes on idle eviction, which is a separate lifetime; see below.) Whether a re-sent commitment is
+/// still worth anything is a question about what the peer holds, and none of that is visible from
+/// this side: it completes a cycle out of the shares it has already buffered plus the commitment it
+/// is still missing, on its own delivery deadline. Releasing on drain instead would give up the
+/// repair exactly where it is worth most, a cycle whose every share has gone out and whose only
+/// missing piece is the one a lost packet took.
+///
+/// Eighteen is `MAX_OVERLAPPING_BATCHES` (2) generations of `MAX_SSA_BATCH_SIZE` (9) cycles, the
+/// figures `hopr-transport-session` is built to; they are not visible from here, so the derivation is
+/// written down rather than imported. It leaves a cycle covered for the whole of its own batch plus
+/// one further generation, and the successor gate makes that second generation expensive — a peer
+/// cannot reach it without draining nearly every cycle of the first, by which point it has been
+/// asking for far longer than [`MAX_COMMITMENT_RETRANSMISSIONS`] attempts on any sane re-request
+/// interval allow.
+///
+/// Costs `polynomials_per_ssa × 33 B` per cycle — 270 kB at the deployed dimensions, 4.8 MB per
+/// pseudonym with the cap full. Entry-side state, which is why it is not charged against an Exit's
+/// incoming-Session memory budget: that reserves reconstructor state for Sessions this node *serves*,
+/// and nothing else the generator holds is charged there either.
+///
+/// It lives as long as the pseudonym's entry in the generator's cache, which idle eviction alone
+/// releases — closing a Session clears nothing here. So a node holds this for every pseudonym it has
+/// committed a cycle for within that window, Sessions long closed included, and churn accumulates it
+/// rather than it tracking the live Session count.
+/// What bounds the consequence is that the same entry keeps its polynomial state under exactly the
+/// same rule, and that term is larger by two orders of magnitude: 270 kB here against ~33 MB there,
+/// per cycle. A Session whose cycles are still queued when it closes — the ordinary case, since
+/// draining one takes `polynomials_per_ssa × (threshold + surplus)` shares, 655 k at the deployed
+/// dimensions — leaves both, and this is under 1% of it. Reaching the cap instead means having
+/// drained eighteen cycles, some twelve million shares, by which point the polynomials are gone and
+/// 4.8 MB is the entire residue.
+///
+/// Clearing the entry outright at Session teardown would release both sooner, and is worth doing for
+/// the polynomial term; [`SsaShareGenerator::forget`] exists for it, but no production path calls it
+/// today.
+pub const MAX_RETAINED_COMMITMENT_CYCLES: usize = 18;
+
 /// Minimum SSA polynomial threshold.
 ///
 /// A threshold of 1 would make every single share reconstruct its polynomial on its own, so the
