@@ -259,7 +259,7 @@
 //!
 //! A PIX Session can end at the Exit long before its funded cycle does, by three routes that all
 //! arrive at the same place: the session server closes the `HoprSession` (`WriteClosed`/`EmptyRead`),
-//! the operator calls `close_session` over the REST API, or the peer sends a `SessionError`. Until
+//! the operator calls `SessionManager::close_session`, or the peer sends a `SessionError`. Until
 //! now each of those tore the Session down at once, taking the action driver's commitment guards and
 //! the reconstructor state with it. If the Exit was already holding enough SURBs to finish the cycle,
 //! the deposit both sides paid for was stranded — the address derives from the two commitments
@@ -285,8 +285,9 @@
 //! in force for the whole drain, because the failure it prevents is worse than a lost deposit: a
 //! return-routed packet that finds no SURB holds *every* packet this node originates for
 //! `surb_resolution_wait`. And the SURB-level notification — the one packet the reserve exempts — is
-//! switched **off** for the duration, since the reason for the exemption is that it asks the Entry
-//! for more SURBs, and the Entry it would ask has gone.
+//! switched **off** for the duration, since the reason for the exemption is that it asks for more
+//! SURBs on behalf of a Session that is gone: the Entry itself very likely still exists, but nothing
+//! is left there to act on the request, so no refill ever answers it.
 //!
 //! What a drain does not do is carry the Session on in any other respect. It retires every sibling
 //! cycle immediately (they are queued behind the target and can receive nothing while it drains) and
@@ -367,7 +368,7 @@
 //!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; no driver I/O. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
 //!    | `SetFillRate` | Applies the rate to the Session's shared keep-alive controller and records the gauge. |
-//!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. A close that ends a *drain* is an ordinary outcome rather than a failure: it is logged as information and the Entry is sent no failure notice, since the notice is return-routed and the peer it would name has already gone. |
+//!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. A close that ends a *drain* is an ordinary outcome rather than a failure: it is logged as information and the Entry is sent no failure notice, since the notice is return-routed and the Session it would report on is already gone — sending it would only spend a SURB out of a buffer that may be empty. |
 //!
 //! 7. PIX protocol events from the packet pipeline arrive via `dispatch_pix_event` and are forwarded to the supervisor
 //!    as `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`, `AlmostRecovered`, or `Recovered`.
@@ -1080,12 +1081,12 @@ pub struct PixFillConfig {
     /// Whether a Session closed at this Exit keeps draining its buffered SURBs into the funded cycle.
     ///
     /// A Session can end at the Exit long before its funded cycle does: the session server closes it,
-    /// the operator calls `close_session`, or the peer reports a `SessionError`. The deposit that
-    /// cycle was paid is only released once its whole emission has ridden back to the Entry, and the
-    /// address it sits at derives from both nodes' commitments — so a cycle abandoned midway strands
-    /// money both sides have already parted with rather than refunding it. With this on, the Exit
-    /// answers such a close by keeping the keep-alive stream running until the cycle recovers,
-    /// spending SURBs it is already holding on shares it has already been paid for.
+    /// the operator calls `SessionManager::close_session`, or the peer reports a `SessionError`. The
+    /// deposit that cycle was paid is only released once its whole emission has ridden back to the
+    /// Entry, and the address it sits at derives from both nodes' commitments — so a cycle abandoned
+    /// midway strands money both sides have already parted with rather than refunding it. With this
+    /// on, the Exit answers such a close by keeping the keep-alive stream running until the cycle
+    /// recovers, spending SURBs it is already holding on shares it has already been paid for.
     ///
     /// Deliberately narrow, and inert unless [`enabled`](Self::enabled) is set — a drain is fill,
     /// planned by the same rate law and carried by the same stream, so a disabled planner emits no
@@ -1095,8 +1096,9 @@ pub struct PixFillConfig {
     ///   [`min_surb_reserve`](Self::min_surb_reserve), covers the cycle's whole remaining emission — a drain that runs
     ///   out partway spends the reserve and recovers nothing, which is worse than not starting;
     /// * [`max_rate`](Self::max_rate) and that same reserve bound it exactly as they bound ordinary fill, and the
-    ///   SURB-level notification — fill's one reserve-exempt packet — is switched off for the duration, since the peer
-    ///   it asks for more SURBs has gone;
+    ///   SURB-level notification — fill's one reserve-exempt packet — is switched off for the duration, since it asks
+    ///   for more SURBs on behalf of a Session that is gone: the Entry itself may well still be there, but nothing is
+    ///   left to act on the request, so no refill answers it;
     /// * [`max_recovery_idle`](SupervisorConfig::max_recovery_idle) and
     ///   [`max_recovery_time`](SupervisorConfig::max_recovery_time) end it whether or not it succeeds.
     ///

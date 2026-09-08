@@ -64,8 +64,10 @@ impl SessionPixSupervisorHandle {
     /// Returns `true` if the event was queued.
     ///
     /// The synchronous counterpart to [`send_event`](Self::send_event), and it exists because one
-    /// caller cannot await: `close_session_with_reason` is a plain `fn`, reached from `poll_close`,
-    /// from a moka eviction listener and from the REST handler, none of which may park on a worker
+    /// caller cannot await: `close_session_with_reason` is a plain `fn`, reached from the manager's
+    /// closure-notification task — which `HoprSession::poll_close` and the empty-read path feed
+    /// through a non-blocking channel — from the public synchronous `SessionManager::close_session`,
+    /// and from `handle_session_error` on a peer `SessionError`. None of them may park on a worker
     /// that happens to be mid-tick.
     ///
     /// A refusal is not lost work, which is what makes dropping acceptable here where it would not be
