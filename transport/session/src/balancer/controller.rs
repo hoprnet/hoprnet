@@ -14,6 +14,7 @@ use std::{
 static EPOCH: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 use futures::{StreamExt, pin_mut};
+use hopr_crypto_packet::prelude::{PacketSignal, PacketSignals};
 use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
@@ -147,6 +148,18 @@ pub struct BalancerStateValues {
     /// damage of a marker that is never withdrawn to a short over-production instead of a session
     /// that mints forever.
     pub return_path_degraded_until_ms: AtomicU64,
+    /// Whether the counterparty's last packet said it was running low on SURBs of its own.
+    ///
+    /// A plain flag with no deadline, unlike `return_path_degraded_until_ms` above, because the two
+    /// fail in opposite directions: a degraded-path marker that is never withdrawn makes this side
+    /// mint forever, whereas a distress flag that is never withdrawn merely keeps organic production
+    /// at one SURB per packet — the behaviour that predates the gate. A flag whose stuck state is
+    /// the old behaviour does not need to expire.
+    ///
+    /// It clears on its own in the normal case: the counterparty recomputes both SURB signals on
+    /// every return packet and strips them once its pool recovers, so the next healthy packet
+    /// resets this.
+    pub counterparty_in_surb_distress: AtomicBool,
 }
 
 impl BalancerStateValues {
@@ -205,6 +218,56 @@ impl BalancerStateValues {
             capacity => {
                 level.min(capacity.max(self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed)))
             }
+        }
+    }
+
+    /// Records what the counterparty's latest packet said about *its own* SURB supply.
+    ///
+    /// Takes the whole signal set rather than a `bool` so the containment rule lives here: `OutOfSurbs`
+    /// is a superset of `SurbDistress` on the wire, so `contains` catches both, whereas an equality
+    /// match against `SurbDistress` would silently ignore the more severe of the two.
+    pub fn observe_counterparty_signals(&self, signals: PacketSignals) {
+        self.counterparty_in_surb_distress.store(
+            signals.contains(PacketSignal::SurbDistress),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// How many SURBs an outgoing Session data packet should carry along with its payload.
+    ///
+    /// Entry-side only. [`BalancerStateValues`] is shared by both ends of a Session, but only the
+    /// initiator mints SURBs for its counterparty, so on the Exit this answer is meaningless.
+    ///
+    /// Returning `0` is the point: a SURB delivered to a counterparty that is already at its target
+    /// evicts the oldest one it holds, and under PIX that destroys an SSA share rather than merely
+    /// wasting a SURB. Production resumes at one per packet as soon as the estimate falls back below
+    /// target, or immediately if the counterparty signals it is running low.
+    ///
+    /// Note this reads the raw buffer level and deliberately does *not* consult
+    /// [`return_path_estimate_is_stale`](Self::return_path_estimate_is_stale), which the otherwise
+    /// analogous `SurbSupply` ceiling must consult. The polarity is inverted between the two: there,
+    /// a degraded-path `0` would read as "admit no bytes" and has to be suppressed; here it reads as
+    /// "below target, keep producing", which is exactly what the `sustain_on_return_path_loss` opt-in
+    /// asks for.
+    pub fn organic_surbs_per_packet(&self) -> usize {
+        // Not defensive boilerplate: nothing rejects a `SurbBalancerConfig` with a zero target, and
+        // without this branch `level >= 0` would hold forever and shut organic production off
+        // permanently — while a PID with a zero output limit produces nothing either.
+        if self.is_disabled() {
+            return 1;
+        }
+
+        if self
+            .counterparty_in_surb_distress
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return 1;
+        }
+
+        if self.buffer_level() >= self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) {
+            0
+        } else {
+            1
         }
     }
 
@@ -505,6 +568,10 @@ where
                 produced = self.surb_estimator.estimate_surbs_produced(),
                 consumed = self.surb_estimator.estimate_surbs_consumed(),
                 degraded,
+                distress = self
+                    .state
+                    .counterparty_in_surb_distress
+                    .load(std::sync::atomic::Ordering::Relaxed),
                 "surb balancer state"
             );
         }
@@ -679,6 +746,106 @@ mod tests {
         let state = BalancerStateValues::default();
         state.buffer_level.store(42, std::sync::atomic::Ordering::Relaxed);
         assert_eq!(state.buffer_level(), 42);
+    }
+
+    /// State with a given target sitting at a given level, for the organic-gate tests below.
+    fn gate_state(target: u64, buffer_level: u64) -> BalancerStateValues {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: target,
+            max_surbs_per_sec: 5_000,
+            ..Default::default()
+        });
+        state
+            .buffer_level
+            .store(buffer_level, std::sync::atomic::Ordering::Relaxed);
+        state
+    }
+
+    #[test]
+    fn organic_surbs_should_be_produced_while_the_counterparty_is_below_target() {
+        assert_eq!(1, gate_state(100, 99).organic_surbs_per_packet());
+        assert_eq!(1, gate_state(100, 0).organic_surbs_per_packet());
+    }
+
+    /// The `>=` boundary: at target is already too many, because the next SURB is the one that
+    /// evicts. Pinned at exactly the target and well past it.
+    #[test]
+    fn organic_surbs_should_stop_once_the_counterparty_reaches_its_target() {
+        assert_eq!(0, gate_state(100, 100).organic_surbs_per_packet());
+        assert_eq!(0, gate_state(100, 200).organic_surbs_per_packet());
+    }
+
+    /// The safety valve. Our level estimate counts SURBs as delivered when they are *sent*, so
+    /// forward-path loss inflates it — the counterparty's own word about its supply has to win over
+    /// an estimate that can be wrong in exactly that direction.
+    #[test]
+    fn organic_surbs_should_resume_at_one_when_the_counterparty_signals_distress() {
+        let state = gate_state(100, 200);
+        assert_eq!(0, state.organic_surbs_per_packet(), "precondition: gate is closed");
+
+        state.observe_counterparty_signals(PacketSignal::SurbDistress.into());
+        assert_eq!(1, state.organic_surbs_per_packet());
+    }
+
+    /// `OutOfSurbs` is `0b11` and `SurbDistress` is `0b01`, so the former *contains* the latter.
+    /// Matching on equality instead of containment would ignore the more severe of the two signals
+    /// and leave production shut off for a counterparty that has nothing left to reply with.
+    #[test]
+    fn out_of_surbs_should_count_as_distress() {
+        let state = gate_state(100, 200);
+        state.observe_counterparty_signals(PacketSignal::OutOfSurbs.into());
+        assert_eq!(1, state.organic_surbs_per_packet());
+    }
+
+    /// Distress is not sticky once the counterparty recovers: it recomputes both signals per return
+    /// packet and strips them when its pool is healthy, so the next such packet re-arms the gate.
+    #[test]
+    fn a_recovered_counterparty_should_clear_distress() {
+        let state = gate_state(100, 200);
+        state.observe_counterparty_signals(PacketSignal::OutOfSurbs.into());
+        assert_eq!(1, state.organic_surbs_per_packet(), "precondition: distress is set");
+
+        state.observe_counterparty_signals(PacketSignals::default());
+        assert_eq!(0, state.organic_surbs_per_packet());
+    }
+
+    /// A zero target means "no balancing", not "the target is already met". Nothing rejects such a
+    /// config, so without the explicit branch `level >= 0` would hold forever and starve the session
+    /// of organic SURBs permanently — while a PID with a zero output limit produces none either.
+    #[test]
+    fn a_disabled_balancer_should_keep_producing_organic_surbs() {
+        let state = gate_state(0, 0);
+        assert!(state.is_disabled(), "precondition: a zero target disables balancing");
+        assert_eq!(1, state.organic_surbs_per_packet());
+    }
+
+    /// Sessions opened without SURB management hold a default state and route their outgoing packets
+    /// through the same policy as balanced ones, relying on it to answer 1. A `Default` that ever
+    /// gained a non-zero target would silently stop those sessions producing organic SURBs, with
+    /// nothing at the call site to show why.
+    #[test]
+    fn a_default_state_should_keep_producing_organic_surbs() {
+        assert_eq!(1, BalancerStateValues::default().organic_surbs_per_packet());
+    }
+
+    /// Mirror image of `a_degraded_return_path_should_not_zero_the_supply_ceiling` in `flow_control`:
+    /// there, the degraded-path `0` must be suppressed because it would read as "admit no bytes";
+    /// here it must be honoured, because it reads as "below target, keep producing" — which is
+    /// exactly what opting into `sustain_on_return_path_loss` asks for. Same stored value, opposite
+    /// polarity, so this must *not* grow the guard its counterpart needs.
+    #[test]
+    fn a_degraded_return_path_should_not_stop_organic_surb_production() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::from_secs(30));
+        // What the control loop writes while it drives production flat out.
+        state.buffer_level.store(0, std::sync::atomic::Ordering::Relaxed);
+
+        assert!(state.return_path_estimate_is_stale(), "precondition: open loop");
+        assert_eq!(1, state.organic_surbs_per_packet());
     }
 
     #[test]
