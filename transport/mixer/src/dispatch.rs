@@ -98,5 +98,13 @@ pub fn create<T: Send + Unpin + 'static>(cfg: MixerConfig) -> (AnySender<T>, Any
             let (tx, rx) = crate::poisson::poisson_channel(cfg);
             (AnySender::Poisson(tx), AnyReceiver::Poisson(rx))
         }
+        // `MixerType::Uniform` also exists under `uniform-adapter` alone (so `MixerSink` can be
+        // configured standalone), but that feature provides no `channel()` to dispatch to here.
+        #[cfg(all(feature = "uniform-adapter", not(feature = "uniform-channel")))]
+        MixerType::Uniform(_) => panic!(
+            "MixerType::Uniform selected but the `uniform-channel` feature is disabled; enable it to dispatch this \
+             engine via `create()` (`uniform-adapter` alone only provides the `MixerSink` adapter, not a channel() \
+             Sender/Receiver pair)"
+        ),
     }
 }

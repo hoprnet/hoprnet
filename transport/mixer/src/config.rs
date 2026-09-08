@@ -69,7 +69,7 @@ pub struct MixerConfig {
 
 impl MixerConfig {
     /// Config selecting the uniform-delay engine with the given delay bounds.
-    #[cfg(feature = "uniform-channel")]
+    #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     pub fn new_uniform(min_delay: Duration, delay_range: Duration) -> Self {
         Self {
             mixer_type: MixerType::Uniform(UniformConfig { min_delay, delay_range }),
@@ -104,14 +104,17 @@ impl MixerConfig {
     /// [`HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR`]× the active engine's nominal max delay in ms
     /// (floored at 1), so the smoothing tracks the configured delay instead of a constant.
     pub fn metric_delay_window(&self) -> u64 {
-        (HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR * self.nominal_max_delay().as_millis() as u64).max(1)
+        let max_delay_ms: u64 = self.nominal_max_delay().as_millis().try_into().unwrap_or(u64::MAX);
+        HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR
+            .saturating_mul(max_delay_ms)
+            .max(1)
     }
 
     /// The active engine's nominal maximum delay: the timing-wheel hard bound `max_delay`, or the
     /// uniform `min_delay + delay_range`.
     fn nominal_max_delay(&self) -> Duration {
         match self.mixer_type {
-            #[cfg(feature = "uniform-channel")]
+            #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
             MixerType::Uniform(uniform) => uniform.min_delay.saturating_add(uniform.delay_range),
             #[cfg(feature = "poisson")]
             MixerType::Poisson(poisson) => poisson.max_delay,
@@ -127,7 +130,7 @@ impl MixerConfig {
     #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     pub(crate) fn uniform_config(&self) -> UniformConfig {
         match self.mixer_type {
-            #[cfg(feature = "uniform-channel")]
+            #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
             MixerType::Uniform(uniform) => uniform,
             #[allow(unreachable_patterns)]
             _ => UniformConfig::default(),
@@ -142,7 +145,7 @@ impl MixerConfig {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MixerType {
     /// Uniform-delay min-heap channel.
-    #[cfg(feature = "uniform-channel")]
+    #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     Uniform(UniformConfig),
     /// Virtual-clock timing-wheel release engine, pool shared on the consumer task.
     #[cfg(feature = "poisson")]
@@ -153,9 +156,12 @@ impl Default for MixerType {
     fn default() -> Self {
         #[cfg(feature = "poisson")]
         return MixerType::Poisson(PoissonConfig::default());
-        #[cfg(all(feature = "uniform-channel", not(feature = "poisson")))]
+        #[cfg(all(
+            any(feature = "uniform-channel", feature = "uniform-adapter"),
+            not(feature = "poisson")
+        ))]
         return MixerType::Uniform(UniformConfig::default());
-        #[cfg(not(any(feature = "uniform-channel", feature = "poisson")))]
+        #[cfg(not(any(feature = "uniform-channel", feature = "uniform-adapter", feature = "poisson")))]
         compile_error!("at least one mixer implementation feature must be enabled");
     }
 }
@@ -165,7 +171,7 @@ impl Default for MixerType {
 impl validator::Validate for MixerType {
     fn validate(&self) -> Result<(), validator::ValidationErrors> {
         match self {
-            #[cfg(feature = "uniform-channel")]
+            #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
             MixerType::Uniform(uniform) => uniform.validate(),
             #[cfg(feature = "poisson")]
             MixerType::Poisson(poisson) => poisson.validate(),
@@ -265,6 +271,22 @@ mod tests {
     #[test]
     fn default_mixer_type_should_be_poisson() {
         assert!(matches!(MixerType::default(), MixerType::Poisson(_)));
+    }
+
+    /// `Duration::as_millis()` returns `u128`; an unchecked `as u64` cast on a pathologically
+    /// large configured delay would silently wrap instead of saturating, producing an
+    /// unrelated-to-intent EMA window instead of a merely very large one.
+    #[cfg(feature = "poisson")]
+    #[test]
+    fn metric_delay_window_should_saturate_instead_of_wrapping_on_overflow() {
+        let cfg = MixerConfig {
+            mixer_type: MixerType::Poisson(PoissonConfig {
+                max_delay: Duration::MAX,
+                ..PoissonConfig::default()
+            }),
+            ..MixerConfig::default()
+        };
+        assert_eq!(cfg.metric_delay_window(), u64::MAX);
     }
 
     #[test]

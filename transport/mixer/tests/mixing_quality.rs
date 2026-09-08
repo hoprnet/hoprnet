@@ -1,10 +1,10 @@
 //! End-to-end mixing-quality checks for the shared-pool virtual-clock timing-wheel mixer.
 //!
 //! `src/pool.rs` unit-tests the release mechanism directly against pure functions; this suite
-//! drives the real `poisson_channel` API (real tokio tasks, real wall-clock sends) so a
-//! wiring bug in `poisson.rs` itself — the `enqueue`/`sweep`/`next_wake` call sites, the
-//! lock discipline, the wake scheduling — has somewhere to be caught that the pure-function tests
-//! cannot see.
+//! drives the real `poisson_channel` API (`futures::executor::block_on`, real wall-clock sends,
+//! no Tokio runtime) so a wiring bug in `poisson.rs` itself — the `enqueue`/`sweep`/`next_wake`
+//! call sites, the lock discipline, the wake scheduling — has somewhere to be caught that the
+//! pure-function tests cannot see.
 
 #![cfg(feature = "poisson")]
 
