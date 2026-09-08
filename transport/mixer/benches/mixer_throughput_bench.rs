@@ -137,16 +137,35 @@ pub fn mixer_channel_throughput_reused(c: &mut Criterion) {
                     let tx = tx.clone();
                     let rx = rx.clone();
                     async move {
+                        // Preload: get a batch aging in the pool before timing starts, then keep
+                        // sends and drains interleaved 1:1 through the timed region instead of
+                        // bursting all sends before any drain. A burst-then-drain round pays a
+                        // near-fixed release-delay tail waiting on its own worst-case packet
+                        // (dwarfing per-message cost at small sizes); an interleaved pipeline
+                        // keeps the pool continuously occupied so drains mostly find an
+                        // already-aged item waiting, measuring steady-state throughput instead
+                        // of a batch-boundary artifact. See `poisson_bench.rs` for why this
+                        // matters there.
+                        for _ in 0..iterations {
+                            tx.send(RANDOM_GIBBERISH).expect("send must succeed");
+                        }
+
                         let start = std::time::Instant::now();
                         for _ in 0..iters {
                             for _ in 0..iterations {
                                 tx.send(RANDOM_GIBBERISH).expect("send must succeed");
-                            }
-                            for _ in 0..iterations {
                                 std::hint::black_box(drain_one(&rx).await.expect("receive must succeed"));
                             }
                         }
-                        start.elapsed()
+                        let elapsed = start.elapsed();
+
+                        // Drain the untimed preload batch so the pool is empty again before the
+                        // next sample/iteration, instead of growing unbounded across the run.
+                        for _ in 0..iterations {
+                            std::hint::black_box(drain_one(&rx).await.expect("receive must succeed"));
+                        }
+
+                        elapsed
                     }
                 });
             },
