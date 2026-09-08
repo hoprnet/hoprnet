@@ -6,26 +6,33 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig};
+use hopr_transport_mixer::config::{MixerConfig, MixerType};
 
 pub const SAMPLE_SIZE: usize = 10;
 
 /// 512 characters long string of random gibberish.
 pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
-/// A near-passthrough timing-wheel config (1 ms bound) so the Poisson-engine benchmark measures
-/// per-message overhead rather than the mixing delay. Read by `PoissonParams::from_mixer`. The
-/// uniform-engine benchmarks use their own zero-delay `MixerConfig::new_uniform` config instead
-/// of relying on this one.
+/// A near-passthrough config (1 ms bound) for whichever mixer engine is active, so a benchmark
+/// using it measures per-message overhead rather than the mixing delay itself. Not hardcoded to
+/// one engine: this module is compiled into every bench binary regardless of which functions a
+/// given bench actually calls, and `mixer_throughput_bench`'s `required-features` deliberately
+/// excludes `poisson` (to benchmark the uniform engine in isolation).
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
-    MixerConfig {
-        mixer_type: MixerType::Poisson(PoissonConfig {
-            max_delay: std::time::Duration::from_millis(1),
-            ..PoissonConfig::default()
-        }),
-        ..MixerConfig::default()
+    let mut cfg = MixerConfig::default();
+    match &mut cfg.mixer_type {
+        #[cfg(feature = "poisson")]
+        MixerType::Poisson(poisson) => poisson.max_delay = std::time::Duration::from_millis(1),
+        #[cfg(feature = "uniform-channel")]
+        MixerType::Uniform(uniform) => {
+            uniform.min_delay = std::time::Duration::ZERO;
+            uniform.delay_range = std::time::Duration::from_millis(1);
+        }
+        #[allow(unreachable_patterns)]
+        _ => {}
     }
+    cfg
 }
 
 /// Workload volumes spanning the realistic 1–10 MB/s operating range. Each volume is one second

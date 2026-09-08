@@ -50,7 +50,11 @@ fn default_target_occupancy() -> usize {
 /// Fields here apply to all engines; per-engine tuning lives in [`MixerType`], whose active
 /// variant also selects which engine [`crate::create`] instantiates.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct MixerConfig {
     /// Preallocated buffer capacity; more items may still be inserted, triggering reallocation.
     #[default(HOPR_MIXER_CAPACITY)]
@@ -177,7 +181,11 @@ impl validator::Validate for MixerType {
 /// `min_delay` floor is a uniform-only concept (it does not aid a memoryless Poisson mixer).
 #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct UniformConfig {
     /// Minimum delay before any packet is eligible for release.
     #[default(Duration::from_millis(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS))]
@@ -212,7 +220,11 @@ impl UniformConfig {
 /// time; the pool's virtual clock advances from wall-clock time and, when `target_occupancy > 0`,
 /// from arrivals. See `hopr_transport_mixer::pool` for the mechanism and its derivation.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
 pub struct PoissonConfig {
     /// Hard latency bound: no entry can be held longer than `max_delay`, by construction of the
     /// release tag (see [`Self::miss_probability`]) — not a force-release rule. `max_delay = 0`
@@ -259,6 +271,17 @@ mod tests {
     fn default_config_should_pass_validation() -> anyhow::Result<()> {
         MixerConfig::default().validate()?;
         Ok(())
+    }
+
+    /// Guards against an operator's stale config silently keeping old behavior after a field is
+    /// renamed or removed (this crate has done both): without `deny_unknown_fields`, an unknown
+    /// key is dropped rather than rejected, and the field just falls back to its default.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserializing_an_unknown_field_should_be_rejected() {
+        let json = r#"{"capacity": 100, "not_a_real_field": 1}"#;
+        let result: Result<MixerConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err(), "unknown field should be rejected, got {result:?}");
     }
 
     #[test]

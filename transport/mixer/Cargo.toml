@@ -57,6 +57,7 @@ futures = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 rstest = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

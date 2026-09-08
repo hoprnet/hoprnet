@@ -55,14 +55,19 @@ impl VirtualClock {
 
     /// Advance the time term to `now` and add `arrival_increment` (`0.0` for a pure time sync,
     /// e.g. from [`sweep`]; `params.inv_target_occupancy` for one arrival, from [`enqueue`]). Returns the
-    /// resulting `V`. `now` going backwards relative to the last sync (impossible in practice,
-    /// but not derivable from the type system) contributes zero via `saturating_duration_since`
-    /// rather than panicking or going negative.
+    /// resulting `V`. `now` going backwards relative to the last sync is a normal occurrence, not
+    /// an edge case: `Sender::send` and `Receiver::poll_next` each capture their own `Instant`
+    /// before finally acquiring the shared pool lock, so a caller holding an older timestamp can
+    /// still apply it here after a caller with a newer one already has. `saturating_duration_since`
+    /// keeps that call's own `dt` at zero rather than negative, and `synced_at` only ever moves
+    /// forward (`self.synced_at.max(now)`) so the stale call can't rewind it — otherwise the next
+    /// call's `dt` would double-count the interval already accounted for, over-advancing `V` and
+    /// releasing packets earlier than their tag intended.
     fn advance(&mut self, now: Instant, mu_max_secs: f64, arrival_increment: f64) -> f64 {
         debug_assert!(mu_max_secs > 0.0, "advance() must not be called in passthrough mode");
         let dt = now.saturating_duration_since(self.synced_at).as_secs_f64();
         self.v += dt / mu_max_secs + arrival_increment;
-        self.synced_at = now;
+        self.synced_at = self.synced_at.max(now);
         self.v
     }
 
@@ -76,10 +81,11 @@ impl VirtualClock {
     /// Reset to a fresh origin at `now`. Only called from [`sweep`] at the moment the pool goes
     /// empty, which is the one point a reset cannot affect any live entry's relative order —
     /// bounding `V`'s growth over a long-lived, intermittently-idle engine instead of letting it
-    /// grow for the process lifetime.
+    /// grow for the process lifetime. Also clamped to move `synced_at` only forward, for the same
+    /// reason as [`Self::advance`].
     fn rebase(&mut self, now: Instant) {
         self.v = 0.0;
-        self.synced_at = now;
+        self.synced_at = self.synced_at.max(now);
     }
 }
 
@@ -415,6 +421,34 @@ mod tests {
     // ---------------------------------------------------------------------------------------
     // (a) the mixing works
     // ---------------------------------------------------------------------------------------
+
+    /// `Sender::send` and `Receiver::poll_next` both call into the shared `VirtualClock` while
+    /// holding the pool lock, but each captures its own `Instant`. If a caller that captured an
+    /// *older* `now` (e.g. the receiver, before it managed to acquire a lock a sender briefly
+    /// held) ends up applying it to the clock *after* a caller with a *newer* `now` already did,
+    /// `synced_at` must not regress — otherwise the next call's `dt` double-counts the interval
+    /// between the two, over-advancing `V` and releasing packets earlier than their tag intended.
+    #[test]
+    fn virtual_clock_should_not_rewind_when_advanced_out_of_order() {
+        let t0 = Instant::now();
+        let mut clock = VirtualClock::new(t0);
+
+        // A fresher `now` (e.g. a sender that just acquired the lock) advances the clock first.
+        clock.advance(t0 + Duration::from_millis(10), 1.0, 0.0);
+
+        // A stale `now` (e.g. a receiver that captured it before waiting on the lock) arrives
+        // second. It must contribute no elapsed time and must not move `synced_at` backwards.
+        clock.advance(t0 + Duration::from_millis(5), 1.0, 0.0);
+
+        // The true elapsed wall time from `t0` is 20ms; with `mu_max_secs = 1.0`, `V` should equal
+        // exactly that — not 25ms, which is what re-opening the [5ms, 10ms] interval would give.
+        let v = clock.advance(t0 + Duration::from_millis(20), 1.0, 0.0);
+        let expected = Duration::from_millis(20).as_secs_f64();
+        assert!(
+            (v - expected).abs() < 1e-9,
+            "V should equal total elapsed wall time ({expected}s), got {v}s — synced_at was rewound"
+        );
+    }
 
     #[test]
     fn next_wake_should_target_the_earliest_v_release() {
