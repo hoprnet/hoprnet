@@ -1324,6 +1324,66 @@ mod tests {
         );
     }
 
+    /// The fill ceiling must clear the rate the widest accepted quota actually needs.
+    ///
+    /// Fill exists to complete funded cycles that the application will not, and a ceiling below the
+    /// requirement is a filler that runs flat out and still strands the deposit. The failure is
+    /// invisible without this check: every individual value validates, the rate gauge sits pinned at
+    /// the cap, and the only symptom is a cycle closing on `RecoveryDeadline` two hours later.
+    ///
+    /// The floor is the planner's own arithmetic taken at the moment fill starts — the whole cycle
+    /// remaining, spread over `finish_fraction` of `max_recovery_time`, plus the loss margin —
+    /// recomputed here rather than shared with the validator, so a change to either has to be
+    /// restated.
+    #[test]
+    fn a_fill_ceiling_below_the_widest_accepted_quota_is_rejected() {
+        let cfg = IncomingSessionPixConfig::default();
+        let packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+        let horizon = cfg
+            .supervision
+            .max_recovery_time
+            .mul_f64(cfg.supervision.fill.finish_fraction);
+        let floor = (packets as f64 * (1.0 + cfg.supervision.fill.loss_margin) / horizon.as_secs_f64()).ceil() as u32;
+
+        assert!(
+            cfg.supervision.fill.max_rate >= floor,
+            "the shipping default ceiling ({}) must clear the {floor} packets/s its own quota range needs",
+            cfg.supervision.fill.max_rate
+        );
+        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+
+        let starved = IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                fill: hopr_transport_session::PixFillConfig {
+                    max_rate: floor - 1,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&starved).is_err(),
+            "a ceiling one packet/s short of the requirement must be refused"
+        );
+
+        // And an Exit that has turned fill off is not held to a bound nothing reads: it has chosen
+        // the pre-fill behaviour, where an idle cycle simply strands.
+        let disabled = IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                fill: hopr_transport_session::PixFillConfig {
+                    enabled: false,
+                    max_rate: 1,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        validate_incoming_session_pix_config(&disabled)
+            .expect("a disabled filler must not be judged against a rate it will never use");
+    }
+
     /// The live-cycle budget must admit at least one Session at the widest quota this Exit accepts.
     ///
     /// Otherwise the Exit advertises a `quota_range` whose top it will always refuse for want of
@@ -1443,6 +1503,30 @@ mod tests {
             IncomingSessionPixConfig::default().quota_range,
             cfg.incoming_session_pix_config.quota_range
         );
+
+        // The fill block is nested inside a `deny_unknown_fields` struct, so it has to carry its own
+        // `serde(default)` for a node configuration written before fill existed to keep loading —
+        // and partial specification must work, or an operator raising the ceiling would have to
+        // restate the heartbeat, the fractions and the reserve alongside it.
+        assert_eq!(
+            hopr_transport_session::PixFillConfig::default(),
+            cfg.incoming_session_pix_config.supervision.fill,
+            "a config that names no fill block must get the shipped one"
+        );
+        let json = r#"{
+            "incoming_session_pix_config": {
+                "supervision": { "fill": { "max_rate": 500 } }
+            }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("a partial fill block must deserialize");
+        let fill = &cfg.incoming_session_pix_config.supervision.fill;
+        assert_eq!(500, fill.max_rate);
+        assert_eq!(
+            hopr_transport_session::PixFillConfig::default().heartbeat,
+            fill.heartbeat,
+            "unspecified fill fields must fall back to their defaults"
+        );
+        assert!(fill.enabled, "omitting `enabled` must retain its true default");
 
         // Both SSA batch knobs and the fixed-mode opt-out must be settable from a config file too.
         // Raising the Exit's ceiling past the Entry's is a silently fatal misconfiguration, and an

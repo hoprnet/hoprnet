@@ -3,7 +3,6 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll, Waker},
-    time::Duration,
 };
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
@@ -247,21 +246,32 @@ pub(crate) enum SurbNotificationMode {
 }
 
 /// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
-#[instrument(level = "debug", skip(sender, routing, notification_mode, cfg))]
+///
+/// `controller` is supplied rather than created here because the Exit shares this one stream between
+/// two independent producers — its SURB-level notification and the PIX filler — and both the rate and
+/// the admission decision below have to be steered from the same handle. The stream is suspended
+/// until the controller is given a non-zero rate.
+///
+/// `admit` is consulted once per released packet and drops it when it answers `false`. It is a
+/// predicate rather than a sink wrapper because the sink here must stay `Clone` — `try_for_each_concurrent`
+/// clones it per message — and the natural wrapper for a sink that may emit nothing,
+/// `SinkExt::with_flat_map`, is not. Filtering after the rate limiter also puts the decision where
+/// the Exit wants it: the rate says how often a packet *may* go, and this says whether this
+/// particular one should.
+#[instrument(level = "debug", skip(sender, routing, notification_mode, cfg, controller, admit))]
 pub(crate) fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
     routing: DestinationRouting,
     notification_mode: SurbNotificationMode,
     cfg: std::sync::Arc<BalancerStateValues>,
-) -> (RateController, AbortHandle)
+    controller: &RateController,
+    admit: impl Fn() -> bool + Send + 'static,
+) -> AbortHandle
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    // The stream is suspended until the caller sets a rate via the Controller
-    let controller = RateController::new(0, Duration::from_secs(1));
-
     // DropAbortable not needed because the stream only generates items when polled
     let (ka_stream, abort_handle) = futures::stream::abortable(
         futures::stream::repeat_with(move || match &notification_mode {
@@ -281,7 +291,8 @@ where
                 additional_data: 0,
             }),
         })
-        .rate_limit_with_controller(&controller),
+        .rate_limit_with_controller(controller)
+        .filter(move |_| futures::future::ready(admit())),
     );
 
     let sender_clone = sender.clone();
@@ -331,7 +342,7 @@ where
         line!(),
     ));
 
-    (controller, abort_handle)
+    abort_handle
 }
 
 #[cfg(test)]
