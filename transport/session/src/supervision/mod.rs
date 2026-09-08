@@ -253,6 +253,61 @@
 //! the required rate. The client accepts that as the price of a Session whose cycles complete, and
 //! funds successors as it would have.
 //!
+//! ### Draining a closed Session
+//!
+//! Fill answers a Session that has nothing to say. This answers one that is no longer there.
+//!
+//! A PIX Session can end at the Exit long before its funded cycle does, by three routes that all
+//! arrive at the same place: the session server closes the `HoprSession` (`WriteClosed`/`EmptyRead`),
+//! the operator calls `close_session` over the REST API, or the peer sends a `SessionError`. Until
+//! now each of those tore the Session down at once, taking the action driver's commitment guards and
+//! the reconstructor state with it. If the Exit was already holding enough SURBs to finish the cycle,
+//! the deposit both sides paid for was stranded — the address derives from the two commitments
+//! together, so nothing refunds it.
+//!
+//! So the Exit keeps draining, under [`fill.drain_after_close`](PixFillConfig::drain_after_close),
+//! and only when the arithmetic says the drain can finish:
+//!
+//! ```text
+//! remaining = E − largest_shares_seen(target)
+//! drain iff estimated_surbs − min_surb_reserve ≥ remaining
+//! ```
+//!
+//! The target is the earliest live cycle, and only if it is both funded and clocked — the same cycle
+//! fill would have been working for. A Session with no funded cycle, or one whose front has already
+//! recovered and left a paid FIFO tail behind, has nothing a drain could buy and closes at once with
+//! `SessionPixCloseReason::SessionClosed`.
+//!
+//! Three things about that predicate are deliberate. The estimate is an **upper** bound — ring-buffer
+//! overwrites, store eviction and invalidated relayers are all unobserved — so `remaining` carries no
+//! loss margin to go with it; in-flight packets are already subtracted from the estimate, and full
+//! recovery needs fewer than `E` shares, so both errors point the conservative way. The reserve stays
+//! in force for the whole drain, because the failure it prevents is worse than a lost deposit: a
+//! return-routed packet that finds no SURB holds *every* packet this node originates for
+//! `surb_resolution_wait`. And the SURB-level notification — the one packet the reserve exempts — is
+//! switched **off** for the duration, since the reason for the exemption is that it asks the Entry
+//! for more SURBs, and the Entry it would ask has gone.
+//!
+//! What a drain does not do is carry the Session on in any other respect. It retires every sibling
+//! cycle immediately (they are queued behind the target and can receive nothing while it drains) and
+//! it never asks for a successor, on any route into the request — there is no Session left to serve a
+//! successor's quota, so ordering one would commit the Entry to a deposit against a cycle that could
+//! never be served. It ends with `SessionPixCloseReason::Drained` when the cycle recovers, and with
+//! `RecoveryIdle` or `RecoveryDeadline` when it does not: `max_recovery_idle` stops being
+//! service-gated while draining, because a drained Session consumes no gated service ever again and
+//! the re-arm would otherwise never fire. The Session slot survives on its `time_to_idle`, which
+//! every progress event refreshes, so a productive drain keeps its slot and a stalled one is closed
+//! by the idle deadline long before the 180 s eviction — which remains the backstop.
+//!
+//! Two cases are deliberately excluded. **Idle eviction** does not drain — it reaches the cache's own
+//! listener rather than any of the close paths above — and that is the right answer rather than an
+//! omission: a filling Session's slot is refreshed by every progress event, so reaching the eviction
+//! at all means the cycle was already starved or stalled. A second explicit close of a *draining*
+//! Session forces the teardown for a different reason: it is the operator's way to overrule the
+//! drain. And a funded successor that has not yet reached the front, or a recovered predecessor's
+//! paid tail, is never drained for: a production SURB buffer is at most ten thousand deep and a cycle
+//! is 160 000–330 000 packets, so it could not cover a second one.
+//!
 //! ## The Worker — bridging pure logic to async
 //!
 //! `spawn_supervisor_worker` creates the `SessionPixSupervisor`,
@@ -312,12 +367,15 @@
 //!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; no driver I/O. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
 //!    | `SetFillRate` | Applies the rate to the Session's shared keep-alive controller and records the gauge. |
-//!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. |
+//!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. A close that ends a *drain* is an ordinary outcome rather than a failure: it is logged as information and the Entry is sent no failure notice, since the notice is return-routed and the peer it would name has already gone. |
 //!
 //! 7. PIX protocol events from the packet pipeline arrive via `dispatch_pix_event` and are forwarded to the supervisor
 //!    as `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`, `AlmostRecovered`, or `Recovered`.
 //! 8. When a commitment becomes verifiable, a `PixDepositObserver` task loops on deposit confirmations, forwarding each
 //!    as `DepositConfirmed` to the supervisor.
+//! 9. `SessionPixEvent::SessionClosed` is the one event that does not come from `dispatch_pix_event`. The manager's own
+//!    close paths raise it, from `begin_surb_drain`, and the supervisor answers by either draining the funded cycle or
+//!    closing at once — see "Draining a closed Session" above.
 //!
 //! ### Entry side (outgoing sessions)
 //!
@@ -383,6 +441,7 @@
 //! | `max_served_without_progress` | 2048 | Packets served with no share of *any* kind coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. Counts `shares_seen`, so a conforming Entry's surplus resets it; see below. |
 //! | `tombstone_retention_window` | 30 s | Bounds how long recovered-cycle diagnostics and observer ownership remain; the separately bounded FIFO-tail receipt may outlive it. |
 //! | `fill` | on | The one rule here that *sends* rather than stops: a funded cycle only recovers once its whole emission has ridden back to the Entry, so an idle Session strands the deposit it has already been paid. See [`PixFillConfig`]. |
+//! | `fill.drain_after_close` | on | A Session closed at the Exit mid-cycle stranding a deposit both sides have already paid for, while the Exit still holds the SURBs that would have completed it. Entered only when the estimated buffer covers the whole remainder, and bounded by everything `fill` is bounded by. |
 //!
 //! ## What is *not* here: the price of a cycle
 //!
@@ -506,6 +565,7 @@
 //! | `fill.max_rate` | 250 | An idle cycle here needs 163 840 x 1.05 / 5400 s = **32 packets/s**, so this is ~8x the requirement — headroom for a Session that fell behind, at a ceiling of ~2 Mbps. `validate_incoming_session_pix_config` enforces the floor against the *widest accepted quota*, which at the default `quota_range` is 128 packets/s |
 //! | `fill.heartbeat` | 60 s | The floor while organic egress covers the need. Not zero: the Entry's own idle eviction is refreshed by this traffic, and its balancer has no SURB-level report without it |
 //! | `fill.min_surb_reserve` | 500 | `SurbStoreConfig::distress_threshold`. A *ceiling*: the effective reserve is `min(500, announced_target / 4)`, floored at one, because the buffer it is measured against is sized by the Entry rather than here. At the 7 000-SURB balancer target below a quarter is 1 750, so 500 is what binds — leaving fill 93 % of the buffer and keeping the last 7 % for the application, which is the side that has something waiting on it. The derivation engages only on a Session whose Entry asked for under 2 000 SURBs, which without it could never be filled at all |
+//! | `fill.drain_after_close` | true | Shipped value, and inert at this profile's buffer depth: 7 000 SURBs less the 500 reserve is 4 % of a 163 840-packet cycle, so a Session closed at any point before the last 6 500 shares simply closes. What it does buy is the endgame — a client that hangs up in the final seconds of a cycle it has all but paid off no longer strands the whole deposit, and the drain then finishes in about 26 s at `max_rate` |
 //!
 //! What one cycle costs is not in this table, because it is not in this configuration: the 162.2 MiB
 //! quota is priced by the deposit pool, which is also what decides that a deposit has cleared it.
@@ -1016,6 +1076,35 @@ pub struct PixFillConfig {
     /// and the derivation only engages on a Session whose Entry asked for less than four times it.
     #[default(500)]
     pub min_surb_reserve: u64,
+
+    /// Whether a Session closed at this Exit keeps draining its buffered SURBs into the funded cycle.
+    ///
+    /// A Session can end at the Exit long before its funded cycle does: the session server closes it,
+    /// the operator calls `close_session`, or the peer reports a `SessionError`. The deposit that
+    /// cycle was paid is only released once its whole emission has ridden back to the Entry, and the
+    /// address it sits at derives from both nodes' commitments — so a cycle abandoned midway strands
+    /// money both sides have already parted with rather than refunding it. With this on, the Exit
+    /// answers such a close by keeping the keep-alive stream running until the cycle recovers,
+    /// spending SURBs it is already holding on shares it has already been paid for.
+    ///
+    /// Deliberately narrow, and inert unless [`enabled`](Self::enabled) is set — a drain is fill,
+    /// planned by the same rate law and carried by the same stream, so a disabled planner emits no
+    /// rate to drain at. Three further conditions bound what it can cost:
+    ///
+    /// * it is entered only when the Exit's *estimated* SURB buffer, net of
+    ///   [`min_surb_reserve`](Self::min_surb_reserve), covers the cycle's whole remaining emission — a drain that runs
+    ///   out partway spends the reserve and recovers nothing, which is worse than not starting;
+    /// * [`max_rate`](Self::max_rate) and that same reserve bound it exactly as they bound ordinary fill, and the
+    ///   SURB-level notification — fill's one reserve-exempt packet — is switched off for the duration, since the peer
+    ///   it asks for more SURBs has gone;
+    /// * [`max_recovery_idle`](SupervisorConfig::max_recovery_idle) and
+    ///   [`max_recovery_time`](SupervisorConfig::max_recovery_time) end it whether or not it succeeds.
+    ///
+    /// Setting it to `false` restores the immediate teardown on every close path, byte for byte.
+    ///
+    /// Default: `true`.
+    #[default(true)]
+    pub drain_after_close: bool,
 }
 
 /// A rate at which the Exit originates PIX fill keep-alives.
@@ -1135,6 +1224,18 @@ pub enum SessionPixEvent {
         ssa_id: SsaId<HoprPseudonym>,
         observed_total: u64,
     },
+    /// The session layer closed this Session at the Exit.
+    ///
+    /// The one event here that does not come from the packet pipeline: it is raised by the manager's
+    /// own close paths — the session server's `WriteClosed`/`EmptyRead`, an operator's
+    /// `close_session`, or a peer `SessionError` — rather than by an observation about a cycle.
+    ///
+    /// `drainable_surbs` is the Exit's *estimate* of the SURBs it may still spend, already net of the
+    /// fill reserve. An estimate, and an upper bound at that: ring-buffer overwrites, store eviction
+    /// and invalidated relayers are all unobserved. That is why the supervisor compares it against
+    /// the whole remaining emission rather than a discounted one, and why the deadlines remain the
+    /// backstop for a drain admitted on a figure that turns out to have been optimistic.
+    SessionClosed { drainable_surbs: u64 },
 }
 
 // ---------------------------------------------------------------------------
@@ -1234,6 +1335,19 @@ pub enum SessionPixCloseReason {
     NoSsaRemaining,
     /// The supervisor action driver failed or was dropped.
     SupervisorUnavailable,
+    /// The Session was closed at the Exit with nothing left worth draining.
+    ///
+    /// Not a fault: it is the ordinary end of a Session whose funded cycle the Exit cannot finish out
+    /// of the SURBs it holds — or which had no funded cycle at all. What it reports is that the
+    /// Session ended because it was closed, rather than because one of the deadlines above expired.
+    SessionClosed,
+    /// The funded cycle recovered after the Session had already been closed at the Exit.
+    ///
+    /// The good outcome of a drain, and the reason the drain exists: the deposit the Entry paid for
+    /// that cycle is released rather than stranded. A drain that instead runs out of SURBs or of
+    /// shares closes with [`RecoveryIdle`](Self::RecoveryIdle) or
+    /// [`RecoveryDeadline`](Self::RecoveryDeadline), which is why there is no third reason here.
+    Drained,
 }
 
 // ---------------------------------------------------------------------------
@@ -2070,6 +2184,8 @@ mod tests {
             SessionPixCloseReason::InvalidTransition,
             SessionPixCloseReason::NoSsaRemaining,
             SessionPixCloseReason::SupervisorUnavailable,
+            SessionPixCloseReason::SessionClosed,
+            SessionPixCloseReason::Drained,
         ];
 
         for reason in reasons {
@@ -2084,7 +2200,9 @@ mod tests {
                 | SessionPixCloseReason::CounterRegression
                 | SessionPixCloseReason::InvalidTransition
                 | SessionPixCloseReason::NoSsaRemaining
-                | SessionPixCloseReason::SupervisorUnavailable => {}
+                | SessionPixCloseReason::SupervisorUnavailable
+                | SessionPixCloseReason::SessionClosed
+                | SessionPixCloseReason::Drained => {}
             }
         }
 

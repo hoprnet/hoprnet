@@ -58,6 +58,14 @@ pub(crate) struct FillTarget {
     pub largest_shares_seen: u64,
     /// The immutable per-cycle recovery deadline this cycle must finish before.
     pub hard_deadline: Instant,
+    /// Whether this target is a post-close drain, so the whole remainder is wanted at once.
+    ///
+    /// A live Session is filled at the pace its deadline needs, because it will still be there when
+    /// the deadline arrives. A drained one will not be: it is closed, the buffer it is spending is
+    /// finite and nothing is refilling it, so the only sensible rate is as fast as
+    /// [`PixFillConfig::max_rate`] allows. See "Draining a closed Session" in the module
+    /// documentation of `supervision`.
+    pub drain: bool,
 }
 
 /// The pure rate law. See the module documentation for what it computes and why.
@@ -248,16 +256,26 @@ impl FillPlanner {
     /// already in the past collapses to one sampling interval, which asks for the whole remainder at
     /// once and is then bounded by `max_rate` — the correct behaviour for a cycle that is out of time,
     /// since there is no rate at which it can still be saved and no reason to stop trying.
+    ///
+    /// A [drain](FillTarget::drain) collapses the horizon the same way for a different reason: pacing
+    /// a cycle to its deadline only makes sense while the Session is still there to be paced, and a
+    /// drained one is spending a buffer nothing will refill. The ceiling in
+    /// [`bound`](Self::bound) then becomes the only thing setting the rate, which is the intent
+    /// rather than a side effect.
     fn required_rate(&self, now: Instant, target: &FillTarget) -> f64 {
         let remaining =
             self.cycle_shares.saturating_sub(target.largest_shares_seen) as f64 * (1.0 + self.cfg.loss_margin);
-        let slack = self.max_recovery_time.mul_f64(1.0 - self.cfg.finish_fraction);
-        let horizon = target
-            .hard_deadline
-            .checked_sub(slack)
-            .map(|finish_by| finish_by.saturating_duration_since(now))
-            .unwrap_or(SAMPLING_INTERVAL)
-            .max(SAMPLING_INTERVAL);
+        let horizon = if target.drain {
+            SAMPLING_INTERVAL
+        } else {
+            let slack = self.max_recovery_time.mul_f64(1.0 - self.cfg.finish_fraction);
+            target
+                .hard_deadline
+                .checked_sub(slack)
+                .map(|finish_by| finish_by.saturating_duration_since(now))
+                .unwrap_or(SAMPLING_INTERVAL)
+                .max(SAMPLING_INTERVAL)
+        };
         remaining / horizon.as_secs_f64()
     }
 
@@ -390,6 +408,7 @@ mod tests {
             ),
             largest_shares_seen: 0,
             hard_deadline: now + Duration::from_secs(3600),
+            drain: false,
         }
     }
 
@@ -516,5 +535,48 @@ mod tests {
             stalled.as_packets_per_sec() <= 5.0,
             "the stall fallback must never exceed the ceiling either"
         );
+    }
+
+    /// A post-close drain wants its whole remainder at once, and `max_rate` is what paces it.
+    ///
+    /// The ordinary rate law spreads the remainder over the aim point, which is the right answer for
+    /// a Session that will still be there in an hour. A drained Session will not be: it is closed,
+    /// the buffer it is spending is finite and nothing is refilling it, and every SURB in it that is
+    /// not spent on a share is one the deposit being recovered has already paid for. So the horizon
+    /// collapses to a single sampling interval and the ceiling becomes the only thing setting the
+    /// pace — which is the intended reading of "drain", not an accident of the arithmetic.
+    #[test]
+    fn a_draining_target_asks_for_its_whole_remainder_at_once() {
+        let idle = Duration::from_secs(30);
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(Duration::from_secs(60), 250, idle), &dims(), now);
+
+        // An hour of runway on both, so the only difference between them is the flag.
+        let patient = target(now);
+        let draining = FillTarget { drain: true, ..patient };
+
+        let whole_remainder = planner.cycle_shares as f64 * (1.0 + planner.cfg.loss_margin);
+        let drained = planner.required_rate(now, &draining);
+        assert!(
+            (drained - whole_remainder / SAMPLING_INTERVAL.as_secs_f64()).abs() < 1e-9,
+            "a drain must ask for its whole remainder inside one sampling interval, got {drained} against a remainder \
+             of {whole_remainder}"
+        );
+
+        let patient_rate = planner.required_rate(now, &patient);
+        assert!(
+            patient_rate < 1.0 && patient_rate * 1_000.0 < drained,
+            "the same target with an hour of runway must still be spread over that hour, got {patient_rate}"
+        );
+
+        // Below the ceiling the drain is the remainder itself, rounded up as every rate is.
+        assert_eq!(
+            FillRate::per_second(whole_remainder.ceil() as u32),
+            planner.bound(now, drained)
+        );
+
+        // And above it, the ceiling binds — the drain is loud, not unbounded.
+        let mut capped = FillPlanner::new(&cfg(Duration::from_secs(60), 100, idle), &dims(), now);
+        assert_eq!(FillRate::per_second(100), capped.bound(now, drained));
     }
 }

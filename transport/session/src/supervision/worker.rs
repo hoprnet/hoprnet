@@ -59,6 +59,34 @@ impl SessionPixSupervisorHandle {
         }
     }
 
+    /// Deliver a PIX event without blocking, dropping it if the channel is full.
+    ///
+    /// Returns `true` if the event was queued.
+    ///
+    /// The synchronous counterpart to [`send_event`](Self::send_event), and it exists because one
+    /// caller cannot await: `close_session_with_reason` is a plain `fn`, reached from `poll_close`,
+    /// from a moka eviction listener and from the REST handler, none of which may park on a worker
+    /// that happens to be mid-tick.
+    ///
+    /// A refusal is not lost work, which is what makes dropping acceptable here where it would not be
+    /// for a lifecycle transition. The only event sent this way is
+    /// [`SessionPixEvent::SessionClosed`], and its caller treats `false` as "this close was not
+    /// answered by the supervisor" and falls back to the immediate teardown that has always been the
+    /// behaviour on that path.
+    pub fn try_send_event(&self, ev: SessionPixEvent) -> bool {
+        match self.cmd_tx.try_send(WorkerCommand::Event(ev)) {
+            Ok(()) => true,
+            Err(TrySendError::Full(_)) => {
+                tracing::debug!("supervisor command channel full — dropping event");
+                false
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                tracing::warn!("PIX supervisor command channel closed");
+                false
+            }
+        }
+    }
+
     /// Send an action result feedback to the supervisor, awaiting capacity if
     /// the channel is full.
     pub async fn send_action_result(&self, action: SessionPixAction, ok: bool) -> Result<(), ()> {
