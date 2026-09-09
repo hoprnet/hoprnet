@@ -215,6 +215,9 @@
 //! fill       = clamp(required − organic, heartbeat, max_rate)
 //! ```
 //!
+//! Both of the middle two lines change for a *drain*, which is the same law over a Session that has
+//! already been closed — see "Draining a closed Session" below.
+//!
 //! The tail wins over the successor whenever it exists, for two reasons that point the same way: its
 //! SURBs sit ahead of the successor's in the Exit's own buffer, so packets sent now carry *its*
 //! shares; and it holds the binding deadline, since the successor's clocks are deliberately not armed
@@ -288,6 +291,23 @@
 //! switched **off** for the duration, since the reason for the exemption is that it asks for more
 //! SURBs on behalf of a Session that is gone: the Entry itself very likely still exists, but nothing
 //! is left there to act on the request, so no refill ever answers it.
+//!
+//! The rate law is the same one, with the two terms that assume a live Session taken out:
+//!
+//! ```text
+//! required = remaining × (1 + loss_margin) / SAMPLING_INTERVAL   -- no aim point; nothing to pace for
+//! fill     = clamp(required, heartbeat, max_rate)                -- no organic; nothing left to contribute
+//! ```
+//!
+//! Pacing a cycle to its aim point only makes sense while the Session is there to be paced, and
+//! subtracting organic egress only makes sense while an application is there to provide it. After the
+//! close neither is true — `served_total` is frozen for good — so a drain asks for its whole remainder
+//! at once and `max_rate` is what actually sets the pace. Leaving the subtraction in would have been
+//! worse than untidy: a client that hangs up on a cycle it has all but paid off leaves a small
+//! remainder against a still-high average, which suppresses the drain to its heartbeat for the whole
+//! of the averaging window — the one case the drain is most clearly worth doing. The stall rule is the
+//! one bound that does **not** step aside: it costs a progressing drain nothing and it is all that
+//! stands between a doomed one and `max_rate` sustained until a deadline fires.
 //!
 //! What a drain does not do is carry the Session on in any other respect. It retires every sibling
 //! cycle immediately (they are queued behind the target and can receive nothing while it drains) and

@@ -1453,6 +1453,16 @@ async fn a_closed_exit_session_drains_its_surbs_into_the_funded_cycle(
         .iter()
         .find(|(milestone, at)| matches!(milestone, PixMilestone::Recovered(_)) && *at >= closed_at);
 
+    // The observation path has to have outlived the budget, or "nothing recovered after the close"
+    // would be a statement about this test rather than about the Exit. Checked for both cases: it is
+    // what gives the control branch's negative assertion any force, and in the drain branch it turns
+    // a dead event driver into a diagnosis rather than an accusation of a stranded deposit.
+    anyhow::ensure!(
+        !driver.is_finished(),
+        "the Exit PIX event driver stopped before the {DRAIN_BUDGET:?} drain budget elapsed, so nothing observed \
+         after the close proves anything either way"
+    );
+
     if drain_after_close {
         let (_, recovered_at) = drained.with_context(|| {
             format!(
