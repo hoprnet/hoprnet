@@ -169,6 +169,10 @@ where
                 PacketRouting::ForwardPath {
                     forward_path,
                     return_paths,
+                    // Stamp the current SURB-batch generation for this pseudonym so the replying side
+                    // can drop SURBs left over from a superseded return path. Bumped on a re-plan
+                    // via `SurbStore::bump_generation`.
+                    generation: self.surb_store.current_generation(&pseudonym),
                 },
             ),
             ResolvedTransportRouting::Return(sender_id, surb) => {
