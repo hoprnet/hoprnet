@@ -157,6 +157,10 @@ pub struct OutgoingPacketInfo {
     pub signals_to_destination: PacketSignals,
     /// The maximum number of SURBs the HOPR packet should be carrying when sent.
     pub max_surbs_in_packet: usize,
+    /// SURB-batch generation to stamp onto the SURBs minted for this packet's return paths,
+    /// captured when those return paths were resolved. `None` when the packet carries no return
+    /// paths, or when the generation is left to the encoder to resolve.
+    pub surb_generation: Option<u8>,
 }
 
 impl Default for OutgoingPacketInfo {
@@ -164,6 +168,7 @@ impl Default for OutgoingPacketInfo {
         Self {
             signals_to_destination: PacketSignals::empty(),
             max_surbs_in_packet: usize::MAX,
+            surb_generation: None,
         }
     }
 }
