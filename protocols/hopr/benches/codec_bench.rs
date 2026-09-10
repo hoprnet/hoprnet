@@ -133,7 +133,7 @@ fn hopr_encoder_bench(c: &mut Criterion) {
             |b, routing| {
                 b.iter_batched(
                     || (create_encoder(&sender), data.clone(), routing.clone()),
-                    |(encoder, data, routing)| encoder.encode_packet(data, routing, None).unwrap(),
+                    |(encoder, data, routing)| encoder.encode_packet(data, routing, None, None).unwrap(),
                     BatchSize::PerIteration,
                 )
             },
@@ -198,7 +198,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
     };
 
     let encoder = create_encoder(&sender);
-    let relay_packet = encoder.encode_packet(data, routing, None).unwrap();
+    let relay_packet = encoder.encode_packet(data, routing, None, None).unwrap();
     let ack_packet = {
         let acks = (0..10)
             .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))

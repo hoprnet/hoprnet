@@ -73,7 +73,7 @@ pub(crate) fn resolve_routing_stage<St, F, Fut>(
 where
     St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
     F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
-    Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>)>>,
+    Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
 {
     input
         .map(move |(unresolved, mut data)| {
@@ -96,7 +96,7 @@ where
                     )
                     .await
                     {
-                        Ok((resolved, rem_surbs)) => {
+                        Ok((resolved, rem_surbs, generation)) => {
                             // Set the SURB distress/out-of-SURBs flag if applicable.
                             // These flags are translated into HOPR protocol packet signals and are
                             // applicable only on the return path.
@@ -119,7 +119,12 @@ where
                                 signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
                             }
 
-                            data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+                            let info = data.packet_info.get_or_insert_default();
+                            info.signals_to_destination = signals_to_dst;
+                            // Carry the generation captured with the return-path plan alongside the
+                            // packet, so the encode stage stamps the plan's generation rather than
+                            // re-reading a possibly-newer one after a concurrent re-plan.
+                            info.surb_generation = generation;
                             trace!(?resolved, "resolved routing for packet");
                             return Some((resolved, data));
                         }
@@ -205,7 +210,7 @@ mod tests {
     where
         St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
         F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
-        Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>)>>,
+        Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
     {
         resolve_routing_stage(
             input,
@@ -293,7 +298,7 @@ mod tests {
             |_size_hint, _max_surbs, routing: DestinationRouting| async move {
                 match routing {
                     DestinationRouting::Return(_) => Err(no_surb(&routing)),
-                    DestinationRouting::Forward { .. } => Ok((resolved(), None)),
+                    DestinationRouting::Forward { .. } => Ok((resolved(), None, None)),
                 }
             },
         )
@@ -412,7 +417,7 @@ mod tests {
                     if attempts.fetch_add(1, Ordering::Relaxed) < FAILURES_BEFORE_SUCCESS {
                         Err(no_surb(&routing))
                     } else {
-                        Ok((resolved(), Some(0)))
+                        Ok((resolved(), Some(0), None))
                     }
                 }
             })
@@ -460,7 +465,7 @@ mod tests {
                 if SEEN.fetch_add(1, Ordering::Relaxed) == 0 {
                     Err(PathPlannerError::Api("no path".into()))
                 } else {
-                    Ok((resolved(), None))
+                    Ok((resolved(), None, None))
                 }
             },
         )
@@ -473,6 +478,37 @@ mod tests {
             emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
             vec![1, 2],
             "only the unroutable packet is dropped; the rest keep their order"
+        );
+
+        Ok(())
+    }
+
+    /// The SURB-batch generation captured with the return-path plan (the third element of the
+    /// resolve result) must ride on the emitted packet's `packet_info`, so the encode stage stamps
+    /// that value instead of re-reading a possibly-newer one after a concurrent re-plan.
+    #[test_log::test(tokio::test)]
+    async fn resolved_packet_should_carry_the_captured_surb_generation() -> anyhow::Result<()> {
+        const CAPTURED: u8 = 7;
+
+        let input = futures::stream::iter(vec![(forward_routing(), packet(0))]);
+
+        let emitted = stage(input, |_size_hint, _max_surbs, _routing| async move {
+            Ok((resolved(), None, Some(CAPTURED)))
+        })
+        .take(1)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the stage did not emit the packet within {TEST_TIMEOUT:?}"))?;
+
+        let (_, data) = emitted
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("no packet emitted"))?;
+        assert_eq!(
+            data.packet_info.and_then(|info| info.surb_generation),
+            Some(CAPTURED),
+            "the generation captured at resolution must ride on packet_info to the encode stage"
         );
 
         Ok(())

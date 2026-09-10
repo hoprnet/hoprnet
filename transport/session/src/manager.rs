@@ -47,15 +47,15 @@ use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
     SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
+        AtomicSurbFlowEstimator, BalancerStateValues, MAX_WAIT_CHUNK, RateController, RateLimitSinkExt, SurbBalancer,
+        SurbControllerWithCorrection, SurbFlowEstimator,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
     errors::{self, SessionManagerError, TransportSessionError},
     supervision::{
-        ActionRx, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SessionPixSupervisorHandle,
-        SupervisorConfig, spawn_supervisor_worker,
+        ActionRx, FillRate, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
+        SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
@@ -344,6 +344,18 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// so a programmatically built config that never calls `validate()` cannot exceed it.
 pub const MAX_SSA_BATCH_SIZE: usize = 9;
 
+// The Entry's retention of commitment material has to outlast the batch that material belongs to.
+// `hopr-protocol-pix` cannot see this figure, so it derives its cap from it in prose; this is the
+// half of that derivation which has to hold. A cycle must stay retransmittable at least until its
+// own batch has finished being committed, or a commitment packet lost early in a large batch becomes
+// unrepairable while the rest of the batch is still arriving. Slack beyond one batch is a judgement
+// call, which is why this is an inequality and not the equality the two figures satisfy today.
+const _: () = assert!(
+    hopr_protocol_pix::MAX_RETAINED_COMMITMENT_CYCLES >= MAX_SSA_BATCH_SIZE,
+    "MAX_SSA_BATCH_SIZE exceeds MAX_RETAINED_COMMITMENT_CYCLES, so a cycle can be evicted from the Entry's retention \
+     before its own batch is fully committed and its commitment stops being repairable"
+);
+
 /// How long an Exit waits for the deposit pool to answer a
 /// [`DepositDataRequest`](HoprSessionOutPixEvent::DepositDataRequest) before sending the batch
 /// without what has not arrived.
@@ -433,6 +445,12 @@ enum SessionHandles {
     Ingress,
     /// Handle to the process that sends keep-alive messages to the Session recipient (Exit).
     KeepAlive,
+    /// Handle to the one-shot timer that turns the SURB-level notification on after its first period.
+    ///
+    /// Registered rather than fired and forgotten: it holds an `Arc<PixFillControl>` for as long as
+    /// the period lasts, and no maximum is enforced on that period, so an unregistered task keeps a
+    /// closed Session's fill control alive for however long the operator configured.
+    SurbNotifyDelay,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
     /// Handle to the task that executes the PIX supervisor's actions.
@@ -452,6 +470,7 @@ impl std::fmt::Display for SessionHandles {
         match self {
             Self::Ingress => write!(f, "Ingress"),
             Self::KeepAlive => write!(f, "KeepAlive"),
+            Self::SurbNotifyDelay => write!(f, "SurbNotifyDelay"),
             Self::Balancer => write!(f, "Balancer"),
             Self::PixActionDriver => write!(f, "PixActionDriver"),
             Self::PixDepositObserver(idx) => write!(f, "PixDepositObserver({idx})"),
@@ -594,6 +613,17 @@ pub(crate) struct SessionSlot {
     /// Held separately from `pix_supervisor` because the egress path touches it per packet and has
     /// no use for the rest of the handle.
     pix_egress_gate: Arc<OnceLock<Arc<ServiceGate>>>,
+    /// Steers the Exit's own Exit → Entry keep-alive stream, where the Session has one.
+    ///
+    /// Exit-side, and populated for every PIX Session as well as for any Session with a configured
+    /// `surb_balance_notify_period` — the two producers share one stream, so they share one handle.
+    /// Empty on the Entry side, whose keep-alives are driven by its SURB balancer instead, and on an
+    /// Exit Session that is neither PIX nor notifying, which originates nothing at all.
+    ///
+    /// A `OnceLock` for the same reason the two fields above are: the action driver that sets rates
+    /// on it is spawned after the slot is published, so it must find the handle rather than race its
+    /// installation.
+    pix_fill: Arc<OnceLock<Arc<PixFillControl>>>,
     /// Exit → Entry Session packets received on this Session, ever.
     ///
     /// Entry-side only; stays zero on the Exit, which is the side that *sends* them. This includes
@@ -608,6 +638,22 @@ pub(crate) struct SessionSlot {
     /// balancer, and it is only wired when `surb_management` is enabled; this one decides whether
     /// money is spent and must be neither. Carrying the increment twice is the cheaper mistake: a
     /// receive path that forgets this counter makes the gate stricter, never laxer.
+    ///
+    /// Credited from exactly two places, and both of them have to stay:
+    ///
+    /// * the `session_rx` inspectors in `new_session`, once per Session data packet handed to the reader — one in each
+    ///   of the balanced and unbalanced branches;
+    /// * the Start-protocol branch of [`dispatch_message`](SessionManager::dispatch_message), which credits every
+    ///   Start-protocol message arriving on an outgoing Session because that traffic bypasses `session_rx` entirely.
+    ///
+    /// The second is what makes the Exit's keep-alives count, and the gate depends on it: an Exit
+    /// whose application has nothing to say can still complete a funded cycle by keep-alive alone, and
+    /// if those packets earned nothing here its successor would be refused as under-served and the
+    /// Session would die on `CommitmentTimeout` with neither side able to name the cause. It is
+    /// credited at the dispatch level rather than inside a per-message handler on purpose — the credit
+    /// is owed for the SURB the packet consumed, which is true whatever the message turns out to be,
+    /// including one this build fails to parse. Adding a second increment inside
+    /// [`handle_keep_alive`](SessionManager::handle_keep_alive) would double-count it.
     returned_packets: Arc<std::sync::atomic::AtomicU64>,
     /// This Session's share of the node's live reconstructor-cycle budget.
     ///
@@ -620,6 +666,238 @@ pub(crate) struct SessionSlot {
     /// the closure; the `Drop` behind the `Arc` is the backstop for anything that bypasses that
     /// function. Both are safe to run because the release is idempotent.
     cycle_budget: Option<Arc<CycleBudgetReservation>>,
+}
+
+/// The Exit's control over the single Exit → Entry keep-alive stream a Session runs.
+///
+/// One stream, two producers with different jobs, and this is what reconciles them:
+///
+/// * the **SURB-level notification**, sent every `surb_balance_notify_period`, which tells the Entry's balancer how
+///   many SURBs the Exit believes it holds. It is the signal that asks for more, so it must go out even when there are
+///   none left;
+/// * **PIX fill**, whose rate the supervisor plans once a second so that a funded cycle completes inside its own
+///   deadline even if the application never sends a byte.
+///
+/// The effective rate is the faster of the two, because both are the same packet: a keep-alive
+/// carrying the SURB level is exactly what fill needs to send, and sending two streams of them would
+/// double the traffic to say the same thing twice. Every shipped Entry already parses it, counts it
+/// as a consumed SURB so its balancer refills, and — since the fix that precedes this — credits it as
+/// service against the successor gate.
+pub(crate) struct PixFillControl {
+    session_id: SessionId,
+    /// The rate limiter of the keep-alive stream this steers.
+    controller: RateController,
+    /// The configured SURB-level notification period, if the node has one.
+    ///
+    /// `None` disables the notification half entirely; the stream then runs at the fill rate alone,
+    /// which is how a PIX Session on a node with `surb_balance_notify_period: None` still fills.
+    notify_period: Option<Duration>,
+    /// SURBs that must remain estimated-available before a *fill* packet is let through.
+    ///
+    /// The *effective* reserve for this Session, not the configured one: the Entry decides how deep
+    /// the Exit's SURB buffer for the Session is, so a reserve above what the Entry ever intends to
+    /// supply would refuse every fill packet forever. See [`effective_surb_reserve`].
+    min_surb_reserve: u64,
+    /// The Session's SURB flow estimate, which is what the reserve is measured against.
+    estimator: AtomicSurbFlowEstimator,
+    state: parking_lot::Mutex<PixFillState>,
+}
+
+struct PixFillState {
+    /// Whether the initial notification delay has elapsed.
+    ///
+    /// The notification stream deliberately waits one period before starting, so a Session that
+    /// closes immediately never sends one. Fill does not wait, and must not be held behind this.
+    notify_started: bool,
+    /// The rate the PIX supervisor last asked for. [`FillRate::ZERO`] when it is not filling.
+    fill: FillRate,
+    /// When a packet was last let through as the SURB-level notification.
+    ///
+    /// The two producers share a stream, so nothing about a packet says which of them it belongs to.
+    /// This is what makes the distinction: one packet per notification period is the notification and
+    /// is exempt from the SURB reserve, and everything above that rate is fill and is not.
+    last_notify_at: Option<Instant>,
+}
+
+impl PixFillControl {
+    fn new(
+        session_id: SessionId,
+        controller: RateController,
+        notify_period: Option<Duration>,
+        min_surb_reserve: u64,
+        estimator: AtomicSurbFlowEstimator,
+    ) -> Self {
+        Self {
+            session_id,
+            controller,
+            notify_period,
+            // Clamped rather than trusted: a `SessionManager` can be built from a config that never
+            // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
+            // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
+            // load-bearing for the tests that construct a control directly.
+            min_surb_reserve: min_surb_reserve.max(1),
+            estimator,
+            state: parking_lot::Mutex::new(PixFillState {
+                notify_started: false,
+                fill: FillRate::ZERO,
+                last_notify_at: None,
+            }),
+        }
+    }
+
+    /// Turns the SURB-level notification on, after its initial delay.
+    pub(crate) fn start_notify(&self) {
+        let mut state = self.state.lock();
+        state.notify_started = true;
+        self.apply(&state);
+    }
+
+    /// Applies a rate planned by the PIX supervisor.
+    pub(crate) fn set_fill(&self, rate: FillRate) {
+        let mut state = self.state.lock();
+        if state.fill == rate {
+            return;
+        }
+        state.fill = rate;
+        self.apply(&state);
+    }
+
+    /// The rate the stream is currently running at — the faster of the two producers.
+    ///
+    /// The production path never asks: [`apply`](Self::apply) derives it and hands it straight to the
+    /// controller, which is the only consumer that matters. This exists so the merge rule can be
+    /// tested as the rule it is, rather than inferred from packet timings.
+    #[cfg(test)]
+    pub(crate) fn effective_rate(&self) -> FillRate {
+        Self::effective(&self.state.lock(), self.notify_period)
+    }
+
+    fn effective(state: &PixFillState, notify_period: Option<Duration>) -> FillRate {
+        let notify = state
+            .notify_started
+            .then_some(notify_period)
+            .flatten()
+            .map(FillRate::once_per);
+        let fill = (!state.fill.is_zero()).then_some(state.fill);
+        match (notify, fill) {
+            (Some(notify), Some(fill)) if fill.as_packets_per_sec() > notify.as_packets_per_sec() => fill,
+            (Some(notify), _) => notify,
+            (None, Some(fill)) => fill,
+            (None, None) => FillRate::ZERO,
+        }
+    }
+
+    fn apply(&self, state: &PixFillState) {
+        let rate = Self::effective(state, self.notify_period);
+        // A zero period would trip the controller's own assertion. `FillRate` never carries one —
+        // `ZERO` is one second and the two constructors take a validated period — so this is a
+        // belt-and-braces floor rather than a case that arises.
+        self.controller
+            .set_rate_per_unit(rate.packets as usize, rate.per.max(Duration::from_micros(1)));
+        trace!(
+            session_id = %self.session_id,
+            packets = rate.packets,
+            per = ?rate.per,
+            "applied the exit keep-alive rate"
+        );
+    }
+
+    /// Decides whether the next keep-alive may go out, and books it if so.
+    ///
+    /// The SURB-level notification always may: it is the message that asks the Entry for more SURBs,
+    /// so refusing it when SURBs are scarce is refusing to ask for the thing that is scarce.
+    ///
+    /// Fill above that rate is refused while the estimate is below the reserve, and that refusal is
+    /// not an optimisation. A return packet that finds no SURB is not dropped — the routing resolver
+    /// holds it, and with it every packet this node originates, for the whole of
+    /// `surb_resolution_wait`. An Exit filling a cycle down to its last SURB would therefore stall
+    /// the Session it is filling for, and every other Session on the node with it.
+    ///
+    /// # Which packet is the notification
+    ///
+    /// Nothing about a packet says which producer it belongs to, so the notification is the first one
+    /// released no sooner than a period after the last — *less a slack of
+    /// `min(MAX_WAIT_CHUNK, period / 2)`*, which is what keeps the classification from resting on
+    /// scheduling latency. The rate limiter that releases these packets sleeps in chunks of
+    /// [`MAX_WAIT_CHUNK`], re-reads its controller on each wake, and rounds a rate into an integer
+    /// packet count, so a stream asked for one packet per period releases them a shade over or a
+    /// shade under it. Compared against the period exactly, a period the controller rounds short by a
+    /// microsecond would classify every other notification as fill — counted in
+    /// `hopr_session_pix_fill_packets_total` and, below the reserve, dropped. That is the signal
+    /// asking the Entry for the SURBs whose absence caused the drop, and it runs on every Exit
+    /// Session with a `surb_balance_notify_period` configured, PIX or not.
+    ///
+    /// The slack cannot let fill masquerade as the notification: `last_notify_at` advances to the
+    /// instant the packet actually went out, so only the *first* packet past the slack window is the
+    /// notification, and every fill packet that follows it inside the period is still fill and is
+    /// still bounded by the reserve. The cap at half the period is what stops a very short period
+    /// from having its window widened away to nothing.
+    pub(crate) fn admit(&self) -> bool {
+        self.admit_at(Instant::now())
+    }
+
+    /// [`admit`](Self::admit) against a caller-supplied instant, so the classification can be tested
+    /// as the rule it is rather than by sleeping out a period and hoping the scheduler cooperates.
+    fn admit_at(&self, now: Instant) -> bool {
+        let mut state = self.state.lock();
+
+        // Due *slightly early*: see the classification rule on `admit`. The slack is what keeps this
+        // from resting on the scheduling latency of the stream that releases the packet.
+        let notification_due = state.notify_started
+            && self.notify_period.is_some_and(|period| {
+                let slack = MAX_WAIT_CHUNK.min(period / 2);
+                state
+                    .last_notify_at
+                    .is_none_or(|at| now.saturating_duration_since(at) >= period.saturating_sub(slack))
+            });
+
+        if notification_due {
+            state.last_notify_at = Some(now);
+            return true;
+        }
+
+        if self.estimator.saturating_diff() >= self.min_surb_reserve {
+            #[cfg(feature = "telemetry")]
+            telemetry::record_pix_fill_packet();
+            return true;
+        }
+
+        debug!(
+            session_id = %self.session_id,
+            reserve = self.min_surb_reserve,
+            estimate = self.estimator.saturating_diff(),
+            "withholding a PIX fill keep-alive to stay above the SURB reserve"
+        );
+        #[cfg(feature = "telemetry")]
+        telemetry::record_pix_fill_backoff(telemetry::PixFillBackoff::SurbReserve);
+        false
+    }
+}
+
+/// The SURB reserve one Session's fill actually respects.
+///
+/// [`PixFillConfig::min_surb_reserve`](crate::supervision::PixFillConfig::min_surb_reserve) is a
+/// *ceiling* rather than the value used, and it has to be, because the two sides of the comparison
+/// are chosen by different nodes. The reserve is measured against the Exit's estimate of its own SURB
+/// buffer for the Session, and how deep that buffer is is the *Entry's* decision — it announces its
+/// balancer target in the lower 32 bits of `StartInitiation::additional_data`. An operator sizing the
+/// reserve against a production buffer therefore also decides, unintentionally, that every Session
+/// whose Entry asks for a shallower one can never be filled at all: the estimate never reaches the
+/// reserve, every fill packet is withheld, and the funded cycle strands on `max_recovery_time` while
+/// the logs report only a backoff.
+///
+/// A quarter of the announced target is what the reserve is for expressed as a proportion: it leaves
+/// fill three quarters of whatever buffer the Entry chose and keeps the last quarter for the
+/// application, which is the side that has something waiting on it. The configured value still binds
+/// wherever it is the smaller of the two — at the shipped 500 against the worked profile's 7 000-SURB
+/// target, a quarter is 1 750, so the derivation is inert on a production-sized Session and only
+/// engages on one whose Entry asked for less than four times the configured reserve.
+///
+/// Floored at one, for the same reason the constructor clamps: a zero reserve is fill spending the
+/// Session's last SURB, and an Entry announcing a three-SURB buffer would otherwise produce exactly
+/// that.
+fn effective_surb_reserve(configured: u64, announced_target: u64) -> u64 {
+    configured.min(announced_target / 4).max(1)
 }
 
 /// One Session's reservation against the node's live reconstructor-cycle budget.
@@ -984,6 +1262,45 @@ pub fn validate_incoming_session_pix_config(
             cfg.supervision.max_recovery_time,
             cfg.quota_range.end(),
         )));
+    }
+
+    // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs, or
+    // the mechanism that exists to complete idle cycles cannot complete the very ones it admits. The
+    // arithmetic is the planner's own, taken at the moment fill starts: the whole cycle remains, the
+    // aim point sits `finish_fraction` of the way through `max_recovery_time`, and the loss margin is
+    // paid on top. `max_recovery_time` is the *configured* per-cycle budget rather than a deadline
+    // observed at run time, so this is a property of the configuration and can be decided here.
+    //
+    // Checked only when fill is enabled: an Exit that has turned it off is choosing the pre-fill
+    // behaviour, where the cap is inert and refusing a Session over it would be refusing it over a
+    // value nothing reads.
+    if cfg.supervision.fill.enabled {
+        let fill = &cfg.supervision.fill;
+        // Before the arithmetic, not after it. `validate_pix_supervision` also range-checks these two,
+        // but it runs later on both paths that reach here — `SessionManager::start` calls this first,
+        // and in `HoprProtocolConfig` this is a field validator while that is a schema-level one. The
+        // `mul_f64` below panics on a `NaN` or negative fraction, so an unchecked one aborts the node
+        // at config load rather than being reported; a fraction above one silently lowers the floor.
+        crate::supervision::validate_fill_fractions(fill)?;
+
+        let horizon = cfg.supervision.max_recovery_time.mul_f64(fill.finish_fraction);
+        // Guarded rather than assumed non-zero: both factors are validated elsewhere, and a divide by
+        // zero here would report an infinite requirement for a configuration whose real fault is
+        // named by its own validator.
+        let floor = if horizon.is_zero() {
+            u64::MAX
+        } else {
+            (worst_cycle_packets as f64 * (1.0 + fill.loss_margin) / horizon.as_secs_f64()).ceil() as u64
+        };
+        if (fill.max_rate as u64) < floor {
+            return Err(TransportSessionError::InvalidConfig(format!(
+                "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} packets \
+                 and needs at least {floor} packets/s to finish inside {horizon:?} with a {} loss margin",
+                fill.max_rate,
+                cfg.quota_range.end(),
+                fill.loss_margin,
+            )));
+        }
     }
 
     let widest = max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
@@ -1460,6 +1777,22 @@ impl PixToolbox {
 /// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signaling that
 /// funds can be deposited at the computed address.
 ///
+/// "One or more" is hundreds at the deployed dimensions — one commitment per polynomial, chunked to
+/// packet size — and the Exit can use *none* of it until every message has landed, since the SSA
+/// commitment is the sum of them all. A single lost packet therefore used to cost the whole Session
+/// on `max_ssa_delivery_time`, typically after the Entry had already been told to fund the address.
+///
+/// So a partially delivered commitment is repaired rather than waited out. Each arriving message
+/// reports `SessionPixEvent::CommitmentProgress`, which arms (and re-arms) the supervisor's
+/// [`commitment_recommit_interval`](crate::SupervisorConfig::commitment_recommit_interval); if
+/// delivery then goes quiet with the set incomplete, `RequestCommitmentRetransmission` has
+/// `send_commitment_retransmission_request` ask the Entry — via an `SsaRequest` whose
+/// [`missing`](hopr_protocol_start::SsaServerCommitmentMessage::missing) scope names the polynomial
+/// runs the reconstructor never received — to re-send exactly those. The Entry answers in
+/// `handle_ssa_recommit` from the bytes it sent the first time, advancing nothing and announcing no
+/// second deposit. A cycle for which *nothing* arrived never asks: it has no scope to name, and the
+/// delivery deadline remains what ends it.
+///
 /// ### 4. Deposit Awaiting (Exit Side)
 ///
 /// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
@@ -1745,6 +2078,29 @@ where
                 .saturating_sub(Duration::from_secs(1))
                 .min(cap);
             sup.max_recovery_idle = sup.max_recovery_idle.min(idle_cap);
+
+            // The fill heartbeat is armed as a deadline like the rest, so it takes the same cap. The
+            // rate ceiling is clamped for a different reason: `RateController::MIN_DELAY` makes
+            // anything above `MAX_FILL_RATE` unrepresentable, and a controller that silently ignores
+            // the one bound on this node's self-generated egress is worse than one that is loud about
+            // refusing it — which is what `validate_pix_supervision` does for a config that was
+            // validated. This branch is for the programmatic ones that never were.
+            //
+            // The heartbeat needs the *lower* bound for the same reason the ceiling needs its upper
+            // one, and it is the one that bites: a zero period makes `FillRate::as_packets_per_sec`
+            // report zero, so the planner's own floor is zero, every branch of `FillPlanner::bound`
+            // that returns the heartbeat returns a zero period, and `PixFillControl::apply` hands
+            // `set_rate_per_unit(1, 1µs)` to the controller — which `MIN_DELAY` turns into 10 000
+            // packets/s. The one clamp that exists to bound self-generated egress is bypassed by the
+            // one field that was left unbounded below. The floor is the exact dual of the ceiling —
+            // the period of `MAX_FILL_RATE` — rather than a new number, so the two cannot drift; an
+            // inverted heartbeat/ceiling pair is already resolved ceiling-wins inside `bound`, which
+            // is what makes any positive floor safe here.
+            sup.fill.heartbeat = sup
+                .fill
+                .heartbeat
+                .clamp(Duration::from_secs(1) / crate::supervision::MAX_FILL_RATE, cap);
+            sup.fill.max_rate = sup.fill.max_rate.clamp(1, crate::supervision::MAX_FILL_RATE);
         }
 
         // The admission wait is spent inside the peer's initiation timeout, so a value at or above
@@ -2298,8 +2654,10 @@ where
                     // claim it is holding.
                     surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
-                    // Spawn the SURB-bearing keep alive stream towards the Exit
-                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
+                    // Spawn the SURB-bearing keep alive stream towards the Exit. Suspended until the
+                    // balancer below gives the controller a rate.
+                    let ka_controller = RateController::new(0, Duration::from_secs(1));
+                    let ka_abort_handle = utils::spawn_keep_alive_stream(
                         session_id,
                         full_surb_scoring_sender,
                         forward_routing.clone(),
@@ -2309,6 +2667,11 @@ where
                             SurbNotificationMode::DoNotNotify
                         },
                         surb_mgmt.clone(),
+                        &ka_controller,
+                        // The Entry's balancer owns this stream outright and there is no second
+                        // producer to arbitrate between, so every packet the rate limiter releases is
+                        // one the balancer asked for.
+                        || true,
                     );
                     abort_handles.insert(SessionHandles::KeepAlive, ka_abort_handle);
 
@@ -2349,6 +2712,7 @@ where
                                 // there is no supervisor here and nothing gates egress.
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
+                                pix_fill: Default::default(),
                                 returned_packets: returned_packets.clone(),
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
@@ -2460,6 +2824,7 @@ where
                                 // Entry side: the Exit is authoritative for the PIX lifecycle.
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
+                                pix_fill: Default::default(),
                                 returned_packets,
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
@@ -2736,6 +3101,7 @@ where
                                     error,
                                     TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
                                 ) {
+                                    myself.stop_pix_fill(&session_id);
                                     gate.poison();
                                     owned_ssas.clear();
                                     myself
@@ -2768,6 +3134,19 @@ where
                             }
                         }
                     }
+                    SessionPixAction::RequestCommitmentRetransmission { ssa_id, params } => {
+                        // Failure is logged and dropped rather than reported back. Unlike
+                        // `RequestSsa` this action is not a step the Session depends on: it repeats
+                        // on its own interval, and the commitment deadline is still the backstop, so
+                        // a dropped ask costs one interval rather than the Session.
+                        if let Some(slot) = myself.sessions.get(&session_id)
+                            && let Err(error) = myself
+                                .send_commitment_retransmission_request(session_id, &slot, ssa_id, params)
+                                .await
+                        {
+                            error!(%session_id, %ssa_id, %error, "failed to re-request ssa commitment parts");
+                        }
+                    }
                     SessionPixAction::ReleaseService => {
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::set_pix_gate_mode(&session_id, true);
@@ -2779,6 +3158,24 @@ where
                     // Gate control is applied synchronously by the supervisor worker. The action
                     // reaches this I/O driver only to preserve observability and ordering.
                     SessionPixAction::ProgressNotification => {}
+                    SessionPixAction::SetFillRate(rate) => {
+                        // Looked up per action rather than captured, because the Session may already
+                        // be gone: the supervisor plans against state it holds itself, and the slot
+                        // can be evicted underneath it. A missing slot needs no rate — its stream is
+                        // already aborted.
+                        if let Some(slot) = myself.sessions.get(&session_id)
+                            && let Some(fill) = slot.pix_fill.get()
+                        {
+                            fill.set_fill(rate);
+                            // Inside the guard for the same reason the lookup is: `close_session`
+                            // removes this Session's metric state and *then* aborts the tasks, and
+                            // the abort is not synchronous, so a queued `SetFillRate` can still be
+                            // processed afterwards. Setting the gauge there would re-create the
+                            // `session_id` label series with nothing left to remove it again.
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::set_pix_fill_rate(&session_id, rate.as_packets_per_sec());
+                        }
+                    }
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
@@ -2796,7 +3193,10 @@ where
             error!(%session_id, %reason, "pix supervisor closed the session");
 
             // Unblock anything parked on the gate before tearing down: the supervisor that would
-            // have woken it is the thing that just stopped.
+            // have woken it is the thing that just stopped. Fill is silenced alongside it, and for a
+            // sharper reason — the gate holds packets back, while fill would go on *originating*
+            // them, return-routed to a pseudonym whose SURBs are about to be gone.
+            myself.stop_pix_fill(&session_id);
             gate.poison();
             owned_ssas.clear();
 
@@ -2812,6 +3212,140 @@ where
                 close_session(session_id, slot, ClosureReason::PixFailure);
             }
         })
+    }
+
+    /// Starts the Exit's single Exit → Entry keep-alive stream and installs the handle that steers it.
+    ///
+    /// Called for every PIX Session, and for any Session with a configured
+    /// `surb_balance_notify_period` — the SURB-level notification and PIX fill are the same packet
+    /// sent for different reasons, so they share one stream and one rate controller. See
+    /// [`PixFillControl`].
+    ///
+    /// Returns without spawning anything when neither producer applies, which is an Exit Session that
+    /// is not PIX on a node that has switched the notification off. Such a Session originates nothing,
+    /// which is what it did before this existed.
+    ///
+    /// Deliberately not passed through the PIX egress gate. These packets carry no payload; gating
+    /// them would let an exhausted predeposit budget silence the very signal the Entry needs in order
+    /// to fund the Session, turning a stall into a teardown. The bound that does apply is
+    /// [`PixFillControl::admit`]'s SURB reserve, which is about this node's own ability to send at
+    /// all rather than about what the peer has paid for.
+    ///
+    /// `announced_surb_target` is the SURB buffer target the Entry asked for, and it is what that
+    /// reserve is derived against — see [`effective_surb_reserve`]. It has to be, because the
+    /// configured reserve is an absolute count while the buffer it is measured against is the Entry's
+    /// choice; a Session whose Entry asks for a shallower buffer than the configured reserve could
+    /// otherwise never be filled at all.
+    fn spawn_exit_keep_alive(
+        &self,
+        session_id: SessionId,
+        slot: &SessionSlot,
+        msg_sender: S,
+        is_pix: bool,
+        announced_surb_target: u64,
+    ) {
+        let notify_period = self.cfg.surb_balance_notify_period;
+        if notify_period.is_none() && !is_pix {
+            return;
+        }
+
+        let configured_reserve = self.cfg.pix_config.supervision.fill.min_surb_reserve;
+        let min_surb_reserve = effective_surb_reserve(configured_reserve, announced_surb_target);
+
+        // Created here and shared: the sink wrapper below has to hold the same control the stream is
+        // rate-limited by, so that it can tell a notification packet from a fill packet.
+        let controller = RateController::new(0, Duration::from_secs(1));
+        let control = Arc::new(PixFillControl::new(
+            session_id,
+            controller.clone(),
+            notify_period,
+            min_surb_reserve,
+            slot.surb_estimator.clone(),
+        ));
+
+        let control_for_admission = control.clone();
+        let surb_estimator = slot.surb_estimator.clone();
+        let ka_abort_handle = utils::spawn_keep_alive_stream(
+            session_id,
+            // Consumption is counted in the sink rather than at the rate limiter, so it counts what
+            // was actually sent: a packet the admission predicate dropped consumed no SURB, and
+            // counting it would walk the Exit's own level estimate down until it starved itself of
+            // the very reserve that dropped it.
+            msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                surb_estimator
+                    .consumed
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(feature = "telemetry")]
+                telemetry::record_session_surb_consumed(&session_id, 1);
+                futures::future::ok::<_, S::Error>((routing, data))
+            }),
+            slot.routing_opts.clone(),
+            SurbNotificationMode::Level(slot.surb_estimator.clone()),
+            slot.surb_mgmt.clone(),
+            &controller,
+            move || control_for_admission.admit(),
+        );
+
+        slot.abort_handles
+            .lock()
+            .insert(SessionHandles::KeepAlive, ka_abort_handle);
+        let _ = slot.pix_fill.set(control.clone());
+
+        if let Some(period) = notify_period {
+            // Delayed by one period, as it always was: a Session that closes immediately should not
+            // have sent a level report about SURBs it never used. Fill is not held behind this — the
+            // supervisor's first rate applies the moment it is planned.
+            //
+            // Registered so `close_session` can abort it. It is a one-shot, but it holds a clone of
+            // the control for the whole period, and nothing bounds how long an operator may make that.
+            let notify_delay = hopr_utils::spawn_as_abortable!(async move {
+                hopr_utils::runtime::prelude::sleep(period).await;
+                control.start_notify();
+            });
+            slot.abort_handles
+                .lock()
+                .insert(SessionHandles::SurbNotifyDelay, notify_delay);
+        }
+
+        // An order of magnitude is the point at which the operator's intent and the Session's shape
+        // have stopped being about the same deployment. A configured reserve of `R` is a reserve
+        // sized for a buffer of `4R`; the derivation only lowers it tenfold once the Entry announces
+        // under `4R / 10`, so this fires exactly on a Session whose buffer is an order of magnitude
+        // shallower than the one this node was configured against. Fill still runs — a derived
+        // reserve is strictly better than one that refuses every packet forever — but it is worth
+        // saying out loud once, when the stream starts, rather than once per withheld packet.
+        if min_surb_reserve.saturating_mul(10) < configured_reserve {
+            warn!(
+                %session_id,
+                configured = configured_reserve,
+                effective = min_surb_reserve,
+                announced_surb_target,
+                "the PIX fill SURB reserve was lowered by more than an order of magnitude to fit the SURB buffer \
+                 target the entry announced for this session"
+            );
+        }
+
+        debug!(
+            %session_id, ?notify_period, is_pix,
+            surb_reserve = min_surb_reserve,
+            announced_surb_target,
+            "started the exit keep-alive stream"
+        );
+    }
+
+    /// Silences a Session's PIX fill, leaving its SURB-level notification alone.
+    ///
+    /// Called on every path that is about to tear a Session down. `close_session` aborts the stream
+    /// outright, so this is not what stops it — it is what stops the *extra* traffic in the window
+    /// between a supervisor deciding the Session is over and the teardown reaching the stream. Every
+    /// packet originated in that window is return-routed to a pseudonym whose SURBs are gone, and one
+    /// packet the routing resolver cannot resolve holds up every packet this node originates.
+    fn stop_pix_fill(&self, session_id: &SessionId) {
+        if let Some(slot) = self.sessions.get(session_id)
+            && let Some(fill) = slot.pix_fill.get()
+        {
+            fill.set_fill(FillRate::ZERO);
+        }
     }
 
     /// Reports an action outcome to a Session's supervisor, if it still has one.
@@ -2995,6 +3529,74 @@ where
         Ok(guards)
     }
 
+    /// Asks the Entry to re-send the parts of one SSA's commitment that never arrived.
+    ///
+    /// The Entry's answer to an `SsaRequest` is hundreds of packets and the reconstructor can use
+    /// none of it until every one has landed, so a single drop used to cost the Session on
+    /// `max_ssa_delivery_time` — after the Entry had already been told to fund the cycle. This is the
+    /// repair: the reconstructor says which polynomial runs are missing, and the Entry re-sends
+    /// exactly those.
+    ///
+    /// Deliberately *not* built on [`send_ssa_request`](Self::send_ssa_request), whose every step is
+    /// wrong here. It registers no Exit commitment — the cycle already has one, and registering a
+    /// second for the same index is refused as a duplicate — allocates no index, and asks the deposit
+    /// pool for nothing, since the deposit data of this cycle travelled with the request that created
+    /// it. Nothing it does can earn the Entry a deposit, which is what makes it safe to repeat.
+    ///
+    /// The scope is read here rather than carried in the action: what is missing changes as the burst
+    /// continues to arrive, and the freshest answer is both smaller and the one that converges.
+    async fn send_commitment_retransmission_request(
+        &self,
+        session_id: SessionId,
+        slot: &SessionSlot,
+        ssa_id: SsaId<HoprPseudonym>,
+        params: PixParams,
+    ) -> errors::Result<()> {
+        let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        // Asked of the encoder, so the scope cannot be sized against a restated layout — see
+        // `StartProtocol::max_missing_runs`.
+        let max_runs = HoprStartProtocol::max_missing_runs(&session_id).map_err(SessionManagerError::other)?;
+
+        let Some(runs) = pix_toolbox.share_processor.missing_commitment_runs(&ssa_id, max_runs) else {
+            // The registration is gone — retired, or expired after
+            // `incomplete_commitment_lifetime` — so there is nothing left for a retransmission to
+            // complete. The commitment deadline is what ends the Session; saying so here is the only
+            // way an operator learns which of the two it was.
+            warn!(%session_id, %ssa_id, "cannot re-request commitment parts for a cycle the reconstructor no longer holds");
+            return Ok(());
+        };
+
+        if runs.is_empty() {
+            // The commitment completed between the timer firing and this running. Its
+            // `CommitmentVerified` is already on its way to the supervisor, which clears the timer.
+            debug!(%session_id, %ssa_id, "commitment completed before its parts could be re-requested");
+            return Ok(());
+        }
+
+        let missing_polynomials: u32 = runs.iter().map(|(first, last)| (last - first) as u32 + 1).sum();
+        info!(
+            %session_id, %ssa_id, runs = runs.len(), missing_polynomials,
+            "re-requesting the SSA commitment parts that did not arrive"
+        );
+
+        send_via_msg_sender(
+            &mut msg_sender,
+            slot.routing_opts.clone(),
+            HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
+                session_id,
+                params,
+                [(ssa_id.ssa_index(), runs)],
+            )),
+            "ssa commitment retransmission request",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
+
+        Ok(())
+    }
+
     /// Returns the current number of active sessions.
     pub fn num_active_sessions(&self) -> usize {
         self.active_sessions.load(Ordering::Relaxed)
@@ -3157,19 +3759,34 @@ where
     /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
     /// their counterparty buffer estimate for `grace`.
     ///
-    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
+    /// Returns the pseudonyms of the Sessions that were marked (empty when nothing routes there).
+    ///
+    /// The caller uses these to advance each Session's SURB generation: the return path to
+    /// `destination` has just been re-planned, so the fresh SURB batch must supersede the SURBs the
+    /// counterparty still holds for the dead path.
     pub fn mark_return_path_degraded(
         &self,
         destination: &hopr_api::types::internal::NodeId,
         grace: std::time::Duration,
-    ) -> usize {
+    ) -> Vec<HoprPseudonym> {
         self.sessions
             .iter()
             .filter(|(_, slot)| {
-                matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
+                // Only sessions that actually run a return path are affected: with `return_options:
+                // None` the session mints no return SURBs, so the counterparty holds none to
+                // supersede and there is nothing to mark or bump.
+                matches!(
+                    &slot.routing_opts,
+                    DestinationRouting::Forward { destination: d, return_options: Some(_), .. }
+                    if d.as_ref() == destination
+                )
             })
-            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
-            .count()
+            .map(|(pseudonym, slot)| {
+                slot.surb_mgmt.mark_return_path_degraded(grace);
+                // The session cache is keyed by pseudonym, which is exactly the SURB-generation key.
+                *pseudonym.as_ref()
+            })
+            .collect()
     }
 
     /// The main method to be called whenever data are received.
@@ -3294,6 +3911,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
@@ -3326,6 +3944,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
@@ -3685,6 +4304,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
             returned_packets: Default::default(),
             cycle_budget,
         };
@@ -3748,6 +4368,30 @@ where
             None
         };
 
+        // The SURB buffer target the Entry asked for, resolved once for both branches below.
+        //
+        // The Session request carries a "hint" as additional data telling what the Session initiator
+        // has configured as its target buffer size in the Balancer. The lower 32 bits contain the
+        // SURB target; the upper 32 bits carry PIX parameters and must be masked out.
+        //
+        // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
+        // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
+        // figure, and on that branch the fallback below — the same one the balancer would have used —
+        // is the only estimate of the buffer there is.
+        let announced_surb_target = {
+            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            if surb_target > 0 {
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+            } else {
+                self.cfg.initial_return_session_egress_rate as u64
+                    * self
+                        .cfg
+                        .minimum_surb_buffer_duration
+                        .max(MIN_SURB_BUFFER_DURATION)
+                        .as_secs()
+            }
+        };
+
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
                 error!(%session_id, %error, %reason, "failed to notify session closure");
@@ -3759,21 +4403,7 @@ where
             let egress_rate_control =
                 RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
-            // The Session request carries a "hint" as additional data telling what
-            // the Session initiator has configured as its target buffer size in the Balancer.
-            // The lower 32 bits contain the SURB target; the upper 32 bits carry PIX
-            // parameters and must be masked out.
-            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
-            let target_surb_buffer_size = if surb_target > 0 {
-                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
-            } else {
-                self.cfg.initial_return_session_egress_rate as u64
-                    * self
-                        .cfg
-                        .minimum_surb_buffer_duration
-                        .max(MIN_SURB_BUFFER_DURATION)
-                        .as_secs()
-            };
+            let target_surb_buffer_size = announced_surb_target;
 
             let surb_estimator_clone = slot.surb_estimator.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
@@ -3847,46 +4477,15 @@ where
                 .lock()
                 .insert(SessionHandles::Balancer, balancer_abort_handle);
 
-            // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
-            if let Some(period) = self.cfg.surb_balance_notify_period {
-                let surb_estimator_clone = slot.surb_estimator.clone();
-                let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
-                    session_id,
-                    // Deliberately not passed through the PIX egress gate. Keep-alives carry no
-                    // payload and exist to report the SURB buffer level; gating them would let an
-                    // exhausted predeposit budget silence the signal the Entry needs to keep the
-                    // Session fundable, turning a stall into a teardown.
-                    //
-                    // Sent Keep-Alive packets also contribute to SURB consumption
-                    msg_sender
-                        .clone()
-                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            // Each sent keepalive consumes 1 SURB
-                            surb_estimator_clone
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_consumed(&session_id, 1);
-                            futures::future::ok::<_, S::Error>((routing, data))
-                        }),
-                    slot.routing_opts.clone(),
-                    SurbNotificationMode::Level(slot.surb_estimator.clone()),
-                    slot.surb_mgmt.clone(),
-                );
-
-                // Start keepalive stream towards the Entry with a predefined period
-                hopr_utils::runtime::prelude::spawn(async move {
-                    // Delay the stream execution by one period
-                    hopr_utils::runtime::prelude::sleep(period).await;
-                    ka_controller.set_rate_per_unit(1, period);
-                });
-
-                slot.abort_handles
-                    .lock()
-                    .insert(SessionHandles::KeepAlive, ka_abort_handle);
-
-                debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
-            }
+            // Reports the SURB buffer level towards the Entry, and — on a PIX Session — carries the
+            // Exit's own fill.
+            self.spawn_exit_keep_alive(
+                session_id,
+                &slot,
+                msg_sender.clone(),
+                pix.is_some(),
+                announced_surb_target,
+            );
 
             session
         } else {
@@ -3894,20 +4493,49 @@ where
             // opts out of rate control is exactly the one that could drain the most service before
             // funding, so leaving this path ungated would make the predeposit budget optional.
             let egress_gate = slot.pix_egress_gate.get().cloned();
-            HoprSession::new(
+            let surb_estimator_clone = slot.surb_estimator.clone();
+            let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
                 (
                     msg_sender.clone().sink_map_err(std::io::Error::other).with(
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            // Counted here too, though nothing on this branch balances anything. The
+                            // estimate is what the fill reserve is measured against, and a reserve
+                            // measured against a counter that only ever counts in one direction is a
+                            // reserve that either never binds or never releases. `NoRateControl` is
+                            // also the branch that can drain SURBs fastest, so it is the one where
+                            // that matters most.
+                            surb_estimator_clone
+                                .consumed
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            telemetry::record_session_surb_consumed(&session_id, 1);
                             acquire_egress_permit(egress_gate.clone(), routing, data)
                         },
                     ),
-                    session_rx,
+                    session_rx.inspect(move |data| {
+                        let produced = data.num_surbs_with_msg() as u64;
+                        surb_estimator_clone
+                            .produced
+                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        #[cfg(feature = "telemetry")]
+                        telemetry::record_session_surb_produced(&session_id, produced);
+                    }),
                 ),
                 Some(closure_notifier),
-            )?
+            )?;
+
+            self.spawn_exit_keep_alive(
+                session_id,
+                &slot,
+                msg_sender.clone(),
+                pix.is_some(),
+                announced_surb_target,
+            );
+
+            session
         };
 
         // Extract useful information about the session from the Start protocol message
@@ -4170,14 +4798,21 @@ where
 
         // A verifiable commitment is what starts the deposit clock, so tell the supervisor before
         // the observer below can report anything against it.
-        if ssa_client_commitment_state.is_verifiable
-            && let Some(supervisor) = session_slot.pix_supervisor.get()
-            && supervisor
-                .send_event(SessionPixEvent::CommitmentVerified(ssa_id))
-                .await
-                .is_err()
-        {
-            error!(%session_id, %ssa_id, "pix supervisor is no longer accepting events");
+        //
+        // An *incomplete* one is reported too, and per message: that is what arms the supervisor's
+        // re-request timer and keeps pushing it out while the burst is still arriving, so it fires
+        // only once delivery has actually stalled. It is also the only evidence that the Entry
+        // answered at all, which is what separates a cycle worth re-asking for from one where
+        // nothing was ever delivered and there is no scope to name.
+        if let Some(supervisor) = session_slot.pix_supervisor.get() {
+            let event = if ssa_client_commitment_state.is_verifiable {
+                SessionPixEvent::CommitmentVerified(ssa_id)
+            } else {
+                SessionPixEvent::CommitmentProgress(ssa_id)
+            };
+            if supervisor.send_event(event).await.is_err() {
+                error!(%session_id, %ssa_id, "pix supervisor is no longer accepting events");
+            }
         }
 
         if ssa_client_commitment_state.deposit_address_first_encountered
@@ -4280,6 +4915,89 @@ where
         if self.close_session(&session_id) {
             error!(%session_id, "closed session after refusing the Exit's SSA request");
         }
+    }
+
+    /// Handled by the Entry, when the Exit says it never received parts of a commitment this node
+    /// already published.
+    ///
+    /// Re-sends the named polynomial commitments and nothing else. Emits no
+    /// [`ReadyToDeposit`](HoprSessionOutPixEvent::ReadyToDeposit): the deposit address of a cycle is
+    /// fixed when it is first committed, and the caller was told it then, so announcing it again
+    /// would invite a second deposit against one quota.
+    ///
+    /// A failure here is reported to the caller of the Start-message dispatcher and otherwise
+    /// dropped. It is deliberately not [`refuse_ssa_request`](Self::refuse_ssa_request), which closes
+    /// the Session: an Exit that asks for a cycle this node cannot serve is asking for something
+    /// already lost, and its own commitment deadline ends the Session either way — whereas closing on
+    /// a request that merely raced our own state would throw away a Session that was about to work.
+    ///
+    /// Two separate bounds keep this from being a packet-amplification lever, because one request may
+    /// name a whole cycle's polynomials and the answer to that is the entire commitment burst again.
+    /// The generator bounds how often it answers for *one* cycle
+    /// ([`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)); this
+    /// function bounds how many cycles one request may set going. Neither stands in for the other —
+    /// the first bounds repeats, the second bounds breadth.
+    async fn handle_ssa_recommit(
+        &self,
+        pseudonym: HoprPseudonym,
+        session_slot: &SessionSlot,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositPayload>,
+    ) -> errors::Result<()> {
+        // The wire bounds the *runs* a request carries, not the number of cycles they are spread
+        // over — one run of 8 bytes can name a whole cycle — so without this a single packet names
+        // every retained cycle and is answered with a full commitment burst for each. The generator's
+        // per-cycle attempt cap does not bound that: it bounds repeats of one cycle, not breadth
+        // across cycles.
+        //
+        // The same cap as the new-SSA path, so repairing a batch can never cost more than committing
+        // to it did, and the Exit's own requests name a single cycle. Dropped rather than refused
+        // with `refuse_ssa_request`: the peer is already inside its own commitment deadline and
+        // learns nothing from a refusal it does not learn from that, and replying at all would hand
+        // back some of the amplification the request was reaching for.
+        let max_ssas_per_request = self.cfg.max_ssas_per_ssa_request;
+        if msg.missing.len() > max_ssas_per_request {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit asked for retransmissions across {} SSA cycles in a single request, at most \
+                 {max_ssas_per_request} allowed",
+                msg.missing.len()
+            ))
+            .into());
+        }
+
+        let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let session_id = msg.session_id;
+
+        for (ssa_index, runs) in msg.missing {
+            // Rebuilt from the bytes that went out the first time, so the peer's already-filled slots
+            // see a re-delivery rather than a contradiction.
+            let pix_toolbox_clone = pix_toolbox.clone();
+            let commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || pix_toolbox_clone.share_generator.recommit(&pseudonym, ssa_index, runs),
+                "client_ssa_recommitment",
+            )
+            .await
+            .map_err(SessionManagerError::other)?
+            .map_err(SessionManagerError::PixError)?;
+
+            let commitment_msgs =
+                SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
+            let num_messages = commitment_msgs.len();
+
+            for commitment_msg in commitment_msgs {
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    session_slot.routing_opts.clone(),
+                    HoprStartProtocol::SsaCommit(commitment_msg),
+                    "re-sent client SSA commitment message",
+                )
+                .await?;
+            }
+
+            info!(%session_id, %ssa_index, num_messages, "re-sent the requested SSA commitment parts");
+        }
+
+        Ok(())
     }
 
     /// Handled by the Entry, when the Exit sends PIX initiation request
@@ -4432,6 +5150,19 @@ where
                 .await;
             return Err(error.into());
         }
+        // A request naming missing commitment parts asks for nothing new — see
+        // `SsaServerCommitmentMessage` — and none of what follows may run for it.
+        //
+        // That placement is the whole safety argument for reusing this message. The successor gate
+        // below would refuse an index that is *already* being served, which is every index a
+        // retransmission can name; the served-packet gate prices service against a batch nobody is
+        // asking for; and `new_ssa_commitment` rejects an index at or below the watermark, which
+        // again is every index this can name. Above this line is what a retransmission does need:
+        // the pseudonym check, the session slot, and the parameter comparison.
+        if !msg.missing.is_empty() {
+            return self.handle_ssa_recommit(pseudonym, &session_slot, msg).await;
+        }
+
         let quota_per_ssa = pix_params_to_quota(&our_params);
 
         // Everything from here to the end of the batch is serialised per pseudonym. Start messages run
@@ -5034,6 +5765,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
             },
@@ -5489,6 +6221,433 @@ mod tests {
         );
 
         assert_no_further_origination(&mut msg_rx, "idle eviction").await;
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------
+    // PIX fill — the Exit's own keep-alives
+    // ---------------------------------------------------------------
+
+    /// A [`PixFillControl`] over a random pseudonym and an empty SURB estimate.
+    ///
+    /// `reserve` is the *effective* reserve, as [`effective_surb_reserve`] would have derived it —
+    /// these tests are about what `admit` does with one, not about where it came from. Against an
+    /// estimate that starts empty, any `reserve` above zero refuses fill outright, which is what makes
+    /// admission a usable assertion that a packet was classified as the notification.
+    fn fill_control(notify_period: Option<Duration>, reserve: u64) -> PixFillControl {
+        PixFillControl::new(
+            HoprPseudonym::random(),
+            RateController::new(0, Duration::from_secs(1)),
+            notify_period,
+            reserve,
+            Default::default(),
+        )
+    }
+
+    /// One stream, two producers, and the faster of them wins.
+    ///
+    /// The SURB-level notification and PIX fill are the same packet sent for different reasons, so
+    /// running two streams of them would double the Exit's return traffic to say the same thing
+    /// twice. What has to be preserved is the floor: turning fill off must leave the notification
+    /// running, and a Session with no notification configured must still be fillable — that second
+    /// case is the deployment's own test fixtures, which pin `surb_balance_notify_period: None`.
+    #[test]
+    fn the_exit_keep_alive_rate_is_the_faster_of_its_two_producers() {
+        let notify = Duration::from_secs(60);
+        let control = fill_control(Some(notify), 1);
+
+        assert_eq!(
+            FillRate::ZERO,
+            control.effective_rate(),
+            "nothing runs before the notification's initial delay has elapsed"
+        );
+
+        control.start_notify();
+        assert_eq!(FillRate::once_per(notify), control.effective_rate());
+
+        control.set_fill(FillRate::per_second(10));
+        assert_eq!(
+            FillRate::per_second(10),
+            control.effective_rate(),
+            "fill above the notification rate must take over"
+        );
+
+        control.set_fill(FillRate::once_per(Duration::from_secs(600)));
+        assert_eq!(
+            FillRate::once_per(notify),
+            control.effective_rate(),
+            "fill below the notification rate must not slow it down"
+        );
+
+        control.set_fill(FillRate::ZERO);
+        assert_eq!(
+            FillRate::once_per(notify),
+            control.effective_rate(),
+            "a Session that has stopped filling still reports its SURB level"
+        );
+
+        // And the other way round: no notification configured, so fill is the only producer.
+        let fill_only = fill_control(None, 1);
+        fill_only.start_notify();
+        assert_eq!(FillRate::ZERO, fill_only.effective_rate());
+        fill_only.set_fill(FillRate::per_second(4));
+        assert_eq!(FillRate::per_second(4), fill_only.effective_rate());
+        fill_only.set_fill(FillRate::ZERO);
+        assert_eq!(FillRate::ZERO, fill_only.effective_rate());
+    }
+
+    /// Fill yields to the Session's own SURB reserve; the SURB-level notification does not.
+    ///
+    /// The asymmetry is the whole rule. A return packet that finds no SURB is not dropped — the
+    /// routing resolver holds it, and every packet this node originates behind it, for the whole of
+    /// `surb_resolution_wait`. So an Exit that filled a cycle down to its last SURB would stall the
+    /// Session it was filling for, and every other Session on the node with it. The notification is
+    /// exempt because it is the message that *asks* for more SURBs: refusing to send it when SURBs
+    /// are scarce is refusing to ask for the thing that is scarce.
+    #[test]
+    fn fill_withholds_below_the_surb_reserve_while_the_level_notification_does_not() {
+        const RESERVE: u64 = 100;
+        let control = fill_control(Some(Duration::from_secs(3600)), RESERVE);
+        control.start_notify();
+
+        // The first packet is the notification, whatever the estimate says.
+        assert!(control.admit(), "the level notification must go out on an empty buffer");
+        // The notification period is an hour, so everything after it is fill — and there is nothing
+        // to spend.
+        assert!(!control.admit(), "fill must not spend a SURB the Session does not have");
+
+        control
+            .estimator
+            .produced
+            .fetch_add(RESERVE - 1, std::sync::atomic::Ordering::Relaxed);
+        assert!(!control.admit(), "one short of the reserve is still short");
+
+        control
+            .estimator
+            .produced
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(control.admit(), "at the reserve, fill may spend");
+
+        // Consumption counted elsewhere walks the estimate back below the reserve.
+        control
+            .estimator
+            .consumed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(!control.admit());
+    }
+
+    /// The SURB-level notification is classified by when it was *due*, not by when the scheduler got
+    /// round to releasing it.
+    ///
+    /// The rate limiter that releases these packets does not hit the period exactly: it sleeps in
+    /// chunks of `MAX_WAIT_CHUNK`, re-reads its controller on each wake, and rounds a rate into an
+    /// integer packet count. Compared against the period exactly, a period the controller rounds
+    /// short by a microsecond would classify every other notification as fill — and, below the
+    /// reserve, drop it. That is the message that *asks* for the SURBs whose absence caused the drop,
+    /// and it runs on every Exit Session with a notification period configured, PIX or not.
+    ///
+    /// The reserve here is the instrument: the estimator is empty, so a packet the rule classifies as
+    /// fill is refused and a packet it classifies as the notification is admitted. Admission is
+    /// therefore the assertion that it was not counted as fill.
+    #[test]
+    fn a_level_notification_released_a_shade_early_is_still_the_notification() {
+        const RESERVE: u64 = 100;
+        // Two seconds, so the slack is `MAX_WAIT_CHUNK` rather than half the period, and the two
+        // bounds are distinguishable.
+        let period = Duration::from_secs(2);
+        let control = fill_control(Some(period), RESERVE);
+        control.start_notify();
+
+        let t0 = Instant::now();
+        assert!(
+            control.admit_at(t0),
+            "the first packet is the notification, whatever the estimate says"
+        );
+
+        // A shade under the period — the shape a rate rounded down by a microsecond produces.
+        let early = t0 + period - Duration::from_micros(1);
+        assert!(
+            control.admit_at(early),
+            "a notification released a microsecond early must not be reclassified as fill and dropped"
+        );
+
+        // And it is the notification rather than a free pass: the next packet is measured from when
+        // this one actually went out, so everything inside the following period is fill.
+        assert!(
+            !control.admit_at(early + Duration::from_millis(1)),
+            "the packet after the notification is fill, and there is nothing to spend"
+        );
+        assert!(
+            !control.admit_at(early + period - MAX_WAIT_CHUNK - Duration::from_millis(1)),
+            "a packet inside the slack window is still fill"
+        );
+
+        // The slack window opens `MAX_WAIT_CHUNK` before the period is up, and not earlier.
+        assert!(
+            control.admit_at(early + period - MAX_WAIT_CHUNK),
+            "at the edge of the slack window the packet is the notification again"
+        );
+
+        // A period short enough that `MAX_WAIT_CHUNK` would swallow it keeps half of itself.
+        let short = Duration::from_millis(200);
+        let control = fill_control(Some(short), RESERVE);
+        control.start_notify();
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0));
+        assert!(
+            !control.admit_at(t0 + short / 2 - Duration::from_millis(1)),
+            "the slack is capped at half the period, so it cannot widen a short period away to nothing"
+        );
+        assert!(control.admit_at(t0 + short / 2));
+    }
+
+    /// The reserve is a ceiling on a figure derived from the buffer the *Entry* asked for.
+    ///
+    /// The configured value is an absolute SURB count, while the buffer it is compared against is
+    /// sized by the peer. Left absolute, a PIX Session whose Entry targets fewer SURBs than the
+    /// reserve could never be filled at all — every fill packet withheld, the funded cycle stranded on
+    /// `max_recovery_time`, and nothing in the logs but a backoff.
+    #[test]
+    fn the_fill_surb_reserve_is_capped_at_a_quarter_of_the_entrys_announced_buffer() {
+        // The shipped reserve against the worked profile's buffer: the configured value binds and the
+        // derivation is inert, which is what keeps this from quietly weakening production.
+        assert_eq!(500, effective_surb_reserve(500, 7_000));
+        // Exactly four times the reserve is the point at which the two agree.
+        assert_eq!(500, effective_surb_reserve(500, 2_000));
+
+        // Below that, the Entry's buffer is what decides. The cluster fixtures' 64-SURB target is the
+        // case this exists for.
+        assert_eq!(16, effective_surb_reserve(500, 64));
+        assert_eq!(12, effective_surb_reserve(500, 50));
+
+        // Never zero: an Entry announcing a buffer of three would otherwise let fill spend the
+        // Session's last SURB, which is the one failure the reserve exists to prevent.
+        assert_eq!(1, effective_surb_reserve(500, 3));
+        assert_eq!(1, effective_surb_reserve(500, 0));
+        assert_eq!(1, effective_surb_reserve(0, 7_000));
+    }
+
+    /// Test dimensions whose cycle is large enough to need a visible fill rate.
+    ///
+    /// [`small_pix_params`] is six packets, which any deadline covers at the heartbeat; these are
+    /// three hundred, which against the fixture's 40 s recovery budget needs about eleven packets a
+    /// second — far enough above the one-per-second notification for the two to be told apart.
+    fn fill_pix_params() -> PixParams {
+        PixParams::try_new(100, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE).expect("test dimensions must be valid")
+    }
+
+    /// Brings up an Exit-side PIX Session, funds its first cycle, and returns once it is recovering.
+    ///
+    /// The Entry half is not simulated: the supervisor is a state machine, and driving it through
+    /// `SsaRequestSent`, `CommitmentVerified` and `DepositConfirmed` puts its cycle in exactly the
+    /// state a real commitment and deposit would — which is the state fill is planned from. What is
+    /// real here is everything downstream of that: the action driver, the rate controller, the
+    /// admission predicate and the stream.
+    async fn recovering_exit_pix_session(
+        capabilities: Capabilities,
+        notify_period: Option<Duration>,
+        min_surb_reserve: u64,
+    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+        let params = fill_pix_params();
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_balance_notify_period: notify_period,
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=pix_params_to_quota(&params),
+                supervision: SupervisorConfig {
+                    // As short as a legal pair gets: the idle deadline must clear the reconstructor's
+                    // 30 s acknowledgement window, and the hard deadline must exceed the idle one.
+                    // That is what makes the required fill rate — a whole cycle over 75 % of 40 s,
+                    // about eleven packets a second — observable inside a test-length window.
+                    max_recovery_idle: Duration::from_secs(31),
+                    max_recovery_time: Duration::from_secs(40),
+                    fill: crate::supervision::PixFillConfig {
+                        min_surb_reserve,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(
+            msg_tx,
+            new_session_tx,
+            Some(pix_toolbox_with_pool(
+                Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+                    polynomials_per_ssa: params.polys_per_ssa(),
+                    threshold: params.shares_per_poly(),
+                    surplus_shares: params.surplus_shares(),
+                })),
+                SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            )),
+            None,
+        )?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(capabilities | Capability::UsePIX),
+                additional_data: params.into_additional_data(0),
+            },
+        )
+        .await?;
+
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        let supervisor = slot
+            .pix_supervisor
+            .get()
+            .context("an Exit-side PIX session must have a supervisor")?;
+
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::new(1).expect("index one is non-zero"));
+        for event in [
+            SessionPixEvent::SsaRequestSent(ssa_id),
+            SessionPixEvent::CommitmentVerified(ssa_id),
+            SessionPixEvent::DepositConfirmed {
+                ssa_id,
+                amount: hopr_api::HoprBalance::new_base(1000),
+            },
+        ] {
+            supervisor
+                .send_event(event)
+                .await
+                .map_err(|()| anyhow::anyhow!("the supervisor stopped accepting events"))?;
+        }
+
+        Ok((mgr, msg_rx, pseudonym))
+    }
+
+    /// Counts the return-routed keep-alives `mgr` originated for `pseudonym` during `window`.
+    async fn keep_alives_during(rx: &mut Originated, pseudonym: HoprPseudonym, window: Duration) -> usize {
+        originated_during(rx, window)
+            .await
+            .iter()
+            .filter(|(routing, data)| {
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == pseudonym)
+            })
+            .count()
+    }
+
+    /// A funded, idle PIX Session must be filled by the Exit at the rate its own deadline needs.
+    ///
+    /// This is the mechanism end to end on one node: the supervisor plans a rate, the action driver
+    /// applies it to the shared keep-alive controller, the admission predicate lets the packets past,
+    /// and they come out return-routed to the Entry. The floor asserted is deliberately the
+    /// *notification* rate rather than the planned one — a regression that leaves the stream running
+    /// at one packet a second is exactly the failure this exists to prevent, and it looks like
+    /// success to any assertion that only checks the stream is alive.
+    #[test_log::test(tokio::test)]
+    async fn a_funded_idle_pix_session_is_filled_by_the_exit() -> anyhow::Result<()> {
+        let notify = Duration::from_secs(1);
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(Capabilities::empty(), Some(notify), 1).await?;
+
+        // SURBs to spend, so the reserve is not what this test is measuring.
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(100_000, std::sync::atomic::Ordering::Relaxed);
+
+        // One sampling interval for the planner, then a window long enough that the notification
+        // alone could not account for what is counted.
+        let _ramp = originated_during(&mut msg_rx, Duration::from_millis(1500)).await;
+        let window = Duration::from_millis(1500);
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, window).await;
+
+        // Counted against the rate the notification is *promoted* at rather than against the period,
+        // for the reason `admit_at` documents: the classification window is one slack shorter than the
+        // period, so a notification-only stream produces rather more than `window / period` packets.
+        // Taking the period at face value here would set the floor too low and let a stream that had
+        // stopped filling pass.
+        let promote_every = notify - MAX_WAIT_CHUNK.min(notify / 2);
+        let notify_only = (window.as_secs_f64() / promote_every.as_secs_f64()).ceil() as usize;
+        assert!(
+            observed > notify_only,
+            "a funded idle cycle produced {observed} keep-alive(s) over {window:?}, which the {notify:?} SURB-level \
+             notification alone could have produced ({notify_only}, one every {promote_every:?})"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+        assert_no_further_origination(&mut msg_rx, "an explicit close of a filling PIX session").await;
+        Ok(())
+    }
+
+    /// The same Session, with no SURBs to spend, must fall back to its SURB-level notification.
+    ///
+    /// A Session whose Entry has stopped supplying SURBs is the one case where filling harder is
+    /// actively harmful: the packets cannot be routed, and an unroutable origination holds up every
+    /// packet the node sends. What must survive is the notification, because it is the message that
+    /// asks for the SURBs whose absence caused the backoff.
+    #[test_log::test(tokio::test)]
+    async fn fill_backs_off_to_the_notification_when_the_entry_supplies_no_surbs() -> anyhow::Result<()> {
+        // At `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, so it survives the clamp `SessionManager::new`
+        // applies. A shorter value would be raised to this one anyway, and the bound below would then
+        // be computed from a period that is not the one in effect.
+        let notify = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+        let (mgr, mut msg_rx, pseudonym) =
+            recovering_exit_pix_session(Capabilities::empty(), Some(notify), 500).await?;
+        assert_eq!(
+            Some(notify),
+            mgr.cfg.surb_balance_notify_period,
+            "the fixture's notification period must be the one the manager actually runs"
+        );
+
+        let _ramp = originated_during(&mut msg_rx, Duration::from_millis(1500)).await;
+        let window = Duration::from_millis(1500);
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, window).await;
+
+        // A notification is promoted every `period - min(MAX_WAIT_CHUNK, period / 2)`, not every
+        // period: `admit_at` opens the window a slack early so the classification does not rest on the
+        // rate limiter's scheduling latency. The ceiling has to be computed from that shorter interval,
+        // or a stream doing exactly what this test permits would be read as filling.
+        let promote_every = notify - MAX_WAIT_CHUNK.min(notify / 2);
+        let notify_only = (window.as_secs_f64() / promote_every.as_secs_f64()).ceil() as usize;
+        assert!(
+            observed > 0,
+            "the SURB-level notification must survive the backoff — it is what asks for the SURBs"
+        );
+        assert!(
+            observed <= notify_only + 1,
+            "with no SURBs to spend the Exit originated {observed} keep-alive(s) over {window:?}, against the \
+             {notify_only} its notification alone accounts for at one every {promote_every:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
+    /// A `NoRateControl` PIX Session must still have a SURB level estimate, or its reserve is a lie.
+    ///
+    /// That branch runs no balancer, and until now it wired no estimator either: `produced` and
+    /// `consumed` both stayed at zero for the life of the Session. A reserve measured against that
+    /// counter would refuse every fill packet forever — which is the branch that can drain SURBs
+    /// fastest, so it is the one where getting it wrong costs most.
+    #[test_log::test(tokio::test)]
+    async fn a_no_rate_control_pix_session_still_estimates_its_surb_level() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) =
+            recovering_exit_pix_session(Capability::NoRateControl.into(), Some(Duration::from_secs(1)), 1).await?;
+
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_estimator
+            .produced
+            .fetch_add(100_000, std::sync::atomic::Ordering::Relaxed);
+
+        let _ = keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(1500)).await;
+
+        assert!(
+            slot.surb_estimator.consumed.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "a NoRateControl Session that has sent keep-alives must have counted them as consumed SURBs"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
         Ok(())
     }
 
@@ -7642,6 +8801,64 @@ mod tests {
         Ok(())
     }
 
+    /// `mark_return_path_degraded` must mark exactly the Sessions routed to the given destination
+    /// **that run a return path**, and return their pseudonyms (the SURB-generation keys the caller
+    /// bumps), leaving Sessions bound for other destinations — and one-way Sessions with no return
+    /// path — untouched.
+    #[test_log::test(tokio::test)]
+    async fn session_manager_mark_return_path_degraded_should_return_the_marked_pseudonyms() -> anyhow::Result<()> {
+        use std::collections::HashSet;
+
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let dest_a: Address = (&ChainKeypair::random()).into();
+        let dest_b: Address = (&ChainKeypair::random()).into();
+
+        let hops = || RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN);
+        let forward_to =
+            |addr: Address, ps: HoprPseudonym, return_options: Option<RoutingOptions>| DestinationRouting::Forward {
+                destination: Box::new(addr.into()),
+                pseudonym: Some(ps),
+                forward_options: hops(),
+                return_options,
+            };
+
+        // Two Sessions route to `dest_a` with a return path, one to `dest_b`, and one one-way Session
+        // (no return path) to `dest_a` that must be skipped.
+        let (ps_a1, ps_a2, ps_b, ps_a_oneway) = (
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+        );
+        mgr.pre_populate_session(ps_a1, forward_to(dest_a, ps_a1, Some(hops())));
+        mgr.pre_populate_session(ps_a2, forward_to(dest_a, ps_a2, Some(hops())));
+        mgr.pre_populate_session(ps_b, forward_to(dest_b, ps_b, Some(hops())));
+        mgr.pre_populate_session(ps_a_oneway, forward_to(dest_a, ps_a_oneway, None));
+        mgr.sessions.run_pending_tasks();
+
+        let node_a = hopr_api::types::internal::NodeId::Chain(dest_a);
+        let marked: HashSet<_> = mgr
+            .mark_return_path_degraded(&node_a, Duration::from_secs(30))
+            .into_iter()
+            .collect();
+        assert_eq!(
+            marked,
+            HashSet::from([ps_a1, ps_a2]),
+            "only return-path Sessions routed to dest_a must be marked; the one-way Session is skipped"
+        );
+
+        // A destination nothing routes to marks nothing.
+        let node_c = hopr_api::types::internal::NodeId::Chain((&ChainKeypair::random()).into());
+        assert!(
+            mgr.mark_return_path_degraded(&node_c, Duration::from_secs(30))
+                .is_empty(),
+            "a destination with no Sessions must return no pseudonyms"
+        );
+
+        Ok(())
+    }
+
     /// Verifies that an Exit `KeepAlive` updates the SURB buffer level and counts as returned service.
     ///
     /// ## Steps
@@ -7693,6 +8910,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
             },
@@ -7802,6 +9020,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
             },
@@ -8174,6 +9393,106 @@ mod tests {
     // ---------------------------------------------------------------------------
     // PIX protocol tests
     // ---------------------------------------------------------------------------
+
+    /// The fill fractions must be range-checked before anything computes with them.
+    ///
+    /// This validator runs *before* `validate_pix_supervision` on both paths that reach it:
+    /// `SessionManager::start` calls it first, and in `HoprProtocolConfig` it is a field validator
+    /// while the other is a schema-level one. So it cannot assume the ranges have already been
+    /// checked — and it feeds `finish_fraction` straight into `Duration::mul_f64`, which panics on a
+    /// `NaN`, on a negative, and on a product the monotonic clock cannot hold. A single
+    /// `finish_fraction: .nan` in a YAML file would therefore abort the node at load instead of being
+    /// reported as the configuration error it is.
+    ///
+    /// The finite out-of-range values do not panic, which is why they are here too: they compute a
+    /// floor that is wrong in the permissive direction, and nothing downstream ever says so.
+    #[test]
+    fn fill_fractions_are_rejected_before_the_ceiling_arithmetic_runs() {
+        let with_fill = |fill: crate::supervision::PixFillConfig| IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                fill,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        for finish_fraction in [f64::NAN, -1.0, f64::INFINITY, 2.0] {
+            let cfg = with_fill(crate::supervision::PixFillConfig {
+                finish_fraction,
+                ..Default::default()
+            });
+            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.finish_fraction")),
+                "a finish_fraction of {finish_fraction} must be refused rather than multiplied, got {outcome:?}"
+            );
+        }
+
+        for loss_margin in [f64::NAN, -0.5, 1.0] {
+            let cfg = with_fill(crate::supervision::PixFillConfig {
+                loss_margin,
+                ..Default::default()
+            });
+            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.loss_margin")),
+                "a loss_margin of {loss_margin} must be refused, got {outcome:?}"
+            );
+        }
+
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), ASSUMED_SESSION_PACKET_RATE)
+            .expect("the shipped defaults must still validate");
+    }
+
+    /// The fill heartbeat is clamped at *both* ends for a programmatically assembled config.
+    ///
+    /// The upper clamp is the one every other supervisor duration takes. The lower one is what stops
+    /// a zero period, which `validate_pix_supervision` rejects and nothing in this crate calls: with
+    /// it, `FillRate::as_packets_per_sec` reports zero for the heartbeat, so the planner's floor is
+    /// zero, both heartbeat branches of `FillPlanner::bound` return a zero-period rate, and
+    /// `PixFillControl::apply` hands `set_rate_per_unit(1, 1µs)` to the controller — which
+    /// `RateController::MIN_DELAY` turns into 10 000 packets/s. The `max_rate` ceiling never sees it,
+    /// so the one bound on this node's self-generated egress would be bypassed by the one field left
+    /// unbounded below.
+    #[test]
+    fn programmatic_fill_heartbeat_is_clamped_to_a_positive_period() {
+        let normalized = |heartbeat: Duration| {
+            let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+                SessionManager::new(SessionManagerConfig {
+                    pix_config: IncomingSessionPixConfig {
+                        supervision: SupervisorConfig {
+                            fill: crate::supervision::PixFillConfig {
+                                heartbeat,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+            mgr.cfg.pix_config.supervision.fill.heartbeat
+        };
+
+        // The exact dual of the `max_rate` ceiling, so the two clamps cannot drift apart.
+        let floor = Duration::from_secs(1) / crate::supervision::MAX_FILL_RATE;
+        assert_eq!(
+            floor,
+            normalized(Duration::ZERO),
+            "a zero heartbeat must be raised to the period of MAX_FILL_RATE"
+        );
+        assert_eq!(
+            crate::supervision::MAX_SUPERVISOR_DURATION,
+            normalized(Duration::MAX),
+            "an unrepresentable heartbeat must be lowered to the same cap every other deadline takes"
+        );
+
+        // Which is the property the clamp exists for: a rate the planner can divide by.
+        assert!(
+            FillRate::once_per(normalized(Duration::ZERO)).as_packets_per_sec() > 0.0,
+            "the clamped heartbeat must be a rate the planner can compare against its ceiling"
+        );
+    }
 
     /// Supervisor durations a programmatic caller supplies must be clamped, not trusted.
     ///
@@ -10031,6 +11350,115 @@ mod tests {
         Ok(())
     }
 
+    /// Re-points the fixture's slot at `Forward` routing, the way a real Entry's slot is built.
+    ///
+    /// [`entry_with_pix_session`] establishes through `handle_incoming_session_initiation` because
+    /// that is the path which installs the PIX state the successor gate needs, and it stores the
+    /// Exit's `Return` reply routing. The gate is an Entry-side rule, and the counter it reads is
+    /// only credited on Sessions this node *initiated* — Start-protocol traffic on an incoming
+    /// Session comes from the Entry over the forward path and must not be paid for. So the routing is
+    /// what decides whether the keep-alives below are read as service arriving or as service being
+    /// asked for, and the fixture has to be put on the side the rule is about.
+    ///
+    /// Re-inserting rather than mutating: the slot lives in a `moka` cache by value, and its routing
+    /// is a plain field rather than a cell, because nothing in production ever changes it.
+    fn make_session_outgoing<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym, destination: Address)
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+    {
+        let mut slot = mgr.sessions.get(pseudonym).expect("session must exist");
+        slot.routing_opts = DestinationRouting::Forward {
+            destination: Box::new(destination.into()),
+            pseudonym: Some(*pseudonym),
+            forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+            return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
+        };
+        mgr.sessions.insert(*pseudonym, slot);
+    }
+
+    /// A cycle served only by the Exit's keep-alives must still buy its successor.
+    ///
+    /// This is the property that lets the Exit finish a funded cycle whose application has fallen
+    /// silent: it sends its own Exit → Entry keep-alives, each one consuming a return SURB and
+    /// therefore unlocking one share, and the cycle completes on those alone. If they earned nothing
+    /// at this gate the Session would die at exactly the moment it succeeded — the Exit's `RequestSsa`
+    /// for the successor is emitted once and never retried, so a refusal here leaves it in
+    /// `AwaitingCommitment` until `max_ssa_delivery_time` and then closes the Session as
+    /// `CommitmentTimeout`, naming a timer rather than the rule that fired.
+    ///
+    /// Driven through [`dispatch_message`](SessionManager::dispatch_message) with real encoded
+    /// keep-alives rather than by touching the counter, because the credit lives on that path and
+    /// nowhere else: the message never reaches `session_rx`, so the receive-path inspector that
+    /// [`returned_packets_are_counted_on_the_entry_receive_path`] pins cannot cover for it.
+    #[test_log::test(tokio::test)]
+    async fn keep_alives_alone_can_carry_a_cycle_to_its_successor() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        // Emission reaches the boundary, so service is the only thing left for the gate to weigh.
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        make_session_outgoing(&mgr, &pseudonym, (&ChainKeypair::random()).into());
+
+        let counter = mgr
+            .sessions
+            .get(&pseudonym)
+            .expect("session must exist")
+            .returned_packets;
+        assert_eq!(
+            0,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "the fixture must start with nothing served"
+        );
+
+        // Exactly what the gate demands, and every packet of it a keep-alive.
+        let required = required_returned_packets(&params, 1);
+        for level in 0..required {
+            let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: pseudonym,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: level,
+            })
+            .try_into()?;
+            mgr.dispatch_message(
+                pseudonym,
+                ApplicationDataIn {
+                    data: keep_alive,
+                    packet_info: Default::default(),
+                },
+            )?;
+        }
+        assert_eq!(
+            required,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "every keep-alive consumed a return SURB and must be credited as service"
+        );
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("a cycle served entirely by keep-alives must still buy its successor")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     /// The Entry's half of the successor gate: a batch asked for before emission has reached the last
     /// cycle of the batch already committed must be refused, committing nothing and depositing
     /// nothing — and the Session must survive it.
@@ -10536,6 +11964,156 @@ mod tests {
         Ok(())
     }
 
+    /// A retransmission request must be capped on the *cycles* it names, not only on the runs the
+    /// wire can carry.
+    ///
+    /// One 8-byte run names a whole cycle, so a request naming every retained cycle is answered with
+    /// a full commitment burst for each — thousands of packets out of a single packet in. The
+    /// generator's per-cycle attempt cap does not bound that: it bounds repeats of one cycle, and
+    /// each cycle here is being asked for the first time.
+    #[test_log::test(tokio::test)]
+    async fn entry_rejects_a_retransmission_request_naming_too_many_cycles() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        /// Commits `cap` cycles to an Entry capped at `cap`, then asks it to retransmit `cycles` of
+        /// them, and reports what `handle_ssa_request` made of the second request together with every
+        /// `SsaCommit` the Entry sent across both — one per cycle at these dimensions, so the
+        /// commitment alone accounts for `cap` of them.
+        ///
+        /// Committing first is what gives the assertions their teeth: an uncapped handler answers
+        /// every *retained* index it is named before it trips over the first one it does not hold, so
+        /// the packet count — not the error — is what separates a gate from an accident. The count is
+        /// read only after the send channel has drained, since the bursts are queued rather than sent
+        /// inline and a running total would race them.
+        async fn ask_for_cycles(cap: usize, cycles: u32) -> anyhow::Result<(errors::Result<()>, usize)> {
+            let (pix_toolbox, _pix_events) = PixToolbox::new(
+                SsaShareGenerator::new(SsaGeneratorConfig {
+                    polynomials_per_ssa: 2,
+                    threshold: 2,
+                    surplus_shares: 1,
+                })
+                .into(),
+                SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            );
+
+            let mgr = SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=1024 * 1024 * 1024,
+                    ..Default::default()
+                },
+                max_ssas_per_ssa_request: cap,
+                ..Default::default()
+            });
+
+            // The amplification is the thing being bounded, so count what actually goes out.
+            let commits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let commits_tx = commits.clone();
+            let mut bob_transport = MockMsgSender::new();
+            bob_transport
+                .expect_send_message()
+                .times(1..)
+                .returning(move |_, data| {
+                    if crate::testing::msg_type(&data, StartProtocolDiscriminants::SsaCommit) {
+                        commits_tx.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Box::pin(async { Ok(()) })
+                });
+
+            let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+            let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+            let _notifications = tokio::spawn(async move {
+                pin_mut!(new_session_rx);
+                while let Some(_session) = new_session_rx.next().await {}
+            });
+            mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
+
+            let alice_pseudonym = HoprPseudonym::random();
+            mgr.handle_incoming_session_initiation(
+                alice_pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                    additional_data: small_pix_additional_data(),
+                },
+            )
+            .await?;
+
+            let params = PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?;
+            let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+                .expect("identity element must be valid");
+
+            // Commit a full batch first, so there is real material for the retransmission to name.
+            let commitments: BTreeMap<_, _> = (100..100 + cap as u32)
+                .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+                .collect();
+            mgr.handle_ssa_request(
+                alice_pseudonym,
+                SsaServerCommitmentMessage::new(alice_pseudonym, params, commitments, []),
+            )
+            .await?;
+
+            // One run apiece, each covering its whole cycle: the cheapest request to send and the
+            // most expensive to answer.
+            let missing = (100..100 + cycles).map(|i| (SsaIndex::new(i).expect("non-zero"), vec![(0u16, 1u16)]));
+
+            let result = mgr
+                .handle_ssa_request(
+                    alice_pseudonym,
+                    SsaServerCommitmentMessage::recommit(alice_pseudonym, params, missing),
+                )
+                .await;
+
+            bob_sender.close_channel();
+            bob_handle.await??;
+
+            Ok((result, commits.load(Ordering::Relaxed)))
+        }
+
+        // One cycle over the cap is refused whole, and — the part that matters — answered with
+        // nothing at all, rather than with a burst for each retained cycle it managed to name first.
+        let (over_cap, over_cap_commits) = ask_for_cycles(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32 + 1,
+        )
+        .await?;
+        assert!(
+            matches!(
+                over_cap,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "a retransmission request over the cycle cap must be refused, got {over_cap:?}"
+        );
+        assert_eq!(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST, over_cap_commits,
+            "a refused request must add nothing to the {DEFAULT_MAX_SSAS_PER_SSA_REQUEST} messages the commitment \
+             itself cost"
+        );
+
+        // ...and the very same cycles are repaired once they fit the cap, so the refusal above is the
+        // cap talking and not some other validation the request also trips.
+        let (at_cap, at_cap_commits) = ask_for_cycles(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32,
+        )
+        .await?;
+        assert!(
+            at_cap.is_ok(),
+            "a request at the cycle cap must be answered, got {at_cap:?}"
+        );
+        assert_eq!(
+            2 * DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            at_cap_commits,
+            "every named cycle must be re-sent, one message each on top of the commitment's own"
+        );
+
+        Ok(())
+    }
+
     /// A batch with one undecodable member must publish nothing at all.
     ///
     /// `handle_ssa_request` used to generate, send and emit per entry, deciding each member's fate
@@ -11000,6 +12578,10 @@ mod tests {
                 supervision: SupervisorConfig {
                     // Short, so the deadline under test fires quickly.
                     max_ssa_delivery_time: Duration::from_millis(50),
+                    // Scaled with it, since it has to stay under the delivery deadline. Nothing arms
+                    // it here — the Entry sends no commitment at all, so there is no scope to
+                    // re-request and the deadline under test is the only one that can fire.
+                    commitment_recommit_interval: Duration::from_millis(10),
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
@@ -11408,6 +12990,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
             },
