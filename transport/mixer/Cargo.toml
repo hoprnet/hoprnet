@@ -68,8 +68,10 @@ ignored = ["humantime-serde"]
 [[bench]]
 name = "mixer_throughput_bench"
 harness = false
-# Compares the uniform-engine variants (sink + channel); poisson has its own bench.
-required-features = ["uniform-channel", "uniform-adapter"]
+# Compares the uniform-engine variants (sink + channel); poisson has its own bench. Also requires
+# poisson because it's a default feature that the shared `common` module's `minimal_delay_mixer_cfg`
+# picks up regardless — listing it here makes that dependency explicit instead of incidental.
+required-features = ["uniform-channel", "uniform-adapter", "poisson"]
 
 [[bench]]
 name = "poisson_bench"
