@@ -7,7 +7,7 @@
     "group:allDigest",
     ":disableDependencyDashboard"
   ],
-  "baseBranchPatterns": ["$default", "/^release\\/\\d.*/"],
+  "baseBranchPatterns": ["$default", "/^release\\/\\d+\\.\\d+$/"],
   "prCreation": "not-pending",
   "semanticCommits": "enabled",
   "rangeStrategy": "bump",
