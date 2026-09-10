@@ -717,6 +717,11 @@ struct PixFillState {
     /// This is what makes the distinction: one packet per notification period is the notification and
     /// is exempt from the SURB reserve, and everything above that rate is fill and is not.
     last_notify_at: Option<Instant>,
+    /// Whether this stream is draining the SURB buffer of a Session that has already been closed.
+    ///
+    /// Set once, by [`PixFillControl::enter_drain`], and never cleared: a drain ends with the
+    /// Session, and the stream with it.
+    draining: bool,
 }
 
 impl PixFillControl {
@@ -741,15 +746,55 @@ impl PixFillControl {
                 notify_started: false,
                 fill: FillRate::ZERO,
                 last_notify_at: None,
+                draining: false,
             }),
         }
     }
 
     /// Turns the SURB-level notification on, after its initial delay.
+    ///
+    /// A no-op once the Session is draining, for the reason [`enter_drain`](Self::enter_drain)
+    /// gives — and it has to be checked here rather than only there, because the one-shot delay task
+    /// holds a clone of this control and nothing bounds how long an operator may make its period.
     pub(crate) fn start_notify(&self) {
         let mut state = self.state.lock();
+        if state.draining {
+            return;
+        }
         state.notify_started = true;
         self.apply(&state);
+    }
+
+    /// Puts the stream into post-close drain mode, silencing the SURB-level notification.
+    ///
+    /// The notification is the single packet [`admit_at`](Self::admit_at) exempts from the SURB
+    /// reserve, and the exemption exists for one reason: it is the message that asks the Entry for
+    /// more SURBs. It asks on behalf of a Session that a drain has already lost — the Entry itself
+    /// may well still be there, but nothing is left to act on the request — so leaving it on would
+    /// originate below the reserve into a buffer nothing is refilling, which is the one failure mode
+    /// [`PixFillConfig::min_surb_reserve`](crate::supervision::PixFillConfig::min_surb_reserve)
+    /// exists to prevent, since a return packet with no SURB holds up every packet this node
+    /// originates. With it off, `notification_due` is always false and the reserve is the only gate.
+    pub(crate) fn enter_drain(&self) {
+        let mut state = self.state.lock();
+        state.draining = true;
+        state.notify_started = false;
+        self.apply(&state);
+    }
+
+    /// Whether this Session is draining its SURB buffer after having been closed.
+    pub(crate) fn is_draining(&self) -> bool {
+        self.state.lock().draining
+    }
+
+    /// The SURBs this Session could still spend on a drain, net of the reserve it must leave behind.
+    ///
+    /// An estimate and an upper bound at that — ring-buffer overwrites, store eviction and
+    /// invalidated relayers are all unobserved — which is why the supervisor weighs it against a
+    /// cycle's whole remaining emission rather than a discounted one. The reserve subtracted is the
+    /// *effective* one already derived for this Session, not the configured ceiling.
+    pub(crate) fn drainable_surbs(&self) -> u64 {
+        self.estimator.saturating_diff().saturating_sub(self.min_surb_reserve)
     }
 
     /// Applies a rate planned by the PIX supervisor.
@@ -2268,12 +2313,12 @@ where
                         // These notifications come from the Sessions themselves once
                         // an empty read is encountered, which means the closure was done by the
                         // other party.
-                        if let Some(session_data) = myself.sessions.remove(&session_id) {
-                            // Reconstructor state is released by `close_session` aborting the PIX
-                            // action driver, whose commitment guards retire on drop.
-                            myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                            close_session(session_id, session_data, closure_reason);
-                        } else {
+                        //
+                        // Routed through `close_session_with_reason` rather than removing the slot
+                        // here, so that this path — the one an Exit-side session server actually
+                        // closes on — can answer with a SURB drain like every other. Identical
+                        // behaviour when it does not.
+                        if !myself.close_session_with_reason(&session_id, closure_reason) {
                             // Do not treat this as an error
                             debug!(
                                 ?session_id,
@@ -3190,7 +3235,20 @@ where
             };
 
             let Some(reason) = close_reason else { return };
-            error!(%session_id, %reason, "pix supervisor closed the session");
+
+            // Read before `stop_pix_fill`, which silences the stream either way. Keyed on the drain
+            // rather than on the reason, which is a strict superset of it: a *stalled* drain closes
+            // with `RecoveryIdle` or `RecoveryDeadline`, and that is likewise the ordinary end of a
+            // Session an operator has already closed rather than something to page anyone about.
+            let draining = myself
+                .sessions
+                .get(&session_id)
+                .is_some_and(|slot| slot.pix_fill.get().is_some_and(|fill| fill.is_draining()));
+            if draining {
+                info!(%session_id, %reason, "pix supervisor ended the post-close SURB drain");
+            } else {
+                error!(%session_id, %reason, "pix supervisor closed the session");
+            }
 
             // Unblock anything parked on the gate before tearing down: the supervisor that would
             // have woken it is the thing that just stopped. Fill is silenced alongside it, and for a
@@ -3205,7 +3263,16 @@ where
 
             // Tell the Entry, so it can drop its side rather than wait out its own timeout. The
             // Session is closed either way, so a send failure here changes nothing.
-            myself.notify_pix_failure(session_id, reply_routing).await;
+            //
+            // Except after a drain, where the Session the report would be about is already gone and
+            // the report is return-routed: sending it would spend a SURB out of a buffer that may
+            // already be empty, which is precisely the origination this whole path exists to avoid.
+            // It would also be new behaviour rather than preserved behaviour, since an Exit-side
+            // close sends the Entry nothing today — and `draining` is set before the supervisor's
+            // verdict, so this covers a refused drain as well as a completed one.
+            if !draining {
+                myself.notify_pix_failure(session_id, reply_routing).await;
+            }
 
             if let Some(slot) = myself.sessions.remove(&session_id) {
                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
@@ -3617,15 +3684,127 @@ where
     /// This avoids waiting for the idle timeout (`time_to_idle`) or the LRU
     /// capacity bound to evict the entry, which is the desired behaviour when
     /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
+    ///
+    /// One case departs from that: an Exit-side PIX Session with
+    /// [`fill.drain_after_close`](crate::PixFillConfig::drain_after_close) on and spendable SURBs
+    /// left starts a SURB drain instead of being torn down (see `begin_surb_drain`). The data path
+    /// still ends at once, but the session slot and the keep-alive stream stay in place until the
+    /// supervisor closes the Session — whether because the funded cycle recovered or because the
+    /// drain was refused — and `true` then means "found, and now draining" rather than "found and
+    /// closed".
     pub fn close_session(&self, id: &SessionId) -> bool {
         self.close_session_with_reason(id, ClosureReason::Eviction)
+    }
+
+    /// Answers an Exit-side close by draining the Session's buffered SURBs, when that is worth doing.
+    ///
+    /// A PIX Session can end long before the cycle it was funded for does. The deposit that cycle was
+    /// paid is released only once its whole emission has ridden back to the Entry, and the address it
+    /// sits at derives from both nodes' commitments — so tearing the Session down mid-cycle strands
+    /// money both sides have already parted with. When the Exit still holds enough SURBs to finish,
+    /// it keeps the keep-alive stream running instead, and the Session's slot with it, until the
+    /// supervisor closes the Session for good.
+    ///
+    /// Returns `None` when this close was **not** answered here, which is every case the caller must
+    /// handle exactly as it always has; `Some(v)` is the value
+    /// [`close_session_with_reason`](Self::close_session_with_reason) should return. `Some` currently
+    /// always carries `true` — a drain is only ever started for a Session that was found — but the
+    /// value is returned rather than assumed so that the two outcomes stay distinguishable if a
+    /// future refusal path wants to report one.
+    ///
+    /// The order of the checks is load-bearing:
+    ///
+    /// 1. the configuration, so that with `drain_after_close` (or `fill.enabled`) off nothing below runs and every
+    ///    close path is byte-for-byte what it was;
+    /// 2. the slot, by `get` rather than `remove` — the lookup also refreshes the idle timer the drain lives on;
+    /// 3. an Exit-side PIX Session, so an Entry-side or non-PIX Session falls straight through;
+    /// 4. an already-draining Session: a `WriteClosed`/`EmptyRead` is the end-of-stream our own ingress abort produces
+    ///    and is absorbed, while anything else — a second operator close, or a peer `SessionError` — forces the hard
+    ///    teardown, which is the operator's way to overrule a drain;
+    /// 5. a PIX failure already tearing the Session down, which nothing here should interfere with;
+    /// 6. the SURB estimate, which is the one half of the predicate this layer can answer — see the comment on it for
+    ///    why answering it here rather than leaving it all to the supervisor matters;
+    /// 7. and only then the stream is put into drain mode, **before** the supervisor is told, so that no packet can be
+    ///    classified as the reserve-exempt notification in the window between the supervisor deciding and the stream
+    ///    learning.
+    ///
+    /// What it does *not* do is decrement `active_sessions` or remove the slot: the supervisor's own
+    /// `Close` teardown does both, whether the drain completes or is refused a channel hop later.
+    /// `Balancer`, `KeepAlive`, `SurbNotifyDelay`, `PixActionDriver` and the deposit observers are
+    /// all left running; only the ingress is aborted, so the session server sees its end of the
+    /// stream as promptly as it would have.
+    fn begin_surb_drain(&self, id: &SessionId, reason: ClosureReason) -> Option<bool> {
+        let fill_cfg = &self.cfg.pix_config.supervision.fill;
+        if !(fill_cfg.enabled && fill_cfg.drain_after_close) {
+            return None;
+        }
+
+        let slot = self.sessions.get(id)?;
+        let supervisor = slot.pix_supervisor.get()?;
+        let fill = slot.pix_fill.get()?;
+
+        if fill.is_draining() {
+            return match reason {
+                ClosureReason::WriteClosed | ClosureReason::EmptyRead => Some(true),
+                _ => None,
+            };
+        }
+
+        if matches!(reason, ClosureReason::PixFailure | ClosureReason::MissingDepositData) {
+            return None;
+        }
+
+        // Nothing to drain *with* is decidable here, and cheaply, unlike whether there is anything
+        // worth draining *for* — which needs the cycle state only the supervisor holds. Asking it
+        // anyway would defer the teardown of every PIX Session by however long the action driver
+        // takes to reach the answer, and a driver mid-`send_ssa_request` can be seconds away from
+        // that. So a Session whose estimate is already at or below its reserve is torn down here and
+        // now, exactly as it always was: no rate the supervisor could plan would put a packet on the
+        // wire against a buffer that shallow.
+        let drainable_surbs = fill.drainable_surbs();
+        if drainable_surbs == 0 {
+            return None;
+        }
+
+        fill.enter_drain();
+        if !supervisor.try_send_event(SessionPixEvent::SessionClosed { drainable_surbs }) {
+            return None;
+        }
+
+        // The data path ends here regardless of what the supervisor decides: a writer parked on the
+        // egress gate is waiting for a Session that has gone, and the reader's end-of-stream is what
+        // the session server is waiting for.
+        if let Some(gate) = slot.pix_egress_gate.get() {
+            gate.poison();
+        }
+        slot.abort_handles.lock().abort_one(&SessionHandles::Ingress);
+
+        #[cfg(feature = "telemetry")]
+        set_session_state(id, SessionLifecycleState::Closing);
+
+        info!(
+            session_id = %id,
+            ?reason,
+            drainable_surbs,
+            "session closed at the exit — draining its buffered SURBs into the funded cycle"
+        );
+        Some(true)
     }
 
     /// [`close_session`](Self::close_session) with the reason spelled out.
     ///
     /// The reason is what the operator reads when a PIX Session stops, and the failures are hard to
     /// tell apart from the outside, so a caller that knows which one it is says so.
+    ///
+    /// `true` means the Session was found and dealt with. Since
+    /// [`begin_surb_drain`](Self::begin_surb_drain), "dealt with" also covers "found, and now
+    /// draining its remaining SURBs into a funded cycle" — in which case the slot is deliberately
+    /// left in place until the supervisor's own teardown removes it.
     fn close_session_with_reason(&self, id: &SessionId, reason: ClosureReason) -> bool {
+        if let Some(handled) = self.begin_surb_drain(id, reason) {
+            return handled;
+        }
+
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             // Reconstructor state is released by `close_session` aborting the PIX action driver,
@@ -6446,7 +6625,7 @@ mod tests {
     async fn recovering_exit_pix_session(
         capabilities: Capabilities,
         notify_period: Option<Duration>,
-        min_surb_reserve: u64,
+        fill: crate::supervision::PixFillConfig,
     ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
         let params = fill_pix_params();
         let mgr = RecordingManager::new(SessionManagerConfig {
@@ -6460,10 +6639,7 @@ mod tests {
                     // about eleven packets a second — observable inside a test-length window.
                     max_recovery_idle: Duration::from_secs(31),
                     max_recovery_time: Duration::from_secs(40),
-                    fill: crate::supervision::PixFillConfig {
-                        min_surb_reserve,
-                        ..Default::default()
-                    },
+                    fill,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -6546,7 +6722,18 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_funded_idle_pix_session_is_filled_by_the_exit() -> anyhow::Result<()> {
         let notify = Duration::from_secs(1);
-        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(Capabilities::empty(), Some(notify), 1).await?;
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(notify),
+            // Draining off, so the trailing close below still means "the stream stopped at once".
+            // What a drain does instead is the subject of the tests further down.
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                drain_after_close: false,
+                ..Default::default()
+            },
+        )
+        .await?;
 
         // SURBs to spend, so the reserve is not what this test is measuring.
         mgr.sessions
@@ -6580,6 +6767,195 @@ mod tests {
         Ok(())
     }
 
+    // ---------------------------------------------------------------
+    // Draining a closed PIX Session
+    // ---------------------------------------------------------------
+
+    /// A funded, filling Exit PIX Session whose SURB estimate covers the rest of its cycle.
+    ///
+    /// The 100 000 is not decoration: it is the estimate `begin_surb_drain` nets the reserve out of
+    /// and hands the supervisor, and against [`fill_pix_params`]' 300-packet cycle it is what makes a
+    /// drain admissible at all. The ramp is waited out for the reason
+    /// [`exit_session_originating_keep_alives`] gives — silence after a close says nothing unless the
+    /// stream was observably running before it.
+    async fn drainable_exit_pix_session(
+        notify_period: Duration,
+    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(notify_period),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(100_000, std::sync::atomic::Ordering::Relaxed);
+
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(1500)).await;
+        anyhow::ensure!(
+            observed > 0,
+            "the fixture's keep-alive stream never ran, so nothing below can tell a drain from a Session that was \
+             silent all along"
+        );
+        Ok((mgr, msg_rx, pseudonym))
+    }
+
+    /// A closed PIX Session goes on originating until the cycle it was paid for recovers.
+    ///
+    /// The deposit is stranded rather than refunded if the cycle does not complete, so a close that
+    /// tore the stream down while the Exit still held enough SURBs to finish would throw away money
+    /// both sides have already paid. What must *not* happen is the mirror image of that: origination
+    /// continuing past the point it is buying anything. So the recovery is delivered and the slot has
+    /// to be gone, and the stream silent, on the other side of it.
+    #[test_log::test(tokio::test)]
+    async fn a_closed_pix_session_keeps_originating_until_its_cycle_recovers() -> anyhow::Result<()> {
+        let notify = Duration::from_secs(1);
+        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(notify).await?;
+
+        assert!(
+            mgr.close_session(&pseudonym),
+            "a close that starts a drain is still a close that was handled"
+        );
+        assert!(
+            mgr.active_sessions().contains(&pseudonym),
+            "the slot must survive the close — the drain runs out of it, and the supervisor's own teardown is what \
+             removes it"
+        );
+
+        // The SURB-level notification is switched off for the whole drain, so every packet counted
+        // here is fill. The bar is nevertheless the notification-only figure, which keeps this
+        // comparable with `a_funded_idle_pix_session_is_filled_by_the_exit` above.
+        let window = Duration::from_millis(1500);
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, window).await;
+        let promote_every = notify - MAX_WAIT_CHUNK.min(notify / 2);
+        let notify_only = (window.as_secs_f64() / promote_every.as_secs_f64()).ceil() as usize;
+        assert!(
+            observed > notify_only,
+            "a closed session with a full SURB buffer originated {observed} keep-alive(s) over {window:?}, which is \
+             no more than the {notify_only} its (now silenced) notification would have accounted for"
+        );
+
+        // Recovery is the end of the drain: there is nothing left to work for, so the Session must go.
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::new(1).expect("index one is non-zero"));
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+            .await?;
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "a recovered cycle must end the drain and tear the Session down"
+        );
+        assert_no_further_origination(&mut msg_rx, "a completed SURB drain").await;
+        Ok(())
+    }
+
+    /// A closed PIX Session with too few SURBs to finish is torn down as it always was.
+    ///
+    /// A hundred SURBs against [`fill_pix_params`]' 300-packet cycle: enough for the manager to offer
+    /// the close to the supervisor, and not enough for the supervisor to take it. That is the
+    /// arithmetic under test — draining on a buffer that runs out partway is strictly worse than not
+    /// draining at all, since the SURBs are spent down to the reserve, the cycle recovers nothing,
+    /// and every packet past the last useful one is return-routed on behalf of a Session that is gone.
+    #[test_log::test(tokio::test)]
+    async fn a_closed_pix_session_without_enough_surbs_originates_nothing() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(100, std::sync::atomic::Ordering::Relaxed);
+        anyhow::ensure!(
+            keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(1500)).await > 0,
+            "the stream must be running before the close for its absence afterwards to mean anything"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "a drain the supervisor refuses must still tear the Session down"
+        );
+        assert_no_further_origination(&mut msg_rx, "a close with too few SURBs to drain").await;
+        Ok(())
+    }
+
+    /// With `drain_after_close` off, every close path is what it was before draining existed.
+    ///
+    /// Including the part an operator would notice first: the slot is gone by the time
+    /// `close_session` returns, rather than one channel hop later once the supervisor has answered.
+    #[test_log::test(tokio::test)]
+    async fn a_closed_pix_session_with_draining_disabled_originates_nothing() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(Duration::from_secs(1)),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                drain_after_close: false,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(100_000, std::sync::atomic::Ordering::Relaxed);
+        anyhow::ensure!(
+            keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(1500)).await > 0,
+            "the fixture's keep-alive stream never ran"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "with draining disabled the slot must be gone by the time the close returns"
+        );
+        assert_no_further_origination(&mut msg_rx, "an explicit close with draining disabled").await;
+        Ok(())
+    }
+
+    /// Closing a draining Session a second time forces the teardown.
+    ///
+    /// The drain is the Exit's decision, taken on the operator's behalf, and this is the operator's
+    /// way to overrule it: a second `SessionManager::close_session` — or a peer `SessionError`, which
+    /// arrives on the same path — stops the origination immediately rather than waiting out a cycle.
+    /// The end-of-stream a close of our own ingress produces is deliberately *not* on this path; it
+    /// carries `WriteClosed`/`EmptyRead` and is absorbed.
+    #[test_log::test(tokio::test)]
+    async fn a_second_close_of_a_draining_session_tears_it_down() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(Duration::from_secs(1)).await?;
+
+        assert!(mgr.close_session(&pseudonym), "the first close starts the drain");
+        assert!(
+            mgr.active_sessions().contains(&pseudonym),
+            "the drain must be running for the second close to have anything to overrule"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the second close must find the session");
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "a second explicit close must remove the slot rather than let the drain run on"
+        );
+        assert_no_further_origination(&mut msg_rx, "a second explicit close of a draining session").await;
+        Ok(())
+    }
+
     /// The same Session, with no SURBs to spend, must fall back to its SURB-level notification.
     ///
     /// A Session whose Entry has stopped supplying SURBs is the one case where filling harder is
@@ -6592,8 +6968,15 @@ mod tests {
         // applies. A shorter value would be raised to this one anyway, and the bound below would then
         // be computed from a period that is not the one in effect.
         let notify = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
-        let (mgr, mut msg_rx, pseudonym) =
-            recovering_exit_pix_session(Capabilities::empty(), Some(notify), 500).await?;
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(notify),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 500,
+                ..Default::default()
+            },
+        )
+        .await?;
         assert_eq!(
             Some(notify),
             mgr.cfg.surb_balance_notify_period,
@@ -6632,8 +7015,15 @@ mod tests {
     /// fastest, so it is the one where getting it wrong costs most.
     #[test_log::test(tokio::test)]
     async fn a_no_rate_control_pix_session_still_estimates_its_surb_level() -> anyhow::Result<()> {
-        let (mgr, mut msg_rx, pseudonym) =
-            recovering_exit_pix_session(Capability::NoRateControl.into(), Some(Duration::from_secs(1)), 1).await?;
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capability::NoRateControl.into(),
+            Some(Duration::from_secs(1)),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                ..Default::default()
+            },
+        )
+        .await?;
 
         let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
         slot.surb_estimator

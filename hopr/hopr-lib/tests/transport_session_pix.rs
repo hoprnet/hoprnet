@@ -10,7 +10,8 @@
 //!   4. [Exit]  `PrivateKeyRecovered` — quota exhausted, key recovered → SessionManager requests next SSA → goto 1
 
 use hopr_lib::testing::fixtures::{
-    MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster, chain_propagation_delay,
+    MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster,
+    build_role_cluster_with_exit_server, chain_propagation_delay,
 };
 #[cfg(feature = "session-client")]
 use {
@@ -114,7 +115,62 @@ async fn build_pix_cluster_with_entry_cap(
     idle_timeout: Duration,
     entry_max_ssas_per_request: usize,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard> {
-    let cluster = build_role_cluster(
+    build_pix_cluster_with(
+        hops,
+        exit_pix,
+        idle_timeout,
+        entry_max_ssas_per_request,
+        hopr_lib::testing::dummies::EchoServer::new(),
+    )
+    .await
+}
+
+/// As [`build_pix_cluster`], but with the Exit's session server under the caller's control.
+///
+/// Only [`a_closed_exit_session_drains_its_surbs_into_the_funded_cycle`] needs this. An
+/// [`EchoServer`](hopr_lib::testing::dummies::EchoServer) owns the Exit-side Session for its whole
+/// life and never hands it back, so there is no way to *close* one from a test; a
+/// [`SessionCaptureServer`](hopr_lib::testing::dummies::SessionCaptureServer) parks instead and hands
+/// the `IncomingSession` out, which is what makes the Exit-side close reachable at all.
+#[cfg(feature = "session-client")]
+async fn build_pix_cluster_with_exit_server<Srv>(
+    hops: usize,
+    exit_pix: IncomingSessionPixConfig,
+    idle_timeout: Duration,
+    exit_server: Srv,
+) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard>
+where
+    Srv: hopr_api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + Sync
+        + 'static,
+{
+    let default_cap = hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request;
+    build_pix_cluster_with(hops, exit_pix, idle_timeout, default_cap, exit_server).await
+}
+
+/// The cluster the three builders above are all a special case of.
+#[cfg(feature = "session-client")]
+async fn build_pix_cluster_with<Srv>(
+    hops: usize,
+    exit_pix: IncomingSessionPixConfig,
+    idle_timeout: Duration,
+    entry_max_ssas_per_request: usize,
+    exit_server: Srv,
+) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard>
+where
+    Srv: hopr_api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + Sync
+        + 'static,
+{
+    let cluster = build_role_cluster_with_exit_server(
         TestNodeConfig {
             win_prob: 1.0,
             pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
@@ -134,6 +190,7 @@ async fn build_pix_cluster_with_entry_cap(
             idle_timeout_ms: idle_timeout.as_millis() as u64,
             ..Default::default()
         },
+        exit_server,
     )
     .await?;
 
@@ -1291,6 +1348,149 @@ async fn idle_session_is_completed_by_exit_fill(#[case] hops: usize, #[case] rat
     driver.abort();
 
     tracing::info!(hops, rate_control, "idle PIX fill test PASSED");
+    Ok(())
+}
+
+/// A Session closed at the Exit still finishes the cycle its deposit has already paid for.
+///
+/// The close here is the real one rather than a simulated one: the Exit's session server hands the
+/// `IncomingSession` back to the test, which closes its write half — the same `WriteClosed` route a
+/// session server takes when its downstream connection ends. Before this, that tore the Exit's
+/// Session down at once, taking the reconstructor state with it; the deposit the Entry had already
+/// paid for the cycle in flight was stranded, since the address derives from both nodes' commitments
+/// and nothing refunds it.
+///
+/// The two cases are the property and its control, and they differ in one config flag:
+///
+/// * with `drain_after_close` on, a `Recovered` milestone arrives **after** the close instant, which can only mean the
+///   Exit went on spending its buffered SURBs on the cycle with no Session left to serve;
+/// * with it off, none does, because the close is the immediate teardown it has always been.
+///
+/// Two guards keep the comparison honest. The cycle must not have recovered *before* the close — at
+/// [`PIX_PARAMS`]' 32-packet cycle against the 45 s aim point, fill alone needs about forty seconds,
+/// so closing a few seconds in leaves most of the cycle outstanding — and no successor may be funded
+/// after the close, since a drained Session has no quota left to serve one with.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1, true)]
+#[case(1, false)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_closed_exit_session_drains_its_surbs_into_the_funded_cycle(
+    #[case] hops: usize,
+    #[case] drain_after_close: bool,
+) -> anyhow::Result<()> {
+    /// Long enough for the Entry's balancer to reach its 64-SURB target, short enough that fill has
+    /// spent only a handful of the cycle's 32 packets by the time the close lands.
+    const SETTLE: Duration = Duration::from_secs(8);
+    /// What the drain gets, and what the control case waits out in full. Above the 30 s
+    /// `max_recovery_idle`, which is no longer service-gated while draining and is therefore the
+    /// deadline a drain that stops making progress actually dies on.
+    const DRAIN_BUDGET: Duration = Duration::from_secs(35);
+
+    let exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        drain_after_close,
+        ..Default::default()
+    });
+    let aim_point = exit_pix
+        .supervision
+        .max_recovery_time
+        .mul_f64(exit_pix.supervision.fill.finish_fraction);
+
+    let (exit_server, captured) = hopr_lib::testing::dummies::SessionCaptureServer::new();
+    let cluster = build_pix_cluster_with_exit_server(hops, exit_pix, Duration::from_secs(120), exit_server).await?;
+
+    // Before the Session exists, as in every fill test here: the Exit's first SSA request blocks on
+    // the deposit pool with a budget shorter than `connect_to` takes to return.
+    let (driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+    // The rate-controlled branch, because it is the only one on which the Entry announces its SURB
+    // buffer target — and that target is what the drain's reserve, and so its own admission
+    // threshold, is derived from.
+    let _session = establish_pix_session_with(&cluster, hops, Some(idle_surb_balancer()), true).await?;
+
+    let funded = await_milestones(&mut milestones, aim_point, |seen| {
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_)))
+    })
+    .await;
+    anyhow::ensure!(
+        funded
+            .iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(_))),
+        "no cycle was funded within {aim_point:?}, so there was never a deposit at stake: {funded:?}"
+    );
+
+    // Doubles as the settle window and as a drain of the milestone channel, so that everything
+    // observed after the close really did arrive after it.
+    let before_close = await_milestones(&mut milestones, SETTLE, |_| false).await;
+    anyhow::ensure!(
+        !before_close
+            .iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Recovered(_))),
+        "the funded cycle recovered before the Session was closed, so this test cannot tell a drain from ordinary \
+         fill: {before_close:?}"
+    );
+
+    let mut exit_session = captured
+        .lock()
+        .map_err(|_| anyhow::anyhow!("the captured-session mutex was poisoned"))?
+        .take()
+        .context("the Exit's session server must have captured the incoming session")?;
+    let closed_at = std::time::Instant::now();
+    tokio::time::timeout(Duration::from_secs(30), exit_session.session.close())
+        .await
+        .context("closing the exit-side session timed out")?
+        .context("closing the exit-side session failed")?;
+    tracing::info!(drain_after_close, "exit-side session closed");
+
+    let after_close = await_milestones(&mut milestones, DRAIN_BUDGET, |seen| {
+        seen.iter()
+            .any(|(milestone, at)| matches!(milestone, PixMilestone::Recovered(_)) && *at >= closed_at)
+    })
+    .await;
+    let drained = after_close
+        .iter()
+        .find(|(milestone, at)| matches!(milestone, PixMilestone::Recovered(_)) && *at >= closed_at);
+
+    // The observation path has to have outlived the budget, or "nothing recovered after the close"
+    // would be a statement about this test rather than about the Exit. Checked for both cases: it is
+    // what gives the control branch's negative assertion any force, and in the drain branch it turns
+    // a dead event driver into a diagnosis rather than an accusation of a stranded deposit.
+    anyhow::ensure!(
+        !driver.is_finished(),
+        "the Exit PIX event driver stopped before the {DRAIN_BUDGET:?} drain budget elapsed, so nothing observed \
+         after the close proves anything either way"
+    );
+
+    if drain_after_close {
+        let (_, recovered_at) = drained.with_context(|| {
+            format!(
+                "the Exit held enough SURBs to finish its funded cycle but stopped working for it when the Session \
+                 closed, so the deposit is stranded; nothing recovered within {DRAIN_BUDGET:?}: {after_close:?}"
+            )
+        })?;
+        tracing::info!(drained_after = ?recovered_at.duration_since(closed_at), "post-close drain completed");
+
+        assert!(
+            !after_close
+                .iter()
+                .any(|(milestone, at)| matches!(milestone, PixMilestone::Funded(_)) && *at >= closed_at),
+            "a drained Session has no quota left to serve, so it must never order a successor cycle the Entry would \
+             have to deposit for: {after_close:?}"
+        );
+    } else {
+        assert!(
+            drained.is_none(),
+            "with draining disabled an Exit-side close must tear the Session down at once, but a cycle recovered {:?} \
+             after it: {after_close:?}",
+            drained.map(|(_, at)| at.duration_since(closed_at))
+        );
+    }
+
+    driver.abort();
+
+    tracing::info!(hops, drain_after_close, "post-close SURB drain test PASSED");
     Ok(())
 }
 

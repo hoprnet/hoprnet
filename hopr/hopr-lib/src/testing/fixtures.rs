@@ -926,6 +926,29 @@ pub async fn build_role_cluster(
     relay_cfgs: Vec<TestNodeConfig>,
     exit_cfg: TestNodeConfig,
 ) -> anyhow::Result<RoleClusterGuard> {
+    build_role_cluster_with_exit_server(entry_cfg, relay_cfgs, exit_cfg, EchoServer::new()).await
+}
+
+/// [`build_role_cluster`] with the Exit's session server under the caller's control.
+///
+/// Only the Exit's server is swappable, because the Entry and the relays never receive an incoming
+/// Session in these clusters — the Entry opens them and the relays only forward. A test that needs to
+/// *hold* the Exit-side `IncomingSession` rather than have it echoed passes
+/// [`SessionCaptureServer`](super::dummies::SessionCaptureServer) here, which is what makes the Exit
+/// side of a Session closable from the test.
+pub async fn build_role_cluster_with_exit_server<Srv>(
+    entry_cfg: TestNodeConfig,
+    relay_cfgs: Vec<TestNodeConfig>,
+    exit_cfg: TestNodeConfig,
+    exit_server: Srv,
+) -> anyhow::Result<RoleClusterGuard>
+where
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+{
     let total_size = 1 + relay_cfgs.len() + 1;
     if !(3..=SWARM_N).contains(&total_size) {
         anyhow::bail!("total cluster size {total_size} must be between 3 and {SWARM_N}");
@@ -969,6 +992,10 @@ pub async fn build_role_cluster(
                 .with_mutator(FullStateEmulator::new(safes[i].module_address));
             let is_entry = i == 0;
             let is_exit = i == total_size - 1;
+            // Cloned per thread rather than moved: only the Exit's branch reads it, but each thread's
+            // closure must own something, and the server is `Clone` precisely so a captured session
+            // handle can be shared back out to the test.
+            let exit_server = exit_server.clone();
 
             std::thread::spawn(move || {
                 let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -1036,7 +1063,7 @@ pub async fn build_role_cluster(
                             config,
                             prober,
                             connector.clone(),
-                            EchoServer::new(),
+                            exit_server,
                         )
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))

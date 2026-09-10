@@ -58,6 +58,14 @@ pub(crate) struct FillTarget {
     pub largest_shares_seen: u64,
     /// The immutable per-cycle recovery deadline this cycle must finish before.
     pub hard_deadline: Instant,
+    /// Whether this target is a post-close drain, so the whole remainder is wanted at once.
+    ///
+    /// A live Session is filled at the pace its deadline needs, because it will still be there when
+    /// the deadline arrives. A drained one will not be: it is closed, the buffer it is spending is
+    /// finite and nothing is refilling it, so the only sensible rate is as fast as
+    /// [`PixFillConfig::max_rate`] allows. See "Draining a closed Session" in the module
+    /// documentation of `supervision`.
+    pub drain: bool,
 }
 
 /// The pure rate law. See the module documentation for what it computes and why.
@@ -183,7 +191,19 @@ impl FillPlanner {
         self.observe_target(now, &target);
 
         let required = self.required_rate(now, &target);
-        let wanted = (required - self.organic_pps).max(0.0);
+        // Organic egress is subtracted because the application is expected to keep contributing it.
+        // A drained Session's will not: the egress gate is poisoned, the ingress is aborted, and
+        // `served_total` can never move again, so the average above is a memory of traffic that
+        // cannot recur. Subtracting it would credit the drain with a contribution nothing is left to
+        // make — and it bites hardest in the case the drain exists for. A client that hangs up on a
+        // cycle it has all but paid off leaves a small remainder and a high average, so `required`
+        // lands *below* what the Session was doing a moment earlier, the drain is suppressed to its
+        // heartbeat for the whole of the averaging window, and the deadline arrives first.
+        let wanted = if target.drain {
+            required
+        } else {
+            (required - self.organic_pps).max(0.0)
+        };
         let rate = self.bound(now, wanted);
 
         self.should_emit(rate).then(|| {
@@ -248,16 +268,26 @@ impl FillPlanner {
     /// already in the past collapses to one sampling interval, which asks for the whole remainder at
     /// once and is then bounded by `max_rate` — the correct behaviour for a cycle that is out of time,
     /// since there is no rate at which it can still be saved and no reason to stop trying.
+    ///
+    /// A [drain](FillTarget::drain) collapses the horizon the same way for a different reason: pacing
+    /// a cycle to its deadline only makes sense while the Session is still there to be paced, and a
+    /// drained one is spending a buffer nothing will refill. The ceiling in
+    /// [`bound`](Self::bound) then becomes the only thing setting the rate, which is the intent
+    /// rather than a side effect.
     fn required_rate(&self, now: Instant, target: &FillTarget) -> f64 {
         let remaining =
             self.cycle_shares.saturating_sub(target.largest_shares_seen) as f64 * (1.0 + self.cfg.loss_margin);
-        let slack = self.max_recovery_time.mul_f64(1.0 - self.cfg.finish_fraction);
-        let horizon = target
-            .hard_deadline
-            .checked_sub(slack)
-            .map(|finish_by| finish_by.saturating_duration_since(now))
-            .unwrap_or(SAMPLING_INTERVAL)
-            .max(SAMPLING_INTERVAL);
+        let horizon = if target.drain {
+            SAMPLING_INTERVAL
+        } else {
+            let slack = self.max_recovery_time.mul_f64(1.0 - self.cfg.finish_fraction);
+            target
+                .hard_deadline
+                .checked_sub(slack)
+                .map(|finish_by| finish_by.saturating_duration_since(now))
+                .unwrap_or(SAMPLING_INTERVAL)
+                .max(SAMPLING_INTERVAL)
+        };
         remaining / horizon.as_secs_f64()
     }
 
@@ -267,6 +297,15 @@ impl FillPlanner {
     /// up still emits one packet per period: it refreshes the Entry's idle eviction, it carries the
     /// SURB level the Entry's balancer acts on, and it is what distinguishes a planner that decided
     /// on nothing from one that has stopped planning.
+    ///
+    /// The stall rule applies to a [drain](FillTarget::drain) exactly as it does to ordinary fill,
+    /// and deliberately so. It is the only thing standing between a *doomed* drain — a failed
+    /// polynomial, or a SURB supply carrying no shares — and `max_rate` sustained until a deadline
+    /// fires, which at the shipped ceiling is fifteen thousand SURBs spent for nothing. It costs a
+    /// healthy drain nothing, because a cycle that is progressing refreshes
+    /// [`target_progress_at`](Self::target_progress_at) on every tick that sees it move. And it is
+    /// not made redundant by `max_recovery_idle` no longer being service-gated while draining: that
+    /// deadline ends the drain, this bounds what the drain spends up to the moment it does.
     fn bound(&mut self, now: Instant, wanted: f64) -> FillRate {
         let heartbeat = FillRate::once_per(self.cfg.heartbeat);
         let heartbeat_pps = heartbeat.as_packets_per_sec();
@@ -390,6 +429,7 @@ mod tests {
             ),
             largest_shares_seen: 0,
             hard_deadline: now + Duration::from_secs(3600),
+            drain: false,
         }
     }
 
@@ -515,6 +555,106 @@ mod tests {
         assert!(
             stalled.as_packets_per_sec() <= 5.0,
             "the stall fallback must never exceed the ceiling either"
+        );
+    }
+
+    /// A post-close drain wants its whole remainder at once, and `max_rate` is what paces it.
+    ///
+    /// The ordinary rate law spreads the remainder over the aim point, which is the right answer for
+    /// a Session that will still be there in an hour. A drained Session will not be: it is closed,
+    /// the buffer it is spending is finite and nothing is refilling it, and every SURB in it that is
+    /// not spent on a share is one the deposit being recovered has already paid for. So the horizon
+    /// collapses to a single sampling interval and the ceiling becomes the only thing setting the
+    /// pace — which is the intended reading of "drain", not an accident of the arithmetic.
+    #[test]
+    fn a_draining_target_asks_for_its_whole_remainder_at_once() {
+        let idle = Duration::from_secs(30);
+        let now = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(Duration::from_secs(60), 250, idle), &dims(), now);
+
+        // An hour of runway on both, so the only difference between them is the flag.
+        let patient = target(now);
+        let draining = FillTarget { drain: true, ..patient };
+
+        let whole_remainder = planner.cycle_shares as f64 * (1.0 + planner.cfg.loss_margin);
+        let drained = planner.required_rate(now, &draining);
+        assert!(
+            (drained - whole_remainder / SAMPLING_INTERVAL.as_secs_f64()).abs() < 1e-9,
+            "a drain must ask for its whole remainder inside one sampling interval, got {drained} against a remainder \
+             of {whole_remainder}"
+        );
+
+        let patient_rate = planner.required_rate(now, &patient);
+        assert!(
+            patient_rate < 1.0 && patient_rate * 1_000.0 < drained,
+            "the same target with an hour of runway must still be spread over that hour, got {patient_rate}"
+        );
+
+        // Below the ceiling the drain is the remainder itself, rounded up as every rate is.
+        assert_eq!(
+            FillRate::per_second(whole_remainder.ceil() as u32),
+            planner.bound(now, drained)
+        );
+
+        // And above it, the ceiling binds — the drain is loud, not unbounded.
+        let mut capped = FillPlanner::new(&cfg(Duration::from_secs(60), 100, idle), &dims(), now);
+        assert_eq!(FillRate::per_second(100), capped.bound(now, drained));
+    }
+
+    /// A drain plans its own remainder, not the traffic the Session used to carry.
+    ///
+    /// Organic egress is subtracted from the requirement because the application is expected to go
+    /// on providing it. After a close it cannot: the gate is poisoned and `served_total` is frozen,
+    /// so the average is a memory. Left in, it suppresses precisely the case the drain exists for —
+    /// a client that hangs up on a cycle it has all but paid off, where the remainder is small and
+    /// the average is still high, so the requirement lands *below* it and the drain falls to its
+    /// heartbeat until the average decays. At the shipped ten-second window that is most of a
+    /// `max_recovery_idle`, and the deadline gets there first.
+    #[test]
+    fn a_drain_is_not_suppressed_by_the_traffic_that_preceded_it() {
+        const REMAINING: u64 = 2;
+
+        let idle = Duration::from_secs(30);
+        let t0 = Instant::now();
+        let mut planner = FillPlanner::new(&cfg(Duration::from_secs(60), 250, idle), &dims(), t0);
+
+        // One tick of a busy Session, to put a real average on the books. The cycle is all but done,
+        // which is what puts the requirement below it.
+        let nearly_done = FillTarget {
+            largest_shares_seen: planner.cycle_shares - REMAINING,
+            ..target(t0)
+        };
+        let busy = planner.plan(t0 + SAMPLING_INTERVAL, 600, Some(nearly_done));
+        assert_eq!(
+            Some(FillRate::once_per(Duration::from_secs(60))),
+            busy,
+            "a live Session this far ahead of its deadline is held at the heartbeat, which is what makes the drain \
+             below observable"
+        );
+        assert!(
+            planner.organic_pps > 0.0,
+            "the average must be non-zero to be subtracted"
+        );
+
+        // Now the same cycle, drained. `served_total` does not move again, ever.
+        let rate = planner
+            .plan(
+                t0 + 2 * SAMPLING_INTERVAL,
+                600,
+                Some(FillTarget {
+                    drain: true,
+                    ..nearly_done
+                }),
+            )
+            .expect("a drain that has to finish a remainder must plan a rate for it");
+
+        let expected = (REMAINING as f64 * (1.0 + planner.cfg.loss_margin) / SAMPLING_INTERVAL.as_secs_f64()).ceil();
+        assert_eq!(
+            FillRate::per_second(expected as u32),
+            rate,
+            "the drain must ask for its {REMAINING}-share remainder, not for what is left of it after {} packets/s of \
+             traffic that can never return",
+            planner.organic_pps
         );
     }
 }
