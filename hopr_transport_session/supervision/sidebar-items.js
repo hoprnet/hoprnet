@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_FILL_RATE","MAX_SUPERVISOR_DURATION","ORGANIC_WINDOW","SAMPLING_INTERVAL"],"enum":["SessionPixAction","SessionPixCloseReason","SessionPixEvent"],"fn":["scaled_deadline","validate_fill_fractions","validate_pix_supervision"],"mod":["fill","gate","supervisor","worker"],"struct":["FillRate","PixFillConfig","PixParams","SupervisorConfig"]};

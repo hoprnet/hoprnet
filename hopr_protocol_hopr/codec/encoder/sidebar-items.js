@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_ACKNOWLEDGEMENTS_BATCH_SIZE"],"struct":["HoprEncoder"]};

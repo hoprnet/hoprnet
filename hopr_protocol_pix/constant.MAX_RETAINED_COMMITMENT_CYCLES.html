@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Cycles per pseudonym whose commitment material the `SsaShareGenerator` retains for retransmission."><title>MAX_RETAINED_COMMITMENT_CYCLES in hopr_protocol_pix - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ddecd707.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_protocol_pix" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (da80ed070 2026-07-14)" data-channel="nightly" data-search-js="search-cf4fc35e.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">MAX_RETAINED_COMMITMENT_CYCLES</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_protocol_pix/index.html">hopr_<wbr>protocol_<wbr>pix</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">hopr_protocol_pix</a></div><h1>Constant <span class="constant">MAX_<wbr>RETAINED_<wbr>COMMITMENT_<wbr>CYCLES</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_protocol_pix/lib.rs.html#230">Source</a> </span></div><pre class="rust item-decl"><code>pub const MAX_RETAINED_COMMITMENT_CYCLES: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a> = 18;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Cycles per pseudonym whose commitment material the <a href="struct.SsaShareGenerator.html" title="struct hopr_protocol_pix::SsaShareGenerator"><code>SsaShareGenerator</code></a> retains for
+retransmission.</p>
+<p>The newest this many are kept and the oldest is evicted, and within a live cache entry that is
+the only thing that releases them — emission deliberately does not enter into it. (The entry as a
+whole goes on idle eviction, which is a separate lifetime; see below.) Whether a re-sent commitment is
+still worth anything is a question about what the peer holds, and none of that is visible from
+this side: it completes a cycle out of the shares it has already buffered plus the commitment it
+is still missing, on its own delivery deadline. Releasing on drain instead would give up the
+repair exactly where it is worth most, a cycle whose every share has gone out and whose only
+missing piece is the one a lost packet took.</p>
+<p>Eighteen is <code>MAX_OVERLAPPING_BATCHES</code> (2) generations of <code>MAX_SSA_BATCH_SIZE</code> (9) cycles, the
+figures <code>hopr-transport-session</code> is built to; they are not visible from here, so the derivation is
+written down rather than imported. It leaves a cycle covered for the whole of its own batch plus
+one further generation, and the successor gate makes that second generation expensive — a peer
+cannot reach it without draining nearly every cycle of the first, by which point it has been
+asking for far longer than <a href="constant.MAX_COMMITMENT_RETRANSMISSIONS.html" title="constant hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS"><code>MAX_COMMITMENT_RETRANSMISSIONS</code></a> attempts on any sane re-request
+interval allow.</p>
+<p>Costs <code>polynomials_per_ssa × 33 B</code> per cycle — 270 kB at the deployed dimensions, 4.8 MB per
+pseudonym with the cap full. Entry-side state, which is why it is not charged against an Exit’s
+incoming-Session memory budget: that reserves reconstructor state for Sessions this node <em>serves</em>,
+and nothing else the generator holds is charged there either.</p>
+<p>It lives as long as the pseudonym’s entry in the generator’s cache, which idle eviction alone
+releases — closing a Session clears nothing here. So a node holds this for every pseudonym it has
+committed a cycle for within that window, Sessions long closed included, and churn accumulates it
+rather than it tracking the live Session count.
+What bounds the consequence is that the same entry keeps its polynomial state under exactly the
+same rule, and that term is larger by two orders of magnitude: 270 kB here against ~33 MB there,
+per cycle. A Session whose cycles are still queued when it closes — the ordinary case, since
+draining one takes <code>polynomials_per_ssa × (threshold + surplus)</code> shares, 655 k at the deployed
+dimensions — leaves both, and this is under 1% of it. Reaching the cap instead means having
+drained eighteen cycles, some twelve million shares, by which point the polynomials are gone and
+4.8 MB is the entire residue.</p>
+<p>Clearing the entry outright at Session teardown would release both sooner, and is worth doing for
+the polynomial term; <a href="struct.SsaShareGenerator.html#method.forget" title="method hopr_protocol_pix::SsaShareGenerator::forget"><code>SsaShareGenerator::forget</code></a> exists for it, but no production path calls it
+today.</p>
+</div></details></section></div></main></body></html>
