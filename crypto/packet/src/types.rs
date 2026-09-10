@@ -213,11 +213,17 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PacketMessage<S, 
 pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl SurbReceiverInfo {
-    pub fn new(pov: ProofOfRelayValues, encrypted_partial_ssa_share: HoprEncryptedPartialSsaShare) -> Self {
+    pub fn new(
+        pov: ProofOfRelayValues,
+        encrypted_partial_ssa_share: HoprEncryptedPartialSsaShare,
+        generation: u8,
+    ) -> Self {
         let mut ret = [0u8; Self::SIZE];
         ret[0..ProofOfRelayValues::SIZE].copy_from_slice(pov.as_ref());
         ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE]
             .copy_from_slice(encrypted_partial_ssa_share.as_ref());
+        // Generation is the trailing byte, so the PoR and SSA-share offsets above are unchanged.
+        ret[Self::SIZE - 1] = generation;
         Self(ret)
     }
 
@@ -231,6 +237,17 @@ impl SurbReceiverInfo {
             &self.0[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE],
         )
         .expect("SurbReceiverInfo always contains valid HoprEncryptedPartialSsaShare")
+    }
+
+    /// Generation (RFC-1982 serial) of the SURB batch this SURB belongs to.
+    ///
+    /// The SURB creator bumps this whenever it changes the return path, minting an entirely fresh
+    /// batch. The replying side keeps only the highest generation it has seen, so SURBs left over
+    /// from a superseded (and possibly dead) return path are dropped rather than used. A return
+    /// path that dies deep in a multi-hop route is invisible to the replying side, so this
+    /// creator-supplied tag is the only signal that distinguishes a stale SURB from a live one.
+    pub fn generation(&self) -> u8 {
+        self.0[Self::SIZE - 1]
     }
 }
 
@@ -252,7 +269,8 @@ impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
 }
 
 impl BytesRepresentable for SurbReceiverInfo {
-    const SIZE: usize = ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE;
+    // Trailing term is the SURB-batch generation byte; see [`SurbReceiverInfo::generation`].
+    const SIZE: usize = ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE + size_of::<u8>();
 }
 
 /// New-type wrapper for the PIX group element representation to provide additional functionality.
@@ -415,7 +433,7 @@ mod tests {
                     &path_ids,
                     &por_strings,
                     recv_data,
-                    SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default()),
+                    SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default(), 0),
                 )
                 .map(|(s, _)| s)
             })

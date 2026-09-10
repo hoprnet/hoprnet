@@ -583,8 +583,9 @@ where
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
+        generation: Option<u8>,
     ) -> Result<OutgoingPacket, <Self as PacketEncoder>::Error> {
-        let packet = self.inner.encode_packet(data, routing.clone(), signals)?;
+        let packet = self.inner.encode_packet(data, routing.clone(), signals, generation)?;
         self.on_minted(&routing, &packet.minted_surbs);
         Ok(packet)
     }

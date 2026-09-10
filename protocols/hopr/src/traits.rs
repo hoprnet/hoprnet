@@ -59,6 +59,29 @@ pub trait SurbStore {
     ///
     /// Defaults to a no-op, for stores that do not track edge validity.
     fn revalidate_relayer(&self, _relayer: &HoprKeyIdent) {}
+
+    /// Current SURB-batch generation to stamp into SURBs minted for `pseudonym`.
+    ///
+    /// Used by the sending side at mint time. The value is written into every SURB of the batch so
+    /// the replying side can tell SURBs for the current return path from ones left over after a
+    /// return-path change (see [`SurbStore::bump_generation`]).
+    ///
+    /// Defaults to `0`, for stores that do not track generations.
+    fn current_generation(&self, _pseudonym: &HoprPseudonym) -> u8 {
+        0
+    }
+
+    /// Advances the SURB-batch generation for `pseudonym` and returns the new value.
+    ///
+    /// Called by the sending side when it changes the return path for a session (a re-plan): the
+    /// next batch it mints will carry the advanced generation, and the replying side drops the SURBs
+    /// it still holds for the superseded path. A `u8` serial (RFC-1982) is sufficient because only
+    /// two adjacent generations are ever in flight.
+    ///
+    /// Defaults to a no-op returning `0`, for stores that do not track generations.
+    fn bump_generation(&self, _pseudonym: &HoprPseudonym) -> u8 {
+        0
+    }
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).
@@ -73,11 +96,19 @@ pub trait PacketEncoder {
     ///
     /// The `data` MUST be already correctly sized for HOPR packets, otherwise the operation
     /// must fail.
+    ///
+    /// `generation` is the SURB-batch generation to stamp onto SURBs minted for a forward packet's
+    /// return paths, captured when those return paths were resolved (see
+    /// [`PathPlanner::resolve_routing`](../../../hopr_transport/path/planner)). It must be captured
+    /// with the plan rather than read here, so a concurrent return-path re-plan cannot label an
+    /// already-chosen batch with a newer generation. `None` (no return path, or a non-forward
+    /// packet) falls back to the store's current generation.
     fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
+        generation: Option<u8>,
     ) -> Result<OutgoingPacket, Self::Error>;
 
     /// Encodes the given vector of [`VerifiedAcknowledgements`](VerifiedAcknowledgement) as an outgoing packet to be
