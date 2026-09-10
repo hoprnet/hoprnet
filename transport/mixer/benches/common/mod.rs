@@ -16,8 +16,12 @@ pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPc
 /// A near-passthrough config (1 ms bound) for whichever mixer engine is active, so a benchmark
 /// using it measures per-message overhead rather than the mixing delay itself. Not hardcoded to
 /// one engine: this module is compiled into every bench binary regardless of which functions a
-/// given bench actually calls, and `mixer_throughput_bench`'s `required-features` deliberately
-/// excludes `poisson` (to benchmark the uniform engine in isolation).
+/// given bench actually calls, and `mixer_throughput_bench`'s `required-features` omits `poisson`
+/// — a minimum, not an exclusion: the crate's default features include `poisson`, so the bench
+/// still compiles it in under a normal `cargo bench` invocation; `required-features` only
+/// guarantees the bench also builds without it (e.g. `--no-default-features --features
+/// uniform-channel,uniform-adapter`), which is what this function needs to stay engine-agnostic
+/// for.
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
     let mut cfg = MixerConfig::default();

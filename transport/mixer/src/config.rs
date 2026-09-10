@@ -183,7 +183,7 @@ impl validator::Validate for MixerType {
 
 /// Tuning parameters for the uniform-delay engines.
 ///
-/// The delay is drawn uniformly from `[min_delay, min_delay + delay_range]`; a deterministic
+/// The delay is drawn uniformly from `[min_delay, min_delay + delay_range)`; a deterministic
 /// `min_delay` floor is a uniform-only concept (it does not aid a memoryless Poisson mixer).
 #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
@@ -197,7 +197,7 @@ pub struct UniformConfig {
     #[default(Duration::from_millis(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub min_delay: Duration,
-    /// Range above `min_delay`; the delay is uniform in `[min_delay, min_delay + delay_range]`.
+    /// Range above `min_delay`; the delay is uniform in `[min_delay, min_delay + delay_range)`.
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub delay_range: Duration,
@@ -205,7 +205,7 @@ pub struct UniformConfig {
 
 #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
 impl UniformConfig {
-    /// A uniform random delay drawn from `[min_delay, min_delay + delay_range]`.
+    /// A uniform random delay drawn from `[min_delay, min_delay + delay_range)`.
     pub fn random_delay(&self) -> Duration {
         let max_delay = self.min_delay.saturating_add(self.delay_range);
         let random_delay = if max_delay.as_millis() == 0 {

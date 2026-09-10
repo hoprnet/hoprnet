@@ -115,8 +115,11 @@ fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() {
 #[test]
 fn constant_privacy_channel_should_hit_the_design_target_at_1000_pps() {
     let cfg = poisson_cfg(Duration::from_millis(200), 0.01, 14);
-    // 1000 pkt/s => 1ms spacing.
-    let stats = run_scenario(cfg, 4_000, Duration::from_millis(1));
+    // 1000 pkt/s => 1ms spacing. Count kept just large enough to clear the occupancy-lock
+    // crossover (~322 pkt/s here) with room for the mean to converge, since spacing (not count)
+    // is what fixes the rate under test — 4,000 sends at 1ms spacing cost >=4s of real wall time
+    // for no added precision the wide assertion band below needs.
+    let stats = run_scenario(cfg, 1_500, Duration::from_millis(1));
     let observed_mean = mean(&stats.delays_ms);
     assert!(
         (5.0..=17.0).contains(&observed_mean),
