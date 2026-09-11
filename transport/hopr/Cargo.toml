@@ -139,7 +139,13 @@ hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-pix = { workspace = true, features = ["rayon"] }
-hopr-transport-mixer = { workspace = true }
+# All engines are compiled so the mixer implementation can be selected at runtime via
+# `MixerConfig::mixer_type`.
+hopr-transport-mixer = { workspace = true, features = [
+  "uniform-channel",
+  "uniform-adapter",
+  "poisson",
+] }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }

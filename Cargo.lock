@@ -4505,7 +4505,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -4520,10 +4520,12 @@ dependencies = [
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",
+ "serde_json",
  "smart-default",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+ "validator",
 ]
 
 [[package]]
