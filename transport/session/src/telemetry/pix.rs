@@ -32,10 +32,21 @@
 //! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
 //! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
 //! | `hopr_pix_gate_block_seconds` | MultiHistogram | seconds | episode end | `reason` = `predeposit_exhausted\|share_lag` |
+//! | `hopr_pix_shares_total` | MultiCounter | shares | validated progress (delta-counted) | `kind` = `useful\|surplus` |
+//! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
+//! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived
 //! from a heap estimate or inferred from logs.
+//!
+//! Two things the per-cycle histograms do *not* cover, both deliberate. A Session closed outright —
+//! `UnverifiableShares` is the case that does this — retires without a per-cycle verdict for its
+//! remaining cycles, so those are counted in `hopr_pix_cycles_total{event="failed"}` but are not
+//! summarized here; `sum(cycle_summaries) <= cycles_total{recovered} + cycles_total{failed}` is
+//! therefore the expected relation rather than equality. And a cycle whose dimensions leave a ratio
+//! undefined is skipped rather than observed as zero, which would read as total failure.
 //!
 //! # Operator queries
 //!
@@ -88,6 +99,37 @@
 //!   / rate(hopr_pix_cycles_total{event="requested"}[10m])
 //! ```
 //!
+//! *Egress against accepted shares.* The coverage question, from raw counter rates so the dashboard
+//! computes the ratio over a window it chooses. A funded Exit should see the two move together; a
+//! rising packets-per-share ratio is service running ahead of what is coming back:
+//!
+//! ```promql
+//! sum(rate(hopr_pix_egress_packets_total[5m]))
+//!   / sum(rate(hopr_pix_shares_total[5m]))
+//! # and the split that says whether the Entry is serving surplus or nothing at all
+//! sum by (kind) (rate(hopr_pix_shares_total[5m]))
+//! ```
+//!
+//! *Where egress is blocked, and for how long.* Episodes rather than refused packets, so this is a
+//! rate of stalls and not of retries:
+//!
+//! ```promql
+//! sum by (reason) (rate(hopr_pix_gate_blocks_total[5m]))
+//! histogram_quantile(0.95, sum by (le, reason) (rate(hopr_pix_gate_block_seconds_bucket[15m])))
+//! ```
+//!
+//! *Paid-cycle recovery distribution.* The failed population is the interesting one — a median near
+//! one means cycles are dying just short of recovering, which is a different problem from cycles
+//! that never started:
+//!
+//! ```promql
+//! histogram_quantile(0.5, sum by (le) (
+//!   rate(hopr_pix_cycle_useful_share_fraction_bucket{outcome="failed"}[1h])))
+//! # what a cycle costs, by how it ended
+//! histogram_quantile(0.9, sum by (le, outcome) (
+//!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
+//! ```
+//!
 //! *Closure rate by reason*, from the existing bounded per-reason counter:
 //!
 //! ```promql
@@ -104,7 +146,9 @@
 
 use crate::supervision::{
     GateBlockReason,
-    telemetry::{PixAdmissionRejection, PixCycleEvent, PixCyclePhase, PixGateBlock, PixGateMode},
+    telemetry::{
+        PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode, PixShareKind,
+    },
 };
 
 lazy_static::lazy_static! {
@@ -159,6 +203,29 @@ lazy_static::lazy_static! {
         "How long PIX egress stayed blocked, from first refusal until service resumed or the session closed",
         vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 15.0, 60.0, 300.0],
         &["reason"]
+    ).unwrap();
+    static ref METRIC_PIX_SHARES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_shares_total",
+        "Supervisor-validated SSA shares newly accepted by this Exit, by whether they advanced reconstruction",
+        &["kind"]
+    ).unwrap();
+    static ref METRIC_PIX_CYCLE_EGRESS_PACKETS: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_cycle_egress_packets",
+        "Packets served while one SSA cycle held the accounting front, observed once when it finalized",
+        vec![256.0, 1024.0, 4096.0, 16384.0, 65536.0, 262144.0, 1048576.0],
+        &["outcome"]
+    ).unwrap();
+    static ref METRIC_PIX_CYCLE_USEFUL_SHARE_FRACTION: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_cycle_useful_share_fraction",
+        "How far an SSA cycle got towards recovery, as useful shares over target, observed once at finalization",
+        vec![0.05, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0],
+        &["outcome"]
+    ).unwrap();
+    static ref METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_cycle_accepted_share_fraction",
+        "Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus",
+        vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
+        &["outcome"]
     ).unwrap();
 }
 
@@ -224,6 +291,32 @@ pub(crate) fn record_gate_block_duration(reason: GateBlockReason, seconds: f64) 
     METRIC_PIX_GATE_BLOCK_SECONDS.observe(&[reason.to_string().as_str()], seconds);
 }
 
+/// Counts `count` newly accepted shares of one kind.
+pub(crate) fn add_shares_total(kind: PixShareKind, count: u64) {
+    METRIC_PIX_SHARES_TOTAL.increment_by(&[kind.to_string().as_str()], count);
+}
+
+/// Observes one finalized cycle's coverage across the three per-cycle histograms.
+///
+/// All three are labelled by outcome and observed from one summary, so a dashboard can compare the
+/// same cycle's cost against what it recovered without joining series. A `None` fraction is one the
+/// cycle's dimensions leave undefined and is skipped — see the caller.
+pub(crate) fn record_cycle_summary(
+    outcome: PixCycleOutcome,
+    egress_packets: u64,
+    useful_fraction: Option<f64>,
+    accepted_fraction: Option<f64>,
+) {
+    let outcome = outcome.to_string();
+    METRIC_PIX_CYCLE_EGRESS_PACKETS.observe(&[outcome.as_str()], egress_packets as f64);
+    if let Some(fraction) = useful_fraction {
+        METRIC_PIX_CYCLE_USEFUL_SHARE_FRACTION.observe(&[outcome.as_str()], fraction);
+    }
+    if let Some(fraction) = accepted_fraction {
+        METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.observe(&[outcome.as_str()], fraction);
+    }
+}
+
 /// Counts `bytes` returned to the node's live-cycle budget.
 pub(crate) fn record_cycle_bytes_released(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RELEASED.increment_by(bytes);
@@ -264,6 +357,25 @@ mod tests {
                 METRIC_PIX_ADMISSION_REJECTIONS.name(),
                 METRIC_PIX_ADMISSION_REJECTIONS.labels(),
             ),
+            (METRIC_PIX_EGRESS_PACKETS.name(), METRIC_PIX_EGRESS_PACKETS.labels()),
+            (METRIC_PIX_GATE_BLOCKS.name(), METRIC_PIX_GATE_BLOCKS.labels()),
+            (
+                METRIC_PIX_GATE_BLOCK_SECONDS.name(),
+                METRIC_PIX_GATE_BLOCK_SECONDS.labels(),
+            ),
+            (METRIC_PIX_SHARES_TOTAL.name(), METRIC_PIX_SHARES_TOTAL.labels()),
+            (
+                METRIC_PIX_CYCLE_EGRESS_PACKETS.name(),
+                METRIC_PIX_CYCLE_EGRESS_PACKETS.labels(),
+            ),
+            (
+                METRIC_PIX_CYCLE_USEFUL_SHARE_FRACTION.name(),
+                METRIC_PIX_CYCLE_USEFUL_SHARE_FRACTION.labels(),
+            ),
+            (
+                METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.name(),
+                METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.labels(),
+            ),
         ];
 
         for (name, labels) in labelled {
@@ -283,6 +395,11 @@ mod tests {
         add_cycles_total(PixCycleEvent::Requested, 5);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
+        add_egress_packets(PixGateMode::Predeposit, 7);
+        record_gate_block(PixGateBlock::ShareLag);
+        record_gate_block_duration(GateBlockReason::ShareLag, 0.25);
+        add_shares_total(PixShareKind::Surplus, 11);
+        record_cycle_summary(PixCycleOutcome::Failed, 4096, Some(0.5), Some(0.75));
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -296,6 +413,13 @@ mod tests {
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
             "hopr_pix_cycle_bytes_reserved_total",
+            "hopr_pix_egress_packets_total{mode=\"predeposit\"}",
+            "hopr_pix_gate_blocks_total{reason=\"share_lag\"}",
+            "hopr_pix_gate_block_seconds",
+            "hopr_pix_shares_total{kind=\"surplus\"}",
+            "hopr_pix_cycle_egress_packets",
+            "hopr_pix_cycle_useful_share_fraction",
+            "hopr_pix_cycle_accepted_share_fraction",
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }
