@@ -18,6 +18,37 @@ use crate::utils::SlotNotify;
 #[error("service gate is poisoned (session closed)")]
 pub struct GateClosed;
 
+/// Why the gate refused a packet.
+///
+/// A closed enum, so it can be a metric label — the same argument as
+/// `SessionPixCloseReason`, and it is carried for the same reason:
+/// an operator asked "why is egress stalled" needs to tell an Entry that has not deposited from one
+/// that has deposited but stopped returning shares. Those are different faults with different
+/// remedies, and a bare "refused" conflates them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum GateBlockReason {
+    /// Unfunded, and the current front has spent its whole predeposit allowance. Service resumes
+    /// when the deposit confirms, or when a paid handoff restores the allowance for a successor.
+    PredepositExhausted,
+    /// Funded, but service has run `max_served_without_progress` packets ahead of the shares coming
+    /// back. Service resumes on the next validated progress notification for the front cycle.
+    ShareLag,
+}
+
+/// What the gate answered a packet with.
+///
+/// Replaces the `bool` this used to be. Both refusal sites already knew which case they were —
+/// carrying it costs nothing, allocates nothing, and is what lets the egress path report *why* it
+/// parked rather than only that it did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateVerdict {
+    /// A permit was taken; the packet may go.
+    Admitted,
+    /// No permit is available right now, for this reason.
+    Blocked(GateBlockReason),
+}
+
 /// Bounded predeposit service gate for a single PIX session.
 ///
 /// # Parking
@@ -30,6 +61,12 @@ pub struct GateClosed;
 pub struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
+    /// Of those, the ones taken from a predeposit allowance rather than from funded service.
+    ///
+    /// Monotonic over the life of the gate and never reset by a rotation, so it is a share of
+    /// [`served`](Self::served) rather than a per-front figure — see
+    /// [`served_split`](Self::served_split), which is the only reader.
+    served_predeposit: AtomicU64,
     /// Predeposit budget restored after each paid front-cycle handoff.
     predeposit_budget: u64,
     /// Remaining predeposit budget (tracked separately so we can park on 0).
@@ -58,6 +95,7 @@ impl ServiceGate {
     pub fn new(predeposit_budget: u64, max_served_without_progress: u64) -> Arc<Self> {
         Arc::new(Self {
             served: AtomicU64::new(0),
+            served_predeposit: AtomicU64::new(0),
             predeposit_budget,
             remaining: AtomicU64::new(predeposit_budget),
             funded: AtomicBool::new(false),
@@ -72,8 +110,8 @@ impl ServiceGate {
     /// Acquire a service permit.
     ///
     /// After funding, enforces a ceiling on packets served without SSA recovery
-    /// progress (see [`max_served_without_progress`](Self::ceiling)). Parks on
-    /// [`SlotNotify`] when the ceiling or predeposit budget is exceeded.
+    /// progress (see the `ceiling` field). Parks on `SlotNotify` when the ceiling or predeposit
+    /// budget is exceeded.
     pub async fn acquire(self: &Arc<Self>) -> Result<(), GateClosed> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(GateClosed);
@@ -149,7 +187,16 @@ impl ServiceGate {
                     .compare_exchange(remaining, remaining - 1, Ordering::AcqRel, Ordering::Relaxed)
                     .is_ok()
                 {
-                    self.served.fetch_add(1, Ordering::Relaxed);
+                    // Counted here as well as on the synchronous path: a writer that parked on an
+                    // exhausted allowance and was woken by a paid handoff takes its permit through
+                    // *this* branch, and a split that missed those would attribute predeposit
+                    // service to the funded bucket.
+                    //
+                    // Published before `served`, and `served` published with `Release`, so that
+                    // `served_split`'s acquire load of `served` cannot see this permit in the total
+                    // while still reading the old predeposit count — see its documentation.
+                    self.served_predeposit.fetch_add(1, Ordering::Relaxed);
+                    self.served.fetch_add(1, Ordering::Release);
                     return Ok(());
                 }
                 // CAS failed — retry.
@@ -283,11 +330,11 @@ impl ServiceGate {
 
     /// Non-blocking try-acquire — the egress fast path.
     ///
-    /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
-    /// exhausted (and gate not yet funded) or the ceiling is exceeded (gate
+    /// Returns [`GateVerdict::Admitted`] on success, [`GateVerdict::Blocked`] with the reason if the
+    /// predeposit budget is exhausted (and the gate not yet funded) or the ceiling is exceeded (gate
     /// funded), or [`GateClosed`] if poisoned.
     ///
-    /// `Ok(false)` means *the gate refused*, and only ever that: both branches retry a lost
+    /// `Blocked` means *the gate refused*, and only ever that: both branches retry a lost
     /// compare-exchange rather than reporting it. Contention on `served` is not a refusal — service
     /// was available and the caller would be turned away anyway — and with several concurrent egress
     /// writers, reporting it as one converts contention into spurious refusals on the documented
@@ -296,8 +343,10 @@ impl ServiceGate {
     /// Every outgoing data packet of a supervised Session comes through here, and service is
     /// available for all but a vanishing fraction of them, so this answering synchronously is what
     /// keeps gating off the allocator: only [`acquire`](Self::acquire)'s parking path needs a future
-    /// large enough to box, and that path is about to block anyway.
-    pub fn try_acquire_sync(&self) -> Result<bool, GateClosed> {
+    /// large enough to box, and that path is about to block anyway. The same argument is why the
+    /// funded branch below does not count anything of its own: it is the steady state, at the
+    /// Session's full packet rate, and the split it would produce is available by subtraction.
+    pub fn try_acquire_sync(&self) -> Result<GateVerdict, GateClosed> {
         loop {
             if self.poisoned.load(Ordering::Acquire) {
                 return Err(GateClosed);
@@ -311,7 +360,7 @@ impl ServiceGate {
                     if !self.mode_is_current(mode_epoch) {
                         continue;
                     }
-                    return Ok(false);
+                    return Ok(GateVerdict::Blocked(GateBlockReason::ShareLag));
                 }
                 if self.poisoned.load(Ordering::Acquire) {
                     return Err(GateClosed);
@@ -324,7 +373,7 @@ impl ServiceGate {
                     .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
                     .is_ok()
                 {
-                    return Ok(true);
+                    return Ok(GateVerdict::Admitted);
                 }
                 continue;
             }
@@ -335,7 +384,7 @@ impl ServiceGate {
                 if !self.mode_is_current(mode_epoch) {
                     continue;
                 }
-                return Ok(false);
+                return Ok(GateVerdict::Blocked(GateBlockReason::PredepositExhausted));
             }
             if self.poisoned.load(Ordering::Acquire) {
                 return Err(GateClosed);
@@ -348,10 +397,46 @@ impl ServiceGate {
                 .compare_exchange(remaining, remaining - 1, Ordering::AcqRel, Ordering::Relaxed)
                 .is_ok()
             {
-                self.served.fetch_add(1, Ordering::Relaxed);
-                return Ok(true);
+                // Predeposit first, then `served` with `Release`: the publication order
+                // `served_split` relies on, documented there.
+                self.served_predeposit.fetch_add(1, Ordering::Relaxed);
+                self.served.fetch_add(1, Ordering::Release);
+                return Ok(GateVerdict::Admitted);
             }
         }
+    }
+
+    /// Packets this gate has admitted, split into `(predeposit, funded)`.
+    ///
+    /// Counted on the predeposit branch only, and derived for the funded one. That asymmetry is the
+    /// whole point: at deployed dimensions the funded branch carries essentially all of a Session's
+    /// egress — tens of thousands of packets a second across a node — while the predeposit branch
+    /// carries at most `max_predeposit_packets` per front rotation. A second `fetch_add` on the
+    /// steady-state path would be paid on every packet to produce a number that subtraction already
+    /// gives exactly.
+    ///
+    /// # The publication order, and why it is that way round
+    ///
+    /// The two loads are not atomic with respect to each other, so a concurrent predeposit permit
+    /// can land between them and be seen by one load but not the other. Which of the two tears is
+    /// possible decides whether that permit is merely *late* or is actually *miscounted*, and the
+    /// writers pick which by the order they publish in.
+    ///
+    /// A predeposit permit therefore increments `served_predeposit` first and publishes `served`
+    /// with [`Release`](Ordering::Release). The acquire load of `served` below synchronizes with
+    /// that store, so seeing the permit in the total guarantees seeing it in the predeposit count
+    /// too: the derived funded figure can never come out one *high*, which would report a
+    /// predeposit packet as funded and then report it again as predeposit on the next read.
+    ///
+    /// The surviving tear is the harmless one — `served_predeposit` new against `served` old, which
+    /// makes the derived funded figure one *low*. Nothing is lost and the next read is consistent
+    /// again, but a consumer keeping a watermark must not store the regressed value or it will
+    /// re-cross that ground: see
+    /// [`PixSessionTelemetry::flush_egress`](super::telemetry::PixSessionTelemetry), which clamps.
+    pub fn served_split(&self) -> (u64, u64) {
+        let served = self.served.load(Ordering::Acquire);
+        let predeposit = self.served_predeposit.load(Ordering::Acquire);
+        (predeposit, served.saturating_sub(predeposit))
     }
 }
 
@@ -437,8 +522,9 @@ mod tests {
         let gate = ServiceGate::new(0, 10);
 
         // Nothing, on either path.
-        assert!(
-            !gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
             "the synchronous path must refuse while unfunded with no budget"
         );
         assert!(
@@ -463,7 +549,10 @@ mod tests {
 
         // Service is then ordinary, and the ceiling counts from funding rather than from a
         // predeposit allowance that was never spent.
-        assert!(gate.try_acquire_sync().expect("a funded gate is not poisoned"));
+        assert_eq!(
+            GateVerdict::Admitted,
+            gate.try_acquire_sync().expect("a funded gate is not poisoned")
+        );
         assert_eq!(gate.served_total(), 2);
     }
 
@@ -573,17 +662,20 @@ mod tests {
     async fn try_acquire_sync_succeeds_within_budget() {
         let gate = gate_with_ceiling(5);
         for _ in 0..5 {
-            assert!(gate.try_acquire_sync().unwrap());
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
         }
         assert_eq!(gate.served_total(), 5);
     }
 
     #[tokio::test]
-    async fn try_acquire_sync_returns_false_when_budget_exhausted() {
+    async fn try_acquire_sync_reports_predeposit_exhaustion_when_the_budget_is_spent() {
         let gate = gate_with_ceiling(2);
-        assert!(gate.try_acquire_sync().unwrap());
-        assert!(gate.try_acquire_sync().unwrap());
-        assert!(!gate.try_acquire_sync().unwrap());
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync().unwrap()
+        );
         assert_eq!(gate.served_total(), 2);
     }
 
@@ -591,9 +683,12 @@ mod tests {
     async fn try_acquire_sync_succeeds_after_funding() {
         let gate = gate_with_ceiling(0);
 
-        assert!(!gate.try_acquire_sync().unwrap());
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync().unwrap()
+        );
         gate.release_service();
-        assert!(gate.try_acquire_sync().unwrap());
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
         assert_eq!(gate.served_total(), 1);
     }
 
@@ -603,14 +698,17 @@ mod tests {
         gate.release_service();
 
         for _ in 0..5 {
-            assert!(gate.try_acquire_sync().unwrap());
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
         }
         // 6th should hit the ceiling.
-        assert!(!gate.try_acquire_sync().unwrap());
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::ShareLag),
+            gate.try_acquire_sync().unwrap()
+        );
 
         // Progress resets it.
         gate.notify_progress();
-        assert!(gate.try_acquire_sync().unwrap());
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync().unwrap());
     }
 
     #[tokio::test]
@@ -686,15 +784,18 @@ mod tests {
     async fn withholding_restores_the_predeposit_budget_for_the_next_paid_handoff() -> anyhow::Result<()> {
         let gate = ServiceGate::new(2, 10);
 
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
 
         gate.withhold_service();
         assert!(!gate.funded());
-        assert!(gate.try_acquire_sync()?);
-        assert!(gate.try_acquire_sync()?);
-        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync()?
+        );
         Ok(())
     }
 
@@ -702,10 +803,13 @@ mod tests {
     async fn strict_prepay_is_restored_when_service_is_withheld() -> anyhow::Result<()> {
         let gate = ServiceGate::new(0, 10);
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
 
         gate.withhold_service();
-        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync()?
+        );
         assert!(
             tokio::time::timeout(Duration::from_millis(50), gate.acquire())
                 .await
@@ -719,7 +823,7 @@ mod tests {
     async fn withholding_wakes_a_ceiling_parked_writer_into_the_new_allowance() -> anyhow::Result<()> {
         let gate = ServiceGate::new(1, 1);
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
 
         let mut parked = {
             let gate = gate.clone();
@@ -748,8 +852,8 @@ mod tests {
         let gate = ServiceGate::new(4, 10);
         assert_eq!(0, gate.predeposit_exposure(), "nothing served, nothing exposed");
 
-        assert!(gate.try_acquire_sync()?);
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
         assert_eq!(2, gate.predeposit_exposure());
 
         gate.release_service();
@@ -760,27 +864,127 @@ mod tests {
         );
 
         // Funded service is not exposure however much of it there is.
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
         assert_eq!(0, gate.predeposit_exposure());
 
         // A paid handoff restores the whole allowance for an unfunded successor, and the successor's
         // own exposure starts again from nothing rather than inheriting its predecessor's.
         gate.withhold_service();
         assert_eq!(0, gate.predeposit_exposure());
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
         assert_eq!(1, gate.predeposit_exposure());
         Ok(())
+    }
+
+    /// The served split attributes each packet to whatever paid for it, across a full rotation.
+    ///
+    /// The funded component is derived rather than counted, so the property worth stating is that
+    /// the derivation is exact: the two halves must always sum to `served_total`, whichever branch
+    /// admitted the packet and whichever of the two entry points it came through.
+    #[tokio::test]
+    async fn the_served_split_attributes_every_packet_to_what_paid_for_it() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(3, 100);
+        assert_eq!((0, 0), gate.served_split());
+
+        // Two on the allowance, synchronously.
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!((2, 0), gate.served_split());
+
+        // One more on the allowance, through the async path — which is the one a writer woken by a
+        // handoff takes, and would be attributed to the wrong bucket if only the sync path counted.
+        gate.acquire().await?;
+        assert_eq!((3, 0), gate.served_split());
+
+        // Funding moves the accounting without rewriting history: the three already served stay
+        // charged to the allowance.
+        gate.release_service();
+        for _ in 0..5 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        assert_eq!((3, 5), gate.served_split());
+
+        // A paid handoff restores the allowance, and the next packets are unpaid again.
+        gate.withhold_service();
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!((4, 5), gate.served_split());
+
+        let (predeposit, funded) = gate.served_split();
+        assert_eq!(
+            gate.served_total(),
+            predeposit + funded,
+            "the split must account for every packet the gate admitted"
+        );
+        Ok(())
+    }
+
+    /// A concurrent reader of the split never sees predeposit service as funded.
+    ///
+    /// The two loads in `served_split` are not atomic with respect to each other, so a permit
+    /// landing between them is visible to one and not the other. On a gate that has never been
+    /// funded the answer is knowable regardless: every packet came off the allowance, so the derived
+    /// funded figure must be zero at *every* observation, however the reads interleave.
+    ///
+    /// That is the invariant the predeposit path's publication order buys — `served_predeposit`
+    /// first, `served` released — and it is worth a test because the failure is silent: a reader
+    /// that saw the total move before the split would emit the packet as funded, and the watermark
+    /// on the other side cannot take that back.
+    ///
+    /// Note this cannot fail on x86, whose store ordering makes the wrong order accidentally
+    /// correct. It is the weaker targets and the compiler's own freedom to reorder two relaxed
+    /// read-modify-writes that this pins down.
+    #[tokio::test]
+    async fn a_concurrent_split_never_attributes_predeposit_service_to_the_funded_bucket() {
+        const PACKETS: u64 = 20_000;
+
+        let gate = ServiceGate::new(PACKETS, u64::MAX);
+        // Both sides are released together. Without it the admissions can be over before the
+        // sampling loop first looks, which would leave the test passing on nothing.
+        let start = Arc::new(std::sync::Barrier::new(2));
+        let admitting = {
+            let gate = gate.clone();
+            let start = start.clone();
+            std::thread::spawn(move || {
+                start.wait();
+                for _ in 0..PACKETS {
+                    assert_eq!(
+                        GateVerdict::Admitted,
+                        gate.try_acquire_sync().expect("an unpoisoned gate with allowance left")
+                    );
+                }
+            })
+        };
+        start.wait();
+
+        // Sample first, check for completion second, so the body runs whatever the scheduler does.
+        loop {
+            let (predeposit, funded) = gate.served_split();
+            assert_eq!(
+                0, funded,
+                "this gate was never funded, so every one of its {predeposit} packets came off the allowance — a \
+                 non-zero funded figure is a torn read being counted"
+            );
+            if admitting.is_finished() {
+                break;
+            }
+        }
+        admitting.join().expect("the admitting thread must not panic");
+
+        assert_eq!((PACKETS, 0), gate.served_split(), "and the final split is exact");
     }
 
     /// A strict-prepay gate has no allowance to expose, whatever happens to it.
     #[tokio::test]
     async fn a_zero_budget_gate_exposes_nothing() -> anyhow::Result<()> {
         let gate = ServiceGate::new(0, 10);
-        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            gate.try_acquire_sync()?
+        );
         assert_eq!(0, gate.predeposit_exposure());
 
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
         assert_eq!(0, gate.predeposit_exposure());
         Ok(())
     }
@@ -789,15 +993,21 @@ mod tests {
     async fn a_new_funded_front_gets_a_fresh_progress_ceiling() -> anyhow::Result<()> {
         let gate = ServiceGate::new(0, 2);
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
-        assert!(gate.try_acquire_sync()?);
-        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::ShareLag),
+            gate.try_acquire_sync()?
+        );
 
         // A funded-to-funded front handoff stays open but starts a new ceiling window.
         gate.release_service();
-        assert!(gate.try_acquire_sync()?);
-        assert!(gate.try_acquire_sync()?);
-        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::ShareLag),
+            gate.try_acquire_sync()?
+        );
         Ok(())
     }
 }

@@ -164,7 +164,7 @@ pub fn spawn_supervisor_worker(
         cfg.max_predeposit_packets,
     );
     let gate = ServiceGate::new(predeposit_budget, cfg.max_served_without_progress);
-    let telemetry = Arc::new(PixSessionTelemetry::new());
+    let telemetry = Arc::new(PixSessionTelemetry::new(gate.clone()));
 
     let handle = SessionPixSupervisorHandle {
         cmd_tx,
@@ -453,7 +453,10 @@ mod tests {
     use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
     use super::{
-        super::{FillRate, PixFillConfig, SAMPLING_INTERVAL},
+        super::{
+            FillRate, PixFillConfig, SAMPLING_INTERVAL,
+            gate::{GateBlockReason, GateVerdict},
+        },
         *,
     };
 
@@ -577,15 +580,17 @@ mod tests {
         };
         let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
 
-        assert!(
-            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+        assert_ne!(
+            GateVerdict::Admitted,
+            handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
             "a strict-prepay gate must refuse the first packet"
         );
         assert_eq!(handle.gate.served_total(), 0);
 
         // What the action driver does when it carries out `ReleaseService`.
         handle.gate.release_service();
-        assert!(
+        assert_eq!(
+            GateVerdict::Admitted,
             handle.gate.try_acquire_sync().expect("a funded gate is not poisoned"),
             "funding must open a strict-prepay gate"
         );
@@ -606,13 +611,15 @@ mod tests {
         let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
 
         for i in 0..49 {
-            assert!(
+            assert_eq!(
+                GateVerdict::Admitted,
                 handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
                 "packet {i} is within `target_useful_shares - 1` and must be served"
             );
         }
-        assert!(
-            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+        assert_ne!(
+            GateVerdict::Admitted,
+            handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
             "the budget must stop at `target_useful_shares - 1`, not at the configured cap"
         );
     }
@@ -666,7 +673,7 @@ mod tests {
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;
 
         poll_until("the paid front opens the gate", || handle.gate.funded()).await;
-        assert!(handle.gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, handle.gate.try_acquire_sync()?);
 
         // The receiver remains alive but deliberately unread, modeling an action driver blocked on
         // RequestSsa I/O. Cryptographic recovery alone must keep the gate funded for the bounded
@@ -679,7 +686,8 @@ mod tests {
             handle.gate.funded()
         })
         .await;
-        assert!(
+        assert_eq!(
+            GateVerdict::Admitted,
             handle.gate.try_acquire_sync()?,
             "cryptographic recovery must reopen a gate whose final progress notification was lost"
         );
@@ -702,7 +710,11 @@ mod tests {
             .await
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;
         poll_until("the unfunded successor closes the gate", || !handle.gate.funded()).await;
-        assert!(!handle.gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            handle.gate.try_acquire_sync()?,
+            "an unfunded successor refuses on its allowance, not on the funded ceiling"
+        );
         Ok(())
     }
 
@@ -916,7 +928,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
-            telemetry: Arc::new(PixSessionTelemetry::new()),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         // Drop the receiver so the channel is disconnected.
@@ -950,7 +962,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
-            telemetry: Arc::new(PixSessionTelemetry::new()),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
@@ -977,7 +989,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
-            telemetry: Arc::new(PixSessionTelemetry::new()),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());

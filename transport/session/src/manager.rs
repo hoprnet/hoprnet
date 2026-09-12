@@ -54,8 +54,9 @@ use crate::{
     },
     errors::{self, SessionManagerError, TransportSessionError},
     supervision::{
-        ActionRx, FillRate, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
-        SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker, telemetry::PixAdmissionRejection,
+        ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
+        SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
+        telemetry::{PixAdmissionRejection, PixGateBlockEpisode, record_gate_closed},
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
@@ -119,6 +120,13 @@ type EgressPermit = futures::future::Either<
 ///
 /// A Session that negotiated no PIX passes through with no gate at all, so an un-supervised Session
 /// pays one `Option` check per packet and nothing else.
+///
+/// Nothing is measured on the admitted arm, deliberately. That arm is the steady state at the
+/// Session's full packet rate, and what an operator wants from it — how much was served, and on
+/// whose money — is already counted inside the gate's own compare-exchange and flushed once per
+/// supervisor turn by [`PixSessionTelemetry`](crate::supervision::telemetry::PixSessionTelemetry).
+/// Only the refused arm, which is about to allocate a boxed future and block, does any telemetry
+/// work of its own.
 fn acquire_egress_permit(
     gate: Option<Arc<ServiceGate>>,
     routing: DestinationRouting,
@@ -129,18 +137,36 @@ fn acquire_egress_permit(
     };
 
     match gate.try_acquire_sync() {
-        Ok(true) => futures::future::Either::Left(std::future::ready(Ok((routing, data)))),
+        Ok(GateVerdict::Admitted) => futures::future::Either::Left(std::future::ready(Ok((routing, data)))),
         // Forwarded rather than reconstructed: the gate now names its own error, so both of its
         // entry points report the same one and neither caller has to know what a refusal means.
-        Err(closed) => futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed)))),
+        Err(closed) => {
+            record_gate_closed();
+            futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed))))
+        }
         // Budget exhausted: park until the supervisor funds the front, restores a successor's
         // allowance, reports front-cycle progress, or gives up on the Session entirely.
-        Ok(false) => futures::future::Either::Right(Box::pin(async move {
-            gate.acquire()
-                .await
-                .map(|_| (routing, data))
-                .map_err(std::io::Error::other)
-        })),
+        //
+        // The episode is opened *here*, at the refusal, and moved into the future, so its clock
+        // covers the whole park and its `Drop` closes it however the park ends — resumed, failed,
+        // or cancelled. Opened outside the `async move` rather than inside it because the refusal
+        // has already happened by the time this returns: a future that is constructed and never
+        // polled is still a packet the gate turned away, and starting the clock at first poll
+        // would under-report every stall by however long the caller took to await it.
+        //
+        // One episode per park rather than per refused packet: this sink is serial, so the next
+        // packet is not offered until this future resolves, and a caller cannot open a second
+        // episode by retrying harder.
+        Ok(GateVerdict::Blocked(reason)) => {
+            let episode = PixGateBlockEpisode::begin(reason);
+            futures::future::Either::Right(Box::pin(async move {
+                let _episode = episode;
+                gate.acquire()
+                    .await
+                    .map(|_| (routing, data))
+                    .map_err(std::io::Error::other)
+            }))
+        }
     }
 }
 
@@ -14151,6 +14177,149 @@ mod tests {
             );
         }
 
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // PIX egress gate pressure
+    // -----------------------------------------------------------------------
+
+    /// The egress path opens exactly one block episode per park, and closes it when the park ends.
+    ///
+    /// Asserted here rather than in the gate's own tests because the wiring is what can be wrong:
+    /// the gate reports a verdict, and this is the only place that turns the verdict into an
+    /// episode. A permit path that forgot to would leave `hopr_pix_gate_blocks_total` silent while
+    /// egress was stalled -- exactly the fault the metric exists to surface.
+    #[tokio::test]
+    async fn a_parked_egress_packet_opens_and_closes_one_block_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        // Strict prepay: the first packet is refused before anything is served.
+        let gate = ServiceGate::new(0, 10);
+
+        let permit = acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        );
+
+        assert_eq!(
+            1,
+            probe::get("gate_blocks/predeposit_exhausted"),
+            "the refusal must be counted as one episode beginning"
+        );
+        assert_eq!(
+            0,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "and must stay open while the packet is still parked"
+        );
+
+        // Funding wakes the parked writer, which ends the episode.
+        gate.release_service();
+        timeout(Duration::from_secs(5), permit)
+            .await
+            .context("funding must wake the parked packet")?
+            .context("a funded gate must admit it")?;
+
+        assert_eq!(1, probe::get("gate_blocks/predeposit_exhausted"), "still one episode");
+        assert_eq!(
+            1,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "resuming must close the episode exactly once"
+        );
+        Ok(())
+    }
+
+    /// Cancelling a parked packet closes its episode too.
+    ///
+    /// The case `Drop` exists for: a Session torn down while a writer is parked drops the permit
+    /// future without ever resolving it, and a timer that only closed on the resume path would be
+    /// left open for every Session that died blocked.
+    #[tokio::test]
+    async fn dropping_a_parked_egress_packet_closes_its_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let gate = ServiceGate::new(0, 10);
+
+        let permit = acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        );
+        // Poll it once so the episode is actually begun inside the future.
+        assert!(
+            timeout(Duration::from_millis(50), permit).await.is_err(),
+            "the packet must park rather than resolve"
+        );
+
+        assert_eq!(1, probe::get("gate_blocks/predeposit_exhausted"));
+        assert_eq!(
+            1,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "a cancelled park must still close its episode"
+        );
+        Ok(())
+    }
+
+    /// A poisoned gate is counted as a refusal but opens no episode.
+    #[tokio::test]
+    async fn a_closed_gate_refuses_without_opening_an_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let gate = ServiceGate::new(10, 10);
+        gate.poison();
+
+        let permit = acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        );
+        assert!(permit.await.is_err(), "a poisoned gate must refuse");
+
+        assert_eq!(1, probe::get("gate_blocks/closed"));
+        assert_eq!(
+            0,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "a gate that never resumes must not be timed"
+        );
+        Ok(())
+    }
+
+    /// An un-gated Session pays nothing and is counted as nothing.
+    #[tokio::test]
+    async fn a_session_without_a_gate_is_not_measured() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+
+        acquire_egress_permit(
+            None,
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        )
+        .await
+        .context("an un-gated packet passes straight through")?;
+
+        assert_eq!(
+            std::collections::BTreeMap::new(),
+            probe::non_zero(),
+            "a Session that negotiated no PIX must contribute to no PIX aggregate"
+        );
         Ok(())
     }
 }
