@@ -293,7 +293,7 @@ impl PixSessionSnapshot {
 /// The supervisor is a pure state machine and cannot emit a metric, so it latches the edge and the
 /// worker drains it — the same arrangement as
 /// [`take_fill_stall`](super::supervisor::SessionPixSupervisor::take_fill_stall).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PixTurnEvents {
     /// Indices allocated into an `SsaRequest`.
     pub requested: u32,
@@ -305,6 +305,77 @@ pub struct PixTurnEvents {
     pub recovered: u32,
     /// Cycles retired without recovering.
     pub failed: u32,
+    /// Newly accepted shares that advanced reconstruction.
+    pub useful_shares: u64,
+    /// Newly accepted shares that did not — the negotiated surplus, and duplicates.
+    pub surplus_shares: u64,
+    /// Cycles that reached a terminal state and have a coverage summary to observe.
+    ///
+    /// A `Vec` rather than a running total because each entry becomes one observation in three
+    /// histograms, and a histogram cannot be fed a sum. Bounded by the cycles one supervisor turn
+    /// can finalize, which is at most a batch.
+    pub finalized: Vec<PixCycleSummary>,
+}
+
+/// What one cycle cost and recovered, observed once when it leaves the accounting front.
+///
+/// Three histograms rather than three gauges, and observed at finalization rather than sampled,
+/// because the question is about the distribution across cycles: an Exit whose median cycle
+/// recovers fully but whose tail does not is in a different position from one where every cycle
+/// half-recovers, and an average hides which.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PixCycleSummary {
+    /// How the cycle ended.
+    pub outcome: PixCycleOutcome,
+    /// Packets this Session's gate served while this cycle held the accounting front.
+    pub egress_packets: u64,
+    /// Shares accepted for it, useful or not.
+    pub accepted_shares: u64,
+    /// Of those, the ones that advanced reconstruction.
+    pub useful_shares: u64,
+    /// Useful shares that would have constituted full recovery.
+    pub target_useful_shares: u64,
+}
+
+impl PixCycleSummary {
+    /// Accepted shares as a fraction of the cycle's payment target.
+    ///
+    /// Can exceed one, and that is meaningful rather than a defect: a conforming Entry emits
+    /// `threshold + surplus` shares per polynomial, so a fully served cycle accepts more shares than
+    /// it needed useful ones. A fraction far *below* one on a recovered cycle would be the anomaly.
+    pub fn accepted_fraction(&self) -> Option<f64> {
+        (self.target_useful_shares > 0).then(|| self.accepted_shares as f64 / self.target_useful_shares as f64)
+    }
+
+    /// Useful shares as a fraction of the payment target — how far recovery actually got.
+    ///
+    /// Exactly one for a recovered cycle by construction, which is why the histogram is labelled by
+    /// outcome: without that split the recovered population would swamp the failed one, and the
+    /// failed one is the distribution an operator wants.
+    pub fn useful_fraction(&self) -> Option<f64> {
+        (self.target_useful_shares > 0).then(|| self.useful_shares as f64 / self.target_useful_shares as f64)
+    }
+}
+
+/// How a cycle's accounting ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum PixCycleOutcome {
+    /// It reconstructed fully.
+    Recovered,
+    /// It did not.
+    Failed,
+}
+
+/// Which kind of accepted share a delta was.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum PixShareKind {
+    /// Advanced reconstruction: the payment counter.
+    Useful,
+    /// Did not — the negotiated surplus a conforming Entry sends, and duplicates. Evidence the
+    /// Entry is still serving, which is what the gate and the idle deadline are asking about.
+    Surplus,
 }
 
 impl PixTurnEvents {
@@ -323,6 +394,14 @@ impl PixTurnEvents {
             (PixCycleEvent::Failed, self.failed),
         ]
     }
+
+    /// The share deltas, in label order.
+    fn shares(&self) -> [(PixShareKind, u64); 2] {
+        [
+            (PixShareKind::Useful, self.useful_shares),
+            (PixShareKind::Surplus, self.surplus_shares),
+        ]
+    }
 }
 
 /// How much of a latched batch a publish may emit.
@@ -336,12 +415,18 @@ impl PixTurnEvents {
 enum EventScope {
     /// All of it. The census is live and moves with the batch, so the two agree by construction.
     Everything,
-    /// Only the counts nothing reads back.
+    /// Only the parts nothing reads back.
     ///
     /// `release` has already charged this Session's outstanding cycles from its last census, so
-    /// re-emitting a [census-coupled](PixCycleEvent::is_census_coupled) count here would account
-    /// the same cycle twice. What is left is an edge in no invariant and no gauge, and dropping it
-    /// would understate the phase-transition rate for no reason at all.
+    /// anything that speaks about *which* cycles ended and how must be left to it or the same cycle
+    /// is accounted twice. That rules out the [census-coupled](PixCycleEvent::is_census_coupled)
+    /// counts and the per-cycle summaries, whose outcome would otherwise be free to contradict the
+    /// count that retired the cycle.
+    ///
+    /// What survives is everything that is only ever a rate: `committed` and `funded`, which are
+    /// edges between census buckets rather than entries or exits, and the share arrivals. Dropping
+    /// those would understate throughput at teardown for nothing — no gauge and no invariant reads
+    /// them, so there is no second copy for them to disagree with.
     EdgesOnly,
 }
 
@@ -557,6 +642,24 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
             emit_cycles_total(event, u64::from(count));
         }
     }
+    // Share arrivals are counted whatever the scope. Nothing reads them back — no gauge, no
+    // invariant, no other series — so a released handle dropping them would be pure loss, and this
+    // is the only copy in existence by the time it gets here.
+    for (kind, count) in events.shares() {
+        if count > 0 {
+            emit_shares_total(kind, count);
+        }
+    }
+    // The summaries are not, because each carries an outcome that must agree with the count that
+    // retired the same cycle. Under `EdgesOnly` that count came from `release`'s census charge —
+    // `failed`, uniformly — so observing a summary here could assert `recovered` for a cycle the
+    // counters have already given up on. `sum(cycle_summaries) <= recovered + failed` is documented
+    // as the expected relation precisely because a Session can end without a verdict per cycle.
+    if scope == EventScope::Everything {
+        for summary in events.finalized {
+            emit_cycle_summary(summary);
+        }
+    }
 }
 
 /// Counts packets admitted since the last flush, by what paid for them.
@@ -626,6 +729,42 @@ fn emit_gate_block(reason: PixGateBlock) {
     probe::add(&format!("gate_blocks/{reason}"), 1);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = reason;
+}
+
+fn emit_shares_total(kind: PixShareKind, count: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_shares_total(kind, count);
+    #[cfg(test)]
+    probe::add(&format!("shares_total/{kind}"), count as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = (kind, count);
+}
+
+fn emit_cycle_summary(summary: PixCycleSummary) {
+    // Derived here rather than inside the instrument module so the two ratios are computed — and so
+    // their `None` case is decided — in the half of this crate that is always compiled and always
+    // tested. `None` means the ratio is undefined for these dimensions, and is skipped rather than
+    // observed as zero: a zero would be read as a cycle that recovered nothing.
+    let useful_fraction = summary.useful_fraction();
+    let accepted_fraction = summary.accepted_fraction();
+
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::record_cycle_summary(
+        summary.outcome,
+        summary.egress_packets,
+        useful_fraction,
+        accepted_fraction,
+    );
+    #[cfg(not(feature = "telemetry"))]
+    let _ = (useful_fraction, accepted_fraction);
+
+    // Recorded as one observation rather than as the values themselves: the shape a test can assert
+    // without depending on bucket boundaries is that a cycle is summarized exactly once, on the
+    // right outcome. The values are asserted against the summary directly.
+    #[cfg(test)]
+    probe::add(&format!("cycle_summaries/{}", summary.outcome), 1);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = summary;
 }
 
 fn emit_gate_block_duration(reason: GateBlockReason, seconds: f64) {
@@ -785,11 +924,26 @@ mod tests {
                 funded: 1,
                 recovered: 1,
                 failed: 1,
+                useful_shares: 7,
+                surplus_shares: 4,
+                finalized: vec![PixCycleSummary {
+                    outcome: PixCycleOutcome::Recovered,
+                    egress_packets: 80,
+                    accepted_shares: 12,
+                    useful_shares: 10,
+                    target_useful_shares: 10,
+                }],
             },
         );
 
         assert_eq!(2, probe::get("cycles_total/committed"));
         assert_eq!(1, probe::get("cycles_total/funded"));
+        assert_eq!(
+            7,
+            probe::get("shares_total/useful"),
+            "a share arrival is only ever a rate"
+        );
+        assert_eq!(4, probe::get("shares_total/surplus"));
         for coupled in ["requested", "recovered", "failed"] {
             assert_eq!(
                 0,
@@ -797,6 +951,11 @@ mod tests {
                 "{coupled} is settled against the census, which `release` has already charged"
             );
         }
+        assert_eq!(
+            0,
+            probe::get("cycle_summaries/recovered"),
+            "a summary asserting `recovered` must not outlive the count that gave the cycle up"
+        );
         assert_eq!(
             None,
             telemetry.published(),
@@ -1301,6 +1460,107 @@ mod tests {
             "a monotonic counter must never be walked back"
         );
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Share and cycle coverage
+    // -----------------------------------------------------------------------
+
+    /// Share deltas and cycle summaries reach the instruments, and a zero delta emits nothing.
+    #[test]
+    fn share_deltas_and_summaries_are_emitted_by_publish() {
+        probe::reset();
+        let telemetry = handle();
+
+        telemetry.publish(
+            snapshot(PixGateMode::Funded, 1),
+            PixTurnEvents {
+                useful_shares: 40,
+                surplus_shares: 12,
+                ..Default::default()
+            },
+        );
+        assert_eq!(40, probe::get("shares_total/useful"));
+        assert_eq!(12, probe::get("shares_total/surplus"));
+
+        // A turn with only useful progress must not mint a surplus series of zero.
+        telemetry.publish(
+            snapshot(PixGateMode::Funded, 1),
+            PixTurnEvents {
+                useful_shares: 5,
+                ..Default::default()
+            },
+        );
+        assert_eq!(45, probe::get("shares_total/useful"));
+        assert_eq!(12, probe::get("shares_total/surplus"), "a zero delta adds nothing");
+
+        telemetry.publish(
+            snapshot(PixGateMode::Funded, 1),
+            PixTurnEvents {
+                recovered: 1,
+                finalized: vec![PixCycleSummary {
+                    outcome: PixCycleOutcome::Recovered,
+                    egress_packets: 8192,
+                    accepted_shares: 768,
+                    useful_shares: 512,
+                    target_useful_shares: 512,
+                }],
+                ..Default::default()
+            },
+        );
+        assert_eq!(1, probe::get("cycle_summaries/recovered"));
+        assert_eq!(0, probe::get("cycle_summaries/failed"));
+    }
+
+    /// Several cycles finalized in one turn are each observed once.
+    ///
+    /// A batch can lose more than one member to the same deadline sweep, and a histogram cannot be
+    /// fed a sum — which is why the latch carries a list rather than a count.
+    #[test]
+    fn every_cycle_finalized_in_one_turn_is_observed() {
+        probe::reset();
+        let telemetry = handle();
+
+        let summary = |outcome| PixCycleSummary {
+            outcome,
+            egress_packets: 1024,
+            accepted_shares: 100,
+            useful_shares: 50,
+            target_useful_shares: 512,
+        };
+        telemetry.publish(
+            snapshot(PixGateMode::Funded, 0),
+            PixTurnEvents {
+                failed: 3,
+                finalized: vec![
+                    summary(PixCycleOutcome::Failed),
+                    summary(PixCycleOutcome::Failed),
+                    summary(PixCycleOutcome::Recovered),
+                ],
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(2, probe::get("cycle_summaries/failed"));
+        assert_eq!(1, probe::get("cycle_summaries/recovered"));
+    }
+
+    /// An empty latch touches nothing at all.
+    #[test]
+    fn an_empty_turn_emits_no_counter() {
+        probe::reset();
+        let telemetry = handle();
+
+        telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
+
+        assert_eq!(
+            std::collections::BTreeMap::from([
+                ("sessions_active/predeposit".to_string(), 1),
+                ("cycles_active/recovering".to_string(), 1),
+            ]),
+            probe::non_zero(),
+            "a turn in which nothing happened moves only the census"
+        );
     }
 
     /// More Sessions than the OpenTelemetry per-instrument cardinality limit, opened and closed.
