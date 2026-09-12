@@ -55,7 +55,7 @@ use crate::{
     errors::{self, SessionManagerError, TransportSessionError},
     supervision::{
         ActionRx, FillRate, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
-        SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
+        SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker, telemetry::PixAdmissionRejection,
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
@@ -165,6 +165,16 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     // still have woken it.
     if let Some(gate) = session_data.pix_egress_gate.get() {
         gate.poison();
+    }
+
+    // Return this Session's share of the node-level PIX aggregates, after the gate is poisoned so
+    // that no permit it was still handing out is missed. Explicit rather than left to `Drop` for the
+    // reason `CycleBudgetReservation` gives below, and one more: the supervisor worker is spawned
+    // detached and stops only when the last command sender goes with the slot — which the cache does
+    // during a later maintenance pass. Until then the node would report Sessions and cycles that no
+    // longer exist. Idempotent, so the `Drop` backstop is free to run afterwards.
+    if let Some(supervisor) = session_data.pix_supervisor.get() {
+        supervisor.telemetry.release();
     }
 
     // Terminate any additional tasks spawned by the Session. This is also what releases the PIX
@@ -1006,6 +1016,10 @@ impl CycleBudgetReservation {
             })
             .unwrap_or_default()
             .saturating_sub(self.bytes);
+
+        #[cfg(feature = "telemetry")]
+        crate::telemetry::pix::record_cycle_bytes_released(self.bytes);
+
         trace!(
             released = self.bytes,
             outstanding, "released live-cycle budget reservation"
@@ -3310,6 +3324,18 @@ where
             #[cfg(feature = "telemetry")]
             crate::telemetry::record_pix_closure(reason);
 
+            // Return this Session's share of the node-level aggregates now, rather than leaving it
+            // to `close_session` below. The notification between here and there is a network send
+            // with its own timeout, and for the whole of it the Session is closed — its supervisor
+            // has stopped and its gate is poisoned — while `hopr_pix_sessions_active` would still
+            // be counting it. Idempotent, so `close_session` remains the backstop for every other
+            // path into it.
+            if let Some(slot) = myself.sessions.get(&session_id)
+                && let Some(supervisor) = slot.pix_supervisor.get()
+            {
+                supervisor.telemetry.release();
+            }
+
             // Tell the Entry, so it can drop its side rather than wait out its own timeout. The
             // Session is closed either way, so a send failure here changes nothing.
             //
@@ -4228,6 +4254,12 @@ where
             })
             .ok()
             .map(|_| {
+                // Reports only this reservation's own bytes, not an outstanding total. Initiations
+                // are processed concurrently, so any total computed here can be published out of
+                // order with another reservation's; the gauge adds instead, which commutes.
+                #[cfg(feature = "telemetry")]
+                crate::telemetry::pix::record_cycle_bytes_reserved(bytes);
+
                 Arc::new(CycleBudgetReservation {
                     bytes,
                     outstanding: self.live_cycle_bytes.clone(),
@@ -4399,6 +4431,10 @@ where
                 identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason: StartErrorReason::UnacceptablePixParams,
             });
+            // Counted before the send, not after: the refusal has already happened, and
+            // `send_via_msg_sender` can fail to encode, fail to send, or time out. Counting
+            // afterwards would drop exactly the refusals that a struggling node makes most.
+            PixAdmissionRejection::NoPixSupport.record_if_pix(session_req.capabilities.0);
             send_via_msg_sender(
                 &mut msg_sender,
                 reply_routing,
@@ -4427,6 +4463,7 @@ where
                     identifier: ErrorIdentifier::Challenge(session_req.challenge),
                     reason,
                 });
+                PixAdmissionRejection::UnacceptableParams.record_if_pix(session_req.capabilities.0);
                 send_via_msg_sender(
                     &mut msg_sender,
                     reply_routing,
@@ -4435,6 +4472,8 @@ where
                 )
                 .await?;
 
+                // Left after the send, unlike the line above: this one counts errors *sent*, so a
+                // send that never happened is correctly not one of them.
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
                 return Ok(());
@@ -4449,6 +4488,14 @@ where
                     identifier: ErrorIdentifier::Challenge(session_req.challenge),
                     reason,
                 });
+                // `request_admission` distinguishes these two on purpose — a refused target will not
+                // be served however the request is phrased, while `Busy` is this node being unable
+                // to ask right now and is worth retrying — so the aggregate keeps them apart too.
+                match reason {
+                    StartErrorReason::TargetNotAdmitted => PixAdmissionRejection::TargetPolicy,
+                    _ => PixAdmissionRejection::Busy,
+                }
+                .record_if_pix(session_req.capabilities.0);
                 send_via_msg_sender(
                     &mut msg_sender,
                     reply_routing,
@@ -4479,6 +4526,7 @@ where
                 identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
+            PixAdmissionRejection::UnacceptableParams.record_if_pix(session_req.capabilities.0);
             send_via_msg_sender(
                 &mut msg_sender,
                 reply_routing,
@@ -4517,6 +4565,10 @@ where
                     identifier: ErrorIdentifier::Challenge(session_req.challenge),
                     reason,
                 });
+                // The refusal this whole aggregate exists to separate from the one below. Both are
+                // `NoSlotsAvailable` on the wire, but this one says the node is healthy and full of
+                // reconstructor state, and the other says it is at its Session limit.
+                PixAdmissionRejection::LiveCycleCapacity.record_if_pix(session_req.capabilities.0);
                 send_via_msg_sender(
                     &mut msg_sender,
                     reply_routing,
@@ -4575,6 +4627,7 @@ where
                 reason,
             });
 
+            PixAdmissionRejection::NoSessionSlot.record_if_pix(session_req.capabilities.0);
             send_via_msg_sender(
                 &mut msg_sender,
                 reply_routing.clone(),
