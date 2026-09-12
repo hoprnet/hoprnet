@@ -1251,7 +1251,7 @@ pub enum SessionPixCloseReason {
 // name is one it cannot match on or downcast to. `manager` currently only forwards it into an
 // `io::Error`, which is why the import reads as unused.
 #[allow(unused_imports)]
-pub use gate::{GateClosed, ServiceGate};
+pub use gate::{GateBlockReason, GateClosed, GateVerdict, ServiceGate};
 /// The state machine itself, for benchmarks only.
 ///
 /// `supervisor` is otherwise private on purpose: the worker owns the only instance that exists in

@@ -36,7 +36,15 @@
 //! value is that they survive the state they describe. Those are latched at the transition that
 //! changes the source of truth ([`PixTurnEvents`]) and drained by the same publish.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Instant,
+};
+
+use super::gate::{GateBlockReason, ServiceGate};
 
 // ---------------------------------------------------------------------------
 // Label enums
@@ -116,6 +124,77 @@ impl PixCycleEvent {
     fn is_census_coupled(self) -> bool {
         matches!(self, Self::Requested | Self::Recovered | Self::Failed)
     }
+}
+
+/// Why PIX egress stopped, as `hopr_pix_gate_blocks_total` labels it.
+///
+/// The gate's own two reasons plus the one it does not have a verdict for: a poisoned gate refuses
+/// through `Err(GateClosed)` rather than through a `Blocked`, because it is not a stall the Session
+/// will come out of.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum PixGateBlock {
+    /// The unfunded front has spent its whole predeposit allowance.
+    PredepositExhausted,
+    /// Funded service has run its full ceiling ahead of the shares coming back.
+    ShareLag,
+    /// The gate was poisoned: the Session is being torn down and will serve nothing further.
+    Closed,
+}
+
+impl From<GateBlockReason> for PixGateBlock {
+    fn from(reason: GateBlockReason) -> Self {
+        match reason {
+            GateBlockReason::PredepositExhausted => Self::PredepositExhausted,
+            GateBlockReason::ShareLag => Self::ShareLag,
+        }
+    }
+}
+
+/// One episode of PIX egress being blocked, measured from first refusal until it ends.
+///
+/// # Why an episode rather than a refusal
+///
+/// A blocked gate is polled again by whatever is trying to send, so counting refusals would measure
+/// how hard the caller retries rather than how long the Exit was stalled — the issue's "a tight
+/// retry loop must not increment blocked on every failed poll". The entry into the blocked state is
+/// counted once, here, and how long it lasted is measured separately.
+///
+/// # Why `Drop`
+///
+/// The episode ends three ways, and only one of them is a return value: the gate resumes and the
+/// parked writer proceeds, the gate is poisoned and the writer fails, or the whole future is
+/// dropped because the Session was torn down underneath it. `Drop` is the one mechanism that covers
+/// all three, which is what makes "block timers close exactly once on every terminal path" hold
+/// without any of those paths having to remember.
+pub struct PixGateBlockEpisode {
+    reason: GateBlockReason,
+    began: Instant,
+}
+
+impl PixGateBlockEpisode {
+    /// Counts one episode beginning, and starts its clock.
+    pub fn begin(reason: GateBlockReason) -> Self {
+        emit_gate_block(reason.into());
+        Self {
+            reason,
+            began: Instant::now(),
+        }
+    }
+}
+
+impl Drop for PixGateBlockEpisode {
+    fn drop(&mut self) {
+        emit_gate_block_duration(self.reason, self.began.elapsed().as_secs_f64());
+    }
+}
+
+/// Counts one refusal by a poisoned gate.
+///
+/// No episode and no duration: a poisoned gate never resumes, so the only thing a clock on it would
+/// measure is how long the Session's teardown took to reach its last writer.
+pub fn record_gate_closed() {
+    emit_gate_block(PixGateBlock::Closed);
 }
 
 /// Why an incoming PIX Session was refused before it was established.
@@ -285,21 +364,32 @@ enum EventScope {
 /// Sessions and cycles that no longer exist. The flag is what lets both the explicit call and `Drop`
 /// run without decrementing twice.
 pub struct PixSessionTelemetry {
-    state: parking_lot::Mutex<Option<PixSessionSnapshot>>,
+    /// The gate this Session's egress passes through, read for its served split.
+    ///
+    /// Held rather than passed in, because the two callers do not both have it at the moment they
+    /// need it: `release` runs from `close_session`, which does have the gate, but `Drop` runs from
+    /// wherever the last `Arc` happens to go.
+    gate: Arc<ServiceGate>,
+    state: parking_lot::Mutex<Published>,
     released: AtomicBool,
 }
 
-impl Default for PixSessionTelemetry {
-    fn default() -> Self {
-        Self::new()
-    }
+/// What this handle has already accounted for.
+#[derive(Clone, Copy, Debug, Default)]
+struct Published {
+    /// The last census, or `None` before the first publish and after a release.
+    census: Option<PixSessionSnapshot>,
+    /// The gate's `(predeposit, funded)` split as of the last flush, so the next one emits the
+    /// difference. Cumulative counters, unlike the census, are never returned on release.
+    egress: (u64, u64),
 }
 
 impl PixSessionTelemetry {
-    /// A handle that has published nothing yet.
-    pub fn new() -> Self {
+    /// A handle that has published nothing yet, reading egress from `gate`.
+    pub fn new(gate: Arc<ServiceGate>) -> Self {
         Self {
-            state: parking_lot::Mutex::new(None),
+            gate,
+            state: parking_lot::Mutex::new(Published::default()),
             released: AtomicBool::new(false),
         }
     }
@@ -327,20 +417,25 @@ impl PixSessionTelemetry {
             return;
         }
 
-        apply_delta(state.as_ref(), Some(&snapshot));
-        *state = Some(snapshot);
+        apply_delta(state.census.as_ref(), Some(&snapshot));
+        state.census = Some(snapshot);
+        let egress = self.flush_egress(&mut state);
         drop(state);
 
+        record_egress(egress);
         record_events(events, EventScope::Everything);
     }
 
-    /// Returns every gauge this Session holds to zero. Idempotent.
+    /// Returns every gauge this Session holds to zero, and flushes its last egress. Idempotent.
     ///
     /// Cycles still live in the last published census are counted as
     /// [`Failed`](PixCycleEvent::Failed), which is what keeps `requested = recovered + failed` exact
     /// for a Session that ends with cycles in flight. `on_unverifiable_shares` does exactly that on
     /// purpose — it closes the Session outright rather than retiring each cycle — and so does any
     /// close that arrives from outside the supervisor.
+    ///
+    /// The egress flush is why `close_session` poisons the gate before calling this: a poisoned gate
+    /// admits nothing further, so the split read here is final rather than a moving target.
     ///
     /// If a publish is racing this, one census applies and the other is suppressed, and either
     /// ordering counts each live cycle exactly once: a publish that wins first shrinks the census
@@ -353,13 +448,14 @@ impl PixSessionTelemetry {
         }
 
         let mut state = self.state.lock();
-        let Some(last) = state.take() else {
-            return;
-        };
-        apply_delta(Some(&last), None);
+        let last = state.census.take();
+        apply_delta(last.as_ref(), None);
+        let egress = self.flush_egress(&mut state);
         drop(state);
 
-        let live = last.live_cycles();
+        record_egress(egress);
+
+        let live = last.map(|census| census.live_cycles()).unwrap_or(0);
         if live > 0 {
             record_events(
                 PixTurnEvents {
@@ -371,11 +467,38 @@ impl PixSessionTelemetry {
         }
     }
 
+    /// Packets admitted since the last flush, and advances the watermark.
+    ///
+    /// Returned rather than emitted so the caller can release the lock first: these are cumulative
+    /// counters, and holding this Session's lock across a global instrument would serialize every
+    /// other Session's publish behind it for no benefit.
+    fn flush_egress(&self, state: &mut Published) -> (u64, u64) {
+        let (predeposit, funded) = self.gate.served_split();
+        // `served_split`'s two loads are not atomic with respect to each other, so a predeposit
+        // permit landing between them is seen by one and not the other. Its publication order rules
+        // out the direction that would misattribute the packet; what remains is a `served_predeposit`
+        // from after the permit against a `served` from before it, which makes the *derived* funded
+        // figure come out one lower than the truth.
+        //
+        // Saturating the subtraction keeps that from wrapping a counter to 2^64. Clamping the stored
+        // watermark is what keeps it from double-counting: without the `max`, the regressed value
+        // would be stored, and every funded packet between it and the real figure would be reported
+        // a second time when the next flush crossed that ground again. The reading corrects itself
+        // on the following flush either way — this only ensures the correction is not paid for
+        // twice.
+        let delta = (
+            predeposit.saturating_sub(state.egress.0),
+            funded.saturating_sub(state.egress.1),
+        );
+        state.egress = (predeposit.max(state.egress.0), funded.max(state.egress.1));
+        delta
+    }
+
     /// The snapshot this handle last published, for tests that assert its bookkeeping without
     /// reading the process-wide metric registry.
     #[cfg(test)]
     pub fn published(&self) -> Option<PixSessionSnapshot> {
-        *self.state.lock()
+        self.state.lock().census
     }
 }
 
@@ -436,6 +559,16 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
     }
 }
 
+/// Counts packets admitted since the last flush, by what paid for them.
+fn record_egress((predeposit, funded): (u64, u64)) {
+    if predeposit > 0 {
+        emit_egress_packets(PixGateMode::Predeposit, predeposit);
+    }
+    if funded > 0 {
+        emit_egress_packets(PixGateMode::Funded, funded);
+    }
+}
+
 // The four shims below are the whole of this module's dependence on the `telemetry` feature. Keeping
 // the `cfg` here rather than around the arithmetic above means that arithmetic is compiled, linted
 // and tested in both configurations — with the feature off and outside a test build, each of these
@@ -475,6 +608,38 @@ fn emit_cycles_total(event: PixCycleEvent, count: u64) {
     probe::add(&format!("cycles_total/{event}"), count as i64);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = (event, count);
+}
+
+fn emit_egress_packets(mode: PixGateMode, count: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_egress_packets(mode, count);
+    #[cfg(test)]
+    probe::add(&format!("egress_packets/{mode}"), count as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = (mode, count);
+}
+
+fn emit_gate_block(reason: PixGateBlock) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::record_gate_block(reason);
+    #[cfg(test)]
+    probe::add(&format!("gate_blocks/{reason}"), 1);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = reason;
+}
+
+fn emit_gate_block_duration(reason: GateBlockReason, seconds: f64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::record_gate_block_duration(reason, seconds);
+    // The one argument the probe does not consume: a test can assert that an episode was closed,
+    // but not how long a wall clock said it took.
+    #[cfg(not(feature = "telemetry"))]
+    let _ = seconds;
+
+    #[cfg(test)]
+    probe::add(&format!("gate_block_observations/{reason}"), 1);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = reason;
 }
 
 /// An in-process mirror of the aggregates, so tests can assert what was emitted.
@@ -534,7 +699,16 @@ pub(crate) mod probe {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::gate::GateVerdict, *};
+
+    /// A handle over a gate that serves nothing, for tests about the census alone.
+    ///
+    /// `ServiceGate::new(0, 0)` is a strict-prepay gate with a zero ceiling: it admits nothing on
+    /// either branch, so `served_split` stays `(0, 0)` and the egress flush contributes nothing to
+    /// what these tests assert.
+    fn handle() -> PixSessionTelemetry {
+        PixSessionTelemetry::new(ServiceGate::new(0, 0))
+    }
 
     fn snapshot(mode: PixGateMode, recovering: u32) -> PixSessionSnapshot {
         PixSessionSnapshot {
@@ -546,12 +720,12 @@ mod tests {
 
     #[test]
     fn a_fresh_handle_has_published_nothing() {
-        assert_eq!(None, PixSessionTelemetry::new().published());
+        assert_eq!(None, handle().published());
     }
 
     #[test]
     fn publish_stores_the_latest_census() {
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(snapshot(PixGateMode::Predeposit, 0), PixTurnEvents::default());
         assert_eq!(Some(snapshot(PixGateMode::Predeposit, 0)), telemetry.published());
@@ -563,7 +737,7 @@ mod tests {
 
     #[test]
     fn release_clears_the_census_and_is_idempotent() {
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
         telemetry.publish(snapshot(PixGateMode::Funded, 3), PixTurnEvents::default());
 
         telemetry.release();
@@ -577,7 +751,7 @@ mod tests {
 
     #[test]
     fn publishing_after_release_is_ignored() {
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
         telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
         telemetry.release();
 
@@ -598,7 +772,7 @@ mod tests {
     /// twice.
     #[test]
     fn a_publish_that_loses_to_release_still_books_the_uncoupled_counts() {
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
         telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
         telemetry.release();
         probe::reset();
@@ -638,7 +812,7 @@ mod tests {
     #[test]
     fn the_lifecycle_invariant_holds_when_release_beats_the_final_publish() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
         telemetry.publish(
             snapshot(PixGateMode::Funded, 2),
             PixTurnEvents {
@@ -683,7 +857,7 @@ mod tests {
 
     #[test]
     fn releasing_a_handle_that_published_nothing_is_a_no_op() {
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
         telemetry.release();
         assert_eq!(None, telemetry.published());
     }
@@ -773,7 +947,7 @@ mod tests {
     #[test]
     fn successive_publishes_emit_differences_not_totals() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(
             PixSessionSnapshot {
@@ -817,7 +991,7 @@ mod tests {
     #[test]
     fn a_funding_session_moves_between_the_two_buckets() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
         assert_eq!(1, probe::get("sessions_active/predeposit"));
@@ -837,7 +1011,7 @@ mod tests {
     #[test]
     fn release_zeroes_the_gauges_and_charges_the_live_cycles() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(
             PixSessionSnapshot {
@@ -875,7 +1049,7 @@ mod tests {
     #[test]
     fn releasing_a_drained_session_charges_no_failure() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(
             PixSessionSnapshot {
@@ -902,7 +1076,7 @@ mod tests {
         probe::reset();
 
         {
-            let telemetry = PixSessionTelemetry::new();
+            let telemetry = handle();
             telemetry.publish(snapshot(PixGateMode::Funded, 2), PixTurnEvents::default());
             assert_eq!(1, probe::get("sessions_active/funded"));
         }
@@ -915,7 +1089,7 @@ mod tests {
     #[test]
     fn a_second_release_does_not_decrement_again() {
         probe::reset();
-        let telemetry = PixSessionTelemetry::new();
+        let telemetry = handle();
 
         telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
         telemetry.release();
@@ -929,6 +1103,204 @@ mod tests {
             "a repeated release must not drive the gauge negative"
         );
         assert_eq!(1, probe::get("cycles_total/failed"), "the loss is charged once");
+    }
+
+    // -----------------------------------------------------------------------
+    // Gate pressure
+    // -----------------------------------------------------------------------
+
+    /// An episode is counted once when it begins and closed once when it ends.
+    #[test]
+    fn a_block_episode_is_counted_once_and_closed_once() {
+        probe::reset();
+
+        {
+            let _episode = PixGateBlockEpisode::begin(GateBlockReason::PredepositExhausted);
+            assert_eq!(1, probe::get("gate_blocks/predeposit_exhausted"));
+            assert_eq!(
+                0,
+                probe::get("gate_block_observations/predeposit_exhausted"),
+                "the duration must not be observed while the episode is still open"
+            );
+        }
+
+        assert_eq!(1, probe::get("gate_block_observations/predeposit_exhausted"));
+        assert_eq!(1, probe::get("gate_blocks/predeposit_exhausted"), "still one episode");
+    }
+
+    /// Successive episodes are separate, and each reason is counted under its own label.
+    #[test]
+    fn each_reason_is_counted_separately() {
+        probe::reset();
+
+        drop(PixGateBlockEpisode::begin(GateBlockReason::PredepositExhausted));
+        drop(PixGateBlockEpisode::begin(GateBlockReason::ShareLag));
+        drop(PixGateBlockEpisode::begin(GateBlockReason::ShareLag));
+
+        assert_eq!(1, probe::get("gate_blocks/predeposit_exhausted"));
+        assert_eq!(2, probe::get("gate_blocks/share_lag"));
+        assert_eq!(1, probe::get("gate_block_observations/predeposit_exhausted"));
+        assert_eq!(2, probe::get("gate_block_observations/share_lag"));
+    }
+
+    /// A poisoned gate is counted but never timed.
+    ///
+    /// It is not a stall the Session recovers from, so a duration on it would measure how long the
+    /// teardown took to reach the last writer — which is not egress pressure and would drag the
+    /// histogram's tail for a reason that is not one.
+    #[test]
+    fn a_closed_gate_is_counted_without_a_duration() {
+        probe::reset();
+
+        record_gate_closed();
+        record_gate_closed();
+
+        assert_eq!(2, probe::get("gate_blocks/closed"));
+        assert_eq!(
+            std::collections::BTreeMap::from([("gate_blocks/closed".to_string(), 2)]),
+            probe::non_zero(),
+            "a closed gate must observe no duration under any reason"
+        );
+    }
+
+    /// Egress is flushed as a delta from the gate, never as its running total.
+    #[test]
+    fn egress_is_flushed_as_a_delta_from_the_gate() -> anyhow::Result<()> {
+        probe::reset();
+        let gate = ServiceGate::new(2, 10);
+        let telemetry = PixSessionTelemetry::new(gate.clone());
+
+        // Two packets on the allowance, then a publish.
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
+        assert_eq!(2, probe::get("egress_packets/predeposit"));
+        assert_eq!(0, probe::get("egress_packets/funded"));
+
+        // A publish with nothing served in between adds nothing.
+        telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
+        assert_eq!(
+            2,
+            probe::get("egress_packets/predeposit"),
+            "totals must not be re-added"
+        );
+
+        // Funded service lands in the other bucket, and the allowance total is untouched.
+        gate.release_service();
+        for _ in 0..3 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
+        assert_eq!(2, probe::get("egress_packets/predeposit"));
+        assert_eq!(3, probe::get("egress_packets/funded"));
+        Ok(())
+    }
+
+    /// `release` flushes the packets served since the last publish rather than losing them.
+    ///
+    /// This is the tail between a Session's final supervisor turn and its teardown. It is not
+    /// hypothetical: the worker publishes per turn, and a Session passing data serves thousands of
+    /// packets between turns.
+    #[test]
+    fn release_flushes_the_final_egress_tail() -> anyhow::Result<()> {
+        probe::reset();
+        let gate = ServiceGate::new(10, 10);
+        let telemetry = PixSessionTelemetry::new(gate.clone());
+
+        assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
+        assert_eq!(1, probe::get("egress_packets/predeposit"));
+
+        // Four more packets with no publish in between — the window `release` has to cover.
+        for _ in 0..4 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        telemetry.release();
+
+        assert_eq!(
+            5,
+            probe::get("egress_packets/predeposit"),
+            "packets served after the last publish must still be counted"
+        );
+        assert_eq!(
+            0,
+            probe::get("sessions_active/predeposit"),
+            "the gauges still come back to zero"
+        );
+        Ok(())
+    }
+
+    /// A flush never lowers the egress watermark, so ground already counted is not counted again.
+    ///
+    /// The rule rather than the race. `served_split` derives its funded component by subtraction
+    /// from two non-atomic loads, and a predeposit permit increments `served_predeposit` before it
+    /// publishes `served` — so a permit landing between the loads is counted in the split but not
+    /// yet in the total, and yields a funded figure *below* the previous one. That is the tear the
+    /// publication order deliberately leaves reachable, because it emits nothing; reproducing the
+    /// interleaving would be a timing test, and what has to hold is simply that a reading below the
+    /// watermark leaves the watermark where it is. The watermark is put ahead of the gate here to
+    /// reach the same state deterministically.
+    #[test]
+    fn a_flush_never_rewinds_the_egress_watermark() -> anyhow::Result<()> {
+        probe::reset();
+        let gate = ServiceGate::new(0, 100);
+        let telemetry = PixSessionTelemetry::new(gate.clone());
+        gate.release_service();
+
+        for _ in 0..6 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
+        assert_eq!(6, probe::get("egress_packets/funded"));
+
+        // The watermark now claims more than the gate will report — the shape a torn read leaves.
+        telemetry.state.lock().egress.1 = 9;
+
+        telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
+        assert_eq!(
+            6,
+            probe::get("egress_packets/funded"),
+            "a reading below the watermark adds nothing"
+        );
+        assert_eq!(
+            9,
+            telemetry.state.lock().egress.1,
+            "and must not drag the watermark back down to it"
+        );
+
+        // Four more packets take the gate to 10, of which exactly one is above the watermark.
+        for _ in 0..4 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
+        assert_eq!(
+            7,
+            probe::get("egress_packets/funded"),
+            "only the packet past the watermark is new; a rewound one would report four"
+        );
+        Ok(())
+    }
+
+    /// Cumulative counters are not returned on release, only gauges are.
+    #[test]
+    fn release_does_not_decrement_the_cumulative_counters() -> anyhow::Result<()> {
+        probe::reset();
+        let gate = ServiceGate::new(4, 10);
+        let telemetry = PixSessionTelemetry::new(gate.clone());
+
+        for _ in 0..4 {
+            assert_eq!(GateVerdict::Admitted, gate.try_acquire_sync()?);
+        }
+        telemetry.publish(snapshot(PixGateMode::Predeposit, 1), PixTurnEvents::default());
+        telemetry.release();
+        drop(telemetry);
+
+        assert_eq!(
+            4,
+            probe::get("egress_packets/predeposit"),
+            "a monotonic counter must never be walked back"
+        );
+        Ok(())
     }
 
     /// More Sessions than the OpenTelemetry per-instrument cardinality limit, opened and closed.
@@ -946,7 +1318,7 @@ mod tests {
         probe::reset();
 
         for i in 0..SESSIONS {
-            let telemetry = PixSessionTelemetry::new();
+            let telemetry = handle();
 
             // Request three cycles, fund them, and let two of the three recover.
             telemetry.publish(

@@ -29,6 +29,9 @@
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
 //! | `hopr_pix_admission_rejections_total` | MultiCounter | refusals | incoming Start path | `reason` — see [`PixAdmissionRejection`] |
+//! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
+//! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
+//! | `hopr_pix_gate_block_seconds` | MultiHistogram | seconds | episode end | `reason` = `predeposit_exhausted\|share_lag` |
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived
@@ -99,7 +102,10 @@
 //!   # should equal hopr_pix_live_cycle_bytes
 //! ```
 
-use crate::supervision::telemetry::{PixAdmissionRejection, PixCycleEvent, PixCyclePhase, PixGateMode};
+use crate::supervision::{
+    GateBlockReason,
+    telemetry::{PixAdmissionRejection, PixCycleEvent, PixCyclePhase, PixGateBlock, PixGateMode},
+};
 
 lazy_static::lazy_static! {
     static ref METRIC_PIX_SESSIONS_ACTIVE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
@@ -136,6 +142,22 @@ lazy_static::lazy_static! {
     static ref METRIC_PIX_ADMISSION_REJECTIONS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_admission_rejections_total",
         "Incoming PIX sessions refused before establishment, by reason",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_PIX_EGRESS_PACKETS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_egress_packets_total",
+        "Exit-to-Entry data packets admitted by PIX egress gates, by what paid for them",
+        &["mode"]
+    ).unwrap();
+    static ref METRIC_PIX_GATE_BLOCKS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_gate_blocks_total",
+        "PIX egress block episodes entered, by reason (counted once per episode, not per refused packet)",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_PIX_GATE_BLOCK_SECONDS: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_gate_block_seconds",
+        "How long PIX egress stayed blocked, from first refusal until service resumed or the session closed",
+        vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 15.0, 60.0, 300.0],
         &["reason"]
     ).unwrap();
 }
@@ -180,6 +202,26 @@ pub(crate) fn record_admission_rejection(reason: PixAdmissionRejection) {
 pub(crate) fn record_cycle_bytes_reserved(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RESERVED.increment_by(bytes);
     METRIC_PIX_LIVE_CYCLE_BYTES.increment(bytes as f64);
+}
+
+/// Counts `count` packets admitted by a PIX egress gate in one mode.
+pub(crate) fn add_egress_packets(mode: PixGateMode, count: u64) {
+    METRIC_PIX_EGRESS_PACKETS.increment_by(&[mode.to_string().as_str()], count);
+}
+
+/// Counts one block episode beginning.
+pub(crate) fn record_gate_block(reason: PixGateBlock) {
+    METRIC_PIX_GATE_BLOCKS.increment(&[reason.to_string().as_str()]);
+}
+
+/// Records how long one block episode lasted.
+///
+/// Only the two resumable reasons are observed. A `closed` gate never resumes, so its "duration"
+/// would be the interval between a Session being torn down and its last writer noticing — which
+/// says nothing about egress pressure and would drag the histogram's tail for a reason that is not
+/// a stall at all.
+pub(crate) fn record_gate_block_duration(reason: GateBlockReason, seconds: f64) {
+    METRIC_PIX_GATE_BLOCK_SECONDS.observe(&[reason.to_string().as_str()], seconds);
 }
 
 /// Counts `bytes` returned to the node's live-cycle budget.
