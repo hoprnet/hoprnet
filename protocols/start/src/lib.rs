@@ -676,7 +676,17 @@ where
                     return Err(StartProtocolError::NumberOfCommitments);
                 }
 
-                for (index, commitment) in commit.coefficient_commitments {
+                // Ascending by polynomial index, so that the same message always encodes to the same
+                // bytes. `coefficient_commitments` is a `HashMap`, whose iteration order varies per
+                // process; the entries carry their own index so the receiver does not care, but a
+                // codec whose output depends on the run is one that cannot be diffed, snapshotted or
+                // reproduced from a capture. The other two collections this message family encodes —
+                // `SsaRequest`'s `commitments` and its `deposit_data` — are already ordered for the
+                // same reason.
+                let mut coefficient_commitments = commit.coefficient_commitments.into_iter().collect::<Vec<_>>();
+                coefficient_commitments.sort_unstable_by_key(|(index, _)| *index);
+
+                for (index, commitment) in coefficient_commitments {
                     let commitment_repr = commitment.as_ref();
                     if commitment_repr.len() != Self::PIX_COEFF_COMMITMENT_REPR_SIZE {
                         return Err(StartProtocolError::ParseError("commitment_repr_size".into()));

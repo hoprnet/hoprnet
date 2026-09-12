@@ -16,6 +16,9 @@ include = [
   "src/**/*.rs",
   "benches/**/*.rs",
   "tests/**/*.rs",
+  # Wireshark dissector for the `capture` feature's diagnostic format, kept in sync with
+  # `src/capture.rs` by the `dissector` tests there.
+  "hopr.lua",
   "Cargo.toml",
   "LICENSE",
 ]
@@ -163,6 +166,9 @@ async-trait = { workspace = true }
 bimap = { workspace = true }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+# Only for the dissector sync test: it walks `Flags::LIST` of the protocol flag sets so that a new
+# capability or keep-alive flag reaches the Wireshark dissector without anyone restating the list.
+flagset = { workspace = true }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }

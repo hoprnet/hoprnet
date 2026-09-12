@@ -4454,6 +4454,7 @@ dependencies = [
  "criterion",
  "crossfire",
  "dashmap",
+ "flagset",
  "futures",
  "futures-concurrency",
  "futures-time",

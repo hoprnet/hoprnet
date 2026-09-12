@@ -30,6 +30,28 @@ cargo nextest run --lib                        # All unit tests
 cargo nextest run --lib -p <crate>             # Single crate unit tests
 ```
 
+### Packet capture and the Wireshark dissector
+
+The diagnostic capture format (`transport/hopr/src/capture.rs`) and the Wireshark dissector that
+reads it (`transport/hopr/hopr.lua`) are kept in sync by tests behind the non-default `capture`
+feature:
+
+```bash
+cargo nextest run -p hopr-transport --features capture --lib capture::
+```
+
+After changing the capture format or any protocol the dissector decodes:
+
+```bash
+# Rewrites the generated constants block of hopr.lua from the Rust definitions.
+HOPR_UPDATE_DISSECTOR=1 cargo nextest run -p hopr-transport --features capture --lib dissector
+cargo insta review                             # byte-layout snapshot of the fixture corpus
+```
+
+The end-to-end test drives `tshark` (in the nix devShell) over a generated capture; it skips with a
+message when `tshark` is absent, unless `HOPR_REQUIRE_TSHARK=1` is set — as it is in CI, so the check
+cannot be lost silently. Set `HOPR_KEEP_CAPTURE=1` to keep the fixture `.pcapng` for inspection.
+
 ### Integration Tests
 
 Integration tests **must** run single-threaded due to shared cluster resources:

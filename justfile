@@ -78,7 +78,7 @@ test:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
     echo "==> Running clippy..."
-    cargo clippy --workspace --all-targets --features testing -- -D warnings
+    cargo clippy --workspace --all-targets --features testing,capture -- -D warnings
     echo ""
     echo "==> Checking metrics documentation..."
     ./.github/scripts/generate-metrics-docs.sh
@@ -86,6 +86,9 @@ test:
     echo "==> Running unit tests with default features..."
     NEXTEST_SHOW_PROGRESS=none cargo nextest run --lib
     NEXTEST_SHOW_PROGRESS=none cargo nextest run --lib --features testing
+    echo ""
+    echo "==> Running packet-capture and Wireshark dissector tests..."
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run -p hopr-transport --features capture --lib capture::
     echo ""
     echo "==> Running doc tests with default features..."
     cargo test --doc --workspace

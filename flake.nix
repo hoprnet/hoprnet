@@ -107,6 +107,9 @@
             inherit fs;
             extraFiles = [
               (fs.fileFilter (file: file.hasExt "snap") ./.)
+              # transport/hopr/hopr.lua: the Wireshark dissector the `capture` tests diff against
+              # and run tshark over.
+              (fs.fileFilter (file: file.hasExt "lua") ./.)
             ];
           };
 
@@ -184,10 +187,17 @@
                   }
                 )
               )).overrideAttrs
-                (_: {
+                (old: {
+                  # `tshark` runs the Wireshark dissector over a generated capture in
+                  # `hopr-transport`'s `capture::dissector` tests. `.out` because the binary lives
+                  # there, and a bare reference resolves to the `dev` output, which has no `bin/`.
+                  nativeCheckInputs = (old.nativeCheckInputs or [ ]) ++ [ pkgs.wireshark-cli.out ];
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --lib
+                    # Without this the dissector test skips when `tshark` is missing, silently
+                    # losing the only check that the Lua dissector still loads and parses.
+                    export HOPR_REQUIRE_TSHARK=1
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F capture --lib
                     runHook postCheck
                   '';
                 });
@@ -263,7 +273,9 @@
             workspace-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
               libraryBuildArgs
               // {
-                cargoExtraArgs = "--workspace";
+                # `capture` is not a default feature, so its code (including the Wireshark
+                # dissector tests) would otherwise never be linted.
+                cargoExtraArgs = "--workspace -F capture";
                 prependPackageName = false;
                 runClippy = true;
               }
@@ -397,6 +409,9 @@
               envsubst
               uv
               graphviz
+              # For `transport/hopr/hopr.lua`: the dissector tests drive `tshark`, and it is also
+              # how a capture is read by hand.
+              wireshark-cli
             ];
             shellHook = ''
               export GITHUB_TOKEN="''${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
