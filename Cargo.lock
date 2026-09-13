@@ -4529,8 +4529,6 @@ dependencies = [
 [[package]]
 name = "hopr-transport-p2p"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe10edd3f8a72932451e3d8f75058075e68d86942c2cc4db005587c31cd58c29"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -4538,7 +4536,7 @@ dependencies = [
  "dashmap",
  "futures",
  "hopr-api",
- "hopr-utilities 0.12.0",
+ "hopr-utilities 0.13.0",
  "libp2p",
  "libp2p-stream",
  "multiaddr",
@@ -4705,26 +4703,13 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c14c15d3f0945752daaf2a0b5c5b0a9e11821d012eff7c48195e89dc1454695d"
 dependencies = [
- "arrayvec",
  "auto_impl",
  "const-hex",
- "crossfire",
- "flume",
  "futures",
- "futures-time",
- "hickory-resolver 0.26.1",
- "hopr-types",
  "indexmap 2.14.0",
- "lazy_static",
- "libp2p-identity",
- "multiaddr",
- "pin-project",
  "rand 0.10.2",
  "serde_json",
- "socket2 0.6.5",
- "strum",
  "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
@@ -5580,6 +5565,7 @@ dependencies = [
  "libp2p-mdns",
  "libp2p-metrics",
  "libp2p-noise",
+ "libp2p-plaintext",
  "libp2p-quic",
  "libp2p-request-response",
  "libp2p-swarm",
@@ -5776,6 +5762,22 @@ dependencies = [
  "tracing",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "libp2p-plaintext"
+version = "0.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e659439578fc6d305da8303834beb9d62f155f40e7f5b9d81c9f2b2c69d1926"
+dependencies = [
+ "asynchronous-codec",
+ "bytes",
+ "futures",
+ "libp2p-core",
+ "libp2p-identity",
+ "quick-protobuf",
+ "quick-protobuf-codec",
+ "tracing",
 ]
 
 [[package]]

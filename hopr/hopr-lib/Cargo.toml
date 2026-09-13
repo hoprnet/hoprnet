@@ -115,7 +115,32 @@ serde = [
 session-client = ["hopr-api/node-session-client"]
 explicit-path = ["session-client"]
 session-server = ["hopr-api/node-session-server"]
-transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
+# Announces QUIC multiaddresses *and* builds the transport that speaks them. The two moved
+# together implicitly before — the p2p implementation's `transport-quic` was pinned on the
+# workspace dependency — which left no way to ask for a node without QUIC. They are one switch
+# now, which is what they always were in practice: announcing an address nothing listens on is
+# not a configuration anyone wants.
+transport-announce-quic = [
+  "hopr-transport/p2p-announce-quic",
+  "hopr-transport-p2p?/transport-quic",
+]
+# Negotiates `/plaintext/2.0.0` instead of `noise` on p2p connections, leaving their traffic
+# readable on the wire.
+#
+# For running a cluster under a protocol dissector: HOPR's onion encryption sits *underneath* the
+# transport's, so with noise in the way a capture is unreadable even to someone holding every
+# node's packet key. See `hopr-transport-p2p`'s `insecure-plaintext` for the full rationale, and
+# the `hopr-wireshark` dissector for what it is for.
+#
+# **Never build a node for a real network with this.** Every packet it sends — tickets,
+# acknowledgements, SURBs, session payloads — is readable by anyone on the path, and nothing stops
+# an active attacker rewriting them. It is off by default, it is mutually exclusive with
+# `transport-announce-quic` (QUIC has no unencrypted mode, and the combination is a compile
+# error), and the node logs a warning on every start:
+#
+#     cargo test -p hopr-lib --no-default-features \
+#       --features pix-bjj,testing,transport-insecure-plaintext
+transport-insecure-plaintext = ["hopr-transport-p2p?/insecure-plaintext"]
 
 # === utility features ===
 utils_futures = []  # utility futures for async adapters
@@ -143,7 +168,6 @@ testing = [
   "hopr-chain-connector/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-p2p/testing",
-  "hopr-transport-p2p/transport-quic",
   "hopr-network-graph/petgraph",
   "hopr-network-graph/graph-api",
   "hopr-ticket-manager/redb",

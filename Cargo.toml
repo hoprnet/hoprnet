@@ -166,9 +166,20 @@ hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.4.0", default-features = false }
-hopr-transport-p2p = { version = "0.11.0", features = ["transport-quic"] }
+# `transport-quic` is selected by `hopr-lib`'s `transport-announce-quic` rather than pinned here.
+# Pinning it made the choice unexpressible: it is mutually exclusive with `insecure-plaintext`,
+# which a cluster built for protocol dissection needs, and a feature forced on the workspace
+# dependency cannot be turned off by anything downstream.
+hopr-transport-p2p = { version = "0.11.0" }
 hopr-ct-full-network = { version = "0.6.0", default-features = false }
 hopr-network-graph = { version = "0.7.0", default-features = false }
+
+# `hopr-transport-p2p`'s `insecure-plaintext` feature is not released yet; `hopr-lib`'s
+# `transport-insecure-plaintext` forwards to it, and cargo resolves a feature's dependencies
+# whether or not the feature is enabled, so the patch cannot be conditional. Replace the path with
+# a `git`/`rev` pair once the branch is pushed, and drop this section once it is published.
+[patch.crates-io]
+hopr-transport-p2p = { path = "../hopr-impls/transport/p2p" }
 
 [profile.dev]
 panic = "abort"

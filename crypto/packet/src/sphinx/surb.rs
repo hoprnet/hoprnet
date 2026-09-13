@@ -254,25 +254,38 @@ where
 /// security assumption here, and this function does not weaken it — anyone able to call it could
 /// already decrypt every hop of the return path directly.
 ///
+/// # Resolving the hops
+///
+/// `candidates_for` is asked, for each hop, which keypairs that key identifier might name. It may
+/// return several, and the right one is then *identified* rather than guessed: the header carries
+/// an authentication tag over its own contents, so transforming it with the wrong key fails with
+/// [`CryptoError::TagMismatch`] and only the correct key gets through.
+///
+/// That matters because a key identifier is assigned by the chain and cannot be derived from a
+/// key, so an observer may know every node's keypair without knowing which identifier stands for
+/// which. Offering all of them and letting the tag decide costs one transformation per candidate
+/// on the first hop and turns an unresolvable identifier into a resolvable one.
+///
 /// # Arguments
 /// * `surb` - the SURB whose opener should be reconstructed.
-/// * `keypair_for` - resolves a key identifier on the return path to that node's keypair. Returning
-///   `None` for any hop fails the reconstruction, since a missing secret leaves the payload
-///   undecryptable anyway.
+/// * `candidates_for` - the keypairs a key identifier on the return path might name. An empty
+///   iterator fails the reconstruction, as does one containing no matching key: a missing secret
+///   leaves the payload undecryptable either way.
 ///
 /// # Errors
-/// [`CryptoError::InvalidInputValue`] if `keypair_for` cannot resolve a hop, or if the path is
-/// longer than [`SphinxHeaderSpec::MAX_HOPS`] — which means the header is not one this
-/// specification could have produced.
-pub fn reply_opener_from_surb<'a, S, H, F>(
+/// [`CryptoError::InvalidInputValue`] if no candidate matches a hop, or if the path is longer than
+/// [`SphinxHeaderSpec::MAX_HOPS`] — which means the header is not one this specification could
+/// have produced.
+pub fn reply_opener_from_surb<'a, S, H, F, I>(
     surb: &SURB<S, H>,
-    mut keypair_for: F,
+    mut candidates_for: F,
 ) -> hopr_types::crypto::errors::Result<ReplyOpener>
 where
     S: SphinxSuite,
     H: SphinxHeaderSpec,
     S::P: 'a,
-    F: FnMut(&H::KeyId) -> Option<&'a S::P>,
+    F: FnMut(&H::KeyId) -> I,
+    I: IntoIterator<Item = &'a S::P>,
     for<'b> &'b Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'b <S::P as Keypair>::Public>,
 {
     let mut alpha = surb.alpha.clone();
@@ -285,15 +298,30 @@ where
     let mut shared_secrets = Vec::with_capacity(H::MAX_HOPS.get());
 
     for _ in 0..H::MAX_HOPS.get() {
-        let keypair = keypair_for(&next_hop).ok_or(CryptoError::InvalidInputValue(
-            "no keypair for a node on the SURB's return path",
+        let mut matched = None;
+
+        for keypair in candidates_for(&next_hop) {
+            let Ok((next_alpha, secret)) =
+                SharedKeys::<S::E, S::G>::forward_transform(&alpha, &keypair.into(), keypair.public().into())
+            else {
+                continue;
+            };
+
+            // Each candidate gets its own copy: `forward_header` decrypts in place, so a failed
+            // attempt would otherwise leave the header unusable for the next one.
+            let mut attempt = header.clone();
+            if let Ok(forwarded) = super::routing::forward_header::<H>(&secret, &mut attempt) {
+                matched = Some((next_alpha, secret, forwarded));
+                break;
+            }
+        }
+
+        let (next_alpha, secret, forwarded) = matched.ok_or(CryptoError::InvalidInputValue(
+            "no candidate keypair matches a node on the SURB's return path",
         ))?;
+        shared_secrets.push(secret);
 
-        let (next_alpha, secret) =
-            SharedKeys::<S::E, S::G>::forward_transform(&alpha, &keypair.into(), keypair.public().into())?;
-        shared_secrets.push(secret.clone());
-
-        match super::routing::forward_header::<H>(&secret, &mut header)? {
+        match forwarded {
             super::routing::ForwardedHeader::Relayed {
                 next_header,
                 next_node,
@@ -400,6 +428,36 @@ mod tests {
             Ok(())
         })()
         .expect("reconstruction must succeed for a well-formed SURB");
+    }
+
+    #[test]
+    fn should_identify_the_right_hop_when_offered_every_keypair() -> anyhow::Result<()> {
+        // What an observer holding the keys but not the chain's identifier table has to do: offer
+        // all of them and let the header's authentication tag pick the one that fits.
+        let keypairs = (0..3).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+        let (surb, kept) = generate_surbs::<CurrentSuite>(keypairs.clone())?;
+
+        let reconstructed = reply_opener_from_surb(&surb, |_| keypairs.iter())?;
+
+        assert_eq!(
+            reconstructed.shared_secrets.len(),
+            kept.shared_secrets.len(),
+            "every hop must be identified without being told which key names it"
+        );
+        for (i, (recovered, expected)) in reconstructed
+            .shared_secrets
+            .iter()
+            .zip(kept.shared_secrets.iter())
+            .enumerate()
+        {
+            assert_eq!(
+                recovered.ct_eq(expected).unwrap_u8(),
+                1,
+                "hop {i} was identified as the wrong node"
+            );
+        }
+
+        Ok(())
     }
 
     #[test]
