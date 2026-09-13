@@ -235,6 +235,88 @@ where
     Ok((surb, reply_opener))
 }
 
+/// Reconstructs the [`ReplyOpener`] belonging to a [`SURB`] from the private keys of the nodes on
+/// its return path.
+///
+/// The opener a [`create_surb`] call produces never leaves the process that made it, and nothing
+/// on the wire carries it: a reply is readable only by the SURB's creator. This function recovers
+/// the same value from the SURB alone, by walking its return path the way each relay on that path
+/// will — [`SharedKeys::forward_transform`] with the hop's private key, then
+/// [`forward_header`](super::routing::forward_header) to reach the next hop — and collecting the
+/// per-hop shared secrets. `sender_key` needs no recovery; it travels inside the SURB.
+///
+/// # When this is the right tool
+///
+/// Only for an observer that legitimately holds every private key on the return path and wants to
+/// read traffic it is not the recipient of — a protocol dissector run against a test cluster.
+/// A node decrypting its own replies must use the opener it kept, which is both cheaper and the
+/// only option it has: it does not hold the relays' keys. Possession of those keys is the entire
+/// security assumption here, and this function does not weaken it — anyone able to call it could
+/// already decrypt every hop of the return path directly.
+///
+/// # Arguments
+/// * `surb` - the SURB whose opener should be reconstructed.
+/// * `keypair_for` - resolves a key identifier on the return path to that node's keypair. Returning
+///   `None` for any hop fails the reconstruction, since a missing secret leaves the payload
+///   undecryptable anyway.
+///
+/// # Errors
+/// [`CryptoError::InvalidInputValue`] if `keypair_for` cannot resolve a hop, or if the path is
+/// longer than [`SphinxHeaderSpec::MAX_HOPS`] — which means the header is not one this
+/// specification could have produced.
+pub fn reply_opener_from_surb<'a, S, H, F>(
+    surb: &SURB<S, H>,
+    mut keypair_for: F,
+) -> hopr_types::crypto::errors::Result<ReplyOpener>
+where
+    S: SphinxSuite,
+    H: SphinxHeaderSpec,
+    S::P: 'a,
+    F: FnMut(&H::KeyId) -> Option<&'a S::P>,
+    for<'b> &'b Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'b <S::P as Keypair>::Public>,
+{
+    let mut alpha = surb.alpha.clone();
+    let mut header = surb.header.as_ref().to_vec();
+    let mut next_hop = surb.first_relayer.clone();
+
+    // `MAX_HOPS` entries plus the final one. A header that never reports `Final` within that many
+    // transformations cannot have been built by `RoutingInfo::new`, so bounding the walk turns a
+    // malformed SURB into an error instead of a loop.
+    let mut shared_secrets = Vec::with_capacity(H::MAX_HOPS.get());
+
+    for _ in 0..H::MAX_HOPS.get() {
+        let keypair = keypair_for(&next_hop).ok_or(CryptoError::InvalidInputValue(
+            "no keypair for a node on the SURB's return path",
+        ))?;
+
+        let (next_alpha, secret) =
+            SharedKeys::<S::E, S::G>::forward_transform(&alpha, &keypair.into(), keypair.public().into())?;
+        shared_secrets.push(secret.clone());
+
+        match super::routing::forward_header::<H>(&secret, &mut header)? {
+            super::routing::ForwardedHeader::Relayed {
+                next_header,
+                next_node,
+                ..
+            } => {
+                alpha = next_alpha;
+                header = next_header.as_ref().to_vec();
+                next_hop = next_node;
+            }
+            super::routing::ForwardedHeader::Final { .. } => {
+                return Ok(ReplyOpener {
+                    sender_key: surb.sender_key.clone(),
+                    shared_secrets,
+                });
+            }
+        }
+    }
+
+    Err(CryptoError::InvalidInputValue(
+        "SURB return path is longer than the maximum number of hops",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use hopr_types::crypto_random::Randomizable;
@@ -280,6 +362,59 @@ mod tests {
         let surb_2 = SURB::<CurrentSuite, HeaderSpec<CurrentSuite>>::try_from(surb_1_enc.as_ref())?;
 
         assert_eq!(surb_1_enc, surb_2.into_boxed());
+
+        Ok(())
+    }
+
+    #[parameterized::parameterized(hops = { 1, 2, 3, 4 })]
+    fn reconstructed_reply_opener_should_equal_the_one_kept_by_the_surb_creator(hops: usize) {
+        (|| -> anyhow::Result<()> {
+            let keypairs = (0..hops).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+            let (surb, kept) = generate_surbs::<CurrentSuite>(keypairs.clone())?;
+
+            let reconstructed = reply_opener_from_surb(&surb, |id| keypairs.iter().find(|kp| kp.public() == id))?;
+
+            assert_eq!(
+                reconstructed.sender_key.ct_eq(&kept.sender_key).unwrap_u8(),
+                1,
+                "sender key must be recovered from the SURB itself"
+            );
+            assert_eq!(
+                reconstructed.shared_secrets.len(),
+                kept.shared_secrets.len(),
+                "must recover one shared secret per return-path hop"
+            );
+            for (i, (recovered, expected)) in reconstructed
+                .shared_secrets
+                .iter()
+                .zip(kept.shared_secrets.iter())
+                .enumerate()
+            {
+                assert_eq!(
+                    recovered.ct_eq(expected).unwrap_u8(),
+                    1,
+                    "shared secret for hop {i} must match the one the creator kept"
+                );
+            }
+
+            Ok(())
+        })()
+        .expect("reconstruction must succeed for a well-formed SURB");
+    }
+
+    #[test]
+    fn reconstructing_a_reply_opener_should_fail_when_a_return_path_key_is_missing() -> anyhow::Result<()> {
+        let keypairs = (0..3).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+        let (surb, _) = generate_surbs::<CurrentSuite>(keypairs.clone())?;
+
+        // Everything but the last hop: a walk that gets partway and then cannot continue must
+        // report that rather than return a short secret list that would silently mis-decrypt.
+        let known = &keypairs[..keypairs.len() - 1];
+
+        assert!(
+            reply_opener_from_surb(&surb, |id| known.iter().find(|kp| kp.public() == id)).is_err(),
+            "a return path with an unknown hop must not yield an opener"
+        );
 
         Ok(())
     }
