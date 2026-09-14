@@ -134,9 +134,10 @@ transport-announce-quic = [
 #
 # **Never build a node for a real network with this.** Every packet it sends — tickets,
 # acknowledgements, SURBs, session payloads — is readable by anyone on the path, and nothing stops
-# an active attacker rewriting them. It is off by default, it is mutually exclusive with
-# `transport-announce-quic` (QUIC has no unencrypted mode, and the combination is a compile
-# error), and the node logs a warning on every start:
+# an active attacker rewriting them. It is off by default and the node logs a warning on every
+# start. It reaches TCP only — QUIC's TLS 1.3 is part of the transport and has no unencrypted
+# mode — so leave `transport-announce-quic` out, or the node may announce an address that stays
+# unreadable:
 #
 #     cargo test -p hopr-lib --no-default-features \
 #       --features pix-bjj,testing,transport-insecure-plaintext

@@ -167,9 +167,10 @@ hopr-chain-connector = { version = "0.26.0" }
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.4.0", default-features = false }
 # `transport-quic` is selected by `hopr-lib`'s `transport-announce-quic` rather than pinned here.
-# Pinning it made the choice unexpressible: it is mutually exclusive with `insecure-plaintext`,
-# which a cluster built for protocol dissection needs, and a feature forced on the workspace
-# dependency cannot be turned off by anything downstream.
+# Pinning it left no way to build a TCP-only node, because a feature forced on the workspace
+# dependency cannot be turned off by anything downstream. A cluster built for protocol dissection
+# needs that: QUIC's TLS 1.3 is part of the transport and stays on whatever else is enabled, so a
+# node that announces QUIC is unreadable no matter how it was built.
 hopr-transport-p2p = { version = "0.11.0" }
 hopr-ct-full-network = { version = "0.6.0", default-features = false }
 hopr-network-graph = { version = "0.7.0", default-features = false }
