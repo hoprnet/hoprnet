@@ -281,22 +281,14 @@ impl BalancerStateValues {
         // Not defensive boilerplate: nothing rejects a `SurbBalancerConfig` with a zero target, and
         // without this branch `level >= 0` would hold forever and shut organic production off
         // permanently — while a PID with a zero output limit produces nothing either.
-        if self.is_disabled() {
-            return 1;
-        }
-
-        if self
-            .counterparty_in_surb_distress
-            .load(std::sync::atomic::Ordering::Relaxed)
-        {
-            return 1;
-        }
-
-        if self.buffer_level() >= self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) {
-            0
-        } else {
-            1
-        }
+        usize::from(
+            self.is_disabled()
+                || self
+                    .counterparty_in_surb_distress
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                || self.buffer_level()
+                    < self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+        )
     }
 
     /// Marks the return path as degraded for the next `grace` period.
