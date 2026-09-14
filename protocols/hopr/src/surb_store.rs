@@ -476,8 +476,7 @@ impl<S> SurbRingBuffer<S> {
 
 #[cfg(test)]
 mod tests {
-    use hopr_api::types::crypto::crypto_traits::Randomizable;
-    use hopr_api::types::crypto::prelude::SecretKey16;
+    use hopr_api::types::crypto::{crypto_traits::Randomizable, prelude::SecretKey16};
     use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
     use rstest::rstest;
 
