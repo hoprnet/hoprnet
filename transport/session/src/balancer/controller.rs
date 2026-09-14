@@ -171,6 +171,15 @@ pub struct BalancerStateValues {
     /// It clears on its own in the normal case: the counterparty recomputes both SURB signals on
     /// every return packet and strips them once its pool recovers, so the next healthy packet
     /// resets this.
+    ///
+    /// Last write wins, and the signal is recorded at dispatch -- ahead of Session sequencing -- so
+    /// a reordered clean packet can clear a distress signal the counterparty sent after it. That
+    /// costs the safety valve, not the recovery: `surb_decay` (on by default, 5% of target per 60 s)
+    /// subtracts from the level estimate on a timer regardless of what any packet says, and once the
+    /// estimate falls back under target both this gate and the keep-alives reopen on their own --
+    /// from the `max(capacity, target)` clamp ceiling that is bounded by single-digit minutes.
+    /// Sequencing the flag would buy a faster reopen in that narrow window, at the cost of making a
+    /// hot-path signal depend on the Session's reassembly.
     pub counterparty_in_surb_distress: AtomicBool,
 }
 

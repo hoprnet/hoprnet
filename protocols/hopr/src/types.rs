@@ -36,11 +36,12 @@ pub struct AuxiliaryPacketInfo {
     pub packet_signals: PacketSignals,
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
-    /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
-    /// already full.
+    /// How many already-held SURBs the store evicted while inserting this packet's, because the
+    /// per-pseudonym buffer was already full.
     ///
-    /// This is the only point at which an overflow is visible: the buffer drops its oldest entry and
-    /// every layer above sees an insert that merely "succeeded". See
+    /// The arriving SURBs are retained; what is lost is the oldest of what was already queued. This
+    /// is the only point at which an overflow is visible — every layer above sees an insert that
+    /// merely "succeeded". See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity).
     ///
     /// Carried for observability. Sessions deliberately do not subtract it from their SURB level
