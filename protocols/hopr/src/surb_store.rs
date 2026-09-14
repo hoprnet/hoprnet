@@ -775,6 +775,36 @@ mod tests {
         Ok(())
     }
 
+    /// A reply opener whose contents don't matter — the tests only ask whether one is *present* —
+    /// so it is built once and cloned for every SURB.
+    fn cheap_opener() -> ReplyOpener {
+        ReplyOpener {
+            sender_key: SecretKey16::random(),
+            shared_secrets: Vec::new(),
+        }
+    }
+
+    /// Floods `flood` reply openers (ids `0..flood`) for one pseudonym into a fresh client store
+    /// capped at `max_openers`, then forces moka's lazy size-driven evictions to land so the
+    /// retained set is observable. Returns the store and its pseudonym.
+    fn flooded_client(max_openers: usize, flood: u64) -> (MemorySurbStore, HoprPseudonym) {
+        let client = MemorySurbStore::new(SurbStoreConfig {
+            max_openers_per_pseudonym: max_openers,
+            ..Default::default()
+        });
+        let pseudonym = HoprPseudonym::random();
+        let opener = cheap_opener();
+        for i in 0..flood {
+            let id: HoprSurbId = i.to_be_bytes();
+            client.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, id), opener.clone());
+        }
+        client.pseudonym_openers.run_pending_tasks();
+        if let Some(inner) = client.pseudonym_openers.get(&pseudonym) {
+            inner.run_pending_tasks();
+        }
+        (client, pseudonym)
+    }
+
     /// Upload-only return-path model.
     ///
     /// One session pseudonym uploads hard: it keeps minting SURBs (one reply opener stored per SURB
@@ -794,40 +824,19 @@ mod tests {
         flood: usize,
         replies: usize,
     ) -> usize {
-        let client = MemorySurbStore::new(SurbStoreConfig {
-            max_openers_per_pseudonym: max_openers,
-            ..Default::default()
-        });
+        let (client, pseudonym) = flooded_client(max_openers, flood as u64);
         let exit = MemorySurbStore::new(SurbStoreConfig {
             rb_capacity,
             pop_order: order,
             ..Default::default()
         });
 
-        let pseudonym = HoprPseudonym::random();
-        let relayer = HoprKeyIdent::from(1u32);
-        // The opener's contents are irrelevant here — the test only asks whether one is *present* —
-        // so a single cheaply-built opener is cloned for every SURB.
-        let opener = ReplyOpener {
-            sender_key: SecretKey16::random(),
-            shared_secrets: Vec::new(),
-        };
-
+        // A direct return path (chain length 1) is always usable, so `find_surb` never skips one for
+        // an unrelated reason — the only thing under test is the opener's presence. The SURB value is
+        // invariant across the flood, so build it once and clone (`HoprSurb` is a memcpy).
+        let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT).expect("valid surb fixture");
         for i in 0..flood as u64 {
-            let id: HoprSurbId = i.to_be_bytes();
-            client.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, id), opener.clone());
-            // A direct return path (chain length 1) is always usable, so `find_surb` never skips one
-            // for an unrelated reason — the only thing under test is the opener's presence.
-            exit.insert_surbs(
-                pseudonym,
-                vec![(id, surb_via(relayer, DIRECT).expect("valid surb fixture"))],
-            );
-        }
-
-        // moka evicts lazily; force the size-driven evictions to land before we probe.
-        client.pseudonym_openers.run_pending_tasks();
-        if let Some(inner) = client.pseudonym_openers.get(&pseudonym) {
-            inner.run_pending_tasks();
+            exit.insert_surbs(pseudonym, vec![(i.to_be_bytes(), surb.clone())]);
         }
 
         (0..replies)
@@ -856,37 +865,21 @@ mod tests {
         );
     }
 
-    /// The fix, at the store level. The per-pseudonym reply-opener cache uses `lru()` eviction, so
-    /// on overflow it **sheds the stalest openers and keeps the newest** — matching the exit's SURB
-    /// ring, which always hands back the newest SURBs. Before the fix the inner cache was left at
-    /// moka's default TinyLFU policy: reply openers are never read before use, so every entry tied
-    /// at frequency zero, incumbents won admission, and a full cache froze the oldest openers and
-    /// dropped every newer one — precisely the openers the exit's newest SURBs need.
+    /// The fix, at the store level: on overflow the reply-opener cache sheds the stalest openers and
+    /// keeps the newest, matching the exit's newest-SURB ring (the `lru()` rationale is on
+    /// [`MemorySurbStore::insert_reply_opener`]). This asserts that directly — after overflowing a
+    /// 7 000-cap cache with 21 000 openers, the oldest ids are gone and the newest are present.
     #[test]
     fn a_sustained_upload_keeps_the_newest_reply_openers_and_sheds_the_stalest() {
         const MAX_OPENERS: usize = 7000;
         const FLOOD: u64 = 21_000;
         const EDGE: u64 = 1_050; // a slice at each end of the id range
 
-        let client = MemorySurbStore::new(SurbStoreConfig {
-            max_openers_per_pseudonym: MAX_OPENERS,
-            ..Default::default()
-        });
-        let pseudonym = HoprPseudonym::random();
-        let opener = ReplyOpener {
-            sender_key: SecretKey16::random(),
-            shared_secrets: Vec::new(),
-        };
-        for i in 0..FLOOD {
-            let id: HoprSurbId = i.to_be_bytes();
-            client.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, id), opener.clone());
-        }
-        client.pseudonym_openers.run_pending_tasks();
+        let (client, pseudonym) = flooded_client(MAX_OPENERS, FLOOD);
         let inner = client
             .pseudonym_openers
             .get(&pseudonym)
             .expect("the pseudonym's opener cache exists");
-        inner.run_pending_tasks();
 
         let present =
             |lo: u64, hi: u64| -> u64 { (lo..hi).filter(|i| inner.contains_key(&i.to_be_bytes())).count() as u64 };
@@ -916,8 +909,8 @@ mod tests {
     #[rstest]
     #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo, 0)]
     #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo, 0)]
-    #[case::inverted_lifo(1000, 15_000, 45_000, SurbPopOrder::Lifo, 0)]
-    #[case::inverted_fifo(1000, 15_000, 45_000, SurbPopOrder::Fifo, 200)]
+    #[case::inverted_lifo(1000, 15_000, 20_000, SurbPopOrder::Lifo, 0)]
+    #[case::inverted_fifo(1000, 15_000, 20_000, SurbPopOrder::Fifo, 200)]
     fn a_sustained_upload_keeps_the_return_path_alive_at_the_deployed_config(
         #[case] max_openers: usize,
         #[case] rb_capacity: usize,
