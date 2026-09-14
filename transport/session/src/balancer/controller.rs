@@ -174,12 +174,19 @@ pub struct BalancerStateValues {
     ///
     /// Last write wins, and the signal is recorded at dispatch -- ahead of Session sequencing -- so
     /// a reordered clean packet can clear a distress signal the counterparty sent after it. That
-    /// costs the safety valve, not the recovery: `surb_decay` (on by default, 5% of target per 60 s)
-    /// subtracts from the level estimate on a timer regardless of what any packet says, and once the
-    /// estimate falls back under target both this gate and the keep-alives reopen on their own --
-    /// from the `max(capacity, target)` clamp ceiling that is bounded by single-digit minutes.
-    /// Sequencing the flag would buy a faster reopen in that narrow window, at the cost of making a
-    /// hot-path signal depend on the Session's reassembly.
+    /// costs the safety valve rather than the recovery: `surb_decay` subtracts from the level
+    /// estimate on a timer regardless of what any packet says, so once the estimate falls back under
+    /// target both this gate and the keep-alives reopen on their own.
+    ///
+    /// How long that takes is a property of the configuration, not a guarantee of this type. It
+    /// scales with the decay rate and with how far above target the estimate sits, and the
+    /// `max(capacity, target)` clamp bounds the latter only while `counterparty_buffer_capacity` is
+    /// known -- its `0` ("unknown") arm leaves the estimate unclamped. With decay switched off the
+    /// estimate does not drain on its own at all, and only a fresh distress signal or observed
+    /// consumption reopens the gate.
+    ///
+    /// Sequencing the flag would buy a faster reopen, at the cost of making a hot-path signal
+    /// depend on the Session's reassembly.
     pub counterparty_in_surb_distress: AtomicBool,
 }
 
