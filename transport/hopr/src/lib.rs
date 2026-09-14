@@ -77,7 +77,7 @@ use hopr_transport_probe::{
 };
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
+pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 use hopr_transport_session::{
     AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
     SessionManagerConfig,
