@@ -296,14 +296,12 @@ impl FillPlanner {
     /// SURB level the Entry's balancer acts on, and it is what distinguishes a planner that decided
     /// on nothing from one that has stopped planning.
     ///
-    /// The stall rule applies to a [drain](FillTarget::drain) exactly as it does to ordinary fill,
-    /// and deliberately so. It is the only thing standing between a *doomed* drain — a failed
-    /// polynomial, or a SURB supply carrying no shares — and `max_rate` sustained until a deadline
-    /// fires, which at the shipped ceiling is fifteen thousand SURBs spent for nothing. It costs a
-    /// healthy drain nothing, because a cycle that is progressing refreshes
-    /// [`target_progress_at`](Self::target_progress_at) on every tick that sees it move. And it is
-    /// not made redundant by `max_recovery_idle` no longer being service-gated while draining: that
-    /// deadline ends the drain, this bounds what the drain spends up to the moment it does.
+    /// The stall rule still applies while draining.
+    ///
+    /// Without it, a doomed drain could sit at `max_rate` until the deadline and waste SURBs. A
+    /// healthy drain pays nothing for the rule, because progress refreshes
+    /// [`target_progress_at`](Self::target_progress_at). And `max_recovery_idle` does not replace
+    /// it: that deadline ends the drain, this bounds what it spends before then.
     fn bound(&mut self, now: Instant, wanted: f64) -> FillRate {
         let heartbeat = FillRate::once_per(self.cfg.heartbeat);
         let heartbeat_pps = heartbeat.as_packets_per_sec();
