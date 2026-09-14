@@ -468,6 +468,7 @@ impl<S> SurbRingBuffer<S> {
 #[cfg(test)]
 mod tests {
     use hopr_api::types::crypto::crypto_traits::Randomizable;
+    use hopr_api::types::crypto::prelude::SecretKey16;
     use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
     use rstest::rstest;
 
@@ -764,6 +765,159 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    /// Upload-only return-path model.
+    ///
+    /// One session pseudonym uploads hard: it keeps minting SURBs (one reply opener stored per SURB
+    /// on the *client*, one SURB stored on the *exit*) while the exit barely replies, so nothing is
+    /// consumed and both stores run to capacity and start evicting. `flood` pairs are pushed, then
+    /// the exit answers `replies` times — each answer pops a SURB the way the exit would and tries
+    /// to open it on the client. Returns how many of those replies land on a reply opener the client
+    /// has already evicted, i.e. how many replies the client cannot decrypt.
+    ///
+    /// The two stores are separate instances with their own configs, mirroring the two ends: the
+    /// client cares only about `max_openers` (its reply-opener cache), the exit only about
+    /// `rb_capacity` + `order` (its SURB ring).
+    fn undecryptable_replies_after_upload_flood(
+        max_openers: usize,
+        rb_capacity: usize,
+        order: SurbPopOrder,
+        flood: usize,
+        replies: usize,
+    ) -> usize {
+        let client = MemorySurbStore::new(SurbStoreConfig {
+            max_openers_per_pseudonym: max_openers,
+            ..Default::default()
+        });
+        let exit = MemorySurbStore::new(SurbStoreConfig {
+            rb_capacity,
+            pop_order: order,
+            ..Default::default()
+        });
+
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+        // The opener's contents are irrelevant here — the test only asks whether one is *present* —
+        // so a single cheaply-built opener is cloned for every SURB.
+        let opener = ReplyOpener {
+            sender_key: SecretKey16::random(),
+            shared_secrets: Vec::new(),
+        };
+
+        for i in 0..flood as u64 {
+            let id: HoprSurbId = i.to_be_bytes();
+            client.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, id), opener.clone());
+            // A direct return path (chain length 1) is always usable, so `find_surb` never skips one
+            // for an unrelated reason — the only thing under test is the opener's presence.
+            exit.insert_surbs(
+                pseudonym,
+                vec![(id, surb_via(relayer, DIRECT).expect("valid surb fixture"))],
+            );
+        }
+
+        // moka evicts lazily; force the size-driven evictions to land before we probe.
+        client.pseudonym_openers.run_pending_tasks();
+        if let Some(inner) = client.pseudonym_openers.get(&pseudonym) {
+            inner.run_pending_tasks();
+        }
+
+        (0..replies)
+            .filter(|_| {
+                let found = exit
+                    .find_surb(SurbMatcher::Pseudonym(pseudonym))
+                    .expect("the exit still holds SURBs to reply with");
+                client.find_reply_opener(&found.sender_id).is_none()
+            })
+            .count()
+    }
+
+    /// Baseline: while the reply-opener cache has not overflowed, every reply opens. Confirms the
+    /// two-store plumbing (matching pseudonym + SURB id) before the overflow tests read anything
+    /// into an eviction.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn replies_stay_decryptable_while_the_opener_cache_has_not_overflowed(#[case] order: SurbPopOrder) {
+        const MAX_OPENERS: usize = 7000;
+        // Flood == capacity: nothing is evicted.
+        let undecryptable = undecryptable_replies_after_upload_flood(MAX_OPENERS, 1050, order, MAX_OPENERS, 200);
+        assert_eq!(
+            0, undecryptable,
+            "no reply should be undecryptable before the cache overflows"
+        );
+    }
+
+    /// Root cause. The per-pseudonym reply-opener cache is a moka cache left at the **default
+    /// (TinyLFU) eviction policy** — only the outer, per-pseudonym cache is `lru()`. Reply openers
+    /// are never read before they are used, so every entry carries the same (zero) access
+    /// frequency, and TinyLFU rejects each new candidate in favour of the incumbent. The result is
+    /// the opposite of what a return path needs: once the cache is full it **freezes the oldest
+    /// openers and drops every newer one**. The exit's SURB ring, meanwhile, always holds the
+    /// newest SURBs (it evicts oldest) — precisely the openers the client has thrown away.
+    #[test]
+    fn a_sustained_upload_evicts_the_newest_reply_openers_and_keeps_the_stalest() {
+        const MAX_OPENERS: usize = 7000;
+        const FLOOD: u64 = 21_000;
+        const EDGE: u64 = 1_050; // a slice at each end of the id range
+
+        let client = MemorySurbStore::new(SurbStoreConfig {
+            max_openers_per_pseudonym: MAX_OPENERS,
+            ..Default::default()
+        });
+        let pseudonym = HoprPseudonym::random();
+        let opener = ReplyOpener {
+            sender_key: SecretKey16::random(),
+            shared_secrets: Vec::new(),
+        };
+        for i in 0..FLOOD {
+            let id: HoprSurbId = i.to_be_bytes();
+            client.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, id), opener.clone());
+        }
+        client.pseudonym_openers.run_pending_tasks();
+        let inner = client
+            .pseudonym_openers
+            .get(&pseudonym)
+            .expect("the pseudonym's opener cache exists");
+        inner.run_pending_tasks();
+
+        let present =
+            |lo: u64, hi: u64| -> u64 { (lo..hi).filter(|i| inner.contains_key(&i.to_be_bytes())).count() as u64 };
+
+        assert_eq!(EDGE, present(0, EDGE), "the stalest openers are kept");
+        assert_eq!(
+            0,
+            present(FLOOD - EDGE, FLOOD),
+            "the freshest openers — the ones the exit's newest SURBs need — are all evicted"
+        );
+    }
+
+    /// The reported failure, reproduced deterministically: once the reply-opener cache overflows, a
+    /// sustained upload makes **every** reply undecryptable — at production buffer proportions
+    /// (openers ≫ SURBs) *and* their inverse, under FIFO *and* LIFO. The exit-side pop order does
+    /// not matter, because the openers the client sheds ([`SurbPopOrder`] notwithstanding) are the
+    /// newest ones, which are exactly the SURBs the exit still holds. This is a different failure
+    /// from the return-path *staleness* that LIFO fixed (hoprnet#8328); LIFO does not help here.
+    ///
+    /// The `flood >= max_openers + rb_capacity` margin guarantees the exit's retained SURB-id range
+    /// and the client's retained opener-id range do not overlap, so the count is exactly `replies`.
+    #[rstest]
+    #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo)]
+    #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo)]
+    #[case::inverted_fifo(1000, 15_000, 45_000, SurbPopOrder::Fifo)]
+    #[case::inverted_lifo(1000, 15_000, 45_000, SurbPopOrder::Lifo)]
+    fn a_sustained_upload_breaks_the_return_path_after_the_opener_cache_overflows(
+        #[case] max_openers: usize,
+        #[case] rb_capacity: usize,
+        #[case] flood: usize,
+        #[case] order: SurbPopOrder,
+    ) {
+        const REPLIES: usize = 200;
+        let undecryptable = undecryptable_replies_after_upload_flood(max_openers, rb_capacity, order, flood, REPLIES);
+        assert_eq!(
+            REPLIES, undecryptable,
+            "every reply must be undecryptable once the opener cache has shed the newest openers"
+        );
     }
 
     #[test]
