@@ -36,6 +36,17 @@ pub struct AuxiliaryPacketInfo {
     pub packet_signals: PacketSignals,
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
+    /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
+    /// already full.
+    ///
+    /// This is the only point at which an overflow is visible: the buffer drops its oldest entry and
+    /// every layer above sees an insert that merely "succeeded". See
+    /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity).
+    ///
+    /// Carried for observability. Sessions deliberately do not subtract it from their SURB level
+    /// estimate, because the imprecise estimate is the one that fails safe — see
+    /// `counterparty_buffer_capacity` in `hopr-transport-session`.
+    pub num_evicted_surbs: usize,
 }
 
 /// An incoming packet with a payload intended for us.
@@ -163,6 +174,19 @@ pub struct FoundSurb {
     pub surb: HoprSurb,
     /// Number of SURBs remaining in the ring buffer with the same pseudonym.
     pub remaining: usize,
+}
+
+/// What storing SURBs via `SurbStore::insert_surbs` did to the ring buffer.
+///
+/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops its
+/// oldest entry and the caller sees only that the insert "succeeded". That count is the only local
+/// evidence that the sender is producing faster than this side can hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SurbInsertOutcome {
+    /// Number of SURBs held for the pseudonym after the insert.
+    pub retained: usize,
+    /// Number of SURBs dropped to make room during this insert, oldest first.
+    pub evicted: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

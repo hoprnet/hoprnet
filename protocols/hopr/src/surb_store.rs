@@ -5,7 +5,7 @@ use hopr_crypto_packet::prelude::*;
 use moka::notification::RemovalCause;
 use validator::ValidationError;
 
-use crate::{FoundSurb, traits::SurbStore};
+use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 
 /// Lower bound on [`SurbStoreConfig::pseudonyms_lifetime`], enforced by the config validator.
 ///
@@ -302,7 +302,7 @@ impl SurbStore for MemorySurbStore {
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
-    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
             .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY), self.cfg.pop_order))
@@ -397,18 +397,24 @@ impl<S> SurbRingBuffer<S> {
 
     /// Pushes all SURBs with their IDs, evicting the oldest ones past capacity.
     ///
-    /// Returns the number of elements held after the push.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> usize {
+    /// Returns what the push did; the eviction count is what lets a caller notice the overflow at
+    /// all, since dropping the oldest entry is otherwise indistinguishable from a clean insert.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> SurbInsertOutcome {
         let mut rb = self.surbs.lock();
+        let mut evicted = 0;
         for surb in surbs {
             // Evict before inserting, so that the length never exceeds the pre-allocated
             // capacity and the backing allocation stays put.
             if rb.len() == self.capacity {
                 rb.pop_front();
+                evicted += 1;
             }
             rb.push_back(surb);
         }
-        rb.len()
+        SurbInsertOutcome {
+            retained: rb.len(),
+            evicted,
+        }
     }
 
     /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
@@ -641,14 +647,90 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_report_no_eviction_below_capacity(#[case] order: SurbPopOrder) {
+        let rb = SurbRingBuffer::new(4, order);
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 0
+            },
+            rb.push([([1u8; 8], 0), ([2u8; 8], 0)])
+        );
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 4,
+                evicted: 0
+            },
+            rb.push([([3u8; 8], 0), ([4u8; 8], 0)])
+        );
+    }
+
+    /// Overflow is otherwise entirely silent — the buffer drops its oldest entry and the caller sees
+    /// only a successful push. The count is what lets the layers above notice that SURBs are being
+    /// destroyed on arrival, so it has to be exact.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_count_evictions_past_capacity(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(2, order);
+
+        let outcome = rb.push([([1u8; 8], 0), ([2u8; 8], 0), ([3u8; 8], 0)]);
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 1
+            },
+            outcome,
+            "a 3-element push into a 2-slot buffer drops exactly one"
+        );
+
+        // The *oldest* is the one gone, in either pop order.
+        let ids: Vec<_> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
+        assert!(
+            !ids.contains(&[1u8; 8]),
+            "the oldest entry must be the evicted one, got {ids:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A buffer already at capacity evicts one per element pushed, however the pushes are grouped —
+    /// the steady-state overflow that a counterparty producing faster than this side drains creates.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_count_evictions_across_separate_pushes(#[case] order: SurbPopOrder) {
+        let rb = SurbRingBuffer::new(2, order);
+        assert_eq!(0, rb.push([([1u8; 8], 0), ([2u8; 8], 0)]).evicted, "precondition: full");
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 1
+            },
+            rb.push([([3u8; 8], 0)])
+        );
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 2
+            },
+            rb.push([([4u8; 8], 0), ([5u8; 8], 0)])
+        );
+    }
+
     #[test]
     fn surb_ring_buffer_should_pop_fifo_by_default() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(5, SurbPopOrder::default());
 
-        let len = rb.push([([1u8; 8], 0)]);
+        let len = rb.push([([1u8; 8], 0)]).retained;
         assert_eq!(1, len);
 
-        let len = rb.push([([2u8; 8], 0)]);
+        let len = rb.push([([2u8; 8], 0)]).retained;
         assert_eq!(2, len);
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
@@ -659,7 +741,7 @@ mod tests {
         assert_eq!([2u8; 8], popped.id);
         assert_eq!(0, popped.remaining);
 
-        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]).retained;
         assert_eq!(2, len);
 
         assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
@@ -672,10 +754,10 @@ mod tests {
     fn surb_ring_buffer_should_pop_lifo_when_configured() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
 
-        let len = rb.push([([1u8; 8], 0)]);
+        let len = rb.push([([1u8; 8], 0)]).retained;
         assert_eq!(1, len);
 
-        let len = rb.push([([2u8; 8], 0)]);
+        let len = rb.push([([2u8; 8], 0)]).retained;
         assert_eq!(2, len);
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
@@ -686,7 +768,7 @@ mod tests {
         assert_eq!([1u8; 8], popped.id);
         assert_eq!(0, popped.remaining);
 
-        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]).retained;
         assert_eq!(2, len);
 
         assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
