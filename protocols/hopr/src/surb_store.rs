@@ -318,6 +318,15 @@ impl SurbStore for MemorySurbStore {
             .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
                     .time_to_live(opener_lifetime)
+                    // Keep the newest openers, not the stalest. Reply openers are written once and
+                    // never read before they are used, so under the default TinyLFU policy every
+                    // entry ties at frequency zero and incumbents win admission: a full cache then
+                    // freezes the oldest openers and drops every newer one. But the counterparty's
+                    // SURB ring always hands back the newest SURBs, whose openers are exactly those
+                    // dropped — so replies stop decrypting once the cache fills. LRU on this
+                    // write-only workload evicts by insertion order, i.e. it sheds the oldest and
+                    // keeps the newest, mirroring the SURB ring buffer (and the outer cache).
+                    .eviction_policy(moka::policy::EvictionPolicy::lru())
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
                             tracing::warn!(
@@ -848,15 +857,14 @@ mod tests {
         );
     }
 
-    /// Root cause. The per-pseudonym reply-opener cache is a moka cache left at the **default
-    /// (TinyLFU) eviction policy** — only the outer, per-pseudonym cache is `lru()`. Reply openers
-    /// are never read before they are used, so every entry carries the same (zero) access
-    /// frequency, and TinyLFU rejects each new candidate in favour of the incumbent. The result is
-    /// the opposite of what a return path needs: once the cache is full it **freezes the oldest
-    /// openers and drops every newer one**. The exit's SURB ring, meanwhile, always holds the
-    /// newest SURBs (it evicts oldest) — precisely the openers the client has thrown away.
+    /// The fix, at the store level. The per-pseudonym reply-opener cache uses `lru()` eviction, so
+    /// on overflow it **sheds the stalest openers and keeps the newest** — matching the exit's SURB
+    /// ring, which always hands back the newest SURBs. Before the fix the inner cache was left at
+    /// moka's default TinyLFU policy: reply openers are never read before use, so every entry tied
+    /// at frequency zero, incumbents won admission, and a full cache froze the oldest openers and
+    /// dropped every newer one — precisely the openers the exit's newest SURBs need.
     #[test]
-    fn a_sustained_upload_evicts_the_newest_reply_openers_and_keeps_the_stalest() {
+    fn a_sustained_upload_keeps_the_newest_reply_openers_and_sheds_the_stalest() {
         const MAX_OPENERS: usize = 7000;
         const FLOOD: u64 = 21_000;
         const EDGE: u64 = 1_050; // a slice at each end of the id range
@@ -884,39 +892,45 @@ mod tests {
         let present =
             |lo: u64, hi: u64| -> u64 { (lo..hi).filter(|i| inner.contains_key(&i.to_be_bytes())).count() as u64 };
 
-        assert_eq!(EDGE, present(0, EDGE), "the stalest openers are kept");
+        assert_eq!(0, present(0, EDGE), "the stalest openers are shed");
         assert_eq!(
-            0,
+            EDGE,
             present(FLOOD - EDGE, FLOOD),
-            "the freshest openers — the ones the exit's newest SURBs need — are all evicted"
+            "the freshest openers — the ones the exit's newest SURBs need — are kept"
         );
     }
 
-    /// The reported failure, reproduced deterministically: once the reply-opener cache overflows, a
-    /// sustained upload makes **every** reply undecryptable — at production buffer proportions
-    /// (openers ≫ SURBs) *and* their inverse, under FIFO *and* LIFO. The exit-side pop order does
-    /// not matter, because the openers the client sheds ([`SurbPopOrder`] notwithstanding) are the
-    /// newest ones, which are exactly the SURBs the exit still holds. This is a different failure
-    /// from the return-path *staleness* that LIFO fixed (hoprnet#8328); LIFO does not help here.
+    /// End-to-end at the store level: with the opener cache keeping its newest entries, a sustained
+    /// upload no longer strands the return path at the deployed configuration. At production
+    /// proportions (opener cache larger than the exit's SURB ring) every reply opens under both pop
+    /// orders, and under LIFO — which hoprd pins on the exit — it opens at any proportion.
+    ///
+    /// The one case that still strands replies is a misconfiguration: a FIFO exit whose SURB ring is
+    /// *larger* than the opener cache, so it pops the oldest SURBs whose openers fall outside the
+    /// smaller opener window. It is neither deployed nor sane, and is asserted here to document the
+    /// boundary of the fix rather than to endorse it. (Before the fix, every one of these cases
+    /// stranded all `REPLIES`; see this test's history.)
     ///
     /// The `flood >= max_openers + rb_capacity` margin guarantees the exit's retained SURB-id range
-    /// and the client's retained opener-id range do not overlap, so the count is exactly `replies`.
+    /// and the client's retained opener-id range do not overlap, so the FIFO-inverted count is
+    /// exactly `replies`.
     #[rstest]
-    #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo)]
-    #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo)]
-    #[case::inverted_fifo(1000, 15_000, 45_000, SurbPopOrder::Fifo)]
-    #[case::inverted_lifo(1000, 15_000, 45_000, SurbPopOrder::Lifo)]
-    fn a_sustained_upload_breaks_the_return_path_after_the_opener_cache_overflows(
+    #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo, 0)]
+    #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo, 0)]
+    #[case::inverted_lifo(1000, 15_000, 45_000, SurbPopOrder::Lifo, 0)]
+    #[case::inverted_fifo(1000, 15_000, 45_000, SurbPopOrder::Fifo, 200)]
+    fn a_sustained_upload_keeps_the_return_path_alive_at_the_deployed_config(
         #[case] max_openers: usize,
         #[case] rb_capacity: usize,
         #[case] flood: usize,
         #[case] order: SurbPopOrder,
+        #[case] expected_undecryptable: usize,
     ) {
         const REPLIES: usize = 200;
         let undecryptable = undecryptable_replies_after_upload_flood(max_openers, rb_capacity, order, flood, REPLIES);
         assert_eq!(
-            REPLIES, undecryptable,
-            "every reply must be undecryptable once the opener cache has shed the newest openers"
+            expected_undecryptable, undecryptable,
+            "unexpected undecryptable-reply count for {order:?} at openers={max_openers}, rb={rb_capacity}"
         );
     }
 
