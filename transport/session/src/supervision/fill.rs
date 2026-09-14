@@ -58,13 +58,11 @@ pub(crate) struct FillTarget {
     pub largest_shares_seen: u64,
     /// The immutable per-cycle recovery deadline this cycle must finish before.
     pub hard_deadline: Instant,
-    /// Whether this target is a post-close drain, so the whole remainder is wanted at once.
+    /// Whether this target is a post-close drain.
     ///
-    /// A live Session is filled at the pace its deadline needs, because it will still be there when
-    /// the deadline arrives. A drained one will not be: it is closed, the buffer it is spending is
-    /// finite and nothing is refilling it, so the only sensible rate is as fast as
-    /// [`PixFillConfig::max_rate`] allows. See "Draining a closed Session" in the module
-    /// documentation of `supervision`.
+    /// A live Session fills only fast enough to meet its deadline. A closed one has no future
+    /// traffic and no SURB replenishment, so the planner spends the remainder at
+    /// [`PixFillConfig::max_rate`]. See "Draining a closed Session" in `supervision`.
     pub drain: bool,
 }
 
