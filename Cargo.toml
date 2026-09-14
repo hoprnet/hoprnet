@@ -176,10 +176,14 @@ hopr-network-graph = { version = "0.7.0", default-features = false }
 
 # `hopr-transport-p2p`'s `insecure-plaintext` feature is not released yet; `hopr-lib`'s
 # `transport-insecure-plaintext` forwards to it, and cargo resolves a feature's dependencies
-# whether or not the feature is enabled, so the patch cannot be conditional. Replace the path with
-# a `git`/`rev` pair once the branch is pushed, and drop this section once it is published.
+# whether or not the feature is enabled, so the patch cannot be conditional.
+#
+# Pinned to a rev rather than the branch it came from: the branch disappears when
+# hoprnet/hopr-impls#21 merges, and a rebuild should not depend on a ref that moves. That PR
+# releases the crate as 0.11.1, which satisfies the `^0.11.0` this workspace already asks for —
+# so once it is published this whole section is deleted and nothing else changes.
 [patch.crates-io]
-hopr-transport-p2p = { path = "../hopr-impls/transport/p2p" }
+hopr-transport-p2p = { git = "https://github.com/hoprnet/hopr-impls", rev = "ca39f1b1024d8fcbfb0887d77393c6c46e72c44c" }
 
 [profile.dev]
 panic = "abort"

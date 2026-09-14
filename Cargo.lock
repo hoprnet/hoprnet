@@ -4528,7 +4528,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.11.0"
+version = "0.11.1"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=ca39f1b1024d8fcbfb0887d77393c6c46e72c44c#ca39f1b1024d8fcbfb0887d77393c6c46e72c44c"
 dependencies = [
  "async-broadcast",
  "async-trait",
