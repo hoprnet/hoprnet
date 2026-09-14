@@ -903,9 +903,11 @@ mod tests {
     /// boundary of the fix rather than to endorse it. (Before the fix, every one of these cases
     /// stranded all `REPLIES`; see this test's history.)
     ///
-    /// The `flood >= max_openers + rb_capacity` margin guarantees the exit's retained SURB-id range
-    /// and the client's retained opener-id range do not overlap, so the FIFO-inverted count is
-    /// exactly `replies`.
+    /// In the inverted case the exit retains the newest `rb_capacity` SURBs and the client the newest
+    /// `max_openers` openers (`flood` overflows both), so the two ranges overlap only on the newest
+    /// `max_openers` ids. FIFO pops from the oldest end, so the first `rb_capacity - max_openers` pops
+    /// fall outside that opener window; since `REPLIES <= rb_capacity - max_openers` (200 ≤ 14 000),
+    /// every tested FIFO reply is undecryptable.
     #[rstest]
     #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo, 0)]
     #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo, 0)]
