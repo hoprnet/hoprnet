@@ -261,22 +261,14 @@ impl BalancerStateValues {
         );
     }
 
-    /// How many SURBs an outgoing Session data packet should carry along with its payload.
+    /// Returns the number of organic SURBs to attach to an outgoing Session data packet.
     ///
-    /// Entry-side only. [`BalancerStateValues`] is shared by both ends of a Session, but only the
-    /// initiator mints SURBs for its counterparty, so on the Exit this answer is meaningless.
+    /// Only the Entry uses this value. Return `0` when the estimated counterparty buffer
+    /// has reached its target. Return `1` when balancing is disabled, the estimate is
+    /// below target, or the counterparty signals SURB distress.
     ///
-    /// Returning `0` is the point: a SURB delivered to a counterparty that is already at its target
-    /// evicts the oldest one it holds, so producing past the target spends bandwidth to destroy
-    /// SURBs already delivered. Production resumes at one per packet as soon as the estimate falls
-    /// back below target, or immediately if the counterparty signals it is running low.
-    ///
-    /// Note this reads the raw buffer level and deliberately does *not* consult
-    /// [`return_path_estimate_is_stale`](Self::return_path_estimate_is_stale), which the otherwise
-    /// analogous `SurbSupply` ceiling must consult. The polarity is inverted between the two: there,
-    /// a degraded-path `0` would read as "admit no bytes" and has to be suppressed; here it reads as
-    /// "below target, keep producing", which is exactly what the `sustain_on_return_path_loss` opt-in
-    /// asks for.
+    /// This method uses the raw buffer estimate. During return-path loss, a zero estimate
+    /// correctly keeps organic SURB production enabled.
     pub fn organic_surbs_per_packet(&self) -> usize {
         // Not defensive boilerplate: nothing rejects a `SurbBalancerConfig` with a zero target, and
         // without this branch `level >= 0` would hold forever and shut organic production off
@@ -286,8 +278,7 @@ impl BalancerStateValues {
                 || self
                     .counterparty_in_surb_distress
                     .load(std::sync::atomic::Ordering::Relaxed)
-                || self.buffer_level()
-                    < self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+                || self.buffer_level() < self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
         )
     }
 
