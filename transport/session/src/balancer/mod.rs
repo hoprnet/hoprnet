@@ -8,6 +8,7 @@ mod rate_limiting;
 pub mod simple;
 
 pub use controller::{BalancerStateValues, SurbBalancer, SurbBalancerConfig};
+pub(crate) use rate_limiting::MAX_WAIT_CHUNK;
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
 
 /// Smallest possible interval for balancer sampling.

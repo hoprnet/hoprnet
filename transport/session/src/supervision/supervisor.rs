@@ -10,7 +10,10 @@ use std::time::{Duration, Instant};
 use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
-use super::{PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig};
+use super::{
+    PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig,
+    fill::{FillPlanner, FillTarget},
+};
 
 // ---------------------------------------------------------------------------
 // SsaPhase
@@ -44,6 +47,23 @@ struct PerSsaState {
 
     // Deadlines (None means not set for this phase).
     commitment_deadline: Option<Instant>,
+    /// When to re-request the parts of this commitment that have not arrived, or `None` while there
+    /// is nothing to ask for.
+    ///
+    /// Set only once *some* of the commitment has arrived, and pushed out by every further part, so
+    /// it measures silence in the delivery rather than elapsed time. A cycle for which nothing was
+    /// ever delivered leaves it unset and dies on `commitment_deadline`, which is all the Exit can
+    /// do about one: it has no scope to name.
+    recommit_deadline: Option<Instant>,
+    /// Re-requests already made for this cycle, capped at
+    /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS).
+    ///
+    /// The cap is a count and not a duration on purpose. `commitment_deadline` bounds the asks in
+    /// *time*, which is what protects the Entry, but the packets they cost are this node's own: at a
+    /// misconfigured millisecond interval inside a 20-second deadline the time bound alone permits
+    /// twenty thousand of them. Matching the figure the Entry will answer means none of the asks is
+    /// wasted either.
+    recommit_attempts: u8,
     deposit_deadline: Option<Instant>,
     recovery_idle_deadline: Option<Instant>,
     recovery_hard_deadline: Option<Instant>,
@@ -93,6 +113,8 @@ impl PerSsaState {
             batch_id,
             phase: SsaPhase::AwaitingCommitment,
             commitment_deadline: None,
+            recommit_deadline: None,
+            recommit_attempts: 0,
             deposit_deadline: None,
             recovery_idle_deadline: None,
             recovery_hard_deadline: None,
@@ -182,6 +204,12 @@ pub struct SessionPixSupervisor {
     /// batch indefinitely while a single funded sibling holds the Session open. Bounded by
     /// [`SupervisorConfig::max_failed_cycles`].
     failed_cycles: usize,
+    /// Plans the rate at which this Exit originates its own fill keep-alives.
+    ///
+    /// Kept here rather than in the worker because the rate is a function of the lifecycle state
+    /// this struct owns — which cycle is at the paid front and how far it has got — and because
+    /// every close path has to be able to stop it in the same action vector that carries the close.
+    fill: FillPlanner,
     /// Greatest SSA index that has been retired (closed and removed).
     ///
     /// Prevents a stale `SsaRequestSent` from resurrecting a closed SSA. A high-watermark rather
@@ -205,6 +233,7 @@ impl SessionPixSupervisor {
         now: Instant,
     ) -> (Self, Vec<SessionPixAction>) {
         let mut s = Self {
+            fill: FillPlanner::new(&cfg, &dims, now),
             cfg,
             dims,
             pseudonym,
@@ -237,6 +266,7 @@ impl SessionPixSupervisor {
 
         let actions = match ev {
             SessionPixEvent::SsaRequestSent(ssa_id) => self.on_ssa_request_sent(ssa_id, now),
+            SessionPixEvent::CommitmentProgress(ssa_id) => self.on_commitment_progress(ssa_id, now),
             SessionPixEvent::CommitmentVerified(ssa_id) => self.on_commitment_verified(ssa_id, now),
             SessionPixEvent::DepositConfirmed { ssa_id, amount } => {
                 self.on_deposit_confirmed(ssa_id, *amount, now, served_total)
@@ -258,7 +288,15 @@ impl SessionPixSupervisor {
             .iter()
             .any(|action| matches!(action, SessionPixAction::Close(_)))
         {
-            Vec::new()
+            // A closing Session has no cycle left to fill for, and the fill stream outlives this
+            // state machine by however long it takes the driver to tear the Session down. Silencing
+            // it here rather than only there is what keeps a close from being followed by a burst of
+            // keep-alives for a cycle that no longer exists.
+            self.fill
+                .stop()
+                .map(SessionPixAction::SetFillRate)
+                .into_iter()
+                .collect()
         } else {
             self.sync_service_gate()
         };
@@ -488,7 +526,7 @@ impl SessionPixSupervisor {
                         "closing PIX Session while its paid recovery tail is stalled"
                     );
                     self.closed = true;
-                    return vec![SessionPixAction::Close(reason)];
+                    return self.with_fill_stopped(vec![SessionPixAction::Close(reason)]);
                 }
             }
         }
@@ -507,6 +545,32 @@ impl SessionPixSupervisor {
                 }
                 ssa.check_deadlines(now)
             };
+
+            // A stalled commitment is re-requested rather than given up on, and the timer re-arms so
+            // a repair that is itself lost is asked for again. This yields no close reason and is
+            // bounded by nothing of its own: the absolute `commitment_deadline` still ends the cycle,
+            // which is why it can repeat freely — and why it is skipped once that deadline has gone,
+            // rather than putting an ask on the wire for a Session about to close.
+            if expired.is_none()
+                && self.ssas[i].phase == SsaPhase::AwaitingCommitment
+                && self.ssas[i].recommit_deadline.is_some_and(|deadline| now >= deadline)
+            {
+                let ssa = &mut self.ssas[i];
+                ssa.recommit_attempts += 1;
+                // Disarmed rather than re-armed at the cap, so the worker stops waking for a timer
+                // that would produce nothing. Further arriving parts cannot re-arm it either.
+                ssa.recommit_deadline = (ssa.recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS)
+                    .then(|| now.checked_add(self.cfg.commitment_recommit_interval))
+                    .flatten();
+                tracing::debug!(
+                    ssa_id = %ssa.ssa_id, attempt = ssa.recommit_attempts,
+                    "commitment delivery stalled — re-requesting the parts that did not arrive"
+                );
+                actions.push(SessionPixAction::RequestCommitmentRetransmission {
+                    ssa_id: ssa.ssa_id,
+                    params: self.dims,
+                });
+            }
 
             if let Some(reason) = expired {
                 // Service-gated idle: if no service consumed since last progress,
@@ -528,7 +592,7 @@ impl SessionPixSupervisor {
         // If the session is already closing, skip tombstone retirement.
         // Whole-session teardown retires everything via the retirement guard.
         if self.closed {
-            return actions;
+            return self.with_fill_stopped(actions);
         }
 
         // Remove tombstones that have expired and emit RetireSsa so the
@@ -575,7 +639,117 @@ impl SessionPixSupervisor {
         gate_actions.extend(actions);
         self.refresh_share_order_front();
 
+        if self.closed {
+            return self.with_fill_stopped(gate_actions);
+        }
         gate_actions
+    }
+
+    /// Runs the deadline sweep and, if one is due, the fill tick — in that order.
+    ///
+    /// The order is the point. The sweep is what arms a promoted cycle's recovery clocks, consumes a
+    /// spent FIFO tail and re-aligns the service gate, so running it first means the tick plans
+    /// against the lifecycle as it is *now* rather than as it was a second ago. A tick that ran first
+    /// would spend one whole sampling interval filling for a cycle that had already recovered.
+    ///
+    /// This is the entry point the worker uses; [`handle_deadline`](Self::handle_deadline) remains
+    /// separate because the deadline logic is meaningful — and tested — on its own.
+    pub fn handle_timers(&mut self, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
+        let mut actions = self.handle_deadline(now, served_total);
+        if self.closed {
+            return actions;
+        }
+        if self.next_fill_tick().is_some_and(|tick| now >= tick) {
+            actions.extend(self.handle_fill_tick(now, served_total));
+        }
+        actions
+    }
+
+    /// Re-plans the fill rate, emitting an action only when the rate actually changes.
+    pub fn handle_fill_tick(&mut self, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
+        if self.closed {
+            return Vec::new();
+        }
+        let target = self.fill_target();
+        self.fill
+            .plan(now, served_total, target)
+            .map(|rate| vec![SessionPixAction::SetFillRate(rate)])
+            .into_iter()
+            .flatten()
+            .collect()
+    }
+
+    /// Reports, once, that fill has fallen back because its target stopped progressing.
+    ///
+    /// Exposed for the worker, which is the layer that may have side effects; this state machine and
+    /// the planner behind it are pure, so neither can record the metric itself.
+    pub fn take_fill_stall(&mut self) -> bool {
+        self.fill.take_stall_onset()
+    }
+
+    /// When the fill planner next wants to run, or `None` if there is nothing for it to do.
+    ///
+    /// `None` while no cycle is being filled for *and* the stream is already silent, which is what
+    /// keeps an unfunded or non-PIX-idle Session from waking its worker once a second for nothing. A
+    /// running stream always yields a tick even without a target, because it is owed the zero that
+    /// stops it.
+    pub fn next_fill_tick(&self) -> Option<Instant> {
+        if self.closed || !self.fill.is_enabled() {
+            return None;
+        }
+        if self.fill_target().is_none() && self.fill.is_idle() {
+            return None;
+        }
+        Some(self.fill.next_tick())
+    }
+
+    /// The cycle the Exit should currently be filling for, if any.
+    ///
+    /// The recovered predecessor's FIFO tail wins whenever it exists, for two reasons that point the
+    /// same way: its SURBs sit ahead of the successor's in the Exit's own buffer, so packets sent now
+    /// carry *its* shares; and it holds the binding hard deadline, since the successor's clocks are
+    /// deliberately not armed until the tail is exhausted (see
+    /// [`arm_recovery_clocks_for_earliest`](Self::arm_recovery_clocks_for_earliest)).
+    ///
+    /// Otherwise it is the earliest live cycle, and only once it is both funded and clocked. An
+    /// unfunded cycle has nothing at stake to be filled for, and a funded one whose clocks have not
+    /// armed is queued behind a predecessor rather than being served — filling for it would spend
+    /// SURBs on shares the Entry cannot yet be emitting.
+    fn fill_target(&self) -> Option<FillTarget> {
+        if let Some(tail) = self.paid_recovery_tail.as_ref() {
+            return tail.hard_deadline.map(|hard_deadline| FillTarget {
+                ssa_id: tail.ssa_id,
+                largest_shares_seen: tail.largest_shares_seen,
+                hard_deadline,
+            });
+        }
+
+        let ssa = &self.ssas[self.earliest_live_idx()?];
+        (ssa.phase == SsaPhase::Recovering)
+            .then_some(ssa)
+            .and_then(|ssa| ssa.recovery_hard_deadline.map(|hard_deadline| (ssa, hard_deadline)))
+            .map(|(ssa, hard_deadline)| FillTarget {
+                ssa_id: ssa.ssa_id,
+                largest_shares_seen: ssa.largest_shares_seen,
+                hard_deadline,
+            })
+    }
+
+    /// Prepends the action that silences the fill stream, when there is one to silence.
+    ///
+    /// Returns `actions` untouched for a Session that never filled — a disabled one, or one that
+    /// closed before its first cycle funded — so the action stream of every non-filling Session is
+    /// exactly what it was before this existed.
+    fn with_fill_stopped(&mut self, actions: Vec<SessionPixAction>) -> Vec<SessionPixAction> {
+        match self.fill.stop() {
+            Some(rate) => {
+                let mut stopped = Vec::with_capacity(actions.len() + 1);
+                stopped.push(SessionPixAction::SetFillRate(rate));
+                stopped.extend(actions);
+                stopped
+            }
+            None => actions,
+        }
     }
 
     /// Returns the earliest deadline across all live SSAs, or `None`.
@@ -594,9 +768,13 @@ impl SessionPixSupervisor {
                     }
                     return None;
                 }
-                // Return the earliest set deadline.
+                // Return the earliest set deadline. The re-request timer belongs here like the rest:
+                // it is shorter than every other deadline of the phase it runs in, so leaving it out
+                // would mean the worker slept past it and only re-requested when something else woke
+                // it up.
                 ssa.commitment_deadline
                     .into_iter()
+                    .chain(ssa.recommit_deadline)
                     .chain(ssa.deposit_deadline)
                     .chain(ssa.recovery_idle_deadline)
                     .chain(ssa.recovery_hard_deadline)
@@ -620,7 +798,9 @@ impl SessionPixSupervisor {
         match action {
             SessionPixAction::RequestSsa { .. } if !ok => {
                 self.closed = true;
-                vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)]
+                self.with_fill_stopped(vec![SessionPixAction::Close(
+                    SessionPixCloseReason::SupervisorUnavailable,
+                )])
             }
             SessionPixAction::Close(_) => {
                 self.closed = true;
@@ -675,6 +855,27 @@ impl SessionPixSupervisor {
         Vec::new()
     }
 
+    /// Arms — or re-arms — the re-request timer on a commitment that is under way but not complete.
+    ///
+    /// This is where the issue's rule lives: a cycle that received *nothing* never reaches here, so
+    /// it never asks, which is correct because there is no scope for it to name. And because every
+    /// arriving part pushes the timer out, the first ask cannot land in the middle of the burst —
+    /// what the timer measures is a stall in delivery.
+    ///
+    /// Unscaled by the batch size, unlike the two absolute deadlines: this is a per-cycle stall
+    /// detector, and a batch's commitment sets do not queue behind one another in a way that would
+    /// make one cycle's silence expected.
+    fn on_commitment_progress(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
+        if let Some(idx) = self.find_ssa_idx(ssa_id)
+            && self.ssas[idx].phase == SsaPhase::AwaitingCommitment
+            && self.ssas[idx].recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS
+        {
+            self.ssas[idx].recommit_deadline = now.checked_add(self.cfg.commitment_recommit_interval);
+        }
+
+        Vec::new()
+    }
+
     fn on_commitment_verified(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
             Some(i) => i,
@@ -692,6 +893,8 @@ impl SessionPixSupervisor {
         ssa.phase = SsaPhase::AwaitingDeposit;
         ssa.deposit_deadline = deposit_deadline;
         ssa.commitment_deadline = None;
+        // Nothing is missing any more, so nothing is to be asked for.
+        ssa.recommit_deadline = None;
 
         Vec::new()
     }
@@ -1143,6 +1346,14 @@ impl SessionPixSupervisor {
         self.ssas[idx].recovered_pending = false;
 
         let mut actions = Vec::new();
+        // A cycle that recovered with nothing buffered behind it leaves the Exit with nothing to fill
+        // for until its successor reaches the front and arms its own clocks — which is at least a
+        // deposit away. Stopping now rather than waiting for the successor keeps those SURBs for the
+        // cycle that will actually be paid for; the next tick starts the ramp again from the
+        // successor's true remainder.
+        if was_front && self.paid_recovery_tail.is_none() {
+            actions.extend(self.fill.stop().map(SessionPixAction::SetFillRate));
+        }
         if was_front {
             // `Recovered` is stronger evidence than an ordinary progress snapshot. Emit this even
             // though the reconstructor normally sends the final snapshot first: progress delivery
@@ -1212,7 +1423,7 @@ impl SessionPixSupervisor {
             "closing PIX session: a polynomial's share set failed to open its commitment"
         );
 
-        vec![SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)]
+        self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)])
     }
 
     // ------------------------------------------------------------------
@@ -1255,7 +1466,7 @@ impl SessionPixSupervisor {
 
         if self.ssas.len() == 1 {
             self.closed = true;
-            return vec![SessionPixAction::Close(close_reason)];
+            return self.with_fill_stopped(vec![SessionPixAction::Close(close_reason)]);
         }
 
         // A batch has siblings to fall back on, which is what makes retiring one member survivable —
@@ -1273,7 +1484,7 @@ impl SessionPixSupervisor {
                 "closing PIX session: too many cycles lost without recovering"
             );
             self.closed = true;
-            return vec![SessionPixAction::Close(close_reason)];
+            return self.with_fill_stopped(vec![SessionPixAction::Close(close_reason)]);
         }
 
         // Clear deadlines on this SSA.
@@ -1289,7 +1500,7 @@ impl SessionPixSupervisor {
             .all(|s| matches!(s.phase, SsaPhase::Closing | SsaPhase::Recovered { .. }))
         {
             self.closed = true;
-            return vec![SessionPixAction::Close(close_reason)];
+            return self.with_fill_stopped(vec![SessionPixAction::Close(close_reason)]);
         }
 
         // Remove this closing SSA and emit RetireSsa so the reconstructor
@@ -1469,7 +1680,10 @@ mod tests {
     };
     use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
-    use super::*;
+    use super::{
+        super::{FillRate, ORGANIC_WINDOW, PixFillConfig, SAMPLING_INTERVAL},
+        *,
+    };
 
     /// A compact baseline for the state-machine tests — *not* [`SupervisorConfig::default`].
     ///
@@ -1481,6 +1695,7 @@ mod tests {
             allow_dynamic_ssa_batches: true,
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
+            commitment_recommit_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
@@ -1489,6 +1704,7 @@ mod tests {
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
+            fill: PixFillConfig::default(),
         }
     }
 
@@ -2380,6 +2596,174 @@ mod tests {
             actions[0],
             SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
         ));
+    }
+
+    /// A commitment that is under way but has gone quiet is re-requested, repeatedly, without ever
+    /// being closed for it — and the absolute deadline is still what ends the cycle.
+    #[test]
+    fn a_stalled_commitment_is_re_requested_until_the_delivery_deadline() {
+        let p = pseudonym();
+        let cfg = default_cfg();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+
+        // Nothing has arrived, so there is no scope to ask for and no timer to expire.
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval * 3, 0)
+                .is_empty(),
+            "a commitment nothing was delivered for must not be re-requested"
+        );
+
+        // The first part arrives; the timer is armed from *that* instant.
+        let first_part = start + Duration::from_secs(1);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), first_part, 0);
+        assert!(
+            sup.handle_deadline(first_part + cfg.commitment_recommit_interval / 2, 0)
+                .is_empty(),
+            "the interval must be measured from the last part that arrived"
+        );
+
+        // More of the burst lands, pushing the timer out again: the first ask must not land in the
+        // middle of delivery.
+        let last_part = first_part + cfg.commitment_recommit_interval;
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), last_part, 0);
+        assert!(
+            sup.handle_deadline(last_part + cfg.commitment_recommit_interval / 2, 0)
+                .is_empty(),
+            "an arriving part must re-arm the timer"
+        );
+
+        // Delivery stalls. Every interval from here produces one ask, and no close, for as long as
+        // the delivery deadline has room — at the shipped 3 s inside 20 s that is five of them, so
+        // the count cap is not what binds at the defaults.
+        let delivery_deadline =
+            start + crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let mut now = last_part;
+        let mut asks = 0;
+        while now + cfg.commitment_recommit_interval < delivery_deadline {
+            now += cfg.commitment_recommit_interval;
+            let actions = sup.handle_deadline(now, 0);
+            assert!(
+                matches!(
+                    actions.as_slice(),
+                    [SessionPixAction::RequestCommitmentRetransmission { ssa_id, params }]
+                        if *ssa_id == id && *params == dims(10, 5)
+                ),
+                "ask {} must name the missing parts, got {actions:?}",
+                asks + 1
+            );
+            asks += 1;
+        }
+        assert!(asks > 1, "the interval must fit several asks inside the deadline");
+
+        // The delivery deadline is untouched by any of it, and remains the only thing that ends the
+        // cycle.
+        let actions = sup.handle_deadline(delivery_deadline, 0);
+        assert!(matches!(
+            actions.as_slice(),
+            [SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)]
+        ));
+    }
+
+    /// Asks stop at [`MAX_COMMITMENT_RETRANSMISSIONS`], which is what the Entry will answer.
+    ///
+    /// The delivery deadline bounds the asks in *time*, and that is what protects the Entry — but the
+    /// packets they cost are the Exit's own, and a short interval inside a long deadline leaves time
+    /// for far more of them than any Entry answers. Hence a count.
+    #[test]
+    fn asks_for_a_stalled_commitment_are_capped_by_count() {
+        let p = pseudonym();
+        // Short enough that the whole budget is spent well inside the delivery deadline, so it is the
+        // count and not the clock that stops it.
+        let cfg = SupervisorConfig {
+            commitment_recommit_interval: Duration::from_secs(1),
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), start, 0);
+
+        let mut now = start;
+        for attempt in 1..=hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            now += cfg.commitment_recommit_interval;
+            let actions = sup.handle_deadline(now, 0);
+            assert!(
+                matches!(
+                    actions.as_slice(),
+                    [SessionPixAction::RequestCommitmentRetransmission { ssa_id, .. }] if *ssa_id == id
+                ),
+                "attempt {attempt} must ask for the missing parts, got {actions:?}"
+            );
+        }
+
+        now += cfg.commitment_recommit_interval;
+        assert!(
+            sup.handle_deadline(now, 0).is_empty(),
+            "the ask budget must be spent, with the delivery deadline still far off"
+        );
+        assert_eq!(
+            Some(start + crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request)),
+            sup.next_deadline(),
+            "a spent budget must leave no timer for the worker to wake on"
+        );
+
+        // Further parts of the burst cannot buy more asks either.
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), now, 0);
+        assert!(
+            sup.handle_deadline(now + cfg.commitment_recommit_interval * 2, 0)
+                .is_empty(),
+            "an arriving part must not re-open a spent budget"
+        );
+    }
+
+    /// The re-request timer is the earliest deadline of the phase it runs in, so the worker has to be
+    /// woken by it — and it must stop existing the moment the commitment completes.
+    #[test]
+    fn the_re_request_timer_leads_the_deadlines_and_ends_with_the_commitment() {
+        let p = pseudonym();
+        let cfg = default_cfg();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg.clone(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(id), start, 0);
+        assert_eq!(
+            Some(start + cfg.commitment_recommit_interval),
+            sup.next_deadline(),
+            "the worker must wake for the re-request before the delivery deadline"
+        );
+
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
+        assert_eq!(
+            Some(start + crate::supervision::scaled_deadline(cfg.max_deposit_wait, cfg.ssas_per_request)),
+            sup.next_deadline(),
+            "a completed commitment leaves only the deposit clock"
+        );
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval, 0)
+                .is_empty(),
+            "nothing may be re-requested once the commitment verified"
+        );
+
+        // A straggling part of the burst arrives after completion — which retransmission makes
+        // routine — and must not resurrect the timer.
+        sup.handle_event(
+            &SessionPixEvent::CommitmentProgress(id),
+            start + cfg.commitment_recommit_interval,
+            0,
+        );
+        assert!(
+            sup.handle_deadline(start + cfg.commitment_recommit_interval * 3, 0)
+                .is_empty(),
+            "a late part must not re-arm a timer the phase has left"
+        );
     }
 
     #[test]
@@ -4499,5 +4883,499 @@ mod tests {
             actions.is_empty(),
             "late tombstone unverifiable shares should be absorbed"
         );
+    }
+
+    // ---------------------------------------------------------------
+    // PIX fill
+    // ---------------------------------------------------------------
+
+    /// Dimensions wide enough that the required fill rate is a whole number of packets per second.
+    ///
+    /// [`dims`]`(10, 5)` is 120 packets over an hour, which the planner correctly expresses as one
+    /// packet every twenty-odd seconds — true, but not a rate any assertion about a *ramp* can be
+    /// written against. These are the profiled dimensions of the worked example: 145 408 packets,
+    /// which needs about 57 packets/s to clear the aim point.
+    fn fill_dims() -> PixParams {
+        dims(2048, 64)
+    }
+
+    /// The rate carried by the last `SetFillRate` in `actions`, if any.
+    fn planned_rate(actions: &[SessionPixAction]) -> Option<FillRate> {
+        actions
+            .iter()
+            .filter_map(|action| match action {
+                SessionPixAction::SetFillRate(rate) => Some(*rate),
+                _ => None,
+            })
+            .next_back()
+    }
+
+    /// A funded, clocked cycle at the front, with the fill planner untouched.
+    ///
+    /// Returns the supervisor and the cycle's id. `now` is both the construction instant and the
+    /// moment the deposit confirms, so the cycle's hard deadline is exactly `max_recovery_time` out.
+    fn funded_at_front(cfg: SupervisorConfig, dims: PixParams, now: Instant) -> (SessionPixSupervisor, HoprPseudonym) {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims, p, now);
+        fund_batch(&mut sup, p, 1, now);
+        (sup, p)
+    }
+
+    /// Feeds `seen` shares of liveness to `id`, as the reconstructor would.
+    fn feed_seen(sup: &mut SessionPixSupervisor, id: SsaId<HoprPseudonym>, seen: u64, now: Instant, served: u64) {
+        let target = sup.dims.target_useful_shares();
+        let progress = make_progress_seen(id, seen.min(target), seen, target, 0);
+        sup.handle_event(&SessionPixEvent::RecoveryProgress(progress), now, served);
+    }
+
+    /// Nothing is filled for a Session whose first cycle has not been paid for.
+    ///
+    /// Fill exists to protect a *deposit*, so an unfunded cycle has nothing at stake and must cost
+    /// nothing. The stronger half of the property is the tick itself: `next_fill_tick` returning
+    /// `None` is what keeps every unfunded PIX Session — including every one that will never be
+    /// funded — from waking its worker once a second for the whole of its commitment and deposit
+    /// deadlines.
+    #[test]
+    fn no_fill_is_planned_or_ticked_before_a_cycle_is_funded() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), fill_dims(), p, t0);
+
+        assert_eq!(None, sup.next_fill_tick(), "a fresh Session has nothing to fill for");
+
+        commit_unfunded(&mut sup, p, 1..=1, t0);
+        assert_eq!(
+            None,
+            sup.next_fill_tick(),
+            "a committed but unfunded cycle still has nothing at stake"
+        );
+
+        // Ticked by hand anyway, in case a caller drives the timers without consulting the schedule.
+        let actions = sup.handle_timers(t0 + Duration::from_secs(2), 0);
+        assert_eq!(None, planned_rate(&actions), "an unfunded cycle must not be filled");
+    }
+
+    /// A cycle that recovers with nothing buffered behind it stops fill until its successor is paid.
+    ///
+    /// Recovery frees the reconstructor's state, but it does not put the successor at the front: the
+    /// successor's clocks arm only once the predecessor's FIFO tail is exhausted, and until then there
+    /// is no deadline to plan against. Filling on regardless would spend SURBs on a cycle nobody has
+    /// deposited for yet — and `shares_seen` at the full emission is exactly the case where no tail is
+    /// created, so this is the handoff with no cover at all.
+    #[test]
+    fn a_recovered_cycle_without_a_tail_stops_fill_and_plans_nothing_for_its_successor() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        let running = planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0))
+            .expect("a funded cycle at the front must be filled");
+        assert!(!running.is_zero());
+
+        // Fully emitted, so `perform_recovered_transition` leaves no paid tail behind.
+        let whole_cycle = max_cycle_shares(&sup);
+        feed_seen(&mut sup, id, whole_cycle, t0 + Duration::from_secs(2), 0);
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(2), 0);
+        assert_eq!(
+            Some(FillRate::ZERO),
+            planned_rate(&actions),
+            "recovery without a tail must silence fill in the same action vector"
+        );
+
+        assert_eq!(
+            None,
+            sup.next_fill_tick(),
+            "an unfunded successor is not something to wake up for"
+        );
+        let actions = sup.handle_timers(t0 + Duration::from_secs(4), 0);
+        assert_eq!(None, planned_rate(&actions), "and nothing is planned for it either");
+    }
+
+    /// The whole point: an idle funded cycle is carried to completion inside its own deadline.
+    ///
+    /// The Session sends not one application packet — `served_total` never moves — so every share
+    /// that comes back was earned by a fill keep-alive. The simulation closes the loop the deployment
+    /// does: whatever fill emits in a second arrives as liveness in the next one, and the planner
+    /// re-derives the rate from the remainder that leaves.
+    ///
+    /// Two properties, and the second is why `max_rate` is a configuration item rather than a
+    /// constant: the cycle must finish *before the aim point*, and it must do so without the planner
+    /// ever asking for more than the ceiling it was given.
+    #[test]
+    fn an_idle_funded_cycle_is_filled_to_completion_before_its_aim_point() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(cfg.clone(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        let cycle = max_cycle_shares(&sup);
+        let aim_point = cfg.max_recovery_time.mul_f64(cfg.fill.finish_fraction);
+
+        let mut rate = FillRate::ZERO;
+        let mut sent = 0.0_f64;
+        let mut completed_at = None;
+        for second in 1..=aim_point.as_secs() {
+            let now = t0 + Duration::from_secs(second);
+            if let Some(planned) = planned_rate(&sup.handle_timers(now, 0)) {
+                assert!(
+                    planned.as_packets_per_sec() <= cfg.fill.max_rate as f64,
+                    "fill asked for {} packets/s against a ceiling of {}",
+                    planned.as_packets_per_sec(),
+                    cfg.fill.max_rate
+                );
+                rate = planned;
+            }
+
+            // A lossless return path, so the packets sent in this second are the shares seen in it.
+            sent += rate.as_packets_per_sec();
+            if sent as u64 >= cycle {
+                completed_at = Some(second);
+                break;
+            }
+            feed_seen(&mut sup, id, sent as u64, now, 0);
+        }
+
+        let completed_at = completed_at.unwrap_or_else(|| {
+            panic!("an idle cycle of {cycle} packets was not filled to completion within {aim_point:?}")
+        });
+        assert!(
+            Duration::from_secs(completed_at) < aim_point,
+            "the cycle completed at {completed_at}s, which is not inside the {aim_point:?} aim point"
+        );
+    }
+
+    /// An application already sending faster than the requirement is not helped, only accompanied.
+    ///
+    /// Fill is `required − organic`, so a Session whose own traffic covers the cycle needs no help and
+    /// must not be charged for any: what is left is the heartbeat, which exists for the Entry's idle
+    /// timer and its SURB balancer rather than for the deadline. Getting this wrong is not a small
+    /// waste — it doubles the return traffic of every busy PIX Session on the node.
+    #[test]
+    fn organic_traffic_above_the_requirement_holds_fill_at_the_heartbeat() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(cfg.clone(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        // Comfortably above the ~57 packets/s the cycle needs, and sustained past the averaging
+        // window so the estimate is the application's rate rather than its first second.
+        const ORGANIC: u64 = 200;
+        let mut rate = None;
+        for second in 1..=(4 * ORGANIC_WINDOW.as_secs()) {
+            let now = t0 + Duration::from_secs(second);
+            let served = ORGANIC * second;
+            if let Some(planned) = planned_rate(&sup.handle_timers(now, served)) {
+                rate = Some(planned);
+            }
+            feed_seen(&mut sup, id, served, now, served);
+        }
+
+        assert_eq!(
+            Some(FillRate::once_per(cfg.fill.heartbeat)),
+            rate,
+            "an application outrunning the requirement must leave fill at its heartbeat"
+        );
+    }
+
+    /// When the application stops, fill picks the cycle up from the remainder that is actually left.
+    ///
+    /// This is the case the deployment is full of — a VPN Session that transfers and then idles — and
+    /// the trap in it is arithmetic rather than plumbing: the planner must re-derive the rate from
+    /// `E − shares seen`, not from the rate it would have asked for at the start. A planner that
+    /// replayed its opening figure would over-send by however much the application already
+    /// contributed.
+    #[test]
+    fn fill_resumes_from_the_true_remainder_when_organic_traffic_stops() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(cfg.clone(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        const ORGANIC: u64 = 200;
+        const BUSY_FOR: u64 = 300;
+        let mut seen = 0;
+        for second in 1..=BUSY_FOR {
+            let now = t0 + Duration::from_secs(second);
+            seen = ORGANIC * second;
+            sup.handle_timers(now, seen);
+            feed_seen(&mut sup, id, seen, now, seen);
+        }
+
+        // The application stops dead. `served_total` is frozen from here on.
+        let mut rate = None;
+        for second in (BUSY_FOR + 1)..=(BUSY_FOR + 4 * ORGANIC_WINDOW.as_secs()) {
+            let now = t0 + Duration::from_secs(second);
+            if let Some(planned) = planned_rate(&sup.handle_timers(now, seen)) {
+                rate = Some(planned);
+            }
+        }
+
+        let elapsed = Duration::from_secs(BUSY_FOR + 4 * ORGANIC_WINDOW.as_secs());
+        let horizon = cfg.max_recovery_time.mul_f64(cfg.fill.finish_fraction) - elapsed;
+        let expected = (max_cycle_shares(&sup) - seen) as f64 * (1.0 + cfg.fill.loss_margin) / horizon.as_secs_f64();
+        let actual = rate
+            .expect("fill must resume once the application stops")
+            .as_packets_per_sec();
+        assert!(
+            (actual - expected).abs() <= 0.15 * expected,
+            "fill resumed at {actual} packets/s against a remainder that needs {expected}"
+        );
+    }
+
+    /// The recovered predecessor's tail is filled against *its* clock, and the successor waits.
+    ///
+    /// The SURBs the Exit holds when a cycle recovers were minted for that cycle and sit ahead of the
+    /// successor's in the same FIFO, so packets sent now carry the predecessor's shares and count
+    /// against the predecessor's deadline — which is why the successor's clocks are deliberately not
+    /// armed until the tail is spent. Planning against the successor here would aim at a deadline
+    /// two hours further out and under-send the tail that is actually draining.
+    #[test]
+    fn the_paid_recovery_tail_is_filled_against_its_predecessors_deadline() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(cfg.clone(), fill_dims(), t0);
+        let first = ssa_id(p, 1);
+        let hard = sup.ssas[0]
+            .recovery_hard_deadline
+            .expect("a funded front cycle is clocked");
+
+        // Recovered with emission still outstanding, which is what leaves a paid tail behind.
+        let partial = max_cycle_shares(&sup) / 2;
+        feed_seen(&mut sup, first, partial, t0 + Duration::from_secs(1), 0);
+        sup.handle_event(&SessionPixEvent::Recovered(first), t0 + Duration::from_secs(1), 0);
+
+        let target = sup.fill_target().expect("the paid tail is the thing being filled for");
+        assert_eq!(first, target.ssa_id, "the tail, not the successor, is the target");
+        assert_eq!(
+            hard, target.hard_deadline,
+            "the tail must be planned against the clock it inherited, not a fresh one"
+        );
+
+        // The successor is funded and reaches the front only once the tail is consumed, which any
+        // share on the successor proves.
+        let second = ssa_id(p, 2);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(second), t0 + Duration::from_secs(2), 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified(second),
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: second,
+                amount: sufficient_balance(),
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        assert_eq!(
+            Some(first),
+            sup.fill_target().map(|target| target.ssa_id),
+            "a funded successor does not take the front while the tail is still draining"
+        );
+
+        feed_seen(&mut sup, second, 1, t0 + Duration::from_secs(3), 0);
+        let target = sup.fill_target().expect("the successor is now the front");
+        assert_eq!(second, target.ssa_id);
+        assert!(
+            target.hard_deadline > hard,
+            "the successor's clock starts at the FIFO boundary, so it must be later than its predecessor's"
+        );
+    }
+
+    /// Within a batch, only the cycle at the front is filled for.
+    ///
+    /// A batch is served in index order because the Entry's emission window is clamped to one cycle,
+    /// so its later members are queued rather than stalled — they have no clocks and can receive no
+    /// shares. Filling for one of them would spend SURBs the Entry cannot answer.
+    #[test]
+    fn only_the_front_cycle_of_a_batch_is_filled_for() {
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            ..default_cfg()
+        };
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, fill_dims(), p, t0);
+        fund_batch(&mut sup, p, 2, t0);
+
+        assert_eq!(
+            Some(ssa_id(p, 1)),
+            sup.fill_target().map(|target| target.ssa_id),
+            "the second cycle of a batch is queued, not being served"
+        );
+    }
+
+    /// A cycle that has stopped moving is filled at the heartbeat and no faster.
+    ///
+    /// The idle rule cannot reach this state: it re-arms whenever no *gated* service was consumed
+    /// since the last progress, and fill is ungated, so a Session whose only traffic is fill looks
+    /// perfectly quiet to it. Without the stall rule an Exit would spend `max_rate × max_recovery_time`
+    /// — half a million packets at the shipped values — on a cycle whose polynomial has already failed
+    /// or whose Entry is returning SURBs that carry nothing.
+    ///
+    /// The second half of the property matters just as much: a cycle that resumes must be filled
+    /// again. A stall latch that never released would turn one slow minute into a lost deposit.
+    #[test]
+    fn a_stalled_cycle_falls_back_to_the_heartbeat_and_recovers_when_it_moves() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(cfg.clone(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        let running = planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).expect("fill must start");
+        assert!(
+            running.as_packets_per_sec() > FillRate::once_per(cfg.fill.heartbeat).as_packets_per_sec(),
+            "the fixture needs a rate above the heartbeat for the fallback to be observable"
+        );
+
+        // Not one share arrives for the whole stall horizon.
+        let mut rate = None;
+        for second in 2..=(cfg.max_recovery_idle.as_secs() + 2) {
+            if let Some(planned) = planned_rate(&sup.handle_timers(t0 + Duration::from_secs(second), 0)) {
+                rate = Some(planned);
+            }
+        }
+        assert_eq!(
+            Some(FillRate::once_per(cfg.fill.heartbeat)),
+            rate,
+            "a motionless cycle must be held at the heartbeat"
+        );
+
+        // And a single share is enough to put it back to work.
+        let resumed_at = t0 + Duration::from_secs(cfg.max_recovery_idle.as_secs() + 3);
+        feed_seen(&mut sup, id, 1, resumed_at, 0);
+        let rate = planned_rate(&sup.handle_timers(resumed_at + SAMPLING_INTERVAL, 0))
+            .expect("progress must lift the fallback");
+        assert!(
+            rate.as_packets_per_sec() > FillRate::once_per(cfg.fill.heartbeat).as_packets_per_sec(),
+            "a cycle that resumed must be filled again, got {rate:?}"
+        );
+    }
+
+    /// A rate that has barely moved is not re-emitted.
+    ///
+    /// The planner runs every second for hours and the required rate drifts continuously, so without
+    /// hysteresis this would put a per-second action on a channel sized for lifecycle transitions —
+    /// and ask the driver to reconfigure a rate controller for a change no packet schedule can
+    /// express.
+    #[test]
+    fn a_rate_that_barely_moved_is_not_re_emitted() {
+        let t0 = Instant::now();
+        let (mut sup, _) = funded_at_front(default_cfg(), fill_dims(), t0);
+
+        assert!(
+            planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).is_some(),
+            "the first plan is always a change"
+        );
+        for second in 2..=10 {
+            assert_eq!(
+                None,
+                planned_rate(&sup.handle_timers(t0 + Duration::from_secs(second), 0)),
+                "second {second} re-emitted a rate that had not meaningfully changed"
+            );
+        }
+    }
+
+    /// Closing the Session silences fill in the same action vector that carries the close.
+    ///
+    /// The fill stream outlives this state machine by however long the action driver takes to tear
+    /// the Session down, and it is the one egress on the Exit with no application behind it to stop
+    /// on its own. A close that did not carry the zero would be followed by keep-alives for a cycle
+    /// that no longer exists.
+    #[test]
+    fn a_close_silences_fill_before_it_is_delivered() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        assert!(planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).is_some());
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: ssa_id(p, 1),
+                observed_total: 1,
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        assert!(
+            matches!(actions.first(), Some(SessionPixAction::SetFillRate(rate)) if rate.is_zero()),
+            "the zero must lead the close, got {actions:?}"
+        );
+        assert!(
+            actions.iter().any(|action| matches!(
+                action,
+                SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)
+            )),
+            "the close itself must still be there, got {actions:?}"
+        );
+    }
+
+    /// The same, on the path where a retired cycle exhausts the failure budget.
+    ///
+    /// A different close path with a different owner — `close_ssa_and_collect` rather than a fault
+    /// handler — and the one an Entry can actually reach without misbehaving, by simply losing two
+    /// deposits.
+    #[test]
+    fn retiring_past_the_failure_budget_silences_fill() {
+        const BATCH: u32 = 4;
+
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            max_failed_cycles: 1,
+            ..default_cfg()
+        };
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, fill_dims(), p, t0);
+
+        // Cycles 1 and 2 funded and recovering, so the front is being filled for; 3 and 4 stuck
+        // awaiting their deposits, which is the state an unpaid cycle is lost from.
+        fund_batch(&mut sup, p, 2, t0);
+        commit_unfunded(&mut sup, p, 3..=BATCH, t0);
+        assert!(
+            planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).is_some(),
+            "the funded front must be filling before the losses"
+        );
+
+        // The first loss is survivable; the second is over the budget and takes the Session with it,
+        // funded siblings and all.
+        sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 3)), t0, 0);
+        assert!(!sup.closed, "one loss is inside the limit");
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, BATCH)), t0, 0);
+
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(_))),
+            "the second lost cycle must close the Session, got {actions:?}"
+        );
+        assert!(
+            matches!(actions.first(), Some(SessionPixAction::SetFillRate(rate)) if rate.is_zero()),
+            "the zero must lead the close, got {actions:?}"
+        );
+    }
+
+    /// With fill disabled the supervisor behaves exactly as it did before fill existed.
+    ///
+    /// Not merely "sends no keep-alives": it must also never schedule a tick, or every PIX Session on
+    /// a node that turned the feature off would still wake its worker once a second for the whole of
+    /// its life.
+    #[test]
+    fn a_disabled_filler_plans_nothing_and_schedules_nothing() {
+        let cfg = SupervisorConfig {
+            fill: PixFillConfig {
+                enabled: false,
+                ..PixFillConfig::default()
+            },
+            ..default_cfg()
+        };
+        let t0 = Instant::now();
+        let (mut sup, _) = funded_at_front(cfg, fill_dims(), t0);
+
+        assert_eq!(None, sup.next_fill_tick(), "a disabled filler has no schedule");
+        for second in 1..=5 {
+            let actions = sup.handle_timers(t0 + Duration::from_secs(second), 0);
+            assert_eq!(None, planned_rate(&actions), "a disabled filler must plan nothing");
+        }
     }
 }

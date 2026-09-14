@@ -30,6 +30,7 @@ pub use manager::{
     MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, cycle_budget_for,
     max_cycle_budget_for_quota, validate_incoming_session_pix_config,
 };
+pub use supervision::{FillRate, PixFillConfig, SupervisorConfig, validate_pix_supervision};
 /// The supervisor state machine and its event/action vocabulary, for `benches/supervisor_bench.rs`.
 ///
 /// Behind the same `benchmark` gate as
@@ -38,7 +39,6 @@ pub use manager::{
 /// it cannot measure. Nothing here is part of the crate's supported surface.
 #[cfg(any(feature = "benchmark", test))]
 pub use supervision::{SessionPixAction, SessionPixEvent, SessionPixSupervisor};
-pub use supervision::{SupervisorConfig, validate_pix_supervision};
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;

@@ -387,12 +387,13 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
         data: T,
         routing: ResolvedTransportRouting<HoprSurb>,
         signals: S,
+        generation: Option<u8>,
     ) -> Result<OutgoingPacket, Self::Error> {
         let data_clone = data.as_ref().to_vec();
         let signals = signals.into();
         let num_surbs = routing.count_return_paths() as u8;
 
-        let packet = self.inner.encode_packet(data, routing, signals)?;
+        let packet = self.inner.encode_packet(data, routing, signals, generation)?;
 
         if let Err(error) = self.sender.try_send(
             PacketBeforeTransit::OutgoingPacket {
