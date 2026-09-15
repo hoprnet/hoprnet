@@ -351,9 +351,9 @@ impl SurbStore for MemorySurbStore {
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
-    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, mut surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
         // A batch is one packet's worth of SURBs, minted by the creator at a single generation, so
-        // the generation of any one of them stands for the whole batch. An empty batch carries no
+        // the generation of the first stands for the whole batch. An empty batch carries no
         // generation and must not create or disturb the buffer.
         let Some(generation) = surbs
             .first()
@@ -364,6 +364,26 @@ impl SurbStore for MemorySurbStore {
                 evicted: 0,
             };
         };
+
+        // That "single generation" holds by construction only for a batch minted by an honest
+        // creator: `PacketRouting::ForwardPath` stamps one generation into every SURB it mints. On
+        // this side the batch is parsed out of a counterparty-controlled payload, so enforce it
+        // rather than assume it — otherwise a mixed batch smuggles SURBs for a superseded return
+        // path into a buffer the push below labels with the newer generation, where no later push
+        // can clear them. The first SURB always survives, so the buffer is never created empty.
+        let mixed = surbs.len();
+        surbs.retain(|(_, surb)| surb.additional_data_receiver.generation() == generation);
+        let dropped = mixed - surbs.len();
+        if dropped > 0 {
+            // A statement about the peer that minted the batch, not a local fault: `warn`, not
+            // `error`. These are not capacity pressure, so they stay out of the `evicted` count.
+            tracing::warn!(
+                %pseudonym,
+                dropped,
+                generation,
+                "discarding SURBs whose generation disagrees with the rest of their batch"
+            );
+        }
 
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
@@ -1524,6 +1544,49 @@ mod tests {
         assert!(
             store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
             "no stale SURB may remain"
+        );
+
+        Ok(())
+    }
+
+    /// A batch is minted at a single generation by an honest creator, but it is parsed out of a
+    /// counterparty-controlled payload. A batch whose SURBs disagree must not smuggle a superseded
+    /// return path into the buffer the batch's generation labels: only the first SURB's generation
+    /// is kept.
+    #[test]
+    fn memory_surb_store_should_reject_surbs_that_disagree_with_their_batch() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        // The peer had already delivered a generation-0 batch that the mixed batch below supersedes.
+        store.insert_surbs(pseudonym, vec![([1u8; 8], surb_gen(relayer, TWO_HOP, 0)?)]);
+
+        let outcome = store.insert_surbs(
+            pseudonym,
+            vec![
+                ([2u8; 8], surb_gen(relayer, TWO_HOP, 1)?),
+                // Stale: belongs to the generation the batch itself supersedes.
+                ([3u8; 8], surb_gen(relayer, TWO_HOP, 0)?),
+            ],
+        );
+        assert_eq!(1, outcome.retained, "only the SURB matching the batch may be stored");
+        assert_eq!(
+            0, outcome.evicted,
+            "a mismatched SURB is not capacity pressure and must not be reported as eviction"
+        );
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        assert_eq!(
+            [2u8; 8],
+            found.sender_id.surb_id(),
+            "must hand out the SURB of the batch's own generation"
+        );
+        assert!(
+            store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
+            "no SURB of a superseded generation may remain"
         );
 
         Ok(())
