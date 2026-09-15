@@ -368,7 +368,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
+            // Datagram mode is stateless-only (see `SessionSocketConfig::datagram`): a stateful
+            // socket's NACK missing-segment bitmap addresses only the first 8 segments of a frame,
+            // so an oversized datagram frame (9-63 segments) could not be recovered. Force it off
+            // here regardless of `cfg`, so the invariant holds even if a caller mis-sets the flag.
+            .segmenter_with_terminating_segment::<C>(frame_size, false);
 
         // We have to merge the streams here and spawn a special task for it
         // Since the control messages from the State can come independent of Upstream writes.
