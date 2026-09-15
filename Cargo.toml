@@ -140,10 +140,7 @@ vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = { version = "4.3.0" }
 hopr-types = { version = "4.0.1", features = ["use-bindings"] }
-# TEMPORARY: git-pinned to the unreleased datagram-aware copy loop (#8421). `version` alongside
-# `git` is the "multiple locations" form: git wins locally, the version requirement survives
-# packaging. Revert to a plain `version = "0.15.0"` once hopr-utilities 0.15.0 is published.
-hopr-utils = { package = "hopr-utilities", version = "0.15.0", git = "https://github.com/hoprnet/hopr-utilities", branch = "kauki/fix/session/datagram-aware-copy-loop", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.15.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "2.0.0", path = "crypto/packet", default-features = false, features = [
@@ -168,9 +165,7 @@ hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-alloca
 hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
-# TEMPORARY: git-pinned to the datagram-aware UDP return path (#8421). Revert to a plain
-# `version = "0.5.0"` once hopr-session-server-forwarder 0.5.0 is published.
-hopr-session-server-forwarder = { version = "0.5.0", git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/session/exit-datagram-return-path", default-features = false }
+hopr-session-server-forwarder = { version = "0.5.0", default-features = false }
 hopr-transport-p2p = { version = "0.11.0", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.6.0", default-features = false }
 hopr-network-graph = { version = "0.7.0", default-features = false }

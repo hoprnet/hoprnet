@@ -4750,7 +4750,8 @@ dependencies = [
 [[package]]
 name = "hopr-utilities"
 version = "0.15.0"
-source = "git+https://github.com/hoprnet/hopr-utilities?branch=kauki%2Ffix%2Fsession%2Fdatagram-aware-copy-loop#7be94e2c2b7030b2c8d204ea78d5c7acb81ac245"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a287a83a776cc8e3901c4441f6cf7631f61b8bc632a0001b22b3da722a566d4d"
 dependencies = [
  "arrayvec",
  "auto_impl",
