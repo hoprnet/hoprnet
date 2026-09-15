@@ -37,7 +37,7 @@ use hopr_lib::{
     errors::HoprLibError,
     exports::transport::{
         HoprSession, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId, SessionId, SessionTarget,
-        transfer_session,
+        transfer_session, transfer_session_datagram,
     },
 };
 use hopr_utils::{
@@ -659,7 +659,7 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
                         hopr_utils::runtime::prelude::spawn(
                             // The stream either terminates naturally (by the client closing the TCP connection)
                             // or is terminated via the abort handle.
-                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
+                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg), false).then(
                                 move |_| async move {
                                     // Regardless how the session ended, remove the abort handle
                                     // from the map
@@ -780,7 +780,7 @@ pub async fn create_udp_client_binding<T: SessionFactory>(
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
+        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg), true).await;
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
@@ -912,11 +912,18 @@ async fn bind_session_to_stream<T>(
     mut stream: T,
     max_buf: usize,
     abort_reg: Option<AbortRegistration>,
+    // Preserve datagram boundaries on the stream->session direction (UDP targets). See #8421.
+    datagram: bool,
 ) where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match transfer_session(&mut session, &mut stream, max_buf, abort_reg).await {
+    let transfer = if datagram {
+        transfer_session_datagram(&mut session, &mut stream, max_buf, abort_reg).await
+    } else {
+        transfer_session(&mut session, &mut stream, max_buf, abort_reg).await
+    };
+    match transfer {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
@@ -948,7 +955,7 @@ mod tests {
         },
         exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession},
     };
-    use hopr_transport::session::HoprSessionConfig;
+    use hopr_transport::session::{Capabilities, Capability, HoprSessionConfig};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
@@ -994,7 +1001,7 @@ mod tests {
 
         tokio::task::spawn(async move {
             match tcp_listener.accept().await {
-                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None).await,
+                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None, false).await,
                 Err(e) => error!("failed to accept connection: {e}"),
             }
         });
@@ -1041,6 +1048,7 @@ mod tests {
             udp_listener,
             ApplicationData::PAYLOAD_SIZE,
             Some(abort_registration),
+            true,
         ));
 
         let mut udp_stream = ConnectedUdpStream::builder()
@@ -1063,6 +1071,79 @@ mod tests {
         }
 
         // Once aborted, the bind_session_to_stream task must terminate too
+        abort_handle.abort();
+        jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
+
+        Ok(())
+    }
+
+    /// End-to-end sanity for the client-side UDP binding wiring (`create_udp_client_binding` ->
+    /// `bind_session_to_stream`, which passes `datagram = true`): a NoDelay session carried through
+    /// the real binding must deliver a datagram larger than `frame_mtu` whole, in a single `read`,
+    /// the way the WireGuard pump (neptun) consumes it. This pins the datagram *socket* mode and the
+    /// binding plumbing — without NoDelay the session would split the datagram at `frame_mtu` into
+    /// two frames and the single read would return only 1500 bytes.
+    ///
+    /// Note: this does not exercise the copy loop's `datagram` flag itself — that only diverges from
+    /// byte-stream mode under write backpressure, which a loopback UDP socket never produces. The
+    /// copy-loop coalescing behavior is covered deterministically by the `hopr-utilities`
+    /// backpressure unit tests. See hoprnet#8421.
+    #[test_log::test(tokio::test)]
+    async fn hoprd_udp_client_binding_delivers_nodelay_datagram_whole() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
+        // Segmentation + NoDelay => stateless datagram socket (one write == one frame regardless of
+        // frame_mtu), exactly as a WireGuard session is opened.
+        let cfg = HoprSessionConfig {
+            capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay,
+            ..Default::default()
+        };
+        let session = HoprSession::new(
+            session_id,
+            DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
+            cfg,
+            loopback_transport(),
+            None,
+        )?;
+
+        let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0), None)
+            .await
+            .context("udp_bind_to failed")?;
+
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        // datagram = true: the UDP client binding.
+        let jh = tokio::task::spawn(bind_session_to_stream(
+            session,
+            udp_listener,
+            HOPR_UDP_BUFFER_SIZE,
+            Some(abort_registration),
+            true,
+        ));
+
+        let mut udp_stream = ConnectedUdpStream::builder()
+            .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+            .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+            .with_counterparty(listen_addr)
+            .build(("127.0.0.1", 0))
+            .context("bind failed")?;
+
+        // One datagram of 2904 bytes > the 1500-byte frame_mtu; loopback echoes it back to us.
+        let datagram: Vec<u8> = (0..2904usize).map(|i| (i % 251) as u8).collect();
+        udp_stream.write_all(&datagram).await.context("write failed")?;
+
+        // Single read into an over-sized buffer: if the datagram socket mode were lost the session
+        // would split the datagram at frame_mtu and this read would return only 1500 bytes.
+        let mut buf = vec![0u8; datagram.len() + 8192];
+        let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp_stream.read(&mut buf))
+            .await?
+            .context("read failed")?;
+        assert_eq!(
+            n,
+            datagram.len(),
+            "datagram must arrive whole in one read (boundary preserved)"
+        );
+        assert_eq!(&buf[..n], &datagram[..], "datagram content must round-trip intact");
+
         abort_handle.abort();
         jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
 

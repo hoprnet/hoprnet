@@ -31,7 +31,7 @@ pub use types::{
     ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
-pub use utils::transfer_session;
+pub use utils::{transfer_session, transfer_session_datagram};
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 ///

@@ -67,8 +67,6 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
@@ -78,6 +76,8 @@ pub use hopr_transport_session::{
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 use hopr_utils::{
     network_types::{

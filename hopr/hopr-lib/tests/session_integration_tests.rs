@@ -13,7 +13,9 @@ use hopr_lib::{
         network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
         transport::{
             ApplicationDataIn, ApplicationDataOut,
-            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session},
+            session::{
+                Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session, transfer_session_datagram,
+            },
         },
     },
 };
@@ -324,7 +326,11 @@ async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketA
     let (ready_tx, ready_rx) = oneshot::channel();
     tokio::task::spawn(async move {
         ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut udp_bridge, BUF_LEN, None).await
+        // Datagram-aware transfer, exactly as the exit forwarder does for UDP targets: one
+        // received datagram per session write, so back-to-back datagrams are never coalesced under
+        // write backpressure (hoprnet#8421). The deterministic copy-loop coalescing regression is
+        // unit-tested in hopr-utilities; here we exercise the full production path end to end.
+        transfer_session_datagram(&mut alice_session, &mut udp_bridge, BUF_LEN, None).await
     });
     ready_rx.await.ok();
 
