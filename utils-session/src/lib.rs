@@ -955,7 +955,7 @@ mod tests {
         },
         exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession},
     };
-    use hopr_transport::session::HoprSessionConfig;
+    use hopr_transport::session::{Capabilities, Capability, HoprSessionConfig};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
@@ -1071,6 +1071,69 @@ mod tests {
         }
 
         // Once aborted, the bind_session_to_stream task must terminate too
+        abort_handle.abort();
+        jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
+
+        Ok(())
+    }
+
+    /// The client-side UDP binding (the `create_udp_client_binding` -> `bind_session_to_stream`
+    /// wiring, which passes `datagram = true`) must preserve datagram boundaries: a datagram larger
+    /// than `frame_mtu` sent into the local UDP socket must come back whole in a single `read`, the
+    /// way the WireGuard pump (neptun) consumes it. On a byte-stream binding the datagram would be
+    /// split at `frame_mtu` across two reads. See hoprnet#8421.
+    #[test_log::test(tokio::test)]
+    async fn hoprd_udp_client_binding_preserves_datagram_boundaries() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
+        // Segmentation + NoDelay => stateless datagram socket (one write == one frame regardless of
+        // frame_mtu), exactly as a WireGuard session is opened.
+        let cfg = HoprSessionConfig {
+            capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay,
+            ..Default::default()
+        };
+        let session = HoprSession::new(
+            session_id,
+            DestinationRouting::forward_only(peer, RoutingOptions::IntermediatePath(Default::default())),
+            cfg,
+            loopback_transport(),
+            None,
+        )?;
+
+        let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0), None)
+            .await
+            .context("udp_bind_to failed")?;
+
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        // datagram = true: the UDP client binding.
+        let jh = tokio::task::spawn(bind_session_to_stream(
+            session,
+            udp_listener,
+            HOPR_UDP_BUFFER_SIZE,
+            Some(abort_registration),
+            true,
+        ));
+
+        let mut udp_stream = ConnectedUdpStream::builder()
+            .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
+            .with_queue_size(HOPR_UDP_QUEUE_SIZE)
+            .with_counterparty(listen_addr)
+            .build(("127.0.0.1", 0))
+            .context("bind failed")?;
+
+        // One datagram of 2904 bytes > the 1500-byte frame_mtu; loopback echoes it back to us.
+        let datagram: Vec<u8> = (0..2904usize).map(|i| (i % 251) as u8).collect();
+        udp_stream.write_all(&datagram).await.context("write failed")?;
+
+        // Single read into an over-sized buffer: a split (byte-stream) regression surfaces as
+        // n < datagram.len(); a coalescing regression as n > datagram.len().
+        let mut buf = vec![0u8; datagram.len() + 8192];
+        let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp_stream.read(&mut buf))
+            .await?
+            .context("read failed")?;
+        assert_eq!(n, datagram.len(), "datagram must arrive whole in one read (boundary preserved)");
+        assert_eq!(&buf[..n], &datagram[..], "datagram content must round-trip intact");
+
         abort_handle.abort();
         jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
 
