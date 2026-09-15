@@ -1,4 +1,4 @@
-use std::{ops::Mul, time::Duration};
+use std::{ops::Mul, sync::atomic::AtomicU64, time::Duration};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hopr_api::{
@@ -12,6 +12,24 @@ use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
     IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError, tbf::TagBloomFilter,
 };
+
+/// How often a sustained SURB-buffer overflow is allowed to log.
+///
+/// A full buffer stays full, so once it is at capacity *every* subsequent insert evicts — and this
+/// runs per received packet. Under poor network conditions eviction is the steady state rather than
+/// the exception, so warning on each one would turn the signal into thousands of lines a second.
+/// Warn once per interval and carry the running totals instead.
+const SURB_EVICTION_WARN_INTERVAL: u64 = 256;
+
+/// Inserts that had to evict, process-wide; drives [`SURB_EVICTION_WARN_INTERVAL`].
+///
+/// Process-wide rather than per-pseudonym: the totals are an operator signal about this node, and a
+/// per-pseudonym breakdown would need a map on the packet hot path to say something the balancer
+/// estimate already implies.
+static SURB_EVICTING_INSERTS: AtomicU64 = AtomicU64::new(0);
+
+/// SURBs destroyed by those evictions, process-wide — the loss magnitude the interval would hide.
+static SURB_EVICTED_TOTAL: AtomicU64 = AtomicU64::new(0);
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
 pub struct HoprDecoder<Chain, S, T> {
@@ -241,15 +259,42 @@ where
         match packet {
             HoprPacket::Final(incoming) => {
                 // Extract additional information from the packet that will be passed upwards
-                let info = AuxiliaryPacketInfo {
+                let mut info = AuxiliaryPacketInfo {
                     packet_signals: incoming.signals,
                     num_surbs: incoming.surbs.len(),
+                    num_evicted_surbs: 0,
                 };
 
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, packet_type = "final", "stored incoming surbs for pseudonym");
+                    let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
+                    info.num_evicted_surbs = outcome.evicted;
+                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
+
+                    // Warn rather than trace: an overflow is silent everywhere else. Without this
+                    // line the only way to learn that a buffer is overflowing is to infer it from a
+                    // balancer estimate that outgrew the store it describes, which is how it was
+                    // found the first time. Rate-limited, because a full buffer evicts on every
+                    // insert from then on -- see `SURB_EVICTION_WARN_INTERVAL`.
+                    if outcome.evicted > 0 {
+                        let total_evicted = SURB_EVICTED_TOTAL
+                            .fetch_add(outcome.evicted as u64, std::sync::atomic::Ordering::Relaxed)
+                            + outcome.evicted as u64;
+                        let prev_inserts = SURB_EVICTING_INSERTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                        // `prev` is a multiple of the interval on the very first overflow, so the
+                        // onset is reported immediately and only the sustained condition is thinned.
+                        if prev_inserts.is_multiple_of(SURB_EVICTION_WARN_INTERVAL) {
+                            tracing::warn!(
+                                pseudonym = %incoming.sender,
+                                evicted = outcome.evicted,
+                                retained = outcome.retained,
+                                total_evicted,
+                                overflowing_inserts = prev_inserts + 1,
+                                "SURB buffer full; dropping the oldest SURBs"
+                            );
+                        }
+                    }
                 }
 
                 let result = match incoming.ack_key {

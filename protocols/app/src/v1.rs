@@ -144,6 +144,12 @@ pub struct IncomingPacketInfo {
     pub signals_from_sender: PacketSignals,
     /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
     pub num_saved_surbs: usize,
+    /// How many already-held SURBs were evicted while inserting this packet's because this sender's
+    /// SURB buffer was full.
+    ///
+    /// The arriving SURBs are retained and the oldest queued ones are dropped. Exposed for
+    /// observability only; sessions deliberately do not feed it back into the SURB flow estimate.
+    pub num_evicted_surbs: usize,
 }
 
 /// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the
