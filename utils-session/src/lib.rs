@@ -780,7 +780,16 @@ pub async fn create_udp_client_binding<T: SessionFactory>(
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg), true).await;
+        // Preserve datagram boundaries only when the session's socket is in datagram mode too,
+        // i.e. when it negotiated `NoDelay` (the socket derives its datagram mode from that). This
+        // keeps the copy loop and the segmenter aligned: turning datagram copy on for a session
+        // whose segmenter still splits at `frame_mtu` would only preserve boundaries the segmenter
+        // then re-crosses. See #8421.
+        let datagram = session
+            .config()
+            .capabilities
+            .contains(hopr_transport::session::Capability::NoDelay);
+        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg), datagram).await;
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
