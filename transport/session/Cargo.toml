@@ -141,6 +141,11 @@ name = "supervisor_bench"
 harness = false
 required-features = ["benchmark"]
 
+[[bench]]
+name = "gate_bench"
+harness = false
+required-features = ["benchmark"]
+
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true, optional = true }
