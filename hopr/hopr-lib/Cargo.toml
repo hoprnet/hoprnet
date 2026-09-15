@@ -202,7 +202,10 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
-hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types-runtime-tokio"] }
+hopr-utils = { workspace = true, features = [
+  "runtime-tokio",
+  "network-types-runtime-tokio",
+] }
 # Self dev-dependency so the integration tests get a tokio session stack (`transfer_session*`,
 # tokio AsyncRead/Write on HoprSession) while hopr-utilities is git-pinned (the pin adds a second
 # hopr-utilities instance whose runtime-tokio features would otherwise not be unified in for the

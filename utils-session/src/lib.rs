@@ -1137,7 +1137,11 @@ mod tests {
         let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp_stream.read(&mut buf))
             .await?
             .context("read failed")?;
-        assert_eq!(n, datagram.len(), "datagram must arrive whole in one read (boundary preserved)");
+        assert_eq!(
+            n,
+            datagram.len(),
+            "datagram must arrive whole in one read (boundary preserved)"
+        );
         assert_eq!(&buf[..n], &datagram[..], "datagram content must round-trip intact");
 
         abort_handle.abort();
