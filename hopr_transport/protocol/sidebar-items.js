@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CURRENT_HOPR_MSG_PROTOCOL","HOPR_PACKET_SIZE"],"enum":["NodeType","PacketPipelineProcesses"],"mod":["codec","counters","errors","heartbeat","pipeline","return_path_recovery","stream","surb_telemetry"],"struct":["AcknowledgementPipelineConfig","PacketPipelineBuilder","PacketPipelineConfig","Unset"],"type":["HoprBinaryCodec"]};
