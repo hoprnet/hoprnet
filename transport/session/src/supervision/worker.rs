@@ -76,17 +76,13 @@ impl SessionPixSupervisorHandle {
     /// answered by the supervisor" and falls back to the immediate teardown that has always been the
     /// behaviour on that path.
     pub fn try_send_event(&self, ev: SessionPixEvent) -> bool {
-        match self.cmd_tx.try_send(WorkerCommand::Event(ev)) {
-            Ok(()) => true,
-            Err(TrySendError::Full(_)) => {
-                tracing::debug!("supervisor command channel full — dropping event");
-                false
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                tracing::warn!("PIX supervisor command channel closed");
-                false
-            }
-        }
+        self.cmd_tx
+            .try_send(WorkerCommand::Event(ev))
+            .inspect_err(|e| match e {
+                TrySendError::Full(_) => tracing::debug!("supervisor command channel full — dropping event"),
+                TrySendError::Disconnected(_) => tracing::warn!("PIX supervisor command channel closed"),
+            })
+            .is_ok()
     }
 
     /// Send an action result feedback to the supervisor, awaiting capacity if
@@ -121,23 +117,16 @@ impl SessionPixSupervisorHandle {
     /// to leave room for a few missed snapshots. Since the command channel is drained by a state
     /// machine that performs no I/O, drops require a genuinely wedged worker.
     pub fn try_send_progress(&self, progress: SsaRecoveryProgress<HoprPseudonym>) -> bool {
-        match self
-            .cmd_tx
+        self.cmd_tx
             .try_send(WorkerCommand::Event(SessionPixEvent::RecoveryProgress(progress)))
-        {
-            Ok(()) => true,
-            Err(TrySendError::Full(_)) => {
-                tracing::debug!(
+            .inspect_err(|e| match e {
+                TrySendError::Full(_) => tracing::debug!(
                     ssa_id = %progress.ssa_id,
                     "supervisor command channel full — dropping progress snapshot"
-                );
-                false
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                tracing::warn!("PIX supervisor command channel closed");
-                false
-            }
-        }
+                ),
+                TrySendError::Disconnected(_) => tracing::warn!("PIX supervisor command channel closed"),
+            })
+            .is_ok()
     }
 }
 
