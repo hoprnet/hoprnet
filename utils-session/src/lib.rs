@@ -1077,13 +1077,19 @@ mod tests {
         Ok(())
     }
 
-    /// The client-side UDP binding (the `create_udp_client_binding` -> `bind_session_to_stream`
-    /// wiring, which passes `datagram = true`) must preserve datagram boundaries: a datagram larger
-    /// than `frame_mtu` sent into the local UDP socket must come back whole in a single `read`, the
-    /// way the WireGuard pump (neptun) consumes it. On a byte-stream binding the datagram would be
-    /// split at `frame_mtu` across two reads. See hoprnet#8421.
+    /// End-to-end sanity for the client-side UDP binding wiring (`create_udp_client_binding` ->
+    /// `bind_session_to_stream`, which passes `datagram = true`): a NoDelay session carried through
+    /// the real binding must deliver a datagram larger than `frame_mtu` whole, in a single `read`,
+    /// the way the WireGuard pump (neptun) consumes it. This pins the datagram *socket* mode and the
+    /// binding plumbing — without NoDelay the session would split the datagram at `frame_mtu` into
+    /// two frames and the single read would return only 1500 bytes.
+    ///
+    /// Note: this does not exercise the copy loop's `datagram` flag itself — that only diverges from
+    /// byte-stream mode under write backpressure, which a loopback UDP socket never produces. The
+    /// copy-loop coalescing behavior is covered deterministically by the `hopr-utilities`
+    /// backpressure unit tests. See hoprnet#8421.
     #[test_log::test(tokio::test)]
-    async fn hoprd_udp_client_binding_preserves_datagram_boundaries() -> anyhow::Result<()> {
+    async fn hoprd_udp_client_binding_delivers_nodelay_datagram_whole() -> anyhow::Result<()> {
         let session_id = HoprPseudonym::random();
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         // Segmentation + NoDelay => stateless datagram socket (one write == one frame regardless of
@@ -1125,8 +1131,8 @@ mod tests {
         let datagram: Vec<u8> = (0..2904usize).map(|i| (i % 251) as u8).collect();
         udp_stream.write_all(&datagram).await.context("write failed")?;
 
-        // Single read into an over-sized buffer: a split (byte-stream) regression surfaces as
-        // n < datagram.len(); a coalescing regression as n > datagram.len().
+        // Single read into an over-sized buffer: if the datagram socket mode were lost the session
+        // would split the datagram at frame_mtu and this read would return only 1500 bytes.
         let mut buf = vec![0u8; datagram.len() + 8192];
         let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp_stream.read(&mut buf))
             .await?
