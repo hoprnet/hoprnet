@@ -37,7 +37,7 @@ use hopr_lib::{
     errors::HoprLibError,
     exports::transport::{
         HoprSession, HoprSessionConfigurator, OffchainPublicKey, SURB_SIZE, ServiceId, SessionId, SessionTarget,
-        transfer_session,
+        transfer_session, transfer_session_datagram,
     },
 };
 use hopr_utils::{
@@ -659,7 +659,7 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
                         hopr_utils::runtime::prelude::spawn(
                             // The stream either terminates naturally (by the client closing the TCP connection)
                             // or is terminated via the abort handle.
-                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
+                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg), false).then(
                                 move |_| async move {
                                     // Regardless how the session ended, remove the abort handle
                                     // from the map
@@ -780,7 +780,7 @@ pub async fn create_udp_client_binding<T: SessionFactory>(
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
-        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
+        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg), true).await;
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
@@ -912,11 +912,18 @@ async fn bind_session_to_stream<T>(
     mut stream: T,
     max_buf: usize,
     abort_reg: Option<AbortRegistration>,
+    // Preserve datagram boundaries on the stream->session direction (UDP targets). See #8421.
+    datagram: bool,
 ) where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match transfer_session(&mut session, &mut stream, max_buf, abort_reg).await {
+    let transfer = if datagram {
+        transfer_session_datagram(&mut session, &mut stream, max_buf, abort_reg).await
+    } else {
+        transfer_session(&mut session, &mut stream, max_buf, abort_reg).await
+    };
+    match transfer {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
@@ -994,7 +1001,7 @@ mod tests {
 
         tokio::task::spawn(async move {
             match tcp_listener.accept().await {
-                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None).await,
+                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None, false).await,
                 Err(e) => error!("failed to accept connection: {e}"),
             }
         });
@@ -1041,6 +1048,7 @@ mod tests {
             udp_listener,
             ApplicationData::PAYLOAD_SIZE,
             Some(abort_registration),
+            true,
         ));
 
         let mut udp_stream = ConnectedUdpStream::builder()

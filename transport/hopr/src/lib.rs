@@ -68,7 +68,7 @@ use hopr_transport_probe::{
 };
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
+pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
