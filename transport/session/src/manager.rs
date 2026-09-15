@@ -183,6 +183,18 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
+/// How a close is answered for a Session whose SURB buffer is already draining.
+///
+/// A `WriteClosed`/`EmptyRead` is the end-of-stream our own ingress abort produces, so it is absorbed
+/// and the drain continues; anything else — a second operator close, or a peer `SessionError` —
+/// overrules the drain by falling through to the hard teardown.
+///
+/// [`begin_surb_drain`](SessionManager::begin_surb_drain) asks it twice, because a Session can be
+/// found draining either before the transition or by losing it to a concurrent close.
+fn answer_while_draining(reason: ClosureReason) -> Option<bool> {
+    matches!(reason, ClosureReason::WriteClosed | ClosureReason::EmptyRead).then_some(true)
+}
+
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
 }
@@ -767,6 +779,11 @@ impl PixFillControl {
 
     /// Puts the stream into post-close drain mode, silencing the SURB-level notification.
     ///
+    /// Returns `false` if the stream was draining already, which is how two closes racing through
+    /// `begin_surb_drain` settle which of them owns the drain. The read and the write have to be one
+    /// lock acquisition for that: callers that each saw [`is_draining`](Self::is_draining) before
+    /// either wrote it would both start a drain, and both tell the supervisor about it.
+    ///
     /// The notification is the single packet [`admit_at`](Self::admit_at) exempts from the SURB
     /// reserve, and the exemption exists for one reason: it is the message that asks the Entry for
     /// more SURBs. It asks on behalf of a Session that a drain has already lost — the Entry itself
@@ -775,11 +792,15 @@ impl PixFillControl {
     /// [`PixFillConfig::min_surb_reserve`](crate::supervision::PixFillConfig::min_surb_reserve)
     /// exists to prevent, since a return packet with no SURB holds up every packet this node
     /// originates. With it off, `notification_due` is always false and the reserve is the only gate.
-    pub(crate) fn enter_drain(&self) {
+    pub(crate) fn enter_drain(&self) -> bool {
         let mut state = self.state.lock();
+        if state.draining {
+            return false;
+        }
         state.draining = true;
         state.notify_started = false;
         self.apply(&state);
+        true
     }
 
     /// Whether this Session is draining its SURB buffer after having been closed.
@@ -3744,10 +3765,7 @@ where
         let fill = slot.pix_fill.get()?;
 
         if fill.is_draining() {
-            return match reason {
-                ClosureReason::WriteClosed | ClosureReason::EmptyRead => Some(true),
-                _ => None,
-            };
+            return answer_while_draining(reason);
         }
 
         if matches!(reason, ClosureReason::PixFailure | ClosureReason::MissingDepositData) {
@@ -3766,7 +3784,15 @@ where
             return None;
         }
 
-        fill.enter_drain();
+        // The check above is only a fast path: `close_session_with_reason` is reached from the
+        // operator, the closure notifier and `handle_session_error` independently, so two closes can
+        // both read it as false. The transition is what actually decides, and the loser is answered
+        // as it would have been had the two been serialized rather than concurrent — which is what
+        // keeps the supervisor from being told a Session closed twice.
+        if !fill.enter_drain() {
+            return answer_while_draining(reason);
+        }
+
         if !supervisor.try_send_event(SessionPixEvent::SessionClosed { drainable_surbs }) {
             return None;
         }
@@ -6513,6 +6539,46 @@ mod tests {
             .consumed
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         assert!(!control.admit());
+    }
+
+    /// Exactly one caller may take a Session into its drain, and doing so silences the notification.
+    ///
+    /// `begin_surb_drain` is reached from the operator's close, the closure notifier and
+    /// `handle_session_error` independently, so two closes can both read [`is_draining`] as false and
+    /// race for the same drain. The transition is what settles it: the winner is the one caller that
+    /// tells the supervisor the Session closed, and the loser is answered as though it had arrived
+    /// afterwards. Were the check and the write separate, both would start a drain and the supervisor
+    /// would be told twice about one close.
+    ///
+    /// [`is_draining`]: PixFillControl::is_draining
+    #[test]
+    fn only_one_caller_can_take_a_session_into_its_drain() {
+        let notify = Duration::from_secs(60);
+        let control = fill_control(Some(notify), 1);
+        control.start_notify();
+        assert_eq!(FillRate::once_per(notify), control.effective_rate());
+
+        assert!(control.enter_drain(), "the first caller takes the drain");
+        assert!(control.is_draining());
+        assert!(
+            !control.enter_drain(),
+            "a concurrent close must lose the transition rather than start a second drain"
+        );
+        assert!(control.is_draining(), "losing the transition must not clear the drain");
+
+        assert_eq!(
+            FillRate::ZERO,
+            control.effective_rate(),
+            "a draining stream runs at the fill rate alone, and nothing is filling it"
+        );
+        assert!(
+            !control.admit(),
+            "the notification is the one packet exempt from the reserve, and a drain silences it"
+        );
+
+        // Nor can the one-shot delay task, which holds a clone of this control, turn it back on.
+        control.start_notify();
+        assert_eq!(FillRate::ZERO, control.effective_rate());
     }
 
     /// The SURB-level notification is classified by when it was *due*, not by when the scheduler got
