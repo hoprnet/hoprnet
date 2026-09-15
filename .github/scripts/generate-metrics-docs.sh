@@ -144,12 +144,52 @@ if [[ ${1:-} == "--fix" ]]; then
   exit 0
 fi
 
+# ── Cardinality guard ────────────────────────────────────────────────────────
+# A `hopr_pix_*` metric is a bounded node-level aggregate by contract, so none of
+# them may carry a label that grows with the node's history: a session id, an SSA
+# index, a pseudonym, a peer or an address. Such a label stops reporting new
+# values after ~2000 of them (the OTel SDK's per-instrument cardinality limit) and
+# does so silently, which is issue #8305.
+#
+# Checked here rather than in a Rust test because the instruments live behind the
+# `telemetry` feature, which no CI job enables — so a test next to them would
+# never run. This script does run, on every commit, via the pre-commit hook.
+DENIED_LABELS='session_id|ssa_id|ssa_index|pseudonym|peer|peerid|address|safe_address|deposit_address|target|error'
+
+check_cardinality() {
+  local violations=()
+  while IFS=$'\t' read -r name _type _desc detail; do
+    [[ $name == hopr_pix_* ]] || continue
+    [[ $detail == keys:* ]] || continue
+    local keys="${detail#keys: }"
+    keys="${keys%%;*}"
+    local key
+    for key in ${keys//,/ }; do
+      if [[ $key =~ ^($DENIED_LABELS)$ ]]; then
+        violations+=("$name is labelled by '$key'")
+      fi
+    done
+  done < <(extract_metrics)
+
+  if [[ ${#violations[@]} -gt 0 ]]; then
+    echo "ERROR: unbounded label on a hopr_pix_* aggregate:" >&2
+    printf '  %s\n' "${violations[@]}" >&2
+    echo "" >&2
+    echo "These metrics are node-level aggregates and must not be keyed by an identifier." >&2
+    echo "See the metric contract in transport/session/src/telemetry/pix.rs." >&2
+    return 1
+  fi
+  return 0
+}
+
 # ── Lint mode ────────────────────────────────────────────────────────────────
 
 if [[ ! -f $METRICS_DOC ]]; then
   echo "ERROR: METRICS.md not found at $METRICS_DOC" >&2
   exit 1
 fi
+
+check_cardinality
 
 # Normalize a markdown table: collapse runs of whitespace around pipes so that
 # column-aligned (prettified) tables compare equal to compact ones.

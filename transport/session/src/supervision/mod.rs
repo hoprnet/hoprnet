@@ -533,6 +533,12 @@ use crate::errors::TransportSessionError;
 mod fill;
 mod gate;
 mod supervisor;
+// Bounded node-level accounting: the census, the event latch, and the per-Session handle.
+//
+// Deliberately not a `///` doc — see the identical note on `telemetry::pix`. An outer doc here is
+// merged with this module's `//!` header and resolved in *this* module's scope, breaking the
+// links the module wrote against its own.
+pub(crate) mod telemetry;
 mod worker;
 
 // ---------------------------------------------------------------------------

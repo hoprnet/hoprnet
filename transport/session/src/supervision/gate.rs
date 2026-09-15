@@ -189,6 +189,24 @@ impl ServiceGate {
         self.served.load(Ordering::Acquire)
     }
 
+    /// Packets served against the current front's predeposit allowance and not yet paid for.
+    ///
+    /// Zero while funded, and that is the definition rather than an approximation: funding is
+    /// exactly the event that converts the allowance the current front spent into service the Entry
+    /// has paid for, so there is nothing outstanding to report. A later
+    /// [`withhold_service`](Self::withhold_service) restores the whole allowance for an unfunded
+    /// successor, and the figure starts climbing again from zero for that cycle.
+    ///
+    /// Read once per supervisor turn rather than per packet, so the two relaxed loads are not on any
+    /// hot path.
+    pub fn predeposit_exposure(&self) -> u64 {
+        if self.funded.load(Ordering::Acquire) {
+            return 0;
+        }
+        self.predeposit_budget
+            .saturating_sub(self.remaining.load(Ordering::Acquire))
+    }
+
     #[cfg(test)]
     pub fn funded(&self) -> bool {
         self.funded.load(Ordering::Acquire)
@@ -717,6 +735,53 @@ mod tests {
         gate.withhold_service();
         tokio::time::timeout(Duration::from_secs(1), parked).await???;
         assert_eq!(gate.served_total(), 2);
+        Ok(())
+    }
+
+    /// Exposure tracks the current front's unpaid service, and funding is what clears it.
+    ///
+    /// Zero once funded is the contract rather than an approximation: funding converts the
+    /// allowance the front spent into service the Entry has paid for, so an Exit reading
+    /// `hopr_pix_predeposit_exposure_packets` sees only what it is still owed.
+    #[tokio::test]
+    async fn predeposit_exposure_tracks_the_current_front_and_clears_on_funding() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(4, 10);
+        assert_eq!(0, gate.predeposit_exposure(), "nothing served, nothing exposed");
+
+        assert!(gate.try_acquire_sync()?);
+        assert!(gate.try_acquire_sync()?);
+        assert_eq!(2, gate.predeposit_exposure());
+
+        gate.release_service();
+        assert_eq!(
+            0,
+            gate.predeposit_exposure(),
+            "the deposit paid for what the allowance advanced"
+        );
+
+        // Funded service is not exposure however much of it there is.
+        assert!(gate.try_acquire_sync()?);
+        assert_eq!(0, gate.predeposit_exposure());
+
+        // A paid handoff restores the whole allowance for an unfunded successor, and the successor's
+        // own exposure starts again from nothing rather than inheriting its predecessor's.
+        gate.withhold_service();
+        assert_eq!(0, gate.predeposit_exposure());
+        assert!(gate.try_acquire_sync()?);
+        assert_eq!(1, gate.predeposit_exposure());
+        Ok(())
+    }
+
+    /// A strict-prepay gate has no allowance to expose, whatever happens to it.
+    #[tokio::test]
+    async fn a_zero_budget_gate_exposes_nothing() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(0, 10);
+        assert!(!gate.try_acquire_sync()?);
+        assert_eq!(0, gate.predeposit_exposure());
+
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+        assert_eq!(0, gate.predeposit_exposure());
         Ok(())
     }
 
