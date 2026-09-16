@@ -997,15 +997,34 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     }
 
     // And one per requested SSA on the Exit side.
+    //
+    // Every `DepositNeeded` observer is *held* for the rest of the test rather than dropped with
+    // `_`. Dropping that sender is not neutral: it tells the manager no deposit is ever coming for
+    // the cycle, which reports `DepositObserverClosed` and makes the supervisor write the cycle off
+    // as lost. At the default `max_failed_cycles: 1` the second write-off closes the Session, and a
+    // closed Session emits no third `DepositNeeded` — so the loop below would wait out its timeout
+    // on a cycle that can no longer arrive.
+    //
+    // Whether that happened was a race, not a certainty: it is lost only if the supervisor acts on
+    // the first two closures before the Exit has emitted the third cycle. The forwarding stream is
+    // unbounded, so on a fast machine all three events are already queued before the first observer
+    // is even dropped and the close is harmless. Under the coverage runner's instrumentation the
+    // emission side is slow enough for the supervisor to get there first. Holding the observers
+    // removes the close entirely rather than racing it. This is the only test here with a batch
+    // above one, and a batch above one is exactly the precondition `max_failed_cycles` documents
+    // for being reachable at all — with a single cycle the failing one is always the last one
+    // standing, so the siblings above never expose it.
     let mut exit_cycles = Vec::new();
+    let mut deposit_observers = Vec::new();
     for i in 0..BATCH {
         let event = tokio_time::timeout(Duration::from_secs(5), pix_bob_rx.next())
             .await
             .map_err(|e| anyhow::anyhow!("timeout awaiting exit cycle {i}: {e}"))?
             .ok_or(anyhow::anyhow!("exit must emit cycle {i}"))?;
-        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+        let HoprSessionOutPixEvent::DepositNeeded(quota, deposit_observer) = event else {
             panic!("expected DepositNeeded, got {event:?}");
         };
+        deposit_observers.push(deposit_observer);
         exit_cycles.push(quota);
     }
 
@@ -1084,6 +1103,12 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
             );
         }
     }
+
+    // Explicit, and after the last assertion on purpose: every cycle above had to stay funded-looking
+    // for the whole batch to be observable, so this is the earliest the observers may go. Dropping
+    // them implicitly at end of scope would work identically today and give no hint why the binding
+    // has to outlive the assertions.
+    drop(deposit_observers);
 
     alice_session.close().await?;
     for ah in ahs {
