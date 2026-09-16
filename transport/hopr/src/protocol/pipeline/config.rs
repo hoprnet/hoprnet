@@ -89,6 +89,47 @@ impl Validate for AcknowledgementPipelineConfig {
     }
 }
 
+fn default_arbitration_enabled() -> bool {
+    true
+}
+fn default_arbitration_occupancy_pct() -> u32 {
+    75
+}
+fn default_arbitration_encode_reserve_pct() -> u32 {
+    50
+}
+
+/// Arbitration of the shared Rayon pool, protecting the encode path (SPHINX wrap + SURB generation)
+/// from decode floods (SPHINX peel — relay forwarding + exit termination).
+///
+/// The arbiter is asymmetric and occupancy-gated: only decode is ever throttled, and only when the
+/// pool is genuinely saturated *and* encode work is present, so pure forwarding and unsaturated
+/// nodes are untouched. Enforced inside `spawn_decode_blocking`
+/// (see `hopr_utils::parallelize::cpu::configure_arbitration`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct PoolArbitrationConfig {
+    /// When `false`, decode is never throttled (the pool is shared first-come-first-served).
+    #[default(default_arbitration_enabled())]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_enabled"))]
+    pub enabled: bool,
+    /// Pool occupancy (percent of threads actually running) at or above which decode admission may
+    /// engage. Below it, decode is never throttled.
+    #[default(default_arbitration_occupancy_pct())]
+    #[validate(range(min = 1, max = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_occupancy_pct"))]
+    pub occupancy_pct: u32,
+    /// Share of the pool (percent) that decode yields to encode when both contend under saturation.
+    #[default(default_arbitration_encode_reserve_pct())]
+    #[validate(range(min = 1, max = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_encode_reserve_pct"))]
+    pub encode_reserve_pct: u32,
+}
+
 /// Overall configuration of the input/output packet processing pipeline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
 #[cfg_attr(
@@ -132,6 +173,10 @@ pub struct PacketPipelineConfig {
     /// Configuration of the packet acknowledgement processing
     #[validate(nested)]
     pub ack_config: AcknowledgementPipelineConfig,
+    /// Fair-share arbitration of the shared Rayon pool between encode and decode.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub arbitration: PoolArbitrationConfig,
 }
 
 #[cfg(all(test, feature = "serde"))]

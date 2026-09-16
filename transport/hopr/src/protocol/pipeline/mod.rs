@@ -5,7 +5,7 @@ mod config;
 
 pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
-pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
+pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig, PoolArbitrationConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
@@ -52,16 +52,6 @@ const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_s
 
 /// Multiplier applied to the CPU count to size each pipeline stage's ready-queue depth.
 const PIPELINE_CONCURRENCY_PER_CPU: usize = 8;
-
-/// Artificial per-packet delay injected into `wire_in` when the Rayon pool is detected as
-/// congested. 20 ms keeps the decode queue from growing while still allowing acks and keep-alive
-/// SURB packets to drain through at a reasonable pace.
-const INGRESS_THROTTLE_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
-
-/// Outstanding-task watermark factor: the ingress gate trips when
-/// `decode_outstanding_tasks() > input_concurrency * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
-/// A factor of 3 gives one full decode-queue worth of headroom above the configured concurrency.
-const INGRESS_POOL_HIGH_WATERMARK_FACTOR: usize = 3;
 
 /// Default per-stage pipeline concurrency (the ready-queue depth feeding the shared Rayon pool)
 /// used when a [`PacketPipelineConfig`] concurrency field is unset or zero.
@@ -1062,20 +1052,16 @@ where
     let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
     let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
 
-    // --- Ingress gate (safety-net backpressure) ---
-    // Gate on DECODE_OUTSTANDING rather than the global outstanding_tasks() so that
-    // encode work from the outgoing SURB/keep-alive pipeline (which runs concurrently
-    // in the same process in cluster tests — and in production on the same node) does
-    // not interfere with the relay's decision to throttle incoming packet decoding.
-    // Using the decode-specific counter means only sustained decode congestion triggers
-    // the delay; encode saturation alone does not.
-    let high_watermark = input_concurrency * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
-    let wire_in = wire_in.then(move |(peer, data)| async move {
-        if hopr_utils::parallelize::cpu::decode_outstanding_tasks() > high_watermark {
-            hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
-        }
-        (peer, data)
-    });
+    // Encode/decode fair-share of the shared Rayon pool is enforced inside `spawn_decode_blocking`,
+    // superseding the previous per-packet ingress sleep-gate. The pool — and thus the arbiter — is
+    // process-global, so we configure it *first-wins*: the first pipeline to start (the node, in
+    // production) applies its config; later starts in a multi-node-per-process host (tests, the
+    // cluster example) neither clobber it nor an explicit benchmark override.
+    hopr_utils::parallelize::cpu::configure_arbitration_once(
+        cfg.arbitration.enabled,
+        cfg.arbitration.occupancy_pct,
+        cfg.arbitration.encode_reserve_pct,
+    );
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,

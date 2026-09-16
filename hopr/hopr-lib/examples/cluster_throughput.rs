@@ -66,6 +66,8 @@ struct Args {
     routes: usize,
     seed: u64,
     flamegraph_out: Option<PathBuf>,
+    pool: Option<usize>,
+    arbiter: bool,
 }
 
 impl Args {
@@ -76,6 +78,8 @@ impl Args {
         let mut routes = 4usize;
         let mut seed = 42u64;
         let mut flamegraph_out: Option<PathBuf> = None;
+        let mut pool: Option<usize> = None;
+        let mut arbiter = true;
 
         while let Some(flag) = iter.next() {
             match flag.as_str() {
@@ -97,6 +101,17 @@ impl Args {
                 "--mb" => mb = next_u64(&mut iter, "--mb")?,
                 "--routes" => routes = next_usize(&mut iter, "--routes")?,
                 "--seed" => seed = next_u64(&mut iter, "--seed")?,
+                "--pool" => pool = Some(next_usize(&mut iter, "--pool")?),
+                "--arbiter" => {
+                    let v = iter
+                        .next()
+                        .ok_or_else(|| anyhow::anyhow!("--arbiter requires on|off"))?;
+                    arbiter = match v.as_str() {
+                        "on" | "true" | "1" => true,
+                        "off" | "false" | "0" => false,
+                        _ => anyhow::bail!("--arbiter must be on|off, got {v}"),
+                    };
+                }
                 "--out" => {
                     let path = iter.next().ok_or_else(|| anyhow::anyhow!("--out requires a path"))?;
                     flamegraph_out = Some(PathBuf::from(path));
@@ -111,6 +126,8 @@ impl Args {
             routes,
             seed,
             flamegraph_out,
+            pool,
+            arbiter,
         })
     }
 }
@@ -140,13 +157,30 @@ fn main() -> anyhow::Result<()> {
     // HOPR nodes start.  Without this, pool_thread_count() returns 0 and all
     // pool-based concurrency limits fall back to avail_parallelism * 8, allowing
     // SURB bursts to flood Rayon and starve data-packet encoding.
-    let rayon_threads = std::thread::available_parallelism()
-        .map(|n| (n.get() / 2).max(1))
-        .unwrap_or(4);
-    // Ignore the error: returns Err if the pool was already initialized (e.g.
-    // by a framework that ran before main); in that case pool_thread_count()
-    // was already set by the prior initialiser, so this is a no-op.
+    let rayon_threads = args.pool.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|n| (n.get() / 2).max(1))
+            .unwrap_or(4)
+    });
+    // Returns Err if the pool was already initialised (e.g. by a framework that ran before main); in
+    // that case pool_thread_count() reflects the prior initialiser's size, not `rayon_threads`.
     let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
+    // Report the *actual* pool size, not the requested one — and fail loudly when an explicit `--pool`
+    // could not take effect, so a benchmark never silently measures a different pool than it claims.
+    let active_pool = hopr_utils::parallelize::cpu::pool_thread_count();
+    if let Some(requested) = args.pool {
+        anyhow::ensure!(
+            active_pool == requested,
+            "--pool {requested} could not take effect: the Rayon pool is already initialised at {active_pool} threads",
+        );
+    }
+    // Explicit process-level override so the benchmark's on/off choice wins over per-node startup
+    // (which uses the first-wins `configure_arbitration_once`).
+    hopr_utils::parallelize::cpu::configure_arbitration(args.arbiter, 75, 50);
+    eprintln!(
+        "→ pool={active_pool} threads, arbiter={}",
+        if args.arbiter { "on" } else { "off" }
+    );
 
     eprintln!(
         "→ Starting {n_nodes}-node cluster ({}-hop) — full-mesh connectivity can take ~100 s for 3 nodes,\n  longer \

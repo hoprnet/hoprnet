@@ -138,3 +138,52 @@ async fn pinned_low_decode_concurrency_degrades_throughput() -> anyhow::Result<(
 
     Ok(())
 }
+
+/// Liveness guard: the pool arbiter (enabled by default) must not break a multi-hop cluster.
+///
+/// NOTE ON MEASUREMENT: this cluster shares ONE process-global Rayon pool across every node, so it
+/// behaves like a single node doing every role at once and cannot isolate the arbiter's per-role
+/// effect (a relay's forwarding-decode gets capped by the endpoints' SURB-encode that shares the
+/// pool). The arbiter's real, per-role numbers — SURB encode ~5× protected under a decode flood,
+/// and zero overhead for pure forwarding — are measured by the single-node criterion benchmark
+/// `pool_arbiter_bench` in the `hopr-utilities` crate. Here we only assert the arbiter keeps the
+/// cluster delivering (no deadlock / collapse) with SURB encode alive.
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[ignore = "slow: requires cluster bootstrap (60–120 s); run with --run-ignored"]
+async fn pool_arbiter_keeps_the_cluster_live() -> anyhow::Result<()> {
+    // 3 hops multiplies forwarding-decode; several routes deepen the shared-pool contention.
+    const HOPS: usize = 3;
+    const N: usize = HOPS + 2;
+
+    let cfg = StressConfig {
+        hops: HOPS,
+        total_bytes: 20 * 1024 * 1024,
+        routes: 3,
+        msg_size_range: 4096..=32768,
+        sample_interval: Duration::from_millis(500),
+        seed: 42,
+        ..StressConfig::default()
+    };
+
+    // Arbiter enabled (the default).
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, N);
+    let report = run_stress(&cluster, &cfg).await?;
+    report.print_series();
+
+    anyhow::ensure!(
+        report.total_bytes_delivered >= cfg.total_bytes,
+        "arbiter-on delivered {}, expected at least {}",
+        report.total_bytes_delivered,
+        cfg.total_bytes,
+    );
+    anyhow::ensure!(
+        report.encode_timeout_drops == 0,
+        "arbiter must keep SURB/data encode alive, but shed {} encode packets",
+        report.encode_timeout_drops,
+    );
+
+    Ok(())
+}
