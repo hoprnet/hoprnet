@@ -13,7 +13,7 @@ use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 use super::{
     PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig,
     fill::{FillPlanner, FillTarget},
-    telemetry::{PixGateMode, PixSessionSnapshot, PixTurnEvents},
+    telemetry::{PixCycleOutcome, PixCycleSummary, PixGateMode, PixSessionSnapshot, PixTurnEvents},
 };
 
 // ---------------------------------------------------------------------------
@@ -105,6 +105,16 @@ struct PerSsaState {
 
     // Service gating.
     served_total_at_last_progress: u64,
+    /// The Session's served count when this cycle reached the front of the batch, or `None` while
+    /// it is still queued behind one.
+    ///
+    /// Subtracted from the served count at finalization to give the cycle's own egress. Baselined
+    /// at the front rather than at the request, because a queued cycle is not being served: the
+    /// Entry's emission window is clamped to one cycle, so charging a batch member for everything
+    /// its predecessors consumed would report the last cycle of a batch as having cost the whole
+    /// batch. `None` on a cycle that never reached the front is therefore the honest answer, and it
+    /// is reported as zero egress rather than as the Session's whole history.
+    served_total_at_front: Option<u64>,
 }
 
 impl PerSsaState {
@@ -128,6 +138,24 @@ impl PerSsaState {
             is_batch_last: false,
             recovered_pending: false,
             served_total_at_last_progress: 0,
+            served_total_at_front: None,
+        }
+    }
+
+    /// This cycle's coverage, for the histograms observed once when it finalizes.
+    fn telemetry_summary(&self, outcome: PixCycleOutcome, served_total: u64) -> PixCycleSummary {
+        PixCycleSummary {
+            outcome,
+            // Saturating rather than assuming monotonicity: the baseline is taken from a
+            // `served_total` sample passed in by the worker, and a cycle retired on a deadline
+            // sweep can be summarized from an older sample than the one that baselined it.
+            egress_packets: self
+                .served_total_at_front
+                .map(|base| served_total.saturating_sub(base))
+                .unwrap_or(0),
+            accepted_shares: self.largest_shares_seen,
+            useful_shares: self.largest_useful_shares,
+            target_useful_shares: self.target_useful_shares,
         }
     }
 
@@ -289,7 +317,9 @@ impl SessionPixSupervisor {
             SessionPixEvent::DepositConfirmed { ssa_id, amount } => {
                 self.on_deposit_confirmed(ssa_id, *amount, now, served_total)
             }
-            SessionPixEvent::DepositObserverClosed(ssa_id) => self.on_deposit_observer_closed(ssa_id, now),
+            SessionPixEvent::DepositObserverClosed(ssa_id) => {
+                self.on_deposit_observer_closed(ssa_id, now, served_total)
+            }
             SessionPixEvent::RecoveryProgress(progress) => self.on_recovery_progress(progress, now, served_total),
             SessionPixEvent::AlmostRecovered(ssa_id) => self.on_almost_recovered(ssa_id, now),
             SessionPixEvent::Recovered(ssa_id) => self.on_recovered(ssa_id, now, served_total),
@@ -553,6 +583,12 @@ impl SessionPixSupervisor {
         ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
         ssa.recovery_hard_deadline = now.checked_add(self.cfg.max_recovery_time);
         ssa.served_total_at_last_progress = served_total;
+        // The same instant, for the same reason: this is when the cycle starts being served, so it
+        // is when its own egress begins. `get_or_insert` rather than a plain assignment because a
+        // cycle reaches the front once — the guard above returns early for one that already armed —
+        // but stating it here means a future caller cannot rebaseline a cycle mid-flight and make
+        // its recorded egress smaller than what it actually consumed.
+        ssa.served_total_at_front.get_or_insert(served_total);
         tracing::debug!(ssa_id = %ssa.ssa_id, "recovery clocks started — cycle is at the front of the batch");
     }
 
@@ -655,7 +691,7 @@ impl SessionPixSupervisor {
                     continue;
                 }
 
-                actions.extend(self.close_ssa_and_collect(i, reason));
+                actions.extend(self.close_ssa_and_collect(i, reason, served_total));
                 continue;
             }
             i += 1;
@@ -1057,7 +1093,12 @@ impl SessionPixSupervisor {
         actions
     }
 
-    fn on_deposit_observer_closed(&mut self, ssa_id: &SsaId<HoprPseudonym>, _now: Instant) -> Vec<SessionPixAction> {
+    fn on_deposit_observer_closed(
+        &mut self,
+        ssa_id: &SsaId<HoprPseudonym>,
+        _now: Instant,
+        served_total: u64,
+    ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
             Some(i) => i,
             None => return Vec::new(),
@@ -1067,7 +1108,7 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed)
+        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed, served_total)
     }
 
     fn on_recovery_progress(
@@ -1124,6 +1165,27 @@ impl SessionPixSupervisor {
         if new_seen <= ssa.largest_shares_seen {
             return Vec::new();
         }
+
+        // The accepted delta, taken here because this is the one point at which a snapshot is known
+        // to be both validated and newer than everything seen before. The absolute/reordered
+        // semantics the issue asks for fall out of the two high-water marks rather than needing
+        // their own machinery: a repeated or stale snapshot returned at the guard above and adds
+        // zero, and a snapshot arriving after a dropped one carries the whole missing delta,
+        // because a mark is a maximum and never a running sum.
+        let accepted_delta = new_seen - ssa.largest_shares_seen;
+        // Clamped to the accepted delta, which is not defensive clutter. The two marks are
+        // independent maxima over possibly different snapshots, so a reconstructor regression could
+        // present `(seen 10, useful 2)` followed by `(seen 11, useful 11)` — a useful delta of nine
+        // against an accepted delta of one — and mint a negative surplus. This file is an
+        // independent backstop against exactly that class of fault everywhere else; it is one here
+        // too.
+        let useful_delta = new_useful.saturating_sub(ssa.largest_useful_shares).min(accepted_delta);
+        self.telemetry.useful_shares = self.telemetry.useful_shares.saturating_add(useful_delta);
+        self.telemetry.surplus_shares = self
+            .telemetry
+            .surplus_shares
+            .saturating_add(accepted_delta - useful_delta);
+
         ssa.largest_shares_seen = new_seen;
 
         // Liveness tier. A share arrived, useful or not, so the Entry is serving this cycle — which is
@@ -1208,7 +1270,7 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        let exhausted = {
+        let (exhausted, accepted_delta) = {
             let tail = self
                 .paid_recovery_tail
                 .as_mut()
@@ -1217,11 +1279,19 @@ impl SessionPixSupervisor {
                 return Vec::new();
             }
 
+            let accepted_delta = progress.shares_seen - tail.largest_shares_seen;
             tail.largest_shares_seen = progress.shares_seen;
             tail.served_total_at_last_progress = served_total;
             tail.idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
-            progress.shares_seen == max_shares_seen
+            (progress.shares_seen == max_shares_seen, accepted_delta)
         };
+
+        // All surplus, by definition: this cycle has already reached its useful-share target, which
+        // is what the guard above requires before a snapshot may touch the receipt at all. These
+        // are the negotiated tail a conforming Entry keeps emitting while the FIFO drains — real
+        // accepted traffic, and the evidence that keeps the paid front open, but no longer worth
+        // anything towards recovery.
+        self.telemetry.surplus_shares = self.telemetry.surplus_shares.saturating_add(accepted_delta);
 
         // Keep the tombstone's diagnostics monotone while it is retained, but do not require the
         // record: tombstone cleanup is intentionally shorter than a Session's possible FIFO drain.
@@ -1434,6 +1504,12 @@ impl SessionPixSupervisor {
         // deposit, and replays it through this function once both arrive. This is the one place a
         // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
         self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
+        // Summarized from the counters as they stand *now*, before the tombstone transition below —
+        // and before `paid_recovery_tail` starts collecting the drain, which belongs to the FIFO
+        // rather than to this cycle's recovery. The terminal fields were just pinned to the target
+        // above, so a recovered cycle's useful fraction is exactly one by construction.
+        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Recovered, served_total);
+        self.telemetry.finalized.push(summary);
 
         // Transition to tombstone.
         self.ssas[idx].phase = SsaPhase::Recovered {
@@ -1618,7 +1694,12 @@ impl SessionPixSupervisor {
     // ------------------------------------------------------------------
 
     /// Close the SSA at `idx` and return close actions.
-    fn close_ssa_and_collect(&mut self, idx: usize, reason: SessionPixCloseReason) -> Vec<SessionPixAction> {
+    fn close_ssa_and_collect(
+        &mut self,
+        idx: usize,
+        reason: SessionPixCloseReason,
+        served_total: u64,
+    ) -> Vec<SessionPixAction> {
         if matches!(self.ssas[idx].phase, SsaPhase::Closing) {
             return Vec::new();
         }
@@ -1632,8 +1713,12 @@ impl SessionPixSupervisor {
         // a recovered cycle leaves through tombstone expiry in `handle_deadline`, not through here.
         self.failed_cycles += 1;
         // Same transition, so the same guard covers both: the `Closing` check at the top of this
-        // function is what makes a repeated close of one cycle count once.
+        // function is what makes a repeated close of one cycle count once. The summary rides along
+        // for the same reason — this is the one place a cycle is retired without recovering, and
+        // the counters are still intact because nothing below has cleared them yet.
         self.telemetry.failed = self.telemetry.failed.saturating_add(1);
+        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Failed, served_total);
+        self.telemetry.finalized.push(summary);
 
         // Warn-level diagnostic with full SSA state before closing.
         let ssa = &self.ssas[idx];
@@ -5992,14 +6077,30 @@ mod tests {
             "a tombstone is retained state, not live state: {after:?}"
         );
         assert_eq!(0, after.recovering, "the recovered cycle must leave the live census");
+
+        let events = sup.take_telemetry_events();
         assert_eq!(
-            PixTurnEvents {
-                recovered: 1,
-                requested: 1,
-                ..Default::default()
-            },
-            sup.take_telemetry_events(),
+            (1, 1),
+            (events.recovered, events.requested),
             "the successor is requested in the same turn the predecessor recovers"
+        );
+        assert_eq!(
+            vec![PixCycleSummary {
+                outcome: PixCycleOutcome::Recovered,
+                // This cycle was never served: the fixture drives the lifecycle directly, with a
+                // served count of zero throughout.
+                egress_packets: 0,
+                accepted_shares: sup.dims.target_useful_shares(),
+                useful_shares: sup.dims.target_useful_shares(),
+                target_useful_shares: sup.dims.target_useful_shares(),
+            }],
+            events.finalized,
+            "a recovered cycle is summarized exactly once, at full useful coverage"
+        );
+        assert_eq!(
+            Some(1.0),
+            events.finalized[0].useful_fraction(),
+            "a recovered cycle's useful fraction is one by construction"
         );
     }
 
@@ -6249,6 +6350,310 @@ mod tests {
             census(&sup),
             "the cycle stays fundable, awaiting a real deposit"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Share coverage — absolute snapshots into positive deltas
+    // -----------------------------------------------------------------------
+
+    /// A funded, recovering single-cycle Session, ready to be fed progress snapshots.
+    fn recovering_session(p: HoprPseudonym, t0: Instant) -> SessionPixSupervisor {
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        fund_batch(&mut sup, p, 1, t0);
+        sup.take_telemetry_events();
+        sup
+    }
+
+    /// Feeds one snapshot and returns the `(useful, surplus)` it booked.
+    fn feed(sup: &mut SessionPixSupervisor, id: SsaId<HoprPseudonym>, useful: u64, seen: u64) -> (u64, u64) {
+        let target = sup.dims.target_useful_shares();
+        let polys = sup.dims.polys_per_ssa();
+        // `recovered_polynomials` is scaled with `useful` so the snapshot stays internally
+        // consistent; the validator rejects one that is not, and this test is about deltas.
+        let recovered = ((useful * polys as u64) / target.max(1)) as u16;
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress_seen(id, useful, seen, target, recovered)),
+            Instant::now(),
+            0,
+        );
+        let events = sup.take_telemetry_events();
+        (events.useful_shares, events.surplus_shares)
+    }
+
+    /// Absolute snapshots become positive deltas, and every degenerate ordering adds zero.
+    ///
+    /// The property the issue names: `shares_seen` is absolute and acknowledgement batches arrive
+    /// out of order or coalesced, so adding it to a counter would over-count wildly. What is added
+    /// is the difference against a high-water mark.
+    #[test]
+    fn absolute_snapshots_become_positive_deltas() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let mut sup = recovering_session(p, t0);
+        let id = ssa_id(p, 1);
+
+        assert_eq!((10, 0), feed(&mut sup, id, 10, 10), "the first snapshot is all delta");
+        assert_eq!((5, 0), feed(&mut sup, id, 15, 15), "and the next is the difference");
+
+        // Repeated: the same snapshot again.
+        assert_eq!((0, 0), feed(&mut sup, id, 15, 15), "a repeated snapshot adds nothing");
+        // Stale: reordered behind one already seen.
+        assert_eq!((0, 0), feed(&mut sup, id, 12, 12), "a stale snapshot adds nothing");
+        // Still stale on the liveness counter even though useful is unchanged.
+        assert_eq!(
+            (0, 0),
+            feed(&mut sup, id, 15, 14),
+            "an older liveness count adds nothing"
+        );
+
+        // Coalesced: a jump standing in for snapshots that were dropped. The whole missing delta
+        // arrives with it, because a high-water mark is a maximum and not a running sum.
+        assert_eq!(
+            (85, 0),
+            feed(&mut sup, id, 100, 100),
+            "a jump carries the missing delta"
+        );
+    }
+
+    /// Shares that arrive but advance nothing are surplus, and are counted as such.
+    ///
+    /// This is the tail of every conforming cycle — `surplus` shares per polynomial that arrive
+    /// after its threshold is met — so an Exit whose `useful` and `surplus` rates are both healthy
+    /// is being served correctly, and one with surplus but no useful progress is not.
+    #[test]
+    fn shares_that_advance_nothing_are_counted_as_surplus() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let mut sup = recovering_session(p, t0);
+        let id = ssa_id(p, 1);
+
+        assert_eq!((20, 0), feed(&mut sup, id, 20, 20));
+        // Liveness advances, payment does not: the conforming surplus run.
+        assert_eq!(
+            (0, 5),
+            feed(&mut sup, id, 20, 25),
+            "a surplus-only snapshot books surplus"
+        );
+        // A mixed snapshot splits.
+        assert_eq!((10, 5), feed(&mut sup, id, 30, 40), "a mixed snapshot splits both ways");
+    }
+
+    /// Useful and surplus always partition the accepted delta, over an arbitrary sequence.
+    ///
+    /// Stated as an invariant over a generated sequence rather than as another worked example,
+    /// because the failure it guards against is an accounting slip in one of the branches rather
+    /// than a wrong answer to one case.
+    #[test]
+    fn useful_and_surplus_always_partition_the_accepted_delta() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let mut sup = recovering_session(p, t0);
+        let id = ssa_id(p, 1);
+        let target = sup.dims.target_useful_shares();
+        // The greatest liveness count these dimensions can produce: anything above it is a protocol
+        // violation the validator closes on, so a walk must stay inside it to be booking deltas at
+        // all rather than testing the rejection path.
+        let max_seen = max_cycle_shares(&sup);
+
+        let mut booked_useful = 0;
+        let mut booked_surplus = 0;
+        let mut highest_seen = 0;
+
+        // A deterministic walk that revisits, regresses and jumps, which is what real delivery does.
+        for step in [
+            (5u64, 5u64),
+            (5, 9),
+            (3, 4),
+            (9, 9),
+            (9, 20),
+            (9, 20),
+            (30, 41),
+            (12, 12),
+            (target, max_seen),
+            (target, max_seen),
+        ] {
+            let (useful, seen) = step;
+            let (u, s) = feed(&mut sup, id, useful, seen);
+            assert_eq!(
+                seen.saturating_sub(highest_seen),
+                u + s,
+                "snapshot {step:?} must book exactly its accepted delta"
+            );
+            highest_seen = highest_seen.max(seen);
+            booked_useful += u;
+            booked_surplus += s;
+        }
+
+        assert_eq!(
+            highest_seen,
+            booked_useful + booked_surplus,
+            "over the whole sequence the two must sum to the greatest liveness count seen"
+        );
+        assert_eq!(
+            target, booked_useful,
+            "and the useful half must sum to the greatest useful count seen"
+        );
+    }
+
+    /// A recovered cycle's drain is all surplus.
+    ///
+    /// Its useful counter is pinned at the target by recovery, so every further share the FIFO
+    /// delivers is accepted traffic that can no longer advance anything.
+    #[test]
+    fn a_recovered_tail_books_only_surplus() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let mut sup = recovering_session(p, t0);
+        let id = ssa_id(p, 1);
+        let target = sup.dims.target_useful_shares();
+
+        feed(&mut sup, id, target, target);
+        sup.handle_event(&SessionPixEvent::Recovered(id), t0, 0);
+        sup.take_telemetry_events();
+        assert!(sup.paid_recovery_tail.is_some(), "the fixture must leave a receipt");
+
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, id, target + 40)),
+            t0,
+            0,
+        );
+        let events = sup.take_telemetry_events();
+        assert_eq!(0, events.useful_shares, "a recovered cycle can advance nothing further");
+        assert_eq!(40, events.surplus_shares);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cycle finalization
+    // -----------------------------------------------------------------------
+
+    /// A cycle retired without recovering is summarized once, with what it actually got.
+    #[test]
+    fn a_failed_cycle_is_summarized_with_its_partial_coverage() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let mut sup = recovering_session(p, t0);
+        let id = ssa_id(p, 1);
+        let target = sup.dims.target_useful_shares();
+
+        // Reached the front and got a quarter of the way before stalling. `recovering_session`
+        // funded it at a served count of zero, so that is where its egress is measured from.
+        feed(&mut sup, id, target / 4, target / 2);
+
+        // Retire it on the hard recovery deadline, with the served count having moved on.
+        let actions = sup.handle_timers(t0 + Duration::from_secs(100_000), 5_000);
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(_))),
+            "the fixture must actually retire the cycle, got {actions:?}"
+        );
+
+        let events = sup.take_telemetry_events();
+        assert_eq!(1, events.failed);
+        assert_eq!(1, events.finalized.len(), "summarized exactly once");
+        let summary = events.finalized[0];
+        assert_eq!(PixCycleOutcome::Failed, summary.outcome);
+        assert_eq!(target / 4, summary.useful_shares);
+        assert_eq!(target / 2, summary.accepted_shares);
+        assert_eq!(Some(0.25), summary.useful_fraction());
+        assert_eq!(Some(0.5), summary.accepted_fraction());
+        assert_eq!(
+            5_000, summary.egress_packets,
+            "egress is the Session's served count measured from when this cycle reached the front"
+        );
+    }
+
+    /// Egress is measured from the front, not from the Session's start.
+    ///
+    /// The companion to the test above: there, the cycle reached the front at a served count of
+    /// zero, so the two readings coincide and the property is invisible. Here a predecessor has
+    /// already consumed 1 000 packets before this cycle is armed, and only the 4 000 after that
+    /// belong to it.
+    #[test]
+    fn cycle_egress_is_measured_from_the_front_not_the_session_start() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        let id = ssa_id(p, 1);
+
+        // Funded at a served count of 1 000: the Session has already been passing data.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), t0, 1_000);
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), t0, 1_000);
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            t0,
+            1_000,
+        );
+        sup.take_telemetry_events();
+
+        sup.handle_timers(t0 + Duration::from_secs(100_000), 5_000);
+
+        let events = sup.take_telemetry_events();
+        assert_eq!(1, events.finalized.len());
+        assert_eq!(
+            4_000, events.finalized[0].egress_packets,
+            "the 1 000 packets served before this cycle reached the front are not its cost"
+        );
+    }
+
+    /// A cycle that never reached the front is charged no egress.
+    ///
+    /// The Entry's emission window is clamped to one cycle, so a queued batch member is not being
+    /// served at all. Charging it for its predecessors' traffic would report the last cycle of a
+    /// batch as having cost the whole batch.
+    #[test]
+    fn a_queued_cycle_is_charged_no_egress() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            max_failed_cycles: 4,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(64, 8), p, t0);
+
+        // Only the first cycle is funded, so the second never reaches the front.
+        commit_unfunded(&mut sup, p, 1..=2, t0);
+        sup.take_telemetry_events();
+        sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 2)), t0, 9_999);
+
+        let events = sup.take_telemetry_events();
+        assert_eq!(1, events.finalized.len());
+        assert_eq!(
+            0, events.finalized[0].egress_packets,
+            "a cycle that never reached the front consumed none of the Session's egress"
+        );
+    }
+
+    /// An undefined coverage ratio is reported as absent rather than as zero.
+    #[test]
+    fn a_cycle_with_no_target_has_no_coverage_fraction() {
+        let summary = PixCycleSummary {
+            outcome: PixCycleOutcome::Failed,
+            egress_packets: 10,
+            accepted_shares: 0,
+            useful_shares: 0,
+            target_useful_shares: 0,
+        };
+        assert_eq!(None, summary.useful_fraction());
+        assert_eq!(None, summary.accepted_fraction());
+    }
+
+    /// Accepted coverage above one is the conforming case, not an error.
+    #[test]
+    fn accepted_coverage_may_exceed_one() {
+        let summary = PixCycleSummary {
+            outcome: PixCycleOutcome::Recovered,
+            egress_packets: 4096,
+            accepted_shares: 768,
+            useful_shares: 512,
+            target_useful_shares: 512,
+        };
+        assert_eq!(Some(1.0), summary.useful_fraction());
+        assert_eq!(Some(1.5), summary.accepted_fraction());
     }
 
     /// The snapshot reports the gate's exposure as given, without interpreting it.
