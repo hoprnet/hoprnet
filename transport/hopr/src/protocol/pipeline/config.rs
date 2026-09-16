@@ -130,8 +130,9 @@ pub struct PoolArbitrationConfig {
 }
 
 impl PoolArbitrationConfig {
-    /// Maps this flat (serde-friendly) config onto the pool arbiter's [`ArbitrationConfig`] enum,
-    /// where the disabled state carries no tuning percentages.
+    /// Maps this flat (serde-friendly) config onto the pool arbiter's
+    /// [`ArbitrationConfig`](hopr_utils::parallelize::cpu::ArbitrationConfig) enum, where the disabled
+    /// state carries no tuning percentages.
     pub fn to_arbitration(&self) -> hopr_utils::parallelize::cpu::ArbitrationConfig {
         use hopr_utils::parallelize::cpu::ArbitrationConfig;
         if self.enabled {
