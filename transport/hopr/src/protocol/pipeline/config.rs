@@ -250,4 +250,28 @@ mod tests {
             "the default arbitration config must pass validation"
         );
     }
+
+    /// `to_arbitration` maps the flat config onto the arbiter enum: enabled → `Enabled` with the
+    /// percentages, disabled → `Disabled` (no percentages).
+    #[test]
+    fn pool_arbitration_config_maps_onto_the_arbiter_enum() {
+        use hopr_utils::parallelize::cpu::ArbitrationConfig;
+        let enabled = PoolArbitrationConfig {
+            enabled: true,
+            occupancy_pct: 80,
+            encode_reserve_pct: 40,
+        };
+        assert_eq!(
+            enabled.to_arbitration(),
+            ArbitrationConfig::Enabled {
+                occupancy_pct: 80,
+                encode_reserve_pct: 40
+            }
+        );
+        let disabled = PoolArbitrationConfig {
+            enabled: false,
+            ..PoolArbitrationConfig::default()
+        };
+        assert_eq!(disabled.to_arbitration(), ArbitrationConfig::Disabled);
+    }
 }
