@@ -546,6 +546,11 @@ pub struct TestNodeConfig {
     /// Gaussian-jittered FIFO delay (see [`TransitLatencyConfig`]) — simulating
     /// WAN-link latency in a local cluster.  `None` (the default) means no extra delay.
     pub transit_latency: Option<TransitLatencyConfig>,
+    /// Optional packet-pipeline concurrency override for this node.
+    ///
+    /// `None` (the default) uses the CPU-derived defaults. Set it to pin a node's decode/encode
+    /// concurrency — e.g. `input_concurrency = Some(1)` to reproduce the pre-fix collapse.
+    pub pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
 }
 
 impl Default for TestNodeConfig {
@@ -556,6 +561,7 @@ impl Default for TestNodeConfig {
             idle_timeout_ms: 2500,
             pix_global_config: None,
             transit_latency: None,
+            pipeline: None,
         }
     }
 }
@@ -564,10 +570,7 @@ impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
         Self {
             win_prob,
-            incoming_pix_config: None,
-            idle_timeout_ms: 2500,
-            pix_global_config: None,
-            transit_latency: None,
+            ..Self::default()
         }
     }
 }
@@ -675,6 +678,15 @@ pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
 /// Identical to [`stress_cluster_fixture`] but sets `transit_latency` on every
 /// node so the packet forwarder injects a Gaussian-jittered FIFO delay — simulating
 /// a WAN link (e.g. mean=50ms, std_dev=5ms) in a local cluster.
+/// [`stress_cluster_fixture`] with explicit per-node configs (stress funding + `CountOnly` echo).
+///
+/// Lets a test set a per-node [`TestNodeConfig::pipeline`] override (e.g. pin `input_concurrency`)
+/// while keeping the high-volume stress chain funding. Each config's `win_prob` should be set to
+/// [`STRESS_WIN_PROB`] to match the stress chain client.
+pub fn stress_cluster_fixture_with_configs(configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    cluster_fixture_inner(configs, build_stress_blokli_client(), EchoMode::CountOnly)
+}
+
 pub fn stress_cluster_fixture_with_latency(win_prob: f64, n: usize, latency: TransitLatencyConfig) -> ClusterGuard {
     let configs = vec![
         TestNodeConfig {
@@ -759,6 +771,7 @@ fn cluster_fixture_inner(
             let idle_timeout_ms = configs[i].idle_timeout_ms;
             let pix_global_config = configs[i].pix_global_config;
             let transit_latency = configs[i].transit_latency;
+            let pipeline = configs[i].pipeline;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -808,6 +821,7 @@ fn cluster_fixture_inner(
                         idle_timeout_ms,
                         pix_global_config,
                         transit_latency,
+                        pipeline,
                     );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
@@ -1038,6 +1052,7 @@ where
                         cfg.idle_timeout_ms,
                         cfg.pix_global_config,
                         cfg.transit_latency,
+                        cfg.pipeline,
                     );
 
                     let prober = Some(hopr_ct_full_network::ProberConfig {

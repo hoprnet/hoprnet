@@ -97,19 +97,17 @@ impl Validate for AcknowledgementPipelineConfig {
     serde(deny_unknown_fields)
 )]
 pub struct PacketPipelineConfig {
-    /// Maximum concurrency when processing outgoing packets.
+    /// Maximum concurrency (ready-queue depth) when processing outgoing packets (SPHINX encode).
     ///
-    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
+    /// `None` or `Some(0)` both fall back to the CPU-derived default (`available_parallelism * 8`).
     pub output_concurrency: Option<usize>,
-    /// Maximum concurrency when processing incoming packets (SPHINX decode).
+    /// Maximum concurrency (ready-queue depth) when processing incoming packets (SPHINX decode).
     ///
-    /// `None` or `Some(0)` fall back to the default, which is computed as
-    /// `max(1, pool_thread_count - ENCODE_RESERVED_THREADS)` when the shared Rayon pool has
-    /// been initialised, or `available_parallelism * 8` as a fallback when it has not.
+    /// `None` or `Some(0)` both fall back to the CPU-derived default (`available_parallelism * 8`).
     ///
-    /// The default is deliberately lower than `output_concurrency` to reserve Rayon threads
-    /// for outgoing packet encode (SURB generation). Flooding the pool with decode work would
-    /// otherwise starve SURB production and collapse download throughput.
+    /// This is a queue depth feeding the shared Rayon pool, not a thread count, so it is derived
+    /// from the CPU count and is independent of the (smaller) pool size — tying it to the pool
+    /// collapsed decode to a near-serial rate on small hosts and halved relay forwarding throughput.
     pub input_concurrency: Option<usize>,
     /// How long routing resolution keeps waiting for a return path's SURBs before giving up on the
     /// packet.
