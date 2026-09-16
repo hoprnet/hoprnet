@@ -5,7 +5,7 @@ use hopr_crypto_packet::prelude::*;
 use moka::notification::RemovalCause;
 use validator::ValidationError;
 
-use crate::{FoundSurb, traits::SurbStore};
+use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 
 /// Lower bound on [`SurbStoreConfig::pseudonyms_lifetime`], enforced by the config validator.
 ///
@@ -351,16 +351,39 @@ impl SurbStore for MemorySurbStore {
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
-    fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
+    fn insert_surbs(&self, pseudonym: HoprPseudonym, mut surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
         // A batch is one packet's worth of SURBs, minted by the creator at a single generation, so
-        // the generation of any one of them stands for the whole batch. An empty batch carries no
+        // the generation of the first stands for the whole batch. An empty batch carries no
         // generation and must not create or disturb the buffer.
         let Some(generation) = surbs
             .first()
             .map(|(_, surb)| surb.additional_data_receiver.generation())
         else {
-            return self.surbs_per_pseudonym.get(&pseudonym).map(|rb| rb.len()).unwrap_or(0);
+            return SurbInsertOutcome {
+                retained: self.surbs_per_pseudonym.get(&pseudonym).map(|rb| rb.len()).unwrap_or(0),
+                evicted: 0,
+            };
         };
+
+        // That "single generation" holds by construction only for a batch minted by an honest
+        // creator: `PacketRouting::ForwardPath` stamps one generation into every SURB it mints. On
+        // this side the batch is parsed out of a counterparty-controlled payload, so enforce it
+        // rather than assume it — otherwise a mixed batch smuggles SURBs for a superseded return
+        // path into a buffer the push below labels with the newer generation, where no later push
+        // can clear them. The first SURB always survives, so the buffer is never created empty.
+        let mixed = surbs.len();
+        surbs.retain(|(_, surb)| surb.additional_data_receiver.generation() == generation);
+        let dropped = mixed - surbs.len();
+        if dropped > 0 {
+            // A statement about the peer that minted the batch, not a local fault: `warn`, not
+            // `error`. These are not capacity pressure, so they stay out of the `evicted` count.
+            tracing::warn!(
+                %pseudonym,
+                dropped,
+                generation,
+                "discarding SURBs whose generation disagrees with the rest of their batch"
+            );
+        }
 
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
@@ -566,8 +589,12 @@ impl<S> SurbRingBuffer<S> {
     /// Once at capacity, each insert evicts the oldest SURB. Under PIX that is a lost SSA share, not
     /// merely a lost SURB — see [`SurbStoreConfig::rb_capacity`].
     ///
-    /// Returns the number of elements held after the push.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> usize {
+    /// Returns what the push did; the eviction count is what lets a caller notice the overflow at
+    /// all, since dropping the oldest entry is otherwise indistinguishable from a clean insert.
+    /// It counts *capacity* overflow only: SURBs dropped because a newer generation superseded them
+    /// were already unusable, and reporting them as pressure would ask the creator to slow down
+    /// because it re-planned its own return path.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> SurbInsertOutcome {
         let mut inner = self.inner.lock();
 
         match inner.generation {
@@ -581,20 +608,28 @@ impl<S> SurbRingBuffer<S> {
             Some(_) => {
                 // Older than what we already hold: a late or reordered batch for a path the creator
                 // has already moved on from. Discard it rather than reintroduce stale SURBs.
-                return inner.surbs.len();
+                return SurbInsertOutcome {
+                    retained: inner.surbs.len(),
+                    evicted: 0,
+                };
             }
             None => inner.generation = Some(generation),
         }
 
+        let mut evicted = 0;
         for surb in surbs {
             // Evict before inserting, so the length never exceeds the ceiling and the backing
             // allocation stops growing once the high-water mark is reached.
             if inner.surbs.len() >= self.capacity {
                 inner.surbs.pop_front();
+                evicted += 1;
             }
             inner.surbs.push_back(surb);
         }
-        inner.surbs.len()
+        SurbInsertOutcome {
+            retained: inner.surbs.len(),
+            evicted,
+        }
     }
 
     /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
@@ -849,8 +884,8 @@ mod tests {
     ) -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(5, order);
 
-        assert_eq!(1, rb.push([([1u8; 8], 0)], 0));
-        assert_eq!(2, rb.push([([2u8; 8], 0)], 0));
+        assert_eq!(1, rb.push([([1u8; 8], 0)], 0).retained);
+        assert_eq!(2, rb.push([([2u8; 8], 0)], 0).retained);
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!(expected[0], popped.id);
@@ -861,7 +896,7 @@ mod tests {
         assert_eq!(0, popped.remaining);
 
         // A fresh batch after draining consumes from the same end.
-        assert_eq!(2, rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0));
+        assert_eq!(2, rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0).retained);
         assert_eq!(expected[0], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
         assert_eq!(expected[1], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
 
@@ -898,6 +933,124 @@ mod tests {
         assert!(rb.pop_any().is_none());
 
         Ok(())
+    }
+
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_report_no_eviction_below_capacity(#[case] order: SurbPopOrder) {
+        let rb = SurbRingBuffer::new(4, order);
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 0
+            },
+            rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0)
+        );
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 4,
+                evicted: 0
+            },
+            rb.push([([3u8; 8], 0), ([4u8; 8], 0)], 0)
+        );
+    }
+
+    /// Overflow is otherwise entirely silent — the buffer drops its oldest entry and the caller sees
+    /// only a successful push. The count is what lets the layers above notice that SURBs (and the
+    /// PIX shares riding on them) are being destroyed on arrival, so it has to be exact.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_count_evictions_past_capacity(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(2, order);
+
+        let outcome = rb.push([([1u8; 8], 0), ([2u8; 8], 0), ([3u8; 8], 0)], 0);
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 1
+            },
+            outcome,
+            "a 3-element push into a 2-slot buffer drops exactly one"
+        );
+
+        // The *oldest* is the one gone, in either pop order.
+        let ids: Vec<_> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
+        assert!(
+            !ids.contains(&[1u8; 8]),
+            "the oldest entry must be the evicted one, got {ids:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A buffer already at capacity evicts one per element pushed, however the pushes are grouped —
+    /// the steady-state overflow that a counterparty producing faster than this side drains creates.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_count_evictions_across_separate_pushes(#[case] order: SurbPopOrder) {
+        let rb = SurbRingBuffer::new(2, order);
+        assert_eq!(
+            0,
+            rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0).evicted,
+            "precondition: full"
+        );
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 1
+            },
+            rb.push([([3u8; 8], 0)], 0)
+        );
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 2
+            },
+            rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0)
+        );
+    }
+
+    /// A newer generation drops the SURBs it supersedes, but those were already unusable — the
+    /// creator re-planned its own return path. Counting them as evictions would report capacity
+    /// pressure that does not exist, and the count feeds a warning (and the counterparty-facing
+    /// `num_evicted_surbs`) that exists to flag over-production. The same holds for a late
+    /// older-generation batch, which is discarded without ever entering the buffer.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_not_count_superseded_generations_as_evictions(#[case] order: SurbPopOrder) {
+        let rb = SurbRingBuffer::new(2, order);
+        assert_eq!(
+            0,
+            rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0).evicted,
+            "precondition: full at generation 0"
+        );
+
+        // A newer generation clears the full buffer before inserting: two SURBs go, none of them to
+        // capacity pressure.
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 1,
+                evicted: 0
+            },
+            rb.push([([3u8; 8], 0)], 1),
+            "a supersede-and-clear is not an overflow"
+        );
+
+        // A late batch from the superseded generation is dropped whole, again without overflowing.
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 1,
+                evicted: 0
+            },
+            rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0),
+            "a discarded older-generation batch is not an overflow"
+        );
     }
 
     /// The buffer grows with occupancy, so it does reallocate on the way up to its ceiling — that
@@ -1391,6 +1544,49 @@ mod tests {
         assert!(
             store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
             "no stale SURB may remain"
+        );
+
+        Ok(())
+    }
+
+    /// A batch is minted at a single generation by an honest creator, but it is parsed out of a
+    /// counterparty-controlled payload. A batch whose SURBs disagree must not smuggle a superseded
+    /// return path into the buffer the batch's generation labels: only the first SURB's generation
+    /// is kept.
+    #[test]
+    fn memory_surb_store_should_reject_surbs_that_disagree_with_their_batch() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        // The peer had already delivered a generation-0 batch that the mixed batch below supersedes.
+        store.insert_surbs(pseudonym, vec![([1u8; 8], surb_gen(relayer, TWO_HOP, 0)?)]);
+
+        let outcome = store.insert_surbs(
+            pseudonym,
+            vec![
+                ([2u8; 8], surb_gen(relayer, TWO_HOP, 1)?),
+                // Stale: belongs to the generation the batch itself supersedes.
+                ([3u8; 8], surb_gen(relayer, TWO_HOP, 0)?),
+            ],
+        );
+        assert_eq!(1, outcome.retained, "only the SURB matching the batch may be stored");
+        assert_eq!(
+            0, outcome.evicted,
+            "a mismatched SURB is not capacity pressure and must not be reported as eviction"
+        );
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        assert_eq!(
+            [2u8; 8],
+            found.sender_id.surb_id(),
+            "must hand out the SURB of the batch's own generation"
+        );
+        assert!(
+            store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
+            "no SURB of a superseded generation may remain"
         );
 
         Ok(())
