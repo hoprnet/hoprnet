@@ -149,10 +149,17 @@
             cargoExtraArgs = "";
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
+          ticketInspectorSrc = pkgs.fetchCrate {
+            pname = "hopr-ticket-manager";
+            version = "0.7.0";
+            hash = "sha256-EwKWZ6U1pFNupnT/k9Wq//j8sg5k2tjNvM/W0Q/d9As=";
+          };
           ticketInspectorBuildArgs = {
-            inherit src depsSrc rev;
-            cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde,cli";
-            cargoToml = ./impls/ticket-manager/Cargo.toml;
+            inherit rev;
+            src = ticketInspectorSrc;
+            depsSrc = ticketInspectorSrc;
+            cargoExtraArgs = "--bin ticket-inspector -F redb,serde,cli";
+            cargoToml = ticketInspectorSrc + "/Cargo.toml";
           };
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
