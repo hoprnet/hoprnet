@@ -151,6 +151,9 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
             async move {
                 hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                // The SURB-batch generation was captured with the return-path plan and carried on
+                // `packet_info`; stamp that, not a value re-read at encode time.
+                let generation = data.packet_info.and_then(|info| info.surb_generation);
                 match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                     move || {
                         encoder.encode_packet(
@@ -159,6 +162,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                             data.packet_info
                                 .map(|data| data.signals_to_destination)
                                 .unwrap_or_default(),
+                            generation,
                         )
                     },
                     "packet_encode",
@@ -502,6 +506,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         packet_info: IncomingPacketInfo {
                             signals_from_sender: aux_info.packet_signals,
                             num_saved_surbs: aux_info.num_surbs,
+                            num_evicted_surbs: aux_info.num_evicted_surbs,
                         }
                     })))
         ))

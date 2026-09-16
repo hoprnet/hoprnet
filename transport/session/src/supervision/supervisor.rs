@@ -161,6 +161,14 @@ pub struct SessionPixSupervisor {
     pub(crate) dims: PixParams,
     pub(crate) pseudonym: HoprPseudonym,
     pub(crate) closed: bool,
+    /// The Session is gone and only its funded front cycle is still being worked for.
+    ///
+    /// Set by [`on_session_closed`](Self::on_session_closed) and never cleared: a drain ends by
+    /// closing, one way or another. While it is set the supervisor asks for no successor, plans fill
+    /// at the ceiling, and stops service-gating the recovery idle deadline — see "Draining a closed
+    /// Session" in this module's documentation for why each of those follows from the Session having
+    /// left rather than being separate policy.
+    pub(crate) draining: bool,
     next_ssa_index: u32,
     /// The cycle the two share-order counters below are measured against — the earliest unrecovered
     /// cycle, i.e. the one the Entry should currently be serving. `None` before the first batch exists.
@@ -242,6 +250,7 @@ impl SessionPixSupervisor {
             front_useful: 0,
             off_front_useful: 0,
             closed: false,
+            draining: false,
             service_open: false,
             service_front: None,
             paid_front_handoff: false,
@@ -278,6 +287,7 @@ impl SessionPixSupervisor {
             SessionPixEvent::UnverifiableShares { ssa_id, observed_total } => {
                 self.on_unverifiable_shares(ssa_id, *observed_total, now)
             }
+            SessionPixEvent::SessionClosed { drainable_surbs } => self.on_session_closed(*drainable_surbs, now),
         };
 
         let mut lifecycle_actions = actions;
@@ -575,7 +585,15 @@ impl SessionPixSupervisor {
             if let Some(reason) = expired {
                 // Service-gated idle: if no service consumed since last progress,
                 // re-arm instead of closing.
+                //
+                // Not while draining, though. The re-arm asks "was any *gated* service consumed",
+                // and a drained Session has no application left to consume any — `served_total` is
+                // frozen for good, so the re-arm would fire for ever and the one bound on a drain
+                // admitted against an over-estimated buffer would be gone with it. A *productive*
+                // drain is unaffected: its own progress still refreshes `recovery_idle_deadline`
+                // through `on_recovery_progress`.
                 if reason == SessionPixCloseReason::RecoveryIdle
+                    && !self.draining
                     && served_total <= self.ssas[i].served_total_at_last_progress
                 {
                     self.ssas[i].recovery_idle_deadline = now.checked_add(max_recovery_idle);
@@ -721,6 +739,7 @@ impl SessionPixSupervisor {
                 ssa_id: tail.ssa_id,
                 largest_shares_seen: tail.largest_shares_seen,
                 hard_deadline,
+                drain: self.draining,
             });
         }
 
@@ -732,6 +751,7 @@ impl SessionPixSupervisor {
                 ssa_id: ssa.ssa_id,
                 largest_shares_seen: ssa.largest_shares_seen,
                 hard_deadline,
+                drain: self.draining,
             })
     }
 
@@ -1301,6 +1321,20 @@ impl SessionPixSupervisor {
     /// `on_deposit_confirmed`/`on_commitment_verified` when `recovered_pending`
     /// was set earlier.
     fn perform_recovered_transition(&mut self, idx: usize, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
+        // The end of a drain, and the outcome it exists for: the deposit this cycle was paid is
+        // released rather than stranded. None of the bookkeeping below is worth doing — the tail
+        // receipt, the tombstone and the gate notification all serve a Session that is about to be
+        // torn down, and `closed` gates every entry point from here on. Returning before the tail is
+        // created also guarantees a drain can never leave one behind.
+        if self.draining {
+            tracing::info!(
+                ssa_id = %self.ssas[idx].ssa_id,
+                "the funded cycle of a closed session recovered — the SURB drain is complete"
+            );
+            self.closed = true;
+            return self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::Drained)]);
+        }
+
         let next_requested = self.ssas[idx].next_requested;
         let was_front = self.earliest_live_idx() == Some(idx);
 
@@ -1424,6 +1458,91 @@ impl SessionPixSupervisor {
         );
 
         self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)])
+    }
+
+    /// Decides whether a Session closed at the Exit is worth draining its buffered SURBs into.
+    ///
+    /// `available` is the manager's estimate of the SURBs still spendable, already net of the fill
+    /// reserve. The cycle it is measured against is the earliest live one, and only when it is both
+    /// funded and clocked — i.e. exactly the cycle fill would have been working for. Two shapes have
+    /// nothing a drain could buy and close at once: an unfunded front, where no deposit is at stake;
+    /// and a recovered predecessor's paid FIFO tail, whose key is already recovered and behind which
+    /// the successor is queued without clocks of its own.
+    ///
+    /// The comparison is against the *whole* remaining emission, with no loss margin. That is
+    /// conservative in both directions on purpose: the estimate is an upper bound (see
+    /// [`SessionPixEvent::SessionClosed`]), while in-flight packets are already subtracted from it
+    /// and full recovery in practice needs fewer than `E` shares. A drain that runs out partway has
+    /// spent the Session's SURBs down to the reserve and recovered nothing, which is strictly worse
+    /// than never starting.
+    ///
+    /// Siblings are retired directly rather than through
+    /// [`close_ssa_and_collect`](Self::close_ssa_and_collect), which would be wrong twice over: it
+    /// charges [`failed_cycles`](Self::failed_cycles), and these cycles were retired by an operator
+    /// closing a Session rather than lost by an Entry; and its `ssas.len() == 1` branch would close
+    /// the Session outright. Recovered tombstones are left alone — they hold no reconstructor state
+    /// and expire on their own timer with an idempotent `RetireSsa`.
+    ///
+    /// `_now` is taken for symmetry with every other handler; nothing here is timed. A drain inherits
+    /// the target's existing clocks rather than starting any of its own, which is the point — the
+    /// resource bound on the cycle must not be extended by the Session ending.
+    fn on_session_closed(&mut self, available: u64, _now: Instant) -> Vec<SessionPixAction> {
+        let target = self
+            .paid_recovery_tail
+            .is_none()
+            .then(|| self.earliest_live_idx())
+            .flatten()
+            .filter(|&idx| {
+                self.ssas[idx].phase == SsaPhase::Recovering && self.ssas[idx].recovery_hard_deadline.is_some()
+            });
+
+        let cycle_shares = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
+        let remaining = target.map(|idx| cycle_shares.saturating_sub(self.ssas[idx].largest_shares_seen));
+
+        let Some((idx, remaining)) = target.zip(remaining).filter(|&(_, remaining)| available >= remaining) else {
+            tracing::info!(
+                available,
+                ?remaining,
+                target = ?target.map(|idx| self.ssas[idx].ssa_id),
+                "closing PIX session: the exit-side close left nothing worth draining for"
+            );
+            self.closed = true;
+            return self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::SessionClosed)]);
+        };
+
+        let target_id = self.ssas[idx].ssa_id;
+        tracing::info!(
+            %target_id,
+            available,
+            remaining,
+            "draining buffered SURBs into the funded cycle of a session closed at the exit"
+        );
+
+        self.draining = true;
+        // A deferred request can never be retried now, and leaving the flag set would have
+        // `retry_deferred_successor_request` call into the (now silent) request path every event.
+        self.successor_request_deferred = false;
+
+        // Every sibling is behind the target in index order — the target *is* `earliest_live_idx` —
+        // so removing them cannot move the front, and the tail of `handle_event` re-derives the same
+        // gate state and share-order front it already had.
+        let mut retired = Vec::new();
+        self.ssas.retain(|ssa| {
+            if ssa.ssa_id == target_id || ssa.is_terminal() {
+                true
+            } else {
+                retired.push(ssa.ssa_id);
+                false
+            }
+        });
+
+        retired
+            .into_iter()
+            .map(|ssa_id| {
+                self.note_retired_index(ssa_id.ssa_index());
+                SessionPixAction::RetireSsa(ssa_id)
+            })
+            .collect()
     }
 
     // ------------------------------------------------------------------
@@ -1553,6 +1672,14 @@ impl SessionPixSupervisor {
     /// once, so the ceiling is `ssas_per_request` SSA quotas rather than one. That is the trade the
     /// knob exists to make, and it is why both deadlines are scaled by the same factor.
     fn emit_request_next_ssa(&mut self, now: Instant) -> Vec<SessionPixAction> {
+        // A drain has no Session left to serve a successor's quota, so asking for one would commit
+        // the Entry to a deposit against a cycle that could never be served. Guarded here rather than
+        // at each of the four call sites — the early signal, the recovered transition, the deferred
+        // retry and the deposit replay — so no route into a request can be missed.
+        if self.draining {
+            return Vec::new();
+        }
+
         let batch = self.cfg.ssas_per_request.clamp(1, crate::MAX_SSA_BATCH_SIZE);
         let live_cycles = self.live_cycle_count();
         let live_batches = self.live_batch_count();
@@ -5352,6 +5479,309 @@ mod tests {
         assert!(
             matches!(actions.first(), Some(SessionPixAction::SetFillRate(rate)) if rate.is_zero()),
             "the zero must lead the close, got {actions:?}"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Draining a closed Session
+    // ---------------------------------------------------------------
+
+    /// A closed Session whose buffer covers the rest of the cycle keeps working for it.
+    ///
+    /// This is the whole feature in one test: the deposit both sides have already paid for is
+    /// recoverable, the SURBs to recover it are already held, and the only thing that had been
+    /// spending them was a Session that has now gone. Nothing about the close makes the cycle
+    /// un-completable, so the supervisor neither closes nor asks for a successor it could never
+    /// serve — it plans the remainder at the ceiling and works it off.
+    #[test]
+    fn a_closed_session_with_enough_surbs_drains_its_funded_cycle() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, _) = funded_at_front(cfg.clone(), fill_dims(), t0);
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0 + Duration::from_secs(1),
+            0,
+        );
+
+        assert!(!sup.closed, "a drain leaves the state machine running");
+        assert!(sup.draining);
+        assert!(
+            !actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(_) | SessionPixAction::RequestSsa { .. })),
+            "a drain neither closes the Session nor asks for a successor, got {actions:?}"
+        );
+
+        // The next tick asks for the whole remainder, which the ceiling then paces.
+        let rate =
+            planned_rate(&sup.handle_timers(t0 + Duration::from_secs(2), 0)).expect("a draining cycle must be filled");
+        assert_eq!(FillRate::per_second(cfg.fill.max_rate), rate);
+    }
+
+    /// A buffer one SURB short of the remainder is not worth draining.
+    ///
+    /// The estimate is an upper bound and the comparison is against the *whole* remaining emission,
+    /// because a drain that runs out partway has spent the Session's SURBs down to the reserve and
+    /// recovered nothing — strictly worse than closing at once, which is what it must do instead.
+    #[test]
+    fn a_closed_session_without_enough_surbs_closes_instead_of_draining() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+
+        // Filling before the close, so the refusal has a stream to silence.
+        assert!(planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).is_some());
+
+        let seen = max_cycle_shares(&sup) / 2;
+        feed_seen(&mut sup, id, seen, t0 + Duration::from_secs(2), 0);
+        let one_short = max_cycle_shares(&sup) - seen - 1;
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: one_short,
+            },
+            t0 + Duration::from_secs(3),
+            0,
+        );
+
+        assert!(sup.closed);
+        assert!(!sup.draining);
+        assert!(
+            matches!(actions.first(), Some(SessionPixAction::SetFillRate(rate)) if rate.is_zero()),
+            "the zero must lead the close, got {actions:?}"
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::SessionClosed))),
+            "got {actions:?}"
+        );
+    }
+
+    /// With no funded cycle to work for, a close is just a close.
+    ///
+    /// Two ways to have none. An unfunded front has nothing at stake — no deposit has been paid, so
+    /// there is nothing to strand. A paid recovery tail means the front's key is *already* recovered,
+    /// so draining it would buy nothing either; and its successor is queued behind the tail with no
+    /// clocks of its own, which is precisely the state fill refuses to plan against.
+    #[test]
+    fn a_closed_session_with_no_funded_cycle_closes_instead_of_draining() {
+        let plenty = u64::MAX;
+
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), fill_dims(), p, t0);
+        commit_unfunded(&mut sup, p, 1..=1, t0);
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: plenty,
+            },
+            t0 + Duration::from_secs(1),
+            0,
+        );
+        assert!(
+            sup.closed && !sup.draining,
+            "an unfunded front has nothing to drain for"
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::SessionClosed))),
+            "got {actions:?}"
+        );
+
+        // And the same with a recovered predecessor's paid tail in front.
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let first = ssa_id(p, 1);
+        let half = max_cycle_shares(&sup) / 2;
+        feed_seen(&mut sup, first, half, t0 + Duration::from_secs(1), 0);
+        sup.handle_event(&SessionPixEvent::Recovered(first), t0 + Duration::from_secs(1), 0);
+        assert!(
+            sup.paid_recovery_tail.is_some(),
+            "the fixture must leave a paid tail behind for this half to mean anything"
+        );
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: plenty,
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        assert!(sup.closed && !sup.draining, "a recovered key is not worth draining for");
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::SessionClosed))),
+            "got {actions:?}"
+        );
+    }
+
+    /// Everything but the cycle being drained is retired at once, and none of it counts as a failure.
+    ///
+    /// A drain works for exactly one cycle: the batch's later members are queued behind it and can
+    /// receive no share while it drains, and there is no successor coming, so holding their
+    /// reconstructor state open would cost memory for the length of the drain and buy nothing. The
+    /// failure counter must not move either — these cycles were retired by an operator closing a
+    /// Session, not lost by an Entry, and charging them would make a second drain on the same node
+    /// look like an Entry over its budget.
+    #[test]
+    fn a_drain_retires_every_cycle_but_the_one_it_is_recovering() {
+        const BATCH: u32 = 4;
+
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            ..default_cfg()
+        };
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, fill_dims(), p, t0);
+        fund_batch(&mut sup, p, 2, t0);
+        commit_unfunded(&mut sup, p, 3..=BATCH, t0);
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0 + Duration::from_secs(1),
+            0,
+        );
+
+        let retired = actions
+            .iter()
+            .filter_map(|action| match action {
+                SessionPixAction::RetireSsa(id) => Some(id.ssa_index().get()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            vec![2, 3, 4],
+            retired,
+            "every cycle but the one being drained must be retired, got {actions:?}"
+        );
+        assert!(!sup.closed && sup.draining);
+        assert_eq!(0, sup.failed_cycles, "a drain retires siblings, it does not lose them");
+        assert_eq!(1, sup.ssas.len());
+        assert_eq!(ssa_id(p, 1), sup.ssas[0].ssa_id);
+    }
+
+    /// A drain that finishes closes on its own reason and never asks for a successor.
+    ///
+    /// Both halves matter. `Drained` is what tells an operator the close was the good outcome — the
+    /// deposit was recovered — rather than one more Session lost on a timer. And the successor
+    /// request has to be suppressed on *every* route into it, the early-recovery signal included:
+    /// there is no Session left to serve a successor's quota, so asking for one would commit the
+    /// Entry to a deposit against a cycle that can never be served.
+    #[test]
+    fn a_completed_drain_closes_the_session_without_asking_for_a_successor() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+        assert!(planned_rate(&sup.handle_timers(t0 + SAMPLING_INTERVAL, 0)).is_some());
+
+        sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        assert!(sup.draining);
+
+        let early = sup.handle_event(&SessionPixEvent::AlmostRecovered(id), t0 + Duration::from_secs(3), 0);
+        assert!(
+            early.is_empty(),
+            "the early-recovery signal must not order a successor for a Session that is gone, got {early:?}"
+        );
+
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(4), 0);
+        assert!(sup.closed);
+        assert!(
+            matches!(actions.first(), Some(SessionPixAction::SetFillRate(rate)) if rate.is_zero()),
+            "the zero must lead the close, got {actions:?}"
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::Drained))),
+            "got {actions:?}"
+        );
+        assert!(
+            !actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::RequestSsa { .. })),
+            "got {actions:?}"
+        );
+    }
+
+    /// A drain that stops making progress is closed by the idle deadline rather than re-armed.
+    ///
+    /// The idle rule normally re-arms whenever no *gated* service was consumed since the last
+    /// progress, so that a merely quiet Entry is never disconnected. A drained Session has no
+    /// application left to consume any, so `served_total` is frozen for good and the re-arm would
+    /// never stop firing — the one bound on a drain admitted against an over-estimated buffer would
+    /// be gone with it.
+    #[test]
+    fn a_stalled_drain_closes_on_the_recovery_idle_deadline() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, _) = funded_at_front(cfg.clone(), fill_dims(), t0);
+
+        sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0,
+            0,
+        );
+        assert!(sup.draining);
+
+        // Not one share, and not one packet of gated service either — which is exactly the shape the
+        // re-arm branch was written for, and the shape it must no longer answer to.
+        let actions = sup.handle_deadline(t0 + cfg.max_recovery_idle, 0);
+        assert!(sup.closed);
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle))),
+            "got {actions:?}"
+        );
+    }
+
+    /// And the hard deadline still ends a drain that is making progress but will not finish.
+    ///
+    /// The immutable per-cycle backstop is not relaxed for a drain: the reconstructor state it holds
+    /// open is the resource the deadline exists to bound, and a closed Session is no reason to hold
+    /// it longer. `check_deadlines` tests the hard clock before the idle one, which is why this
+    /// reports the deadline rather than the silence that came with it.
+    #[test]
+    fn a_drain_still_ends_at_its_hard_recovery_deadline() {
+        let cfg = default_cfg();
+        let t0 = Instant::now();
+        let (mut sup, _) = funded_at_front(cfg.clone(), fill_dims(), t0);
+
+        sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0,
+            0,
+        );
+        assert!(sup.draining);
+
+        let actions = sup.handle_deadline(t0 + cfg.max_recovery_time, 0);
+        assert!(sup.closed);
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::Close(SessionPixCloseReason::RecoveryDeadline))),
+            "got {actions:?}"
         );
     }
 

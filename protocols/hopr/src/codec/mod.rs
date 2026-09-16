@@ -196,6 +196,7 @@ mod tests {
                 resp,
                 ResolvedTransportRouting::Return(surb.sender_id, surb.surb),
                 None,
+                None,
             )?)
         }
 
@@ -232,6 +233,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         let in_packet = decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
@@ -263,6 +265,7 @@ mod tests {
                         ),
                         return_paths: vec![],
                     },
+                    None,
                     None,
                 )
                 .is_err()
@@ -300,6 +303,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         let fwd_packet = relay_decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
@@ -328,6 +332,7 @@ mod tests {
                 forward_path: f.forward_path.clone(),
                 return_paths: vec![f.return_path.clone()],
             },
+            None,
             None,
         )?;
 
@@ -412,6 +417,7 @@ mod tests {
                     forward_path: f.forward_path.clone(),
                     return_paths: vec![f.return_path.clone()],
                 },
+                None,
                 None,
             )?;
 
@@ -537,6 +543,7 @@ mod tests {
                     forward_path: f.forward_path.clone(),
                     return_paths: vec![f.return_path.clone()],
                 },
+                None,
                 None,
             )?;
 
@@ -738,6 +745,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         // First decode should succeed
@@ -772,6 +780,7 @@ mod tests {
                 ),
                 return_paths: vec![],
             },
+            None,
             None,
         )?;
 

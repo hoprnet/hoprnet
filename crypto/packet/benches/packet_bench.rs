@@ -202,6 +202,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                                 PacketRouting::ForwardPath {
                                     forward_path,
                                     return_paths,
+                                    generation: 0,
                                 },
                                 sender_chain,
                                 tb,
@@ -247,6 +248,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                 PacketRouting::ForwardPath {
                     forward_path,
                     return_paths: vec![],
+                    generation: 0,
                 },
                 sender_chain,
                 tb,
@@ -310,6 +312,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                                 PacketRouting::ForwardPath {
                                     forward_path,
                                     return_paths,
+                                    generation: 0,
                                 },
                                 sender_chain,
                                 tb,
@@ -354,6 +357,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         PacketRouting::ForwardPath {
             forward_path: TransportPath::new(path.to_vec()).unwrap(),
             return_paths: vec![],
+            generation: 0,
         },
         sender_chain,
         tb,
@@ -419,6 +423,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         PacketRouting::ForwardPath {
             forward_path,
             return_paths: vec![],
+            generation: 0,
         },
         sender_chain,
         tb,

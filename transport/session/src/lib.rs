@@ -55,7 +55,7 @@ pub use types::{
     SessionAdmissionSink, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
-pub use utils::transfer_session;
+pub use utils::{transfer_session, transfer_session_datagram};
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 ///
@@ -83,7 +83,20 @@ flagset::flags! {
         ///
         /// Implies [`Segmentation`].
         RetransmissionNack = 0b000_1010,
-        /// Disable packet buffering.
+        /// UDP-like behavior: disable packet buffering, and — on stateless (non-retransmitting)
+        /// sessions — preserve datagram boundaries by emitting each write as exactly one frame
+        /// (delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
+        /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
+        /// coalesced. On reliable (retransmitting) sessions only the buffering behavior applies;
+        /// boundary preservation is stateless-only (the NACK missing-segment bitmap cannot address
+        /// the segments of an oversized datagram frame).
+        ///
+        /// Boundary preservation holds only up to the reader's buffer: a single read cannot return
+        /// more bytes than its buffer, so a datagram larger than the peer's read buffer is still
+        /// delivered in multiple reads. Callers must therefore size the read buffer for the largest
+        /// datagram they need preserved. In the UDP-forwarding path the datagram size is bounded at
+        /// ingress by the forwarding buffer (`HOPR_UDP_BUFFER_SIZE`), so it never exceeds it there;
+        /// a datagram-mode frame may otherwise be as large as `64 * SESSION_MTU`.
         ///
         /// Implies [`Segmentation`].
         NoDelay = 0b0000_1001,
@@ -129,6 +142,12 @@ pub struct SessionClientConfig {
     /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
     /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
     /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    ///
+    /// It also opts out of the SURB balancer's control over organic production entirely. With the
+    /// default `false`, a data packet carries *at most* one SURB and none at all while the
+    /// counterparty is estimated to be at its target buffer size — which is what stops SURBs (and
+    /// the PIX shares they carry) being delivered into a full buffer that discards them. Setting
+    /// this to `true` keeps producing regardless of that estimate.
     ///
     /// Set this to `true` only when the underlying traffic is highly asymmetric.
     ///
