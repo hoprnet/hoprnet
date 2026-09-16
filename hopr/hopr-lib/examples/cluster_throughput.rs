@@ -175,8 +175,16 @@ fn main() -> anyhow::Result<()> {
         );
     }
     // Explicit process-level override so the benchmark's on/off choice wins over per-node startup
-    // (which uses the first-wins `configure_arbitration_once`).
-    hopr_utils::parallelize::cpu::configure_arbitration(args.arbiter, 75, 50);
+    // (which uses the first-wins `with_arbitration_once`).
+    use hopr_utils::parallelize::cpu::ArbitrationConfig;
+    hopr_utils::parallelize::cpu::with_arbitration(if args.arbiter {
+        ArbitrationConfig::Enabled {
+            occupancy_pct: 75,
+            encode_reserve_pct: 50,
+        }
+    } else {
+        ArbitrationConfig::Disabled
+    });
     eprintln!(
         "→ pool={active_pool} threads, arbiter={}",
         if args.arbiter { "on" } else { "off" }

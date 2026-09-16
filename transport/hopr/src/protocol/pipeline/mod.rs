@@ -802,11 +802,7 @@ where
     // process-global, so we configure it *first-wins*: the first pipeline to start (the node, in
     // production) applies its config; later starts in a multi-node-per-process host (tests, the
     // cluster example) neither clobber it nor an explicit benchmark override.
-    hopr_utils::parallelize::cpu::configure_arbitration_once(
-        cfg.arbitration.enabled,
-        cfg.arbitration.occupancy_pct,
-        cfg.arbitration.encode_reserve_pct,
-    );
+    hopr_utils::parallelize::cpu::with_arbitration_once(cfg.arbitration.to_arbitration());
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,

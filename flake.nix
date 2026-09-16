@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.4";
-    nix-lib.url = "github:hoprnet/nix-lib/1409f8caa2666afcf575dd5e05d5a8c521f5c1d6";
+    nix-lib.url = "github:hoprnet/nix-lib/main";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
