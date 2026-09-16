@@ -13,6 +13,7 @@ use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 use super::{
     PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig,
     fill::{FillPlanner, FillTarget},
+    telemetry::{PixGateMode, PixSessionSnapshot, PixTurnEvents},
 };
 
 // ---------------------------------------------------------------------------
@@ -230,6 +231,13 @@ pub struct SessionPixSupervisor {
     /// guard is therefore placed *after* the live-record lookup, so a cycle that still exists always
     /// wins and the watermark only ever answers for indices that have none.
     highest_retired_ssa_index: Option<SsaIndex>,
+    /// Cycle lifecycle transitions since the worker last drained this.
+    ///
+    /// Latched rather than emitted because this type is a pure function of its inputs and a metric
+    /// is not — the same arrangement as [`FillPlanner`]'s stall, which is latched here and drained
+    /// in the worker. Always compiled, including without the `telemetry` feature, so the default
+    /// test configuration exercises the counting rather than only the feature-enabled one.
+    telemetry: PixTurnEvents,
 }
 
 impl SessionPixSupervisor {
@@ -260,6 +268,7 @@ impl SessionPixSupervisor {
             first_failure_reason: None,
             failed_cycles: 0,
             highest_retired_ssa_index: None,
+            telemetry: PixTurnEvents::default(),
         };
 
         let actions = s.emit_request_next_ssa(now);
@@ -409,6 +418,51 @@ impl SessionPixSupervisor {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// This Session's current contribution to the node-level live-set gauges.
+    ///
+    /// Recomputed from `ssas` and `paid_recovery_tail` rather than maintained incrementally, which
+    /// is what makes the gauges drain on every terminal path without any of those paths having to
+    /// know they exist. A Session holds at most `ssas_per_request × MAX_OVERLAPPING_BATCHES` cycles,
+    /// so the scan is over a handful of entries once per turn.
+    ///
+    /// `predeposit_exposure` comes from the gate, which the caller reads — this type deliberately
+    /// knows nothing about the gate's counters.
+    pub fn telemetry_snapshot(&self, predeposit_exposure: u64) -> PixSessionSnapshot {
+        let mut snapshot = PixSessionSnapshot {
+            // The mode the gate is actually in, which is what an operator reading this gauge next to
+            // `hopr_pix_predeposit_exposure_packets` is asking about. A paid recovered predecessor
+            // still holding the front counts as funded, because service continues to be authorized.
+            gate_mode: if self.service_open {
+                PixGateMode::Funded
+            } else {
+                PixGateMode::Predeposit
+            },
+            paid_tail: u32::from(self.paid_recovery_tail.is_some()),
+            predeposit_exposure_packets: predeposit_exposure,
+            ..Default::default()
+        };
+
+        for ssa in self.ssas.iter() {
+            // Recovered tombstones and `Closing` records are retained diagnostics, not live cycles.
+            // Counting them would leave `hopr_pix_cycles_active` unable to drain, since a tombstone
+            // outlives the cycle by `tombstone_retention_window`.
+            let bucket = match ssa.phase {
+                SsaPhase::AwaitingCommitment => &mut snapshot.awaiting_commitment,
+                SsaPhase::AwaitingDeposit => &mut snapshot.awaiting_deposit,
+                SsaPhase::Recovering => &mut snapshot.recovering,
+                SsaPhase::Recovered { .. } | SsaPhase::Closing => continue,
+            };
+            *bucket = bucket.saturating_add(1);
+        }
+
+        snapshot
+    }
+
+    /// Drains the cycle lifecycle transitions latched since the last call.
+    pub fn take_telemetry_events(&mut self) -> PixTurnEvents {
+        std::mem::take(&mut self.telemetry)
     }
 
     fn live_cycle_count(&self) -> usize {
@@ -916,6 +970,10 @@ impl SessionPixSupervisor {
         // Nothing is missing any more, so nothing is to be asked for.
         ssa.recommit_deadline = None;
 
+        // Behind the phase guard above, so a repeated `CommitmentVerified` for a cycle that has
+        // already moved on counts nothing.
+        self.telemetry.committed = self.telemetry.committed.saturating_add(1);
+
         Vec::new()
     }
 
@@ -964,6 +1022,10 @@ impl SessionPixSupervisor {
         ssa.phase = SsaPhase::Recovering;
         ssa.deposit_deadline = None;
         ssa.served_total_at_last_progress = served_total;
+
+        // Behind both the phase guard and the zero-amount guard above, so a duplicate confirmation
+        // and a zero balance — which is not a verdict — both count nothing.
+        self.telemetry.funded = self.telemetry.funded.saturating_add(1);
 
         // If recovery completed before the deposit arrived, immediately
         // tombstone the SSA — the Recovered event was deferred.
@@ -1367,6 +1429,12 @@ impl SessionPixSupervisor {
                 });
         }
 
+        // Counted here rather than on the `Recovered` event, because that event is not the
+        // transition: `on_recovered` defers it when the cycle is still awaiting its commitment or
+        // deposit, and replays it through this function once both arrive. This is the one place a
+        // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
+        self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
+
         // Transition to tombstone.
         self.ssas[idx].phase = SsaPhase::Recovered {
             tombstone_until: now
@@ -1563,6 +1631,9 @@ impl SessionPixSupervisor {
         // record being retired. Every path into this function is a cycle lost without recovering —
         // a recovered cycle leaves through tombstone expiry in `handle_deadline`, not through here.
         self.failed_cycles += 1;
+        // Same transition, so the same guard covers both: the `Closing` check at the top of this
+        // function is what makes a repeated close of one cycle count once.
+        self.telemetry.failed = self.telemetry.failed.saturating_add(1);
 
         // Warn-level diagnostic with full SSA state before closing.
         let ssa = &self.ssas[idx];
@@ -1730,6 +1801,11 @@ impl SessionPixSupervisor {
                 self.dims.target_useful_shares(),
                 now,
             ));
+            // Counted at allocation rather than at `SsaRequestSent`, for the same reason the record
+            // is created here: a cycle is registered before its request goes out, and observations
+            // about it can arrive before the confirmation that it was asked for. A batch truncated
+            // by index exhaustion counts only what it allocated.
+            self.telemetry.requested = self.telemetry.requested.saturating_add(1);
             ssa_ids.push(ssa_id);
         }
 
@@ -5807,5 +5883,382 @@ mod tests {
             let actions = sup.handle_timers(t0 + Duration::from_secs(second), 0);
             assert_eq!(None, planned_rate(&actions), "a disabled filler must plan nothing");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Bounded aggregate telemetry — the census and the event latch
+    // -----------------------------------------------------------------------
+
+    /// The census as the worker reads it, with no predeposit exposure to complicate the comparison.
+    fn census(sup: &SessionPixSupervisor) -> PixSessionSnapshot {
+        sup.telemetry_snapshot(0)
+    }
+
+    /// A census naming the gate mode and the three live phase counts, for comparing against
+    /// [`census`].
+    ///
+    /// The mode is a parameter rather than defaulted because it is half of what these tests are
+    /// checking: an `hopr_pix_sessions_active` that stayed in the predeposit bucket after a deposit
+    /// confirmed would tell an operator the opposite of the truth.
+    fn phases(
+        gate_mode: PixGateMode,
+        awaiting_commitment: u32,
+        awaiting_deposit: u32,
+        recovering: u32,
+    ) -> PixSessionSnapshot {
+        PixSessionSnapshot {
+            gate_mode,
+            awaiting_commitment,
+            awaiting_deposit,
+            recovering,
+            ..Default::default()
+        }
+    }
+
+    /// One Session walked end to end, asserting the census and the latch at every step.
+    ///
+    /// This is the test the whole census design exists for: a gauge that fails to come back down is
+    /// invisible to an operator until they compare it against reality, and there is no reality to
+    /// compare a metric against in production.
+    #[test]
+    fn a_session_walks_the_census_from_request_to_rollover() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        let first = ssa_id(p, 1);
+
+        // `new` allocates and requests the first cycle, so it is already awaiting its commitment.
+        assert_eq!(phases(PixGateMode::Predeposit, 1, 0, 0), census(&sup));
+        assert_eq!(
+            PixTurnEvents {
+                requested: 1,
+                ..Default::default()
+            },
+            sup.take_telemetry_events(),
+            "allocation is what counts as requested, not the confirmation that it was sent"
+        );
+        assert!(
+            sup.take_telemetry_events().is_empty(),
+            "the latch must drain rather than accumulate"
+        );
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(first), t0, 0);
+        assert_eq!(phases(PixGateMode::Predeposit, 1, 0, 0), census(&sup));
+        assert!(
+            sup.take_telemetry_events().is_empty(),
+            "confirming the send is not a lifecycle transition"
+        );
+
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(first), t0, 0);
+        assert_eq!(phases(PixGateMode::Predeposit, 0, 1, 0), census(&sup));
+        assert_eq!(
+            PixTurnEvents {
+                committed: 1,
+                ..Default::default()
+            },
+            sup.take_telemetry_events()
+        );
+        assert_eq!(
+            PixGateMode::Predeposit,
+            census(&sup).gate_mode,
+            "a committed but unfunded front is still spending its predeposit allowance"
+        );
+
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: first,
+                amount: sufficient_balance(),
+            },
+            t0,
+            0,
+        );
+        assert_eq!(phases(PixGateMode::Funded, 0, 0, 1), census(&sup));
+        assert_eq!(
+            PixTurnEvents {
+                funded: 1,
+                ..Default::default()
+            },
+            sup.take_telemetry_events()
+        );
+        assert_eq!(PixGateMode::Funded, census(&sup).gate_mode);
+
+        // Recovery retires the cycle into a tombstone and asks for its successor, so the census
+        // swaps one recovering cycle for one awaiting a commitment — never showing both.
+        sup.handle_event(&SessionPixEvent::Recovered(first), t0, 0);
+        let after = census(&sup);
+        assert_eq!(
+            1,
+            after.awaiting_commitment + after.awaiting_deposit + after.recovering,
+            "a tombstone is retained state, not live state: {after:?}"
+        );
+        assert_eq!(0, after.recovering, "the recovered cycle must leave the live census");
+        assert_eq!(
+            PixTurnEvents {
+                recovered: 1,
+                requested: 1,
+                ..Default::default()
+            },
+            sup.take_telemetry_events(),
+            "the successor is requested in the same turn the predecessor recovers"
+        );
+    }
+
+    /// A cycle that recovers with its negotiated tail outstanding is reported as `paid_tail`.
+    ///
+    /// The distinction matters to an operator: the Session is still being served, and still funded,
+    /// but by a receipt from a cycle that has already reconstructed rather than by a live one.
+    #[test]
+    fn a_paid_recovered_predecessor_is_censused_as_a_paid_tail() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        let first = ssa_id(p, 1);
+
+        fund_batch(&mut sup, p, 1, t0);
+        // Some surplus is outstanding, so recovery leaves a receipt behind rather than nothing.
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress_seen(
+                first,
+                sup.dims.target_useful_shares(),
+                sup.dims.target_useful_shares(),
+                sup.dims.target_useful_shares(),
+                sup.dims.polys_per_ssa(),
+            )),
+            t0,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(first), t0, 0);
+
+        assert_eq!(1, census(&sup).paid_tail, "the receipt must be visible");
+        assert_eq!(
+            PixGateMode::Funded,
+            census(&sup).gate_mode,
+            "a paid tail still authorizes service"
+        );
+
+        // Draining the receipt to its emitted ceiling consumes it, and the census follows.
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_recovered_tail_progress(&sup, first, max_cycle_shares(&sup))),
+            t0,
+            0,
+        );
+        assert_eq!(0, census(&sup).paid_tail, "an exhausted receipt must leave the census");
+    }
+
+    /// Every terminal path drains the live census, and each lost cycle is counted exactly once.
+    ///
+    /// Parameterised over the failure modes rather than written out per reason, because the property
+    /// is the same for all of them and the risk is that one path forgets.
+    #[test]
+    fn every_terminal_path_drains_the_census_and_counts_its_loss_once() {
+        let t0 = Instant::now();
+
+        // Each case drives a single-cycle Session into a terminal state a different way, and says
+        // which of the two routes its cycle takes out. Stating it is what keeps a case honest: the
+        // sum invariant below holds even for a case that has silently stopped reaching its
+        // terminal path at all, because a cycle that stays live is absorbed by `still_live`.
+        //
+        // `Retired` — the supervisor retired the cycle itself, charging it as it went.
+        // `LiveAtClose` — the Session closed outright with the cycle still live, so the charge is
+        // `PixSessionTelemetry::release`'s to make from the census.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum Route {
+            Retired,
+            LiveAtClose,
+        }
+        type Kill = fn(&mut SessionPixSupervisor, HoprPseudonym, Instant);
+        let cases: [(&str, Route, Kill); 5] = [
+            ("commitment timeout", Route::Retired, |sup, p, t0| {
+                // `SsaRequestSent` is what arms `commitment_deadline` — a cycle registered by
+                // `emit_request_next_ssa` has none, because its request has not gone out and there
+                // is nothing for it to be late for. Without this the sweep below expires nothing
+                // and the case silently degenerates into "an unarmed cycle stays live".
+                sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 1)), t0, 0);
+                sup.handle_timers(t0 + Duration::from_secs(3600), 0);
+            }),
+            ("deposit observer closed", Route::Retired, |sup, p, t0| {
+                let id = ssa_id(p, 1);
+                sup.handle_event(&SessionPixEvent::SsaRequestSent(id), t0, 0);
+                sup.handle_event(&SessionPixEvent::CommitmentVerified(id), t0, 0);
+                sup.handle_event(&SessionPixEvent::DepositObserverClosed(id), t0, 0);
+            }),
+            ("deposit timeout", Route::Retired, |sup, p, t0| {
+                let id = ssa_id(p, 1);
+                sup.handle_event(&SessionPixEvent::SsaRequestSent(id), t0, 0);
+                sup.handle_event(&SessionPixEvent::CommitmentVerified(id), t0, 0);
+                sup.handle_timers(t0 + Duration::from_secs(7200), 0);
+            }),
+            ("recovery hard deadline", Route::Retired, |sup, p, t0| {
+                fund_batch(sup, p, 1, t0);
+                sup.handle_timers(t0 + Duration::from_secs(100_000), 0);
+            }),
+            ("unverifiable shares", Route::LiveAtClose, |sup, p, t0| {
+                fund_batch(sup, p, 1, t0);
+                sup.handle_event(
+                    &SessionPixEvent::UnverifiableShares {
+                        ssa_id: ssa_id(p, 1),
+                        observed_total: 1,
+                    },
+                    t0,
+                    0,
+                );
+            }),
+        ];
+
+        for (name, route, kill) in cases {
+            let p = pseudonym();
+            let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+            let requested = sup.take_telemetry_events().requested;
+            assert_eq!(1, requested, "{name}: one cycle was allocated");
+
+            kill(&mut sup, p, t0);
+
+            let events = sup.take_telemetry_events();
+            assert_eq!(0, events.recovered, "{name}: nothing recovered");
+
+            let charged_here = events.failed;
+            let still_live = census(&sup).live_cycles();
+
+            // Asserted before the sum, because the sum alone cannot tell a case that reached its
+            // terminal path from one that never got there.
+            let (expected_charged, expected_live) = match route {
+                Route::Retired => (1, 0),
+                Route::LiveAtClose => (0, 1),
+            };
+            assert_eq!(
+                (expected_charged, expected_live),
+                (charged_here, still_live),
+                "{name}: expected the {route:?} route"
+            );
+
+            // And the invariant the aggregate actually reports: whichever route the cycle took, it
+            // is accounted for exactly once. `UnverifiableShares` closes the Session without
+            // retiring its cycles — the fault is evidence about the peer rather than about one
+            // cycle — so its charge is `release`'s to make from the census.
+            assert_eq!(
+                requested,
+                charged_here + still_live,
+                "{name}: every requested cycle must be accounted for exactly once, got {charged_here} retired and \
+                 {still_live} live"
+            );
+        }
+    }
+
+    /// Tombstones and closing records never appear in the live census.
+    ///
+    /// Stated on its own because it is the failure the census design was chosen to avoid: a
+    /// tombstone outlives its cycle by `tombstone_retention_window`, so counting one would leave
+    /// `hopr_pix_cycles_active` reporting a cycle the Exit has already finished with.
+    #[test]
+    fn retained_but_finished_cycles_are_not_live() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(64, 8), p, t0);
+
+        fund_batch(&mut sup, p, 2, t0);
+        assert_eq!(2, census(&sup).recovering);
+
+        sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), t0, 0);
+        assert!(
+            sup.ssas.iter().any(|s| matches!(s.phase, SsaPhase::Recovered { .. })),
+            "the tombstone must still be retained, or this test proves nothing"
+        );
+        assert_eq!(
+            1,
+            census(&sup).recovering,
+            "only the surviving sibling is live; the tombstone is retained state"
+        );
+    }
+
+    /// A repeated lifecycle event counts its transition once.
+    ///
+    /// Concurrent acknowledgement batches make duplicates ordinary rather than exceptional, and the
+    /// counters must not treat replay as progress.
+    #[test]
+    fn replayed_lifecycle_events_do_not_double_count() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        let first = ssa_id(p, 1);
+        sup.take_telemetry_events();
+
+        for _ in 0..3 {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(first), t0, 0);
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(first), t0, 0);
+        }
+        assert_eq!(
+            1,
+            sup.take_telemetry_events().committed,
+            "a repeated CommitmentVerified must count one transition"
+        );
+
+        for _ in 0..3 {
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: first,
+                    amount: sufficient_balance(),
+                },
+                t0,
+                0,
+            );
+        }
+        assert_eq!(
+            1,
+            sup.take_telemetry_events().funded,
+            "a duplicate deposit confirmation must count one transition"
+        );
+
+        for _ in 0..3 {
+            sup.handle_event(&SessionPixEvent::Recovered(first), t0, 0);
+        }
+        assert_eq!(
+            1,
+            sup.take_telemetry_events().recovered,
+            "a duplicate Recovered must count one transition"
+        );
+    }
+
+    /// A zero deposit is not a verdict, so it must not be counted as funding.
+    #[test]
+    fn a_zero_deposit_counts_no_funding() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+        let first = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(first), t0, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(first), t0, 0);
+        sup.take_telemetry_events();
+
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: first,
+                amount: HoprBalance::zero(),
+            },
+            t0,
+            0,
+        );
+
+        assert_eq!(0, sup.take_telemetry_events().funded);
+        assert_eq!(
+            phases(PixGateMode::Predeposit, 0, 1, 0),
+            census(&sup),
+            "the cycle stays fundable, awaiting a real deposit"
+        );
+    }
+
+    /// The snapshot reports the gate's exposure as given, without interpreting it.
+    #[test]
+    fn predeposit_exposure_is_carried_through_from_the_gate() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (sup, _) = SessionPixSupervisor::new(default_cfg(), dims(64, 8), p, t0);
+
+        assert_eq!(0, sup.telemetry_snapshot(0).predeposit_exposure_packets);
+        assert_eq!(917, sup.telemetry_snapshot(917).predeposit_exposure_packets);
     }
 }
