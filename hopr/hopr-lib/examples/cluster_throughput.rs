@@ -165,8 +165,8 @@ fn main() -> anyhow::Result<()> {
     // Returns Err if the pool was already initialised (e.g. by a framework that ran before main); in
     // that case pool_thread_count() reflects the prior initialiser's size, not `rayon_threads`.
     let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
-    // Report the *actual* pool size, not the requested one — and fail loudly when an explicit `--pool`
-    // could not take effect, so a benchmark never silently measures a different pool than it claims.
+    // Assert the live pool matches `--pool`; a benchmark must never silently measure a different pool
+    // than it claims.
     let active_pool = hopr_utils::parallelize::cpu::pool_thread_count();
     if let Some(requested) = args.pool {
         anyhow::ensure!(

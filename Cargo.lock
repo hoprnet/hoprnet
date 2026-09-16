@@ -4750,7 +4750,7 @@ dependencies = [
 [[package]]
 name = "hopr-utilities"
 version = "0.16.0"
-source = "git+https://github.com/hoprnet/hopr-utilities?branch=kauki%2Ffeat%2Fparallelize%2Fpool-arbitration#ae95e75ea414e4d64335be3ea2731ff26288c7ab"
+source = "git+https://github.com/hoprnet/hopr-utilities?branch=kauki%2Ffeat%2Fparallelize%2Fpool-arbitration#3b6cd150ce56bb7b1749dba36889a27240ee0608"
 dependencies = [
  "arrayvec",
  "auto_impl",
