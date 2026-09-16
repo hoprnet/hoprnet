@@ -173,10 +173,13 @@ async fn pool_arbiter_keeps_the_cluster_live() -> anyhow::Result<()> {
     let report = run_stress(&cluster, &cfg).await?;
     report.print_series();
 
+    // Assert destination *receipt*, not just source-side delivery: run_stress returns after its
+    // drain timeout even if the receiver never caught up, so checking bytes the source wrote could
+    // pass on a collapsed cluster. total_bytes_received is the destination EchoServer's own count.
     anyhow::ensure!(
-        report.total_bytes_delivered >= cfg.total_bytes,
-        "arbiter-on delivered {}, expected at least {}",
-        report.total_bytes_delivered,
+        report.total_bytes_received >= cfg.total_bytes,
+        "arbiter-on received {} at the destination, expected at least {}",
+        report.total_bytes_received,
         cfg.total_bytes,
     );
     anyhow::ensure!(
