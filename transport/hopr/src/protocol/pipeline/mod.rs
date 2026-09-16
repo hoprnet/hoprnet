@@ -5,7 +5,7 @@ mod config;
 
 pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
-pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
+pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig, PoolArbitrationConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
@@ -46,20 +46,21 @@ const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Number of Rayon threads kept permanently free for outgoing packet encode (SURB generation).
-/// The ingress decode concurrency default is `pool_thread_count - ENCODE_RESERVED_THREADS` so
-/// that heavy download traffic cannot starve the upload/SURB replenishment path.
-const ENCODE_RESERVED_THREADS: usize = 2;
+/// Multiplier applied to the CPU count to size each pipeline stage's ready-queue depth.
+const PIPELINE_CONCURRENCY_PER_CPU: usize = 8;
 
-/// Artificial per-packet delay injected into `wire_in` when the Rayon pool is detected as
-/// congested. 20 ms keeps the decode queue from growing while still allowing acks and keep-alive
-/// SURB packets to drain through at a reasonable pace.
-const INGRESS_THROTTLE_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
-
-/// Pool outstanding-task watermark factor: the gate trips when
-/// `outstanding_tasks > pool_thread_count * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
-/// A factor of 3 gives one full pool worth of headroom above the cap.
-const INGRESS_POOL_HIGH_WATERMARK_FACTOR: usize = 3;
+/// Default per-stage pipeline concurrency (the ready-queue depth feeding the shared Rayon pool)
+/// used when a [`PacketPipelineConfig`] concurrency field is unset or zero.
+///
+/// This is a queue depth, not a thread count, so it is derived from the CPU count
+/// (`available_parallelism * PIPELINE_CONCURRENCY_PER_CPU`) and is deliberately **independent of the
+/// Rayon pool size**. In production the pool is only `available_parallelism()/2`; sizing the ingress
+/// decode default from the pool (`pool - 2`) collapsed it to a near-serial `1` on small hosts and
+/// halved relay forwarding throughput. Fair sharing under a congested pool is handled by the
+/// arbiter in `hopr_utils::parallelize::cpu`, not by shrinking this default.
+fn default_pipeline_concurrency(available_parallelism: usize) -> usize {
+    available_parallelism.max(1) * PIPELINE_CONCURRENCY_PER_CPU
+}
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -787,65 +788,23 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // Fallback concurrency when the Rayon pool has not been initialised yet.
-    // Zero is normalised to 1 to prevent deadlock (0 concurrent tasks = no work done ever).
-    let avail_concurrency = std::thread::available_parallelism()
-        .ok()
-        .map(|n| n.get())
-        .unwrap_or(1)
-        .max(1)
-        * 8;
+    // Default per-stage concurrency is a CPU-derived ready-queue depth (see
+    // `default_pipeline_concurrency`); a `None`/`Some(0)` config value falls back to it. The default
+    // is intentionally not tied to the Rayon pool size — see that function for why.
+    let available_parallelism = std::thread::available_parallelism().ok().map(|n| n.get()).unwrap_or(1);
+    let default_concurrency = default_pipeline_concurrency(available_parallelism);
 
-    // Cap `output_concurrency` so the egress encode pipeline does not submit more tasks to Rayon
-    // than it can drain within `PACKET_ENCODING_TIMEOUT`.  A deep queue (output_concurrency >> pool)
-    // lets SURB keep-alive bursts queue hundreds of encode tasks, starving data packets that
-    // arrive later and triggering the 150 ms timeout.
-    //
-    // The default cap mirrors the ingress watermark: `pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
-    // At encode time ≤ 5 ms and 14 threads: max queue wait ≈ (3×14 − 14)/14 × 5 ms = 10 ms, well
-    // within the 150 ms budget.  Falls back to avail_concurrency when the pool is uninitialised.
-    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
-    let default_output_concurrency = if pool_threads > 0 {
-        pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR
-    } else {
-        avail_concurrency
-    };
-    let output_concurrency = cfg
-        .output_concurrency
-        .filter(|&n| n > 0)
-        .unwrap_or(default_output_concurrency);
+    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
+    let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
 
-    // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
-    // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
-    // Without this cap the FIFO pool fills up with decode work under heavy download traffic and
-    // SURB replenishment starves, slowly collapsing the session's download throughput.
-    // Note: pool_threads is already computed above for output_concurrency.
-    let default_input_concurrency = if pool_threads > ENCODE_RESERVED_THREADS {
-        pool_threads - ENCODE_RESERVED_THREADS
-    } else if pool_threads > 0 {
-        1 // pool is tiny but initialised — leave at least 1 decode slot
-    } else {
-        avail_concurrency // pool not initialised yet; fall back to the old behaviour
-    };
-    let input_concurrency = cfg
-        .input_concurrency
-        .filter(|&n| n > 0)
-        .unwrap_or(default_input_concurrency);
-
-    // --- Ingress gate (safety-net backpressure) ---
-    // Gate on DECODE_OUTSTANDING rather than the global outstanding_tasks() so that
-    // encode work from the outgoing SURB/keep-alive pipeline (which runs concurrently
-    // in the same process in cluster tests — and in production on the same node) does
-    // not interfere with the relay's decision to throttle incoming packet decoding.
-    // Using the decode-specific counter means only sustained decode congestion triggers
-    // the delay; encode saturation alone does not.
-    let high_watermark = input_concurrency * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
-    let wire_in = wire_in.then(move |(peer, data)| async move {
-        if hopr_utils::parallelize::cpu::decode_outstanding_tasks() > high_watermark {
-            hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
-        }
-        (peer, data)
-    });
+    // Encode/decode fair-share of the shared Rayon pool is enforced inside
+    // `spawn_decode_blocking` (configured once here at node startup), superseding the previous
+    // per-packet ingress sleep-gate. The pool is process-global, so this configures the node's arbiter.
+    hopr_utils::parallelize::cpu::configure_arbitration(
+        cfg.arbitration.enabled,
+        cfg.arbitration.occupancy_pct,
+        cfg.arbitration.encode_reserve_pct,
+    );
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
@@ -937,6 +896,21 @@ mod tests {
     use futures::channel::mpsc;
 
     use super::*;
+
+    /// Regression guard for the 4.1.x relay throughput collapse (#8246 fallout).
+    ///
+    /// In production the Rayon pool is sized to `available_parallelism()/2`, so a 4-core node has a
+    /// 2-thread pool. The old default `pool_thread_count - ENCODE_RESERVED_THREADS` evaluated to `0`
+    /// there, clamped to `1`, decoding packets essentially one at a time. The per-stage concurrency
+    /// default MUST instead track the CPU-derived deep queue and never collapse below the CPU count.
+    #[test]
+    fn default_pipeline_concurrency_is_cpu_scaled() {
+        assert_eq!(default_pipeline_concurrency(4), 4 * PIPELINE_CONCURRENCY_PER_CPU);
+        for cpus in 1..=16 {
+            assert!(default_pipeline_concurrency(cpus) >= cpus);
+        }
+        assert!(default_pipeline_concurrency(0) >= 1);
+    }
 
     /// Regression test for the Entry-node ack-sink bug.
     ///

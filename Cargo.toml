@@ -136,7 +136,7 @@ validator = { version = "0.21.0", features = ["derive"] }
 
 hopr-api = { version = "2.0.0" }
 hopr-types = { version = "2.2.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.9.1", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.9.3", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -228,3 +228,9 @@ ignored = [
   "hopr-session-server-forwarder",
   "hopr-utils-session",
 ]
+
+# TEMPORARY: consume the unpublished hopr-utilities compat/v4 pool-arbitration branch so the whole
+# stack verifies end-to-end before 0.9.3 is published. Remove once hopr-utilities 0.9.3 is on
+# crates.io — the version requirement above then resolves normally.
+[patch.crates-io]
+hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", branch = "kauki/feat/parallelize/pool-arbitration-v4" }

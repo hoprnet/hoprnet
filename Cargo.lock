@@ -2748,7 +2748,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -4168,7 +4168,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.4"
+version = "4.0.5"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4366,7 +4366,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.48.4"
+version = "0.48.5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4620,9 +4620,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4be85522dd5a1a42e3114d17ee354002cd5fe51aac691af95c035e3b953bfee"
+version = "0.9.3"
+source = "git+https://github.com/hoprnet/hopr-utilities?branch=kauki%2Ffeat%2Fparallelize%2Fpool-arbitration-v4#31aeaf75bfdfd6d0769cfb6df3af170ac7370a60"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4630,6 +4629,7 @@ dependencies = [
  "blokli-client",
  "const-hex",
  "crossfire",
+ "event-listener 5.4.2",
  "flume",
  "futures",
  "futures-time",
@@ -8601,7 +8601,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
