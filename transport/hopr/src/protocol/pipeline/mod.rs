@@ -797,10 +797,12 @@ where
     let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
     let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(default_concurrency);
 
-    // Encode/decode fair-share of the shared Rayon pool is enforced inside
-    // `spawn_decode_blocking` (configured once here at node startup), superseding the previous
-    // per-packet ingress sleep-gate. The pool is process-global, so this configures the node's arbiter.
-    hopr_utils::parallelize::cpu::configure_arbitration(
+    // Encode/decode fair-share of the shared Rayon pool is enforced inside `spawn_decode_blocking`,
+    // superseding the previous per-packet ingress sleep-gate. The pool — and thus the arbiter — is
+    // process-global, so we configure it *first-wins*: the first pipeline to start (the node, in
+    // production) applies its config; later starts in a multi-node-per-process host (tests, the
+    // cluster example) neither clobber it nor an explicit benchmark override.
+    hopr_utils::parallelize::cpu::configure_arbitration_once(
         cfg.arbitration.enabled,
         cfg.arbitration.occupancy_pct,
         cfg.arbitration.encode_reserve_pct,
