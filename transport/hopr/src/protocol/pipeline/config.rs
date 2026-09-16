@@ -218,4 +218,19 @@ mod tests {
             "zero must reach the code as zero, not as unset"
         );
     }
+
+    /// The `SmartDefault` derive and the serde field defaults share the `default_arbitration_*` fns,
+    /// so they can't diverge — pin the values the arbiter ships with, and that a default config
+    /// validates (the percentages sit inside the `1..=100` range).
+    #[test]
+    fn pool_arbitration_config_defaults_are_enabled_75_50_and_valid() {
+        let cfg = PoolArbitrationConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.occupancy_pct, 75);
+        assert_eq!(cfg.encode_reserve_pct, 50);
+        assert!(
+            cfg.validate().is_ok(),
+            "the default arbitration config must pass validation"
+        );
+    }
 }
