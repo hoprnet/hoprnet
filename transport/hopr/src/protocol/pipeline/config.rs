@@ -89,15 +89,12 @@ impl Validate for AcknowledgementPipelineConfig {
     }
 }
 
-#[cfg(feature = "serde")]
 fn default_arbitration_enabled() -> bool {
     true
 }
-#[cfg(feature = "serde")]
 fn default_arbitration_occupancy_pct() -> u32 {
     75
 }
-#[cfg(feature = "serde")]
 fn default_arbitration_encode_reserve_pct() -> u32 {
     50
 }
@@ -108,7 +105,7 @@ fn default_arbitration_encode_reserve_pct() -> u32 {
 /// Asymmetric and occupancy-gated: only decode is ever throttled, and only when the pool is
 /// saturated *and* encode work is present, so pure forwarding and unsaturated nodes are untouched.
 /// Enforced inside `spawn_decode_blocking` (see `hopr_utils::parallelize::cpu::configure_arbitration`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Validate)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault, Validate)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -116,27 +113,20 @@ fn default_arbitration_encode_reserve_pct() -> u32 {
 )]
 pub struct PoolArbitrationConfig {
     /// When `false`, decode is never throttled (the pool is shared first-come-first-served).
+    #[default(default_arbitration_enabled())]
     #[cfg_attr(feature = "serde", serde(default = "default_arbitration_enabled"))]
     pub enabled: bool,
     /// Pool occupancy (percent of threads actually running) at or above which decode admission may
     /// engage. Below it, decode is never throttled.
+    #[default(default_arbitration_occupancy_pct())]
     #[validate(range(min = 1, max = 100))]
     #[cfg_attr(feature = "serde", serde(default = "default_arbitration_occupancy_pct"))]
     pub occupancy_pct: u32,
     /// Share of the pool (percent) that decode yields to encode when both contend under saturation.
+    #[default(default_arbitration_encode_reserve_pct())]
     #[validate(range(min = 1, max = 100))]
     #[cfg_attr(feature = "serde", serde(default = "default_arbitration_encode_reserve_pct"))]
     pub encode_reserve_pct: u32,
-}
-
-impl Default for PoolArbitrationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            occupancy_pct: 75,
-            encode_reserve_pct: 50,
-        }
-    }
 }
 
 /// Overall configuration of the input/output packet processing pipeline.
@@ -153,13 +143,11 @@ pub struct PacketPipelineConfig {
     pub output_concurrency: Option<usize>,
     /// Maximum concurrency when processing incoming packets (SPHINX decode).
     ///
-    /// `None` or `Some(0)` fall back to the default, which is computed as
-    /// `max(1, pool_thread_count - ENCODE_RESERVED_THREADS)` when the shared Rayon pool has
-    /// been initialised, or `available_parallelism * 8` as a fallback when it has not.
-    ///
-    /// The default is deliberately lower than `output_concurrency` to reserve Rayon threads
-    /// for outgoing packet encode (SURB generation). Flooding the pool with decode work would
-    /// otherwise starve SURB production and collapse download throughput.
+    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8), the same as
+    /// `output_concurrency`. Encode is no longer protected by throttling this queue depth below
+    /// output's (which regressed relay forwarding — #8246); protection now lives in the shared-pool
+    /// arbiter (see [`PoolArbitrationConfig`]), which throttles decode *admission* only under a
+    /// genuine flood, leaving pure forwarding at full concurrency.
     pub input_concurrency: Option<usize>,
     /// How long routing resolution keeps waiting for a return path's SURBs before giving up on the
     /// packet.
