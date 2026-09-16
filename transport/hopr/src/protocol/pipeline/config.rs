@@ -130,6 +130,23 @@ pub struct PoolArbitrationConfig {
     pub encode_reserve_pct: u32,
 }
 
+impl PoolArbitrationConfig {
+    /// Maps this flat (serde-friendly) config onto the pool arbiter's
+    /// [`ArbitrationConfig`](hopr_utils::parallelize::cpu::ArbitrationConfig) enum, where the disabled
+    /// state carries no tuning percentages.
+    pub fn to_arbitration(&self) -> hopr_utils::parallelize::cpu::ArbitrationConfig {
+        use hopr_utils::parallelize::cpu::ArbitrationConfig;
+        if self.enabled {
+            ArbitrationConfig::Enabled {
+                occupancy_pct: self.occupancy_pct,
+                encode_reserve_pct: self.encode_reserve_pct,
+            }
+        } else {
+            ArbitrationConfig::Disabled
+        }
+    }
+}
+
 /// Overall configuration of the input/output packet processing pipeline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
 #[cfg_attr(
