@@ -154,16 +154,6 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
-    /// If set, sets the PIX dimensions for the Session.
-    ///
-    /// These must match this node's own PIX configuration exactly — see
-    /// [`SessionClientConfig::pix_ssa_quota`](hopr_transport::SessionClientConfig) — so the usual
-    /// way to build one is `PixParams::try_from_config` over the installed generator's config rather
-    /// than by restating the values. The curve suite among them is fixed at build time, not
-    /// configured; [`LOCAL_PIX_SUITE`] names this build's.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
@@ -204,10 +194,6 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     pub always_max_out_surbs: bool,
-    /// If set, sets the PIX dimensions for the Session.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
     /// As [`HoprSessionClientConfig::max_frames_behind_gap`].
@@ -225,7 +211,6 @@ impl Default for HoprSessionClientExplicitPathConfig {
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
-            pix_ssa_quota: None,
             flow_control: None,
             max_frames_behind_gap: None,
         }
@@ -242,7 +227,6 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
-            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
             max_frames_behind_gap: value.max_frames_behind_gap,
         }
@@ -266,7 +250,6 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
-            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
             max_frames_behind_gap: value.max_frames_behind_gap,
         })
@@ -960,7 +943,6 @@ mod tests {
             pseudonym: None,
             surb_management: None,
             always_max_out_surbs: false,
-            pix_ssa_quota: None,
             flow_control: None,
             max_frames_behind_gap: Some(8),
         })

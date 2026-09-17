@@ -50,7 +50,11 @@ const PIX_SHARES: u8 = 2;
 /// the wire. At `PIX_SHARES = 2` the derivation yields 1, so this being 2 is observable end to end.
 const PIX_SURPLUS: u8 = 2;
 
-/// The three above as the Session asks for them.
+/// The three above as the node announces them.
+///
+/// Not something the Session asks for: the dimensions are read off the installed generator, so this
+/// is the same quadruple arriving by the other route — what `PIX_POLYS`/`PIX_SHARES`/`PIX_SURPLUS`
+/// assemble into once they have been through `PixGlobalConfig` below.
 ///
 /// `const` rather than built at the call site so the range check runs at compile time — the values
 /// are constants, so a typo here should not need a cluster to boot before it is noticed.
@@ -291,7 +295,6 @@ async fn establish_pix_session_with(
                 pseudonym: None,
                 surb_management,
                 always_max_out_surbs: false,
-                pix_ssa_quota: Some(PIX_PARAMS),
                 flow_control: None,
                 max_frames_behind_gap: None,
             },
@@ -1767,7 +1770,6 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: false,
-                pix_ssa_quota: None,
                 flow_control: None,
                 max_frames_behind_gap: None,
             },
@@ -1826,8 +1828,10 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::Result<()> {
-    let quota_per_ssa = PIX_POLYS as u64
-        * (PIX_SHARES as u64 + PIX_SURPLUS as u64)
+    // Through `PIX_PARAMS` rather than the three constants directly: this must be the quota the
+    // node announces, and the node announces whatever its configured dimensions assemble into.
+    let quota_per_ssa = PIX_PARAMS.polys_per_ssa() as u64
+        * PIX_PARAMS.emitted_shares_per_poly() as u64
         * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
     let accepted_batch_quota = quota_per_ssa * SSA_BATCH as u64;
 

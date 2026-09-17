@@ -284,7 +284,6 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -559,7 +558,6 @@ async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(params),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -714,7 +712,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 ///
 /// ## Steps
 /// 1. Both managers are started without a `PixToolbox`.
-/// 2. Alice initiates with `Capability::Segmentation` only and `pix_ssa_quota: None`, so PIX is never negotiated.
+/// 2. Alice initiates with `Capability::Segmentation` only — without `Capability::UsePIX`, PIX is never negotiated.
 /// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice, and the `.times(1)` on
 ///    *both* transports is what pins the absence of a third message.
 /// 4. Both sessions are established and both sides receive a session handle.
@@ -797,7 +795,6 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
-                    pix_ssa_quota: None,
                     ..Default::default()
                 },
             ),
@@ -966,7 +963,6 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -1262,7 +1258,6 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
                 pseudonym: alice_pseudonym.into(),
                 capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                 surb_management: None,
-                pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                 return_path_options: RoutingOptions::Hops(1.try_into()?),
                 ..Default::default()
             },
@@ -1463,7 +1458,6 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
                     pseudonym: free_pseudonym.into(),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
-                    pix_ssa_quota: None,
                     ..Default::default()
                 },
             ),
@@ -1506,7 +1500,6 @@ async fn the_session_target_decides_whether_the_exit_serves_a_session() -> Resul
                 pseudonym: paid_pseudonym.into(),
                 capabilities: Capability::Segmentation.into(),
                 surb_management: None,
-                pix_ssa_quota: None,
                 ..Default::default()
             },
         ),
