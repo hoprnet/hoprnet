@@ -144,6 +144,17 @@ pub struct IncomingPacketInfo {
     pub signals_from_sender: PacketSignals,
     /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
     pub num_saved_surbs: usize,
+    /// How many of those SURBs were discarded on arrival because the SURB buffer for this sender was
+    /// already full.
+    ///
+    /// Non-zero means the sender is producing SURBs faster than this side can hold them, and the
+    /// surplus was destroyed rather than queued. Under PIX each destroyed SURB also destroys the
+    /// partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
+    /// used — so this is not a bandwidth statistic but a loss counter.
+    ///
+    /// Reported for observability, and deliberately not fed back into the SURB flow estimator — see
+    /// the note on the field it would correct in `hopr-transport-session`'s `BalancerStateValues`.
+    pub num_evicted_surbs: usize,
 }
 
 /// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the

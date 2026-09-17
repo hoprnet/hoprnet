@@ -9,6 +9,15 @@ use hopr_protocol_session::SessionMessageDiscriminants;
 pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
+// Bounded node-level PIX Exit aggregates, kept apart from the per-Session instruments above because
+// they answer a different question for a different consumer and reach a different exporter.
+//
+// A `//` comment rather than a `///` doc on purpose: rustdoc merges an outer doc on a `mod` item
+// with that module's own `//!` header and then resolves the *whole* merged block in the parent's
+// scope, which silently breaks every intra-doc link the module wrote against its own scope. The
+// module documents itself.
+pub(crate) mod pix;
+
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
 /// for local types, so we create a local wrapper.

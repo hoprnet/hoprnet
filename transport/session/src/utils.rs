@@ -15,7 +15,7 @@ use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 /// Re-exported from `hopr-utils`; the published generic version accepts any two
 /// `AsyncRead + AsyncWrite` streams. Only available with Tokio.
 #[cfg(feature = "runtime-tokio")]
-pub use hopr_utils::network_types::utils::transfer_session;
+pub use hopr_utils::network_types::utils::{transfer_session, transfer_session_datagram};
 use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, debug, error, instrument};
 

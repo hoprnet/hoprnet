@@ -17,7 +17,7 @@ use hopr_utils::runtime::prelude::spawn;
 
 use super::{
     PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig, gate::ServiceGate,
-    supervisor::SessionPixSupervisor,
+    supervisor::SessionPixSupervisor, telemetry::PixSessionTelemetry,
 };
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,12 @@ pub type ActionRx = AsyncRx<ActionChannel>;
 pub struct SessionPixSupervisorHandle {
     cmd_tx: CmdTx,
     pub(crate) gate: Arc<ServiceGate>,
+    /// This Session's share of the node-level PIX aggregates.
+    ///
+    /// Carried here rather than on `SessionSlot` because the slot already holds this handle, and
+    /// both parties that need it can reach it: the worker publishes through its own clone, and
+    /// `close_session` releases through the slot's.
+    pub(crate) telemetry: Arc<PixSessionTelemetry>,
 }
 
 impl SessionPixSupervisorHandle {
@@ -57,6 +63,32 @@ impl SessionPixSupervisorHandle {
                 Err(())
             }
         }
+    }
+
+    /// Deliver a PIX event without blocking, dropping it if the channel is full.
+    ///
+    /// Returns `true` if the event was queued.
+    ///
+    /// The synchronous counterpart to [`send_event`](Self::send_event), and it exists because one
+    /// caller cannot await: `close_session_with_reason` is a plain `fn`, reached from the manager's
+    /// closure-notification task — which `HoprSession::poll_close` and the empty-read path feed
+    /// through a non-blocking channel — from the public synchronous `SessionManager::close_session`,
+    /// and from `handle_session_error` on a peer `SessionError`. None of them may park on a worker
+    /// that happens to be mid-tick.
+    ///
+    /// A refusal is not lost work, which is what makes dropping acceptable here where it would not be
+    /// for a lifecycle transition. The only event sent this way is
+    /// [`SessionPixEvent::SessionClosed`], and its caller treats `false` as "this close was not
+    /// answered by the supervisor" and falls back to the immediate teardown that has always been the
+    /// behaviour on that path.
+    pub fn try_send_event(&self, ev: SessionPixEvent) -> bool {
+        self.cmd_tx
+            .try_send(WorkerCommand::Event(ev))
+            .inspect_err(|e| match e {
+                TrySendError::Full(_) => tracing::debug!("supervisor command channel full — dropping event"),
+                TrySendError::Disconnected(_) => tracing::warn!("PIX supervisor command channel closed"),
+            })
+            .is_ok()
     }
 
     /// Send an action result feedback to the supervisor, awaiting capacity if
@@ -91,23 +123,16 @@ impl SessionPixSupervisorHandle {
     /// to leave room for a few missed snapshots. Since the command channel is drained by a state
     /// machine that performs no I/O, drops require a genuinely wedged worker.
     pub fn try_send_progress(&self, progress: SsaRecoveryProgress<HoprPseudonym>) -> bool {
-        match self
-            .cmd_tx
+        self.cmd_tx
             .try_send(WorkerCommand::Event(SessionPixEvent::RecoveryProgress(progress)))
-        {
-            Ok(()) => true,
-            Err(TrySendError::Full(_)) => {
-                tracing::debug!(
+            .inspect_err(|e| match e {
+                TrySendError::Full(_) => tracing::debug!(
                     ssa_id = %progress.ssa_id,
                     "supervisor command channel full — dropping progress snapshot"
-                );
-                false
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                tracing::warn!("PIX supervisor command channel closed");
-                false
-            }
-        }
+                ),
+                TrySendError::Disconnected(_) => tracing::warn!("PIX supervisor command channel closed"),
+            })
+            .is_ok()
     }
 }
 
@@ -139,15 +164,35 @@ pub fn spawn_supervisor_worker(
         cfg.max_predeposit_packets,
     );
     let gate = ServiceGate::new(predeposit_budget, cfg.max_served_without_progress);
+    let telemetry = Arc::new(PixSessionTelemetry::new(gate.clone()));
 
     let handle = SessionPixSupervisorHandle {
         cmd_tx,
         gate: gate.clone(),
+        telemetry: telemetry.clone(),
     };
 
-    let (supervisor, initial_actions) = SessionPixSupervisor::new(cfg, dims, pseudonym, now);
+    let (mut supervisor, initial_actions) = SessionPixSupervisor::new(cfg, dims, pseudonym, now);
 
-    spawn(worker_loop(supervisor, cmd_rx, action_tx, gate, initial_actions));
+    // Published here rather than left to the worker's first turn, because the worker is spawned and
+    // this function returns before it is scheduled. A Session torn down inside that window —
+    // establishment failing after the supervisor is stood up is the realistic way — would have its
+    // telemetry released before anything was ever published, and the first batch's `requested`
+    // count would be lost along with the census it belonged to.
+    //
+    // Correct to do before `dispatch`: a fresh supervisor has no funded front, so the initial
+    // actions change neither the gate mode nor its exposure, and the worker's own publish after
+    // dispatch then finds nothing to move.
+    publish_telemetry(&mut supervisor, &gate, &telemetry);
+
+    spawn(worker_loop(
+        supervisor,
+        cmd_rx,
+        action_tx,
+        gate,
+        telemetry,
+        initial_actions,
+    ));
 
     (handle, action_rx)
 }
@@ -161,13 +206,16 @@ async fn worker_loop(
     cmd_rx: CmdRx,
     action_tx: ActionTx,
     gate: Arc<ServiceGate>,
+    telemetry: Arc<PixSessionTelemetry>,
     initial_actions: Vec<SessionPixAction>,
 ) {
     // Emit initial actions. `false` says only that a freshly built supervisor has not flagged
     // itself, which it cannot have: `new` does not close. It is not a claim that these actions are
     // non-terminal — `dispatch` reads the payload for that, so a construction-time `Close` would
     // still fail closed here rather than being waved through on the strength of the flag.
-    if !dispatch(&initial_actions, false, &action_tx, &gate) {
+    let keep_running = dispatch(&initial_actions, false, &action_tx, &gate);
+    publish_telemetry(&mut supervisor, &gate, &telemetry);
+    if !keep_running {
         return;
     }
 
@@ -187,7 +235,9 @@ async fn worker_loop(
             if now >= dl {
                 let actions = supervisor.handle_timers(now, gate.served_total());
                 report_fill_stall(&mut supervisor);
-                if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
+                let keep_running = dispatch(&actions, supervisor.closed, &action_tx, &gate);
+                publish_telemetry(&mut supervisor, &gate, &telemetry);
+                if !keep_running {
                     return;
                 }
                 continue;
@@ -201,7 +251,7 @@ async fn worker_loop(
                 .await
             {
                 Ok(result) => {
-                    if !process_cmd(result.ok(), &mut supervisor, &action_tx, &gate).await {
+                    if !process_cmd(result.ok(), &mut supervisor, &action_tx, &gate, &telemetry).await {
                         return;
                     }
                 }
@@ -209,14 +259,16 @@ async fn worker_loop(
                     let now = Instant::now();
                     let actions = supervisor.handle_timers(now, gate.served_total());
                     report_fill_stall(&mut supervisor);
-                    if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
+                    let keep_running = dispatch(&actions, supervisor.closed, &action_tx, &gate);
+                    publish_telemetry(&mut supervisor, &gate, &telemetry);
+                    if !keep_running {
                         return;
                     }
                 }
             }
         } else {
             let cmd = cmd_rx.recv().await.ok();
-            if !process_cmd(cmd, &mut supervisor, &action_tx, &gate).await {
+            if !process_cmd(cmd, &mut supervisor, &action_tx, &gate, &telemetry).await {
                 return;
             }
         }
@@ -236,6 +288,31 @@ fn report_fill_stall(supervisor: &mut SessionPixSupervisor) {
     }
 }
 
+/// Publishes this Session's share of the node-level PIX aggregates.
+///
+/// Called once per turn, after [`dispatch`] rather than before it, and on the terminal path as well
+/// as the ordinary one. Both halves of that matter:
+///
+/// * *after*, because `dispatch` applies the gate transitions locally before sending anything, and the gate is where
+///   the predeposit exposure is read from. Publishing first would report a rotating Session's exhausted predecessor
+///   allowance for one more turn.
+/// * *on the terminal path too*, because that turn is the one that carries the last `failed`/`recovered` counts, and
+///   the worker is about to stop. Returning the gauges to zero is not this function's job —
+///   [`PixSessionTelemetry::release`] does that from `close_session`, which knows the Session is gone rather than
+///   merely that this worker has stopped.
+///
+/// Kept out of `dispatch` for the reason `report_fill_stall` is: this produces no work for the
+/// action driver, only numbers for the operator, and `dispatch`'s callers hold the supervisor by
+/// different borrows.
+fn publish_telemetry(
+    supervisor: &mut SessionPixSupervisor,
+    gate: &Arc<ServiceGate>,
+    telemetry: &Arc<PixSessionTelemetry>,
+) {
+    let snapshot = supervisor.telemetry_snapshot(gate.predeposit_exposure());
+    telemetry.publish(snapshot, supervisor.take_telemetry_events());
+}
+
 /// Handle a received command from the handle.
 ///
 /// Returns `false` to signal the worker loop to stop.
@@ -244,34 +321,37 @@ async fn process_cmd(
     supervisor: &mut SessionPixSupervisor,
     action_tx: &ActionTx,
     gate: &Arc<ServiceGate>,
+    telemetry: &Arc<PixSessionTelemetry>,
 ) -> bool {
     let cmd = match cmd {
         Some(c) => c,
         None => {
             // All senders dropped — close. Terminal by construction, so `dispatch` is told the
             // supervisor is closed and its `false` is the verdict.
+            //
+            // Nothing is published: this close is synthesized here rather than by the state machine,
+            // so no transition was latched and the census is whatever the previous turn already
+            // reported. `release` charges its live cycles when the Session is torn down.
             let actions = vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)];
             return dispatch(&actions, true, action_tx, gate);
         }
     };
 
-    match cmd {
+    let keep_running = match cmd {
         WorkerCommand::Event(ev) => {
             let now = Instant::now();
             let actions = supervisor.handle_event(&ev, now, gate.served_total());
-            if !dispatch(&actions, supervisor.closed, action_tx, gate) {
-                return false;
-            }
+            dispatch(&actions, supervisor.closed, action_tx, gate)
         }
         WorkerCommand::ActionResult { action, ok } => {
             let now = Instant::now();
             let actions = supervisor.action_result(&action, ok, now);
-            if !dispatch(&actions, supervisor.closed, action_tx, gate) {
-                return false;
-            }
+            dispatch(&actions, supervisor.closed, action_tx, gate)
         }
-    }
-    true
+    };
+
+    publish_telemetry(supervisor, gate, telemetry);
+    keep_running
 }
 
 /// Apply gate control, forward `actions`, then report whether the worker should keep running.
@@ -373,9 +453,55 @@ mod tests {
     use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
     use super::{
-        super::{FillRate, PixFillConfig, SAMPLING_INTERVAL},
+        super::{
+            FillRate, PixFillConfig, SAMPLING_INTERVAL,
+            gate::{GateBlockReason, GateVerdict},
+        },
         *,
     };
+
+    /// The first batch's census and `requested` count survive a Session torn down before its worker
+    /// is ever scheduled.
+    ///
+    /// `spawn_supervisor_worker` returns as soon as the task is queued, and establishment can still
+    /// fail after that — rolling the slot back and releasing the telemetry. A release that found
+    /// nothing published would suppress the worker's first publish when it finally ran, losing the
+    /// allocation this Session had already made.
+    #[tokio::test]
+    async fn the_initial_census_survives_a_release_before_the_worker_runs() {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let p = HoprPseudonym::random();
+        let (handle, _action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Nothing has been polled yet: the census must already be published.
+        assert_eq!(
+            1,
+            probe::get("cycles_total/requested"),
+            "the first batch's allocation is published before the worker is scheduled"
+        );
+        assert_eq!(1, probe::get("cycles_active/awaiting_commitment"));
+        assert_eq!(1, probe::get("sessions_active/predeposit"));
+
+        // Tear it down in that same window.
+        handle.telemetry.release();
+        assert_eq!(
+            0,
+            probe::get("cycles_active/awaiting_commitment"),
+            "release must return the census it found"
+        );
+        assert_eq!(0, probe::get("sessions_active/predeposit"));
+        assert_eq!(
+            1,
+            probe::get("cycles_total/failed"),
+            "and charge the cycle that never got anywhere, so requested still balances"
+        );
+        assert_eq!(
+            probe::get("cycles_total/requested"),
+            probe::get("cycles_total/recovered") + probe::get("cycles_total/failed"),
+        );
+    }
 
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
@@ -454,15 +580,17 @@ mod tests {
         };
         let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
 
-        assert!(
-            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+        assert_ne!(
+            GateVerdict::Admitted,
+            handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
             "a strict-prepay gate must refuse the first packet"
         );
         assert_eq!(handle.gate.served_total(), 0);
 
         // What the action driver does when it carries out `ReleaseService`.
         handle.gate.release_service();
-        assert!(
+        assert_eq!(
+            GateVerdict::Admitted,
             handle.gate.try_acquire_sync().expect("a funded gate is not poisoned"),
             "funding must open a strict-prepay gate"
         );
@@ -483,13 +611,15 @@ mod tests {
         let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
 
         for i in 0..49 {
-            assert!(
+            assert_eq!(
+                GateVerdict::Admitted,
                 handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
                 "packet {i} is within `target_useful_shares - 1` and must be served"
             );
         }
-        assert!(
-            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+        assert_ne!(
+            GateVerdict::Admitted,
+            handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
             "the budget must stop at `target_useful_shares - 1`, not at the configured cap"
         );
     }
@@ -543,7 +673,7 @@ mod tests {
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;
 
         poll_until("the paid front opens the gate", || handle.gate.funded()).await;
-        assert!(handle.gate.try_acquire_sync()?);
+        assert_eq!(GateVerdict::Admitted, handle.gate.try_acquire_sync()?);
 
         // The receiver remains alive but deliberately unread, modeling an action driver blocked on
         // RequestSsa I/O. Cryptographic recovery alone must keep the gate funded for the bounded
@@ -556,7 +686,8 @@ mod tests {
             handle.gate.funded()
         })
         .await;
-        assert!(
+        assert_eq!(
+            GateVerdict::Admitted,
             handle.gate.try_acquire_sync()?,
             "cryptographic recovery must reopen a gate whose final progress notification was lost"
         );
@@ -579,7 +710,11 @@ mod tests {
             .await
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;
         poll_until("the unfunded successor closes the gate", || !handle.gate.funded()).await;
-        assert!(!handle.gate.try_acquire_sync()?);
+        assert_eq!(
+            GateVerdict::Blocked(GateBlockReason::PredepositExhausted),
+            handle.gate.try_acquire_sync()?,
+            "an unfunded successor refuses on its allowance, not on the funded ceiling"
+        );
         Ok(())
     }
 
@@ -793,6 +928,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         // Drop the receiver so the channel is disconnected.
@@ -826,6 +962,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
@@ -852,6 +989,7 @@ mod tests {
         let handle = SessionPixSupervisorHandle {
             cmd_tx,
             gate: gate.clone(),
+            telemetry: Arc::new(PixSessionTelemetry::new(gate.clone())),
         };
 
         let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());

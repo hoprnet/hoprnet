@@ -202,7 +202,17 @@ pub(super) async fn process_chain_events<C, G, S>(
                 *ticket_price.write() = price;
                 push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
-            _ => {}
+            ChainEvent::TicketRedeemed(..) => {}
+            ChainEvent::ServiceRegistered(_)
+            | ChainEvent::ServiceUpdated(_)
+            | ChainEvent::ServiceDeregistered(..)
+            | ChainEvent::ServiceTypeRegistered(..)
+            | ChainEvent::ServiceTypeOwnerChanged(..)
+            | ChainEvent::ServiceTypeRequirementChanged(..)
+            | ChainEvent::ServiceTypeRegistrationBurnChanged(..)
+            | ChainEvent::ServiceTypeUpdateBurnChanged(..)
+            | ChainEvent::ServiceTypeRegistrationFeeChanged(_)
+            | ChainEvent::ServiceRegistryPointerChanged(_) => {}
         }
     }
 }
@@ -254,12 +264,15 @@ mod tests {
         types::{
             chain::chain_events::ChainEvent,
             crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
-            internal::prelude::{AccountEntry, AccountType, ChannelEntry, ChannelStatus},
+            internal::prelude::{
+                AccountEntry, AccountType, ChannelEntry, ChannelStatus, ServiceEntry, ServiceMetadata, ServiceType,
+            },
             primitive::prelude::Address,
         },
     };
     use hopr_transport::MemorySurbStore;
     use parking_lot::RwLock;
+    use rstest::rstest;
 
     use super::process_chain_events;
 
@@ -889,6 +902,105 @@ mod tests {
             Some(tx),
         )
         .await;
+    }
+
+    type MakeServiceEvent = fn(Address, Address, ServiceEntry, HoprBalance) -> ChainEvent;
+
+    #[rstest]
+    #[case::registered(|_, _, entry, _| ChainEvent::ServiceRegistered(entry))]
+    #[case::updated(|_, _, entry, _| ChainEvent::ServiceUpdated(entry))]
+    #[case::deregistered(|node, _, _, _| ChainEvent::ServiceDeregistered(ServiceType::GVPN_EXIT, node))]
+    #[case::type_registered(|_, owner, _, _| ChainEvent::ServiceTypeRegistered(ServiceType::GVPN_EXIT, owner))]
+    #[case::type_owner_changed(|_, owner, _, _| ChainEvent::ServiceTypeOwnerChanged(ServiceType::GVPN_EXIT, Some(owner)))]
+    #[case::type_requirement_changed(
+        |_, owner, _, _| ChainEvent::ServiceTypeRequirementChanged(ServiceType::GVPN_EXIT, Some(owner))
+    )]
+    #[case::type_registration_burn_changed(
+        |_, _, _, burn| ChainEvent::ServiceTypeRegistrationBurnChanged(ServiceType::GVPN_EXIT, burn)
+    )]
+    #[case::type_update_burn_changed(
+        |_, _, _, burn| ChainEvent::ServiceTypeUpdateBurnChanged(ServiceType::GVPN_EXIT, burn)
+    )]
+    #[case::type_registration_fee_changed(|_, _, _, burn| ChainEvent::ServiceTypeRegistrationFeeChanged(burn))]
+    #[case::registry_pointer_changed(|_, owner, _, _| ChainEvent::ServiceRegistryPointerChanged(owner))]
+    #[tokio::test]
+    async fn service_events_are_ignored_without_stopping_processing(
+        #[case] make_event: MakeServiceEvent,
+    ) -> anyhow::Result<()> {
+        let (src_offchain, src_chain) = make_keypairs();
+        let (dst_offchain, dst_chain) = make_keypairs();
+        let src_addr = src_chain.public().to_address();
+        let dst_addr = dst_chain.public().to_address();
+        let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
+
+        let now = SystemTime::now();
+        let entry = ServiceEntry::new(
+            ServiceType::GVPN_EXIT,
+            dst_addr,
+            src_addr,
+            ServiceMetadata::try_from(b"exit-node".to_vec())?,
+            now,
+            now,
+        )?;
+        let event = make_event(dst_addr, src_addr, entry, HoprBalance::from(7u64));
+
+        // Held here rather than inside `run`, so the values after the run can be inspected.
+        let ticket_price = Arc::new(RwLock::new(HoprBalance::from(10u64)));
+        let win_probability = Arc::new(RwLock::new(WinningProbability::ALWAYS));
+        let graph = RecordingGraph::default();
+
+        // The trailing channel event is the regression guard: an arm that panicked or
+        // short-circuited the loop would swallow everything behind it.
+        let events = vec![
+            event,
+            ChainEvent::ChannelOpened(channel(src_addr, dst_addr, 100, ChannelStatus::Open)),
+        ];
+
+        process_chain_events(
+            stub,
+            graph.clone(),
+            MemorySurbStore::default(),
+            futures::stream::iter(events),
+            src_addr,
+            *src_offchain.public(),
+            ticket_price.clone(),
+            win_probability.clone(),
+            None,
+        )
+        .await;
+
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::Balance::from(10u64)],
+            "only the unconditional startup face-value seed should be recorded"
+        );
+        assert_eq!(
+            *ticket_price.read(),
+            HoprBalance::from(10u64),
+            "a service event must not change the ticket price"
+        );
+        assert_eq!(
+            win_probability.read().as_f64(),
+            WinningProbability::ALWAYS.as_f64(),
+            "a service event must not change the winning probability"
+        );
+        assert!(graph.nodes().is_empty(), "a service event must not record a graph node");
+
+        let edges = graph.edges();
+        assert_eq!(
+            edges.len(),
+            1,
+            "only the channel event may record an edge, and it must still be routed"
+        );
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::Balance::from(100u64)),
+            "the balance inputs must have survived the service event"
+        );
+        assert_eq!(edges[0].src, *src_offchain.public());
+        assert_eq!(edges[0].dest, *dst_offchain.public());
+
+        Ok(())
     }
 
     // ---------------------------------------------------------------------------

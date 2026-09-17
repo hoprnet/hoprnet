@@ -58,3 +58,22 @@ HOPRD_METRIC_EXPORT_INTERVAL=15000,hopr_session=1000
 
 - Session telemetry metrics are exported via OTLP (`hopr_session_*`).
 - They are not exposed by the Prometheus `/metrics` endpoint.
+
+## PIX Exit Metrics
+
+The PIX Exit surface is split across both exporters, by consumer rather than by subsystem:
+
+- **`hopr_pix_*`** — bounded node-level aggregates: live Sessions and SSA cycles by phase, predeposit exposure,
+  egress and gate pressure, share coverage, cycle outcomes, live-cycle capacity and admission refusals. None is
+  labelled by a Session, cycle, peer or address, so these are the ones to dashboard and alert on. They go to the
+  default provider and therefore **do** appear on `/metrics`.
+- **`hopr_session_pix_*`** — per-Session detail (gate mode, recovery progress, fill rate) plus the bounded
+  per-reason closure and fill-backoff counters. OTLP only, like the rest of `hopr_session_*`.
+
+The routing is by name prefix, so the spelling is what decides the exporter. The full metric contract —
+instrument type, unit, the exact transition that updates each one, its complete label value set, and worked
+PromQL for the questions above — is the module documentation of
+`transport/session/src/telemetry/pix.rs`.
+
+Note that per-Session series are subject to the OpenTelemetry SDK's 2000-per-instrument cardinality limit (see
+issue #8305); the `hopr_pix_*` aggregates are not, by construction.

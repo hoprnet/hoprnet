@@ -31,14 +31,17 @@ pub use manager::{
     max_cycle_budget_for_quota, validate_incoming_session_pix_config,
 };
 pub use supervision::{FillRate, PixFillConfig, SupervisorConfig, validate_pix_supervision};
-/// The supervisor state machine and its event/action vocabulary, for `benches/supervisor_bench.rs`.
+/// The supervisor state machine and its event/action vocabulary, for `benches/supervisor_bench.rs`,
+/// and the egress gate, for `benches/gate_bench.rs`.
 ///
 /// Behind the same `benchmark` gate as
 /// [`SessionManager::pre_populate_session`](crate::SessionManager::pre_populate_session), and for
 /// the same reason: a criterion bench is a separate crate, so a path that is `pub(crate)` is a path
 /// it cannot measure. Nothing here is part of the crate's supported surface.
 #[cfg(any(feature = "benchmark", test))]
-pub use supervision::{SessionPixAction, SessionPixEvent, SessionPixSupervisor};
+pub use supervision::{
+    GateBlockReason, GateClosed, GateVerdict, ServiceGate, SessionPixAction, SessionPixEvent, SessionPixSupervisor,
+};
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
@@ -55,7 +58,7 @@ pub use types::{
     SessionAdmissionSink, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
-pub use utils::transfer_session;
+pub use utils::{transfer_session, transfer_session_datagram};
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 ///
@@ -83,7 +86,20 @@ flagset::flags! {
         ///
         /// Implies [`Segmentation`].
         RetransmissionNack = 0b000_1010,
-        /// Disable packet buffering.
+        /// UDP-like behavior: disable packet buffering, and — on stateless (non-retransmitting)
+        /// sessions — preserve datagram boundaries by emitting each write as exactly one frame
+        /// (delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
+        /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
+        /// coalesced. On reliable (retransmitting) sessions only the buffering behavior applies;
+        /// boundary preservation is stateless-only (the NACK missing-segment bitmap cannot address
+        /// the segments of an oversized datagram frame).
+        ///
+        /// Boundary preservation holds only up to the reader's buffer: a single read cannot return
+        /// more bytes than its buffer, so a datagram larger than the peer's read buffer is still
+        /// delivered in multiple reads. Callers must therefore size the read buffer for the largest
+        /// datagram they need preserved. In the UDP-forwarding path the datagram size is bounded at
+        /// ingress by the forwarding buffer (`HOPR_UDP_BUFFER_SIZE`), so it never exceeds it there;
+        /// a datagram-mode frame may otherwise be as large as `64 * SESSION_MTU`.
         ///
         /// Implies [`Segmentation`].
         NoDelay = 0b0000_1001,
@@ -95,7 +111,9 @@ flagset::flags! {
         NoRateControl = 0b0001_0000,
         /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
         ///
-        /// The upper half of additional data may be used to configure the PIX protocol parameters.
+        /// The Exit may still refuse the Session if the offered quota
+        /// (from this node's  [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator)) falls
+        /// outside its acceptable range, or (with `enforce_pix`) if this flag is *absent*.
         UsePIX = 0b0010_0000,
     }
 }
@@ -130,32 +148,17 @@ pub struct SessionClientConfig {
     /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
     /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
     ///
+    /// It also opts out of the SURB balancer's control over organic production entirely. With the
+    /// default `false`, a data packet carries *at most* one SURB and none at all while the
+    /// counterparty is estimated to be at its target buffer size — which is what stops SURBs (and
+    /// the PIX shares they carry) being delivered into a full buffer that discards them. Setting
+    /// this to `true` keeps producing regardless of that estimate.
+    ///
     /// Set this to `true` only when the underlying traffic is highly asymmetric.
     ///
     /// Default is `false`.
     #[default(false)]
     pub always_max_out_surbs: bool,
-    /// PIX parameters for SSAs.
-    ///
-    /// When not set, the Session will not advertise any PIX capability and may
-    /// get refused by the Exit (if it requires PIX).
-    ///
-    /// The Exit may also refuse to accept the Session if the given values
-    /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
-    ///
-    /// These are not free parameters: the shares this node puts on the wire come from the installed
-    /// [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator), so
-    /// [`SessionManager::new_session`] refuses any value that disagrees with it rather than
-    /// advertising dimensions it cannot honour. Setting this is therefore an assertion about the
-    /// node's own PIX configuration — build it with
-    /// [`PixParams::try_from_config`](hopr_protocol_pix::PixParams::try_from_config) over that
-    /// generator's config if you do not want to restate it.
-    ///
-    /// The fourth component, the curve suite, is fixed by how this node was built rather than
-    /// configured; [`LOCAL_PIX_SUITE`] names it for anyone restating the values by hand.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session.
     ///
     /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the

@@ -203,7 +203,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management,
                     always_max_out_surbs: false,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -253,7 +252,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -537,8 +535,8 @@ pub struct TestNodeConfig {
     /// Session idle timeout in milliseconds (default 2500).
     pub idle_timeout_ms: u64,
     /// Optional PIX global config override (num_ssa_parts, ssa_part_size).
-    /// When set, configures the transport-level SsaShareGenerator dimensions.
-    /// Must match the dimensions used in pix_ssa_quota for PIX sessions.
+    /// When set, configures the transport-level SsaShareGenerator dimensions, which is what
+    /// every PIX Session on this node announces — the dimensions are not per-Session.
     pub pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     /// Optional simulated transit latency for this node's packet forwarder.
     ///
@@ -546,6 +544,11 @@ pub struct TestNodeConfig {
     /// Gaussian-jittered FIFO delay (see [`TransitLatencyConfig`]) — simulating
     /// WAN-link latency in a local cluster.  `None` (the default) means no extra delay.
     pub transit_latency: Option<TransitLatencyConfig>,
+    /// Optional packet-pipeline concurrency override for this node.
+    ///
+    /// `None` (the default) uses the CPU-derived defaults. Set it to pin a node's decode/encode
+    /// concurrency — e.g. `input_concurrency = Some(1)` to reproduce the pre-fix collapse.
+    pub pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
 }
 
 impl Default for TestNodeConfig {
@@ -556,6 +559,7 @@ impl Default for TestNodeConfig {
             idle_timeout_ms: 2500,
             pix_global_config: None,
             transit_latency: None,
+            pipeline: None,
         }
     }
 }
@@ -564,10 +568,7 @@ impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
         Self {
             win_prob,
-            incoming_pix_config: None,
-            idle_timeout_ms: 2500,
-            pix_global_config: None,
-            transit_latency: None,
+            ..Self::default()
         }
     }
 }
@@ -675,6 +676,15 @@ pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
 /// Identical to [`stress_cluster_fixture`] but sets `transit_latency` on every
 /// node so the packet forwarder injects a Gaussian-jittered FIFO delay — simulating
 /// a WAN link (e.g. mean=50ms, std_dev=5ms) in a local cluster.
+/// [`stress_cluster_fixture`] with explicit per-node configs (stress funding + `CountOnly` echo).
+///
+/// Lets a test set a per-node [`TestNodeConfig::pipeline`] override (e.g. pin `input_concurrency`)
+/// while keeping the high-volume stress chain funding. Each config's `win_prob` should be set to
+/// [`STRESS_WIN_PROB`] to match the stress chain client.
+pub fn stress_cluster_fixture_with_configs(configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    cluster_fixture_inner(configs, build_stress_blokli_client(), EchoMode::CountOnly)
+}
+
 pub fn stress_cluster_fixture_with_latency(win_prob: f64, n: usize, latency: TransitLatencyConfig) -> ClusterGuard {
     let configs = vec![
         TestNodeConfig {
@@ -759,6 +769,7 @@ fn cluster_fixture_inner(
             let idle_timeout_ms = configs[i].idle_timeout_ms;
             let pix_global_config = configs[i].pix_global_config;
             let transit_latency = configs[i].transit_latency;
+            let pipeline = configs[i].pipeline;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -808,6 +819,7 @@ fn cluster_fixture_inner(
                         idle_timeout_ms,
                         pix_global_config,
                         transit_latency,
+                        pipeline,
                     );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
@@ -926,6 +938,29 @@ pub async fn build_role_cluster(
     relay_cfgs: Vec<TestNodeConfig>,
     exit_cfg: TestNodeConfig,
 ) -> anyhow::Result<RoleClusterGuard> {
+    build_role_cluster_with_exit_server(entry_cfg, relay_cfgs, exit_cfg, EchoServer::new()).await
+}
+
+/// [`build_role_cluster`] with the Exit's session server under the caller's control.
+///
+/// Only the Exit's server is swappable, because the Entry and the relays never receive an incoming
+/// Session in these clusters — the Entry opens them and the relays only forward. A test that needs to
+/// *hold* the Exit-side `IncomingSession` rather than have it echoed passes
+/// [`SessionCaptureServer`](super::dummies::SessionCaptureServer) here, which is what makes the Exit
+/// side of a Session closable from the test.
+pub async fn build_role_cluster_with_exit_server<Srv>(
+    entry_cfg: TestNodeConfig,
+    relay_cfgs: Vec<TestNodeConfig>,
+    exit_cfg: TestNodeConfig,
+    exit_server: Srv,
+) -> anyhow::Result<RoleClusterGuard>
+where
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+{
     let total_size = 1 + relay_cfgs.len() + 1;
     if !(3..=SWARM_N).contains(&total_size) {
         anyhow::bail!("total cluster size {total_size} must be between 3 and {SWARM_N}");
@@ -969,6 +1004,10 @@ pub async fn build_role_cluster(
                 .with_mutator(FullStateEmulator::new(safes[i].module_address));
             let is_entry = i == 0;
             let is_exit = i == total_size - 1;
+            // Cloned per thread rather than moved: only the Exit's branch reads it, but each thread's
+            // closure must own something, and the server is `Clone` precisely so a captured session
+            // handle can be shared back out to the test.
+            let exit_server = exit_server.clone();
 
             std::thread::spawn(move || {
                 let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -1011,6 +1050,7 @@ pub async fn build_role_cluster(
                         cfg.idle_timeout_ms,
                         cfg.pix_global_config,
                         cfg.transit_latency,
+                        cfg.pipeline,
                     );
 
                     let prober = Some(hopr_ct_full_network::ProberConfig {
@@ -1036,7 +1076,7 @@ pub async fn build_role_cluster(
                             config,
                             prober,
                             connector.clone(),
-                            EchoServer::new(),
+                            exit_server,
                         )
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))

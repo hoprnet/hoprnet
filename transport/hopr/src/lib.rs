@@ -76,8 +76,6 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
 use hopr_transport_session::{
     AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
     SessionManagerConfig,
@@ -90,6 +88,8 @@ pub use hopr_transport_session::{
 };
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 use hopr_utils::{
     network_types::{
@@ -828,12 +828,13 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        // The SSA generator is dimensioned from the global PIX config (not per
-        // session) because `handle_ssa_request` (SessionManager) validates that the
-        // Exit's negotiated quota matches the session's `pix_ssa_quota` before any
-        // client commitments are generated, and the Exit's `new_exit_commitment`
-        // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
-        // a subset of what the global generator covers, so one generator suffices.
+        // The SSA generator is dimensioned from the global PIX config, and that is the only place
+        // the dimensions come from: `new_session` reads them straight off this generator to build
+        // what it announces, so every PIX Session on this node is established at exactly these
+        // values and one generator suffices. `handle_ssa_request` (SessionManager) then holds the
+        // Exit to them, rejecting a negotiated quota that differs before any client commitments are
+        // generated. `new_exit_commitment` itself adds no range check — a `PixParams` can only
+        // come from `try_new`, which is what bounds polys_per_ssa and shares_per_poly.
         //
         // Validated here rather than left to the constructor: `PixGlobalConfig` carries more than
         // the three fields `SsaGeneratorConfig` covers, and this used to be a SAFETY comment
