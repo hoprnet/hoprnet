@@ -316,7 +316,7 @@ fn cause_label(cause: RemovalCause) -> &'static str {
     }
 }
 
-/// Per-cause evictions from one cache in the current interval; `Explicit` removals are deliberate, not evictions.
+/// Per-cause evictions from one cache this interval; `Explicit` removals are deliberate, not evictions.
 #[derive(Debug, Default)]
 struct CauseCounts {
     expired: AtomicU64,
@@ -358,7 +358,7 @@ impl ClosedCounts {
     }
 }
 
-/// Per-cache, per-cause eviction counts reported once per interval (GNO-793: per-entry lines flooded the log).
+/// Eviction counts per cache and cause, reported once per interval (GNO-793: per-entry lines flooded the log).
 struct EvictionStats {
     interval: Duration,
     warn_threshold: u64,
@@ -393,7 +393,7 @@ impl EvictionStats {
         self.close_interval_if_elapsed(now)
     }
 
-    /// No async runtime here, so the first eviction after the interval elapses closes it: a quiet store reports late.
+    /// No runtime here, so the first eviction past the interval closes it: a quiet store reports late, not never.
     fn close_interval_if_elapsed(&self, now: Instant) -> Option<EvictionReport> {
         let mut started_at = self.interval_started_at.lock();
         if now.duration_since(*started_at) < self.interval {
