@@ -634,11 +634,11 @@ where
         // heap, so cross-destination packets are mixed together rather than each destination
         // getting its own independent delay queue. The single forwarder task owns the receiver
         // (and therefore the heap timer) — no per-clone waker coordination is needed.
-        let mut mixer_cfg = self.cfg.mixer;
-        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
-            .unwrap_or(u64::MAX)
-            .max(1);
-        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
+        let mixer_cfg = self.cfg.mixer;
+        // The mixer implementation is selected at runtime from `mixer_cfg.mixer_type`; every
+        // engine exposes the same `Sink`/`Stream` surface, so the pipeline and forwarder below
+        // are agnostic to which one runs.
+        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::create(mixer_cfg);
         let transit_latency_cfg = self.cfg.transit_latency;
         processes.insert(
             HoprTransportProcess::MixerForwarder,
