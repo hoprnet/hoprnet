@@ -225,6 +225,17 @@ pub struct MemorySurbStore {
     cfg: Arc<SurbStoreConfig>,
 }
 
+/// Idle expiry is routine and per-entry (thousands/min under load): `debug`; other causes mean pressure: `warn`.
+macro_rules! log_eviction {
+    ($cause:expr, $($field:tt)*) => {
+        if $cause == RemovalCause::Expired {
+            tracing::debug!($($field)*);
+        } else {
+            tracing::warn!($($field)*);
+        }
+    };
+}
+
 impl MemorySurbStore {
     /// Creates a new instance with the given configuration.
     pub fn new(cfg: SurbStoreConfig) -> Self {
@@ -236,7 +247,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    log_eviction!(cause, ?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
                 .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
@@ -246,7 +257,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    log_eviction!(cause, %pseudonym, ?cause, "evicting surb for pseudonym");
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
@@ -411,7 +422,8 @@ impl SurbStore for MemorySurbStore {
                     .eviction_policy(moka::policy::EvictionPolicy::lru())
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(
+                            log_eviction!(
+                                cause,
                                 pseudonym = %sender_id.pseudonym(),
                                 surb_id = const_hex::encode(id.as_slice()),
                                 ?cause,
