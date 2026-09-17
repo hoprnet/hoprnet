@@ -228,9 +228,3 @@ ignored = [
   "hopr-session-server-forwarder",
   "hopr-utils-session",
 ]
-
-# TEMPORARY: consume the unpublished hopr-utilities compat/v4 pool-arbitration branch so the whole
-# stack verifies end-to-end before 0.9.3 is published. Remove once hopr-utilities 0.9.3 is on
-# crates.io — the version requirement above then resolves normally.
-[patch.crates-io]
-hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", branch = "kauki/feat/parallelize/pool-arbitration-v4" }
