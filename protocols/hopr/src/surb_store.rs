@@ -1,9 +1,6 @@
 use std::{
     collections::VecDeque,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -316,55 +313,43 @@ fn cause_label(cause: RemovalCause) -> &'static str {
     }
 }
 
-/// Per-cause evictions from one cache this interval; `Explicit` removals are deliberate, not evictions.
-#[derive(Debug, Default)]
-struct CauseCounts {
-    expired: AtomicU64,
-    size: AtomicU64,
-    replaced: AtomicU64,
-}
-
-impl CauseCounts {
-    fn counter(&self, cause: RemovalCause) -> Option<&AtomicU64> {
-        match cause {
-            RemovalCause::Expired => Some(&self.expired),
-            RemovalCause::Size => Some(&self.size),
-            RemovalCause::Replaced => Some(&self.replaced),
-            RemovalCause::Explicit => None,
-        }
-    }
-
-    /// Reads and resets the counts, closing them off for a report.
-    fn take(&self) -> ClosedCounts {
-        ClosedCounts {
-            expired: self.expired.swap(0, Ordering::Relaxed),
-            size: self.size.swap(0, Ordering::Relaxed),
-            replaced: self.replaced.swap(0, Ordering::Relaxed),
-        }
-    }
-}
-
-/// Evictions from one cache over one completed report interval, by cause.
+/// Evictions from one cache in one report interval, by cause.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct ClosedCounts {
+struct EvictionCounts {
     expired: u64,
     size: u64,
     replaced: u64,
 }
 
-impl ClosedCounts {
+impl EvictionCounts {
+    /// `Explicit` removals are deliberate (a used opener, an invalidation), not evictions, so they are skipped.
+    fn bump(&mut self, cause: RemovalCause) {
+        match cause {
+            RemovalCause::Expired => self.expired += 1,
+            RemovalCause::Size => self.size += 1,
+            RemovalCause::Replaced => self.replaced += 1,
+            RemovalCause::Explicit => {}
+        }
+    }
+
     fn total(&self) -> u64 {
         self.expired + self.size + self.replaced
     }
+}
+
+/// The interval being counted right now.
+#[derive(Debug)]
+struct IntervalState {
+    started_at: Instant,
+    /// Parallel to [`EvictedCache::ALL`].
+    counts: [EvictionCounts; 4],
 }
 
 /// Eviction counts per cache and cause, reported once per interval (GNO-793: per-entry lines flooded the log).
 struct EvictionStats {
     interval: Duration,
     warn_threshold: u64,
-    /// Parallel to [`EvictedCache::ALL`].
-    counts: [CauseCounts; 4],
-    interval_started_at: parking_lot::Mutex<Instant>,
+    state: parking_lot::Mutex<IntervalState>,
 }
 
 impl EvictionStats {
@@ -372,8 +357,10 @@ impl EvictionStats {
         Self {
             interval: cfg.eviction_report_interval.max(MINIMUM_EVICTION_REPORT_INTERVAL),
             warn_threshold: cfg.eviction_report_threshold,
-            counts: Default::default(),
-            interval_started_at: parking_lot::Mutex::new(Instant::now()),
+            state: parking_lot::Mutex::new(IntervalState {
+                started_at: Instant::now(),
+                counts: Default::default(),
+            }),
         }
     }
 
@@ -385,29 +372,30 @@ impl EvictionStats {
 
     /// Closes the interval if `now` is past it, then counts one eviction; returns the closed interval's counts.
     fn record_at(&self, cache: EvictedCache, cause: RemovalCause, now: Instant) -> Option<EvictionReport> {
-        // Closing first keeps an eviction at or past the boundary out of the interval it ends.
-        let report = self.close_interval_if_elapsed(now);
-        if let Some(counter) = self.counts[cache as usize].counter(cause) {
-            counter.fetch_add(1, Ordering::Relaxed);
-            #[cfg(all(feature = "telemetry", not(test)))]
+        // One lock for check, drain and count, so a rollover cannot split an eviction from its interval.
+        let mut state = self.state.lock();
+        let report = self.close_interval_if_elapsed(&mut state, now);
+        state.counts[cache as usize].bump(cause);
+        drop(state);
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        if cause != RemovalCause::Explicit {
             METRIC_SURB_STORE_EVICTIONS.increment(&[cache.into(), cause_label(cause)]);
         }
         report
     }
 
     /// No runtime here, so the first eviction past the interval closes it: a quiet store reports late, not never.
-    fn close_interval_if_elapsed(&self, now: Instant) -> Option<EvictionReport> {
-        let mut started_at = self.interval_started_at.lock();
-        if now.duration_since(*started_at) < self.interval {
+    fn close_interval_if_elapsed(&self, state: &mut IntervalState, now: Instant) -> Option<EvictionReport> {
+        if now.duration_since(state.started_at) < self.interval {
             return None;
         }
-        *started_at = now;
-        // Still under the lock: only one closer takes the counters, so no eviction is reported twice.
-        let per_cache = EvictedCache::ALL.map(|cache| (cache, self.counts[cache as usize].take()));
+        state.started_at = now;
+        let counts = std::mem::take(&mut state.counts);
         Some(EvictionReport {
             interval: self.interval,
             warn_threshold: self.warn_threshold,
-            per_cache,
+            per_cache: EvictedCache::ALL.map(|cache| (cache, counts[cache as usize])),
         })
     }
 }
@@ -417,11 +405,11 @@ impl EvictionStats {
 struct EvictionReport {
     interval: Duration,
     warn_threshold: u64,
-    per_cache: [(EvictedCache, ClosedCounts); 4],
+    per_cache: [(EvictedCache, EvictionCounts); 4],
 }
 
 impl EvictionReport {
-    fn counts(&self, cache: EvictedCache) -> ClosedCounts {
+    fn counts(&self, cache: EvictedCache) -> EvictionCounts {
         self.per_cache[cache as usize].1
     }
 
@@ -929,6 +917,8 @@ impl<S> SurbRingBuffer<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use anyhow::Context;
     use hopr_api::types::crypto::{crypto_traits::Randomizable, prelude::SecretKey16};
     use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
@@ -1920,7 +1910,7 @@ mod tests {
 
         assert_eq!(
             report.counts(EvictedCache::ReplyOpener),
-            ClosedCounts {
+            EvictionCounts {
                 expired: 3,
                 size: 2,
                 replaced: 0
@@ -1928,7 +1918,7 @@ mod tests {
         );
         assert_eq!(
             report.counts(EvictedCache::SurbRing),
-            ClosedCounts {
+            EvictionCounts {
                 expired: 0,
                 size: 0,
                 replaced: 1
@@ -1937,17 +1927,17 @@ mod tests {
         );
         assert_eq!(
             report.counts(EvictedCache::Generation),
-            ClosedCounts::default(),
+            EvictionCounts::default(),
             "the eviction that closes an interval belongs to the next one"
         );
-        assert_eq!(report.counts(EvictedCache::ReplyOpenerBatch), ClosedCounts::default());
+        assert_eq!(report.counts(EvictedCache::ReplyOpenerBatch), EvictionCounts::default());
 
         let next = stats
             .record_at(EvictedCache::SurbRing, RemovalCause::Explicit, t0 + 2 * REPORT_INTERVAL)
             .context("second interval has elapsed")?;
         assert_eq!(
             next.counts(EvictedCache::Generation),
-            ClosedCounts {
+            EvictionCounts {
                 expired: 1,
                 size: 0,
                 replaced: 0
@@ -2069,12 +2059,13 @@ mod tests {
     #[test]
     fn eviction_stats_should_log_when_a_real_eviction_closes_the_interval() -> anyhow::Result<()> {
         let stats = eviction_stats(0);
-        *stats.interval_started_at.lock() = Instant::now()
-            .checked_sub(2 * REPORT_INTERVAL)
-            .context("monotonic clock must be at least two intervals old")?;
-        stats.counts[EvictedCache::SurbRing as usize]
-            .expired
-            .fetch_add(1, Ordering::Relaxed);
+        {
+            let mut state = stats.state.lock();
+            state.started_at = Instant::now()
+                .checked_sub(2 * REPORT_INTERVAL)
+                .context("monotonic clock must be at least two intervals old")?;
+            state.counts[EvictedCache::SurbRing as usize].expired += 1;
+        }
 
         let recorder = Arc::new(RecordingSubscriber::default());
         tracing::subscriber::with_default(recorder.clone(), || {
@@ -2113,7 +2104,7 @@ mod tests {
             EvictedCache::SurbRing,
             EvictedCache::Generation,
         ] {
-            let size_evictions = store.stats.counts[cache as usize].size.load(Ordering::Relaxed);
+            let size_evictions = store.stats.state.lock().counts[cache as usize].size;
             assert!(
                 size_evictions > 0,
                 "{cache} overflowed, so its size evictions must be counted"
@@ -2126,9 +2117,7 @@ mod tests {
     fn memory_surb_store_should_count_size_evictions_of_flooded_reply_openers() {
         let (client, _) = flooded_client(MINIMUM_OPENERS_PER_PSEUDONYM, 3 * MINIMUM_OPENERS_PER_PSEUDONYM as u64);
 
-        let size_evictions = client.stats.counts[EvictedCache::ReplyOpener as usize]
-            .size
-            .load(Ordering::Relaxed);
+        let size_evictions = client.stats.state.lock().counts[EvictedCache::ReplyOpener as usize].size;
         assert!(
             size_evictions > 0,
             "the flood overflowed the opener cache, so its size evictions must be counted"
