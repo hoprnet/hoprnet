@@ -2926,7 +2926,8 @@ where
                     slot_guard.commit();
                     Ok(session)
                 } else {
-                    warn!(%session_id, "session ready without SURB balancing");
+                    // Routine for short-lived sessions (health checks, bridges); not a fault.
+                    tracing::debug!(%session_id, "session ready without SURB balancing");
 
                     // Counted here too, unlike `surb_estimator`: the PIX successor gate reads this,
                     // and a knob that binds on some Sessions and not others is how a deposit gate
