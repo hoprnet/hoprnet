@@ -3773,9 +3773,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.19"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef8e5e5a340588f4452631496976cf8636d4a7ecf600239fdc27615d2530bc16"
+checksum = "839c0e8a181239723652be9062bb56ca5bf5f64011f73b623f6f4fc59086a228"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4303,7 +4303,6 @@ dependencies = [
  "bloomfilter",
  "bytes",
  "cfg_eval",
- "const-hex",
  "criterion",
  "hex-literal",
  "hopr-api",
@@ -4583,7 +4582,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -1838,12 +1838,14 @@ impl PixToolbox {
 /// What is announced is built from the installed [`SsaShareGenerator`]'s
 /// [`SsaGeneratorConfig`](hopr_protocol_pix::SsaGeneratorConfig), never from the caller: the
 /// generator is what produces the shares that go on the wire, so advertising anything else would
-/// let the Session proceed while emitting shares the Exit cannot reconstruct. The caller's
-/// `pix_ssa_quota` is an assertion about this node's own PIX configuration, and a disagreement is
-/// refused so a caller whose belief is stale fails loudly rather than silently getting a different
-/// per-SSA quota — and so differently sized deposits — than it sized for. That check runs before
-/// the initiation challenge slot is reserved, so repeated misconfigurations cannot exhaust
-/// challenge slots.
+/// let the Session proceed while emitting shares the Exit cannot reconstruct. The dimensions are
+/// therefore not configurable per Session — [`Capability::UsePIX`] is the whole per-Session switch,
+/// and a node with no PIX toolbox installed refuses the Session. That check runs before the
+/// initiation challenge slot is reserved, so a node that cannot serve PIX at all cannot have its
+/// challenge slots exhausted by repeated requests for it.
+///
+/// The caller never needs to know the resulting quota in advance: it is computed node-side and
+/// handed back per SSA in [`AgreedSsaQuota::quota_per_ssa`], which is what sizes the deposit.
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
@@ -2624,10 +2626,6 @@ where
                 .into());
             }
 
-            let requested = cfg
-                .pix_ssa_quota
-                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
-
             // Validate that PIX toolbox is available before advertising UsePIX
             let pix_toolbox = self
                 .pix_toolbox
@@ -2635,24 +2633,17 @@ where
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
 
             // The installed generator is what actually produces the shares that go on the wire, so
-            // it — not the caller — is the source of the announced parameters. The requested value
-            // is an assertion about this node's own PIX configuration, checked so that a caller
-            // whose belief is stale fails loudly instead of silently getting different dimensions
-            // (and so a different per-SSA quota, and so differently sized deposits) than it sized
-            // for. Advertising the caller's value instead would let the Session proceed while
-            // producing shares the Exit cannot reconstruct.
+            // it — not the caller — is the source of the announced parameters. Letting a caller name
+            // them instead would allow a Session to proceed while producing shares the Exit cannot
+            // reconstruct, so the dimensions are not a per-Session choice at all: `UsePIX` is the
+            // whole switch, and everything downstream (the per-SSA quota, and so the deposit amount
+            // reported to the funding strategy in `AgreedSsaQuota`) is derived from what follows.
             // The same source for the dimensions and for the curve suite: `HoprPixSpec` is what the
             // installed generator is instantiated over, so the announced suite cannot disagree with
             // the one that will actually produce the shares.
             let gen_cfg = pix_toolbox.share_generator.config();
             let params = PixParams::try_from_config::<HoprPixSpec>(gen_cfg)
                 .map_err(|error| SessionManagerError::Other(anyhow!("invalid PIX dimensions: {error}")))?;
-            if requested != params {
-                return Err(SessionManagerError::Unacceptable(format!(
-                    "requested PIX parameters {requested} do not match installed generator ({params})"
-                ))
-                .into());
-            }
 
             let _ = current_ssa_state.set(SessionSsaState::new(params));
             additional_data = params.into_additional_data(additional_data as u32);
@@ -2935,7 +2926,8 @@ where
                     slot_guard.commit();
                     Ok(session)
                 } else {
-                    warn!(%session_id, "session ready without SURB balancing");
+                    // Routine for short-lived sessions (health checks, bridges); not a fault.
+                    tracing::debug!(%session_id, "session ready without SURB balancing");
 
                     // Counted here too, unlike `surb_estimator`: the PIX successor gate reads this,
                     // and a knob that binds on some Sessions and not others is how a deposit gate
@@ -8753,7 +8745,6 @@ mod tests {
                     pseudonym: Some(HoprPseudonym::random()),
                     capabilities: Capability::Segmentation.into(),
                     surb_management: None,
-                    pix_ssa_quota: None,
                     ..Default::default()
                 },
             )
@@ -10139,7 +10130,6 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(0.try_into()?),
                     ..Default::default()
@@ -10167,43 +10157,29 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that `new_session` rejects UsePIX when the requested
-    /// `pix_ssa_quota` doesn't match the installed `SsaShareGenerator`'s configured dimensions.
+    /// Verifies that `new_session` rejects `UsePIX` on a node with no `PixToolbox` installed.
     ///
-    /// ## Steps
-    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3, surplus=5)`.
-    /// 2. Start the manager with that toolbox installed.
-    /// 3. Call `new_session` requesting `pix_ssa_quota: Some(PixParams::try_new(10, 10, 5))` — every value is within
-    ///    protocol bounds but mismatches the generator.
-    /// 4. Assert the error identifies the mismatch.
-    /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
+    /// Since the announced dimensions are read off the installed generator rather than named by the
+    /// caller, the presence of that generator is the *only* precondition left for an outgoing PIX
+    /// Session — there is no longer a caller-supplied value whose absence would fail first. A node
+    /// that advertised `UsePIX` without one would establish a Session it cannot produce a single
+    /// share for.
+    ///
+    /// The return path carries 2 intermediate hops so the zero-hop guard above cannot be what
+    /// rejects this, and the assertion names the toolbox error specifically for the same reason.
     #[test_log::test(tokio::test)]
-    async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
-
-        // The surplus is at the threshold rather than above it: `surplus_must_not_exceed_threshold`
-        // began rejecting the latter when the surplus became a billed ratio, and this fixture was
-        // left behind at 5-against-3, which made the generator itself unconstructible.
-        let ssa_gen_config = SsaGeneratorConfig {
-            polynomials_per_ssa: 5,
-            threshold: 3,
-            surplus_shares: 3,
-        };
-        let (pix_toolbox, _) = PixToolbox::new(
-            Arc::new(SsaShareGenerator::new(ssa_gen_config)),
-            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
-        );
-
+    async fn new_session_rejects_usepix_when_no_pix_toolbox_is_installed() -> anyhow::Result<()> {
         let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(Default::default());
 
         let mut transport = MockMsgSender::new();
-        // The error happens before any message is sent, so expect NO sends.
+        // The error happens before any message is sent, so expect_send_message should NOT fire.
         transport.expect_send_message().times(0);
 
         let (sender, _handle) = mock_packet_planning(transport);
         let (new_session_tx, _) = futures::channel::mpsc::channel(1);
-        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
+        // `None` for the toolbox: this is a node that cannot serve PIX at all.
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
         assert!(mgr.is_started());
 
         let result = mgr
@@ -10213,8 +10189,6 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    // Every dimension passes protocol bounds but polys=10 != generator's 5
-                    pix_ssa_quota: Some(PixParams::try_new(10, 10, 5, LOCAL_PIX_SUITE)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
                     ..Default::default()
@@ -10222,38 +10196,10 @@ mod tests {
             )
             .await;
 
-        let err = result.unwrap_err();
-        let msg = format!("{err:?}");
+        let msg = format!("{:?}", result.unwrap_err());
         assert!(
-            msg.contains("do not match installed generator"),
-            "expected generator mismatch error, got: {msg}"
-        );
-
-        // A surplus-only mismatch must be rejected too. It is the value with no other consumer —
-        // nothing downstream would notice it being wrong — so if the comparison ever narrows back
-        // to the two priced dimensions, this is what catches it.
-        let result = mgr
-            .new_session(
-                Address::from(&ChainKeypair::random()),
-                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
-                    capabilities: Capability::UsePIX.into(),
-                    surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_new(
-                        ssa_gen_config.polynomials_per_ssa,
-                        ssa_gen_config.threshold,
-                        ssa_gen_config.surplus_shares + 1,
-                        LOCAL_PIX_SUITE,
-                    )?),
-                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
-                    return_path_options: RoutingOptions::Hops(2.try_into()?),
-                    ..Default::default()
-                },
-            )
-            .await;
-        assert!(
-            format!("{:?}", result.unwrap_err()).contains("do not match installed generator"),
-            "a surplus-only mismatch must be rejected"
+            msg.contains("UsePIX requested but no PIX toolbox installed"),
+            "expected missing-toolbox error, got: {msg}"
         );
 
         assert_eq!(mgr.num_active_sessions(), 0);
@@ -10261,7 +10207,7 @@ mod tests {
         assert_eq!(
             mgr.session_initiations.entry_count(),
             0,
-            "session_initiations must remain empty when generator mismatch is rejected"
+            "session_initiations must remain empty when UsePIX is rejected for a missing toolbox"
         );
 
         sender.close_channel();
@@ -11363,7 +11309,7 @@ mod tests {
     }
 
     /// Verifies that the entry/initiator (Alice) rejects a `SsaRequest` from the exit when the
-    /// proposed SSA quota does not match what Alice offered in `pix_ssa_quota`.
+    /// proposed SSA quota does not match what Alice announced from her own installed generator.
     ///
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a generous PIX quota config. Alice's session initiation is

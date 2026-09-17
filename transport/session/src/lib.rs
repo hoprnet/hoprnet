@@ -111,7 +111,9 @@ flagset::flags! {
         NoRateControl = 0b0001_0000,
         /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
         ///
-        /// The upper half of additional data may be used to configure the PIX protocol parameters.
+        /// The Exit may still refuse the Session if the offered quota
+        /// (from this node's  [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator)) falls
+        /// outside its acceptable range, or (with `enforce_pix`) if this flag is *absent*.
         UsePIX = 0b0010_0000,
     }
 }
@@ -157,27 +159,6 @@ pub struct SessionClientConfig {
     /// Default is `false`.
     #[default(false)]
     pub always_max_out_surbs: bool,
-    /// PIX parameters for SSAs.
-    ///
-    /// When not set, the Session will not advertise any PIX capability and may
-    /// get refused by the Exit (if it requires PIX).
-    ///
-    /// The Exit may also refuse to accept the Session if the given values
-    /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
-    ///
-    /// These are not free parameters: the shares this node puts on the wire come from the installed
-    /// [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator), so
-    /// [`SessionManager::new_session`] refuses any value that disagrees with it rather than
-    /// advertising dimensions it cannot honour. Setting this is therefore an assertion about the
-    /// node's own PIX configuration — build it with
-    /// [`PixParams::try_from_config`](hopr_protocol_pix::PixParams::try_from_config) over that
-    /// generator's config if you do not want to restate it.
-    ///
-    /// The fourth component, the curve suite, is fixed by how this node was built rather than
-    /// configured; [`LOCAL_PIX_SUITE`] names it for anyone restating the values by hand.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session.
     ///
     /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the

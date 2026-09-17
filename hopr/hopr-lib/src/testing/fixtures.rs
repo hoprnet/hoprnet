@@ -203,7 +203,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management,
                     always_max_out_surbs: false,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -253,7 +252,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -537,8 +535,8 @@ pub struct TestNodeConfig {
     /// Session idle timeout in milliseconds (default 2500).
     pub idle_timeout_ms: u64,
     /// Optional PIX global config override (num_ssa_parts, ssa_part_size).
-    /// When set, configures the transport-level SsaShareGenerator dimensions.
-    /// Must match the dimensions used in pix_ssa_quota for PIX sessions.
+    /// When set, configures the transport-level SsaShareGenerator dimensions, which is what
+    /// every PIX Session on this node announces — the dimensions are not per-Session.
     pub pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     /// Optional simulated transit latency for this node's packet forwarder.
     ///
