@@ -833,8 +833,8 @@ where
         // what it announces, so every PIX Session on this node is established at exactly these
         // values and one generator suffices. `handle_ssa_request` (SessionManager) then holds the
         // Exit to them, rejecting a negotiated quota that differs before any client commitments are
-        // generated, and the Exit's `new_exit_commitment` bounds-checks polys_per_ssa and
-        // shares_per_poly.
+        // generated. `new_exit_commitment` itself adds no range check — a `PixParams` can only
+        // come from `try_new`, which is what bounds polys_per_ssa and shares_per_poly.
         //
         // Validated here rather than left to the constructor: `PixGlobalConfig` carries more than
         // the three fields `SsaGeneratorConfig` covers, and this used to be a SAFETY comment
