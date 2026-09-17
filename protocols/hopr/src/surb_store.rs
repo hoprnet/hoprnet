@@ -2005,6 +2005,123 @@ mod tests {
         Ok(())
     }
 
+    /// Counts events per level; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct RecordingSubscriber {
+        warnings: AtomicU64,
+        debugs: AtomicU64,
+    }
+
+    impl tracing::Subscriber for RecordingSubscriber {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            match *event.metadata().level() {
+                tracing::Level::WARN => self.warnings.fetch_add(1, Ordering::Relaxed),
+                tracing::Level::DEBUG => self.debugs.fetch_add(1, Ordering::Relaxed),
+                _ => 0,
+            };
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    #[test]
+    fn eviction_report_should_log_one_line_per_cache_that_saw_evictions() -> anyhow::Result<()> {
+        let stats = eviction_stats(5);
+        let t0 = Instant::now();
+        for _ in 0..6 {
+            stats.record_at(EvictedCache::ReplyOpener, RemovalCause::Expired, t0);
+        }
+        stats.record_at(EvictedCache::SurbRing, RemovalCause::Size, t0);
+        let report = stats
+            .record_at(EvictedCache::SurbRing, RemovalCause::Explicit, t0 + REPORT_INTERVAL)
+            .context("report due")?;
+
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || report.log());
+
+        assert_eq!(
+            recorder.warnings.load(Ordering::Relaxed),
+            1,
+            "exactly one cache exceeded the threshold"
+        );
+        assert_eq!(
+            recorder.debugs.load(Ordering::Relaxed),
+            1,
+            "one cache saw evictions below the threshold; caches without evictions log nothing"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn eviction_stats_should_log_when_a_real_eviction_closes_the_interval() -> anyhow::Result<()> {
+        let stats = eviction_stats(0);
+        *stats.interval_started_at.lock() = Instant::now()
+            .checked_sub(2 * REPORT_INTERVAL)
+            .context("monotonic clock must be at least two intervals old")?;
+        stats.counts[EvictedCache::SurbRing as usize]
+            .expired
+            .fetch_add(1, Ordering::Relaxed);
+
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || {
+            stats.record(EvictedCache::SurbRing, RemovalCause::Expired)
+        });
+
+        assert_eq!(recorder.warnings.load(Ordering::Relaxed), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_count_evictions_from_every_cache() -> anyhow::Result<()> {
+        // Both caps are floored at 1000 pseudonyms per cache, so 1500 distinct ones overflow all three.
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            max_openers_per_pseudonym: 100,
+            max_pseudonyms: 100,
+            ..Default::default()
+        });
+        let relayer = HoprKeyIdent::from(1u32);
+        let opener = cheap_opener();
+        for _ in 0..1500 {
+            let pseudonym = HoprPseudonym::random();
+            store.insert_reply_opener(
+                HoprSenderId::from_pseudonym_and_id(&pseudonym, [0u8; 8]),
+                opener.clone(),
+            );
+            store.insert_surbs(pseudonym, vec![([0u8; 8], surb_via(relayer, DIRECT)?)]);
+            store.bump_generation(&pseudonym);
+        }
+        store.pseudonym_openers.run_pending_tasks();
+        store.surbs_per_pseudonym.run_pending_tasks();
+        store.generations.run_pending_tasks();
+
+        for cache in [
+            EvictedCache::ReplyOpenerBatch,
+            EvictedCache::SurbRing,
+            EvictedCache::Generation,
+        ] {
+            let size_evictions = store.stats.counts[cache as usize].size.load(Ordering::Relaxed);
+            assert!(
+                size_evictions > 0,
+                "{cache} overflowed, so its size evictions must be counted"
+            );
+        }
+        Ok(())
+    }
+
     #[test]
     fn memory_surb_store_should_count_size_evictions_of_flooded_reply_openers() {
         let (client, _) = flooded_client(MINIMUM_OPENERS_PER_PSEUDONYM, 3 * MINIMUM_OPENERS_PER_PSEUDONYM as u64);
