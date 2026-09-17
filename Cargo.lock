@@ -4303,7 +4303,6 @@ dependencies = [
  "bloomfilter",
  "bytes",
  "cfg_eval",
- "const-hex",
  "criterion",
  "hex-literal",
  "hopr-api",
