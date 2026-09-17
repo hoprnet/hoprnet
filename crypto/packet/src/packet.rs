@@ -19,6 +19,7 @@ use crate::{
         PacketError::{PacketConstructionError, PacketDecodingError},
         Result,
     },
+    expand::KeyExpander,
     por::{ProofOfRelayString, ProofOfRelayValues, derive_ack_key_share, generate_proof_of_relay, pre_verify},
     sphinx::prelude::*,
     types::{HoprPacketMessage, HoprPacketParts, PacketSignals, SurbReceiverInfo},
@@ -61,8 +62,11 @@ struct PathKeyData {
 }
 
 impl PathKeyData {
-    fn new(path: &[OffchainPublicKey]) -> Result<Self> {
-        let shared_keys = HoprSphinxSuite::new_shared_keys(path)?;
+    /// The single place in the protocol where a peer's packet key has to be decompressed; see
+    /// [`KeyExpander`].
+    fn new<X: KeyExpander>(path: &[OffchainPublicKey], expander: &X) -> Result<Self> {
+        let expanded = expander.expand_path(path)?;
+        let shared_keys = HoprSphinxSuite::new_shared_keys_expanded(&expanded)?;
         let (por_strings, (por_values, first_relayer_solution)) = generate_proof_of_relay(&shared_keys.secrets)?;
 
         Ok(Self {
@@ -77,7 +81,10 @@ impl PathKeyData {
     /// Computes `PathKeyData` for the given paths.
     ///
     /// Uses parallel processing if the `rayon` feature is enabled.
-    fn iter_from_paths(paths: Vec<&[OffchainPublicKey]>) -> Result<impl Iterator<Item = Self> + use<>> {
+    fn iter_from_paths<X: KeyExpander>(
+        paths: Vec<&[OffchainPublicKey]>,
+        expander: &X,
+    ) -> Result<impl Iterator<Item = Self> + use<X>> {
         #[cfg(not(feature = "rayon"))]
         let paths = paths.into_iter();
 
@@ -85,7 +92,7 @@ impl PathKeyData {
         let paths = paths.into_par_iter();
 
         paths
-            .map(Self::new)
+            .map(|path| Self::new(path, expander))
             .collect::<Result<Vec<_>>>()
             .map(|paths| paths.into_iter())
     }
@@ -101,18 +108,22 @@ impl PartialHoprPacket {
     /// * `chain_keypair` private key of the local node.
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
+    /// * `expander` supplying the expanded form of the packet keys on the path.
     /// * `pix_share_gen` generator for the pix share.
     /// * `domain_separator` channel contract domain separator.
+    #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
     pub fn new<
         G: EntryShareGenerator<HoprPixSpec>,
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
+        X: KeyExpander,
     >(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
+        expander: &X,
         pix_share_gen: &G,
         domain_separator: &Hash,
     ) -> Result<Self> {
@@ -127,6 +138,7 @@ impl PartialHoprPacket {
                     std::iter::once(forward_path.hops())
                         .chain(return_paths.iter().map(|p| p.hops()))
                         .collect(),
+                    expander,
                 )?;
 
                 let PathKeyData {
@@ -221,7 +233,7 @@ impl PartialHoprPacket {
                     por_strings,
                     por_values,
                     ..
-                } = PathKeyData::new(&[destination])?;
+                } = PathKeyData::new(&[destination], expander)?;
 
                 // Update the ticket with the challenge
                 let ticket = ticket
@@ -526,6 +538,7 @@ impl HoprPacket {
     /// * `chain_keypair` private key of the local node.
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
+    /// * `expander` supplying the expanded form of the packet keys on the path.
     /// * `domain_separator` channel contract domain separator.
     /// * `pix_share_gen` generator of the PIX protocol shares.
     /// * `signals` optional signals passed to the packet's final destination.
@@ -538,6 +551,7 @@ impl HoprPacket {
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
         S: Into<PacketSignals>,
+        X: KeyExpander,
     >(
         msg: &[u8],
         pseudonym: &HoprPseudonym,
@@ -545,6 +559,7 @@ impl HoprPacket {
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
+        expander: &X,
         domain_separator: &Hash,
         pix_share_gen: &G,
         signals: S,
@@ -555,6 +570,7 @@ impl HoprPacket {
             chain_keypair,
             ticket,
             mapper,
+            expander,
             pix_share_gen,
             domain_separator,
         )?
@@ -670,7 +686,7 @@ mod tests {
     use parameterized::parameterized;
 
     use super::*;
-    use crate::types::PacketSignal;
+    use crate::{expand::DirectKeyExpander, types::PacketSignal};
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -782,6 +798,7 @@ mod tests {
             &PEERS[0].0,
             ticket,
             &*MAPPER,
+            &DirectKeyExpander,
             &Hash::default(),
             &ssa_gen,
             FLAGS,
@@ -811,6 +828,7 @@ mod tests {
             &PEERS[sender_node].0,
             ticket,
             &*MAPPER,
+            &DirectKeyExpander,
             &Hash::default(),
             &ssa_gen,
             FLAGS,

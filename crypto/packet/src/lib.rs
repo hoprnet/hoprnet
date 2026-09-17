@@ -20,6 +20,8 @@ pub mod sphinx;
 
 /// Lists all errors in this crate.
 pub mod errors;
+/// Supplies the expanded form of a packet key to the Sphinx sender path.
+pub mod expand;
 /// Implements the overlay packet intermediary object.
 mod packet;
 /// Implements the Proof of Relay.
@@ -35,6 +37,7 @@ pub mod prelude {
 
     pub use super::*;
     pub use crate::{
+        expand::{DirectKeyExpander, KeyExpander},
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },

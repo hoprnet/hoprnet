@@ -159,18 +159,59 @@ pub trait SphinxSuite {
     /// Scalar type supported by the EC group
     type E: Scalar + for<'a> From<&'a Self::P>;
 
+    /// Expanded form of [`Self::P`]'s public key, suitable for EC computations.
+    ///
+    /// Deriving it from the compact [`Keypair::Public`] can be CPU-intensive, which is why it is
+    /// a type of its own: a path can be expanded once and reused across several packets.
+    type ExpandedPublic;
+
     /// EC group element
-    type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
+    type G: GroupElement<Self::E> + for<'a> From<&'a Self::ExpandedPublic>;
 
     /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
     type PRP: crypto_traits::PRP + crypto_traits::KeyIvInit;
 
+    /// Expands a compact public key into [`Self::ExpandedPublic`].
+    ///
+    /// Can be CPU-intensive. Fails if `public_key` is not a valid point on the curve.
+    fn expand_public(
+        public_key: &<Self::P as Keypair>::Public,
+    ) -> hopr_types::crypto::errors::Result<Self::ExpandedPublic>;
+
+    /// Expands an entire path. See [`SphinxSuite::expand_public`].
+    fn expand_path(
+        public_keys: &[<Self::P as Keypair>::Public],
+    ) -> hopr_types::crypto::errors::Result<Vec<Self::ExpandedPublic>> {
+        public_keys.iter().map(|pk| Self::expand_public(pk)).collect()
+    }
+
     /// Convenience function to generate shared keys from the path of public keys.
+    ///
+    /// Expands every key on the path; use [`SphinxSuite::new_shared_keys_expanded`] when the path
+    /// has already been expanded, so that the cost is not paid once per packet.
     fn new_shared_keys<'a>(
         public_keys: &'a [<Self::P as Keypair>::Public],
     ) -> hopr_types::crypto::errors::Result<SharedKeys<Self::E, Self::G>>
     where
         &'a Alpha<<Self::G as GroupElement<Self::E>>::AlphaLen>: From<&'a <Self::P as Keypair>::Public>,
+    {
+        let expanded = Self::expand_path(public_keys)?;
+
+        SharedKeys::generate(
+            expanded
+                .iter()
+                .zip(public_keys)
+                .map(|(expanded, compact)| (expanded.into(), compact.into()))
+                .collect(),
+        )
+    }
+
+    /// As [`SphinxSuite::new_shared_keys`], but for a path that is already expanded.
+    fn new_shared_keys_expanded<'a>(
+        public_keys: &'a [Self::ExpandedPublic],
+    ) -> hopr_types::crypto::errors::Result<SharedKeys<Self::E, Self::G>>
+    where
+        &'a Alpha<<Self::G as GroupElement<Self::E>>::AlphaLen>: From<&'a Self::ExpandedPublic>,
     {
         SharedKeys::generate(public_keys.iter().map(|pk| (pk.into(), pk.into())).collect())
     }

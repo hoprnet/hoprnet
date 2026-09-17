@@ -231,3 +231,9 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+# Points at the branch carrying the compact/expanded `OffchainPublicKey` split
+# (hopr-types#52). Drop this once hopr-types 5.0 is published; the same pattern is
+# already used between hopr-impls and hopr-api.
+[patch.crates-io]
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/extended-offchain-key" }
