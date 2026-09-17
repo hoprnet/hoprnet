@@ -89,6 +89,64 @@ impl Validate for AcknowledgementPipelineConfig {
     }
 }
 
+fn default_arbitration_enabled() -> bool {
+    true
+}
+fn default_arbitration_occupancy_pct() -> u32 {
+    75
+}
+fn default_arbitration_encode_reserve_pct() -> u32 {
+    50
+}
+
+/// Arbitration of the shared Rayon pool, protecting the encode path (SPHINX wrap + SURB generation)
+/// from decode floods (SPHINX peel — relay forwarding + exit termination).
+///
+/// The arbiter is asymmetric and occupancy-gated: only decode is ever throttled, and only when the
+/// pool is genuinely saturated *and* encode work is present, so pure forwarding and unsaturated
+/// nodes are untouched. Enforced inside `spawn_decode_blocking`
+/// (see `hopr_utils::parallelize::cpu::configure_arbitration`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct PoolArbitrationConfig {
+    /// When `false`, decode is never throttled (the pool is shared first-come-first-served).
+    #[default(default_arbitration_enabled())]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_enabled"))]
+    pub enabled: bool,
+    /// Pool occupancy (percent of threads actually running) at or above which decode admission may
+    /// engage. Below it, decode is never throttled.
+    #[default(default_arbitration_occupancy_pct())]
+    #[validate(range(min = 1, max = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_occupancy_pct"))]
+    pub occupancy_pct: u32,
+    /// Share of the pool (percent) that decode yields to encode when both contend under saturation.
+    #[default(default_arbitration_encode_reserve_pct())]
+    #[validate(range(min = 1, max = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_arbitration_encode_reserve_pct"))]
+    pub encode_reserve_pct: u32,
+}
+
+impl PoolArbitrationConfig {
+    /// Maps this flat (serde-friendly) config onto the pool arbiter's
+    /// [`ArbitrationConfig`](hopr_utils::parallelize::cpu::ArbitrationConfig) enum, where the disabled
+    /// state carries no tuning percentages.
+    pub fn to_arbitration(&self) -> hopr_utils::parallelize::cpu::ArbitrationConfig {
+        use hopr_utils::parallelize::cpu::ArbitrationConfig;
+        if self.enabled {
+            ArbitrationConfig::Enabled {
+                occupancy_pct: self.occupancy_pct,
+                encode_reserve_pct: self.encode_reserve_pct,
+            }
+        } else {
+            ArbitrationConfig::Disabled
+        }
+    }
+}
+
 /// Overall configuration of the input/output packet processing pipeline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
 #[cfg_attr(
@@ -132,6 +190,10 @@ pub struct PacketPipelineConfig {
     /// Configuration of the packet acknowledgement processing
     #[validate(nested)]
     pub ack_config: AcknowledgementPipelineConfig,
+    /// Fair-share arbitration of the shared Rayon pool between encode and decode.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub arbitration: PoolArbitrationConfig,
 }
 
 #[cfg(all(test, feature = "serde"))]
@@ -173,5 +235,44 @@ mod tests {
             parse(Some("0s")).surb_resolution_wait,
             "zero must reach the code as zero, not as unset"
         );
+    }
+
+    /// The `SmartDefault` derive and the serde field defaults share the `default_arbitration_*` fns,
+    /// so they can't diverge — pin the values the arbiter ships with, and that a default config
+    /// validates (the percentages sit inside the `1..=100` range).
+    #[test]
+    fn pool_arbitration_config_defaults_are_enabled_75_50_and_valid() {
+        let cfg = PoolArbitrationConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.occupancy_pct, 75);
+        assert_eq!(cfg.encode_reserve_pct, 50);
+        assert!(
+            cfg.validate().is_ok(),
+            "the default arbitration config must pass validation"
+        );
+    }
+
+    /// `to_arbitration` maps the flat config onto the arbiter enum: enabled → `Enabled` with the
+    /// percentages, disabled → `Disabled` (no percentages).
+    #[test]
+    fn pool_arbitration_config_maps_onto_the_arbiter_enum() {
+        use hopr_utils::parallelize::cpu::ArbitrationConfig;
+        let enabled = PoolArbitrationConfig {
+            enabled: true,
+            occupancy_pct: 80,
+            encode_reserve_pct: 40,
+        };
+        assert_eq!(
+            enabled.to_arbitration(),
+            ArbitrationConfig::Enabled {
+                occupancy_pct: 80,
+                encode_reserve_pct: 40
+            }
+        );
+        let disabled = PoolArbitrationConfig {
+            enabled: false,
+            ..PoolArbitrationConfig::default()
+        };
+        assert_eq!(disabled.to_arbitration(), ArbitrationConfig::Disabled);
     }
 }

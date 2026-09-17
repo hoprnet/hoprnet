@@ -140,7 +140,7 @@ vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = { version = "4.3.0" }
 hopr-types = { version = "4.0.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.15.0", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.16.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "2.0.0", path = "crypto/packet", default-features = false, features = [
