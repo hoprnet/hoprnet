@@ -23,6 +23,10 @@ pub struct NodeSafeConfig {
     pub module_address: Address,
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "test-only node config builder; each argument is a distinct per-node knob"
+)]
 pub fn create_hopr_instance_config(
     host_port: u16,
     safe: NodeSafeConfig,
@@ -31,6 +35,7 @@ pub fn create_hopr_instance_config(
     idle_timeout_ms: u64,
     pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     transit_latency: Option<TransitLatencyConfig>,
+    pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
 ) -> HoprLibConfig {
     HoprLibConfig {
         host: crate::config::HostConfig {
@@ -66,6 +71,7 @@ pub fn create_hopr_instance_config(
                     outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
                     ..Default::default()
                 },
+                pipeline: pipeline.unwrap_or_default(),
                 ..Default::default()
             },
             mixer: Default::default(),
