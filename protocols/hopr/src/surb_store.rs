@@ -383,14 +383,16 @@ impl EvictionStats {
         }
     }
 
-    /// Counts one eviction; once `now` is past the interval, closes it and returns its counts for reporting.
+    /// Closes the interval if `now` is past it, then counts one eviction; returns the closed interval's counts.
     fn record_at(&self, cache: EvictedCache, cause: RemovalCause, now: Instant) -> Option<EvictionReport> {
+        // Closing first keeps an eviction at or past the boundary out of the interval it ends.
+        let report = self.close_interval_if_elapsed(now);
         if let Some(counter) = self.counts[cache as usize].counter(cause) {
             counter.fetch_add(1, Ordering::Relaxed);
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SURB_STORE_EVICTIONS.increment(&[cache.into(), cause_label(cause)]);
         }
-        self.close_interval_if_elapsed(now)
+        report
     }
 
     /// No runtime here, so the first eviction past the interval closes it: a quiet store reports late, not never.
@@ -1935,13 +1937,22 @@ mod tests {
         );
         assert_eq!(
             report.counts(EvictedCache::Generation),
+            ClosedCounts::default(),
+            "the eviction that closes an interval belongs to the next one"
+        );
+        assert_eq!(report.counts(EvictedCache::ReplyOpenerBatch), ClosedCounts::default());
+
+        let next = stats
+            .record_at(EvictedCache::SurbRing, RemovalCause::Explicit, t0 + 2 * REPORT_INTERVAL)
+            .context("second interval has elapsed")?;
+        assert_eq!(
+            next.counts(EvictedCache::Generation),
             ClosedCounts {
                 expired: 1,
                 size: 0,
                 replaced: 0
             }
         );
-        assert_eq!(report.counts(EvictedCache::ReplyOpenerBatch), ClosedCounts::default());
         Ok(())
     }
 
