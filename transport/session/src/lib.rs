@@ -111,16 +111,9 @@ flagset::flags! {
         NoRateControl = 0b0001_0000,
         /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
         ///
-        /// This flag is the entire per-Session PIX switch: the announced dimensions are not a
-        /// Session-level choice. [`SessionManager::new_session`](crate::manager::SessionManager::new_session)
-        /// derives them from the node's installed
-        /// [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator) — which is what actually
-        /// produces the shares that go on the wire — and encodes them into the upper half of the
-        /// additional data. A node with no PIX toolbox installed refuses the Session rather than
-        /// advertising a capability it cannot honour.
-        ///
-        /// The Exit may still refuse the Session if the resulting quota falls outside its
-        /// acceptable range, or (with `enforce_pix`) if this flag is *absent*.
+        /// The Exit may still refuse the Session if the offered quota
+        /// (from this node's  [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator)) falls
+        /// outside its acceptable range, or (with `enforce_pix`) if this flag is *absent*.
         UsePIX = 0b0010_0000,
     }
 }
