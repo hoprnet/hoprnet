@@ -203,7 +203,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    tracing::debug!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
                 .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
@@ -213,7 +213,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    tracing::debug!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
@@ -329,7 +329,7 @@ impl SurbStore for MemorySurbStore {
                     .eviction_policy(moka::policy::EvictionPolicy::lru())
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(
+                            tracing::debug!(
                                 pseudonym = %sender_id.pseudonym(),
                                 surb_id = const_hex::encode(id.as_slice()),
                                 ?cause,
@@ -482,6 +482,8 @@ impl<S> SurbRingBuffer<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use hopr_api::types::crypto::{crypto_traits::Randomizable, prelude::SecretKey16};
     use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
     use rstest::rstest;
@@ -885,6 +887,75 @@ mod tests {
             inner.run_pending_tasks();
         }
         (client, pseudonym)
+    }
+
+    /// Counts events per level; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct RecordingSubscriber {
+        warnings: AtomicU64,
+        debugs: AtomicU64,
+    }
+
+    impl tracing::Subscriber for RecordingSubscriber {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            match *event.metadata().level() {
+                tracing::Level::WARN => self.warnings.fetch_add(1, Ordering::Relaxed),
+                tracing::Level::DEBUG => self.debugs.fetch_add(1, Ordering::Relaxed),
+                _ => 0,
+            };
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    #[test]
+    fn routine_cache_evictions_should_be_logged_below_warn() -> anyhow::Result<()> {
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || -> anyhow::Result<()> {
+            // Overflow an inner reply-opener cache.
+            let _ = flooded_client(MINIMUM_OPENERS_PER_PSEUDONYM, 3 * MINIMUM_OPENERS_PER_PSEUDONYM as u64);
+
+            // Overflow both outer caches with distinct pseudonyms.
+            let store = MemorySurbStore::new(SurbStoreConfig {
+                max_openers_per_pseudonym: MINIMUM_OPENER_PSEUDONYMS,
+                max_pseudonyms: MINIMUM_SURBS_PER_PSEUDONYM,
+                ..Default::default()
+            });
+            let opener = cheap_opener();
+            let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT)?;
+            for _ in 0..1500 {
+                let pseudonym = HoprPseudonym::random();
+                store.insert_reply_opener(
+                    HoprSenderId::from_pseudonym_and_id(&pseudonym, [0u8; 8]),
+                    opener.clone(),
+                );
+                store.insert_surbs(pseudonym, vec![([0u8; 8], surb.clone())]);
+            }
+            store.pseudonym_openers.run_pending_tasks();
+            store.surbs_per_pseudonym.run_pending_tasks();
+            Ok(())
+        })?;
+
+        assert_eq!(0, recorder.warnings.load(Ordering::Relaxed));
+        assert!(
+            recorder.debugs.load(Ordering::Relaxed) > 0,
+            "expected debug eviction events"
+        );
+        Ok(())
     }
 
     /// Upload-only return-path model.
