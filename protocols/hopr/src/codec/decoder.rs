@@ -1,4 +1,4 @@
-use std::{ops::Mul, time::Duration};
+use std::ops::Mul;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hopr_api::{
@@ -23,7 +23,6 @@ pub struct HoprDecoder<Chain, S, T> {
     channels_dst: Hash,
     cfg: HoprCodecConfig,
     tbf: parking_lot::Mutex<TagBloomFilter>,
-    peer_id_cache: moka::sync::Cache<PeerId, OffchainPublicKey>,
 }
 
 impl<Chain, S, T> HoprDecoder<Chain, S, T>
@@ -50,10 +49,6 @@ where
             cfg,
             ticket_factory,
             tbf: parking_lot::Mutex::new(Default::default()),
-            peer_id_cache: moka::sync::Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build(),
         }
     }
 
@@ -185,19 +180,12 @@ where
         tracing::trace!(data_len = data.len(), "decoding packet");
 
         // Phase 1: Peer ID conversion
-        // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet.
-        // The async block ensures the Rayon task is only submitted on cache miss.
+        // Reads the key straight out of the peer id's multihash, so there is nothing to cache.
         let previous_hop = trace_timed!("peer_id_conversion complete", {
-            match self
-                .peer_id_cache
-                .try_get_with_by_ref(&sender, || OffchainPublicKey::from_peerid(&sender))
-            {
-                Ok(peer) => Ok(peer),
-                Err(error) => {
-                    tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
-                    Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender))
-                }
-            }
+            OffchainPublicKey::from_peerid(&sender).map_err(|error| {
+                tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
+                IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender)
+            })
         })?;
 
         // Phase 2: Sphinx packet decoding

@@ -130,10 +130,6 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 lazy_static::lazy_static! {
     static ref SESSION_INITIATION_TIMEOUT_MAX: Duration = 2 * SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
 
-    static ref PEER_ID_CACHE: moka::sync::Cache<PeerId, OffchainPublicKey> = moka::sync::Cache::builder()
-        .time_to_idle(Duration::from_mins(15))
-        .max_capacity(10_000)
-        .build();
 
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
@@ -158,21 +154,19 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
     rb_capacity.saturating_mul(SURB_BUFFER_TARGET_NUMERATOR) / SURB_BUFFER_TARGET_DENOMINATOR
 }
 
-/// PeerId -> OffchainPublicKey is a CPU-intensive blocking operation.
+/// Reads the packet key out of an Ed25519 [`PeerId`]'s multihash.
 ///
-/// This helper uses a cached static object to speed up the lookup and avoid blocking the async
-/// runtime on repeated conversions for the same [`PeerId`]s.
+/// This used to be CPU-intensive - it decompressed the curve point - and was served from a
+/// process-wide cache. The compact [`OffchainPublicKey`] carries the compressed encoding as-is,
+/// so the conversion is now a length check and a copy, and caching it would cost more than it
+/// saves.
 pub fn peer_id_to_public_key(peer_id: &PeerId) -> crate::errors::Result<OffchainPublicKey> {
-    PEER_ID_CACHE
-        .try_get_with_by_ref(peer_id, move || {
-            OffchainPublicKey::from_peerid(peer_id).map_err(|e| e.into())
-        })
-        .map_err(|e: Arc<HoprTransportError>| {
-            crate::errors::HoprTransportError::Other(anyhow::anyhow!(
-                "failed to convert peer_id ({:?}) to an offchain public key: {e}",
-                peer_id
-            ))
-        })
+    OffchainPublicKey::from_peerid(peer_id).map_err(|e| {
+        crate::errors::HoprTransportError::Other(anyhow::anyhow!(
+            "failed to convert peer_id ({:?}) to an offchain public key: {e}",
+            peer_id
+        ))
+    })
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]

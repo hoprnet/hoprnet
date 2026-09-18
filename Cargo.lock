@@ -4638,7 +4638,7 @@ dependencies = [
 [[package]]
 name = "hopr-types"
 version = "4.0.2"
-source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Fextended-offchain-key#89e9e77a59f0ec37f9d4df5a6e9aba92a93faa13"
+source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Fextended-offchain-key#1d4d630d69aba069f16e1a149c3fcfd50e3eddd7"
 dependencies = [
  "aes 0.9.2",
  "anyhow",

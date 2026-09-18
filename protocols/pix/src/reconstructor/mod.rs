@@ -690,7 +690,7 @@ fn record_progress<P: PartialEq>(acc: &mut Vec<SsaRecoveryProgress<P>>, snapshot
 }
 
 /// One SSA's fault observation, with the relayer that carried the offending share.
-type FaultObservation<P> = (Box<OffchainPublicKey>, SsaId<P>, u64);
+type FaultObservation<P> = (OffchainPublicKey, SsaId<P>, u64);
 
 /// Merges a fault observation into the batch's pending set, keeping the highest total per SSA.
 ///
@@ -1310,7 +1310,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 Ok(ProcessedAckResult::InvalidShare(id, observed_total)) => {
                     tracing::error!(%id, observed_total, "deferred share could not be verified");
                     resolved.push(ShareResolution::InvalidShares {
-                        peer: peer.into(),
+                        peer,
                         ssa_id: id,
                         observed_total,
                     });
@@ -1960,7 +1960,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 Ok(ProcessedAckResult::Progressed(snapshot)) => record_progress(&mut progress, snapshot),
                 Ok(ProcessedAckResult::InvalidShare(ssa_id, observed_total)) => {
                     tracing::error!(%ssa_id, observed_total, "encountered share that could not be verified");
-                    record_fault(&mut faults, (Box::new(peer), ssa_id, observed_total));
+                    record_fault(&mut faults, (peer, ssa_id, observed_total));
                 }
                 Ok(ProcessedAckResult::NoProgress) => {}
                 Ok(ProcessedAckResult::VerifierNotReady(spi)) => {
@@ -5065,7 +5065,7 @@ mod tests {
         assert_eq!(ssa_id, faults[0].1);
         assert_eq!(
             carrier.public(),
-            faults[0].0.as_ref(),
+            &faults[0].0,
             "the fault must name the relayer that carried the share, not the peer that collected it"
         );
 
