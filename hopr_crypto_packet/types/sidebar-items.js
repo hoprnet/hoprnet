@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["S_MASK"],"enum":["PacketSignal"],"struct":["PacketMessage","PacketParts"],"type":["HoprPacketMessage","HoprPacketParts","PacketSignals"]};
