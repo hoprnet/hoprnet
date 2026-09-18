@@ -237,3 +237,7 @@ ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 # already used between hopr-impls and hopr-api.
 [patch.crates-io]
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/extended-offchain-key" }
+# The connector must come from the branch too, not just be *built against* the patched
+# hopr-types: the published 0.26.0 would pick up the compact key's length-only parser without
+# the curve check that compensates for it, and admit off-curve keys into the account tables.
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }
