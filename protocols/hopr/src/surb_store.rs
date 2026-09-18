@@ -1,4 +1,11 @@
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{
+    collections::VecDeque,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use hopr_api::types::internal::{prelude::HoprPseudonym, routing::SurbMatcher};
 use hopr_crypto_packet::prelude::*;
@@ -177,6 +184,77 @@ pub struct SurbStoreConfig {
     pub reply_opener_lifetime: Duration,
 }
 
+/// Shortest gap between two capacity-eviction warnings from the same cache.
+const SIZE_EVICTION_WARN_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Keeps capacity evictions observable without letting them flood the log.
+///
+/// Routine causes (expiry, explicit invalidation, replacement) are the steady state and stay at
+/// DEBUG. [`RemovalCause::Size`] is different: it means the cache is too small for the offered
+/// load, entries are lost that nothing asked to drop, and only an operator can fix it. Those
+/// evictions also arrive in bursts of thousands, so they are summarised rather than logged one by
+/// one - every drop is counted, and at most one WARN per [`SIZE_EVICTION_WARN_INTERVAL`] reports
+/// how many were shed since the previous one.
+struct SizeEvictionReporter {
+    /// Which cache this reports for, as it appears in the warning.
+    cache: &'static str,
+    dropped: AtomicU64,
+    /// `None` until the first warning, so the first capacity eviction is reported immediately.
+    last_warned: parking_lot::Mutex<Option<Instant>>,
+}
+
+impl SizeEvictionReporter {
+    fn new(cache: &'static str) -> Self {
+        Self {
+            cache,
+            dropped: AtomicU64::new(0),
+            last_warned: parking_lot::Mutex::new(None),
+        }
+    }
+
+    /// Records one eviction, warning about capacity pressure at most once per interval.
+    fn record(&self, cause: RemovalCause) {
+        if cause != RemovalCause::Size {
+            return;
+        }
+
+        self.dropped.fetch_add(1, Ordering::Relaxed);
+
+        let mut last_warned = self.last_warned.lock();
+        if last_warned.is_some_and(|at| at.elapsed() < SIZE_EVICTION_WARN_INTERVAL) {
+            return;
+        }
+        *last_warned = Some(Instant::now());
+        drop(last_warned);
+
+        tracing::warn!(
+            cache = self.cache,
+            dropped = self.dropped.swap(0, Ordering::Relaxed),
+            "SURB store cache is at capacity, dropping entries"
+        );
+    }
+}
+
+/// The capacity-eviction reporters of a single [`MemorySurbStore`], one per cache.
+///
+/// Shared by all the store's eviction listeners, including those of the per-pseudonym opener
+/// caches: a reporter per pseudonym would rate-limit nothing under a pseudonym flood.
+struct EvictionReporters {
+    opener_pseudonyms: SizeEvictionReporter,
+    surb_pseudonyms: SizeEvictionReporter,
+    openers: SizeEvictionReporter,
+}
+
+impl Default for EvictionReporters {
+    fn default() -> Self {
+        Self {
+            opener_pseudonyms: SizeEvictionReporter::new("reply openers by pseudonym"),
+            surb_pseudonyms: SizeEvictionReporter::new("surbs by pseudonym"),
+            openers: SizeEvictionReporter::new("reply openers"),
+        }
+    }
+}
+
 /// Basic [`SurbStore`] implementation based on an in-memory cache.
 ///
 /// This SURB store offers no persistence, and all SURBs and Reply Openers are lost once dropped.
@@ -189,12 +267,17 @@ pub struct MemorySurbStore {
     /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
     /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
     invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
+    reporters: Arc<EvictionReporters>,
     cfg: Arc<SurbStoreConfig>,
 }
 
 impl MemorySurbStore {
     /// Creates a new instance with the given configuration.
     pub fn new(cfg: SurbStoreConfig) -> Self {
+        let reporters = Arc::new(EvictionReporters::default());
+        let opener_pseudonym_reporter = reporters.clone();
+        let surb_pseudonym_reporter = reporters.clone();
+
         Self {
             // Reply openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
             // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
@@ -202,8 +285,9 @@ impl MemorySurbStore {
             pseudonym_openers: moka::sync::Cache::builder()
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
-                .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                .eviction_listener(move |sender_id, _reply_opener, cause| {
+                    tracing::debug!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    opener_pseudonym_reporter.opener_pseudonyms.record(cause);
                 })
                 .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
@@ -212,12 +296,14 @@ impl MemorySurbStore {
             surbs_per_pseudonym: moka::sync::Cache::builder()
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
-                .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                .eviction_listener(move |pseudonym, _reply_opener, cause| {
+                    tracing::debug!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    surb_pseudonym_reporter.surb_pseudonyms.record(cause);
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             invalidated_relayers: Default::default(),
+            reporters,
             cfg: cfg.into(),
         }
     }
@@ -314,6 +400,7 @@ impl SurbStore for MemorySurbStore {
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         let opener_lifetime = self.cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME);
         let max_openers_per_pseudonym = self.cfg.max_openers_per_pseudonym.max(MINIMUM_OPENERS_PER_PSEUDONYM);
+        let reporters = self.reporters.clone();
         self.pseudonym_openers
             .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
@@ -329,12 +416,13 @@ impl SurbStore for MemorySurbStore {
                     .eviction_policy(moka::policy::EvictionPolicy::lru())
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(
+                            tracing::debug!(
                                 pseudonym = %sender_id.pseudonym(),
                                 surb_id = const_hex::encode(id.as_slice()),
                                 ?cause,
                                 "evicting reply opener for sender id"
                             );
+                            reporters.openers.record(cause);
                         }
                     })
                     .max_capacity(max_openers_per_pseudonym as u64)
@@ -885,6 +973,110 @@ mod tests {
             inner.run_pending_tasks();
         }
         (client, pseudonym)
+    }
+
+    /// Counts events per level; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct RecordingSubscriber {
+        warnings: AtomicU64,
+        debugs: AtomicU64,
+    }
+
+    impl tracing::Subscriber for RecordingSubscriber {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            match *event.metadata().level() {
+                tracing::Level::WARN => self.warnings.fetch_add(1, Ordering::Relaxed),
+                tracing::Level::DEBUG => self.debugs.fetch_add(1, Ordering::Relaxed),
+                _ => 0,
+            };
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    #[test]
+    fn expiry_style_evictions_should_not_warn() {
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || {
+            let reporter = SizeEvictionReporter::new("test");
+            for _ in 0..1000 {
+                reporter.record(RemovalCause::Expired);
+                reporter.record(RemovalCause::Explicit);
+                reporter.record(RemovalCause::Replaced);
+            }
+        });
+
+        assert_eq!(0, recorder.warnings.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn capacity_evictions_should_warn_once_per_interval() {
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || {
+            let reporter = SizeEvictionReporter::new("test");
+            for _ in 0..1000 {
+                reporter.record(RemovalCause::Size);
+            }
+        });
+
+        // A thousand drops inside one interval must still be a single, summarising warning.
+        assert_eq!(1, recorder.warnings.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn overflowing_caches_should_log_evictions_at_debug_and_warn_about_capacity() -> anyhow::Result<()> {
+        let recorder = Arc::new(RecordingSubscriber::default());
+        tracing::subscriber::with_default(recorder.clone(), || -> anyhow::Result<()> {
+            // Overflow an inner reply-opener cache.
+            let _ = flooded_client(MINIMUM_OPENERS_PER_PSEUDONYM, 3 * MINIMUM_OPENERS_PER_PSEUDONYM as u64);
+
+            // Overflow both outer caches with distinct pseudonyms.
+            let store = MemorySurbStore::new(SurbStoreConfig {
+                max_openers_per_pseudonym: MINIMUM_OPENER_PSEUDONYMS,
+                max_pseudonyms: MINIMUM_SURBS_PER_PSEUDONYM,
+                ..Default::default()
+            });
+            let opener = cheap_opener();
+            let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT)?;
+            for _ in 0..1500 {
+                let pseudonym = HoprPseudonym::random();
+                store.insert_reply_opener(
+                    HoprSenderId::from_pseudonym_and_id(&pseudonym, [0u8; 8]),
+                    opener.clone(),
+                );
+                store.insert_surbs(pseudonym, vec![([0u8; 8], surb.clone())]);
+            }
+            store.pseudonym_openers.run_pending_tasks();
+            store.surbs_per_pseudonym.run_pending_tasks();
+            Ok(())
+        })?;
+
+        // Thousands of evictions, but capacity pressure is reported once per cache at most: two
+        // stores are flooded here, so at most four reporters can have fired.
+        let warnings = recorder.warnings.load(Ordering::Relaxed);
+        assert!(
+            (1..=4).contains(&warnings),
+            "expected a rate-limited capacity warning, got {warnings}"
+        );
+        assert!(
+            recorder.debugs.load(Ordering::Relaxed) > 0,
+            "expected debug eviction events"
+        );
+        Ok(())
     }
 
     /// Upload-only return-path model.
