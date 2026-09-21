@@ -165,7 +165,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_SESSION_SURB_BUFFER_ESTIMATE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_surb_buffer_estimate",
-        "Estimated SURB buffer size",
+        "Balancer estimate of the SURBs the counterparty holds, bounded by its store and corrected by its reports",
         &["session_id"]
     ).unwrap();
     static ref METRIC_SESSION_SURB_TARGET_BUFFER: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
@@ -175,7 +175,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_SESSION_SURB_RATE_PER_SEC: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_surb_rate_per_sec",
-        "Estimated SURB buffer rate change per second",
+        "SURB production rate per second, averaged over at least one second; see hopr_surb_balancer_surbs_rate for the net rate",
         &["session_id"]
     ).unwrap();
     static ref METRIC_SESSION_SURB_REFILL_IN_FLIGHT: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
@@ -256,9 +256,12 @@ pub enum SessionAckMode {
 struct SessionSurbRuntimeState {
     state: Arc<BalancerStateValues>,
     estimator: AtomicSurbFlowEstimator,
-    last_snapshot_total: u64,
+    last_snapshot_produced: u64,
     last_snapshot_us: u64,
 }
+
+/// Shortest rate window; refreshes happen on activity, so one SURB 1 ms after the last snapshot would read 1000/s.
+const SURB_RATE_WINDOW_US: u64 = 1_000_000;
 
 #[derive(Debug)]
 struct SessionRuntimeState {
@@ -322,6 +325,10 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
 pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
+    // Unconditional unlike PIX below: minted for every Session anyway, and a closed one must stop reporting them.
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id_str], 0.0);
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id_str], 0.0);
+    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[session_id_str], 0.0);
     if has_pix {
         // Only for a Session that had a gate: setting these unconditionally would mint a
         // `hopr_session_pix_*` series for every non-PIX Session that ever closed.
@@ -388,13 +395,15 @@ pub fn set_session_balancer_data(
     state: Arc<BalancerStateValues>,
 ) {
     let now = now_us();
+    let produced = estimator.produced.load(std::sync::atomic::Ordering::Relaxed);
     {
         let mut all = SESSION_RUNTIME.lock();
         let runtime = all.entry(*session_id).or_insert_with(|| SessionRuntimeState::new(now));
         runtime.surb = Some(SessionSurbRuntimeState {
             state,
             estimator,
-            last_snapshot_total: 0,
+            // Seeded from the running total: production from before telemetry attached is not new production.
+            last_snapshot_produced: produced,
             last_snapshot_us: now,
         });
     }
@@ -527,21 +536,6 @@ fn refresh_surb_gauges(session_id: &SessionId, runtime: &mut SessionRuntimeState
         return;
     };
 
-    let produced = surb.estimator.produced.load(std::sync::atomic::Ordering::Relaxed);
-    let consumed = surb.estimator.consumed.load(std::sync::atomic::Ordering::Relaxed);
-    let total = produced.saturating_sub(consumed);
-
-    let elapsed_us = now_us.saturating_sub(surb.last_snapshot_us);
-    let rate_per_sec = if elapsed_us == 0 {
-        0.0
-    } else {
-        let delta = total as i64 - surb.last_snapshot_total as i64;
-        delta as f64 / (elapsed_us as f64 / 1_000_000.0)
-    };
-
-    surb.last_snapshot_total = total;
-    surb.last_snapshot_us = now_us;
-
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_SURB_TARGET_BUFFER.set(
         &[session_id_str],
@@ -549,8 +543,24 @@ fn refresh_surb_gauges(session_id: &SessionId, runtime: &mut SessionRuntimeState
             .target_surb_buffer_size
             .load(std::sync::atomic::Ordering::Relaxed) as f64,
     );
-    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id_str], total as f64);
-    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id_str], rate_per_sec);
+    // The balancer level, not `produced - consumed`: only it is clamped to the store and corrected by its reports.
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id_str], surb.state.buffer_level() as f64);
+
+    let elapsed_us = now_us.saturating_sub(surb.last_snapshot_us);
+    if elapsed_us < SURB_RATE_WINDOW_US {
+        return;
+    }
+
+    // Production alone: the level jumps on counterparty reports and clamps, which are not flow.
+    let produced = surb.estimator.produced.load(std::sync::atomic::Ordering::Relaxed);
+    let produced_since = produced.saturating_sub(surb.last_snapshot_produced);
+    surb.last_snapshot_produced = produced;
+    surb.last_snapshot_us = now_us;
+
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(
+        &[session_id_str],
+        produced_since as f64 / (elapsed_us as f64 / 1_000_000.0),
+    );
 }
 
 fn now_us() -> u64 {
@@ -685,5 +695,112 @@ mod tests {
 
         assert!(text.contains(&produced_metric));
         assert!(text.contains(&consumed_metric));
+    }
+
+    /// Attaches balancer data to a fresh Session and returns the pieces a gauge test drives.
+    fn session_with_balancer() -> (SessionId, AtomicSurbFlowEstimator, Arc<BalancerStateValues>) {
+        let id: SessionId = HoprPseudonym::random();
+        initialize_session_metrics(id, HoprSessionConfig::default());
+        let estimator = AtomicSurbFlowEstimator::default();
+        let state = Arc::new(BalancerStateValues::new(Default::default()));
+        set_session_balancer_data(&id, estimator.clone(), Arc::clone(&state));
+        (id, estimator, state)
+    }
+
+    /// Refreshes at a chosen instant; the production path uses `try_lock` and can skip under parallel tests.
+    fn refresh_at(session_id: &SessionId, now_us: u64) {
+        let mut all = SESSION_RUNTIME.lock();
+        let runtime = all.get_mut(session_id).expect("session runtime must exist");
+        refresh_surb_gauges(session_id, runtime, now_us);
+    }
+
+    /// Pins where the rate window starts, so a test can choose its own instants.
+    fn set_snapshot_base(session_id: &SessionId, at_us: u64) {
+        let mut all = SESSION_RUNTIME.lock();
+        let surb = all
+            .get_mut(session_id)
+            .and_then(|runtime| runtime.surb.as_mut())
+            .expect("balancer data must be attached");
+        surb.last_snapshot_us = at_us;
+    }
+
+    fn gauge(metric: &hopr_api::types::telemetry::MultiGauge, session_id: &SessionId) -> f64 {
+        let session_id_str: &str = session_id.as_ref();
+        metric.get(&[session_id_str]).expect("gauge must have been set")
+    }
+
+    /// The regression: decay refills never land in `consumed`, so the raw difference must not reach the gauge.
+    #[test]
+    fn surb_buffer_estimate_reports_the_balancer_level_not_the_raw_counters() {
+        let (id, estimator, state) = session_with_balancer();
+
+        estimator
+            .produced
+            .fetch_add(1_960_000, std::sync::atomic::Ordering::Relaxed);
+        state.buffer_level.store(7_000, std::sync::atomic::Ordering::Relaxed);
+
+        refresh_at(&id, now_us());
+
+        assert_eq!(gauge(&METRIC_SESSION_SURB_BUFFER_ESTIMATE, &id), 7_000.0);
+    }
+
+    /// The level is corrected downwards by what the counterparty reports, and the gauge follows.
+    #[test]
+    fn surb_buffer_estimate_follows_the_counterparty_report_downwards() {
+        let (id, _estimator, state) = session_with_balancer();
+
+        state.buffer_level.store(4_200, std::sync::atomic::Ordering::Relaxed);
+        refresh_at(&id, now_us());
+        assert_eq!(gauge(&METRIC_SESSION_SURB_BUFFER_ESTIMATE, &id), 4_200.0);
+
+        state.buffer_level.store(900, std::sync::atomic::Ordering::Relaxed);
+        refresh_at(&id, now_us());
+        assert_eq!(gauge(&METRIC_SESSION_SURB_BUFFER_ESTIMATE, &id), 900.0);
+    }
+
+    #[test]
+    fn surb_rate_reports_production_over_at_least_one_second() {
+        let (id, estimator, _state) = session_with_balancer();
+
+        const START_US: u64 = 1_000_000_000;
+        set_snapshot_base(&id, START_US);
+        estimator.produced.fetch_add(500, std::sync::atomic::Ordering::Relaxed);
+        estimator.consumed.fetch_add(400, std::sync::atomic::Ordering::Relaxed);
+
+        refresh_at(&id, START_US + 500_000);
+        assert_eq!(
+            gauge(&METRIC_SESSION_SURB_RATE_PER_SEC, &id),
+            0.0,
+            "half a second is too short a window to publish a rate from"
+        );
+
+        refresh_at(&id, START_US + 1_000_000);
+        assert_eq!(
+            gauge(&METRIC_SESSION_SURB_RATE_PER_SEC, &id),
+            500.0,
+            "the rate is production alone, not production net of consumption"
+        );
+
+        estimator.produced.fetch_add(200, std::sync::atomic::Ordering::Relaxed);
+        refresh_at(&id, START_US + 3_000_000);
+        assert_eq!(gauge(&METRIC_SESSION_SURB_RATE_PER_SEC, &id), 100.0);
+    }
+
+    /// A closed Session must not go on reporting the level and rate it died with.
+    #[test]
+    fn closing_a_session_zeroes_its_surb_gauges() {
+        let (id, estimator, state) = session_with_balancer();
+
+        estimator
+            .produced
+            .fetch_add(3_000, std::sync::atomic::Ordering::Relaxed);
+        state.buffer_level.store(3_000, std::sync::atomic::Ordering::Relaxed);
+        refresh_at(&id, now_us());
+
+        remove_session_metrics_state(&id, false);
+
+        assert_eq!(gauge(&METRIC_SESSION_SURB_BUFFER_ESTIMATE, &id), 0.0);
+        assert_eq!(gauge(&METRIC_SESSION_SURB_RATE_PER_SEC, &id), 0.0);
+        assert_eq!(gauge(&METRIC_SESSION_SURB_REFILL_IN_FLIGHT, &id), 0.0);
     }
 }
