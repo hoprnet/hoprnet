@@ -153,13 +153,13 @@ hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.30.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "ad48a9ca8a9d3a057027d3f49cafabe2e60ec991" }
+hopr-chain-connector = { version = "0.26.1" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.1.2", default-features = false }
-hopr-transport-p2p = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "ad48a9ca8a9d3a057027d3f49cafabe2e60ec991", features = ["transport-quic"] }
-hopr-ct-full-network = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "ad48a9ca8a9d3a057027d3f49cafabe2e60ec991", default-features = false }
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "ad48a9ca8a9d3a057027d3f49cafabe2e60ec991", default-features = false }
+hopr-transport-p2p = { version = "0.9.6", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.6.0", default-features = false }
+hopr-network-graph = { version = "0.7.0", default-features = false }
 
 [profile.dev]
 panic = "abort"
