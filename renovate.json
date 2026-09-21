@@ -63,6 +63,66 @@
         "digest"
       ],
       "enabled": false
+    },
+    {
+      "description": "Keep hopr-api on the 2.0.x patch line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-api"],
+      "allowedVersions": "/^2\\.0\\./"
+    },
+    {
+      "description": "Keep hopr-types on the 2.3.x patch line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-types"],
+      "allowedVersions": "/^2\\.3\\./"
+    },
+    {
+      "description": "Keep libp2p on the 0.56.x patch line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["libp2p"],
+      "allowedVersions": "/^0\\.56\\./"
+    },
+    {
+      "description": "Keep hopr-utilities on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-utilities"],
+      "allowedVersions": "/^0\\.9\\./"
+    },
+    {
+      "description": "Keep hopr-chain-connector on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-chain-connector"],
+      "allowedVersions": "/^0\\.22\\./"
+    },
+    {
+      "description": "Keep hopr-ticket-manager on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-ticket-manager"],
+      "allowedVersions": "/^0\\.5\\./"
+    },
+    {
+      "description": "Keep hopr-session-server-forwarder on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-session-server-forwarder"],
+      "allowedVersions": "/^0\\.1\\./"
+    },
+    {
+      "description": "Keep hopr-transport-p2p on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-transport-p2p"],
+      "allowedVersions": "/^0\\.9\\./"
+    },
+    {
+      "description": "Keep hopr-ct-full-network on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-ct-full-network"],
+      "allowedVersions": "/^0\\.4\\./"
+    },
+    {
+      "description": "Keep hopr-network-graph on the compat/v4 line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["hopr-network-graph"],
+      "allowedVersions": "/^0\\.5\\./"
     }
   ]
 }
