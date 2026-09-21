@@ -4095,7 +4095,7 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.26.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?rev=bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1#bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?rev=ad48a9ca8a9d3a057027d3f49cafabe2e60ec991#ad48a9ca8a9d3a057027d3f49cafabe2e60ec991"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4152,7 +4152,7 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.6.0"
-source = "git+https://github.com/hoprnet/hopr-impls.git?rev=bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1#bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?rev=ad48a9ca8a9d3a057027d3f49cafabe2e60ec991#ad48a9ca8a9d3a057027d3f49cafabe2e60ec991"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4215,7 +4215,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.7.0"
-source = "git+https://github.com/hoprnet/hopr-impls.git?rev=bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1#bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?rev=ad48a9ca8a9d3a057027d3f49cafabe2e60ec991#ad48a9ca8a9d3a057027d3f49cafabe2e60ec991"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4449,7 +4449,7 @@ dependencies = [
 [[package]]
 name = "hopr-transport-p2p"
 version = "0.11.0"
-source = "git+https://github.com/hoprnet/hopr-impls.git?rev=bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1#bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?rev=ad48a9ca8a9d3a057027d3f49cafabe2e60ec991#ad48a9ca8a9d3a057027d3f49cafabe2e60ec991"
 dependencies = [
  "async-broadcast",
  "async-trait",
