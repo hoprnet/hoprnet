@@ -4159,7 +4159,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hopr-api",
- "hopr-network-graph 0.7.0 (git+https://github.com/hoprnet/hopr-impls.git?rev=bd02b0921e7b03b6b16cbe139dbef56a5cfd96d1)",
+ "hopr-network-graph",
  "hopr-utilities 0.15.0",
  "smart-default",
  "tracing",
@@ -4184,7 +4184,7 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-ct-full-network",
- "hopr-network-graph 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-network-graph",
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
@@ -4210,27 +4210,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-network-graph"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2515e6939e1b1c2388f6414a6da5a7e22de8fa0755203f8f19b4e296703b1b8c"
-dependencies = [
- "anyhow",
- "bimap",
- "futures",
- "hopr-api",
- "hopr-utilities 0.12.0",
- "indexmap 2.14.2",
- "lazy_static",
- "parking_lot",
- "petgraph",
- "rand 0.10.2",
- "smallvec",
- "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
@@ -4407,7 +4386,7 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-network-graph 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hopr-network-graph",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-protocol-session",
