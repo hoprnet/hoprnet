@@ -65,16 +65,22 @@
       "enabled": false
     },
     {
-      "description": "Keep hopr-api on the 2.x release line",
+      "description": "Keep hopr-api on the 2.0.x patch line",
       "matchManagers": ["cargo"],
       "matchPackageNames": ["hopr-api"],
-      "allowedVersions": "/^2\\./"
+      "allowedVersions": "/^2\\.0\\./"
     },
     {
-      "description": "Keep hopr-types on the 2.x release line",
+      "description": "Keep hopr-types on the 2.3.x patch line",
       "matchManagers": ["cargo"],
       "matchPackageNames": ["hopr-types"],
-      "allowedVersions": "/^2\\./"
+      "allowedVersions": "/^2\\.3\\./"
+    },
+    {
+      "description": "Keep libp2p on the 0.56.x patch line",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["libp2p"],
+      "allowedVersions": "/^0\\.56\\./"
     },
     {
       "description": "Keep hopr-utilities on the compat/v4 line",
