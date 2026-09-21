@@ -94,7 +94,7 @@ more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 oas3 = "0.22.0"
 opentelemetry-prometheus-text-exporter = { version = "0.3" }
-opentelemetry_sdk = { version = "0.33.0" }
+opentelemetry_sdk = { version = "0.32.1" }
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
