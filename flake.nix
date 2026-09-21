@@ -149,11 +149,6 @@
             cargoExtraArgs = "";
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
-          ticketInspectorBuildArgs = {
-            inherit src depsSrc rev;
-            cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde,cli";
-            cargoToml = ./impls/ticket-manager/Cargo.toml;
-          };
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
           fixUtoipaEmbedPaths =
@@ -167,10 +162,7 @@
             });
 
           hoprPackages = {
-            # ticket-inspector: diagnostic CLI for inspecting the tickets database
-            binary-ticket-inspector = rust-builder-local.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            library = rust-builder-local.callPackage nixLib.mkRustPackage libraryBuildArgs;
             test-unit =
               (fixUtoipaEmbedPaths (
                 rust-builder-local.callPackage nixLib.mkRustPackage (
@@ -640,7 +632,7 @@
           packages = hoprPackages // {
             inherit docs;
             inherit pre-commit-check;
-            default = hoprPackages.binary-ticket-inspector;
+            default = hoprPackages.library;
           };
 
           devShells.default = devShell;
