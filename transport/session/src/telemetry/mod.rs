@@ -323,6 +323,9 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
 }
 
 pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
+    // Before the zeroing below: a concurrent touch landing in between would refresh the gauges back to nonzero.
+    SESSION_RUNTIME.lock().remove(session_id);
+
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
     // Unconditional unlike PIX below: minted for every Session anyway, and a closed one must stop reporting them.
@@ -339,7 +342,6 @@ pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
         // indistinguishable from one that is still filling at it.
         METRIC_SESSION_PIX_FILL_RATE.set(&[session_id_str], 0.0);
     }
-    SESSION_RUNTIME.lock().remove(session_id);
 }
 
 pub fn set_session_state(session_id: &SessionId, state: SessionLifecycleState) {
