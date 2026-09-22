@@ -709,7 +709,7 @@ mod tests {
         (id, estimator, state)
     }
 
-    /// Refreshes at a chosen instant; the production path uses `try_lock` and can skip under parallel tests.
+    /// Refreshes under a blocking lock, because the production path's `try_lock` could skip under parallel tests.
     fn refresh_at(session_id: &SessionId, now_us: u64) {
         let mut all = SESSION_RUNTIME.lock();
         let runtime = all.get_mut(session_id).expect("session runtime must exist");
