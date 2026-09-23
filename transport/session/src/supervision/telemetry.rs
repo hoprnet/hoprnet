@@ -807,7 +807,7 @@ fn emit_shares_total(kind: PixShareKind, count: u64) {
 /// `pub(crate)` unlike its siblings, because this gauge has a second producer: the manager's
 /// `PixFillControl` raises [`PixStallCause::SurbStarved`], which the supervisor cannot see. Routing
 /// it here rather than straight at the instrument keeps the metric to one emission point and one
-/// `cfg`, and lets both causes be asserted through [`probe`].
+/// `cfg`, and lets both causes be asserted through the `probe` below.
 pub(crate) fn emit_sessions_stalled(cause: PixStallCause, delta: i64) {
     #[cfg(feature = "telemetry")]
     crate::telemetry::pix::add_sessions_stalled(cause, delta);
