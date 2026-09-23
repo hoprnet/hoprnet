@@ -36,6 +36,7 @@
 //! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
 //! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_cycle_phase_seconds` | MultiHistogram | seconds | cycle leaves a phase | `phase` — same set as `hopr_pix_cycles_active` |
 //! | `hopr_pix_deposits_confirmed_uhopr_total` | SimpleCounter | µHOPR | deposit confirmed | — |
 //! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
 //! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
@@ -137,6 +138,19 @@
 //! histogram_quantile(0.9, sum by (le, outcome) (
 //!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
 //! ```
+//!
+//! *Where the time goes.* The phase census above says how many cycles are stuck; this says for how
+//! long, which is what separates a slow Entry (`awaiting_commitment`) from a slow chain
+//! (`awaiting_deposit`) from a starved return path (`recovering`):
+//!
+//! ```promql
+//! histogram_quantile(0.9, sum by (le, phase) (rate(hopr_pix_cycle_phase_seconds_bucket[1h])))
+//! ```
+//!
+//! The phase boundaries are the supervisor's, so `recovering` includes the wait behind an earlier
+//! member of the same batch. That matches `hopr_pix_cycles_active{phase="recovering"}`, which counts
+//! queued cycles too. Only phases that *ended* are observed, so a cycle still live when its Session
+//! ends contributes nothing.
 //!
 //! *Stranded deposit value.* What the Entries paid for and this Exit did not recover. Compared as
 //! cumulative totals rather than as rates, like the reservation-leak query below: a cycle confirms
@@ -271,6 +285,12 @@ lazy_static::lazy_static! {
         vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
         &["outcome"]
     ).unwrap();
+    static ref METRIC_PIX_CYCLE_PHASE_SECONDS: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_cycle_phase_seconds",
+        "How long an SSA cycle spent in one supervisor phase, observed when it leaves that phase",
+        vec![1.0, 5.0, 15.0, 60.0, 300.0, 900.0, 3600.0, 14400.0],
+        &["phase"]
+    ).unwrap();
     static ref METRIC_PIX_DEPOSITS_CONFIRMED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_pix_deposits_confirmed_uhopr_total",
         "Deposit value confirmed for SSA cycles of this Exit, in uHOPR (1e-6 HOPR)"
@@ -379,6 +399,11 @@ pub(crate) fn record_cycle_summary(
     }
 }
 
+/// Observes how long one cycle spent in `phase`.
+pub(crate) fn record_cycle_phase_duration(phase: PixCyclePhase, seconds: f64) {
+    METRIC_PIX_CYCLE_PHASE_SECONDS.observe(&[phase.to_string().as_str()], seconds);
+}
+
 /// Adds `uhopr` of deposit value confirmed for a cycle.
 pub(crate) fn add_deposits_confirmed(uhopr: u64) {
     METRIC_PIX_DEPOSITS_CONFIRMED.increment_by(uhopr);
@@ -464,6 +489,10 @@ mod tests {
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.name(),
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.labels(),
             ),
+            (
+                METRIC_PIX_CYCLE_PHASE_SECONDS.name(),
+                METRIC_PIX_CYCLE_PHASE_SECONDS.labels(),
+            ),
             (METRIC_PIX_CLOSURES_TOTAL.name(), METRIC_PIX_CLOSURES_TOTAL.labels()),
             (
                 METRIC_PIX_FILL_BACKOFF_TOTAL.name(),
@@ -497,6 +526,7 @@ mod tests {
         record_pix_fill_backoff(PixFillBackoff::SurbReserve);
         add_deposits_confirmed(1_500_000);
         add_deposits_recovered(1_000_000);
+        record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -517,6 +547,7 @@ mod tests {
             "hopr_pix_cycle_egress_packets",
             "hopr_pix_cycle_useful_share_fraction",
             "hopr_pix_cycle_accepted_share_fraction",
+            "hopr_pix_cycle_phase_seconds",
             "hopr_pix_deposits_confirmed_uhopr_total",
             "hopr_pix_deposits_recovered_uhopr_total",
             // PascalCase because `SessionPixCloseReason`'s `Display` values are snapshot-locked as

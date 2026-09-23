@@ -313,6 +313,11 @@ pub struct PixTurnEvents {
     /// [`finalized`](Self::finalized) instead, so the two follow the scope rules of the cycle
     /// counters they mirror.
     pub deposit_confirmed_uhopr: u64,
+    /// Phases that *ended* this turn, and how long each lasted in milliseconds.
+    ///
+    /// Milliseconds rather than an `f64` of seconds so this struct keeps its `Eq`; the conversion
+    /// happens at the instrument.
+    pub phase_durations: Vec<(PixCyclePhase, u64)>,
     /// Cycles that reached a terminal state and have a coverage summary to observe.
     ///
     /// A `Vec` rather than a running total because each entry becomes one observation in three
@@ -661,6 +666,12 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
     if events.deposit_confirmed_uhopr > 0 {
         emit_deposits_confirmed(events.deposit_confirmed_uhopr);
     }
+    // Phase durations are emitted whatever the scope, on the same argument as share arrivals: each
+    // states how long a phase lasted and asserts nothing about how the cycle ended, so none of them
+    // can contradict a census charge `release` has already made.
+    for (phase, millis) in events.phase_durations.iter().copied() {
+        emit_cycle_phase_duration(phase, millis as f64 / 1_000.0);
+    }
     // The summaries are not, because each carries an outcome that must agree with the count that
     // retired the same cycle. Under `EdgesOnly` that count came from `release`'s census charge —
     // `failed`, uniformly — so observing a summary here could assert `recovered` for a cycle the
@@ -762,6 +773,15 @@ fn emit_shares_total(kind: PixShareKind, count: u64) {
     probe::add(&format!("shares_total/{kind}"), count as i64);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = (kind, count);
+}
+
+fn emit_cycle_phase_duration(phase: PixCyclePhase, seconds: f64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::record_cycle_phase_duration(phase, seconds);
+    #[cfg(test)]
+    probe::add(&format!("cycle_phase_seconds/{phase}"), 1);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = (phase, seconds);
 }
 
 fn emit_deposits_confirmed(uhopr: u64) {
@@ -1008,6 +1028,7 @@ mod tests {
                 useful_shares: 7,
                 surplus_shares: 4,
                 deposit_confirmed_uhopr: 500_000,
+                phase_durations: vec![(PixCyclePhase::Recovering, 90_000)],
                 finalized: vec![PixCycleSummary {
                     outcome: PixCycleOutcome::Recovered,
                     egress_packets: 80,
@@ -1049,6 +1070,11 @@ mod tests {
             probe::get("deposits_recovered_uhopr"),
             "recovered value rides the summaries, so it is dropped with them — the gap between the two counters \
              over-states stranded value rather than hiding it"
+        );
+        assert_eq!(
+            1,
+            probe::get("cycle_phase_seconds/recovering"),
+            "a phase duration asserts nothing about how the cycle ended, so this scope still books it"
         );
         assert_eq!(
             None,

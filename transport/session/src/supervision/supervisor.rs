@@ -13,7 +13,7 @@ use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 use super::{
     PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig,
     fill::{FillPlanner, FillTarget},
-    telemetry::{PixCycleOutcome, PixCycleSummary, PixGateMode, PixSessionSnapshot, PixTurnEvents},
+    telemetry::{PixCycleOutcome, PixCyclePhase, PixCycleSummary, PixGateMode, PixSessionSnapshot, PixTurnEvents},
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +84,8 @@ struct PerSsaState {
 
     /// What the Entry deposited for this cycle, in µHOPR, or zero until the deposit confirms.
     deposit_uhopr: u64,
+    /// When [`phase`](Self::phase) was entered, for `hopr_pix_cycle_phase_seconds`.
+    phase_entered_at: Instant,
 
     // Progress tracking.
     largest_useful_shares: u64,
@@ -134,11 +136,12 @@ struct PerSsaState {
 }
 
 impl PerSsaState {
-    fn new(ssa_id: SsaId<HoprPseudonym>, batch_id: u32, target_useful_shares: u64, _now: Instant) -> Self {
+    fn new(ssa_id: SsaId<HoprPseudonym>, batch_id: u32, target_useful_shares: u64, now: Instant) -> Self {
         Self {
             ssa_id,
             batch_id,
             phase: SsaPhase::AwaitingCommitment,
+            phase_entered_at: now,
             commitment_deadline: None,
             recommit_deadline: None,
             recommit_attempts: 0,
@@ -157,6 +160,23 @@ impl PerSsaState {
             served_total_at_last_progress: 0,
             served_total_at_front: None,
         }
+    }
+
+    /// Moves to `phase`, returning how long the outgoing one lasted in milliseconds.
+    ///
+    /// `None` for an outgoing `Recovered` or `Closing`, which have no [`PixCyclePhase`] label — both
+    /// are retained state rather than live state, so neither is measured.
+    fn enter_phase(&mut self, phase: SsaPhase, now: Instant) -> Option<(PixCyclePhase, u64)> {
+        let left = match self.phase {
+            SsaPhase::AwaitingCommitment => Some(PixCyclePhase::AwaitingCommitment),
+            SsaPhase::AwaitingDeposit => Some(PixCyclePhase::AwaitingDeposit),
+            SsaPhase::Recovering => Some(PixCyclePhase::Recovering),
+            SsaPhase::Recovered { .. } | SsaPhase::Closing => None,
+        };
+        let elapsed = now.saturating_duration_since(self.phase_entered_at).as_millis() as u64;
+        self.phase = phase;
+        self.phase_entered_at = now;
+        left.map(|phase| (phase, elapsed))
     }
 
     /// This cycle's coverage, for the histograms observed once when it finalizes.
@@ -192,6 +212,8 @@ impl PerSsaState {
 /// is precisely when the predecessor's receipt must stop authorizing service.
 struct PaidRecoveryTail {
     ssa_id: SsaId<HoprPseudonym>,
+    /// When the tail took the paid front, for `hopr_pix_cycle_phase_seconds{phase="paid_tail"}`.
+    entered_at: Instant,
     largest_shares_seen: u64,
     served_total_at_last_progress: u64,
     idle_deadline: Option<Instant>,
@@ -351,7 +373,7 @@ impl SessionPixSupervisor {
 
         let mut lifecycle_actions = actions;
         lifecycle_actions.extend(self.retry_deferred_successor_request(now));
-        self.consume_paid_tail_at_observed_boundary();
+        self.consume_paid_tail_at_observed_boundary(now);
         self.arm_recovery_clocks_for_earliest(now, served_total);
         let mut actions = if lifecycle_actions
             .iter()
@@ -404,7 +426,15 @@ impl SessionPixSupervisor {
     /// its first snapshot. In every case the observation proves the transport crossed the cycle
     /// boundary. Keeping the old funded receipt beyond it would let an unfunded successor spend the
     /// predecessor's remaining allowance.
-    fn consume_paid_tail_at_observed_boundary(&mut self) {
+    /// Retires the paid tail, latching how long it held the front.
+    fn release_paid_tail(&mut self, now: Instant) {
+        if let Some(tail) = self.paid_recovery_tail.take() {
+            let elapsed = now.saturating_duration_since(tail.entered_at).as_millis() as u64;
+            self.telemetry.phase_durations.push((PixCyclePhase::PaidTail, elapsed));
+        }
+    }
+
+    fn consume_paid_tail_at_observed_boundary(&mut self, now: Instant) {
         let Some(front_idx) = self.earliest_live_idx() else {
             return;
         };
@@ -424,7 +454,7 @@ impl SessionPixSupervisor {
                 successor = %front_id,
                 "successor progress consumed the paid FIFO-tail handoff"
             );
-            self.paid_recovery_tail = None;
+            self.release_paid_tail(now);
         }
     }
 
@@ -711,7 +741,7 @@ impl SessionPixSupervisor {
                     continue;
                 }
 
-                actions.extend(self.close_ssa_and_collect(i, reason, served_total));
+                actions.extend(self.close_ssa_and_collect(i, reason, served_total, now));
                 continue;
             }
             i += 1;
@@ -742,7 +772,7 @@ impl SessionPixSupervisor {
         // the replacement request in the action stream so the reconstructor drops the old guard
         // before allocating the successor.
         actions.extend(self.retry_deferred_successor_request(now));
-        self.consume_paid_tail_at_observed_boundary();
+        self.consume_paid_tail_at_observed_boundary(now);
 
         // If no SSAs remain, close.
         // Note: a successor request may still be in flight here (RequestSsa
@@ -1020,11 +1050,12 @@ impl SessionPixSupervisor {
             self.cfg.max_deposit_wait,
             self.cfg.ssas_per_request,
         ));
-        ssa.phase = SsaPhase::AwaitingDeposit;
+        let phase_sample = ssa.enter_phase(SsaPhase::AwaitingDeposit, now);
         ssa.deposit_deadline = deposit_deadline;
         ssa.commitment_deadline = None;
         // Nothing is missing any more, so nothing is to be asked for.
         ssa.recommit_deadline = None;
+        self.telemetry.phase_durations.extend(phase_sample);
 
         // Behind the phase guard above, so a repeated `CommitmentVerified` for a cycle that has
         // already moved on counts nothing.
@@ -1075,9 +1106,10 @@ impl SessionPixSupervisor {
 
         // Transition to Recovering. The two recovery clocks are *not* started here — see
         // `arm_recovery_clocks_for_earliest`, which starts them when this cycle's turn comes.
-        ssa.phase = SsaPhase::Recovering;
+        let phase_sample = ssa.enter_phase(SsaPhase::Recovering, now);
         ssa.deposit_deadline = None;
         ssa.served_total_at_last_progress = served_total;
+        self.telemetry.phase_durations.extend(phase_sample);
 
         // Behind both the phase guard and the zero-amount guard above, so a duplicate confirmation
         // and a zero balance — which is not a verdict — both count nothing.
@@ -1119,7 +1151,7 @@ impl SessionPixSupervisor {
     fn on_deposit_observer_closed(
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
-        _now: Instant,
+        now: Instant,
         served_total: u64,
     ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
@@ -1131,7 +1163,7 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed, served_total)
+        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed, served_total, now)
     }
 
     fn on_recovery_progress(
@@ -1326,7 +1358,7 @@ impl SessionPixSupervisor {
         }
 
         if exhausted {
-            self.paid_recovery_tail = None;
+            self.release_paid_tail(now);
         }
         vec![SessionPixAction::ProgressNotification]
     }
@@ -1509,6 +1541,7 @@ impl SessionPixSupervisor {
             self.paid_recovery_tail =
                 (self.ssas[idx].largest_shares_seen < max_shares_seen).then(|| PaidRecoveryTail {
                     ssa_id: self.ssas[idx].ssa_id,
+                    entered_at: now,
                     largest_shares_seen: self.ssas[idx].largest_shares_seen,
                     served_total_at_last_progress: served_total,
                     // Recovery itself is fresh, cryptographic progress. Reusing the prior idle
@@ -1535,11 +1568,15 @@ impl SessionPixSupervisor {
         self.telemetry.finalized.push(summary);
 
         // Transition to tombstone.
-        self.ssas[idx].phase = SsaPhase::Recovered {
-            tombstone_until: now
-                .checked_add(self.cfg.tombstone_retention_window)
-                .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
-        };
+        let phase_sample = self.ssas[idx].enter_phase(
+            SsaPhase::Recovered {
+                tombstone_until: now
+                    .checked_add(self.cfg.tombstone_retention_window)
+                    .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
+            },
+            now,
+        );
+        self.telemetry.phase_durations.extend(phase_sample);
         self.ssas[idx].commitment_deadline = None;
         self.ssas[idx].deposit_deadline = None;
         self.ssas[idx].recovery_idle_deadline = None;
@@ -1724,6 +1761,7 @@ impl SessionPixSupervisor {
         idx: usize,
         reason: SessionPixCloseReason,
         served_total: u64,
+        now: Instant,
     ) -> Vec<SessionPixAction> {
         if matches!(self.ssas[idx].phase, SsaPhase::Closing) {
             return Vec::new();
@@ -1762,7 +1800,8 @@ impl SessionPixSupervisor {
             "closing PIX SSA"
         );
 
-        self.ssas[idx].phase = SsaPhase::Closing;
+        let phase_sample = self.ssas[idx].enter_phase(SsaPhase::Closing, now);
+        self.telemetry.phase_durations.extend(phase_sample);
 
         if self.ssas.len() == 1 {
             self.closed = true;
@@ -2124,6 +2163,50 @@ mod tests {
 
     fn _small_balance() -> HoprBalance {
         HoprBalance::new_base(1)
+    }
+
+    /// Each phase is timed from when it was entered to when it was left, and only on leaving.
+    #[test]
+    fn a_cycle_is_timed_in_each_phase_it_leaves() {
+        let p = pseudonym();
+        let t0 = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, t0);
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), t0, 0);
+        assert!(
+            sup.take_telemetry_events().phase_durations.is_empty(),
+            "a cycle that has not left a phase has nothing to time"
+        );
+
+        // Three seconds awaiting the commitment, then seven awaiting the deposit.
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), t0 + Duration::from_secs(3), 0);
+        assert_eq!(
+            vec![(PixCyclePhase::AwaitingCommitment, 3_000)],
+            sup.take_telemetry_events().phase_durations
+        );
+
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            t0 + Duration::from_secs(10),
+            0,
+        );
+        assert_eq!(
+            vec![(PixCyclePhase::AwaitingDeposit, 7_000)],
+            sup.take_telemetry_events().phase_durations,
+            "the clock restarts at each transition rather than measuring from the request"
+        );
+
+        // Recovery runs for a minute. The tombstone it leaves is not a phase, so nothing further is
+        // timed for this cycle.
+        sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(70), 0);
+        assert_eq!(
+            vec![(PixCyclePhase::Recovering, 60_000)],
+            sup.take_telemetry_events().phase_durations
+        );
     }
 
     // ---------------------------------------------------------------
@@ -6070,6 +6153,10 @@ mod tests {
         assert_eq!(
             PixTurnEvents {
                 committed: 1,
+                // Zero because this fixture drives every transition at `t0`; that the sample is
+                // latched at all is the assertion. `a_cycle_is_timed_in_each_phase_it_leaves`
+                // covers the durations themselves.
+                phase_durations: vec![(PixCyclePhase::AwaitingCommitment, 0)],
                 ..Default::default()
             },
             sup.take_telemetry_events()
@@ -6095,6 +6182,7 @@ mod tests {
                 // `sufficient_balance()` is 1000 HOPR; confirming it books the value alongside the
                 // count, in the same turn.
                 deposit_confirmed_uhopr: 1_000_000_000,
+                phase_durations: vec![(PixCyclePhase::AwaitingDeposit, 0)],
                 ..Default::default()
             },
             sup.take_telemetry_events()
