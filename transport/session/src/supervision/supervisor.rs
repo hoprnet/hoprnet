@@ -521,6 +521,7 @@ impl SessionPixSupervisor {
             },
             paid_tail: u32::from(self.paid_recovery_tail.is_some()),
             predeposit_exposure_packets: predeposit_exposure,
+            stalled_share: u32::from(self.fill.is_stalled()),
             ..Default::default()
         };
 

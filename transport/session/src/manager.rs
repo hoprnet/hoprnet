@@ -765,6 +765,9 @@ struct PixFillState {
     /// This is what makes the distinction: one packet per notification period is the notification and
     /// is exempt from the SURB reserve, and everything above that rate is fill and is not.
     last_notify_at: Option<Instant>,
+    /// Whether the SURB reserve is currently withholding fill, so `hopr_pix_sessions_stalled` counts
+    /// this Session once per stall rather than once per refused packet.
+    withholding: bool,
     /// Whether this stream is draining the SURB buffer of a Session that has already been closed.
     ///
     /// Set once, by [`PixFillControl::enter_drain`], and never cleared: a drain ends with the
@@ -794,6 +797,7 @@ impl PixFillControl {
                 notify_started: false,
                 fill: FillRate::ZERO,
                 last_notify_at: None,
+                withholding: false,
                 draining: false,
             }),
         }
@@ -959,6 +963,7 @@ impl PixFillControl {
         }
 
         if self.estimator.saturating_diff() >= self.min_surb_reserve {
+            Self::set_withholding(&mut state, false);
             #[cfg(feature = "telemetry")]
             telemetry::record_pix_fill_packet();
             return true;
@@ -970,9 +975,35 @@ impl PixFillControl {
             estimate = self.estimator.saturating_diff(),
             "withholding a PIX fill keep-alive to stay above the SURB reserve"
         );
+        Self::set_withholding(&mut state, true);
         #[cfg(feature = "telemetry")]
         telemetry::pix::record_pix_fill_backoff(telemetry::pix::PixFillBackoff::SurbReserve);
         false
+    }
+
+    /// Moves the `surb_starved` gauge on the edges only, so it counts stalled Sessions rather than
+    /// refused packets — the same distinction `PixGateBlockEpisode` draws for the egress gate.
+    fn set_withholding(state: &mut PixFillState, withholding: bool) {
+        if state.withholding == withholding {
+            return;
+        }
+        state.withholding = withholding;
+        crate::supervision::telemetry::emit_sessions_stalled(
+            crate::supervision::telemetry::PixStallCause::SurbStarved,
+            if withholding { 1 } else { -1 },
+        );
+    }
+}
+
+/// Returns this Session's `surb_starved` count if it was withholding when it went away.
+///
+/// `Drop` rather than a call on the close paths, for the reason `PixGateBlockEpisode` gives: a
+/// Session can end by teardown, by drain, or by its last `Arc` going out of scope in a task nobody
+/// is waiting on, and this is the one mechanism that covers all three. Without it a Session that
+/// dies mid-stall leaves the gauge standing for the life of the process.
+impl Drop for PixFillControl {
+    fn drop(&mut self) {
+        Self::set_withholding(self.state.get_mut(), false);
     }
 }
 
@@ -6663,6 +6694,52 @@ mod tests {
             reserve,
             Default::default(),
         )
+    }
+
+    /// The `surb_starved` gauge moves on the edges, and a control dropped mid-stall returns it.
+    ///
+    /// Per refused packet would measure how hard the stream retried rather than how long the
+    /// Session was starved, and a control that went away while withholding would leave the count
+    /// standing for the life of the process.
+    #[test]
+    fn the_surb_starved_gauge_counts_stalls_and_is_returned_on_drop() {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let control = fill_control(None, 10);
+        let now = Instant::now();
+
+        // The estimator starts empty, so every one of these is below the reserve of ten.
+        for _ in 0..3 {
+            assert!(!control.admit_at(now), "fill must be withheld below the reserve");
+        }
+        assert_eq!(
+            1,
+            probe::get("sessions_stalled/surb_starved"),
+            "three refusals are one stall, not three"
+        );
+
+        // Enough SURBs arrive to clear the reserve.
+        control
+            .estimator
+            .produced
+            .fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        assert!(control.admit_at(now));
+        assert_eq!(0, probe::get("sessions_stalled/surb_starved"));
+
+        // And a control dropped while withholding returns its own.
+        control
+            .estimator
+            .consumed
+            .fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        assert!(!control.admit_at(now));
+        assert_eq!(1, probe::get("sessions_stalled/surb_starved"));
+        drop(control);
+        assert_eq!(
+            0,
+            probe::get("sessions_stalled/surb_starved"),
+            "a session that dies mid-stall must not leave the gauge standing"
+        );
     }
 
     /// One stream, two producers, and the faster of them wins.

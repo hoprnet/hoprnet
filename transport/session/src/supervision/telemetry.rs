@@ -85,6 +85,22 @@ pub enum PixCyclePhase {
     PaidTail,
 }
 
+/// Why a Session's fill is not keeping up, as `hopr_pix_sessions_stalled` labels it.
+///
+/// The two are different faults with different fixes, and an operator watching a cycle fail to
+/// progress needs to tell them apart: one is an Exit that cannot send, the other an Exit that is
+/// sending into a cycle which is not advancing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum PixStallCause {
+    /// The Exit's own SURB estimate is below the fill reserve, so fill is being withheld. Tracked by
+    /// the manager's `PixFillControl`, which is the only thing that sees the estimate.
+    SurbStarved,
+    /// The cycle being filled for has not advanced for `max_recovery_idle`, so the planner has
+    /// fallen back to its heartbeat.
+    ShareStarved,
+}
+
 /// A cycle lifecycle transition worth a cumulative count.
 ///
 /// There is deliberately no `retired` event. Every `RetireSsa` follows either a tombstone expiring
@@ -267,6 +283,13 @@ pub struct PixSessionSnapshot {
     /// Packets this Session has been served against an unfunded front's predeposit allowance and
     /// which no deposit has yet converted into paid service.
     pub predeposit_exposure_packets: u64,
+    /// Whether this Session's fill has fallen back because its cycle stopped advancing (0 or 1).
+    ///
+    /// A census field rather than an edge the worker latches, so that
+    /// [`release`](PixSessionTelemetry::release) returns it like every other gauge — a Session that
+    /// dies while stalled cannot leave the count standing. [`PixStallCause::SurbStarved`] is not
+    /// here because the supervisor cannot see the SURB estimate.
+    pub stalled_share: u32,
 }
 
 impl PixSessionSnapshot {
@@ -637,6 +660,12 @@ fn apply_delta(from: Option<&PixSessionSnapshot>, to: Option<&PixSessionSnapshot
     if exposure != 0 {
         emit_predeposit_exposure(exposure);
     }
+
+    let stalled =
+        i64::from(to.map(|s| s.stalled_share).unwrap_or(0)) - i64::from(from.map(|s| s.stalled_share).unwrap_or(0));
+    if stalled != 0 {
+        emit_sessions_stalled(PixStallCause::ShareStarved, stalled);
+    }
 }
 
 /// 1 if `snapshot` is a live Session in `mode`, else 0.
@@ -775,13 +804,30 @@ fn emit_shares_total(kind: PixShareKind, count: u64) {
     let _ = (kind, count);
 }
 
+/// `pub(crate)` unlike its siblings, because this gauge has a second producer: the manager's
+/// `PixFillControl` raises [`PixStallCause::SurbStarved`], which the supervisor cannot see. Routing
+/// it here rather than straight at the instrument keeps the metric to one emission point and one
+/// `cfg`, and lets both causes be asserted through [`probe`].
+pub(crate) fn emit_sessions_stalled(cause: PixStallCause, delta: i64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_sessions_stalled(cause, delta);
+    #[cfg(test)]
+    probe::add(&format!("sessions_stalled/{cause}"), delta);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = (cause, delta);
+}
+
 fn emit_cycle_phase_duration(phase: PixCyclePhase, seconds: f64) {
     #[cfg(feature = "telemetry")]
     crate::telemetry::pix::record_cycle_phase_duration(phase, seconds);
+    // One observation rather than the value, for the reason `emit_cycle_summary` gives: what a test
+    // can assert without depending on bucket boundaries is that a phase is timed exactly once.
     #[cfg(test)]
     probe::add(&format!("cycle_phase_seconds/{phase}"), 1);
+    #[cfg(not(feature = "telemetry"))]
+    let _ = seconds;
     #[cfg(not(any(feature = "telemetry", test)))]
-    let _ = (phase, seconds);
+    let _ = phase;
 }
 
 fn emit_deposits_confirmed(uhopr: u64) {
@@ -922,6 +968,49 @@ mod tests {
     #[test]
     fn a_fresh_handle_has_published_nothing() {
         assert_eq!(None, handle().published());
+    }
+
+    /// A Session that dies mid-stall returns its gauge, rather than leaving the count standing.
+    ///
+    /// This is why `share_starved` is a census field and not an edge the worker latches: the worker
+    /// loop has five separate `return` points, and `release` already handles the whole problem for
+    /// every other gauge.
+    #[test]
+    fn a_session_that_dies_while_stalled_returns_its_stall_gauge() {
+        let telemetry = handle();
+        probe::reset();
+
+        let stalled = PixSessionSnapshot {
+            stalled_share: 1,
+            ..snapshot(PixGateMode::Funded, 1)
+        };
+        telemetry.publish(stalled, PixTurnEvents::default());
+        assert_eq!(1, probe::get("sessions_stalled/share_starved"));
+
+        telemetry.release();
+        assert_eq!(
+            0,
+            probe::get("sessions_stalled/share_starved"),
+            "release must return the stall gauge like every other census field"
+        );
+    }
+
+    /// A stall that ends while the Session lives is returned too, without waiting for teardown.
+    #[test]
+    fn a_stall_that_clears_returns_its_gauge() {
+        let telemetry = handle();
+        probe::reset();
+
+        telemetry.publish(
+            PixSessionSnapshot {
+                stalled_share: 1,
+                ..snapshot(PixGateMode::Funded, 1)
+            },
+            PixTurnEvents::default(),
+        );
+        telemetry.publish(snapshot(PixGateMode::Funded, 1), PixTurnEvents::default());
+
+        assert_eq!(0, probe::get("sessions_stalled/share_starved"));
     }
 
     /// Only a cycle that recovered books recovered value, so the gap between the two counters is
@@ -1154,6 +1243,7 @@ mod tests {
             recovering: 4,
             paid_tail: 1,
             predeposit_exposure_packets: 17,
+            stalled_share: 0,
         };
         assert_eq!(9, snapshot.live_cycles());
     }
@@ -1300,6 +1390,7 @@ mod tests {
                 recovering: 3,
                 paid_tail: 1,
                 predeposit_exposure_packets: 64,
+                stalled_share: 1,
             },
             PixTurnEvents {
                 requested: 6,

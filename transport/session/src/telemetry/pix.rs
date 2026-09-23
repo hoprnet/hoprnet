@@ -36,6 +36,7 @@
 //! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
 //! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_sessions_stalled` | MultiGauge | Sessions | stall begins / ends | `cause` = `surb_starved\|share_starved` |
 //! | `hopr_pix_cycle_phase_seconds` | MultiHistogram | seconds | cycle leaves a phase | `phase` — same set as `hopr_pix_cycles_active` |
 //! | `hopr_pix_deposits_confirmed_uhopr_total` | SimpleCounter | µHOPR | deposit confirmed | — |
 //! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
@@ -139,6 +140,16 @@
 //!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
 //! ```
 //!
+//! *Why fill is stalled, right now.* One series instead of correlating a fill-backoff rate against
+//! a gate-block rate: `surb_starved` is an Exit that cannot send because the Entry is not supplying
+//! SURBs, `share_starved` is one sending into a cycle that has stopped advancing.
+//!
+//! ```promql
+//! sum by (cause) (hopr_pix_sessions_stalled)
+//! # as a share of the Sessions that could be stalled
+//! sum(hopr_pix_sessions_stalled) / sum(hopr_pix_sessions_active)
+//! ```
+//!
 //! *Where the time goes.* The phase census above says how many cycles are stuck; this says for how
 //! long, which is what separates a slow Entry (`awaiting_commitment`) from a slow chain
 //! (`awaiting_deposit`) from a starved return path (`recovering`):
@@ -191,6 +202,7 @@ use crate::supervision::{
     GateBlockReason, SessionPixCloseReason,
     telemetry::{
         PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode, PixShareKind,
+        PixStallCause,
     },
 };
 
@@ -284,6 +296,11 @@ lazy_static::lazy_static! {
         "Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus",
         vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
         &["outcome"]
+    ).unwrap();
+    static ref METRIC_PIX_SESSIONS_STALLED: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_pix_sessions_stalled",
+        "PIX sessions whose fill is currently not keeping up, by cause",
+        &["cause"]
     ).unwrap();
     static ref METRIC_PIX_CYCLE_PHASE_SECONDS: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
         "hopr_pix_cycle_phase_seconds",
@@ -399,6 +416,11 @@ pub(crate) fn record_cycle_summary(
     }
 }
 
+/// Moves the stalled-Session count for `cause` by `delta`.
+pub(crate) fn add_sessions_stalled(cause: PixStallCause, delta: i64) {
+    METRIC_PIX_SESSIONS_STALLED.increment(&[cause.to_string().as_str()], delta as f64);
+}
+
 /// Observes how long one cycle spent in `phase`.
 pub(crate) fn record_cycle_phase_duration(phase: PixCyclePhase, seconds: f64) {
     METRIC_PIX_CYCLE_PHASE_SECONDS.observe(&[phase.to_string().as_str()], seconds);
@@ -489,6 +511,7 @@ mod tests {
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.name(),
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.labels(),
             ),
+            (METRIC_PIX_SESSIONS_STALLED.name(), METRIC_PIX_SESSIONS_STALLED.labels()),
             (
                 METRIC_PIX_CYCLE_PHASE_SECONDS.name(),
                 METRIC_PIX_CYCLE_PHASE_SECONDS.labels(),
@@ -527,6 +550,7 @@ mod tests {
         add_deposits_confirmed(1_500_000);
         add_deposits_recovered(1_000_000);
         record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
+        add_sessions_stalled(PixStallCause::ShareStarved, 1);
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -547,6 +571,7 @@ mod tests {
             "hopr_pix_cycle_egress_packets",
             "hopr_pix_cycle_useful_share_fraction",
             "hopr_pix_cycle_accepted_share_fraction",
+            "hopr_pix_sessions_stalled{cause=\"share_starved\"}",
             "hopr_pix_cycle_phase_seconds",
             "hopr_pix_deposits_confirmed_uhopr_total",
             "hopr_pix_deposits_recovered_uhopr_total",
