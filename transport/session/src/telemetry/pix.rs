@@ -575,9 +575,7 @@ mod tests {
             "hopr_pix_cycle_phase_seconds",
             "hopr_pix_deposits_confirmed_uhopr_total",
             "hopr_pix_deposits_recovered_uhopr_total",
-            // PascalCase because `SessionPixCloseReason`'s `Display` values are snapshot-locked as
-            // API by `pix_close_reason_display_values_are_stable`.
-            "hopr_pix_closures_total{reason=\"RecoveryIdle\"}",
+            "hopr_pix_closures_total{reason=\"recovery_idle\"}",
             "hopr_pix_fill_backoff_total{reason=\"surb_reserve\"}",
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");

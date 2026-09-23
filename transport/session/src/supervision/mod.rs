@@ -1338,6 +1338,7 @@ pub enum SessionPixAction {
 ///
 /// These are mapped to public [`ClosureReason`](crate::types::ClosureReason) by the caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum SessionPixCloseReason {
     /// The commitment delivery deadline expired.
     CommitmentTimeout,
