@@ -2186,8 +2186,8 @@ mod tests {
 
     /// The `Display` value of every close reason is a metric label, so it is API.
     ///
-    /// [`crate::telemetry::record_pix_closure`] derives the `reason` label of
-    /// `hopr_session_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
+    /// [`crate::telemetry::pix::record_pix_closure`] derives the `reason` label of
+    /// `hopr_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
     /// attribute added to one, silently renames a metric series and breaks whatever dashboards and
     /// alerts were built on the old name.
     ///

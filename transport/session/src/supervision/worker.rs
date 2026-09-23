@@ -284,7 +284,7 @@ async fn worker_loop(
 fn report_fill_stall(supervisor: &mut SessionPixSupervisor) {
     if supervisor.take_fill_stall() {
         #[cfg(feature = "telemetry")]
-        crate::telemetry::record_pix_fill_backoff(crate::telemetry::PixFillBackoff::Stalled);
+        crate::telemetry::pix::record_pix_fill_backoff(crate::telemetry::pix::PixFillBackoff::Stalled);
     }
 }
 

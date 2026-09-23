@@ -36,6 +36,12 @@
 //! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
 //! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
+//! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
+//!
+//! The last two are per-Session events rather than node aggregates, but they belong on this prefix
+//! because neither is labelled by a Session. Their per-Session siblings
+//! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived
@@ -130,10 +136,17 @@
 //!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
 //! ```
 //!
-//! *Closure rate by reason*, from the existing bounded per-reason counter:
+//! *Closure rate by reason*, from the bounded per-reason counter:
 //!
 //! ```promql
-//! sum by (reason) (rate(hopr_session_pix_closures_total[10m]))
+//! sum by (reason) (rate(hopr_pix_closures_total[10m]))
+//! ```
+//!
+//! *Why fill is not keeping up.* `surb_reserve` is an Exit that cannot send because the Entry is
+//! not supplying SURBs; `stalled` is one sending into a cycle that has stopped advancing:
+//!
+//! ```promql
+//! sum by (reason) (rate(hopr_pix_fill_backoff_total[5m]))
 //! ```
 //!
 //! *Reservation leaks.* The two cumulative byte counters must converge once the live set drains; a
@@ -145,11 +158,26 @@
 //! ```
 
 use crate::supervision::{
-    GateBlockReason,
+    GateBlockReason, SessionPixCloseReason,
     telemetry::{
         PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode, PixShareKind,
     },
 };
+
+/// Why PIX fill sent less than its planned rate, as `hopr_pix_fill_backoff_total` labels it.
+///
+/// Lives here rather than with the label enums in `supervision::telemetry` because neither producer
+/// is the supervisor, and that module is compiled without this feature.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub(crate) enum PixFillBackoff {
+    /// The estimated SURB level was below `fill.min_surb_reserve`, so the packet was withheld.
+    /// Counted per withheld packet.
+    SurbReserve,
+    /// The cycle being filled for stopped progressing for `max_recovery_idle`, so the planner
+    /// dropped back to its heartbeat. Counted once per stall, not once per tick.
+    Stalled,
+}
 
 lazy_static::lazy_static! {
     static ref METRIC_PIX_SESSIONS_ACTIVE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
@@ -226,6 +254,16 @@ lazy_static::lazy_static! {
         "Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus",
         vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
         &["outcome"]
+    ).unwrap();
+    static ref METRIC_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_closures_total",
+        "Sessions closed by the PIX supervisor, by reason",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_PIX_FILL_BACKOFF_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_fill_backoff_total",
+        "Times PIX fill held back, by reason",
+        &["reason"]
     ).unwrap();
 }
 
@@ -317,6 +355,19 @@ pub(crate) fn record_cycle_summary(
     }
 }
 
+/// Counts a Session closed by the PIX supervisor, labelled by why.
+///
+/// Takes the enum rather than a `&str` so that bounded cardinality is a property of the signature,
+/// and so the label has one spelling.
+pub(crate) fn record_pix_closure(reason: SessionPixCloseReason) {
+    METRIC_PIX_CLOSURES_TOTAL.increment(&[reason.to_string().as_str()]);
+}
+
+/// Counts one occasion on which PIX fill held back, labelled by why.
+pub(crate) fn record_pix_fill_backoff(reason: PixFillBackoff) {
+    METRIC_PIX_FILL_BACKOFF_TOTAL.increment(&[reason.to_string().as_str()]);
+}
+
 /// Counts `bytes` returned to the node's live-cycle budget.
 pub(crate) fn record_cycle_bytes_released(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RELEASED.increment_by(bytes);
@@ -376,6 +427,11 @@ mod tests {
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.name(),
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.labels(),
             ),
+            (METRIC_PIX_CLOSURES_TOTAL.name(), METRIC_PIX_CLOSURES_TOTAL.labels()),
+            (
+                METRIC_PIX_FILL_BACKOFF_TOTAL.name(),
+                METRIC_PIX_FILL_BACKOFF_TOTAL.labels(),
+            ),
         ];
 
         for (name, labels) in labelled {
@@ -400,6 +456,8 @@ mod tests {
         record_gate_block_duration(GateBlockReason::ShareLag, 0.25);
         add_shares_total(PixShareKind::Surplus, 11);
         record_cycle_summary(PixCycleOutcome::Failed, 4096, Some(0.5), Some(0.75));
+        record_pix_closure(SessionPixCloseReason::RecoveryIdle);
+        record_pix_fill_backoff(PixFillBackoff::SurbReserve);
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -420,6 +478,10 @@ mod tests {
             "hopr_pix_cycle_egress_packets",
             "hopr_pix_cycle_useful_share_fraction",
             "hopr_pix_cycle_accepted_share_fraction",
+            // PascalCase because `SessionPixCloseReason`'s `Display` values are snapshot-locked as
+            // API by `pix_close_reason_display_values_are_stable`.
+            "hopr_pix_closures_total{reason=\"RecoveryIdle\"}",
+            "hopr_pix_fill_backoff_total{reason=\"surb_reserve\"}",
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }

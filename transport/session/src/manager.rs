@@ -971,7 +971,7 @@ impl PixFillControl {
             "withholding a PIX fill keep-alive to stay above the SURB reserve"
         );
         #[cfg(feature = "telemetry")]
-        telemetry::record_pix_fill_backoff(telemetry::PixFillBackoff::SurbReserve);
+        telemetry::pix::record_pix_fill_backoff(telemetry::pix::PixFillBackoff::SurbReserve);
         false
     }
 }
@@ -3340,7 +3340,7 @@ where
             owned_ssas.clear();
 
             #[cfg(feature = "telemetry")]
-            crate::telemetry::record_pix_closure(reason);
+            crate::telemetry::pix::record_pix_closure(reason);
 
             // Return this Session's share of the node-level aggregates now, rather than leaving it
             // to `close_session` below. The notification between here and there is a network send
