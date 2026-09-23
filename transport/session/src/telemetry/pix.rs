@@ -36,6 +36,8 @@
 //! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
 //! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_deposits_confirmed_uhopr_total` | SimpleCounter | µHOPR | deposit confirmed | — |
+//! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
 //! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
 //! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
 //!
@@ -135,6 +137,20 @@
 //! histogram_quantile(0.9, sum by (le, outcome) (
 //!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
 //! ```
+//!
+//! *Stranded deposit value.* What the Entries paid for and this Exit did not recover. Compared as
+//! cumulative totals rather than as rates, like the reservation-leak query below: a cycle confirms
+//! now and recovers an hour later, so the two counters do not move together over a short window.
+//!
+//! ```promql
+//! (hopr_pix_deposits_confirmed_uhopr_total - hopr_pix_deposits_recovered_uhopr_total) / 1e6
+//! # what fraction of what was paid for is being lost
+//! 1 - hopr_pix_deposits_recovered_uhopr_total / hopr_pix_deposits_confirmed_uhopr_total
+//! ```
+//!
+//! A Session released mid-flight drops its recovered value but keeps its confirmed value — see
+//! [`EventScope`](super::super::supervision::telemetry) — so this over-states the loss rather than
+//! hiding it.
 //!
 //! *Closure rate by reason*, from the bounded per-reason counter:
 //!
@@ -255,6 +271,14 @@ lazy_static::lazy_static! {
         vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
         &["outcome"]
     ).unwrap();
+    static ref METRIC_PIX_DEPOSITS_CONFIRMED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_deposits_confirmed_uhopr_total",
+        "Deposit value confirmed for SSA cycles of this Exit, in uHOPR (1e-6 HOPR)"
+    ).unwrap();
+    static ref METRIC_PIX_DEPOSITS_RECOVERED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_deposits_recovered_uhopr_total",
+        "Deposit value this Exit actually unlocked by fully recovering the cycle, in uHOPR (1e-6 HOPR)"
+    ).unwrap();
     static ref METRIC_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_closures_total",
         "Sessions closed by the PIX supervisor, by reason",
@@ -353,6 +377,19 @@ pub(crate) fn record_cycle_summary(
     if let Some(fraction) = accepted_fraction {
         METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.observe(&[outcome.as_str()], fraction);
     }
+}
+
+/// Adds `uhopr` of deposit value confirmed for a cycle.
+pub(crate) fn add_deposits_confirmed(uhopr: u64) {
+    METRIC_PIX_DEPOSITS_CONFIRMED.increment_by(uhopr);
+}
+
+/// Adds `uhopr` of deposit value unlocked by a cycle recovering.
+///
+/// Always at most its confirmed sibling; the difference is value the Exit was paid for and did not
+/// recover, which nothing refunds.
+pub(crate) fn add_deposits_recovered(uhopr: u64) {
+    METRIC_PIX_DEPOSITS_RECOVERED.increment_by(uhopr);
 }
 
 /// Counts a Session closed by the PIX supervisor, labelled by why.
@@ -458,6 +495,8 @@ mod tests {
         record_cycle_summary(PixCycleOutcome::Failed, 4096, Some(0.5), Some(0.75));
         record_pix_closure(SessionPixCloseReason::RecoveryIdle);
         record_pix_fill_backoff(PixFillBackoff::SurbReserve);
+        add_deposits_confirmed(1_500_000);
+        add_deposits_recovered(1_000_000);
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -478,6 +517,8 @@ mod tests {
             "hopr_pix_cycle_egress_packets",
             "hopr_pix_cycle_useful_share_fraction",
             "hopr_pix_cycle_accepted_share_fraction",
+            "hopr_pix_deposits_confirmed_uhopr_total",
+            "hopr_pix_deposits_recovered_uhopr_total",
             // PascalCase because `SessionPixCloseReason`'s `Display` values are snapshot-locked as
             // API by `pix_close_reason_display_values_are_stable`.
             "hopr_pix_closures_total{reason=\"RecoveryIdle\"}",

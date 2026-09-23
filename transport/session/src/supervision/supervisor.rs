@@ -35,6 +35,19 @@ enum SsaPhase {
     Closing,
 }
 
+/// Wei in one µHOPR, the unit `hopr_pix_deposits_*_uhopr_total` counts.
+const WEI_PER_UHOPR: u128 = 1_000_000_000_000;
+
+/// A deposit in µHOPR, saturating rather than wrapping.
+///
+/// Integer because the counters it feeds are, and µHOPR because wei overflows a `u64` at 18 HOPR
+/// while whole HOPR would round every realistic deposit to nothing.
+fn deposit_uhopr(amount: HoprBalance) -> u64 {
+    let wei = amount.amount();
+    let wei = if wei.bits() > 128 { u128::MAX } else { wei.low_u128() };
+    (wei / WEI_PER_UHOPR).min(u64::MAX as u128) as u64
+}
+
 // ---------------------------------------------------------------------------
 // PerSsaState
 // ---------------------------------------------------------------------------
@@ -68,6 +81,9 @@ struct PerSsaState {
     deposit_deadline: Option<Instant>,
     recovery_idle_deadline: Option<Instant>,
     recovery_hard_deadline: Option<Instant>,
+
+    /// What the Entry deposited for this cycle, in µHOPR, or zero until the deposit confirms.
+    deposit_uhopr: u64,
 
     // Progress tracking.
     largest_useful_shares: u64,
@@ -126,6 +142,7 @@ impl PerSsaState {
             commitment_deadline: None,
             recommit_deadline: None,
             recommit_attempts: 0,
+            deposit_uhopr: 0,
             deposit_deadline: None,
             recovery_idle_deadline: None,
             recovery_hard_deadline: None,
@@ -156,6 +173,7 @@ impl PerSsaState {
             accepted_shares: self.largest_shares_seen,
             useful_shares: self.largest_useful_shares,
             target_useful_shares: self.target_useful_shares,
+            deposit_uhopr: self.deposit_uhopr,
         }
     }
 
@@ -1063,7 +1081,10 @@ impl SessionPixSupervisor {
 
         // Behind both the phase guard and the zero-amount guard above, so a duplicate confirmation
         // and a zero balance — which is not a verdict — both count nothing.
+        ssa.deposit_uhopr = deposit_uhopr(amount);
         self.telemetry.funded = self.telemetry.funded.saturating_add(1);
+        self.telemetry.deposit_confirmed_uhopr =
+            self.telemetry.deposit_confirmed_uhopr.saturating_add(ssa.deposit_uhopr);
 
         // If recovery completed before the deposit arrived, immediately
         // tombstone the SSA — the Recovered event was deferred.
@@ -6071,6 +6092,9 @@ mod tests {
         assert_eq!(
             PixTurnEvents {
                 funded: 1,
+                // `sufficient_balance()` is 1000 HOPR; confirming it books the value alongside the
+                // count, in the same turn.
+                deposit_confirmed_uhopr: 1_000_000_000,
                 ..Default::default()
             },
             sup.take_telemetry_events()
@@ -6103,6 +6127,9 @@ mod tests {
                 accepted_shares: sup.dims.target_useful_shares(),
                 useful_shares: sup.dims.target_useful_shares(),
                 target_useful_shares: sup.dims.target_useful_shares(),
+                // `sufficient_balance()` is 1000 HOPR, so the deposit the fixture confirmed reaches
+                // the summary that decides how much value this recovery unlocked.
+                deposit_uhopr: 1_000_000_000,
             }],
             events.finalized,
             "a recovered cycle is summarized exactly once, at full useful coverage"
@@ -6648,6 +6675,7 @@ mod tests {
             accepted_shares: 0,
             useful_shares: 0,
             target_useful_shares: 0,
+            deposit_uhopr: 0,
         };
         assert_eq!(None, summary.useful_fraction());
         assert_eq!(None, summary.accepted_fraction());
@@ -6662,6 +6690,7 @@ mod tests {
             accepted_shares: 768,
             useful_shares: 512,
             target_useful_shares: 512,
+            deposit_uhopr: 0,
         };
         assert_eq!(Some(1.0), summary.useful_fraction());
         assert_eq!(Some(1.5), summary.accepted_fraction());

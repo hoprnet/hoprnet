@@ -309,6 +309,10 @@ pub struct PixTurnEvents {
     pub useful_shares: u64,
     /// Newly accepted shares that did not — the negotiated surplus, and duplicates.
     pub surplus_shares: u64,
+    /// Deposit value confirmed this turn, in µHOPR. Recovered value is read off
+    /// [`finalized`](Self::finalized) instead, so the two follow the scope rules of the cycle
+    /// counters they mirror.
+    pub deposit_confirmed_uhopr: u64,
     /// Cycles that reached a terminal state and have a coverage summary to observe.
     ///
     /// A `Vec` rather than a running total because each entry becomes one observation in three
@@ -335,6 +339,8 @@ pub struct PixCycleSummary {
     pub useful_shares: u64,
     /// Useful shares that would have constituted full recovery.
     pub target_useful_shares: u64,
+    /// What the Entry deposited for it, in µHOPR. Zero for a cycle that never funded.
+    pub deposit_uhopr: u64,
 }
 
 impl PixCycleSummary {
@@ -650,12 +656,30 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
             emit_shares_total(kind, count);
         }
     }
+    // Confirmed deposit value pairs with `Funded`, which is not census-coupled, so it is emitted in
+    // both scopes for the same reason that count is.
+    if events.deposit_confirmed_uhopr > 0 {
+        emit_deposits_confirmed(events.deposit_confirmed_uhopr);
+    }
     // The summaries are not, because each carries an outcome that must agree with the count that
     // retired the same cycle. Under `EdgesOnly` that count came from `release`'s census charge —
     // `failed`, uniformly — so observing a summary here could assert `recovered` for a cycle the
     // counters have already given up on. `sum(cycle_summaries) <= recovered + failed` is documented
     // as the expected relation precisely because a Session can end without a verdict per cycle.
+    //
+    // Recovered deposit value rides with them rather than being latched separately, so it inherits
+    // that rule from `Recovered`, which is census-coupled. The consequence is deliberate: a Session
+    // released mid-flight under-reports recovered value while still reporting confirmed, so the gap
+    // between the two counters over-states stranded value rather than hiding it.
     if scope == EventScope::Everything {
+        let recovered_uhopr = events
+            .finalized
+            .iter()
+            .filter(|summary| summary.outcome == PixCycleOutcome::Recovered)
+            .fold(0u64, |total, summary| total.saturating_add(summary.deposit_uhopr));
+        if recovered_uhopr > 0 {
+            emit_deposits_recovered(recovered_uhopr);
+        }
         for summary in events.finalized {
             emit_cycle_summary(summary);
         }
@@ -738,6 +762,24 @@ fn emit_shares_total(kind: PixShareKind, count: u64) {
     probe::add(&format!("shares_total/{kind}"), count as i64);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = (kind, count);
+}
+
+fn emit_deposits_confirmed(uhopr: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_deposits_confirmed(uhopr);
+    #[cfg(test)]
+    probe::add("deposits_confirmed_uhopr", uhopr as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = uhopr;
+}
+
+fn emit_deposits_recovered(uhopr: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_deposits_recovered(uhopr);
+    #[cfg(test)]
+    probe::add("deposits_recovered_uhopr", uhopr as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = uhopr;
 }
 
 fn emit_cycle_summary(summary: PixCycleSummary) {
@@ -862,6 +904,45 @@ mod tests {
         assert_eq!(None, handle().published());
     }
 
+    /// Only a cycle that recovered books recovered value, so the gap between the two counters is
+    /// what the Exit was paid for and did not unlock.
+    #[test]
+    fn a_failed_cycle_books_its_deposit_as_confirmed_but_never_as_recovered() {
+        let telemetry = handle();
+        probe::reset();
+
+        let summary = |outcome, deposit_uhopr| PixCycleSummary {
+            outcome,
+            egress_packets: 0,
+            accepted_shares: 5,
+            useful_shares: 5,
+            target_useful_shares: 10,
+            deposit_uhopr,
+        };
+
+        telemetry.publish(
+            snapshot(PixGateMode::Funded, 0),
+            PixTurnEvents {
+                funded: 2,
+                recovered: 1,
+                failed: 1,
+                deposit_confirmed_uhopr: 900_000,
+                finalized: vec![
+                    summary(PixCycleOutcome::Recovered, 400_000),
+                    summary(PixCycleOutcome::Failed, 500_000),
+                ],
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(900_000, probe::get("deposits_confirmed_uhopr"));
+        assert_eq!(
+            400_000,
+            probe::get("deposits_recovered_uhopr"),
+            "the failed cycle's 500_000 is the stranded half and must not be counted as recovered"
+        );
+    }
+
     #[test]
     fn publish_stores_the_latest_census() {
         let telemetry = handle();
@@ -926,12 +1007,14 @@ mod tests {
                 failed: 1,
                 useful_shares: 7,
                 surplus_shares: 4,
+                deposit_confirmed_uhopr: 500_000,
                 finalized: vec![PixCycleSummary {
                     outcome: PixCycleOutcome::Recovered,
                     egress_packets: 80,
                     accepted_shares: 12,
                     useful_shares: 10,
                     target_useful_shares: 10,
+                    deposit_uhopr: 400_000,
                 }],
             },
         );
@@ -955,6 +1038,17 @@ mod tests {
             0,
             probe::get("cycle_summaries/recovered"),
             "a summary asserting `recovered` must not outlive the count that gave the cycle up"
+        );
+        assert_eq!(
+            500_000,
+            probe::get("deposits_confirmed_uhopr"),
+            "confirmed value pairs with `funded`, which this scope still books"
+        );
+        assert_eq!(
+            0,
+            probe::get("deposits_recovered_uhopr"),
+            "recovered value rides the summaries, so it is dropped with them — the gap between the two counters \
+             over-states stranded value rather than hiding it"
         );
         assert_eq!(
             None,
@@ -1504,6 +1598,7 @@ mod tests {
                     accepted_shares: 768,
                     useful_shares: 512,
                     target_useful_shares: 512,
+                    deposit_uhopr: 0,
                 }],
                 ..Default::default()
             },
@@ -1527,6 +1622,7 @@ mod tests {
             accepted_shares: 100,
             useful_shares: 50,
             target_useful_shares: 512,
+            deposit_uhopr: 0,
         };
         telemetry.publish(
             snapshot(PixGateMode::Funded, 0),
