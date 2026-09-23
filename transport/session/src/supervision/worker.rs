@@ -1135,6 +1135,7 @@ mod tests {
             .send_event(SessionPixEvent::UnverifiableShares {
                 ssa_id: SsaId::new(p, SsaIndex::new(1).expect("index one is non-zero")),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             })
             .await
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;

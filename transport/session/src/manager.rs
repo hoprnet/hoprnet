@@ -3978,8 +3978,9 @@ where
     /// outlive their Session by up to the reconstructor's ack window, so events for a just-closed
     /// Session are routine. Callers distinguish it for exactly that reason.
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
-        let session_id = event.pseudonym();
-        let Some(slot) = self.sessions.get(session_id) else {
+        // Copied rather than borrowed, so the match below can move the event's payload out.
+        let session_id = *event.pseudonym();
+        let Some(slot) = self.sessions.get(&session_id) else {
             debug!(%session_id, "pix event for a session that is no longer registered");
             return Err(SessionManagerError::NonExistingSession.into());
         };
@@ -3999,7 +4000,7 @@ where
         // one, and the next one supersedes it.
         if let HoprSessionInPixEvent::RecoveryProgress(progress) = event {
             #[cfg(feature = "telemetry")]
-            telemetry::set_pix_recovery_progress(session_id, progress.useful_shares, progress.target_useful_shares);
+            telemetry::set_pix_recovery_progress(&session_id, progress.useful_shares, progress.target_useful_shares);
 
             if !supervisor.try_send_progress(progress) {
                 trace!(%session_id, "dropped a pix progress snapshot on a full supervisor channel");
@@ -4014,9 +4015,17 @@ where
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
                 supervisor.send_event(SessionPixEvent::Recovered(ssa_id)).await
             }
-            HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total } => {
+            HoprSessionInPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total,
+                peer,
+            } => {
                 supervisor
-                    .send_event(SessionPixEvent::UnverifiableShares { ssa_id, observed_total })
+                    .send_event(SessionPixEvent::UnverifiableShares {
+                        ssa_id,
+                        observed_total,
+                        peer,
+                    })
                     .await
             }
             HoprSessionInPixEvent::RecoveryProgress(_) => unreachable!("handled above"),
@@ -10975,6 +10984,7 @@ mod tests {
         mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
             ssa_id,
             observed_total: 1,
+            peer: crate::supervision::test_peer(),
         })
         .await?;
 
@@ -13761,6 +13771,7 @@ mod tests {
             .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
                 ssa_id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             })
             .await;
         // Forwarding succeeds even for the event that closes: the supervisor decides, and it does so

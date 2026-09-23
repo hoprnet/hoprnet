@@ -7,7 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
+use hopr_api::{HoprBalance, OffchainPublicKey, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
 use super::{
@@ -323,9 +323,11 @@ impl SessionPixSupervisor {
             SessionPixEvent::RecoveryProgress(progress) => self.on_recovery_progress(progress, now, served_total),
             SessionPixEvent::AlmostRecovered(ssa_id) => self.on_almost_recovered(ssa_id, now),
             SessionPixEvent::Recovered(ssa_id) => self.on_recovered(ssa_id, now, served_total),
-            SessionPixEvent::UnverifiableShares { ssa_id, observed_total } => {
-                self.on_unverifiable_shares(ssa_id, *observed_total, now)
-            }
+            SessionPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total,
+                peer,
+            } => self.on_unverifiable_shares(ssa_id, *observed_total, peer, now),
             SessionPixEvent::SessionClosed { drainable_surbs } => self.on_session_closed(*drainable_surbs, now),
         };
 
@@ -1580,6 +1582,7 @@ impl SessionPixSupervisor {
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
         observed_total: u64,
+        peer: &OffchainPublicKey,
         _now: Instant,
     ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
@@ -1596,6 +1599,7 @@ impl SessionPixSupervisor {
 
         tracing::warn!(
             %ssa_id,
+            %peer,
             observed_total,
             phase = ?self.ssas[idx].phase,
             "closing PIX session: a polynomial's share set failed to open its commitment"
@@ -3521,6 +3525,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
@@ -3556,6 +3561,7 @@ mod tests {
                 &SessionPixEvent::UnverifiableShares {
                     ssa_id: id,
                     observed_total,
+                    peer: crate::supervision::test_peer(),
                 },
                 now,
                 0,
@@ -3600,6 +3606,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: ids[2],
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
@@ -4472,6 +4479,7 @@ mod tests {
             SessionPixEvent::UnverifiableShares {
                 ssa_id: ssa_id(p, 2),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
         ] {
             assert!(
@@ -5163,6 +5171,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
                 observed_total: 5,
+                peer: crate::supervision::test_peer(),
             },
             start,
             100,
@@ -5581,6 +5590,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: ssa_id(p, 1),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             t0 + Duration::from_secs(2),
             0,
@@ -6199,6 +6209,7 @@ mod tests {
                     &SessionPixEvent::UnverifiableShares {
                         ssa_id: ssa_id(p, 1),
                         observed_total: 1,
+                        peer: crate::supervision::test_peer(),
                     },
                     t0,
                     0,
