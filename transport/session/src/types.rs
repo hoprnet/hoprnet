@@ -476,7 +476,7 @@ pub struct HoprSessionConfig {
     /// Expected frame size of the Session protocol socket.
     ///
     /// Clamped to the socket's supported frame size range — see
-    /// [`session_frame_size`](hopr_protocol_session::session_frame_size).
+    /// [`session_frame_size`].
     ///
     /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
     #[default(SESSION_MTU)]
