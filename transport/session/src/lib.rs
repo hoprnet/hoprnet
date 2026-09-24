@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
-        assert_eq!(1500, SESSION_MTU); // Needs to be changed when the Session MTU cap changes
+        assert_eq!(1452, SESSION_MTU); // Needs to be changed when the Session MTU cap changes
     }
 
     #[test]

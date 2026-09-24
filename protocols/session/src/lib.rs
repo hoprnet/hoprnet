@@ -69,8 +69,9 @@ const fn min(a: usize, b: usize) -> usize {
 
 /// Maximum Session MTU even if the HOPR packet allows for more.
 ///
-/// Preserves the 1500-byte frame capacity, including 1456-byte VPN datagrams, in one segment.
-pub const MAX_SESSION_MTU: usize = 1500;
+/// Based on wireguard-go with a 1420-byte tunnel MTU, whose padding is capped at that MTU,
+/// plus a 16-byte transport header and a 16-byte authentication tag.
+pub const MAX_SESSION_MTU: usize = 1452;
 
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {

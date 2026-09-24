@@ -615,7 +615,8 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn session_socket_should_preserve_datagram_frame_size() -> anyhow::Result<()> {
         for (frame_size, datagram_size) in [
-            (SessionSocketConfig::default().frame_size, 1456),
+            (SessionSocketConfig::default().frame_size, 1452),
+            (1456, 1456),
             (1500, 1500),
             (2800, 2800),
         ] {
