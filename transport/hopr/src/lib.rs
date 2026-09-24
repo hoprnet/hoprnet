@@ -76,8 +76,6 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
 use hopr_transport_session::{
     AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
     SessionManagerConfig,
@@ -85,11 +83,13 @@ use hopr_transport_session::{
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
-    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    SessionAdmissionReply, SessionAdmissionSink, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::{transfer_session, transfer_session_datagram};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
 use hopr_utils::{
     network_types::{
@@ -119,7 +119,7 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations, PixDepositSecret},
-    node::{PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
+    node::{PixAddressId, PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
@@ -329,6 +329,18 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
+        // Validated at the constructor boundary, because this is the boundary. The shared node
+        // builder does validate before all four of its build methods reach here, but this function is
+        // `pub`, and a direct caller then skips every relational check on the way in — including
+        // `validate_pix_supervision_pairing`, which is a schema-level validator on
+        // `HoprProtocolConfig` and so is not reached by validating any single field.
+        //
+        // `run_inner` validates `self.cfg.pix` alone, which is the narrower of the two: it cannot see
+        // the supervisor-against-reconstructor pairing, and it runs at Session establishment rather
+        // than at construction — long after a caller could have been told.
+        validator::Validate::validate(&cfg)
+            .map_err(|error| HoprTransportError::Api(format!("invalid protocol configuration: {error}")))?;
+
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(
@@ -455,6 +467,7 @@ where
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -479,6 +492,7 @@ where
             ticket_factory,
             exit_ack_share,
             Some(on_incoming_session),
+            on_session_admission,
         )
         .await
     }
@@ -490,6 +504,10 @@ where
     ///
     /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
     /// to decrypt PIX shares.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "each argument is a distinct wiring point supplied by hopr-lib"
+    )]
     pub async fn run_exit<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
@@ -498,6 +516,7 @@ where
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -520,6 +539,7 @@ where
             ticket_factory,
             pix_events,
             Some(on_incoming_session),
+            on_session_admission,
         )
         .await
     }
@@ -558,6 +578,7 @@ where
             ticket_factory,
             pix_events,
             None,
+            None,
         )
         .await
     }
@@ -579,6 +600,7 @@ where
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
         on_incoming_session: Option<Sender<IncomingSession>>,
+        on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -806,12 +828,13 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        // The SSA generator is dimensioned from the global PIX config (not per
-        // session) because `handle_ssa_request` (SessionManager) validates that the
-        // Exit's negotiated quota matches the session's `pix_ssa_quota` before any
-        // client commitments are generated, and the Exit's `new_exit_commitment`
-        // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
-        // a subset of what the global generator covers, so one generator suffices.
+        // The SSA generator is dimensioned from the global PIX config, and that is the only place
+        // the dimensions come from: `new_session` reads them straight off this generator to build
+        // what it announces, so every PIX Session on this node is established at exactly these
+        // values and one generator suffices. `handle_ssa_request` (SessionManager) then holds the
+        // Exit to them, rejecting a negotiated quota that differs before any client commitments are
+        // generated. `new_exit_commitment` itself adds no range check — a `PixParams` can only
+        // come from `try_new`, which is what bounds polys_per_ssa and shares_per_poly.
         //
         // Validated here rather than left to the constructor: `PixGlobalConfig` carries more than
         // the three fields `SsaGeneratorConfig` covers, and this used to be a SAFETY comment
@@ -957,10 +980,17 @@ where
                     HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
                 })?,
                 pix_toolbox,
+                on_session_admission,
             )
         } else {
-            self.smgr
-                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain(), pix_toolbox)
+            // An Entry establishes Sessions rather than admitting them, so there is nothing to ask
+            // about even if the caller installed a session server.
+            self.smgr.start(
+                unresolved_routing_msg_tx.clone(),
+                futures::sink::drain(),
+                pix_toolbox,
+                None,
+            )
         };
 
         smgr_start_res
@@ -1011,6 +1041,7 @@ where
         let surb_flush_smgr = self.smgr.clone();
         let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
+        let surb_flush_store = self.path_planner.surb_store.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1025,7 +1056,8 @@ where
                     //
                     // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
                     // they capture has to survive being invoked once per silent destination.
-                    let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
+                    let (planner, chain, smgr, store) =
+                        (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr, &surb_flush_store);
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
@@ -1046,10 +1078,19 @@ where
                             // stocked -- so tell the Sessions routed there to stop believing
                             // that estimate while the evidence says otherwise.
                             match chain.packet_key_to_chain_key(&destination) {
-                                Ok(Some(address)) => smgr.mark_return_path_degraded(
-                                    &hopr_api::types::internal::prelude::NodeId::Chain(address),
-                                    RETURN_PATH_DEGRADED_GRACE,
-                                ),
+                                Ok(Some(address)) => {
+                                    let marked = smgr.mark_return_path_degraded(
+                                        &hopr_api::types::internal::prelude::NodeId::Chain(address),
+                                        RETURN_PATH_DEGRADED_GRACE,
+                                    );
+                                    // The return path for these sessions was just re-planned; advance
+                                    // each one's SURB generation so the fresh batch supersedes the
+                                    // SURBs the counterparty still holds for the dead path.
+                                    for pseudonym in &marked {
+                                        store.bump_generation(pseudonym);
+                                    }
+                                    marked.len()
+                                }
                                 // A resolver error is exactly the failure this recovery path exists
                                 // to surface, so it must not be collapsed into "no chain key" — log
                                 // it rather than silently marking zero sessions.
@@ -1395,17 +1436,16 @@ pub(crate) fn recovered_ssa_to_pix_event(
     rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
 ) -> PixEvent {
     PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
-        id: (*rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
+        id: PixAddressId::new(rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
         secret: PixDepositSecret(rec.ssa.secret().clone()),
     })
 }
 
 /// How many PIX share resolutions may be dispatched into the [`SessionManager`] at once.
 ///
-/// A dispatch is not cheap: `SsaAlmostRecovered` / `SsaRecovered` reach `request_next_ssa`, which
-/// acquires a per-session lock (with a 30 s timeout), generates an Exit commitment on the blocking
-/// pool and sends an `SsaRequest` over the network. All sessions share this one stream, so
-/// dispatching sequentially lets a single slow or stalled session hold up PIX progress — and
+/// A dispatch can block: lifecycle events are delivered to a per-session supervisor over a bounded
+/// channel, so a session whose supervisor is busy backpressures its sender. All sessions share this
+/// one stream, so dispatching sequentially would let one such session hold up PIX progress — and
 /// therefore the pipelined next-SSA request — for every other session on the node.
 const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
 
@@ -1417,32 +1457,38 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
             ssa_id,
             deposit_address,
             quota_per_ssa,
+            deposit_data,
         }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+            id: PixAddressId::new(ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // `None` rather than the handshake's `deposit_data`: that field is carried by the Start
-            // protocol's `SsaRequest` (`hopr-protocol-start`) and is not surfaced through
-            // `AgreedSsaQuota`, so there is nothing here to forward yet. Threading it through is a
-            // change to the Session layer's event types, not to this mapping.
-            additional_data: None,
+            // What the Exit attached to this SSA in its `SsaRequest`, rebuilt by the Session layer
+            // from the message. Empty when the Exit's pool produced none — `PixDepositData::is_empty`
+            // is what tells the two apart, so there is nothing to signal here.
+            deposit_data,
         }),
         HoprSessionOutPixEvent::DepositNeeded(
             AgreedSsaQuota {
                 ssa_id,
                 deposit_address,
                 quota_per_ssa,
+                deposit_data,
             },
             notifier,
         ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+            id: PixAddressId::new(ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // See `NewDepositAddress` above: the handshake's `deposit_data` does not reach
-            // `AgreedSsaQuota`, so there is nothing to forward yet.
-            additional_data: None,
-            deposit_updated: Some(notifier),
+            // This node's own data coming back to it: the pool produced it for this SSA before the
+            // request went out, and gets it returned now that the address it pays for is known.
+            deposit_data,
+            // Not optional as of hopr-api 4.0.1: the Exit always has a channel to report the deposit
+            // on, and every `DepositAddressReceived` this maps from carries one.
+            deposit_updated: notifier,
         }),
+        // Straight through: `PixDepositDataRequest` is the pool's own request type, and the Session
+        // layer neither adds to it nor reads the answers off the channel it carries.
+        HoprSessionOutPixEvent::DepositDataRequest(request) => PixEvent::DepositDataRequest(request),
     }
 }
 
@@ -1478,27 +1524,31 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
             if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
             None
         }
-        // Nothing consumes recovery progress yet — the Exit-side PIX supervisor is what will, and it
-        // is the only thing that can act on a running total. Dropped here rather than suppressed at
-        // the reconstructor so that the emission contract (and its tests) live with the producer.
-        //
-        // Cheap to discard: this branch awaits nothing, so the resolution channel is drained faster
-        // than the acknowledgement path can fill it.
+        // Feeds the supervisor's recovery deadlines and the egress gate's progress ceiling. A funded
+        // Session that stops making progress stops being served, so dropping these outright would
+        // stall a healthy Session rather than merely lose a statistic.
         ShareResolution::Progress(progress) => {
             tracing::trace!(
                 ssa_id = %progress.ssa_id,
                 useful_shares = progress.useful_shares,
+                shares_seen = progress.shares_seen,
                 target = progress.target_useful_shares,
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
             );
+            if let Err(error) = smgr
+                .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))
+                .await
+            {
+                tracing::trace!(%error, ssa_id = %progress.ssa_id, "recovery progress for an unsupervised session");
+            }
             None
         }
     }
@@ -1521,6 +1571,36 @@ fn ssa_reconstructor(cfg: &PixGlobalConfig) -> errors::Result<Arc<hopr_protocol_
     hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::try_new(cfg.reconstructor.into())
         .map(Arc::new)
         .map_err(|error| HoprTransportError::Api(format!("invalid SSA reconstructor configuration: {error}")))
+}
+
+/// Turns the reconstructor's synchronous resolution wake-up into an asynchronous stream.
+///
+/// The one-slot channel carries only wake-ups, never resolutions. A full channel therefore means a
+/// wake-up is already pending and can be safely coalesced; the resolutions themselves remain in the
+/// reconstructor until this stream or the acknowledgement fallback atomically takes them.
+fn commitment_resolution_stream(
+    ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
+) -> impl futures::Stream<Item = HoprShareResolution> + Send + 'static {
+    let (ready_tx, ready_rx) = bounded_sink_channel::<()>(1);
+    let registered = ssa_reconstructor.set_ready_resolution_notifier(move || match ready_tx.try_send(()) {
+        Ok(()) | Err(crossfire::TrySendError::Full(())) => {}
+        Err(crossfire::TrySendError::Disconnected(())) => {
+            tracing::error!("PIX commitment-resolution notification stream is disconnected");
+        }
+    });
+    if !registered {
+        tracing::error!("PIX reconstructor already has a commitment-resolution notification stream");
+    }
+
+    let ssa_reconstructor = Arc::downgrade(&ssa_reconstructor);
+    ready_rx.flat_map(move |_| {
+        futures::stream::iter(
+            ssa_reconstructor
+                .upgrade()
+                .map(|reconstructor| reconstructor.take_ready_resolutions())
+                .unwrap_or_default(),
+        )
+    })
 }
 
 /// Wires the Exit-side PIX machinery: [`PixToolbox`], the recovered-share channel and the
@@ -1566,14 +1646,19 @@ where
     PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
     PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
 {
+    let commitment_resolutions = commitment_resolution_stream(ssa_reconstructor.clone());
     let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator, ssa_reconstructor.clone());
     let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
     processes.insert(
         HoprTransportProcess::PixEvents,
         hopr_utils::spawn_as_abortable!(
-            pix_event_stream(session_pix_events, ssa_share_resolution_events_rx, smgr)
-                .map(Ok)
-                .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
+            pix_event_stream(
+                session_pix_events,
+                ssa_share_resolution_events_rx.merge(commitment_resolutions),
+                smgr,
+            )
+            .map(Ok)
+            .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
         ),
     );
 
@@ -1589,10 +1674,11 @@ where
 /// the packet pipeline. Share resolutions are dispatched into the `SessionManager` concurrently
 /// (see [`PIX_EVENT_DISPATCH_CONCURRENCY`]).
 ///
-/// Concurrency does not require ordering guarantees here: `request_next_ssa` serializes on a
-/// per-session lock and re-checks the SSA index under it, so of the events belonging to one cycle
-/// exactly one advances the index and the rest are recognised as stale and become no-ops,
-/// regardless of the order in which they arrive.
+/// Concurrency does not require ordering guarantees here: events for one session converge on that
+/// session's supervisor, which is a single-threaded state machine whose handlers are idempotent per
+/// phase and whose counters are absolute rather than incremental. Of the events belonging to one
+/// cycle exactly one advances it and the rest are recognised as stale, whatever order they arrive
+/// in.
 fn pix_event_stream(
     session_pix_events: impl futures::Stream<Item = HoprSessionOutPixEvent> + Send + 'static,
     ssa_share_resolutions: impl futures::Stream<Item = HoprShareResolution> + Send + 'static,
@@ -1697,8 +1783,11 @@ pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::
 
 #[cfg(test)]
 mod pix_recovery_event_tests {
+    use std::{sync::Arc, time::Duration};
+
+    use futures::StreamExt;
     use hopr_api::{
-        node::PixEvent,
+        node::{PixAddressId, PixEvent},
         types::{
             crypto::{
                 keypairs::{Keypair, OffchainKeypair},
@@ -1710,35 +1799,42 @@ mod pix_recovery_event_tests {
     };
     use hopr_crypto_packet::HoprPixSpec;
     use hopr_protocol_pix::{
-        EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, SsaGeneratorConfig, SsaId, SsaIndex,
-        SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+        EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaGeneratorConfig, SsaId,
+        SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
     };
 
-    use super::recovered_ssa_to_pix_event;
+    use super::{commitment_resolution_stream, recovered_ssa_to_pix_event};
 
-    #[test]
-    fn recovered_ssa_maps_to_private_key_event_with_correct_secret_and_id() -> anyhow::Result<()> {
+    /// A commitment that redeems the final deferred acknowledgement must deliver the recovered key
+    /// without waiting for another acknowledgement batch that may never arrive.
+    #[test_log::test(tokio::test)]
+    async fn commitment_recovery_reaches_the_private_key_event_without_a_later_ack() -> anyhow::Result<()> {
         let cfg = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
         };
         let generator = SsaShareGenerator::<HoprPixSpec>::new(cfg);
-        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {
+        let reconstructor = Arc::new(SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {
             early_recovery_threshold: 1.0,
             ..Default::default()
-        });
+        }));
+        let mut commitment_resolutions = Box::pin(commitment_resolution_stream(reconstructor.clone()));
 
         let pseudonym = SimplePseudonym::random();
         let peer = OffchainKeypair::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let client = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-        let server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let server_commitment = reconstructor.new_exit_commitment(
+            ssa_id,
+            hopr_protocol_pix::PixParams::try_new_for::<HoprPixSpec>(2, 2, 0)?,
+        )?;
         let expected_addr = HoprPixSpec::group_to_deposit_address(client.ssa_commitment + server_commitment)
             .ok_or_else(|| anyhow::anyhow!("deposit address"))?;
-        client.process_into_reconstructor(&reconstructor)?;
 
+        // Every share and acknowledgement arrives before the client commitment, so all of them
+        // defer waiting for their verifier and this acknowledgement call returns no resolution.
         let mut acks = Vec::new();
         while let Some((msg, share)) = {
             let msg = random_bytes::<20>();
@@ -1754,11 +1850,32 @@ mod pix_recovery_event_tests {
             acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
         }
 
-        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
-        let rec = resolutions
-            .into_iter()
-            .find_map(|r| r.try_as_recovered_ssa())
+        assert!(
+            reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty(),
+            "acknowledgements must remain deferred until the commitment installs their verifiers"
+        );
+
+        // This is the final input. In particular, there is no acknowledge_shares call below to
+        // pull a parked resolution out of the reconstructor.
+        client.process_into_reconstructor(reconstructor.as_ref())?;
+
+        let progress = tokio::time::timeout(Duration::from_secs(1), commitment_resolutions.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("timed out waiting for commitment-side recovery progress"))?
+            .ok_or_else(|| anyhow::anyhow!("commitment resolution stream ended before reporting progress"))?;
+        assert!(matches!(progress, ShareResolution::Progress(_)));
+
+        let recovered = tokio::time::timeout(Duration::from_secs(1), commitment_resolutions.next())
+            .await
+            .map_err(|_| anyhow::anyhow!("timed out waiting for commitment-side SSA recovery"))?
+            .ok_or_else(|| anyhow::anyhow!("commitment resolution stream ended before SSA recovery"))?;
+        let rec = recovered
+            .try_as_recovered_ssa()
             .ok_or_else(|| anyhow::anyhow!("expected a RecoveredSsa resolution"))?;
+
+        // The wake-up is coalesced and the buffer is atomically taken, so the same recovery cannot
+        // be emitted a second time.
+        assert!(futures::poll!(commitment_resolutions.next()).is_pending());
 
         assert_eq!(<HoprPixSpec as PixSpec>::DepositAddress::from(&rec.ssa), expected_addr);
 
@@ -1766,7 +1883,7 @@ mod pix_recovery_event_tests {
             anyhow::bail!("expected PrivateKeyRecovered");
         };
 
-        assert_eq!(pk.id, (pseudonym, ssa_id.ssa_index()));
+        assert_eq!(pk.id, PixAddressId::new(&pseudonym, ssa_id.ssa_index()));
         assert_eq!(pk.secret.0.as_ref(), rec.ssa.secret().as_ref());
 
         Ok(())

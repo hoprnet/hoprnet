@@ -154,7 +154,16 @@ async fn test_channel_retrieval(cluster: &ClusterGuard) -> anyhow::Result<()> {
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 /// Exercises the native withdrawal path by sending xDai from one node to a fixed address
-/// and asserting that the recipient balance increases while the sender balance decreases.
+/// and asserting that the recipient balance increases while the paying **Safe** decreases.
+///
+/// The Safe and not the node's own account: the fixture builds each node on a Safe-bound
+/// connector, so `withdraw` goes out as an `execTransactionFromModule` and the Safe holds the
+/// value being moved. The node key only signs, and pays the gas.
+///
+/// This asserted against the node's own balance until `hopr-utils` 0.13.0, whose blokli emulator
+/// began settling a withdrawal against the payer the parsed action names rather than always
+/// against the signer. The old assertion passed because the emulator debited the wrong account,
+/// not because the node paid.
 async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
     let [src] = cluster.sample_nodes::<1>();
 
@@ -170,6 +179,11 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .unwrap_or("0 wxHOPR".into());
     assert_eq!("0 wxHOPR", &balance);
 
+    let initial_safe_balance = src
+        .inner()
+        .get_safe_balance::<XDai>()
+        .await
+        .context("should get safe xdai balance")?;
     let initial_balance_src = src
         .inner()
         .get_balance::<XDai>()
@@ -182,6 +196,11 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .await
         .context("failed to withdraw native")?;
 
+    let final_safe_balance = src
+        .inner()
+        .get_safe_balance::<XDai>()
+        .await
+        .context("should get safe xdai balance")?;
     let final_balance_src = src
         .inner()
         .get_balance::<XDai>()
@@ -196,6 +215,16 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
         .unwrap_or("0 wxHOPR".into());
     assert_eq!(balance, withdrawn_amount.to_string());
 
-    assert!(final_balance_src < initial_balance_src - withdrawn_amount); // account for gas
+    // Exactly the withdrawn amount: the Safe pays the value and none of the gas.
+    assert_eq!(final_safe_balance, initial_safe_balance - withdrawn_amount);
+    // The signer is out the fee and nothing else, so it is bounded on both sides rather than
+    // stated exactly — the fee is not fixed, but neither bound may be slack:
+    //
+    // - strictly below, because the signer always pays the fee. `<=` would also admit a node that paid nothing at all,
+    //   which is what a broken fee accounting looks like.
+    // - strictly above `initial - withdrawn`, because it must not have paid the value. Without this, a node debited for
+    //   the whole withdrawal satisfies the bound above just as well.
+    assert!(final_balance_src < initial_balance_src);
+    assert!(final_balance_src > initial_balance_src - withdrawn_amount);
     Ok(())
 }

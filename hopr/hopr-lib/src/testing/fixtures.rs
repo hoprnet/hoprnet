@@ -203,7 +203,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management,
                     max_surbs_per_data_packet: 1,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -253,7 +252,6 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management: Some(SurbBalancerConfig::default()),
                     max_surbs_per_data_packet: 1,
-                    pix_ssa_quota: None,
                     flow_control: None,
                     max_frames_behind_gap: None,
                 },
@@ -389,6 +387,77 @@ pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
     Duration::from_mins(4)
 };
 
+/// Fraction of [`TEST_GLOBAL_TIMEOUT`] that a single convergence wait may consume.
+///
+/// A quarter: a test performs one or two waits on top of cluster bootstrap, so this leaves ample
+/// outer budget while giving each wait real headroom. Convergence takes well under 20 s on an idle
+/// machine, so this still fails fast on a genuine hang rather than running to the outer timeout —
+/// but it no longer loses to ordinary runner contention, which the previous fixed 60 s did.
+const CONVERGENCE_BUDGET_FRACTION: u32 = 4;
+
+/// Interval between convergence probes.
+const CONVERGENCE_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+/// Time a single [`wait_for_convergence`] call may spend before giving up.
+///
+/// Derived from [`TEST_GLOBAL_TIMEOUT`] rather than hardcoded, so it scales with coverage
+/// instrumentation instead of silently keeping a fixed budget while the outer timeout doubles.
+pub fn convergence_budget() -> Duration {
+    TEST_GLOBAL_TIMEOUT / CONVERGENCE_BUDGET_FRACTION
+}
+
+/// Outcome of one convergence probe.
+pub enum Probe<T> {
+    /// Converged; stop polling and yield this.
+    Ready(T),
+    /// Not yet converged, described for the failure message. Keep polling.
+    Pending(String),
+}
+
+/// Polls `probe` until it reports convergence or [`convergence_budget`] expires.
+///
+/// `probe` returns `Ok(Probe::Ready)` once converged and `Ok(Probe::Pending(state))` while it is
+/// still settling; on expiry the error carries `what`, the elapsed time and that last observed
+/// state, since a bare boolean cannot distinguish "converged slowly" from "never converged" — which
+/// is exactly what a CI log needs to be diagnosable without a re-run.
+///
+/// An `Err` from `probe` is a *hard* failure (a broken API call, say) and propagates immediately:
+/// retrying it until the budget expires would only turn a clear error into a timeout.
+pub async fn wait_for_convergence<T, F, Fut>(what: &str, mut probe: F) -> anyhow::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<Probe<T>>>,
+{
+    let budget = convergence_budget();
+    let started = tokio::time::Instant::now();
+    let deadline = started + budget;
+    let mut observed = "<never probed>".to_string();
+
+    while let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) {
+        // Bound the probe itself: an unbounded `probe().await` that blocks would sail past the
+        // budget and only stop at the outer test timeout, which is what this helper exists to avoid.
+        match tokio::time::timeout_at(deadline, probe()).await {
+            Ok(result) => match result? {
+                Probe::Ready(converged) => return Ok(converged),
+                Probe::Pending(state) => observed = state,
+            },
+            Err(_) => {
+                observed = format!("{observed} (probe still running at the deadline)");
+                break;
+            }
+        }
+
+        tracing::trace!(what, ?budget, elapsed = ?started.elapsed(), "waiting for convergence");
+        // Never sleep past the deadline, or the next probe would start after the budget expired.
+        sleep(CONVERGENCE_POLL_INTERVAL.min(remaining)).await;
+    }
+
+    anyhow::bail!(
+        "{what} did not converge within {budget:?} (elapsed {:?}); last observed: {observed}",
+        started.elapsed(),
+    )
+}
+
 lazy_static::lazy_static! {
     pub static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
         ChainKeypair::from_secret(&hex!("76a4edbc3f595d4d07671779a0055e30b2b8477ecfd5d23c37afd7b5aa83781d")).unwrap(),
@@ -466,8 +535,8 @@ pub struct TestNodeConfig {
     /// Session idle timeout in milliseconds (default 2500).
     pub idle_timeout_ms: u64,
     /// Optional PIX global config override (num_ssa_parts, ssa_part_size).
-    /// When set, configures the transport-level SsaShareGenerator dimensions.
-    /// Must match the dimensions used in pix_ssa_quota for PIX sessions.
+    /// When set, configures the transport-level SsaShareGenerator dimensions, which is what
+    /// every PIX Session on this node announces — the dimensions are not per-Session.
     pub pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     /// Optional simulated transit latency for this node's packet forwarder.
     ///
@@ -475,6 +544,11 @@ pub struct TestNodeConfig {
     /// Gaussian-jittered FIFO delay (see [`TransitLatencyConfig`]) — simulating
     /// WAN-link latency in a local cluster.  `None` (the default) means no extra delay.
     pub transit_latency: Option<TransitLatencyConfig>,
+    /// Optional packet-pipeline concurrency override for this node.
+    ///
+    /// `None` (the default) uses the CPU-derived defaults. Set it to pin a node's decode/encode
+    /// concurrency — e.g. `input_concurrency = Some(1)` to reproduce the pre-fix collapse.
+    pub pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
 }
 
 impl Default for TestNodeConfig {
@@ -485,6 +559,7 @@ impl Default for TestNodeConfig {
             idle_timeout_ms: 2500,
             pix_global_config: None,
             transit_latency: None,
+            pipeline: None,
         }
     }
 }
@@ -493,10 +568,7 @@ impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
         Self {
             win_prob,
-            incoming_pix_config: None,
-            idle_timeout_ms: 2500,
-            pix_global_config: None,
-            transit_latency: None,
+            ..Self::default()
         }
     }
 }
@@ -604,6 +676,15 @@ pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
 /// Identical to [`stress_cluster_fixture`] but sets `transit_latency` on every
 /// node so the packet forwarder injects a Gaussian-jittered FIFO delay — simulating
 /// a WAN link (e.g. mean=50ms, std_dev=5ms) in a local cluster.
+/// [`stress_cluster_fixture`] with explicit per-node configs (stress funding + `CountOnly` echo).
+///
+/// Lets a test set a per-node [`TestNodeConfig::pipeline`] override (e.g. pin `input_concurrency`)
+/// while keeping the high-volume stress chain funding. Each config's `win_prob` should be set to
+/// [`STRESS_WIN_PROB`] to match the stress chain client.
+pub fn stress_cluster_fixture_with_configs(configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    cluster_fixture_inner(configs, build_stress_blokli_client(), EchoMode::CountOnly)
+}
+
 pub fn stress_cluster_fixture_with_latency(win_prob: f64, n: usize, latency: TransitLatencyConfig) -> ClusterGuard {
     let configs = vec![
         TestNodeConfig {
@@ -688,6 +769,7 @@ fn cluster_fixture_inner(
             let idle_timeout_ms = configs[i].idle_timeout_ms;
             let pix_global_config = configs[i].pix_global_config;
             let transit_latency = configs[i].transit_latency;
+            let pipeline = configs[i].pipeline;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -737,6 +819,7 @@ fn cluster_fixture_inner(
                         idle_timeout_ms,
                         pix_global_config,
                         transit_latency,
+                        pipeline,
                     );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
@@ -855,6 +938,29 @@ pub async fn build_role_cluster(
     relay_cfgs: Vec<TestNodeConfig>,
     exit_cfg: TestNodeConfig,
 ) -> anyhow::Result<RoleClusterGuard> {
+    build_role_cluster_with_exit_server(entry_cfg, relay_cfgs, exit_cfg, EchoServer::new()).await
+}
+
+/// [`build_role_cluster`] with the Exit's session server under the caller's control.
+///
+/// Only the Exit's server is swappable, because the Entry and the relays never receive an incoming
+/// Session in these clusters — the Entry opens them and the relays only forward. A test that needs to
+/// *hold* the Exit-side `IncomingSession` rather than have it echoed passes
+/// [`SessionCaptureServer`](super::dummies::SessionCaptureServer) here, which is what makes the Exit
+/// side of a Session closable from the test.
+pub async fn build_role_cluster_with_exit_server<Srv>(
+    entry_cfg: TestNodeConfig,
+    relay_cfgs: Vec<TestNodeConfig>,
+    exit_cfg: TestNodeConfig,
+    exit_server: Srv,
+) -> anyhow::Result<RoleClusterGuard>
+where
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+{
     let total_size = 1 + relay_cfgs.len() + 1;
     if !(3..=SWARM_N).contains(&total_size) {
         anyhow::bail!("total cluster size {total_size} must be between 3 and {SWARM_N}");
@@ -898,6 +1004,10 @@ pub async fn build_role_cluster(
                 .with_mutator(FullStateEmulator::new(safes[i].module_address));
             let is_entry = i == 0;
             let is_exit = i == total_size - 1;
+            // Cloned per thread rather than moved: only the Exit's branch reads it, but each thread's
+            // closure must own something, and the server is `Clone` precisely so a captured session
+            // handle can be shared back out to the test.
+            let exit_server = exit_server.clone();
 
             std::thread::spawn(move || {
                 let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -940,6 +1050,7 @@ pub async fn build_role_cluster(
                         cfg.idle_timeout_ms,
                         cfg.pix_global_config,
                         cfg.transit_latency,
+                        cfg.pipeline,
                     );
 
                     let prober = Some(hopr_ct_full_network::ProberConfig {
@@ -965,7 +1076,7 @@ pub async fn build_role_cluster(
                             config,
                             prober,
                             connector.clone(),
-                            EchoServer::new(),
+                            exit_server,
                         )
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))

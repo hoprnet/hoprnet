@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-rust-version = "1.91"
+rust-version = "1.97"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 license = "GPL-3.0-only"
@@ -138,50 +138,37 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-# TEMPORARY: pinned to unreleased branches so this change compiles and is tested end to end,
-# and pinned together so a single hopr-api major is in the graph — two majors coexisting makes
-# `hopr_api::chain::DeployedSafe` two distinct types. `version` alongside `git` is the "multiple
-# locations" form: git wins locally, the version requirement survives packaging. Revert to plain
-# versions once hopr-api 2.0.0, hopr-utilities 0.9.0 and the hopr-impls crates are published.
-hopr-api = { version = "2.0.0" }
-hopr-types = { version = "2.2.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.9.0", default-features = false }
+hopr-api = { version = "4.3.0" }
+hopr-types = { version = "4.0.1", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.16.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
-# The PIX curve is chosen by `pix-bjj` (default) or overridden by `pix-secp256k1`, and neither is
-# named here: `pix-bjj` reaches this crate through `hopr-transport` and `hopr-lib`, both of which
-# keep it in their `default` set, so building any hoprnet crate directly is unchanged.
-#
-# This used to say that `bjj` was withheld here so a downstream consumer could turn it off. That
-# reasoning no longer applies and never worked: Cargo features are additive, so withholding one
-# only holds while every crate in the graph agrees to it. `pix-secp256k1` replaces the omission
-# with a positive override that wins wherever it is enabled — see `crypto/packet/Cargo.toml`.
-hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
+hopr-crypto-packet = { version = "2.0.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "4.0.2-rc.11", path = "hopr/hopr-lib" }
-hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false, features = [
+hopr-lib = { version = "5.0.0-rc.2", path = "hopr/hopr-lib" }
+hopr-protocol-app = { version = "1.1.0", path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { version = "6.3.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
 ] }
-hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-features = false, features = [
+hopr-protocol-pix = { version = "0.2.0", path = "protocols/pix", default-features = false, features = [
   "rayon",
 ] }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
-hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.5.2" }
-hopr-transport = { version = "0.48.1", path = "transport/hopr" }
+hopr-protocol-start = { version = "2.0.0", path = "protocols/start", default-features = false }
+hopr-ticket-manager = { version = "0.7.0" }
+hopr-transport = { version = "0.50.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.29.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.31.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.22.2" }
+hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.1.1", default-features = false }
-hopr-transport-p2p = { version = "0.9.5", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.4.0", default-features = false }
-hopr-network-graph = { version = "0.5.0", default-features = false }
+hopr-session-server-forwarder = { version = "0.5.0", default-features = false }
+hopr-transport-p2p = { version = "0.11.0", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.6.0", default-features = false }
+hopr-network-graph = { version = "0.7.0", default-features = false }
 
 [profile.dev]
 panic = "abort"

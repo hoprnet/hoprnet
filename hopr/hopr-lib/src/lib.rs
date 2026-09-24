@@ -151,25 +151,16 @@ pub struct HoprSessionClientConfig {
     /// Enable automatic SURB management for the session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
-    /// Sets the maximum number of possible SURBs that will always be sent with session data packets.
+    /// Sets the maximum number of SURBs sent with session data packets.
     ///
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
     /// The value is bounded by the packet size and will saturate there.
+    /// The default `1` follows the balancer's target; values greater than `1` bypass that gate.
     /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
     /// configured, there will be no SURBs produced at all, making the traffic only possible in
     /// one direction.
     #[default(1)]
     pub max_surbs_per_data_packet: usize,
-    /// If set, sets the PIX dimensions for the Session.
-    ///
-    /// These must match this node's own PIX configuration exactly — see
-    /// [`SessionClientConfig::pix_ssa_quota`](hopr_transport::SessionClientConfig) — so the usual
-    /// way to build one is `PixParams::try_from_config` over the installed generator's config rather
-    /// than by restating the values. The curve suite among them is fixed at build time, not
-    /// configured; [`LOCAL_PIX_SUITE`] names this build's.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
@@ -210,10 +201,6 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// Sets the maximum number of possible SURBs which will always be sent with Session data packets (if they fit).
     pub max_surbs_per_data_packet: usize,
-    /// If set, sets the PIX dimensions for the Session.
-    ///
-    /// Defaults to `None`.
-    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
     /// As [`HoprSessionClientConfig::max_frames_behind_gap`].
@@ -231,7 +218,6 @@ impl Default for HoprSessionClientExplicitPathConfig {
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
             max_surbs_per_data_packet: 1,
-            pix_ssa_quota: None,
             flow_control: None,
             max_frames_behind_gap: None,
         }
@@ -248,7 +234,6 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             max_surbs_per_data_packet: value.max_surbs_per_data_packet,
-            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
             max_frames_behind_gap: value.max_frames_behind_gap,
         }
@@ -272,7 +257,6 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             max_surbs_per_data_packet: value.max_surbs_per_data_packet,
-            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
             max_frames_behind_gap: value.max_frames_behind_gap,
         })
@@ -287,6 +271,9 @@ pub(crate) enum HoprLibProcess {
     #[strum(to_string = "session server providing the exit node session stream functionality")]
     #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionServer,
+    #[strum(to_string = "session server deciding the terms incoming sessions are admitted on")]
+    #[allow(dead_code)] // constructed only with feature = "session-server"
+    SessionAdmission,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
     #[strum(to_string = "on received ticket event (winning or rejected)")]
@@ -963,7 +950,6 @@ mod tests {
             pseudonym: None,
             surb_management: None,
             max_surbs_per_data_packet: 1,
-            pix_ssa_quota: None,
             flow_control: None,
             max_frames_behind_gap: Some(8),
         })

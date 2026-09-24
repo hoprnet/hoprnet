@@ -41,6 +41,14 @@ pub enum StartErrorReason {
     Busy = 2,
     /// The recipient requires incentivization or the incentivization parameters are not acceptable.
     UnacceptablePixParams = 3,
+    /// The recipient does not serve this Session's target, or does not serve it on the offered
+    /// terms.
+    ///
+    /// Distinct from [`UnacceptablePixParams`](Self::UnacceptablePixParams) because the two call for
+    /// different responses: those parameters could be re-offered differently, whereas this target
+    /// will not be served by this recipient however the request is phrased. Distinct from
+    /// [`Busy`](Self::Busy) because that one is transient and worth retrying.
+    TargetNotAdmitted = 4,
 }
 
 /// Identifies which entity a [`StartErrorType`] refers to.
@@ -115,7 +123,8 @@ pub struct StartEstablished<I> {
 /// - `T` is the session target.
 /// - `C` are session capabilities.
 /// - `G` is the type of the commitment to the Session Stealth Address (SSA).
-/// - `K` is the wire form of the proof of knowledge accompanying a client SSA commitment.
+/// - `K` is the wire form of the proof of knowledge going with a client SSA commitment.
+/// - `D` is the type of the deposit data carried in the Server's SSA commitment.
 ///
 /// # Diagram of the protocol
 /// ```mermaid
@@ -293,31 +302,57 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
     }
 }
 
-/// Sent by the Server to deliver the commitment to possibly multiple new Session Stealth Addresses (SSAs).
+/// Inclusive run of polynomial indices, as carried by
+/// [`SsaServerCommitmentMessage::missing`].
 ///
-/// This message is typically sent for the first time right after the [`StartEstablished`] message
-/// if PIX capabilities are indicated in the [`StartInitiation`] message, and the Server accepts it.
+/// A run rather than a list of indices because commitment loss is chunk-shaped: the sender slices a
+/// cycle's commitment into packet-sized slices of *consecutive* polynomial indices, so one lost
+/// packet is one run of a couple of dozen, and a burst that never arrived at all is a single run.
+pub type PolynomialRun = (hopr_protocol_pix::PolynomialIndex, hopr_protocol_pix::PolynomialIndex);
+
+/// Sent by the Server either to deliver the commitment to new Session Stealth Addresses (SSAs), or
+/// to ask for the parts of an earlier commitment it never received.
 ///
-/// It is then subsequently sent every time the Server needs the next batch of SSAs
-/// (with indices strictly greater than in the last batch) to be committed to.
+/// The first kind is typically sent right after the [`StartEstablished`] message if PIX capabilities
+/// are indicated in the [`StartInitiation`] message and the Server accepts it, and then again every
+/// time the Server needs the next batch of SSAs (with indices strictly greater than in the last
+/// batch) to be committed to.
+///
+/// The second kind exists because the Client's answer to the first is not one message but hundreds,
+/// and the Server can use none of it until every one of them has landed. It names the gaps in
+/// [`missing`](Self::missing) and asks for nothing new; see there.
+///
+/// Exactly one of [`commitments`](Self::commitments) and [`missing`](Self::missing) is populated,
+/// which is what makes the two kinds impossible to confuse — [`Self::new`] and [`Self::recommit`]
+/// each build one of them, and both encoding and decoding refuse a message that is neither.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaServerCommitmentMessage<I, G, D> {
     /// Session ID.
     pub session_id: I,
     /// Parameters of the PIX protocol the server requires, packed by
     /// [`PixParams::to_u32`](hopr_protocol_pix::PixParams::to_u32).
-    ///
-    /// Deliberately the raw word rather than a [`PixParams`](hopr_protocol_pix::PixParams): the
-    /// codec stays total, so an out-of-range value from a peer reaches the session layer and is
-    /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
-    /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
-    /// Deposit/payment data for the PIX session, carried in CBOR.
+    /// Per-SSA deposit/payment data, carried in CBOR as a single map keyed by the same
+    /// [`SsaIndex`](hopr_protocol_pix::SsaIndex) as [`commitments`](Self::commitments).
     ///
-    /// Currently set to [`Default::default`]. Must be preserved through encode/decode.
-    pub deposit_data: D,
+    /// Empty on a retransmission request: it asks for no new SSA, and the deposit data of the cycles
+    /// it names was delivered when they were first requested.
+    pub deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
+    ///
+    /// Empty on a retransmission request — see the type-level documentation.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
+    /// Polynomial-index runs whose commitments the Server never received, per SSA.
+    ///
+    /// Empty on a request for new SSAs. Non-empty makes this a *retransmission* request: the Server
+    /// is asking the Client to re-send the commitments it names for cycles it has already committed
+    /// to, and nothing else. Nothing new is requested, no deposit follows, and the Client must not
+    /// announce one — the deposit address of a cycle is fixed when it is first committed.
+    ///
+    /// The runs of one SSA are ascending and disjoint, which the decoder enforces: it makes the scope
+    /// canonical, bounds the indices one request can name at the cycle's polynomial count, and lets
+    /// the answer be assembled without deduplicating.
+    pub missing: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, Vec<PolynomialRun>>,
 }
 
 impl<I, G, D> SsaServerCommitmentMessage<I, G, D> {
@@ -326,14 +361,45 @@ impl<I, G, D> SsaServerCommitmentMessage<I, G, D> {
         session_id: I,
         params: hopr_protocol_pix::PixParams,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
-        deposit_data: D,
+        deposit_data: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, D)>,
     ) -> Self {
         Self {
             session_id,
             params: params.to_u32(),
-            deposit_data,
+            deposit_data: deposit_data.into_iter().collect(),
             commitments: commitments.into_iter().collect(),
+            missing: Default::default(),
         }
+    }
+
+    /// Asks the Client to re-send the commitments of polynomial runs the Server never received.
+    ///
+    /// A constructor of its own rather than a field to fill in, so the two request kinds cannot be
+    /// mixed: this one carries no commitments and no deposit data, which is the invariant the codec
+    /// enforces. `params` is echoed so the recipient can check the request against what was
+    /// negotiated, exactly as it does for a request for new SSAs.
+    ///
+    /// The caller is responsible for keeping the runs of each SSA ascending and disjoint, and for
+    /// naming no more of them than [`StartProtocol::max_missing_runs`] allows.
+    pub fn recommit(
+        session_id: I,
+        params: hopr_protocol_pix::PixParams,
+        missing: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, Vec<PolynomialRun>)>,
+    ) -> Self {
+        Self {
+            session_id,
+            params: params.to_u32(),
+            deposit_data: Default::default(),
+            commitments: Default::default(),
+            missing: missing.into_iter().collect(),
+        }
+    }
+
+    /// Total number of polynomial runs this request names, across every SSA.
+    ///
+    /// The wire form is a flat table, so this — not the number of SSAs — is what has to fit a packet.
+    pub fn missing_run_count(&self) -> usize {
+        self.missing.values().map(Vec::len).sum()
     }
 
     /// The PIX dimensions this request was made under, and the curve suite they are dimensions of.
@@ -383,9 +449,13 @@ flagset::flags! {
     }
 }
 
-impl<I> KeepAliveMessage<I> {
-    /// The minimum number of SURBs a [`KeepAliveMessage`] must be able to carry.
-    pub const MIN_SURBS_PER_MESSAGE: usize = HoprPacket::MAX_SURBS_IN_PACKET;
+impl<I: serde::Serialize> KeepAliveMessage<I> {
+    /// Number of SURBs that fit alongside this message, including the application tag.
+    pub fn max_surbs(&self) -> errors::Result<usize> {
+        // Start header (version, discriminant, body length), flags, additional data and CBOR session ID.
+        let message_len = 4 + size_of::<u8>() + size_of::<u64>() + serde_cbor_2::to_vec(&self.session_id)?.len();
+        Ok(HoprPacket::max_surbs_with_message(Tag::SIZE + message_len))
+    }
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -399,16 +469,25 @@ impl<I> From<I> for KeepAliveMessage<I> {
 }
 
 impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
+    /// Maximum size of the CBOR-serialized
+    /// [`deposit_data`](SsaServerCommitmentMessage::deposit_data) map an
+    /// [`SsaRequest`](StartProtocol::SsaRequest) message can carry.
+    pub const MAX_DEPOSIT_DATA_SIZE: usize = ApplicationData::PAYLOAD_SIZE.saturating_sub(
+        4 + size_of::<u32>()
+            + size_of::<u16>()
+            + size_of::<hopr_protocol_pix::SsaIndex>()
+            + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+            + size_of::<u16>()
+            + 1,
+    );
     /// Maximum number of SSAs that can be requested in a single SsaRequest message.
-    ///
-    /// Derived from the SsaRequest encode layout with minimal CBOR deposit_data and session_id:
-    /// header(4) + params(4) + deposit_data(1 for CBOR null) + num_commitments(2) = 11 overhead;
-    /// (PAYLOAD_SIZE - 11) / (SsaIndex + commitment_repr) = (1030 - 11) / (4 + 33) = 27.
-    /// Since a zero-length session_id is the smallest possible, any non-empty session_id
-    /// only makes this bound tighter, making it a safe decode limit.
-    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 11)
+    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 13)
         / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
         as u16;
+    /// Wire size of one [`missing`](SsaServerCommitmentMessage::missing) table entry: the SSA index
+    /// it belongs to, then the run's inclusive first and last polynomial index.
+    pub const MISSING_RUN_ENTRY_SIZE: usize =
+        size_of::<hopr_protocol_pix::SsaIndex>() + 2 * size_of::<hopr_protocol_pix::PolynomialIndex>();
     /// Size of the PIX coefficient commitment representation in bytes.
     pub const PIX_COEFF_COMMITMENT_REPR_SIZE: usize = size_of::<G>();
     /// Size of the serialized client SSA commitment proof of knowledge in bytes.
@@ -465,6 +544,37 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
             // only phase 1 pays for the proof, costing a handful of extra messages per cycle.
             max_constant_terms_per_message: (budget.saturating_sub(Self::PIX_COMMITMENT_PROOF_SIZE) / per_entry).max(1),
         })
+    }
+
+    /// How many [`missing`](SsaServerCommitmentMessage::missing) runs one retransmission request can
+    /// carry.
+    ///
+    /// Exposed for the same reason as [`ssa_commit_chunking`](Self::ssa_commit_chunking): the caller
+    /// choosing the scope must not restate the encode layout, because a copy that drifts either
+    /// overflows a packet or silently under-reports what is missing. It takes the `session_id`
+    /// itself rather than a length, since the id's CBOR encoding is part of that layout.
+    ///
+    /// Derived against a request built by [`SsaServerCommitmentMessage::recommit`], which carries no
+    /// commitments and an empty `deposit_data` map:
+    ///
+    /// ```text
+    ///   header:    version(1) + disc(1) + data_len(2) = 4
+    ///   fixed:     params(4) + empty CBOR map(1) + num_commitments(2) + num_missing_runs(2) = 9
+    ///   per-entry: MISSING_RUN_ENTRY_SIZE
+    ///   trailer:   CBOR-encoded session_id
+    /// ```
+    ///
+    /// At least one, so a caller can always ask for something: a budget that rounded to zero would
+    /// leave a repairable cycle with no way to be repaired.
+    pub fn max_missing_runs(session_id: &I) -> Result<usize, StartProtocolError>
+    where
+        I: serde::Serialize,
+    {
+        let header_and_fixed: usize = 4 + size_of::<u32>() + 1 + size_of::<u16>() + size_of::<u16>();
+        let cbor_session_id_size = serde_cbor_2::to_vec(session_id)?.len();
+        let budget = ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size);
+
+        Ok((budget / Self::MISSING_RUN_ENTRY_SIZE).max(1))
     }
 }
 
@@ -586,8 +696,36 @@ where
                 data.extend(session_id);
             }
             StartProtocol::SsaRequest(req) => {
+                // A request either asks for new SSAs or asks for pieces of ones already committed
+                // to, never both and never neither. Refusing the other two combinations here is what
+                // lets the recipient tell the two kinds apart by looking at one field, and stops a
+                // retransmission request from carrying an index nothing asked for.
+                //
+                // Deposit data goes with SSAs being requested, so a retransmission carries none of
+                // it either. Both rules are enforced on the way out as well as on the way in, so a
+                // message this side is willing to build is one the peer is willing to read.
+                let num_missing_runs = req.missing_run_count();
+                if req.commitments.is_empty() == (num_missing_runs == 0) {
+                    return Err(StartProtocolError::NumberOfCommitments);
+                }
+                if num_missing_runs > 0 && !req.deposit_data.is_empty() {
+                    return Err(StartProtocolError::ParseError(
+                        "deposit_data on a retransmission request".into(),
+                    ));
+                }
+
                 data.extend_from_slice(&req.params.to_be_bytes());
-                let deposit_data = serde_cbor_2::to_vec(&req.deposit_data)?;
+
+                let deposit_data =
+                    serde_cbor_2::to_vec(&req.deposit_data.iter().collect::<std::collections::BTreeMap<_, _>>())?;
+
+                if deposit_data.len() > Self::MAX_DEPOSIT_DATA_SIZE {
+                    return Err(StartProtocolError::DepositDataTooLarge {
+                        size: deposit_data.len(),
+                        max: Self::MAX_DEPOSIT_DATA_SIZE,
+                    });
+                }
+
                 data.extend_from_slice(&deposit_data);
 
                 let num_commitments = req.commitments.len() as u16;
@@ -596,14 +734,23 @@ where
                 let session_id = serde_cbor_2::to_vec(&req.session_id)?;
 
                 let required_size = (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE)
-                    * req.commitments.len();
+                    * req.commitments.len()
+                    + size_of::<u16>()
+                    + Self::MISSING_RUN_ENTRY_SIZE * num_missing_runs;
 
                 // Remaining payload budget: the final `out` buffer contains
                 // version (1) + disc (1) + data_len (2) + data contents = 4 + data.len(),
                 // which must fit within PAYLOAD_SIZE.  Check using explicit arithmetic
                 // rather than Vec::spare_capacity_mut() which reflects pre-allocation.
+                //
+                // `data` already holds the serialized deposit data, so a `D` that passed
+                // `MAX_DEPOSIT_DATA_SIZE` above still narrows this budget: past a certain size it
+                // is the commitment count that has to give way, which is what this reports.
+                //
+                // Covers the run table as well, which is also what makes the `as u16` cast below
+                // safe: a count that could not be represented could not have fitted the payload.
                 let avail_space = ApplicationData::PAYLOAD_SIZE.saturating_sub(4 + data.len() + session_id.len());
-                if req.commitments.is_empty() || required_size > avail_space {
+                if required_size > avail_space {
                     return Err(StartProtocolError::NumberOfCommitments);
                 }
 
@@ -617,6 +764,20 @@ where
                     data.extend_from_slice(commitment_repr);
                 }
 
+                data.extend_from_slice(&(num_missing_runs as u16).to_be_bytes());
+                for (ssa_index, runs) in req.missing {
+                    for (first, last) in runs {
+                        // Ascending and disjoint is the decoder's rule, and an inverted run names
+                        // nothing at all, so an encoder must not be able to emit one.
+                        if first > last {
+                            return Err(StartProtocolError::ParseError("missing_run_is_inverted".into()));
+                        }
+                        data.extend_from_slice(&ssa_index.get().to_be_bytes());
+                        data.extend_from_slice(&first.to_be_bytes());
+                        data.extend_from_slice(&last.to_be_bytes());
+                    }
+                }
+
                 data.extend(session_id);
             }
         }
@@ -626,6 +787,57 @@ where
 
         Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
+}
+
+/// Reads the per-SSA deposit data map, refusing one that announces more entries than a request can
+/// carry.
+fn decode_deposit_data<'de, D, De>(
+    deserializer: De,
+    max_entries: usize,
+) -> Result<std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>, De::Error>
+where
+    D: serde::Deserialize<'de>,
+    De: serde::Deserializer<'de>,
+{
+    struct BoundedMap<D> {
+        max_entries: usize,
+        _deposit_data: std::marker::PhantomData<D>,
+    }
+
+    impl<'de, D: serde::Deserialize<'de>> serde::de::Visitor<'de> for BoundedMap<D> {
+        type Value = std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "at most {} per-SSA deposit data entries", self.max_entries)
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            if let Some(declared) = map.size_hint()
+                && declared > self.max_entries
+            {
+                return Err(serde::de::Error::invalid_length(declared, &self));
+            }
+
+            // Safe to trust now: whatever it says is at or below the bound.
+            let mut out = std::collections::HashMap::with_capacity(map.size_hint().unwrap_or(0));
+            // Counted as they arrive, not by what the map ends up holding: repeating one key
+            // overwrites in place, so `out.len()` would sit at one however many entries followed.
+            let mut entries = 0;
+            while let Some((ssa_index, data)) = map.next_entry()? {
+                entries += 1;
+                if entries > self.max_entries {
+                    return Err(serde::de::Error::invalid_length(entries, &self));
+                }
+                out.insert(ssa_index, data);
+            }
+            Ok(out)
+        }
+    }
+
+    deserializer.deserialize_map(BoundedMap {
+        max_entries,
+        _deposit_data: std::marker::PhantomData,
+    })
 }
 
 impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D>
@@ -735,8 +947,15 @@ where
                     };
                     StartProtocol::SessionError(StartErrorType {
                         identifier,
-                        reason: StartErrorReason::from_repr(body[reason_start])
-                            .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
+                        // An unrecognized reason is read as [`StartErrorReason::Unknown`] rather
+                        // than failing the message, which is the whole purpose of that variant.
+                        // The alternative loses the error entirely: a peer that added a reason this
+                        // build predates would have its `SessionError` rejected as malformed, and
+                        // the Session it was closing would die on a timeout instead of being
+                        // reported. Refusing to parse tells this node *less* than reading the byte
+                        // it does not recognize as "some reason", so a reason may be added without
+                        // a protocol version bump.
+                        reason: StartErrorReason::from_repr(body[reason_start]).unwrap_or(StartErrorReason::Unknown),
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
@@ -745,8 +964,23 @@ where
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: KeepAliveFlags::new(body[0])
-                            .map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
+                        // Unknown bits are dropped rather than failing the message, for the same
+                        // reason [`StartErrorReason::Unknown`] exists above: a peer that sets a flag
+                        // this build predates would otherwise have its whole keep-alive rejected as
+                        // malformed, and a keep-alive is not a message a Session can afford to lose.
+                        // It carries the Exit's SURB level to the Entry's balancer, it is what keeps
+                        // an otherwise silent Session alive, and on a PIX Session it is one packet of
+                        // the service the Entry's successor gate prices — the gate that decides
+                        // whether the next deposit is admitted at all. Refusing to parse tells this
+                        // node *less* than reading the bits it does recognize, so a flag may be added
+                        // without a protocol version bump.
+                        //
+                        // Truncating is safe because the flags only ever *select* a meaning for
+                        // `additional_data`, and every handler tests for the bit it acts on rather
+                        // than matching the set as a whole. An unknown bit therefore selects no
+                        // behaviour, which is what an older node should do with a meaning it has
+                        // never heard of.
+                        flags: KeepAliveFlags::new_truncated(body[0]),
                         additional_data: u64::from_be_bytes(
                             body[1..1 + size_of::<u64>()]
                                 .try_into()
@@ -880,9 +1114,15 @@ where
 
                     // deposit_data is CBOR — decode using a deserializer that tracks its
                     // byte offset so we can skip only its size and leave the rest of the body
-                    // (num_commitments + entries + session_id) untouched.
+                    // (num_commitments + entries + session_id) untouched. This holds for the map
+                    // just as it did for a single value: the offset is where the one CBOR item
+                    // ended, whatever its shape.
+                    //
+                    // The `SsaIndex` keys are `NonZero`, so a peer sending index 0 is rejected here
+                    // by serde rather than reaching the session layer — the same guard the
+                    // commitment entries get below, for free.
                     let mut de = serde_cbor_2::Deserializer::from_slice(&body[size_of::<u32>()..]);
-                    let deposit_data: D = serde::Deserialize::deserialize(&mut de)
+                    let deposit_data = decode_deposit_data::<D, _>(&mut de, Self::MAX_SSAS_PER_REQUEST as usize)
                         .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
                     let deposit_data_len = de.byte_offset();
                     let mut next_offset = size_of::<u32>() + deposit_data_len;
@@ -896,7 +1136,7 @@ where
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("num_commitments".into()))?,
                     );
-                    if num_commitments == 0 || num_commitments > Self::MAX_SSAS_PER_REQUEST {
+                    if num_commitments > Self::MAX_SSAS_PER_REQUEST {
                         return Err(StartProtocolError::NumberOfCommitments);
                     }
                     next_offset += size_of::<u16>();
@@ -930,11 +1170,86 @@ where
                         }
                     }
 
+                    if body.len() <= next_offset + size_of::<u16>() {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
+                    let num_missing_runs = u16::from_be_bytes(
+                        body[next_offset..next_offset + size_of::<u16>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("num_missing_runs".into()))?,
+                    );
+                    next_offset += size_of::<u16>();
+
+                    // A request asks for new SSAs or for pieces of ones already committed to, never
+                    // both and never neither — see [`SsaServerCommitmentMessage`]. Enforced before
+                    // the runs are walked, so a message that is neither is reported as the malformed
+                    // request it is rather than as a length error further in.
+                    if (num_commitments == 0) == (num_missing_runs == 0) {
+                        return Err(StartProtocolError::NumberOfCommitments);
+                    }
+
+                    // The count is the peer's word for what follows, so it is bounded by what the
+                    // body can actually hold before it is used to size anything — reserving at least
+                    // one byte for the trailing CBOR session id, as the table above is.
+                    let max_by_payload = body.len().saturating_sub(next_offset + 1) / Self::MISSING_RUN_ENTRY_SIZE;
+                    if num_missing_runs as usize > max_by_payload {
+                        return Err(StartProtocolError::NumberOfCommitments);
+                    }
+
+                    let mut missing: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, Vec<PolynomialRun>> =
+                        std::collections::BTreeMap::new();
+                    for _ in 0..num_missing_runs {
+                        let ssa_index: hopr_protocol_pix::SsaIndex = hopr_protocol_pix::RawSsaIndex::from_be_bytes(
+                            body[next_offset..next_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
+                        )
+                        .try_into()
+                        .map_err(|_| StartProtocolError::ParseError("ssa_index is 0".into()))?;
+                        let polynomial_index_at = |offset: usize| {
+                            Ok::<_, StartProtocolError>(hopr_protocol_pix::PolynomialIndex::from_be_bytes(
+                                body[offset..offset + size_of::<hopr_protocol_pix::PolynomialIndex>()]
+                                    .try_into()
+                                    .map_err(|_| StartProtocolError::ParseError("missing_run".into()))?,
+                            ))
+                        };
+                        let run_offset = next_offset + size_of::<hopr_protocol_pix::SsaIndex>();
+                        let first = polynomial_index_at(run_offset)?;
+                        let last = polynomial_index_at(run_offset + size_of::<hopr_protocol_pix::PolynomialIndex>())?;
+                        next_offset += Self::MISSING_RUN_ENTRY_SIZE;
+
+                        // An inverted run names nothing, and one past the largest cycle the protocol
+                        // admits names nothing that can exist.
+                        if first > last || last >= MAX_POLYS_PER_SSA {
+                            return Err(StartProtocolError::ParseError("missing_run_out_of_range".into()));
+                        }
+
+                        // Ascending and disjoint within one SSA. This is what bounds the polynomials
+                        // one request can name by the cycle's own polynomial count rather than by
+                        // `runs × count`, and what lets the answer be assembled without
+                        // deduplicating.
+                        let runs = missing.entry(ssa_index).or_default();
+                        if runs.last().is_some_and(|(_, previous_last)| first <= *previous_last) {
+                            return Err(StartProtocolError::ParseError("missing_runs_not_ascending".into()));
+                        }
+                        runs.push((first, last));
+                    }
+
+                    // Deposit data belongs to SSAs being requested, and a retransmission requests
+                    // none. Checked so that every message which decodes really is exactly one of the
+                    // two kinds, and a recipient branching on `missing` need not re-establish it.
+                    if !missing.is_empty() && !deposit_data.is_empty() {
+                        return Err(StartProtocolError::ParseError(
+                            "deposit_data on a retransmission request".into(),
+                        ));
+                    }
+
                     StartProtocol::SsaRequest(SsaServerCommitmentMessage {
                         session_id: serde_cbor_2::from_slice(&body[next_offset..])?,
                         params,
                         deposit_data,
                         commitments,
+                        missing,
                     })
                 }
             },
@@ -987,7 +1302,8 @@ mod tests {
 
     use super::*;
 
-    /// A minimal deposit data type for tests (CBOR-encodes as a single byte).
+    /// A minimal deposit data *value* type for tests: `()` CBOR-encodes as a single byte, so a map of
+    /// them costs only its keys, and an empty one costs a single byte in total.
     type MinimalDeposit = ();
 
     #[test]
@@ -1075,6 +1391,66 @@ mod tests {
         Ok(())
     }
 
+    /// The reason travels as a single byte read back through `from_repr`, so a variant that does not
+    /// survive the round trip is one a peer cannot be told about at all.
+    #[test]
+    fn every_session_error_reason_survives_the_round_trip() -> anyhow::Result<()> {
+        for reason in [
+            StartErrorReason::Unknown,
+            StartErrorReason::NoSlotsAvailable,
+            StartErrorReason::Busy,
+            StartErrorReason::UnacceptablePixParams,
+            StartErrorReason::TargetNotAdmitted,
+        ] {
+            let sent = StartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason,
+            });
+
+            let (tag, msg) = sent.clone().encode()?;
+            let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+            assert_eq!(sent, received, "round trip of {reason}");
+        }
+
+        Ok(())
+    }
+
+    /// A reason byte this build does not know must still decode, as `Unknown`.
+    ///
+    /// Otherwise adding a reason is a protocol break in one direction: the older peer rejects the
+    /// whole `SessionError` as malformed and loses the close it was being told about, so the
+    /// Session dies on a timeout instead. Reading the byte as "some reason" tells it strictly more.
+    #[test]
+    fn a_session_error_reason_this_build_does_not_know_decodes_as_unknown() -> anyhow::Result<()> {
+        let sent =
+            StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(10),
+                reason: StartErrorReason::TargetNotAdmitted,
+            });
+        let (tag, msg) = sent.encode()?;
+
+        // Stand in for a reason added after this build: the last byte is the reason.
+        let mut msg = msg.into_vec();
+        let reason_byte = msg.len() - 1;
+        msg[reason_byte] = u8::MAX;
+
+        let received = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
+
+        assert!(
+            matches!(
+                received,
+                StartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(10),
+                    reason: StartErrorReason::Unknown,
+                })
+            ),
+            "an unknown reason must survive as Unknown, got {received:?}"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn start_protocol_session_ssa_request_message_should_encode_and_decode() -> anyhow::Result<()> {
         let mut commitments = std::collections::BTreeMap::new();
@@ -1082,11 +1458,18 @@ mod tests {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
+        // One deposit entry per commitment, which is the shape a real batch has.
+        let deposit_data = commitments
+            .keys()
+            .map(|&ssa_index| (ssa_index, MinimalDeposit::default()))
+            .collect();
+
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: MinimalDeposit::default(),
+            deposit_data,
             commitments,
+            missing: Default::default(),
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -1098,13 +1481,217 @@ mod tests {
         Ok(())
     }
 
+    /// A retransmission request round-trips, and carries the scope rather than any new SSA.
+    #[test]
+    fn start_protocol_ssa_recommit_request_should_encode_and_decode() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>;
+
+        let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::Secp256k1)?;
+        // Two cycles at once, several runs each: the wire form is a flat table keyed by SSA index, so
+        // one request can scope a whole batch.
+        let msg_1 = Spec::SsaRequest(SsaServerCommitmentMessage::recommit(
+            0xfeedbeef_u32,
+            params,
+            [
+                (1.try_into()?, vec![(0, 25), (104, 129), (8191, 8191)]),
+                (2.try_into()?, vec![(52, 77)]),
+            ],
+        ));
+
+        let (tag, encoded) = msg_1.clone().encode()?;
+        let msg_2 = Spec::decode(tag, &encoded)?;
+        assert_eq!(msg_1, msg_2);
+
+        let Spec::SsaRequest(decoded) = msg_2 else {
+            anyhow::bail!("expected an SsaRequest");
+        };
+        assert_eq!(params, decoded.dimensions()?);
+        assert_eq!(4, decoded.missing_run_count());
+        assert!(
+            decoded.commitments.is_empty() && decoded.deposit_data.is_empty(),
+            "a retransmission request asks for nothing new"
+        );
+        assert!(
+            encoded.len() <= HoprPacket::PAYLOAD_SIZE,
+            "a retransmission request must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
+        );
+
+        Ok(())
+    }
+
+    /// Exactly one of the two tables is populated, so the recipient can tell the two request kinds
+    /// apart by looking at one field — and a retransmission can never smuggle in a new SSA or the
+    /// deposit data that would go with one.
+    #[test]
+    fn start_protocol_ssa_request_must_ask_for_exactly_one_of_the_two_things() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>;
+
+        let neither = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0,
+            deposit_data: Default::default(),
+            commitments: Default::default(),
+            missing: Default::default(),
+        });
+        assert!(matches!(neither.encode(), Err(StartProtocolError::NumberOfCommitments)));
+
+        let both = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0,
+            deposit_data: Default::default(),
+            commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+            missing: [(SsaIndex::MIN, vec![(0, 0)])].into_iter().collect(),
+        });
+        assert!(matches!(both.encode(), Err(StartProtocolError::NumberOfCommitments)));
+
+        // Decode refuses both combinations too, so nothing hand-built gets past it either.
+        for (declared_commitments, entries, declared_runs, runs) in [
+            (0u16, &[][..], 0u16, &[][..]),
+            (1, &[(1u32, [0u8; 33])][..], 1, &[(1u32, 0u16, 0u16)][..]),
+        ] {
+            let body = ssa_request_body_with(&[0xa0], declared_commitments, entries, declared_runs, runs);
+            assert!(
+                matches!(
+                    decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
+                    Err(StartProtocolError::NumberOfCommitments)
+                ),
+                "commitments={declared_commitments} runs={declared_runs} must be refused"
+            );
+        }
+
+        // Deposit data belongs to SSAs being requested, and a retransmission requests none. Refused
+        // on the way out as well as on the way in, so `encode` never builds what `decode` rejects.
+        let deposit_data = serde_cbor_2::to_vec(
+            &[(1u32, MinimalDeposit::default())]
+                .into_iter()
+                .collect::<std::collections::BTreeMap<_, _>>(),
+        )?;
+        let body = ssa_request_body_with(&deposit_data, 0, &[], 1, &[(1, 0, 0)]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(ref e) if is_parse_error(e, "deposit_data on a retransmission request")),
+            "deposit data on a retransmission request must be refused: {:?}",
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        let with_deposit_data = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0,
+            deposit_data: [(SsaIndex::MIN, MinimalDeposit::default())].into_iter().collect(),
+            commitments: Default::default(),
+            missing: [(SsaIndex::MIN, vec![(0, 0)])].into_iter().collect(),
+        });
+        assert!(
+            matches!(with_deposit_data.encode(), Err(ref e) if is_parse_error(e, "deposit_data on a retransmission request")),
+        );
+
+        // An inverted run names nothing, so the encoder must not be able to emit one either.
+        let inverted = Spec::SsaRequest(SsaServerCommitmentMessage::recommit(
+            0xfeedbeef_u32,
+            hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::Secp256k1)?,
+            [(SsaIndex::MIN, vec![(7, 6)])],
+        ));
+        assert!(matches!(inverted.encode(), Err(ref e) if is_parse_error(e, "missing_run_is_inverted")));
+
+        Ok(())
+    }
+
+    /// The scope has to be canonical: ascending, disjoint and inside the polynomial range. That is
+    /// what bounds the polynomials one request can name by the cycle's own count rather than by
+    /// `runs × count`, and what lets the answer be assembled without deduplicating.
+    #[test]
+    fn start_protocol_decode_should_reject_a_malformed_missing_scope() {
+        let refused = |runs: &[(u32, u16, u16)], what: &str| {
+            let body = ssa_request_body_with(&[0xa0], 0, &[], runs.len() as u16, runs);
+            let decoded = decode_framed(StartProtocolDiscriminants::SsaRequest, &body);
+            assert!(
+                matches!(&decoded, Err(e) if is_parse_error(e, what)),
+                "{runs:?} must be refused as {what}, got {decoded:?}"
+            );
+        };
+
+        refused(&[(1, 7, 6)], "missing_run_out_of_range");
+        refused(&[(1, 0, MAX_POLYS_PER_SSA)], "missing_run_out_of_range");
+        // Overlapping, and merely repeated, both break the disjointness the answer relies on.
+        refused(&[(1, 0, 10), (1, 5, 20)], "missing_runs_not_ascending");
+        refused(&[(1, 0, 10), (1, 0, 10)], "missing_runs_not_ascending");
+        // Descending across two runs of one SSA. Two runs of *different* SSAs are unrelated, which
+        // the accepted case below pins.
+        refused(&[(1, 20, 30), (1, 0, 10)], "missing_runs_not_ascending");
+
+        let interleaved = [(2u32, 20u16, 30u16), (1, 0, 10), (2, 40, 50)];
+        let body = ssa_request_body_with(&[0xa0], 0, &[], interleaved.len() as u16, &interleaved);
+        let decoded = decode_framed(StartProtocolDiscriminants::SsaRequest, &body);
+        assert!(
+            matches!(&decoded, Ok(StartProtocol::SsaRequest(req)) if req.missing_run_count() == 3),
+            "the ordering rule is per SSA, so interleaved SSAs must decode: {decoded:?}"
+        );
+
+        // A count the body cannot possibly satisfy is refused on the count, before it sizes anything.
+        let body = ssa_request_body_with(&[0xa0], 0, &[], u16::MAX, &[(1, 0, 0)]);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
+            Err(StartProtocolError::NumberOfCommitments)
+        ));
+
+        // And a zero SSA index has no representation, in this table as in the other one.
+        let body = ssa_request_body_with(&[0xa0], 0, &[], 1, &[(0, 0, 0)]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(ref e) if is_parse_error(e, "ssa_index is 0")),
+        );
+    }
+
+    /// Pins [`StartProtocol::max_missing_runs`] against the encoder it exists to predict.
+    ///
+    /// The Exit sizes its scope from this and cannot see the layout, so a bound that drifted either
+    /// overflows a packet or silently under-reports what is missing.
+    #[test]
+    fn max_missing_runs_should_match_the_encode_layout() -> anyhow::Result<()> {
+        type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], MinimalDeposit>;
+
+        // PAYLOAD_SIZE(3238) - header(4) - params(4) - empty CBOR map(1) - num_commitments(2)
+        // - num_missing_runs(2) - CBOR null session_id(1), over 8 bytes per run.
+        let max_runs = Spec::max_missing_runs(&())?;
+        assert_eq!(403, max_runs);
+
+        let scope = |runs: usize| {
+            // One run per SSA index, which is the worst case for the flat table: every entry pays
+            // for its own key.
+            (1..=runs as u32)
+                .map(|index| {
+                    (
+                        hopr_protocol_pix::SsaIndex::new(index).expect("index must be non-zero"),
+                        vec![(0u16, 0u16)],
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let at_the_bound = Spec::SsaRequest(SsaServerCommitmentMessage::recommit(
+            (),
+            hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::Secp256k1)?,
+            scope(max_runs),
+        ));
+        let (tag, encoded) = at_the_bound.clone().encode()?;
+        assert!(encoded.len() <= ApplicationData::PAYLOAD_SIZE);
+        assert_eq!(at_the_bound, Spec::decode(tag, &encoded)?);
+
+        let over_the_bound = Spec::SsaRequest(SsaServerCommitmentMessage::recommit(
+            (),
+            hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::Secp256k1)?,
+            scope(max_runs + 1),
+        ));
+        assert!(
+            matches!(over_the_bound.encode(), Err(StartProtocolError::NumberOfCommitments)),
+            "one run past the bound must not encode"
+        );
+
+        Ok(())
+    }
+
     /// The round-trip test above deliberately uses an out-of-range sentinel to prove the codec is
     /// total. This one goes through the constructor and the accessor, which is what production uses
     /// and what actually pins the packed layout across `encode`/`decode`.
-    // `MinimalDeposit` is `()` — the instantiation that carries no deposit data — so passing
-    // `MinimalDeposit::default()` as the generic `deposit_data` argument is literally passing a
-    // unit value. That is the point of this instantiation, not an oversight.
-    #[allow(clippy::unit_arg)]
     #[test]
     fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
         let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::BabyJubJub)?;
@@ -1113,7 +1700,10 @@ mod tests {
                 0xfeedbeef_u32,
                 params,
                 [(1.try_into()?, [0u8; 33]), (2.try_into()?, [1u8; 33])],
-                MinimalDeposit::default(),
+                [
+                    (1.try_into()?, MinimalDeposit::default()),
+                    (2.try_into()?, MinimalDeposit::default()),
+                ],
             ),
         );
 
@@ -1135,8 +1725,9 @@ mod tests {
         let msg: SsaServerCommitmentMessage<u32, [u8; 33], MinimalDeposit> = SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: MinimalDeposit::default(),
+            deposit_data: Default::default(),
             commitments: Default::default(),
+            missing: Default::default(),
         };
         assert!(matches!(msg.dimensions(), Err(StartProtocolError::ParseError(_))));
     }
@@ -1156,11 +1747,165 @@ mod tests {
             StartProtocol::<u32, (), u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaRequest(SsaServerCommitmentMessage {
                 session_id: 0xfeedbeef,
                 params: 0xfeedbeef,
-                deposit_data: MinimalDeposit::default(),
+                // Empty: this test is about the commitment count exhausting the payload, and an
+                // empty map keeps the deposit data out of that arithmetic entirely.
+                deposit_data: Default::default(),
                 commitments,
+                missing: Default::default(),
             });
 
         assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
+        Ok(())
+    }
+
+    /// A single-entry deposit map whose CBOR encoding is exactly `target` bytes long.
+    ///
+    /// The bound is on the *serialized* size of the whole map, which is what the encoder budgets
+    /// against, so the two tests below must not have to know how wide a length prefix CBOR spends on
+    /// the payload they ask for. Searching for the overhead keeps them correct across a prefix
+    /// boundary. One entry keyed by [`SsaIndex::MIN`] — the cheapest key there is — so what the tests
+    /// vary is the size of the deposit map and not of its keys.
+    fn deposit_data_of_cbor_size(target: usize) -> anyhow::Result<std::collections::HashMap<SsaIndex, Vec<u8>>> {
+        for overhead in 1..=8 {
+            let candidate: std::collections::HashMap<_, _> =
+                [(SsaIndex::MIN, vec![0u8; target.saturating_sub(overhead)])]
+                    .into_iter()
+                    .collect();
+            if serde_cbor_2::to_vec(&candidate)?.len() == target {
+                return Ok(candidate);
+            }
+        }
+        anyhow::bail!("no single-entry deposit map CBOR-encodes to exactly {target} bytes")
+    }
+
+    /// The per-SSA values must survive the round trip *individually*.
+    ///
+    /// A codec that kept only one value, or paired values with the wrong indices, would still satisfy
+    /// a check on the encoded length — so this compares the map itself. One deposit index is
+    /// deliberately outside the commitment range: the codec does not require the two key sets to
+    /// agree, and must not quietly normalise them either.
+    #[test]
+    fn start_protocol_ssa_request_should_round_trip_per_ssa_deposit_data() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        let deposit_data: std::collections::HashMap<SsaIndex, Vec<u8>> = [
+            (SsaIndex::MIN, vec![1u8, 2, 3]),
+            (2u32.try_into()?, vec![4u8]),
+            (0xdead_u32.try_into()?, vec![5u8; 20]),
+        ]
+        .into_iter()
+        .collect();
+
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0xfeedbeef,
+            deposit_data: deposit_data.clone(),
+            commitments: [(SsaIndex::MIN, [0u8; 33]), (2u32.try_into()?, [1u8; 33])]
+                .into_iter()
+                .collect(),
+            missing: Default::default(),
+        });
+
+        let (tag, encoded) = msg.clone().encode()?;
+        let decoded = Spec::decode(tag, &encoded)?;
+        assert_eq!(msg, decoded);
+
+        let StartProtocol::SsaRequest(req) = decoded else {
+            anyhow::bail!("expected an SsaRequest");
+        };
+        assert_eq!(deposit_data, req.deposit_data);
+
+        Ok(())
+    }
+
+    /// The encoding is a function of the message, not of the hasher.
+    ///
+    /// `deposit_data` is a `HashMap`, and two maps holding equal entries iterate in different orders —
+    /// `RandomState` varies its seed per instance. Handing that order to CBOR would make the bytes of
+    /// two equal messages differ, which is why `encode` sorts the map first. Two independently built
+    /// maps, filled in opposite orders, is what catches its removal.
+    #[test]
+    fn start_protocol_ssa_request_encoding_should_not_depend_on_deposit_map_order() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        // Twelve entries rather than a handful: two independent maps can coincide on an iteration
+        // order by luck, and at this width the odds of that (1 in 12!) put the test past the point
+        // where a passing run means anything other than the sort being there.
+        let entries = (1u32..=12)
+            .map(|i| Ok((i.try_into()?, vec![i as u8; 2])))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let build = |deposit_data: std::collections::HashMap<SsaIndex, Vec<u8>>| {
+            Spec::SsaRequest(SsaServerCommitmentMessage {
+                session_id: 0xfeedbeef,
+                params: 0xfeedbeef,
+                deposit_data,
+                commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+                missing: Default::default(),
+            })
+        };
+
+        let forward = build(entries.iter().cloned().collect());
+        let reverse = build(entries.iter().rev().cloned().collect());
+
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.encode()?.1, reverse.encode()?.1);
+
+        Ok(())
+    }
+
+    /// An oversized `D` must be named as such, and not reported as a commitment-count problem.
+    ///
+    /// The distinction is what the caller can act on: below this bound the deposit data and the
+    /// batch size compete for one budget and dropping commitments is a fix, whereas above it no
+    /// commitment count would have made the message fit.
+    #[test]
+    fn start_protocol_ssa_request_should_reject_oversized_deposit_data() -> anyhow::Result<()> {
+        type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        let too_large = Spec::MAX_DEPOSIT_DATA_SIZE + 1;
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: (),
+            params: 0xfeedbeef,
+            deposit_data: deposit_data_of_cbor_size(too_large)?,
+            commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+            missing: Default::default(),
+        });
+
+        assert!(matches!(
+            msg.encode(),
+            Err(StartProtocolError::DepositDataTooLarge { size, max })
+                if size == too_large && max == Spec::MAX_DEPOSIT_DATA_SIZE
+        ));
+        Ok(())
+    }
+
+    /// Pins [`StartProtocol::MAX_DEPOSIT_DATA_SIZE`] as *achievable*, not merely safe.
+    ///
+    /// A bound a few bytes too conservative would pass a "the message still fits" assertion just as
+    /// well, so this asserts equality instead: the smallest legal `SsaRequest` built around a
+    /// maximal `deposit_data` — one commitment, a one-byte CBOR session_id — must fill the payload
+    /// exactly, and still round-trip.
+    #[test]
+    fn max_deposit_data_size_should_match_the_encode_layout() -> anyhow::Result<()> {
+        type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        // PAYLOAD_SIZE(3238) - header(4) - params(4) - num_commitments(2) - one entry(4 + 33)
+        // - num_missing_runs(2) - CBOR null session_id(1). Stated as a literal so a layout change
+        // has to come through here.
+        assert_eq!(3188, Spec::MAX_DEPOSIT_DATA_SIZE);
+
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: (),
+            params: 0xfeedbeef,
+            deposit_data: deposit_data_of_cbor_size(Spec::MAX_DEPOSIT_DATA_SIZE)?,
+            commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+            missing: Default::default(),
+        });
+
+        let (tag, encoded) = msg.clone().encode()?;
+        assert_eq!(ApplicationData::PAYLOAD_SIZE, encoded.len());
+        assert_eq!(msg, Spec::decode(tag, &encoded)?);
+
         Ok(())
     }
 
@@ -1275,6 +2020,64 @@ mod tests {
         Ok(())
     }
 
+    /// A keep-alive carrying a flag this build does not know must still decode.
+    ///
+    /// The flags are the one field of this message that a later protocol version can extend without
+    /// changing its layout, so strict decoding here is a forward-compatibility trap rather than a
+    /// safety property: an Exit that sets a new bit would have every keep-alive rejected by an older
+    /// Entry as malformed. That Entry then loses the SURB level the message reports, the liveness it
+    /// provides on an otherwise silent Session, and — on a PIX Session — the credit for one packet of
+    /// service against its successor gate, which is what decides whether the next deposit is made.
+    ///
+    /// The unknown bit itself must not survive: it selects no behaviour on this node, and letting it
+    /// through would make `flags.contains(..)` answer for a meaning this build cannot implement.
+    #[test]
+    fn a_keep_alive_with_an_unknown_flag_decodes_without_the_unknown_bit() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let known: KeepAliveFlags = KeepAliveFlag::BalancerState.into();
+        let msg = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
+            session_id: 10_i32,
+            flags: known,
+            additional_data: 0xffffffff,
+        });
+
+        let (tag, mut encoded) = msg.encode()?;
+
+        // The flag byte is the first byte of the body, which starts after the version, the
+        // discriminant and the two-byte length. `0x80` is the highest bit and no flag this build
+        // knows about, so it stands in for one a later protocol version adds.
+        const FLAGS_AT: usize = 4;
+        assert_eq!(
+            known.bits(),
+            encoded[FLAGS_AT],
+            "the flag byte must be where this test patches it"
+        );
+        encoded[FLAGS_AT] |= 0x80;
+
+        let decoded = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &encoded)
+            .context("a keep-alive carrying an unknown flag bit must still decode")?;
+
+        match decoded {
+            StartProtocol::KeepAlive(ka) => {
+                assert_eq!(10_i32, ka.session_id);
+                assert_eq!(0xffffffff, ka.additional_data);
+                assert!(
+                    ka.flags.contains(KeepAliveFlag::BalancerState),
+                    "the known flag must survive the unknown one"
+                );
+                assert_eq!(
+                    known.bits(),
+                    ka.flags.bits(),
+                    "the unknown bit must be dropped, not carried into a flag test"
+                );
+            }
+            other => anyhow::bail!("expected KeepAlive, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
         let msg =
@@ -1331,8 +2134,9 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        // The deposit_data field (64 bytes) slightly reduces the per-request capacity, but
-        // 23 commitments must still fit alongside a realistic long session-id.
+        // The deposit_data map costs a key per SSA on top of the commitments, so 23 of them must
+        // still fit alongside a realistic long session-id — with a deposit entry for each, which is
+        // the shape a real batch has.
         let mut commitments = std::collections::BTreeMap::new();
         for i in 1..24 {
             commitments.insert(i.try_into()?, [0u8; 33]);
@@ -1342,8 +2146,12 @@ mod tests {
             SsaServerCommitmentMessage {
                 session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
                 params: 0xfeedbeef,
-                deposit_data: MinimalDeposit::default(),
+                deposit_data: commitments
+                    .keys()
+                    .map(|&ssa_index| (ssa_index, MinimalDeposit::default()))
+                    .collect(),
                 commitments,
+                missing: Default::default(),
             },
         );
         assert!(
@@ -1400,28 +2208,14 @@ mod tests {
     }
 
     #[test]
-    fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        // The slack left after `MAX_SURBS_IN_PACKET` SURBs is `PAYLOAD_SIZE % HoprSurb::SIZE`
-        // (38 bytes at the current packet size), so how long a session id may be while the message
-        // still maxes out its SURBs tracks the packet size rather than being a constant. The real
-        // instantiation uses a `HoprPseudonym` and has far more room than this generic `String`.
-        let msg =
-            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
-                session_id: "long-session-id-abcde".to_string(),
-                flags: None.into(),
-                additional_data: 0,
-            });
-        let len = msg.encode()?.1.len();
-        assert_eq!(
-            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
-            HoprPacket::MAX_SURBS_IN_PACKET
-        );
-        assert!(
-            HoprPacket::max_surbs_with_message(len) >= KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
-            "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
-            len,
-            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
-        );
+    fn start_protocol_message_keep_alive_surb_capacity_should_include_all_headers() -> anyhow::Result<()> {
+        for id_len in [0, 9, 20, 500] {
+            let keep_alive = KeepAliveMessage::from("x".repeat(id_len));
+            let capacity = keep_alive.max_surbs()?;
+            let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(keep_alive);
+            let data = ApplicationData::try_from(msg)?;
+            assert_eq!(capacity, HoprPacket::max_surbs_with_message(data.total_len()));
+        }
 
         Ok(())
     }
@@ -1470,14 +2264,43 @@ mod tests {
 
     /// The `SsaRequest` counterpart of [`ssa_commit_body`], whose entries are keyed by SSA index.
     fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
+        // An empty CBOR map, which is the single byte 0xA0 — the smallest `deposit_data` there is,
+        // so these bodies stay about the commitment entries that follow it.
+        ssa_request_body_with_deposit_data(&[0xa0], declared_commitments, entries)
+    }
+
+    /// [`ssa_request_body`] with the `deposit_data` bytes written out by the caller, for the tests
+    /// that are about that map rather than about what follows it.
+    fn ssa_request_body_with_deposit_data(
+        deposit_data: &[u8],
+        declared_commitments: u16,
+        entries: &[(u32, [u8; 33])],
+    ) -> Vec<u8> {
+        ssa_request_body_with(deposit_data, declared_commitments, entries, 0, &[])
+    }
+
+    /// The most general `SsaRequest` body: both tables written out as the caller asks, counts and
+    /// all, so a count is free to disagree with the entries that follow it.
+    fn ssa_request_body_with(
+        deposit_data: &[u8],
+        declared_commitments: u16,
+        entries: &[(u32, [u8; 33])],
+        declared_runs: u16,
+        runs: &[(u32, u16, u16)],
+    ) -> Vec<u8> {
         let mut body = Vec::new();
         body.extend_from_slice(&0u32.to_be_bytes());
-        // CBOR-encoded `()` (`null`), which is the single byte 0xF6
-        body.push(0xf6);
+        body.extend_from_slice(deposit_data);
         body.extend_from_slice(&declared_commitments.to_be_bytes());
         for (ssa_index, commitment) in entries {
             body.extend_from_slice(&ssa_index.to_be_bytes());
             body.extend_from_slice(commitment);
+        }
+        body.extend_from_slice(&declared_runs.to_be_bytes());
+        for (ssa_index, first, last) in runs {
+            body.extend_from_slice(&ssa_index.to_be_bytes());
+            body.extend_from_slice(&first.to_be_bytes());
+            body.extend_from_slice(&last.to_be_bytes());
         }
         body.extend(serde_cbor_2::to_vec(&MALFORMED_SESSION_ID).expect("session id must serialize"));
         body
@@ -1588,8 +2411,9 @@ mod tests {
             SsaServerCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 params: 0,
-                deposit_data: MinimalDeposit::default(),
+                deposit_data: [(SsaIndex::MIN, MinimalDeposit::default())].into_iter().collect(),
                 commitments: [(SsaIndex::MIN, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
+                missing: Default::default(),
             },
         );
         assert!(
@@ -1733,6 +2557,73 @@ mod tests {
             decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
             Err(StartProtocolError::InvalidLength)
         ));
+    }
+
+    /// A map header is the peer's word for how many entries follow, and a packet of a few dozen
+    /// bytes is free to claim billions. Sizing an allocation from that claim is the whole problem:
+    /// the count a request can carry is bounded by its commitments, and a header above that bound is
+    /// refused on the header, before it has been used to size anything.
+    #[test]
+    fn start_protocol_decode_should_reject_a_deposit_data_map_larger_than_a_request_can_carry() {
+        let over_the_bound = |context: &str| context.starts_with("deposit_data") && context.contains("at most");
+
+        // A definite-length CBOR map (0xBB) announcing every entry the address space can hold, in a
+        // body that carries none of them.
+        let mut announced = vec![0xbb];
+        announced.extend_from_slice(&u64::MAX.to_be_bytes());
+        let body = ssa_request_body_with_deposit_data(&announced, 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "a map header claiming {} entries must be refused on the claim: {:?}",
+            u64::MAX,
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // Complete and well-formed, one entry over the bound — the case a header check alone would
+        // let through, and the only difference from the accepted body below.
+        let cbor_map = |entries: u16| {
+            serde_cbor_2::to_vec(
+                &(1..=entries as u32)
+                    .map(|i| (i, ()))
+                    .collect::<std::collections::BTreeMap<_, _>>(),
+            )
+            .expect("deposit data map must serialize")
+        };
+
+        let body =
+            ssa_request_body_with_deposit_data(&cbor_map(Decoder::MAX_SSAS_PER_REQUEST + 1), 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "a complete map one entry over the bound must be refused: {:?}",
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // An indefinite-length map (0xbf … 0xff) announces no count at all, so the header check has
+        // nothing to refuse and the per-entry one is the only bound left. Repeating a single key
+        // makes the map's own size useless as a counter: every entry overwrites the last, so the
+        // decoder holds one pair no matter how many went past it. Only the entries themselves are
+        // hand-framed; the pairs come from the serializer.
+        let mut repeated_key = vec![0xbf];
+        for _ in 0..=Decoder::MAX_SSAS_PER_REQUEST {
+            repeated_key.extend(serde_cbor_2::to_vec(&1u32).expect("an ssa index must serialize"));
+            repeated_key.extend(serde_cbor_2::to_vec(&MinimalDeposit::default()).expect("deposit data must serialize"));
+        }
+        repeated_key.push(0xff);
+
+        let body = ssa_request_body_with_deposit_data(&repeated_key, 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "an indefinite map must be bounded by the entries it carries, not the keys it keeps: {:?}",
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // And the bound itself still parses, entries and all.
+        let body = ssa_request_body_with_deposit_data(&cbor_map(Decoder::MAX_SSAS_PER_REQUEST), 1, &[(1, [0u8; 33])]);
+        let decoded = decode_framed(StartProtocolDiscriminants::SsaRequest, &body);
+        assert!(
+            matches!(decoded, Ok(StartProtocol::SsaRequest(ref req)) if req.deposit_data.len() == Decoder::MAX_SSAS_PER_REQUEST as usize),
+            "a map at the bound must decode with all of its entries: {decoded:?}"
+        );
     }
 
     #[test]

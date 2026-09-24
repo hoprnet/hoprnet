@@ -90,6 +90,32 @@ async fn transport_constructs_with_multiaddresses() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The constructor is a validation boundary, not just an assembly step.
+///
+/// `HoprTransport::new` is public. The shared node builder validates before every one of its build
+/// methods reaches it, but a direct caller does not, and `run_inner` validates only the `pix` field
+/// — which cannot see `validate_pix_supervision_pairing`, a schema-level rule on the whole
+/// `HoprProtocolConfig`. Without validation here such a caller gets a node that fails at Session
+/// establishment instead of at construction.
+///
+/// `max_recovery_idle` below the reconstructor's acknowledgement window is the cheapest way to state
+/// a conflict that no single field can catch: each half is individually valid.
+#[tokio::test]
+async fn transport_rejects_a_config_whose_pix_deadlines_conflict() -> anyhow::Result<()> {
+    let mut cfg = HoprProtocolConfig::default();
+    cfg.incoming_session_pix_config.supervision.max_recovery_idle = cfg.pix.reconstructor.max_ack_await_time / 2;
+
+    let error = create_stubbed_transport_with_cfg(0, vec![], cfg)
+        .err()
+        .context("a supervisor deadline inside the reconstructor's ack window must be rejected")?
+        .to_string();
+    assert!(
+        error.contains("invalid protocol configuration"),
+        "the constructor must report the configuration as invalid, got: {error}"
+    );
+    Ok(())
+}
+
 // --- Pre-run behavior tests ---
 
 #[tokio::test]

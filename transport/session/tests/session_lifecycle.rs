@@ -132,13 +132,13 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
     assert!(alice_mgr.is_started());
 
     // Start Bob
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
     assert!(bob_mgr.is_started());
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -300,12 +300,12 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
 
     // Start Bob
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
     assert!(bob_mgr.is_started());
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -453,7 +453,7 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
     // Start Alice
     let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
     assert!(alice_mgr.is_started());
 
     let alice_session = alice_mgr
@@ -533,13 +533,13 @@ async fn session_manager_should_timeout_new_session_attempt_when_no_response() -
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
-    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?;
     assert!(alice_mgr.is_started());
 
     // Start Bob
     let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
     let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
-    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?;
     assert!(bob_mgr.is_started());
 
     let result = alice_mgr
@@ -695,13 +695,13 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
     assert!(alice_mgr.is_started());
 
     // Start Bob
     let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
     let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
     assert!(bob_mgr.is_started());
 
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);

@@ -35,12 +35,12 @@ pub mod surb_telemetry;
 pub use counters::{PeerProtocolCounterRegistry, PeerProtocolCounters};
 pub use pipeline::{
     AcknowledgementPipelineConfig, NodeType, NopExitAcknowledgementShareProcessor, PacketPipelineBuilder,
-    PacketPipelineConfig, PacketPipelineProcesses, Unset,
+    PacketPipelineConfig, PacketPipelineProcesses, PoolArbitrationConfig, Unset,
 };
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
 pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 // The larger fixed-size packets cannot be decoded by peers using the previous wire format.
-// Version 1.2.0 is already used on master for generation-tagged SURBs.
+// Version 1.2.0 uses generation-tagged SURBs with the previous packet payload size.
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.3.0";

@@ -8,6 +8,7 @@ mod rate_limiting;
 pub mod simple;
 
 pub use controller::{BalancerStateValues, SurbBalancer, SurbBalancerConfig};
+pub(crate) use rate_limiting::MAX_WAIT_CHUNK;
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
 
 /// Smallest possible interval for balancer sampling.
@@ -162,8 +163,8 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
 /// factor on time unit.
 ///
 /// For example, when this is used to control the flow of keep-alive messages (carrying SURBs),
-/// the correction factor is `HoprPacket::MAX_SURBS_IN_PACKET` - which is the number of SURBs
-/// a single keep-alive message can bear.
+/// the correction factor is [`KeepAliveMessage::max_surbs`](hopr_protocol_start::KeepAliveMessage::max_surbs),
+/// the number of SURBs a single keep-alive message can bear including its headers.
 ///
 /// In another case, when this is used to control the egress of a Session, each outgoing packet
 /// consumes only a single SURB and therefore the correction factor is `1`.

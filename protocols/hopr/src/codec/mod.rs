@@ -196,6 +196,7 @@ mod tests {
                 resp,
                 ResolvedTransportRouting::Return(surb.sender_id, surb.surb),
                 None,
+                None,
             )?)
         }
 
@@ -232,6 +233,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         let in_packet = decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
@@ -263,6 +265,7 @@ mod tests {
                         ),
                         return_paths: vec![],
                     },
+                    None,
                     None,
                 )
                 .is_err()
@@ -300,6 +303,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         let fwd_packet = relay_decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
@@ -328,6 +332,7 @@ mod tests {
                 forward_path: f.forward_path.clone(),
                 return_paths: vec![f.return_path.clone()],
             },
+            None,
             None,
         )?;
 
@@ -368,8 +373,7 @@ mod tests {
         // New commitment of the receiver
         let _ = f.receiver.ssa_rcn.new_exit_commitment(
             ssa_id,
-            f.sender.ssa_gen.config().polynomials_per_ssa as usize,
-            f.sender.ssa_gen.config().threshold as usize,
+            hopr_protocol_pix::PixParams::try_from_config::<HoprPixSpec>(f.sender.ssa_gen.config())?,
         )?;
 
         // Sender makes a commitment too and delivers it to the receiver
@@ -413,6 +417,7 @@ mod tests {
                     forward_path: f.forward_path.clone(),
                     return_paths: vec![f.return_path.clone()],
                 },
+                None,
                 None,
             )?;
 
@@ -509,10 +514,10 @@ mod tests {
             .collect();
 
         // --- First commitment setup (before the loop) ---
-        let _ = f
-            .receiver
-            .ssa_rcn
-            .new_exit_commitment(ssa_ids[0], num_polys, threshold)?;
+        let _ = f.receiver.ssa_rcn.new_exit_commitment(
+            ssa_ids[0],
+            hopr_protocol_pix::PixParams::try_from_config::<HoprPixSpec>(f.sender.ssa_gen.config())?,
+        )?;
         let sender_commitment = f
             .sender
             .ssa_gen
@@ -538,6 +543,7 @@ mod tests {
                     forward_path: f.forward_path.clone(),
                     return_paths: vec![f.return_path.clone()],
                 },
+                None,
                 None,
             )?;
 
@@ -608,10 +614,10 @@ mod tests {
                 // At the last message of this gap, set up the next commitment
                 if pos_in_segment == segment_len - 1 {
                     let next_idx = i / segment_len + 1;
-                    let _ = f
-                        .receiver
-                        .ssa_rcn
-                        .new_exit_commitment(ssa_ids[next_idx], num_polys, threshold)?;
+                    let _ = f.receiver.ssa_rcn.new_exit_commitment(
+                        ssa_ids[next_idx],
+                        hopr_protocol_pix::PixParams::try_from_config::<HoprPixSpec>(f.sender.ssa_gen.config())?,
+                    )?;
                     let next_commitment = f
                         .sender
                         .ssa_gen
@@ -739,6 +745,7 @@ mod tests {
                 return_paths: vec![],
             },
             None,
+            None,
         )?;
 
         // First decode should succeed
@@ -773,6 +780,7 @@ mod tests {
                 ),
                 return_paths: vec![],
             },
+            None,
             None,
         )?;
 

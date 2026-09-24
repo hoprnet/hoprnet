@@ -1,0 +1,19 @@
+---
+source: transport/session/src/supervision/mod.rs
+expression: labels
+---
+[
+    "CommitmentTimeout",
+    "DepositTimeout",
+    "DepositObserverClosed",
+    "RecoveryIdle",
+    "RecoveryDeadline",
+    "UnverifiableShares",
+    "BatchServedOutOfOrder",
+    "CounterRegression",
+    "InvalidTransition",
+    "NoSsaRemaining",
+    "SupervisorUnavailable",
+    "SessionClosed",
+    "Drained",
+]

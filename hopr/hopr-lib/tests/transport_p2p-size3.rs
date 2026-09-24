@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::Context;
 use hopr_lib::{
     api::{
@@ -11,11 +9,12 @@ use hopr_lib::{
         node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
         types::primitive::prelude::Address,
     },
-    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
+    testing::fixtures::{
+        ClusterGuard, Probe, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster, wait_for_convergence,
+    },
 };
 use rstest::*;
 use serial_test::serial;
-use tokio::time::sleep;
 
 #[rstest]
 #[test_log::test(tokio::test)]
@@ -134,24 +133,26 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
 
     // Wait for probe quality to settle — the fixture only checks that edges exist,
     // not that probe rounds have produced non-zero scores.
-    let mut scored_all = false;
-    for _ in 0..30 {
-        scored_all = peers.iter().all(|peer| {
-            node.inner()
-                .transport()
-                .network_peer_observations(peer)
-                .and_then(|obs| {
-                    obs.immediate_qos()
-                        .map(|imm| imm.average_probe_rate().is_some_and(|r| r > 0.0))
-                })
-                .unwrap_or(false)
-        });
-        if scored_all {
-            break;
-        }
-        sleep(Duration::from_secs(2)).await;
-    }
-    assert!(scored_all, "all peers should have non-zero probe rate");
+    wait_for_convergence("probe rates", || async {
+        let rates: Vec<(String, Option<f64>)> = peers
+            .iter()
+            .map(|peer| {
+                let rate = node
+                    .inner()
+                    .transport()
+                    .network_peer_observations(peer)
+                    .and_then(|obs| obs.immediate_qos().and_then(|imm| imm.average_probe_rate()));
+                (peer.to_string(), rate)
+            })
+            .collect();
+
+        Ok(if rates.iter().all(|(_, rate)| rate.is_some_and(|r| r > 0.0)) {
+            Probe::Ready(())
+        } else {
+            Probe::Pending(format!("probe rates per peer: {rates:?}"))
+        })
+    })
+    .await?;
 
     for peer in &peers {
         let obs = node
@@ -185,25 +186,31 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
 
     // Wait for probe quality to propagate — `all_network_peers(0.0)` filters
     // peers with score > 0 which requires at least one successful probe round.
-    let mut all_peers = Vec::new();
-    for _ in 0..30 {
-        all_peers = node
+    let all_peers = wait_for_convergence("peer scores", || async {
+        // A failing API call is a hard error, not slow convergence: propagate it rather than
+        // retrying until the budget expires.
+        let peers = node
             .inner()
             .transport()
             .all_network_peers(0.0)
             .await
             .context("failed to get all network peers")?;
-        if all_peers.len() >= expected_count
-            && all_peers
-                .iter()
-                .all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
-        {
-            break;
-        }
-        sleep(Duration::from_secs(2)).await;
-    }
 
-    assert!(!all_peers.is_empty(), "should have at least one peer with score > 0");
+        Ok(
+            if peers.len() == expected_count
+                && peers
+                    .iter()
+                    .all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
+            {
+                Probe::Ready(peers)
+            } else {
+                let scores: Vec<(String, Option<f64>)> =
+                    peers.iter().map(|(id, obs)| (id.to_string(), obs.score())).collect();
+                Probe::Pending(format!("{}/{expected_count} scored peers: {scores:?}", peers.len()))
+            },
+        )
+    })
+    .await?;
 
     for (peer_id, obs) in &all_peers {
         assert!(

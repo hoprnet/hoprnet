@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "6.1.0"
+version = "6.3.1"
 description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
 edition.workspace = true
 license.workspace = true
@@ -40,7 +40,6 @@ auto_impl = { workspace = true }
 bytes = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
-const-hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
