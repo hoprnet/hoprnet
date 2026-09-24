@@ -24,9 +24,10 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SegmentRequest,
+    SeqIndicator, SessionSocketConfig, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
+    session_frame_size,
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
@@ -342,8 +343,7 @@ pub struct HoprSessionConfig {
     pub capabilities: Capabilities,
     /// Expected frame size of the Session protocol socket.
     ///
-    /// Floored to a whole multiple of [`SESSION_MTU`] by the socket, so a value that is not one
-    /// buys nothing and costs a runt segment's worth of packet — see
+    /// Clamped to the socket's supported frame size range — see
     /// [`session_frame_size`](hopr_protocol_session::session_frame_size).
     ///
     /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
@@ -418,7 +418,7 @@ impl HoprSession {
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
-        cfg: HoprSessionConfig,
+        mut cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
@@ -429,6 +429,17 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
+        if cfg.capabilities.contains(Capability::Segmentation) {
+            let mut max_segments = (SeqIndicator::MAX + 1) as usize;
+            if cfg.capabilities.contains(Capability::RetransmissionAck)
+                || cfg.capabilities.contains(Capability::RetransmissionNack)
+            {
+                max_segments = max_segments
+                    .min(SegmentRequest::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MISSING_SEGMENTS_PER_FRAME);
+            }
+            // Use the same effective frame size for the socket and its delivery accounting.
+            cfg.frame_mtu = session_frame_size::<{ ApplicationData::PAYLOAD_SIZE }>(cfg.frame_mtu, max_segments);
+        }
         let routing_clone = routing.clone();
 
         #[cfg(feature = "telemetry")]
@@ -682,7 +693,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::{AsyncReadExt, AsyncWriteExt};
+    use futures::{AsyncReadExt, AsyncWriteExt, FutureExt};
     use hopr_api::types::{
         crypto::prelude::*,
         crypto_random::Randomizable,
@@ -881,6 +892,51 @@ mod tests {
     }
 
     // --- Existing tests ---
+
+    #[test_log::test(tokio::test)]
+    async fn session_flow_control_should_use_effective_frame_size() -> anyhow::Result<()> {
+        use hopr_protocol_session::types::{FrameAcknowledgements, SessionMessage};
+
+        let id = HoprPseudonym::random();
+        let (mut incoming, rx) = futures::channel::mpsc::channel(1);
+        let mut session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::RetransmissionAck.into(),
+                frame_mtu: 1, // The socket clamps this up to one full segment.
+                ..Default::default()
+            },
+            (futures::sink::drain(), rx),
+            None,
+            None,
+            Some(FlowControlConfig {
+                min_window_size: SESSION_MTU,
+                max_window_size: SESSION_MTU,
+                ..Default::default()
+            }),
+        )?;
+        let frame = vec![7u8; SESSION_MTU];
+        session.write_all(&frame).await?;
+        session.flush().await?;
+
+        let ack =
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::Acknowledge(FrameAcknowledgements::try_from(vec![1])?);
+        incoming
+            .send(ApplicationDataIn {
+                data: ApplicationData::new(SESSION_APPLICATION_TAG, ack.into_encoded().into_vec())?,
+                packet_info: Default::default(),
+            })
+            .await?;
+        // Process the acknowledgement; no application payload is available to read.
+        assert!(session.read(&mut [0u8; 1]).now_or_never().is_none());
+
+        tokio::time::timeout(Duration::from_millis(100), session.write_all(&frame))
+            .await
+            .context("one frame acknowledgement must release a full frame's send window")??;
+        assert_eq!(session.config().frame_mtu, SESSION_MTU);
+        Ok(())
+    }
 
     #[test_log::test(tokio::test)]
     async fn test_session_bidirectional_flow_without_segmentation() -> anyhow::Result<()> {

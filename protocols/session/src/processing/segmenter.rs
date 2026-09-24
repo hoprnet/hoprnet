@@ -62,11 +62,6 @@ where
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
         // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
-        //
-        // Deliberately only a clamp, not an alignment: whether a frame is a whole number of segments
-        // is `SessionSocket`'s policy (see `session_frame_size`), while the segmenter stays a
-        // mechanism that faithfully segments whatever it is handed — a partial frame at flush time is
-        // misaligned by nature and must still work.
         let frame_size = frame_size.clamp(
             session_socket_mtu::<C>(),
             session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,

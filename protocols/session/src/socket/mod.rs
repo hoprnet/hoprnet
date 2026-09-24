@@ -37,13 +37,9 @@ use crate::{
 pub struct SessionSocketConfig {
     /// The maximum size of a frame on the read/write interface of the [`SessionSocket`].
     ///
-    /// Snapped by [`session_frame_size`] to a whole multiple of [`session_socket_mtu`], between one
-    /// segment and:
+    /// Clamped by [`session_frame_size`] between one [`crate::session_socket_mtu`] payload and:
     /// - `SeqIndicator::MAX` + 1 segments for stateless sockets, or
     /// - min(`SeqIndicator::MAX` + 1, `SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`) segments for stateful sockets
-    ///
-    /// A value that is not a whole multiple is floored, never raised — see [`session_frame_size`]
-    /// for why.
     ///
     /// Default is [`MAX_SESSION_MTU`], i.e. exactly one segment per frame.
     #[default(MAX_SESSION_MTU)]
@@ -161,9 +157,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
-        // A frame is a whole number of segments: at least one, at most as many as the SeqIndicator
-        // can enumerate. Snapping rather than clamping is what keeps a frame from ending in a runt
-        // segment, which the unbuffered downstream would pay a whole packet for.
+        // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
         let frame_size = session_frame_size::<C>(cfg.frame_size, (SeqIndicator::MAX + 1) as usize);
 
         // Segment data incoming/outgoing using underlying transport
@@ -312,8 +306,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
-        // A frame is a whole number of segments (see the stateless constructor). The upper bound is
-        // additionally reduced here by the size of the missing-segment bitmap in SegmentRequests.
+        // The upper bound is additionally limited by the missing-segment bitmap in SegmentRequests.
         let frame_size = session_frame_size::<C>(
             cfg.frame_size,
             SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
@@ -618,6 +611,48 @@ mod tests {
     const FRAME_SIZE: usize = MAX_SESSION_MTU;
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
+
+    #[test_log::test(tokio::test)]
+    async fn session_socket_should_preserve_datagram_frame_size() -> anyhow::Result<()> {
+        for (frame_size, datagram_size) in [
+            (SessionSocketConfig::default().frame_size, 1456),
+            (1500, 1500),
+            (2800, 2800),
+        ] {
+            let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+            let cfg = SessionSocketConfig {
+                frame_size,
+                ..Default::default()
+            };
+            let mut sender = SessionSocket::<MTU, _>::new_stateless(
+                "alice",
+                alice,
+                cfg,
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?;
+            let mut receiver = SessionSocket::<MTU, _>::new_stateless(
+                "bob",
+                bob,
+                cfg,
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?;
+            let data = vec![7u8; datagram_size];
+            sender.write_all(&data).await?;
+            sender.flush().await?;
+
+            // UDP forwarding turns each read into a datagram: read_exact would hide a split frame.
+            let mut received = vec![0u8; datagram_size + 1];
+            let n = receiver
+                .read(&mut received)
+                .timeout(futures_time::time::Duration::from_secs(2))
+                .await??;
+            assert_eq!(n, datagram_size, "frame_size={frame_size}");
+            assert_eq!(&received[..n], data);
+        }
+        Ok(())
+    }
 
     #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {

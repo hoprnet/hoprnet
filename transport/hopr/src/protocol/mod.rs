@@ -41,4 +41,6 @@ pub use pipeline::{
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
 pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
-pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.1.0";
+// The larger fixed-size packets cannot be decoded by peers using the previous wire format.
+// Version 1.2.0 is already used on master for generation-tagged SURBs.
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.3.0";

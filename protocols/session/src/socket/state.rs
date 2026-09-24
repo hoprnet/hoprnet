@@ -136,11 +136,7 @@ mod tests {
         utils::test::{FaultyNetworkConfig, setup_alice_bob},
     };
 
-    /// What the socket segments with when production's [`MAX_SESSION_MTU`] frame meets this
-    /// module's deliberately small `MTU`: floored to a whole number of segments.
-    ///
-    /// Snapped rather than used raw because the two do not coincide here the way they do at the real
-    /// HOPR packet size, and the segment counts below have to follow the real frame boundary.
+    /// The production frame size over this module's deliberately small segment MTU.
     const FRAME_SIZE: usize = session_frame_size::<MTU>(MAX_SESSION_MTU, (SeqIndicator::MAX + 1) as usize);
 
     const MTU: usize = 1000;
@@ -226,8 +222,7 @@ mod tests {
     async fn session_socket_must_correctly_dispatch_segment_and_frame_state_events() -> anyhow::Result<()> {
         const NUM_FRAMES: usize = 2;
 
-        // Exact: FRAME_SIZE is a whole number of segments, so no frame ends in a runt.
-        const NUM_SEGMENTS: usize = NUM_FRAMES * FRAME_SIZE / session_socket_mtu::<MTU>();
+        const NUM_SEGMENTS: usize = NUM_FRAMES * FRAME_SIZE.div_ceil(session_socket_mtu::<MTU>());
 
         let mut alice_seq = mockall::Sequence::new();
         let mut alice_state = MockSockState::new();

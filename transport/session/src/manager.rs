@@ -632,8 +632,7 @@ pub struct IncomingSessionPixConfig {
 pub struct SessionManagerConfig {
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
-    /// Floored to a whole multiple of [`SESSION_MTU`] by the socket, so a value that is not one
-    /// buys nothing and costs a runt segment's worth of packet.
+    /// Clamped to the socket's supported frame size range, preserving boundaries within that range.
     ///
     /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
     #[default(SESSION_MTU)]
