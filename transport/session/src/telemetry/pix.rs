@@ -36,6 +36,16 @@
 //! | `hopr_pix_cycle_egress_packets` | MultiHistogram | packets | cycle finalization | `outcome` = `recovered\|failed` |
 //! | `hopr_pix_cycle_useful_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
 //! | `hopr_pix_cycle_accepted_share_fraction` | MultiHistogram | ratio | cycle finalization | `outcome` |
+//! | `hopr_pix_sessions_stalled` | MultiGauge | Sessions | stall begins / ends | `cause` = `surb_starved\|share_starved` |
+//! | `hopr_pix_cycle_phase_seconds` | MultiHistogram | seconds | cycle leaves a phase | `phase` — same set as `hopr_pix_cycles_active` |
+//! | `hopr_pix_deposits_confirmed_uhopr_total` | SimpleCounter | µHOPR | deposit confirmed | — |
+//! | `hopr_pix_deposits_recovered_uhopr_total` | SimpleCounter | µHOPR | cycle finalization (recovered) | — |
+//! | `hopr_pix_closures_total` | MultiCounter | Sessions | supervisor close | `reason` — see [`SessionPixCloseReason`] |
+//! | `hopr_pix_fill_backoff_total` | MultiCounter | occasions | fill withheld / stall onset | `reason` = `surb_reserve\|stalled` |
+//!
+//! The last two are per-Session events rather than node aggregates, but they belong on this prefix
+//! because neither is labelled by a Session. Their per-Session siblings
+//! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived
@@ -130,10 +140,54 @@
 //!   rate(hopr_pix_cycle_egress_packets_bucket[1h])))
 //! ```
 //!
-//! *Closure rate by reason*, from the existing bounded per-reason counter:
+//! *Why fill is stalled, right now.* One series instead of correlating a fill-backoff rate against
+//! a gate-block rate: `surb_starved` is an Exit that cannot send because the Entry is not supplying
+//! SURBs, `share_starved` is one sending into a cycle that has stopped advancing.
 //!
 //! ```promql
-//! sum by (reason) (rate(hopr_session_pix_closures_total[10m]))
+//! sum by (cause) (hopr_pix_sessions_stalled)
+//! # as a share of the Sessions that could be stalled
+//! sum(hopr_pix_sessions_stalled) / sum(hopr_pix_sessions_active)
+//! ```
+//!
+//! *Where the time goes.* The phase census above says how many cycles are stuck; this says for how
+//! long, which is what separates a slow Entry (`awaiting_commitment`) from a slow chain
+//! (`awaiting_deposit`) from a starved return path (`recovering`):
+//!
+//! ```promql
+//! histogram_quantile(0.9, sum by (le, phase) (rate(hopr_pix_cycle_phase_seconds_bucket[1h])))
+//! ```
+//!
+//! The phase boundaries are the supervisor's, so `recovering` includes the wait behind an earlier
+//! member of the same batch. That matches `hopr_pix_cycles_active{phase="recovering"}`, which counts
+//! queued cycles too. Only phases that *ended* are observed, so a cycle still live when its Session
+//! ends contributes nothing.
+//!
+//! *Stranded deposit value.* What the Entries paid for and this Exit did not recover. Compared as
+//! cumulative totals rather than as rates, like the reservation-leak query below: a cycle confirms
+//! now and recovers an hour later, so the two counters do not move together over a short window.
+//!
+//! ```promql
+//! (hopr_pix_deposits_confirmed_uhopr_total - hopr_pix_deposits_recovered_uhopr_total) / 1e6
+//! # what fraction of what was paid for is being lost
+//! 1 - hopr_pix_deposits_recovered_uhopr_total / hopr_pix_deposits_confirmed_uhopr_total
+//! ```
+//!
+//! A Session released mid-flight drops its recovered value but keeps its confirmed value — see
+//! [`EventScope`](super::super::supervision::telemetry) — so this over-states the loss rather than
+//! hiding it.
+//!
+//! *Closure rate by reason*, from the bounded per-reason counter:
+//!
+//! ```promql
+//! sum by (reason) (rate(hopr_pix_closures_total[10m]))
+//! ```
+//!
+//! *Why fill is not keeping up.* `surb_reserve` is an Exit that cannot send because the Entry is
+//! not supplying SURBs; `stalled` is one sending into a cycle that has stopped advancing:
+//!
+//! ```promql
+//! sum by (reason) (rate(hopr_pix_fill_backoff_total[5m]))
 //! ```
 //!
 //! *Reservation leaks.* The two cumulative byte counters must converge once the live set drains; a
@@ -145,11 +199,27 @@
 //! ```
 
 use crate::supervision::{
-    GateBlockReason,
+    GateBlockReason, SessionPixCloseReason,
     telemetry::{
         PixAdmissionRejection, PixCycleEvent, PixCycleOutcome, PixCyclePhase, PixGateBlock, PixGateMode, PixShareKind,
+        PixStallCause,
     },
 };
+
+/// Why PIX fill sent less than its planned rate, as `hopr_pix_fill_backoff_total` labels it.
+///
+/// Lives here rather than with the label enums in `supervision::telemetry` because neither producer
+/// is the supervisor, and that module is compiled without this feature.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
+pub(crate) enum PixFillBackoff {
+    /// The estimated SURB level was below `fill.min_surb_reserve`, so the packet was withheld.
+    /// Counted per withheld packet.
+    SurbReserve,
+    /// The cycle being filled for stopped progressing for `max_recovery_idle`, so the planner
+    /// dropped back to its heartbeat. Counted once per stall, not once per tick.
+    Stalled,
+}
 
 lazy_static::lazy_static! {
     static ref METRIC_PIX_SESSIONS_ACTIVE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
@@ -226,6 +296,35 @@ lazy_static::lazy_static! {
         "Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus",
         vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
         &["outcome"]
+    ).unwrap();
+    static ref METRIC_PIX_SESSIONS_STALLED: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_pix_sessions_stalled",
+        "PIX sessions whose fill is currently not keeping up, by cause",
+        &["cause"]
+    ).unwrap();
+    static ref METRIC_PIX_CYCLE_PHASE_SECONDS: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
+        "hopr_pix_cycle_phase_seconds",
+        "How long an SSA cycle spent in one supervisor phase, observed when it leaves that phase",
+        vec![1.0, 5.0, 15.0, 60.0, 300.0, 900.0, 3600.0, 14400.0],
+        &["phase"]
+    ).unwrap();
+    static ref METRIC_PIX_DEPOSITS_CONFIRMED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_deposits_confirmed_uhopr_total",
+        "Deposit value confirmed for SSA cycles of this Exit, in uHOPR (1e-6 HOPR)"
+    ).unwrap();
+    static ref METRIC_PIX_DEPOSITS_RECOVERED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_deposits_recovered_uhopr_total",
+        "Deposit value this Exit actually unlocked by fully recovering the cycle, in uHOPR (1e-6 HOPR)"
+    ).unwrap();
+    static ref METRIC_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_closures_total",
+        "Sessions closed by the PIX supervisor, by reason",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_PIX_FILL_BACKOFF_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_pix_fill_backoff_total",
+        "Times PIX fill held back, by reason",
+        &["reason"]
     ).unwrap();
 }
 
@@ -317,6 +416,42 @@ pub(crate) fn record_cycle_summary(
     }
 }
 
+/// Moves the stalled-Session count for `cause` by `delta`.
+pub(crate) fn add_sessions_stalled(cause: PixStallCause, delta: i64) {
+    METRIC_PIX_SESSIONS_STALLED.increment(&[cause.to_string().as_str()], delta as f64);
+}
+
+/// Observes how long one cycle spent in `phase`.
+pub(crate) fn record_cycle_phase_duration(phase: PixCyclePhase, seconds: f64) {
+    METRIC_PIX_CYCLE_PHASE_SECONDS.observe(&[phase.to_string().as_str()], seconds);
+}
+
+/// Adds `uhopr` of deposit value confirmed for a cycle.
+pub(crate) fn add_deposits_confirmed(uhopr: u64) {
+    METRIC_PIX_DEPOSITS_CONFIRMED.increment_by(uhopr);
+}
+
+/// Adds `uhopr` of deposit value unlocked by a cycle recovering.
+///
+/// Always at most its confirmed sibling; the difference is value the Exit was paid for and did not
+/// recover, which nothing refunds.
+pub(crate) fn add_deposits_recovered(uhopr: u64) {
+    METRIC_PIX_DEPOSITS_RECOVERED.increment_by(uhopr);
+}
+
+/// Counts a Session closed by the PIX supervisor, labelled by why.
+///
+/// Takes the enum rather than a `&str` so that bounded cardinality is a property of the signature,
+/// and so the label has one spelling.
+pub(crate) fn record_pix_closure(reason: SessionPixCloseReason) {
+    METRIC_PIX_CLOSURES_TOTAL.increment(&[reason.to_string().as_str()]);
+}
+
+/// Counts one occasion on which PIX fill held back, labelled by why.
+pub(crate) fn record_pix_fill_backoff(reason: PixFillBackoff) {
+    METRIC_PIX_FILL_BACKOFF_TOTAL.increment(&[reason.to_string().as_str()]);
+}
+
 /// Counts `bytes` returned to the node's live-cycle budget.
 pub(crate) fn record_cycle_bytes_released(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RELEASED.increment_by(bytes);
@@ -376,6 +511,16 @@ mod tests {
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.name(),
                 METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION.labels(),
             ),
+            (METRIC_PIX_SESSIONS_STALLED.name(), METRIC_PIX_SESSIONS_STALLED.labels()),
+            (
+                METRIC_PIX_CYCLE_PHASE_SECONDS.name(),
+                METRIC_PIX_CYCLE_PHASE_SECONDS.labels(),
+            ),
+            (METRIC_PIX_CLOSURES_TOTAL.name(), METRIC_PIX_CLOSURES_TOTAL.labels()),
+            (
+                METRIC_PIX_FILL_BACKOFF_TOTAL.name(),
+                METRIC_PIX_FILL_BACKOFF_TOTAL.labels(),
+            ),
         ];
 
         for (name, labels) in labelled {
@@ -400,6 +545,12 @@ mod tests {
         record_gate_block_duration(GateBlockReason::ShareLag, 0.25);
         add_shares_total(PixShareKind::Surplus, 11);
         record_cycle_summary(PixCycleOutcome::Failed, 4096, Some(0.5), Some(0.75));
+        record_pix_closure(SessionPixCloseReason::RecoveryIdle);
+        record_pix_fill_backoff(PixFillBackoff::SurbReserve);
+        add_deposits_confirmed(1_500_000);
+        add_deposits_recovered(1_000_000);
+        record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
+        add_sessions_stalled(PixStallCause::ShareStarved, 1);
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
 
@@ -420,6 +571,12 @@ mod tests {
             "hopr_pix_cycle_egress_packets",
             "hopr_pix_cycle_useful_share_fraction",
             "hopr_pix_cycle_accepted_share_fraction",
+            "hopr_pix_sessions_stalled{cause=\"share_starved\"}",
+            "hopr_pix_cycle_phase_seconds",
+            "hopr_pix_deposits_confirmed_uhopr_total",
+            "hopr_pix_deposits_recovered_uhopr_total",
+            "hopr_pix_closures_total{reason=\"recovery_idle\"}",
+            "hopr_pix_fill_backoff_total{reason=\"surb_reserve\"}",
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }
