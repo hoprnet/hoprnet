@@ -1166,7 +1166,10 @@ where
                         // so the correction by this factor is applied.
                         SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
                         surb_mgmt.clone(),
-                    );
+                    )
+                    // Keep-alives only exist for the balancer, so they are what gives way when the
+                    // local uplink cannot keep up.
+                    .with_egress_pressure(self.egress_pressure.clone());
 
                     let (level_stream, balancer_abort_handle) =
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);

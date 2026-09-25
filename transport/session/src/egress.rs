@@ -77,12 +77,15 @@ impl EgressPressure {
 
     /// Whether egress was congested at any point during the `window` before `now`.
     pub fn is_congested_within(&self, now: Instant, window: Duration) -> bool {
+        self.last_congested_at()
+            .is_some_and(|last| now.saturating_duration_since(last) <= window)
+    }
+
+    /// When egress was last seen congested, or `None` if it never was.
+    pub fn last_congested_at(&self) -> Option<Instant> {
         match self.last_congested_ns.load(Ordering::Relaxed) {
-            0 => false,
-            at => {
-                let last = self.origin + Duration::from_nanos(at - 1);
-                now.saturating_duration_since(last) <= window
-            }
+            0 => None,
+            at => Some(self.origin + Duration::from_nanos(at - 1)),
         }
     }
 

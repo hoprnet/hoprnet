@@ -20,9 +20,9 @@ use tracing::{Instrument, instrument};
 
 use super::{
     BalancerControllerBounds, ControlInput, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator,
-    SurbBalancerController, SurbFlowController, SurbFlowEstimator,
+    SurbBalancerController, SurbFlowController, SurbFlowEstimator, congestion::CongestionCeiling,
 };
-use crate::SessionId;
+use crate::{SessionId, egress::EgressPressure};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -78,6 +78,12 @@ lazy_static::lazy_static! {
         hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_keep_alive_wire_bytes_per_sec",
             "Wire bytes per second spent on SURB-bearing keep-alive packets",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_EFFECTIVE_CEILING: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_effective_ceiling",
+            "Most SURBs per second the balancer may command after backing off from local egress congestion",
             &["session_id"]
     ).unwrap();
 }
@@ -507,6 +513,11 @@ pub struct SurbBalancer<C, E, F> {
     /// replies that reach us, so what it reads then is how many replies were lost, not how many
     /// SURBs the counterparty spent.
     net_consumption_per_sec: f64,
+    /// Local egress congestion to back production off from, if this balancer's output rides on
+    /// the local uplink.
+    egress_pressure: Option<Arc<EgressPressure>>,
+    /// The output ceiling as backed off from `egress_pressure`.
+    congestion: CongestionCeiling,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
     /// DIAGNOSTIC: estimator state at the last balancer-state line, to report rates over its window.
@@ -550,9 +561,20 @@ where
             was_below_target: true,
             was_degraded: false,
             net_consumption_per_sec: 0.0,
+            egress_pressure: None,
+            congestion: CongestionCeiling::default(),
             last_report: std::time::Instant::now(),
             last_report_snapshot,
         }
+    }
+
+    /// Backs this balancer's output off while `pressure` reports the local uplink queueing.
+    ///
+    /// For a balancer whose output is traffic on the local uplink: the Entry's keep-alives. The
+    /// configured output limit stays the hard ceiling either way.
+    pub fn with_egress_pressure(mut self, pressure: Arc<EgressPressure>) -> Self {
+        self.egress_pressure = Some(pressure);
+        self
     }
 
     /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
@@ -686,11 +708,17 @@ where
             "estimated SURB buffer change"
         );
 
+        let limit = self.controller.bounds().output_limit();
+        let ceiling = match &self.egress_pressure {
+            Some(pressure) => self.congestion.update(now, dt, pressure.last_congested_at(), limit),
+            None => limit,
+        };
+
         let output = self.controller.next_control_output(ControlInput {
             level: current,
             net_consumption_per_sec: self.net_consumption_per_sec,
             dt,
-            ceiling: self.controller.bounds().output_limit(),
+            ceiling,
         });
         tracing::trace!(output, "next balancer control output for session");
 
@@ -720,6 +748,12 @@ where
                 consumed = snapshot.consumed,
                 consumed_s = rates.consumed.round() as u64,
                 net_consumption_s = self.net_consumption_per_sec.round() as i64,
+                ceiling,
+                backed_off = self.congestion.is_backed_off(),
+                egress_delay_ms = self
+                    .egress_pressure
+                    .as_ref()
+                    .map(|p| p.last_sojourn().as_millis() as u64),
                 organic_surbs_s = rates.organic.round() as u64,
                 ka_surbs_s = rates.keep_alive_surbs.round() as u64,
                 ka_pkts_s = rates.keep_alive_packets.round() as u64,
@@ -752,6 +786,7 @@ where
             METRIC_CURRENT_TARGET.set(&[sid], self.controller.bounds().target() as f64);
             METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], error as f64);
             METRIC_CONTROL_OUTPUT.set(&[sid], output as f64);
+            METRIC_EFFECTIVE_CEILING.set(&[sid], ceiling as f64);
             METRIC_SURB_RATE.set(&[sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
@@ -1282,6 +1317,16 @@ mod tests {
             }
         }
 
+        /// A harness whose keep-alives back off from the returned record of egress congestion, as
+        /// the live Entry's do.
+        fn congestible(cfg: SurbBalancerConfig) -> (Self, Arc<EgressPressure>) {
+            // Created first: congestion is recorded relative to when the record was created.
+            let pressure = Arc::new(EgressPressure::new());
+            let mut harness = Self::new(cfg);
+            harness.balancer = harness.balancer.with_egress_pressure(pressure.clone());
+            (harness, pressure)
+        }
+
         /// One sampling interval: mint at the rate last commanded, and consume `consumed` of them.
         fn tick(&mut self, consumed: u64) {
             self.now += TICK;
@@ -1511,6 +1556,66 @@ mod tests {
             harness.output() <= 50,
             "with consumption covered by organic supply, keep-alives only close what is left of the gap: {}/s",
             harness.output()
+        );
+    }
+
+    /// Keep-alives are what gives way when the local uplink queues: however far below target the
+    /// buffer falls, production must stay under the backed-off ceiling rather than refill the queue.
+    #[test_log::test]
+    fn local_egress_congestion_should_hold_keep_alives_below_the_backed_off_ceiling() {
+        let cfg = sustaining_config(false);
+        let (mut harness, pressure) = Harness::congestible(cfg);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let healthy = harness.output();
+
+        // Two seconds of a standing egress queue.
+        let mut highest = 0;
+        for _ in 0..40 {
+            pressure.mark_congested(harness.now);
+            harness.tick(REPLIES_PER_TICK);
+            highest = highest.max(harness.output());
+        }
+
+        // One backoff per half second: 2500 * 0.7^4 = 600.
+        let backed_off = (cfg.max_surbs_per_sec as f64 * 0.7f64.powi(4)).round() as u64;
+        assert!(
+            harness.output() <= backed_off,
+            "production must stay under the backed-off ceiling of {backed_off}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            harness.output() < healthy,
+            "congestion must cut production below the healthy {healthy}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            highest <= cfg.max_surbs_per_sec,
+            "the configured limit stays the hard ceiling"
+        );
+    }
+
+    /// Once the uplink has cleared, the ceiling probes back up and the session is refilled.
+    #[test_log::test]
+    fn keep_alive_production_should_recover_once_the_uplink_clears() {
+        let cfg = sustaining_config(false);
+        let (mut harness, pressure) = Harness::congestible(cfg);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+
+        for _ in 0..40 {
+            pressure.mark_congested(harness.now);
+            harness.tick(REPLIES_PER_TICK);
+        }
+
+        // Twenty seconds clear: enough to probe back from any backoff and refill.
+        harness.run(400, REPLIES_PER_TICK);
+        assert!(
+            harness.level() >= cfg.target_surb_buffer_size / 2,
+            "the buffer must be refilled once the uplink clears, level {}",
+            harness.level()
+        );
+        assert!(
+            !harness.balancer.congestion.is_backed_off(),
+            "a clear uplink must get the whole limit back"
         );
     }
 

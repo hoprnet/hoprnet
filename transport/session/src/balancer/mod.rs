@@ -1,3 +1,4 @@
+mod congestion;
 mod controller;
 /// Contains the paced-refill implementation of the [`SurbBalancerController`] trait, which drives
 /// the Entry's keep-alive production.
