@@ -21,6 +21,7 @@ use tracing::{Instrument, instrument};
 use super::{
     BalancerControllerBounds, ControlInput, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator,
     SurbBalancerController, SurbFlowController, SurbFlowEstimator, congestion::CongestionCeiling,
+    sustain::SustainBudget,
 };
 use crate::{SessionId, egress::EgressPressure};
 
@@ -518,6 +519,8 @@ pub struct SurbBalancer<C, E, F> {
     egress_pressure: Option<Arc<EgressPressure>>,
     /// The output ceiling as backed off from `egress_pressure`.
     congestion: CongestionCeiling,
+    /// Production cap while the return path is degraded, decaying over an episode.
+    sustain: SustainBudget,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
     /// DIAGNOSTIC: estimator state at the last balancer-state line, to report rates over its window.
@@ -563,6 +566,7 @@ where
             net_consumption_per_sec: 0.0,
             egress_pressure: None,
             congestion: CongestionCeiling::default(),
+            sustain: SustainBudget::default(),
             last_report: std::time::Instant::now(),
             last_report_snapshot,
         }
@@ -674,7 +678,8 @@ where
             // counterparty spends is invisible from here, so the accumulated `produced - consumed`
             // reads as a filling buffer precisely when it is emptying. Drop to open loop and assume
             // the worst: an empty buffer, refilled on top of the last consumption seen while
-            // replies still arrived.
+            // replies still arrived. The surplus above that consumption decays for as long as the
+            // episode lasts (see `SustainBudget`), so a path that stays dead is not fed forever.
             tracing::debug!(
                 believed = current,
                 "return path degraded; ignoring the counterparty buffer estimate"
@@ -709,10 +714,18 @@ where
         );
 
         let limit = self.controller.bounds().output_limit();
-        let ceiling = match &self.egress_pressure {
+        let congestion_ceiling = match &self.egress_pressure {
             Some(pressure) => self.congestion.update(now, dt, pressure.last_congested_at(), limit),
             None => limit,
         };
+        // While degraded, the consumption held is the last one measured while replies arrived.
+        let sustain_cap = self.sustain.update(
+            now,
+            degraded,
+            self.net_consumption_per_sec,
+            self.controller.bounds().target(),
+        );
+        let ceiling = sustain_cap.map_or(congestion_ceiling, |cap| congestion_ceiling.min(cap));
 
         let output = self.controller.next_control_output(ControlInput {
             level: current,
@@ -750,6 +763,7 @@ where
                 net_consumption_s = self.net_consumption_per_sec.round() as i64,
                 ceiling,
                 backed_off = self.congestion.is_backed_off(),
+                degraded_for_s = self.sustain.episode_duration(now).map(|d| d.as_secs()),
                 egress_delay_ms = self
                     .egress_pressure
                     .as_ref()
@@ -1449,6 +1463,76 @@ mod tests {
             harness.output() as f64 >= consumption,
             "five seconds into an outage production must still cover the consumption last seen: {}/s against \
              {consumption}/s",
+            harness.output()
+        );
+    }
+
+    /// A return path that stays dead must not be fed at the opening rate forever: the surplus decays
+    /// towards the last healthy consumption. It never drops below that consumption, because the
+    /// counterparty keeps spending at about that rate and has to be resupplied for the re-planned
+    /// paths to take over.
+    #[test_log::test]
+    fn a_long_degraded_episode_should_back_off_to_the_healthy_consumption() {
+        let mut harness = Harness::new(sustaining_config(true));
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let consumption = harness.balancer.net_consumption_per_sec;
+
+        harness.mark_degraded(Duration::from_secs(60));
+        let minted_before = harness
+            .estimator
+            .keep_alive_surbs
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let mut highest = 0;
+        for _ in 0..600 {
+            harness.tick(0);
+            highest = highest.max(harness.output());
+        }
+        let minted = harness
+            .estimator
+            .keep_alive_surbs
+            .load(std::sync::atomic::Ordering::Relaxed)
+            - minted_before;
+
+        // Thirty seconds is six half-lives of the surplus.
+        let backed_off = (consumption * (1.0 + 0.5f64.powi(6))).round() as u64 + 1;
+        assert!(
+            harness.output() <= backed_off,
+            "thirty seconds into the episode production must have backed off to about {consumption:.0}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            highest as f64 <= 2.0 * consumption + 1.0,
+            "an episode must never open above twice the healthy consumption, peaked at {highest}/s"
+        );
+        assert!(
+            minted as f64 >= consumption * 30.0 * 0.99,
+            "the counterparty must be resupplied at least at its healthy spending: minted {minted} in 30 s against \
+             {consumption:.0}/s"
+        );
+    }
+
+    /// The loop seen in the field: degraded, recovered for a few seconds, degraded again. Each new
+    /// window must continue the backoff rather than reopen at the full surplus.
+    #[test_log::test]
+    fn a_flapping_return_path_should_not_reopen_at_the_full_surplus() {
+        let mut harness = Harness::new(sustaining_config(true));
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let consumption = harness.balancer.net_consumption_per_sec;
+
+        harness.mark_degraded(Duration::from_secs(10));
+        harness.run(200, 0);
+        // The mark lapses and replies resume for four seconds.
+        harness.run(80, REPLIES_PER_TICK);
+
+        harness.mark_degraded(Duration::from_secs(30));
+        harness.run(20, 0);
+
+        // Fifteen seconds into the episode, not one: three half-lives of surplus are gone.
+        let continued = (consumption * (1.0 + 0.5f64.powi(3))).round() as u64 + 20;
+        assert!(
+            harness.output() <= continued,
+            "a window reopening four seconds after the last must continue its backoff: expected at most \
+             {continued}/s, got {}/s",
             harness.output()
         );
     }

@@ -60,7 +60,7 @@ const REFILL_ALLOWANCE_PER_CONSUMPTION: f64 = 1.0;
 ///
 /// Scaling the allowance with consumption alone would never refill an idle session. This floor
 /// refills an idle, drained buffer in about this long.
-const IDLE_REFILL_HORIZON: Duration = Duration::from_secs(10);
+pub(crate) const IDLE_REFILL_HORIZON: Duration = Duration::from_secs(10);
 
 /// Shortest refill horizon honoured. A zero horizon would ask for the whole gap at once.
 const MIN_REFILL_HORIZON: Duration = Duration::from_millis(100);

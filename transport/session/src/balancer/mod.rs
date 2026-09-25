@@ -10,6 +10,7 @@ pub mod pid;
 mod rate_limiting;
 /// Contains a simple proportional output implementation of the [`SurbBalancerController`] trait.
 pub mod simple;
+mod sustain;
 
 pub use controller::{BalancerStateValues, SurbBalancer, SurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
