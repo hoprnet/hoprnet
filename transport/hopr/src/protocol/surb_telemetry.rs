@@ -14,11 +14,12 @@
 //! a path identity it has no other use for.
 
 use std::{
+    collections::{HashMap, HashSet, VecDeque},
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use bytes::Bytes;
@@ -51,6 +52,9 @@ const PENDING_SURB_TTL: Duration = Duration::from_secs(60);
 pub struct SurbRoundTripCounters {
     expected: AtomicU64,
     observed: AtomicU64,
+    /// Summed age of the observed replies, in milliseconds from minting the SURB to its reply
+    /// arriving.
+    reply_age_ms: AtomicU64,
 }
 
 impl SurbRoundTripCounters {
@@ -58,8 +62,10 @@ impl SurbRoundTripCounters {
         self.expected.fetch_add(count, Ordering::Relaxed);
     }
 
-    fn record_observed(&self, count: u64) {
-        self.observed.fetch_add(count, Ordering::Relaxed);
+    fn record_observed(&self, age: Duration) {
+        self.observed.fetch_add(1, Ordering::Relaxed);
+        self.reply_age_ms
+            .fetch_add(u64::try_from(age.as_millis()).unwrap_or(u64::MAX), Ordering::Relaxed);
     }
 
     /// Reads both counts without resetting them.
@@ -70,8 +76,14 @@ impl SurbRoundTripCounters {
         )
     }
 
-    /// Takes both counts, resetting them to zero.
+    /// Reads the summed age of the observed replies without resetting it.
+    fn peek_reply_age(&self) -> Duration {
+        Duration::from_millis(self.reply_age_ms.load(Ordering::Relaxed))
+    }
+
+    /// Takes both counts, resetting them and the summed reply age to zero.
     fn take(&self) -> (u64, u64) {
+        self.reply_age_ms.store(0, Ordering::Relaxed);
         (
             self.expected.swap(0, Ordering::Relaxed),
             self.observed.swap(0, Ordering::Relaxed),
@@ -91,6 +103,11 @@ pub struct SurbRoundTripRegistry {
     destinations: Arc<DashMap<ForwardAndReturnPath, OffchainPublicKey>>,
     /// What each pair's recent flushes say about whether it still works.
     silence: Arc<DashMap<ForwardAndReturnPath, Silence>>,
+    /// How long replies from each destination take to come back after their SURB was minted.
+    ///
+    /// The counterparty spends SURBs oldest first, so this is mostly how long its buffer lasts
+    /// rather than a network round-trip: seconds, not milliseconds.
+    reply_age: Arc<DashMap<OffchainPublicKey, Duration>>,
     /// Flushes since each destination was last reported, so one is not re-planned repeatedly.
     replanned: Arc<DashMap<OffchainPublicKey, u32>>,
     /// Slot this node occupies, learned from the first pair recorded.
@@ -114,6 +131,7 @@ impl Default for SurbRoundTripRegistry {
             inner: Default::default(),
             destinations: Default::default(),
             silence: Default::default(),
+            reply_age: Default::default(),
             replanned: Default::default(),
             me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
         }
@@ -126,9 +144,9 @@ fn return_relayers(reply: &PathId, me_slot: u64) -> impl Iterator<Item = u64> + 
 }
 
 /// Per-pair silence bookkeeping, carried between flushes.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 struct Silence {
-    /// Consecutive flushes in which the pair minted SURBs and got nothing back.
+    /// Consecutive flushes in which replies were due over the pair and none came back.
     runs: u32,
     /// Whether a reply has ever come back over this pair.
     ///
@@ -136,13 +154,73 @@ struct Silence {
     /// has never delivered may simply be too young -- a reply is credited to the flush it *arrives*
     /// in, so the first flushes of a new pair legitimately show mints with no replies yet.
     delivered: bool,
+    /// SURBs minted over the pair in each of the last [`MINT_HISTORY_FLUSHES`] flushes, oldest
+    /// first.
+    minted: VecDeque<u64>,
 }
 
-/// SURBs a pair must have minted in one flush before its silence counts as evidence.
+impl Silence {
+    /// Records the SURBs minted over the pair in the flush being scanned, and returns how many were
+    /// minted `lag` flushes ago: those whose replies should have come back by now.
+    ///
+    /// `lag` must be below [`MINT_HISTORY_FLUSHES`].
+    fn record_minted(&mut self, minted: u64, lag: usize) -> u64 {
+        if self.minted.len() == MINT_HISTORY_FLUSHES {
+            self.minted.pop_front();
+        }
+        self.minted.push_back(minted);
+        // Before the pair was first seen, nothing was minted over it.
+        self.minted.len().checked_sub(lag + 1).map_or(0, |at| self.minted[at])
+    }
+}
+
+/// SURBs whose replies are due in one flush before a pair's silence counts as evidence.
 ///
 /// Measured after a relayer was killed: the dead leg minted 2270 SURBs in the 5s that followed
 /// while returning none. A handful is noise; thousands is not.
 const MIN_EXPECTED_FOR_SILENCE: u64 = 20;
+
+/// Flushes of mint history kept per pair, and so the longest reply lag silence is judged against.
+///
+/// Thirty-two seconds at the default one-second flush. A longer lag is clamped to it, which judges
+/// a pair that has just resumed a little early rather than never.
+const MINT_HISTORY_FLUSHES: usize = 32;
+
+/// Weight a shorter reply age gets against a destination's estimate, once per flush.
+///
+/// A longer age is taken at once, a shorter one only gradually. Overestimating the age only delays
+/// judging a pair that has just resumed; underestimating it judges that pair on SURBs the
+/// counterparty has not reached yet, which is the false alarm the age exists to prevent.
+const REPLY_AGE_FALL_WEIGHT: f64 = 0.2;
+
+/// Folds one flush's mean reply age into a destination's estimate.
+fn next_reply_age(current: Duration, sample: Duration) -> Duration {
+    if sample >= current {
+        sample
+    } else {
+        current.mul_f64(1.0 - REPLY_AGE_FALL_WEIGHT) + sample.mul_f64(REPLY_AGE_FALL_WEIGHT)
+    }
+}
+
+/// Flushes a reply of this age spans, which is how far back its SURB was minted.
+fn reply_lag(age: Duration, flush_interval: Duration) -> usize {
+    if flush_interval.is_zero() {
+        return 0;
+    }
+    let flushes = age.as_nanos().div_ceil(flush_interval.as_nanos());
+    usize::try_from(flushes)
+        .unwrap_or(usize::MAX)
+        .min(MINT_HISTORY_FLUSHES - 1)
+}
+
+/// What a flush knows about the interval it closes, beyond the counts themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlushWindow {
+    /// Time between two flushes. It turns a reply's age into a number of flushes.
+    pub interval: Duration,
+    /// Whether local egress was congested at any point during the interval.
+    pub egress_congested: bool,
+}
 
 /// Consecutive silent flushes before a pair that used to deliver is called dead.
 ///
@@ -191,7 +269,20 @@ impl SurbRoundTripRegistry {
     /// The claim made is narrower than "this pair is silent": it is "this pair **used to deliver**
     /// and has now stopped". Silence alone was measured to fire during healthy operation, because
     /// a pair that has not yet returned its first reply is indistinguishable from a dead one.
-    pub fn degraded_destinations(&self) -> Vec<OffchainPublicKey> {
+    ///
+    /// Silence is also judged against the SURBs whose replies are *due*, not against this flush's
+    /// mints. The counterparty spends SURBs oldest first, so a reply comes back as long after its
+    /// SURB was minted as the counterparty's buffer lasts -- measured at around ten seconds, twice
+    /// the silence gate. A pair the planner draws again after a pause therefore mints for that long
+    /// before its first reply can arrive, while its siblings keep answering with SURBs they brought
+    /// in earlier. Judged on its mints it looked dead; judged on what is due, it is not yet
+    /// judged at all. A pair drawn all along is due every flush, so a dead one is still named as
+    /// quickly as before.
+    ///
+    /// While `window` reports local egress congestion, a silent flush does not count toward a run,
+    /// and does not reset one either. SURBs still queued on our own uplink have not reached the
+    /// counterparty, so their silence says nothing about the return path.
+    pub fn degraded_destinations(&self, window: FlushWindow) -> Vec<OffchainPublicKey> {
         let mut degraded = Vec::new();
 
         // Age the per-destination cooldowns once per flush, dropping those that have served out.
@@ -200,6 +291,8 @@ impl SurbRoundTripRegistry {
             *since < FLUSHES_BETWEEN_REPLANS
         });
 
+        self.update_reply_ages();
+
         // Which destinations had *some* pair deliver in this flush.
         //
         // This is what makes silence mean anything. On its own, "minted and got nothing back" is
@@ -207,7 +300,7 @@ impl SurbRoundTripRegistry {
         // mint either way. Only a sibling pair still delivering to the same destination tells the
         // two apart, and it does so without a threshold: if the peer had gone quiet, every pair
         // would be silent together.
-        let delivering: std::collections::HashSet<OffchainPublicKey> = self
+        let delivering: HashSet<OffchainPublicKey> = self
             .inner
             .iter()
             .filter(|entry| entry.value().peek().1 > 0)
@@ -228,7 +321,7 @@ impl SurbRoundTripRegistry {
             return degraded;
         }
 
-        let delivering_relayers: std::collections::HashSet<u64> = self
+        let delivering_relayers: HashSet<u64> = self
             .inner
             .iter()
             .filter(|entry| entry.value().peek().1 > 0)
@@ -240,12 +333,20 @@ impl SurbRoundTripRegistry {
         // `degraded`: these are exactly the return paths that are failing but that the detector
         // *cannot* act on (a single-relayer collapse looks identical to a quiet peer). Surfacing
         // them is the diagnostic that was missing when this condition took the tunnel down.
-        let mut blind_spot: std::collections::HashSet<OffchainPublicKey> = std::collections::HashSet::new();
+        let mut blind_spot: HashSet<OffchainPublicKey> = HashSet::new();
+        // Pairs whose silence would have counted, had local egress not been congested.
+        let mut held = 0usize;
 
         for entry in self.inner.iter() {
             let paths = *entry.key();
             let (expected, observed) = entry.value().peek();
+            let destination = self.destinations.get(&paths).map(|d| *d);
+            let lag = destination
+                .and_then(|d| self.reply_age.get(&d).map(|age| reply_lag(*age, window.interval)))
+                .unwrap_or(0);
             let mut state = self.silence.entry(paths).or_default();
+            // Recorded before anything below can skip the pair, so its history has no gaps.
+            let due = state.record_minted(expected, lag);
 
             if observed > 0 {
                 // Delivering. Note that it ever worked, so future silence is meaningful.
@@ -254,8 +355,9 @@ impl SurbRoundTripRegistry {
                 continue;
             }
 
-            if expected < MIN_EXPECTED_FOR_SILENCE {
-                // Too little went out to conclude anything. An idle pair is not a failing one.
+            if due < MIN_EXPECTED_FOR_SILENCE {
+                // Too few replies should be back by now to conclude anything. An idle pair is not
+                // a failing one, and neither is one whose SURBs the counterparty has not reached.
                 state.runs = 0;
                 continue;
             }
@@ -266,7 +368,7 @@ impl SurbRoundTripRegistry {
                 continue;
             }
 
-            let Some(dest) = self.destinations.get(&paths).map(|d| *d) else {
+            let Some(dest) = destination else {
                 continue;
             };
 
@@ -291,6 +393,14 @@ impl SurbRoundTripRegistry {
                 continue;
             }
 
+            if window.egress_congested {
+                // The SURBs due now may still be queued on our own uplink, or have been delayed
+                // there past their due flush. Hold the run where it is: resetting it would let a
+                // dead relayer hide behind every congested flush.
+                held += 1;
+                continue;
+            }
+
             state.runs += 1;
             // Early warning: this pair used to deliver, is now silent, and a sibling to the same
             // destination is still answering — so the silence is attributable and climbing toward a
@@ -300,6 +410,8 @@ impl SurbRoundTripRegistry {
                 runs = state.runs,
                 threshold = SILENT_FLUSHES_BEFORE_DEGRADED,
                 expected,
+                due,
+                lag_flushes = lag,
                 "return pair silent while a sibling delivers; silence run climbing",
             );
             if state.runs >= SILENT_FLUSHES_BEFORE_DEGRADED {
@@ -326,11 +438,15 @@ impl SurbRoundTripRegistry {
         // One line per flush, only when there is something to say. `blind_spot` is the actionable
         // gap: return paths demonstrably failing that the detector cannot re-plan for want of a
         // corroborating sibling — raise return-relayer diversity (see the path selector) to close it.
-        if !degraded.is_empty() || !blind_spot.is_empty() {
+        // `held` is silence our own uplink may account for: pairs that would have climbed toward a
+        // re-plan had local egress not been congested.
+        if !degraded.is_empty() || !blind_spot.is_empty() || held > 0 {
             tracing::debug!(
                 degraded = degraded.len(),
                 blind_spot = blind_spot.len(),
                 blind_spot_destinations = ?blind_spot,
+                held,
+                egress_congested = window.egress_congested,
                 delivering_destinations = delivering.len(),
                 delivering_relayers = delivering_relayers.len(),
                 "surb return-path degradation scan",
@@ -340,9 +456,33 @@ impl SurbRoundTripRegistry {
         degraded
     }
 
-    /// Records that `count` replies arrived over these legs.
-    pub fn record_observed(&self, paths: ForwardAndReturnPath, count: u64) {
-        self.counters(paths).record_observed(count);
+    /// Folds this flush's replies into each destination's reply-age estimate.
+    fn update_reply_ages(&self) {
+        let mut replies: HashMap<OffchainPublicKey, (u64, Duration)> = HashMap::new();
+        for entry in self.inner.iter() {
+            let (_, observed) = entry.value().peek();
+            if observed == 0 {
+                continue;
+            }
+            if let Some(destination) = self.destinations.get(entry.key()).map(|d| *d) {
+                let (count, age) = replies.entry(destination).or_default();
+                *count += observed;
+                *age += entry.value().peek_reply_age();
+            }
+        }
+
+        for (destination, (count, age)) in replies {
+            let mean = age / u32::try_from(count).unwrap_or(u32::MAX);
+            self.reply_age
+                .entry(destination)
+                .and_modify(|estimate| *estimate = next_reply_age(*estimate, mean))
+                .or_insert(mean);
+        }
+    }
+
+    /// Records that a reply arrived over these legs, `age` after its SURB was minted.
+    pub fn record_observed(&self, paths: ForwardAndReturnPath, age: Duration) {
+        self.counters(paths).record_observed(age);
     }
 
     /// Takes every non-empty entry, resetting the counts.
@@ -377,7 +517,16 @@ pub fn no_path_slots() -> PathSlotResolver {
 /// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
 /// shared by both. Giving each half its own leaves every lookup missing and silently discards the
 /// entire observation side of the metric.
-pub type PendingLegs = moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>;
+pub type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
+
+/// What is kept about each outstanding SURB until its reply arrives.
+#[derive(Debug, Clone, Copy)]
+pub struct PendingSurb {
+    /// Legs the SURB was minted over.
+    paths: ForwardAndReturnPath,
+    /// When it was minted, so its reply's age can be measured.
+    minted_at: Instant,
+}
 
 /// Builds the shared pending map, bounded by capacity and TTL.
 pub fn pending_legs(max_pending: u64) -> PendingLegs {
@@ -590,6 +739,7 @@ impl<C> SurbTelemetryCodec<C> {
             "surb mint seen by telemetry"
         );
 
+        let minted_at = Instant::now();
         for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
             let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
             let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
@@ -598,7 +748,7 @@ impl<C> SurbTelemetryCodec<C> {
             };
 
             self.registry.record_expected(paths, 1, destination);
-            self.pending.insert(*surb_id, paths);
+            self.pending.insert(*surb_id, PendingSurb { paths, minted_at });
         }
     }
 
@@ -606,7 +756,11 @@ impl<C> SurbTelemetryCodec<C> {
     fn on_replied(&self, surb_id: &HoprSurbId) {
         // A SURB is single-use, so the association is consumed with it.
         match self.pending.remove(surb_id) {
-            Some(paths) => self.registry.record_observed(paths, 1),
+            // Aged from minting, which is before the packet carrying the SURB left our own egress
+            // queues: time spent queued on our uplink is part of the lag a reply is judged against.
+            Some(pending) => self
+                .registry
+                .record_observed(pending.paths, pending.minted_at.elapsed()),
             None => tracing::debug!("reply on a surb with no pending legs"),
         }
     }
@@ -733,7 +887,8 @@ mod tests {
         };
 
         registry.record_expected(paths, 3, peers[0]);
-        registry.record_observed(paths, 2);
+        registry.record_observed(paths, Duration::ZERO);
+        registry.record_observed(paths, Duration::ZERO);
 
         assert_eq!(vec![(paths, 3, 2)], registry.drain());
         // Counts belong to the interval that produced them, so a second flush must not re-report.
@@ -898,12 +1053,31 @@ mod tests {
         Ok(())
     }
 
+    /// Flush interval the tests run at, the default.
+    const FLUSH: Duration = Duration::from_secs(1);
+
+    /// A flush interval in which local egress kept up.
+    const CLEAR: FlushWindow = FlushWindow {
+        interval: FLUSH,
+        egress_congested: false,
+    };
+
+    /// A flush interval in which local egress was congested.
+    const CONGESTED: FlushWindow = FlushWindow {
+        interval: FLUSH,
+        egress_congested: true,
+    };
+
     /// One flush interval, in the order the flush task runs it: detect, then drain.
     ///
     /// Draining matters to these tests -- without it a single reply stays visible forever and
     /// silence can never be observed at all.
     fn flush(registry: &SurbRoundTripRegistry) -> Vec<OffchainPublicKey> {
-        let degraded = registry.degraded_destinations();
+        flush_in(registry, CLEAR)
+    }
+
+    fn flush_in(registry: &SurbRoundTripRegistry, window: FlushWindow) -> Vec<OffchainPublicKey> {
+        let degraded = registry.degraded_destinations(window);
         registry.drain();
         degraded
     }
@@ -920,9 +1094,11 @@ mod tests {
     }
 
     /// A pair that mints steadily and returns replies -- the healthy case.
+    ///
+    /// The replies come back at once, so silence is judged against this flush's mints.
     fn deliver(registry: &SurbRoundTripRegistry, paths: ForwardAndReturnPath, destination: OffchainPublicKey) {
         registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
-        registry.record_observed(paths, 1);
+        registry.record_observed(paths, Duration::ZERO);
     }
 
     /// A pair that mints steadily and returns nothing.
@@ -1064,6 +1240,7 @@ mod tests {
             &registry,
             &graph,
             0,
+            CLEAR,
             &mut episodes,
             |_d| async {
                 replans.set(replans.get() + 1);
@@ -1088,6 +1265,7 @@ mod tests {
                 &registry,
                 &graph,
                 0,
+                CLEAR,
                 &mut episodes,
                 |_d| async {
                     replans.set(replans.get() + 1);
@@ -1140,6 +1318,7 @@ mod tests {
             &registry,
             &graph,
             0,
+            CLEAR,
             &mut episodes,
             |_d| async {
                 replans.set(replans.get() + 1);
@@ -1432,5 +1611,206 @@ mod tests {
         recorder.on_replied(&surb_id(9));
 
         assert!(recorder.registry.drain().is_empty());
+    }
+
+    #[test]
+    fn a_reply_should_be_aged_from_when_its_surb_was_minted() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let recorder = recorder(graph);
+
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path: ValidatedPath::direct(destination, address()),
+            return_paths: vec![ValidatedPath::direct(me, address())],
+        };
+        recorder.on_minted(&routing, &[surb_id(1)]);
+
+        // Backdate the mint rather than wait for it to age.
+        let pending = recorder.pending.get(&surb_id(1)).context("the mint is pending")?;
+        let minted_at = pending
+            .minted_at
+            .checked_sub(Duration::from_secs(3))
+            .context("the clock reaches back three seconds")?;
+        recorder
+            .pending
+            .insert(surb_id(1), PendingSurb { minted_at, ..pending });
+        recorder.on_replied(&surb_id(1));
+
+        recorder.registry.degraded_destinations(CLEAR);
+        let age = recorder
+            .registry
+            .reply_age
+            .get(&destination)
+            .map(|age| *age)
+            .context("the reply must have been aged")?;
+        assert!(
+            (Duration::from_secs(3)..Duration::from_secs(4)).contains(&age),
+            "the age must run from the mint: {age:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_reply_age_estimate_should_rise_at_once_and_fall_gradually() {
+        let short = Duration::from_secs(1);
+        let long = Duration::from_secs(10);
+
+        assert_eq!(long, next_reply_age(short, long), "a longer age must be taken at once");
+        let lowered = next_reply_age(long, short);
+        assert!(
+            short < lowered && lowered < long,
+            "a shorter age must only pull the estimate down gradually: {lowered:?}"
+        );
+    }
+
+    #[test]
+    fn a_reply_lag_should_round_up_to_whole_flushes_within_the_history() {
+        assert_eq!(0, reply_lag(Duration::ZERO, FLUSH));
+        assert_eq!(
+            1,
+            reply_lag(Duration::from_millis(200), FLUSH),
+            "a reply faster than a flush is judged against the previous flush's mints"
+        );
+        assert_eq!(10, reply_lag(Duration::from_secs(10), FLUSH));
+        assert_eq!(MINT_HISTORY_FLUSHES - 1, reply_lag(Duration::from_secs(600), FLUSH));
+        assert_eq!(0, reply_lag(Duration::from_secs(10), Duration::ZERO));
+    }
+
+    /// Flushes after minting at which a reply comes back, as when the counterparty spends SURBs
+    /// oldest first from a buffer that lasts ten seconds.
+    const LAG_FLUSHES: usize = 10;
+
+    /// The age of a reply that comes back [`LAG_FLUSHES`] after its SURB was minted.
+    const REPLY_AGE: Duration = Duration::from_secs(LAG_FLUSHES as u64);
+
+    /// A pair whose replies come back [`LAG_FLUSHES`] after minting, next to a sibling that is
+    /// drawn in every flush and keeps answering.
+    struct LaggedPair {
+        registry: SurbRoundTripRegistry,
+        destination: OffchainPublicKey,
+        /// Age the detector is told each reply has.
+        reported_age: Duration,
+        /// Whether the pair was drawn, per flush so far.
+        drawn: Vec<bool>,
+    }
+
+    impl LaggedPair {
+        fn new(reported_age: Duration) -> Self {
+            Self {
+                registry: registry_at_slot_zero(),
+                destination: *OffchainKeypair::random().public(),
+                reported_age,
+                drawn: Vec::new(),
+            }
+        }
+
+        /// Runs one flush in which the pair is `drawn` or not, and in which its return relayer
+        /// drops every reply if `lost`.
+        fn flush(&mut self, drawn: bool, lost: bool) -> Vec<OffchainPublicKey> {
+            let now = self.drawn.len();
+            self.drawn.push(drawn);
+
+            if drawn {
+                self.registry
+                    .record_expected(legs(), MIN_EXPECTED_FOR_SILENCE, self.destination);
+            }
+            let due = now.checked_sub(LAG_FLUSHES).is_some_and(|minted| self.drawn[minted]);
+            if due && !lost {
+                self.registry.record_observed(legs(), self.reported_age);
+            }
+
+            self.registry
+                .record_expected(heartbeat(), MIN_EXPECTED_FOR_SILENCE, self.destination);
+            self.registry.record_observed(heartbeat(), self.reported_age);
+            flush(&self.registry)
+        }
+    }
+
+    /// The false alarm seen in the field. A pair the planner draws again after a pause mints for as
+    /// long as the counterparty's buffer lasts before its first reply can arrive, while its sibling
+    /// keeps answering with SURBs it brought in earlier. That is twice the silence gate.
+    #[test]
+    fn a_pair_drawn_again_after_a_pause_should_not_be_judged_before_its_replies_are_due() {
+        assert_eq!(LAG_FLUSHES, reply_lag(REPLY_AGE, FLUSH), "precondition");
+        // Drawn for twenty flushes, paused for twenty, then drawn again for thirty.
+        let drawn = |flush: usize| !(20..40).contains(&flush);
+
+        let mut pair = LaggedPair::new(REPLY_AGE);
+        let named: Vec<_> = (0..70).flat_map(|at| pair.flush(drawn(at), false)).collect();
+        assert!(
+            named.is_empty(),
+            "a pair whose replies are not due yet is not silent: {named:?}"
+        );
+
+        // Vacuity guard: told that replies come back at once, the detector judges the pair on its
+        // fresh mints, which is what it did before it knew the age, and names it.
+        let mut unaware = LaggedPair::new(Duration::ZERO);
+        let named: Vec<_> = (0..70).flat_map(|at| unaware.flush(drawn(at), false)).collect();
+        assert!(
+            !named.is_empty(),
+            "without the reply age the same resumption must be flagged"
+        );
+    }
+
+    /// Judging silence on what is due must not slow down the case the detector exists for. A pair
+    /// drawn all along has replies due every flush, whatever its lag.
+    #[test]
+    fn a_pair_drawn_throughout_should_be_named_after_the_usual_run_however_long_its_lag() {
+        const HEALTHY_FLUSHES: usize = 3 * LAG_FLUSHES;
+        let mut pair = LaggedPair::new(REPLY_AGE);
+
+        for at in 0..HEALTHY_FLUSHES {
+            assert!(pair.flush(true, false).is_empty(), "healthy flush {at}");
+        }
+        // The return relayer dies: every reply over it is dropped from now on, including those
+        // for SURBs minted before it died.
+        for at in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            assert!(pair.flush(true, true).is_empty(), "silent flush {at} is too early");
+        }
+        assert_eq!(
+            vec![pair.destination],
+            pair.flush(true, true),
+            "a dead return path must be named after as many silent flushes as with instant replies"
+        );
+    }
+
+    /// Our own uplink queueing delays every SURB we mint, so while it is congested silence is not
+    /// evidence either way. It must neither build a run nor clear one.
+    #[test]
+    fn local_egress_congestion_should_hold_a_silence_run() {
+        let destination = *OffchainKeypair::random().public();
+        let registry = registry_at_slot_zero();
+        let paths = legs();
+        let silent_flush = |window| {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            flush_in(&registry, window)
+        };
+
+        deliver(&registry, paths, destination);
+        assert!(flush(&registry).is_empty());
+
+        // The run climbs to two short of the gate.
+        let before = SILENT_FLUSHES_BEFORE_DEGRADED - 2;
+        for _ in 0..before {
+            assert!(silent_flush(CLEAR).is_empty());
+        }
+
+        // Counted, this much silence would name the destination twice over.
+        for _ in 0..2 * SILENT_FLUSHES_BEFORE_DEGRADED {
+            assert!(
+                silent_flush(CONGESTED).is_empty(),
+                "silence while our own uplink is queueing must not count toward a run"
+            );
+        }
+
+        // Once egress clears the run resumes where it was, rather than from zero.
+        assert!(silent_flush(CLEAR).is_empty());
+        assert_eq!(
+            vec![destination],
+            silent_flush(CLEAR),
+            "the run held through the congestion must complete once it clears"
+        );
     }
 }

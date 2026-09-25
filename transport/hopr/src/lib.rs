@@ -814,6 +814,7 @@ where
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_smgr = self.smgr.clone();
+        let surb_flush_egress = self.smgr.egress_pressure();
         let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
         processes.insert(
@@ -834,10 +835,18 @@ where
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
+                    // SURBs still queued on our own uplink have not reached the counterparty, so
+                    // silence while it is congested says nothing about the return path.
+                    let window = protocol::surb_telemetry::FlushWindow {
+                        interval: surb_flush_interval,
+                        egress_congested: surb_flush_egress
+                            .is_congested_within(std::time::Instant::now(), surb_flush_interval),
+                    };
                     for step in protocol::return_path_recovery::run_flush_tick(
                         &surb_round_trips,
                         &surb_flush_graph,
                         now_ms,
+                        window,
                         &mut episodes,
                         |destination| async move { planner.recompute_paths_from(&destination).await },
                         |destination| async move {

@@ -110,10 +110,14 @@ impl<K: Eq + Hash + Copy> ReturnPathEpisodes<K> {
 /// see this interval's counts *before* any re-plan reads it (otherwise the re-plan the silence just
 /// triggered runs a whole tick behind the evidence). Returns the recovery steps taken, for the
 /// caller to log.
+///
+/// `window` describes the interval this tick closes. Detection needs its length to tell a late
+/// reply from a lost one, and whether local egress was congested during it.
 pub async fn run_flush_tick<G, R, RFut, F, FFut>(
     surb_round_trips: &crate::protocol::surb_telemetry::SurbRoundTripRegistry,
     graph: &G,
     now_ms: u128,
+    window: crate::protocol::surb_telemetry::FlushWindow,
     episodes: &mut ReturnPathEpisodes<hopr_api::types::crypto::types::OffchainPublicKey>,
     replan: R,
     refill: F,
@@ -127,7 +131,7 @@ where
 {
     // Detection before the drain: `degraded_destinations` reads the counts the flush is about to
     // reset.
-    let silent = surb_round_trips.degraded_destinations();
+    let silent = surb_round_trips.degraded_destinations(window);
     // The graph has to see this interval's counts before anything re-plans on it.
     crate::protocol::surb_telemetry::flush_into(surb_round_trips, graph, now_ms);
     episodes.tick(silent, replan, refill).await
