@@ -606,7 +606,7 @@
 
 use std::time::Duration;
 
-use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
+use hopr_api::{HoprBalance, OffchainPublicKey, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 
 use crate::errors::TransportSessionError;
@@ -1250,6 +1250,9 @@ pub enum SessionPixEvent {
     UnverifiableShares {
         ssa_id: SsaId<HoprPseudonym>,
         observed_total: u64,
+        /// Relayer that carried the offending share. Diagnostic only — it reaches the close log and
+        /// nothing else, since the cycle is condemned whoever relayed the share.
+        peer: Box<OffchainPublicKey>,
     },
     /// The session layer closed this Session at the Exit.
     ///
@@ -1334,6 +1337,7 @@ pub enum SessionPixAction {
 ///
 /// These are mapped to public [`ClosureReason`](crate::types::ClosureReason) by the caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum SessionPixCloseReason {
     /// The commitment delivery deadline expired.
     CommitmentTimeout,
@@ -1739,6 +1743,14 @@ pub(crate) fn scaled_deadline(per_cycle: Duration, ssas_per_request: usize) -> D
 // `cargo test -p hopr-transport-session`. The gate was invisible because the workspace build
 // unifies the feature in from other crates — the coverage was only missing for the one command an
 // operator of this crate would run.
+/// An arbitrary relayer, for the tests that have to name one in a `SessionPixEvent`.
+#[cfg(test)]
+pub(crate) fn test_peer() -> Box<OffchainPublicKey> {
+    use hopr_api::{OffchainKeypair, types::crypto::prelude::Keypair};
+
+    Box::new(*OffchainKeypair::random().public())
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -2185,8 +2197,8 @@ mod tests {
 
     /// The `Display` value of every close reason is a metric label, so it is API.
     ///
-    /// [`crate::telemetry::record_pix_closure`] derives the `reason` label of
-    /// `hopr_session_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
+    /// [`crate::telemetry::pix::record_pix_closure`] derives the `reason` label of
+    /// `hopr_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
     /// attribute added to one, silently renames a metric series and breaks whatever dashboards and
     /// alerts were built on the old name.
     ///
@@ -2262,6 +2274,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
@@ -2291,6 +2304,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
