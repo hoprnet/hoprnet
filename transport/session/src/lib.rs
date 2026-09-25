@@ -44,6 +44,30 @@ pub const SESSION_MTU: usize =
 /// This is the re-export of [`hopr_crypto_packet::HoprSurb::SIZE`].
 pub const SURB_SIZE: usize = hopr_crypto_packet::HoprSurb::SIZE;
 
+/// Largest `max_surbs_per_sec` whose keep-alive messages fit into `wire_bits_per_sec` of upstream.
+///
+/// This is the conversion to use for [`SurbBalancerConfig::max_surbs_per_sec`] when the budget is
+/// an upstream bit rate. A keep-alive is a whole `HoprPacket::SIZE` packet carrying
+/// `HoprPacket::MAX_SURBS_IN_PACKET` SURBs, so each SURB it delivers costs half a packet on the
+/// wire, not its own [`SURB_SIZE`]. Dividing a budget by `SURB_SIZE` instead grants about 1.85×
+/// the upstream it names.
+///
+/// Organic SURBs piggybacked on Session data are not counted: they ride in packets that are sent
+/// anyway, so they cost no extra upstream.
+pub const fn max_surbs_per_sec_for_wire_bps(wire_bits_per_sec: u64) -> u64 {
+    wire_bits_per_sec.saturating_mul(hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET as u64)
+        / (8 * hopr_crypto_packet::prelude::HoprPacket::SIZE as u64)
+}
+
+/// Upstream bits per second that keep-alive messages occupy while delivering `surbs_per_sec`.
+///
+/// The inverse of [`max_surbs_per_sec_for_wire_bps`], for reporting what a configured
+/// `max_surbs_per_sec` actually costs on the wire.
+pub const fn keep_alive_wire_bps(surbs_per_sec: u64) -> u64 {
+    surbs_per_sec.saturating_mul(8 * hopr_crypto_packet::prelude::HoprPacket::SIZE as u64)
+        / hopr_crypto_packet::prelude::HoprPacket::MAX_SURBS_IN_PACKET as u64
+}
+
 flagset::flags! {
     /// Individual capabilities of a Session.
     #[repr(u8)]
@@ -164,6 +188,41 @@ mod tests {
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
         assert_eq!(1020, SESSION_MTU); // Needs to be changed when HOPR packet payload size changes
+    }
+
+    /// A budget converted with `SURB_SIZE` overshoots by the packet overhead: "16 Mb/s" used to
+    /// mean 5063 SURB/s, which is 29.6 Mb/s of keep-alives on the wire.
+    #[test]
+    fn keep_alive_budget_should_be_converted_at_the_packet_cost_not_the_surb_size() {
+        // The pinned figures below follow from these; they need updating if either changes.
+        assert_eq!(1461, HoprPacket::SIZE);
+        assert_eq!(2, HoprPacket::MAX_SURBS_IN_PACKET);
+
+        assert_eq!(2737, max_surbs_per_sec_for_wire_bps(16_000_000));
+        assert_eq!(2053, max_surbs_per_sec_for_wire_bps(12_000_000));
+        assert_eq!(1368, max_surbs_per_sec_for_wire_bps(8_000_000));
+        assert_eq!(87, max_surbs_per_sec_for_wire_bps(512_000));
+
+        let naive = 16_000_000 / (8 * SURB_SIZE as u64);
+        assert!(
+            keep_alive_wire_bps(naive) > 29_000_000,
+            "the SURB_SIZE conversion must be shown to overshoot: {naive} SURB/s"
+        );
+    }
+
+    #[test]
+    fn keep_alive_budget_conversion_should_never_exceed_the_budget() {
+        for budget in [1, 11_688, 512_000, 8_000_000, 16_000_000, 1_000_000_000] {
+            let rate = max_surbs_per_sec_for_wire_bps(budget);
+            assert!(
+                keep_alive_wire_bps(rate) <= budget,
+                "{rate} SURB/s must fit into {budget} b/s"
+            );
+            assert!(
+                keep_alive_wire_bps(rate + 1) > budget,
+                "{rate} SURB/s must be the largest rate fitting into {budget} b/s"
+            );
+        }
     }
 
     #[test]

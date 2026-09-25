@@ -1119,10 +1119,21 @@ where
                         },
                     );
 
+                    // Keep-alives are counted towards `produced` by `full_surb_scoring_sender` like any
+                    // other packet; this only attributes them, so the budget they cost is visible
+                    // apart from the SURBs piggybacked on Session data.
+                    let surb_estimator_for_ka = surb_estimator.clone();
+                    let keep_alive_scoring_sender = full_surb_scoring_sender.with(
+                        move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            surb_estimator_for_ka.record_keep_alive(data.estimate_surbs_with_msg() as u64);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
+
                     // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
-                        full_surb_scoring_sender,
+                        keep_alive_scoring_sender,
                         forward_routing.clone(),
                         if self.cfg.surb_target_notify {
                             SurbNotificationMode::Target
@@ -1943,12 +1954,21 @@ where
                         && !session_slot.surb_mgmt.is_disabled()
                         && session_slot.surb_mgmt.buffer_level() != msg.additional_data
                     {
-                        // Update the buffer level as sent to us from the Exit
+                        // Update the buffer level as sent to us from the Exit. This is the only
+                        // absolute correction of the dead-reckoned estimate, so it is also the only
+                        // way the level can jump while production is idle -- log the jump itself.
+                        let previous_level = session_slot.surb_mgmt.buffer_level();
                         session_slot
                             .surb_mgmt
                             .buffer_level
                             .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                        debug!(
+                            %session_id,
+                            previous_level,
+                            surb_level = msg.additional_data,
+                            delta = msg.additional_data as i64 - previous_level as i64,
+                            "keep-alive updated SURB buffer size from the Exit"
+                        );
                     }
 
                     // Increase the number of consumed SURBs in the estimator
@@ -1987,6 +2007,7 @@ where
                         .surb_estimator
                         .produced
                         .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                    session_slot.surb_estimator.record_keep_alive(produced);
                     #[cfg(feature = "telemetry")]
                     crate::telemetry::record_session_surb_produced(&session_id, produced);
                 }

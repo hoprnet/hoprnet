@@ -72,6 +72,7 @@ pub use hopr_transport_session::{
     IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
+    keep_alive_wire_bps, max_surbs_per_sec_for_wire_bps,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]

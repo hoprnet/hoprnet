@@ -56,6 +56,80 @@ lazy_static::lazy_static! {
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
     ).unwrap();
+    static ref METRIC_CONSUMED_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_consumed_surbs_per_sec",
+            "SURBs consumed per second, averaged over the last reporting window",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_ORGANIC_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_organic_surbs_per_sec",
+            "SURBs per second piggybacked on Session data rather than delivered by keep-alives",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_KEEP_ALIVE_PACKET_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_keep_alive_packets_per_sec",
+            "Keep-alive packets per second delivering SURBs (sent by the Entry, received by the Exit)",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_KEEP_ALIVE_WIRE_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_keep_alive_wire_bytes_per_sec",
+            "Wire bytes per second spent on SURB-bearing keep-alive packets",
+            &["session_id"]
+    ).unwrap();
+}
+
+/// Per-second SURB flow over one window between two estimator snapshots.
+///
+/// Splits production into what rode along with Session data and what keep-alives had to carry on
+/// their own: the first is free on the wire, the second is the upstream budget the balancer spends.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct SurbFlowRates {
+    consumed: f64,
+    organic: f64,
+    keep_alive_surbs: f64,
+    keep_alive_packets: f64,
+}
+
+impl SurbFlowRates {
+    /// Rates between the `earlier` and `later` snapshots taken `window` apart.
+    ///
+    /// Counters are monotonic, but the keep-alive attribution is recorded a moment before the
+    /// production it belongs to, so a snapshot taken in between can momentarily show more keep-alive
+    /// SURBs than produced ones. Saturating keeps that from surfacing as a huge organic rate.
+    fn between(earlier: &SimpleSurbFlowEstimator, later: &SimpleSurbFlowEstimator, window: Duration) -> Self {
+        let secs = window.as_secs_f64();
+        if secs <= 0.0 {
+            return Self::default();
+        }
+        let delta = |later: u64, earlier: u64| later.saturating_sub(earlier) as f64;
+
+        let produced = delta(later.produced, earlier.produced);
+        let keep_alive_surbs = delta(later.keep_alive_surbs, earlier.keep_alive_surbs);
+        Self {
+            consumed: delta(later.consumed, earlier.consumed) / secs,
+            organic: (produced - keep_alive_surbs).max(0.0) / secs,
+            keep_alive_surbs: keep_alive_surbs / secs,
+            keep_alive_packets: delta(later.keep_alive_packets, earlier.keep_alive_packets) / secs,
+        }
+    }
+
+    /// Wire bytes per second the keep-alive packets occupied.
+    fn keep_alive_wire_bytes(&self) -> f64 {
+        self.keep_alive_packets * hopr_crypto_packet::prelude::HoprPacket::SIZE as f64
+    }
+
+    /// Average number of SURBs each keep-alive packet carried, or zero when none was sent.
+    fn surbs_per_keep_alive(&self) -> f64 {
+        if self.keep_alive_packets > 0.0 {
+            self.keep_alive_surbs / self.keep_alive_packets
+        } else {
+            0.0
+        }
+    }
 }
 
 /// Configuration for the `SurbBalancer`.
@@ -83,7 +157,13 @@ pub struct SurbBalancerConfig {
     /// - In the context of the remote SURB buffer (Exit), this is the maximum egress of keep-alive messages to the
     ///   counterparty (= artificial SURB production).
     ///
-    /// The default is 5000 (which is 2500 packets/second currently)
+    /// On the Entry this is an upstream budget, and a larger one than `max_surbs_per_sec × SURB_SIZE`
+    /// suggests: each keep-alive is a whole packet carrying two SURBs, so every SURB it delivers
+    /// costs half a packet on the wire. Derive the value from an upstream bit rate with
+    /// [`max_surbs_per_sec_for_wire_bps`](crate::max_surbs_per_sec_for_wire_bps), and report what a
+    /// given value costs with [`keep_alive_wire_bps`](crate::keep_alive_wire_bps).
+    ///
+    /// The default is 5000 (2500 keep-alive packets/second, about 29 Mbit/s of upstream).
     #[default(5_000)]
     pub max_surbs_per_sec: u64,
 
@@ -407,6 +487,8 @@ pub struct SurbBalancer<C, E, F> {
     was_degraded: bool,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
+    /// DIAGNOSTIC: estimator state at the last balancer-state line, to report rates over its window.
+    last_report_snapshot: SimpleSurbFlowEstimator,
 }
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -430,6 +512,9 @@ where
         }
 
         controller.set_target_and_limit(state.controller_bounds());
+        // Rates are reported from now on: whatever was produced before the balancer started (e.g.
+        // while pre-loading SURBs) is not part of the first window.
+        let last_report_snapshot = SimpleSurbFlowEstimator::from(&surb_estimator);
 
         Self {
             surb_estimator,
@@ -443,6 +528,7 @@ where
             was_below_target: true,
             was_degraded: false,
             last_report: std::time::Instant::now(),
+            last_report_snapshot,
         }
     }
 
@@ -569,15 +655,29 @@ where
         // At `debug` rather than `info`: one line per session per second is fine for a handful of
         // sessions and is a lot of formatting work for a node carrying many, none of which an
         // operator needs to see during healthy operation.
-        if self.last_report.elapsed() >= Duration::from_secs(1) {
+        //
+        // The rates split production by what it costs: `organic_surbs_s` rode along with Session
+        // data for free, `ka_*` is what keep-alives spent on the wire. Without that split the
+        // upstream the balancer spends is invisible, since keep-alives carry no application bytes.
+        let report_window = self.last_report.elapsed();
+        if report_window >= Duration::from_secs(1) {
             self.last_report = std::time::Instant::now();
+            let rates = SurbFlowRates::between(&self.last_report_snapshot, &snapshot, report_window);
+            self.last_report_snapshot = snapshot;
+
             tracing::debug!(
                 session = %self.session_id,
                 level = current,
                 target = self.controller.bounds().target(),
                 output,
-                produced = self.surb_estimator.estimate_surbs_produced(),
-                consumed = self.surb_estimator.estimate_surbs_consumed(),
+                produced = snapshot.produced,
+                consumed = snapshot.consumed,
+                consumed_s = rates.consumed.round() as u64,
+                organic_surbs_s = rates.organic.round() as u64,
+                ka_surbs_s = rates.keep_alive_surbs.round() as u64,
+                ka_pkts_s = rates.keep_alive_packets.round() as u64,
+                ka_bytes_s = rates.keep_alive_wire_bytes().round() as u64,
+                surbs_per_ka_pkt = (rates.surbs_per_keep_alive() * 100.0).round() / 100.0,
                 degraded,
                 distress = self
                     .state
@@ -585,6 +685,15 @@ where
                     .load(std::sync::atomic::Ordering::Relaxed),
                 "surb balancer state"
             );
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            {
+                let sid: &str = self.session_id.as_ref();
+                METRIC_CONSUMED_RATE.set(&[sid], rates.consumed);
+                METRIC_ORGANIC_RATE.set(&[sid], rates.organic);
+                METRIC_KEEP_ALIVE_PACKET_RATE.set(&[sid], rates.keep_alive_packets);
+                METRIC_KEEP_ALIVE_WIRE_RATE.set(&[sid], rates.keep_alive_wire_bytes());
+            }
         }
 
         self.flow_control.adjust_surb_flow(output as usize);
@@ -681,6 +790,56 @@ mod tests {
         let cfg = SurbBalancerConfig::default();
         let state_data = BalancerStateValues::new(cfg);
         assert_eq!(cfg, state_data.as_config());
+    }
+
+    #[test]
+    fn flow_rates_should_split_production_into_organic_and_keep_alive() {
+        let later = SimpleSurbFlowEstimator {
+            produced: 3_000,
+            consumed: 1_000,
+            keep_alive_surbs: 2_000,
+            keep_alive_packets: 1_000,
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::from_secs(2));
+
+        assert_eq!(
+            SurbFlowRates {
+                consumed: 500.0,
+                organic: 500.0,
+                keep_alive_surbs: 1_000.0,
+                keep_alive_packets: 500.0,
+            },
+            rates
+        );
+        assert_eq!(
+            500.0 * hopr_crypto_packet::prelude::HoprPacket::SIZE as f64,
+            rates.keep_alive_wire_bytes()
+        );
+        assert_eq!(2.0, rates.surbs_per_keep_alive());
+    }
+
+    /// The keep-alive attribution is recorded just before the production it belongs to, so a
+    /// snapshot can land in between. That must not read as negative -- or wrapped -- organic flow.
+    #[test]
+    fn flow_rates_should_not_invent_organic_surbs_from_an_attribution_seen_early() {
+        let later = SimpleSurbFlowEstimator {
+            keep_alive_surbs: 2,
+            keep_alive_packets: 1,
+            ..Default::default()
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::from_secs(1));
+        assert_eq!(0.0, rates.organic);
+    }
+
+    #[test]
+    fn flow_rates_over_an_empty_window_should_be_zero() {
+        let later = SimpleSurbFlowEstimator {
+            produced: 10,
+            ..Default::default()
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::ZERO);
+        assert_eq!(SurbFlowRates::default(), rates);
+        assert_eq!(0.0, rates.surbs_per_keep_alive());
     }
 
     #[test]
