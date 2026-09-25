@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["GateBlockReason","GateVerdict"],"struct":["GateClosed","ServiceGate"]};
