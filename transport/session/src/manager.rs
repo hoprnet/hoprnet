@@ -33,10 +33,8 @@ use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
-        pid::{PidBalancerController, PidControllerGains},
-        simple::SimpleBalancerController,
+        AtomicSurbFlowEstimator, BalancerStateValues, EntryBalancerController, RateController, RateLimitSinkExt,
+        SurbBalancer, SurbControllerWithCorrection, simple::SimpleBalancerController,
     },
     egress::EgressPressure,
     errors::{SessionManagerError, TransportSessionError},
@@ -1162,7 +1160,7 @@ where
                     let balancer = SurbBalancer::new(
                         session_id,
                         // The setpoint and output limit is immediately reconfigured by the SurbBalancer
-                        PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
+                        EntryBalancerController::from_env_or_default(),
                         surb_estimator.clone(),
                         // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
                         // so the correction by this factor is applied.

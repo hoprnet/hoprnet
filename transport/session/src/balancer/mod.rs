@@ -1,4 +1,7 @@
 mod controller;
+/// Contains the paced-refill implementation of the [`SurbBalancerController`] trait, which drives
+/// the Entry's keep-alive production.
+pub mod paced;
 /// Contains implementation of the [`SurbBalancerController`] trait using a Proportional Integral Derivative (PID)
 /// controller.
 pub mod pid;
@@ -109,14 +112,46 @@ impl BalancerControllerBounds {
     }
 }
 
+/// What a [`SurbBalancerController`] is told about the SURB buffer on each sample.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ControlInput {
+    /// Estimated number of SURBs in the buffer.
+    pub level: u64,
+    /// SURBs per second the buffer loses beyond what reaches it without the controller's help,
+    /// smoothed over recent samples.
+    ///
+    /// Consumption minus organic supply. Negative when SURBs piggybacked on Session data alone
+    /// arrive faster than they are spent.
+    pub net_consumption_per_sec: f64,
+    /// Time elapsed since the previous sample.
+    pub dt: std::time::Duration,
+    /// The most the controller may output on this sample.
+    ///
+    /// Controllers also respect their own output limit, so this can only lower it.
+    pub ceiling: u64,
+}
+
+#[cfg(test)]
+impl ControlInput {
+    /// An input carrying only a buffer level, for testing controllers that need nothing else.
+    pub fn at_level(level: u64) -> Self {
+        Self {
+            level,
+            ceiling: u64::MAX,
+            ..Default::default()
+        }
+    }
+}
+
 /// Trait abstracting a controller used in the [`SurbBalancer`].
 pub trait SurbBalancerController {
     /// Gets the current bounds of the controller.
     fn bounds(&self) -> BalancerControllerBounds;
     /// Updates the controller's target (setpoint) and output limit.
     fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds);
-    /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.
-    fn next_control_output(&mut self, current_buffer_level: u64) -> u64;
+    /// Queries the controller for the next control output given what is known about the buffer on
+    /// this sample.
+    fn next_control_output(&mut self, input: ControlInput) -> u64;
     /// Discards accumulated history, leaving the bounds intact.
     ///
     /// Used when the buffer estimate the controller has been acting on stops meaning what it meant
@@ -215,6 +250,63 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
 
     fn estimate_keep_alive_packets(&self) -> u64 {
         self.keep_alive_packets.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// The controller that drives the Entry's keep-alive production.
+///
+/// [Paced refill](paced::PacedRefillController) unless `HOPR_BALANCER_CONTROLLER=pid` selects the
+/// [PID controller](pid::PidBalancerController) it replaced, kept as a rollback.
+#[derive(Clone, Debug)]
+pub enum EntryBalancerController {
+    /// Consumption fed forward, refills paced. The default.
+    Paced(paced::PacedRefillController),
+    /// The previous per-sample PID controller.
+    Pid(pid::PidBalancerController),
+}
+
+impl EntryBalancerController {
+    /// Selects the controller from `HOPR_BALANCER_CONTROLLER`, and its parameters from the
+    /// controller's own environment variables.
+    pub fn from_env_or_default() -> Self {
+        match std::env::var("HOPR_BALANCER_CONTROLLER") {
+            Ok(v) if v.trim().eq_ignore_ascii_case("pid") => Self::Pid(pid::PidBalancerController::from_gains(
+                pid::PidControllerGains::from_env_or_default(),
+            )),
+            _ => Self::Paced(paced::PacedRefillController::new(
+                paced::PacedRefillParams::from_env_or_default(),
+            )),
+        }
+    }
+}
+
+impl SurbBalancerController for EntryBalancerController {
+    fn bounds(&self) -> BalancerControllerBounds {
+        match self {
+            Self::Paced(c) => c.bounds(),
+            Self::Pid(c) => c.bounds(),
+        }
+    }
+
+    fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds) {
+        match self {
+            Self::Paced(c) => c.set_target_and_limit(bounds),
+            Self::Pid(c) => c.set_target_and_limit(bounds),
+        }
+    }
+
+    fn next_control_output(&mut self, input: ControlInput) -> u64 {
+        match self {
+            Self::Paced(c) => c.next_control_output(input),
+            Self::Pid(c) => c.next_control_output(input),
+        }
+    }
+
+    fn reset(&mut self) {
+        match self {
+            Self::Paced(c) => c.reset(),
+            Self::Pid(c) => c.reset(),
+        }
     }
 }
 
