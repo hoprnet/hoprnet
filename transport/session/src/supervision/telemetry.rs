@@ -123,7 +123,7 @@ pub enum PixCycleEvent {
     /// Reported for a cycle retired by the supervisor *and* for one still live when its Session
     /// ended, which is not the same as "the supervisor named a close reason for it":
     /// `on_unverifiable_shares` closes a Session outright without routing its siblings through
-    /// retirement, and `hopr_session_pix_closures_total{reason}` is where the reasons are. The label
+    /// retirement, and `hopr_pix_closures_total{reason}` is where the reasons are. The label
     /// means "did not recover".
     Failed,
 }

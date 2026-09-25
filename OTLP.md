@@ -71,7 +71,8 @@ The PIX Exit surface is split across both exporters, by consumer rather than by 
 - **`hopr_session_pix_*`** — per-Session detail: gate mode, recovery progress, fill rate. OTLP only, like the
   rest of `hopr_session_*`, because each is labelled by a Session.
 
-What decides the exporter is whether a series is bounded by construction, not which subsystem raised it.
+Which of the two prefixes a metric belongs under is decided by whether it is bounded by construction, not by
+which subsystem raised it.
 
 The routing is by name prefix, so the spelling is what decides the exporter. The full metric contract —
 instrument type, unit, the exact transition that updates each one, its complete label value set, and worked

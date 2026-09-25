@@ -676,6 +676,9 @@ impl SessionPixSupervisor {
                         served_total_at_last_progress = tail.served_total_at_last_progress,
                         "closing PIX Session while its paid recovery tail is stalled"
                     );
+                    // The tail is ending here, not merely being abandoned with the Session, so it
+                    // owes its duration like every other phase that reaches a terminal edge.
+                    self.release_paid_tail(now);
                     self.closed = true;
                     return self.with_fill_stopped(vec![SessionPixAction::Close(reason)]);
                 }
@@ -1504,16 +1507,60 @@ impl SessionPixSupervisor {
         }
     }
 
+    /// Books what a recovered cycle owes the counters and retires it into its tombstone.
+    ///
+    /// Split out because a drain returns before the rest of the transition, and would otherwise
+    /// never book the deposit it just unlocked — making the one outcome the drain exists for read as
+    /// stranded value in `hopr_pix_deposits_recovered_uhopr_total`.
+    fn book_recovered_cycle(&mut self, idx: usize, now: Instant, served_total: u64) {
+        // `Recovered` is a local cryptographic fact, so it supplies the lower bound even if its
+        // final absolute Progress snapshot is delivered just afterwards by a concurrent worker.
+        // Every later tail snapshot must keep these terminal fields exact.
+        let target = self.dims.target_useful_shares();
+        self.ssas[idx].largest_useful_shares = target;
+        self.ssas[idx].largest_shares_seen = self.ssas[idx].largest_shares_seen.max(target);
+        self.ssas[idx].recovered_polynomials = self.dims.polys_per_ssa();
+
+        // Counted here rather than on the `Recovered` event, because that event is not the
+        // transition: `on_recovered` defers it when the cycle is still awaiting its commitment or
+        // deposit, and replays it through this function once both arrive. This is the one place a
+        // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
+        self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
+        // Summarized before the tombstone transition below, and before `paid_recovery_tail` starts
+        // collecting the drain, which belongs to the FIFO rather than to this cycle's recovery. The
+        // terminal fields were just pinned to the target above, so a recovered cycle's useful
+        // fraction is exactly one by construction.
+        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Recovered, served_total);
+        self.telemetry.finalized.push(summary);
+
+        let phase_sample = self.ssas[idx].enter_phase(
+            SsaPhase::Recovered {
+                tombstone_until: now
+                    .checked_add(self.cfg.tombstone_retention_window)
+                    .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
+            },
+            now,
+        );
+        self.telemetry.phase_durations.extend(phase_sample);
+    }
+
     /// Perform the terminal tombstone transition for a fully-recovered SSA.
     /// Called from `on_recovered` (normal Recovering path) and replayed from
     /// `on_deposit_confirmed`/`on_commitment_verified` when `recovered_pending`
     /// was set earlier.
     fn perform_recovered_transition(&mut self, idx: usize, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
+        let next_requested = self.ssas[idx].next_requested;
+        // Read before the cycle is retired below, which would make it terminal and change the answer.
+        let was_front = self.earliest_live_idx() == Some(idx);
+        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
+
+        self.book_recovered_cycle(idx, now, served_total);
+
         // The end of a drain, and the outcome it exists for: the deposit this cycle was paid is
         // released rather than stranded. None of the bookkeeping below is worth doing — the tail
-        // receipt, the tombstone and the gate notification all serve a Session that is about to be
-        // torn down, and `closed` gates every entry point from here on. Returning before the tail is
-        // created also guarantees a drain can never leave one behind.
+        // receipt, the gate notification and the successor request all serve a Session that is about
+        // to be torn down, and `closed` gates every entry point from here on. Returning before the
+        // tail is created also guarantees a drain can never leave one behind.
         if self.draining {
             tracing::info!(
                 ssa_id = %self.ssas[idx].ssa_id,
@@ -1522,18 +1569,6 @@ impl SessionPixSupervisor {
             self.closed = true;
             return self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::Drained)]);
         }
-
-        let next_requested = self.ssas[idx].next_requested;
-        let was_front = self.earliest_live_idx() == Some(idx);
-
-        // `Recovered` is a local cryptographic fact, so it supplies the lower bound even if its
-        // final absolute Progress snapshot is delivered just afterwards by a concurrent worker.
-        // Every later tail snapshot must keep these terminal fields exact.
-        let target = self.dims.target_useful_shares();
-        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
-        self.ssas[idx].largest_useful_shares = target;
-        self.ssas[idx].largest_shares_seen = self.ssas[idx].largest_shares_seen.max(target);
-        self.ssas[idx].recovered_polynomials = self.dims.polys_per_ssa();
 
         if was_front {
             // Replacing rather than accumulating is intentional. Only the immediate recovered
@@ -1556,28 +1591,6 @@ impl SessionPixSupervisor {
                 });
         }
 
-        // Counted here rather than on the `Recovered` event, because that event is not the
-        // transition: `on_recovered` defers it when the cycle is still awaiting its commitment or
-        // deposit, and replays it through this function once both arrive. This is the one place a
-        // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
-        self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
-        // Summarized from the counters as they stand *now*, before the tombstone transition below —
-        // and before `paid_recovery_tail` starts collecting the drain, which belongs to the FIFO
-        // rather than to this cycle's recovery. The terminal fields were just pinned to the target
-        // above, so a recovered cycle's useful fraction is exactly one by construction.
-        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Recovered, served_total);
-        self.telemetry.finalized.push(summary);
-
-        // Transition to tombstone.
-        let phase_sample = self.ssas[idx].enter_phase(
-            SsaPhase::Recovered {
-                tombstone_until: now
-                    .checked_add(self.cfg.tombstone_retention_window)
-                    .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
-            },
-            now,
-        );
-        self.telemetry.phase_durations.extend(phase_sample);
         self.ssas[idx].commitment_deadline = None;
         self.ssas[idx].deposit_deadline = None;
         self.ssas[idx].recovery_idle_deadline = None;
@@ -5214,6 +5227,15 @@ mod tests {
             ),
             "tail trickle must not move the predecessor's absolute deadline: {actions:?}"
         );
+        // The tail took the front at +1 s and ends here, so it owes its 20 s like any other phase
+        // that reaches a terminal edge — being ended by a deadline is still ending.
+        assert_eq!(
+            Some(&(PixCyclePhase::PaidTail, 20_000)),
+            sup.take_telemetry_events()
+                .phase_durations
+                .iter()
+                .find(|(phase, _)| *phase == PixCyclePhase::PaidTail)
+        );
     }
 
     /// Recovered does not mean replayable: only the immediate predecessor owns the one tail slot.
@@ -5994,6 +6016,46 @@ mod tests {
                 .any(|action| matches!(action, SessionPixAction::RequestSsa { .. })),
             "got {actions:?}"
         );
+    }
+
+    /// A completed drain books its deposit as recovered, not as stranded.
+    ///
+    /// The drain exists to un-strand a deposit, so it is the one close path that must never leave
+    /// its value out of `hopr_pix_deposits_recovered_uhopr_total`. It returns early from the
+    /// recovered transition, which is what previously skipped the summary the counter reads.
+    #[test]
+    fn a_completed_drain_books_the_deposit_it_unlocked_as_recovered() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+        // `funded_at_front` confirms `sufficient_balance()`, which is 1000 HOPR.
+        assert_eq!(1_000_000_000, sup.take_telemetry_events().deposit_confirmed_uhopr);
+
+        sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(4), 0);
+
+        let events = sup.take_telemetry_events();
+        assert_eq!(
+            1, events.recovered,
+            "a drained cycle recovered, so it counts as recovered"
+        );
+        let recovered: Vec<_> = events
+            .finalized
+            .iter()
+            .filter(|summary| summary.outcome == PixCycleOutcome::Recovered)
+            .collect();
+        assert_eq!(
+            1,
+            recovered.len(),
+            "the drain must summarize its cycle, or the value it unlocked reads as stranded"
+        );
+        assert_eq!(1_000_000_000, recovered[0].deposit_uhopr);
     }
 
     /// A drain that stops making progress is closed by the idle deadline rather than re-armed.
