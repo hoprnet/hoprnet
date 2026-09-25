@@ -9,6 +9,7 @@
 
 pub(crate) mod balancer;
 pub mod counters;
+pub mod egress;
 pub mod errors;
 pub mod flow_control;
 mod manager;

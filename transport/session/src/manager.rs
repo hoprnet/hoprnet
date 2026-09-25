@@ -38,6 +38,7 @@ use crate::{
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
+    egress::EgressPressure,
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG},
     utils,
@@ -593,6 +594,8 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    /// Congestion of the local egress queues, measured by the transport that owns them.
+    egress_pressure: Arc<EgressPressure>,
     cfg: SessionManagerConfig,
 }
 
@@ -606,6 +609,7 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            egress_pressure: self.egress_pressure.clone(),
         }
     }
 }
@@ -763,8 +767,17 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
+            egress_pressure: Arc::new(EgressPressure::new()),
             cfg,
         }
+    }
+
+    /// The record of local egress congestion that this manager's Sessions react to.
+    ///
+    /// The transport carrying this manager's packets must report into it. Until something does,
+    /// egress reads as never congested, so Sessions behave exactly as they would without it.
+    pub fn egress_pressure(&self) -> Arc<EgressPressure> {
+        self.egress_pressure.clone()
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`

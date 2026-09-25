@@ -544,8 +544,15 @@ where
         let transport_layer_process = network_process;
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
-        let (wire_msg_tx, wire_msg_rx) =
-            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone(), self.cfg.stream).await?;
+        // The per-peer queues are where egress congestion becomes visible first, and the Sessions are
+        // what can back off from it, so the queues report into the session manager's record.
+        let (wire_msg_tx, wire_msg_rx) = protocol::stream::process_stream_protocol(
+            msg_codec,
+            transport_network.clone(),
+            self.cfg.stream,
+            self.smgr.egress_pressure(),
+        )
+        .await?;
 
         // Shared mixing channel: all per-destination clones of `mixing_channel_tx` push into one
         // heap, so cross-destination packets are mixed together rather than each destination
