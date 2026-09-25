@@ -276,21 +276,21 @@ async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketA
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
     // The WireGuard session uses Segmentation + NoDelay; on a stateless session NoDelay enables
-    // datagram-boundary preservation (UDP-like framing). frame_mtu defaults to 1500.
+    // datagram-boundary preservation (UDP-like framing). frame_mtu defaults to 1452.
     let cfg = HoprSessionConfig {
         capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay,
         ..Default::default()
     };
     assert_eq!(
-        cfg.frame_mtu, 1500,
-        "test assumes the WireGuard session frame_mtu of 1500"
+        cfg.frame_mtu, 1452,
+        "test assumes the WireGuard session frame_mtu of 1452"
     );
 
     // Exit-side session endpoint (bridged to the WireGuard server).
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cfg.clone(),
+        cfg,
         (
             alice_tx,
             alice_rx.map(|(_, d)| ApplicationDataIn {
@@ -371,7 +371,7 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
 /// Regression test for hoprnet#8356. A UDP datagram forwarded through `transfer_session` must be
 /// delivered to the peer as a single `read`. Before the fix the byte-stream session split a
 /// datagram larger than `frame_mtu` across frames, so the client's single `read` returned only one
-/// frame (<= 1500) and neptun rejected the partial buffer (`InvalidPacket`/`InvalidAeadTag`) until
+/// frame (<= 1452) and neptun rejected the partial buffer (`InvalidPacket`/`InvalidAeadTag`) until
 /// the `DecapStalled` guard reconnected. With `NoDelay` on a stateless session the session preserves
 /// the boundary (one frame per write), whatever the datagram size.
 async fn udp_datagram_is_delivered_whole(#[case] datagram_len: usize) -> anyhow::Result<()> {
@@ -438,7 +438,7 @@ async fn nodelay_on_reliable_session_keeps_byte_stream_framing(
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cfg.clone(),
+        cfg,
         (
             alice_tx,
             alice_rx.map(|(_, d)| ApplicationDataIn {
@@ -462,7 +462,7 @@ async fn nodelay_on_reliable_session_keeps_byte_stream_framing(
         None,
     )?;
 
-    // A payload well above frame_mtu (1500): if datagram mode were (wrongly) active it would arrive
+    // A payload well above frame_mtu (1452): if datagram mode were (wrongly) active it would arrive
     // in one read; on a reliable socket it must be split at frame_mtu instead.
     let payload = vec![0x5Au8; 2904];
     alice_session.write_all(&payload).await?;

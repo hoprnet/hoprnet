@@ -63,9 +63,29 @@ pub type UnreliableSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
 /// Represents a socket with reliable delivery.
 pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;
 
+const fn min(a: usize, b: usize) -> usize {
+    if a < b { a } else { b }
+}
+
+/// Maximum Session MTU even if the HOPR packet allows for more.
+///
+/// Based on wireguard-go with a 1420-byte tunnel MTU, whose padding is capped at that MTU,
+/// plus a 16-byte transport header and a 16-byte authentication tag.
+pub const MAX_SESSION_MTU: usize = 1452;
+
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {
-    C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD
+    min(MAX_SESSION_MTU, C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD)
+}
+
+/// Clamps a requested `frame_size` between one and `max_segments` segment payloads.
+///
+/// Preserves frame boundaries within these limits: UDP forwarding turns each reconstructed frame
+/// into a datagram, so rounding down could split a datagram that fits the requested frame size.
+pub const fn session_frame_size<const C: usize>(frame_size: usize, max_segments: usize) -> usize {
+    let segment = session_socket_mtu::<C>();
+    let frame_size = min(frame_size, segment.saturating_mul(max_segments));
+    if frame_size < segment { segment } else { frame_size }
 }
 
 /// Adaptors for [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport to use Session protocol.

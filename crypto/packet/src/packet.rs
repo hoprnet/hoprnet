@@ -498,10 +498,9 @@ fn create_surb_for_path<
 }
 
 /// Guards the SURB-batch generation byte added to `SurbReceiverInfo`: it must not have shrunk the
-/// per-packet SURB capacity. A drop from 2 to 1 would halve SURB delivery throughput, which would be
-/// a worse regression than the return-path staleness the generation tag exists to fix.
+/// per-packet SURB capacity. The larger packet payload must still fit eight SURBs.
 const _: () = assert!(
-    HoprPacket::MAX_SURBS_IN_PACKET == 2,
+    HoprPacket::MAX_SURBS_IN_PACKET == 8,
     "SURB size grew enough to reduce MAX_SURBS_IN_PACKET; the generation carrier must move to spare bits (e.g. \
      ProofOfRelayValues chain_length high bits) instead of enlarging SurbReceiverInfo"
 );

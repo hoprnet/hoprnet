@@ -132,11 +132,12 @@ mod tests {
     #[cfg(feature = "telemetry")]
     use crate::socket::telemetry::NoopTracker;
     use crate::{
-        SessionSocket, SessionSocketConfig,
+        MAX_SESSION_MTU, SessionSocket, SessionSocketConfig, session_frame_size, session_socket_mtu,
         utils::test::{FaultyNetworkConfig, setup_alice_bob},
     };
 
-    const FRAME_SIZE: usize = 1500;
+    /// The production frame size over this module's deliberately small segment MTU.
+    const FRAME_SIZE: usize = session_frame_size::<MTU>(MAX_SESSION_MTU, (SeqIndicator::MAX + 1) as usize);
 
     const MTU: usize = 1000;
 
@@ -221,7 +222,7 @@ mod tests {
     async fn session_socket_must_correctly_dispatch_segment_and_frame_state_events() -> anyhow::Result<()> {
         const NUM_FRAMES: usize = 2;
 
-        const NUM_SEGMENTS: usize = NUM_FRAMES * FRAME_SIZE / MTU + 1;
+        const NUM_SEGMENTS: usize = NUM_FRAMES * FRAME_SIZE.div_ceil(session_socket_mtu::<MTU>());
 
         let mut alice_seq = mockall::Sequence::new();
         let mut alice_state = MockSockState::new();

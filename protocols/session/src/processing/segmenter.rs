@@ -8,7 +8,8 @@ use std::{
 use tracing::instrument;
 
 use crate::{
-    protocol::{FrameId, Segment, SeqIndicator, SessionMessage},
+    protocol::{FrameId, Segment, SeqIndicator},
+    session_socket_mtu,
     utils::segment_into,
 };
 
@@ -63,22 +64,24 @@ where
 {
     fn new(inner: S, frame_size: usize, send_terminating_segment: bool, datagram: bool) -> Self {
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
-        // Minimum is SESSION_MTU (= C - SEGMENT_OVERHEAD) so that a single frame fits in one
+        // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
         //
         // In datagram mode `frame_size` no longer bounds a frame (each write is its own frame);
         // an individual datagram may be up to the same SeqIndicator-bounded maximum. `frame_size`
         // is then only a capacity hint for the frame buffer.
         let frame_size = frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,
         );
 
         Self {
             inner,
             state: State::BufferingFrame,
             frame: Vec::with_capacity(frame_size),
-            ready_segments: VecDeque::with_capacity(frame_size.div_ceil(C - SessionMessage::<C>::SEGMENT_OVERHEAD)),
+            // Segments are `session_socket_mtu` bytes, not `C - SEGMENT_OVERHEAD`; sizing this on the
+            // latter under-counts whenever the MAX_SESSION_MTU cap binds.
+            ready_segments: VecDeque::with_capacity(frame_size.div_ceil(session_socket_mtu::<C>())),
             frame_size,
             frame_id: 1,
             is_closed: false,
@@ -114,13 +117,8 @@ where
                         if buf.is_empty() {
                             return Poll::Ready(Ok(0));
                         }
-                        segment_into(
-                            buf,
-                            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-                            *this.frame_id,
-                            this.ready_segments,
-                        )
-                        .map_err(std::io::Error::other)?;
+                        segment_into(buf, session_socket_mtu::<C>(), *this.frame_id, this.ready_segments)
+                            .map_err(std::io::Error::other)?;
 
                         tracing::trace!(
                             num_segments = this.ready_segments.len(),
@@ -145,7 +143,7 @@ where
                         // and write segments to the downstream
                         segment_into(
                             this.frame.as_slice(),
-                            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
+                            session_socket_mtu::<C>(),
                             *this.frame_id,
                             this.ready_segments,
                         )
@@ -197,7 +195,7 @@ where
                 // because poll_write always makes sure it is before returning Ready
                 segment_into(
                     this.frame.as_slice(),
-                    C - SessionMessage::<C>::SEGMENT_OVERHEAD,
+                    session_socket_mtu::<C>(),
                     *this.frame_id,
                     this.ready_segments,
                 )
@@ -274,11 +272,15 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::{protocol::SeqNum, utils::segment};
+    use crate::{
+        MAX_SESSION_MTU,
+        protocol::{SeqNum, SessionMessage},
+        utils::segment,
+    };
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
-    const FRAME_SIZE: usize = 1500;
+    const FRAME_SIZE: usize = MAX_SESSION_MTU;
 
     const SEGMENTS_PER_FRAME: usize = FRAME_SIZE / MTU + 1;
 
@@ -377,17 +379,19 @@ mod tests {
 
     #[tokio::test]
     async fn datagram_mode_keeps_a_multi_segment_datagram_in_one_frame() -> anyhow::Result<()> {
+        const DATAGRAM_MTU: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE;
+        let segment_size = session_socket_mtu::<DATAGRAM_MTU>();
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
-        let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE, true);
+        let mut writer = segments_tx.segmenter_with_terminating_segment::<DATAGRAM_MTU>(FRAME_SIZE, true);
         pin_mut!(segments);
 
         // A datagram larger than one segment (and larger than frame_size) stays a single frame: all
         // segments share one frame_id/seq_len with contiguous indices, matching a direct segment().
-        let datagram = vec![0xABu8; SMTU * 2 + 10];
+        let datagram = vec![0xABu8; segment_size * 2 + 10];
         writer.write_all(&datagram).await?;
         writer.flush().await?;
 
-        for expected in segment(&datagram, SMTU, 1)? {
+        for expected in segment(&datagram, segment_size, 1)? {
             let seg = segments
                 .next()
                 .timeout(futures_time::time::Duration::from_millis(500))

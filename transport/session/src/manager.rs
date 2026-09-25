@@ -1458,8 +1458,10 @@ pub fn validate_incoming_session_pix_config(
 pub struct SessionManagerConfig {
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
-    /// Default is 1500.
-    #[default(1500)]
+    /// Clamped to the socket's supported frame size range, preserving boundaries within that range.
+    ///
+    /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
+    #[default(SESSION_MTU)]
     pub frame_mtu: usize,
 
     /// The maximum time for an incomplete frame to stay in the Session's output buffer.
@@ -2136,9 +2138,8 @@ fn initialize_session_telemetry(
 
 /// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer.
 ///
-/// `max_out` is the client's `always_max_out_surbs` opt-in, which wins outright: a client that has
-/// asked for the maximum has said something about its own traffic that the balancer's estimate
-/// cannot contradict.
+/// The default cap of `1` follows the balancer's target. Explicit limits of `0` or more than `1`
+/// take precedence; `usize::MAX` leaves the packet's existing limit untouched.
 ///
 /// Otherwise the cap comes from [`BalancerStateValues::organic_surbs_per_packet`], which yields `0`
 /// once the counterparty is estimated to be at its target. That zero is the whole point of the
@@ -2150,9 +2151,13 @@ fn initialize_session_telemetry(
 /// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
 /// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
 /// queued for a packet that can actually deliver it.
-fn cap_organic_surbs(data: &mut ApplicationDataOut, max_out: bool, surb_mgmt: &BalancerStateValues) {
-    if !max_out {
-        data.packet_info.get_or_insert_default().max_surbs_in_packet = surb_mgmt.organic_surbs_per_packet();
+fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) {
+    if max_surbs != usize::MAX {
+        data.packet_info.get_or_insert_default().max_surbs_in_packet = if max_surbs == 1 {
+            surb_mgmt.organic_surbs_per_packet()
+        } else {
+            max_surbs
+        };
     }
 }
 
@@ -2327,7 +2332,7 @@ where
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
             // Idle rather than live TTL, and generous: the entry must outlive the gap between two
-            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~61 min at the
+            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~192 min at the
             // deployed dimensions and the documented rate cap. Matches the generator's own
             // per-pseudonym cache, which is what the guarded region reads.
             ssa_request_locks: moka::future::Cache::builder()
@@ -2771,6 +2776,7 @@ where
                 // with our maximum value.
                 if let Some(balancer_config) = cfg.surb_management {
                     let surb_estimator = AtomicSurbFlowEstimator::default();
+                    let surbs_per_keep_alive = KeepAliveMessage::from(session_id).max_surbs()? as u32;
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
@@ -2794,14 +2800,14 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
                         // NOTE: this is put in-front of the `full_surb_scoring_sender`,
                         // so that its estimate of SURBs gets automatically updated based on
                         // the `max_surbs_in_packets` set here.
                         move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            cap_organic_surbs(&mut data, max_out_organic_surbs, &surb_mgmt_for_tx);
+                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                             futures::future::ok::<_, S::Error>((routing, data))
                         },
                     );
@@ -2834,9 +2840,8 @@ where
                         // The setpoint and output limit is immediately reconfigured by the SurbBalancer
                         PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
                         surb_estimator.clone(),
-                        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-                        // so the correction by this factor is applied.
-                        SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+                        // Convert the requested SURB rate to packets using the keep-alive's capacity.
+                        SurbControllerWithCorrection(ka_controller, surbs_per_keep_alive),
                         surb_mgmt.clone(),
                     );
 
@@ -3005,11 +3010,11 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let reduced_surb_sender =
                         msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            cap_organic_surbs(&mut data, max_out_organic_surbs, &surb_mgmt_for_tx);
+                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -5080,8 +5085,7 @@ where
                     }
 
                     // Increase the number of received SURBs in the estimator.
-                    // Typically, 2 SURBs per Keep-Alive message
-                    let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                    let produced = msg.max_surbs()? as u64;
                     session_slot
                         .surb_estimator
                         .produced
@@ -6059,7 +6063,7 @@ mod tests {
     #[test]
     fn cap_organic_surbs_should_zero_the_packet_once_the_counterparty_is_at_target() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, false, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
 
         assert_eq!(Some(0), data.packet_info.map(|i| i.max_surbs_in_packet));
         assert_eq!(
@@ -6073,7 +6077,7 @@ mod tests {
     #[test]
     fn cap_organic_surbs_should_allow_one_while_the_counterparty_is_below_target() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, false, &gate_state(100, 10));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 10));
 
         assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
         assert_eq!(1, data.estimate_surbs_with_msg());
@@ -6091,7 +6095,7 @@ mod tests {
             surb_generation: Some(7),
         });
 
-        cap_organic_surbs(&mut data, false, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
 
         let info = data.packet_info.expect("packet info must survive");
         assert_eq!(0, info.max_surbs_in_packet);
@@ -6107,16 +6111,30 @@ mod tests {
         Ok(())
     }
 
-    /// `always_max_out_surbs` is an explicit statement by the client about its own traffic, so it
+    /// `usize::MAX` is an explicit statement by the client about its own traffic, so it
     /// wins over the balancer's estimate — and must leave the packet entirely untouched rather than
     /// writing some larger cap.
     #[test]
     fn maxing_out_surbs_should_bypass_the_balancer_gate() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, true, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, usize::MAX, &gate_state(100, 200));
 
         assert_eq!(None, data.packet_info, "the opt-in must not touch the packet at all");
         assert!(data.estimate_surbs_with_msg() >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn cap_organic_surbs_should_honor_explicit_packet_limits() -> anyhow::Result<()> {
+        for limit in [0, 2] {
+            for buffer_level in [10, 200] {
+                let mut data = small_outgoing_packet()?;
+                cap_organic_surbs(&mut data, limit, &gate_state(100, buffer_level));
+
+                assert_eq!(Some(limit), data.packet_info.map(|info| info.max_surbs_in_packet));
+                assert_eq!(limit, data.estimate_surbs_with_msg());
+            }
+        }
         Ok(())
     }
 
