@@ -10,12 +10,14 @@
 //! Here, production is the sum of two terms:
 //!
 //! - the consumption that organic supply does not cover, fed forward, so that holding the level costs no error at all;
-//! - the gap to target spread over [`PacedRefillParams::refill_horizon`], and never more than the consumption itself
-//!   (or a small idle floor), so that a refill asks for roughly as much again as the session already spends rather than
-//!   the whole budget.
+//! - the gap to target spread over
+//!   [`PacedRefillParams::refill_horizon`](crate::balancer::paced::PacedRefillParams::refill_horizon), and never more
+//!   than the consumption itself (or a small idle floor), so that a refill asks for roughly as much again as the
+//!   session already spends rather than the whole budget.
 //!
-//! The output then rises no faster than [`PacedRefillParams::ramp_time`] allows and never exceeds
-//! the ceiling. It falls immediately.
+//! The output then rises no faster than
+//! [`PacedRefillParams::ramp_time`](crate::balancer::paced::PacedRefillParams::ramp_time) allows and never
+//! exceeds the ceiling. It falls immediately.
 //!
 //! ## Pre-loading
 //!
