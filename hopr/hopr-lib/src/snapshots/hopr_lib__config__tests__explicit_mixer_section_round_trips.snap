@@ -2,6 +2,9 @@
 source: hopr/hopr-lib/src/config.rs
 expression: cfg.protocol.mixer
 ---
-min_delay: 5ms
-delay_range: 50ms
 capacity: 1000
+mixer_type:
+  Poisson:
+    max_delay: 20ms
+    miss_probability: 0.01
+    target_occupancy: 0
