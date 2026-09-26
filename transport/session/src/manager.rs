@@ -2050,7 +2050,11 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+    use crate::{
+        Capabilities,
+        balancer::{SurbBalancerConfig, SurbFlowEstimator},
+        types::SessionTarget,
+    };
 
     #[test]
     fn session_config_forwards_max_buffered_segments() {
@@ -2315,6 +2319,20 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         mgr.active_sessions().is_empty()
+    }
+
+    /// Polls `condition` until it holds, failing once `within` has passed.
+    async fn eventually(within: Duration, mut condition: impl FnMut() -> anyhow::Result<bool>) -> anyhow::Result<()> {
+        timeout(within, async {
+            loop {
+                if condition()? {
+                    return Ok::<_, anyhow::Error>(());
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("condition did not hold in time")?
     }
 
     #[test_log::test(tokio::test)]
@@ -3356,8 +3374,25 @@ mod tests {
                     .as_secs()
         );
 
+        // The balancer paces keep-alives to what the SURB level needs, about one a second for a target
+        // this small, so a fixed wait alone does not fit the expected number on a loaded machine. Wait
+        // until Bob has received them, too.
+        const KEEP_ALIVE_WAIT: Duration = Duration::from_secs(20);
+        let bob_id = *bob_session.session.id();
+        let bob_keep_alives = || -> anyhow::Result<u64> {
+            Ok(bob_mgr
+                .sessions
+                .get(&bob_id)
+                .ok_or(anyhow!("bob must hold the session slot"))?
+                .surb_estimator
+                .estimate_keep_alive_packets())
+        };
+
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
+        eventually(KEEP_ALIVE_WAIT, || Ok(bob_keep_alives()? >= 5))
+            .await
+            .context("bob must receive five keep-alives reporting the initial target")?;
 
         let new_balancer_cfg = SurbBalancerConfig {
             target_surb_buffer_size: NEXT_BALANCER_TARGET,
@@ -3368,8 +3403,22 @@ mod tests {
         // Update to a higher target
         alice_mgr.update_surb_balancer_config(alice_session.id(), new_balancer_cfg)?;
 
+        // Keep-alives arrive in the order they were sent, so every one from the first to report the
+        // new target onwards reports it as well.
+        eventually(KEEP_ALIVE_WAIT, || {
+            Ok(bob_mgr
+                .get_surb_balancer_config(&bob_id)?
+                .is_some_and(|cfg| cfg.target_surb_buffer_size == NEXT_BALANCER_TARGET))
+        })
+        .await
+        .context("bob must learn the updated target")?;
+        let since_next_target = bob_keep_alives()?;
+
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
+        eventually(KEEP_ALIVE_WAIT, || Ok(bob_keep_alives()? >= since_next_target + 5))
+            .await
+            .context("bob must receive five keep-alives reporting the updated target")?;
 
         // Bob should know about the updated target
         let remote_cfg = bob_mgr
