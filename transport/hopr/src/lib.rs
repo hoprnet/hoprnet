@@ -72,6 +72,7 @@ pub use hopr_transport_session::{
     IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
+    keep_alive_wire_bps, max_surbs_per_sec_for_wire_bps,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
@@ -543,8 +544,15 @@ where
         let transport_layer_process = network_process;
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
-        let (wire_msg_tx, wire_msg_rx) =
-            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone(), self.cfg.stream).await?;
+        // The per-peer queues are where egress congestion becomes visible first, and the Sessions are
+        // what can back off from it, so the queues report into the session manager's record.
+        let (wire_msg_tx, wire_msg_rx) = protocol::stream::process_stream_protocol(
+            msg_codec,
+            transport_network.clone(),
+            self.cfg.stream,
+            self.smgr.egress_pressure(),
+        )
+        .await?;
 
         // Shared mixing channel: all per-destination clones of `mixing_channel_tx` push into one
         // heap, so cross-destination packets are mixed together rather than each destination
@@ -806,6 +814,7 @@ where
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_smgr = self.smgr.clone();
+        let surb_flush_egress = self.smgr.egress_pressure();
         let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
         processes.insert(
@@ -826,10 +835,18 @@ where
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
+                    // SURBs still queued on our own uplink have not reached the counterparty, so
+                    // silence while it is congested says nothing about the return path.
+                    let window = protocol::surb_telemetry::FlushWindow {
+                        interval: surb_flush_interval,
+                        egress_congested: surb_flush_egress
+                            .is_congested_within(std::time::Instant::now(), surb_flush_interval),
+                    };
                     for step in protocol::return_path_recovery::run_flush_tick(
                         &surb_round_trips,
                         &surb_flush_graph,
                         now_ms,
+                        window,
                         &mut episodes,
                         |destination| async move { planner.recompute_paths_from(&destination).await },
                         |destination| async move {

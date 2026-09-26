@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use pid::Pid;
 
 use crate::{
-    balancer::{BalancerControllerBounds, SurbBalancerController},
+    balancer::{BalancerControllerBounds, ControlInput, SurbBalancerController},
     errors,
     errors::SessionManagerError,
 };
@@ -127,8 +127,9 @@ impl SurbBalancerController for PidBalancerController {
         self.0 = pid;
     }
 
-    fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
+    fn next_control_output(&mut self, input: ControlInput) -> u64 {
+        let output = self.0.next_control_output(input.level as f64).output.max(0.0) as u64;
+        output.min(input.ceiling)
     }
 
     fn reset(&mut self) {
@@ -149,7 +150,7 @@ mod tests {
         let mut c = PidBalancerController::from_gains(PidControllerGains::default());
         c.set_target_and_limit(BalancerControllerBounds::new(7_000, 5_000));
 
-        let out = c.next_control_output(0);
+        let out = c.next_control_output(ControlInput::at_level(0));
         assert!(out > 0, "empty buffer against a 7000 target must produce, got {out}");
     }
 
@@ -161,7 +162,11 @@ mod tests {
         let mut c = PidBalancerController::from_gains(PidControllerGains::default());
         c.set_target_and_limit(BalancerControllerBounds::new(7_000, 0));
 
-        assert_eq!(0, c.next_control_output(0), "a zero limit clamps every term to zero");
+        assert_eq!(
+            0,
+            c.next_control_output(ControlInput::at_level(0)),
+            "a zero limit clamps every term to zero"
+        );
     }
 
     /// Reproduces the exact operating point observed on a cluster: target 9803, empty buffer,
@@ -175,7 +180,7 @@ mod tests {
             crate::SurbBalancerConfig::default().max_surbs_per_sec,
         ));
 
-        let out = c.next_control_output(0);
+        let out = c.next_control_output(ControlInput::at_level(0));
         assert!(out > 0, "target 9803 with an empty buffer produced {out}");
     }
 
@@ -187,7 +192,7 @@ mod tests {
         c.set_target_and_limit(BalancerControllerBounds::new(7_000, 5_000));
 
         assert!(
-            c.next_control_output(0) > 0,
+            c.next_control_output(ControlInput::at_level(0)) > 0,
             "first output after reconfiguration was zero"
         );
     }
@@ -199,7 +204,7 @@ mod tests {
         let mut c = PidBalancerController::from_gains(PidControllerGains::default());
         c.set_target_and_limit(BalancerControllerBounds::new(9_803, 1_960));
 
-        let out = c.next_control_output(0);
+        let out = c.next_control_output(ControlInput::at_level(0));
         assert!(out > 0, "target 9803 / limit 1960 with an empty buffer produced {out}");
     }
 
@@ -213,11 +218,11 @@ mod tests {
 
         // Healthy: sitting at target, so the controller has nothing to do for a while.
         for _ in 0..100 {
-            c.next_control_output(9_803);
+            c.next_control_output(ControlInput::at_level(9_803));
         }
 
         // The return path breaks and the buffer drains.
-        let out = c.next_control_output(0);
+        let out = c.next_control_output(ControlInput::at_level(0));
         assert!(out > 0, "an emptied buffer after a healthy period produced {out}");
     }
 
@@ -291,7 +296,9 @@ mod tests {
         let gains = PidControllerGains::default();
         let mut ctrl = PidBalancerController::new(100, 200, gains);
 
-        let outputs: Vec<u64> = (0..10).map(|_| ctrl.next_control_output(0)).collect();
+        let outputs: Vec<u64> = (0..10)
+            .map(|_| ctrl.next_control_output(ControlInput::at_level(0)))
+            .collect();
         insta::assert_yaml_snapshot!(outputs);
     }
 
@@ -301,7 +308,7 @@ mod tests {
         let mut ctrl = PidBalancerController::new(100, 200, gains);
 
         // When buffer level equals setpoint, output should converge toward 0
-        let output = ctrl.next_control_output(100);
+        let output = ctrl.next_control_output(ControlInput::at_level(100));
         // First call at setpoint: P=0, I=0, D=0 → output=0
         assert_eq!(output, 0);
     }
@@ -312,7 +319,7 @@ mod tests {
         let mut ctrl = PidBalancerController::new(100, 200, gains);
 
         // Buffer well above setpoint — PID error is negative, output clamped to 0
-        let output = ctrl.next_control_output(200);
+        let output = ctrl.next_control_output(ControlInput::at_level(200));
         assert_eq!(output, 0);
     }
 
@@ -326,7 +333,7 @@ mod tests {
         let mut history = Vec::new();
 
         for _ in 0..20 {
-            let output = ctrl.next_control_output(buffer as u64);
+            let output = ctrl.next_control_output(ControlInput::at_level(buffer as u64));
             buffer += output as f64;
             buffer = buffer.min(200.0); // clamp to limit
             history.push(buffer as u64);

@@ -19,10 +19,11 @@ use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
 use super::{
-    BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
-    SurbFlowController, SurbFlowEstimator,
+    BalancerControllerBounds, ControlInput, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator,
+    SurbBalancerController, SurbFlowController, SurbFlowEstimator, congestion::CongestionCeiling,
+    sustain::SustainBudget,
 };
-use crate::SessionId;
+use crate::{SessionId, egress::EgressPressure};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -56,6 +57,92 @@ lazy_static::lazy_static! {
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
     ).unwrap();
+    static ref METRIC_CONSUMED_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_consumed_surbs_per_sec",
+            "SURBs consumed per second, averaged over the last reporting window",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_ORGANIC_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_organic_surbs_per_sec",
+            "SURBs per second piggybacked on Session data rather than delivered by keep-alives",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_KEEP_ALIVE_PACKET_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_keep_alive_packets_per_sec",
+            "Keep-alive packets per second delivering SURBs (sent by the Entry, received by the Exit)",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_KEEP_ALIVE_WIRE_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_keep_alive_wire_bytes_per_sec",
+            "Wire bytes per second spent on SURB-bearing keep-alive packets",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_EFFECTIVE_CEILING: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_surb_balancer_effective_ceiling",
+            "Most SURBs per second the balancer may command after backing off from local egress congestion",
+            &["session_id"]
+    ).unwrap();
+}
+
+/// Time constant over which the consumption fed forward to the controller is smoothed.
+///
+/// Long enough to ride out the jitter of packet arrivals between samples, short enough that a
+/// download starting or stopping is followed within a couple of seconds.
+const CONSUMPTION_SMOOTHING: Duration = Duration::from_secs(1);
+
+/// Per-second SURB flow over one window between two estimator snapshots.
+///
+/// Splits production into what rode along with Session data and what keep-alives had to carry on
+/// their own: the first is free on the wire, the second is the upstream budget the balancer spends.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct SurbFlowRates {
+    consumed: f64,
+    organic: f64,
+    keep_alive_surbs: f64,
+    keep_alive_packets: f64,
+}
+
+impl SurbFlowRates {
+    /// Rates between the `earlier` and `later` snapshots taken `window` apart.
+    ///
+    /// Counters are monotonic, but the keep-alive attribution is recorded a moment before the
+    /// production it belongs to, so a snapshot taken in between can momentarily show more keep-alive
+    /// SURBs than produced ones. Saturating keeps that from surfacing as a huge organic rate.
+    fn between(earlier: &SimpleSurbFlowEstimator, later: &SimpleSurbFlowEstimator, window: Duration) -> Self {
+        let secs = window.as_secs_f64();
+        if secs <= 0.0 {
+            return Self::default();
+        }
+        let delta = |later: u64, earlier: u64| later.saturating_sub(earlier) as f64;
+
+        let produced = delta(later.produced, earlier.produced);
+        let keep_alive_surbs = delta(later.keep_alive_surbs, earlier.keep_alive_surbs);
+        Self {
+            consumed: delta(later.consumed, earlier.consumed) / secs,
+            organic: (produced - keep_alive_surbs).max(0.0) / secs,
+            keep_alive_surbs: keep_alive_surbs / secs,
+            keep_alive_packets: delta(later.keep_alive_packets, earlier.keep_alive_packets) / secs,
+        }
+    }
+
+    /// Wire bytes per second the keep-alive packets occupied.
+    fn keep_alive_wire_bytes(&self) -> f64 {
+        self.keep_alive_packets * hopr_crypto_packet::prelude::HoprPacket::SIZE as f64
+    }
+
+    /// Average number of SURBs each keep-alive packet carried, or zero when none was sent.
+    fn surbs_per_keep_alive(&self) -> f64 {
+        if self.keep_alive_packets > 0.0 {
+            self.keep_alive_surbs / self.keep_alive_packets
+        } else {
+            0.0
+        }
+    }
 }
 
 /// Configuration for the `SurbBalancer`.
@@ -83,7 +170,13 @@ pub struct SurbBalancerConfig {
     /// - In the context of the remote SURB buffer (Exit), this is the maximum egress of keep-alive messages to the
     ///   counterparty (= artificial SURB production).
     ///
-    /// The default is 5000 (which is 2500 packets/second currently)
+    /// On the Entry this is an upstream budget, and a larger one than `max_surbs_per_sec × SURB_SIZE`
+    /// suggests: each keep-alive is a whole packet carrying two SURBs, so every SURB it delivers
+    /// costs half a packet on the wire. Derive the value from an upstream bit rate with
+    /// [`max_surbs_per_sec_for_wire_bps`](crate::max_surbs_per_sec_for_wire_bps), and report what a
+    /// given value costs with [`keep_alive_wire_bps`](crate::keep_alive_wire_bps).
+    ///
+    /// The default is 5000 (2500 keep-alive packets/second, about 29 Mbit/s of upstream).
     #[default(5_000)]
     pub max_surbs_per_sec: u64,
 
@@ -288,7 +381,17 @@ impl BalancerStateValues {
     /// here the two are indistinguishable, since neither delivers replies. Re-marking simply
     /// extends the window.
     pub fn mark_return_path_degraded(&self, grace: Duration) {
-        let until = EPOCH.elapsed().saturating_add(grace).as_millis().min(u64::MAX as u128) as u64;
+        self.mark_return_path_degraded_at(Instant::now(), grace);
+    }
+
+    /// [`mark_return_path_degraded`](Self::mark_return_path_degraded) as of `now`, so that the
+    /// balancer's own clock can drive the window in tests.
+    pub(crate) fn mark_return_path_degraded_at(&self, now: Instant, grace: Duration) {
+        let until = now
+            .saturating_duration_since(*EPOCH)
+            .saturating_add(grace)
+            .as_millis()
+            .min(u64::MAX as u128) as u64;
         self.return_path_degraded_until_ms
             .fetch_max(until, std::sync::atomic::Ordering::Relaxed);
     }
@@ -296,10 +399,10 @@ impl BalancerStateValues {
     /// Whether [`buffer_level`](Self::buffer_level) is currently an instruction rather than a
     /// measurement.
     ///
-    /// While this holds, the controller deliberately writes `0` into the level to drive production
-    /// to its maximum. That zero says "produce flat out", not "the counterparty holds nothing", so
-    /// anything reading the level as a *supply ceiling* must consult this first or it will read the
-    /// instruction as an order to send nothing.
+    /// While this holds, the controller deliberately writes `0` into the level to keep production
+    /// up whatever the estimate says. That zero says "keep producing", not "the counterparty holds
+    /// nothing", so anything reading the level as a *supply ceiling* must consult this first or it
+    /// will read the instruction as an order to send nothing.
     ///
     /// True only when both the opt-in (`sustain_on_return_path_loss`) and live evidence
     /// ([`mark_return_path_degraded`](Self::mark_return_path_degraded), within its window) are
@@ -309,10 +412,10 @@ impl BalancerStateValues {
     /// `pub` because it is not only the controller's business — hence the emphasis above on what
     /// the flag does *not* mean. It is not a general "the return path is degraded" signal.
     pub fn return_path_estimate_is_stale(&self) -> bool {
-        self.should_sustain_through_return_path_loss()
+        self.should_sustain_through_return_path_loss_at(Instant::now())
     }
 
-    fn should_sustain_through_return_path_loss(&self) -> bool {
+    fn should_sustain_through_return_path_loss_at(&self, now: Instant) -> bool {
         let deadline = self
             .return_path_degraded_until_ms
             .load(std::sync::atomic::Ordering::Relaxed);
@@ -320,7 +423,7 @@ impl BalancerStateValues {
         // Zero is "never marked", not "marked at the epoch" -- otherwise every session that opted
         // in would start out believing its return path was already dead.
         deadline > 0
-            && (EPOCH.elapsed().as_millis() as u64) < deadline
+            && (now.saturating_duration_since(*EPOCH).as_millis() as u64) < deadline
             && self
                 .sustain_on_return_path_loss
                 .load(std::sync::atomic::Ordering::Relaxed)
@@ -405,8 +508,23 @@ pub struct SurbBalancer<C, E, F> {
     was_below_target: bool,
     /// Whether the previous update ran in open loop, so both edges can be acted on.
     was_degraded: bool,
+    /// Smoothed consumption the buffer loses beyond organic supply, in SURBs per second.
+    ///
+    /// Held, not updated, while the return path is degraded: consumption is observed through the
+    /// replies that reach us, so what it reads then is how many replies were lost, not how many
+    /// SURBs the counterparty spent.
+    net_consumption_per_sec: f64,
+    /// Local egress congestion to back production off from, if this balancer's output rides on
+    /// the local uplink.
+    egress_pressure: Option<Arc<EgressPressure>>,
+    /// The output ceiling as backed off from `egress_pressure`.
+    congestion: CongestionCeiling,
+    /// Production cap while the return path is degraded, decaying over an episode.
+    sustain: SustainBudget,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
+    /// DIAGNOSTIC: estimator state at the last balancer-state line, to report rates over its window.
+    last_report_snapshot: SimpleSurbFlowEstimator,
 }
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -430,6 +548,9 @@ where
         }
 
         controller.set_target_and_limit(state.controller_bounds());
+        // Rates are reported from now on: whatever was produced before the balancer started (e.g.
+        // while pre-loading SURBs) is not part of the first window.
+        let last_report_snapshot = SimpleSurbFlowEstimator::from(&surb_estimator);
 
         Self {
             surb_estimator,
@@ -442,14 +563,40 @@ where
             last_decay: std::time::Instant::now(),
             was_below_target: true,
             was_degraded: false,
+            net_consumption_per_sec: 0.0,
+            egress_pressure: None,
+            congestion: CongestionCeiling::default(),
+            sustain: SustainBudget::default(),
             last_report: std::time::Instant::now(),
+            last_report_snapshot,
         }
     }
 
+    /// Backs this balancer's output off while `pressure` reports the local uplink queueing.
+    ///
+    /// For a balancer whose output is traffic on the local uplink: the Entry's keep-alives. The
+    /// configured output limit stays the hard ceiling either way.
+    pub fn with_egress_pressure(mut self, pressure: Arc<EgressPressure>) -> Self {
+        self.egress_pressure = Some(pressure);
+        self
+    }
+
     /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
-    #[tracing::instrument(level = "trace", skip_all)]
     fn update(&mut self) -> u64 {
-        let dt = self.last_update.elapsed();
+        self.update_at(Instant::now())
+    }
+
+    /// Folds one sample into the smoothed net consumption that the controller feeds forward.
+    fn observe_net_consumption(&mut self, rates: SurbFlowRates, dt: Duration) {
+        let sample = rates.consumed - rates.organic;
+        let weight = 1.0 - (-dt.as_secs_f64() / CONSUMPTION_SMOOTHING.as_secs_f64()).exp();
+        self.net_consumption_per_sec += weight * (sample - self.net_consumption_per_sec);
+    }
+
+    /// [`update`](Self::update) as of `now`, so that tests can drive the loop on a synthetic clock.
+    #[tracing::instrument(level = "trace", skip_all)]
+    fn update_at(&mut self, now: Instant) -> u64 {
+        let dt = now.saturating_duration_since(self.last_update);
 
         // Load the updated current buffer level
         let mut current = self.state.buffer_level.load(std::sync::atomic::Ordering::Acquire);
@@ -459,7 +606,7 @@ where
             return current;
         }
 
-        self.last_update = std::time::Instant::now();
+        self.last_update = now;
 
         // Take a snapshot of the active SURB estimator and calculate the balance change
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
@@ -468,6 +615,7 @@ where
             return current;
         };
 
+        let sample_rates = SurbFlowRates::between(&self.last_estimator_state, &snapshot, dt);
         self.last_estimator_state = snapshot;
         current = current.saturating_add_signed(target_buffer_change);
 
@@ -476,11 +624,11 @@ where
         if let Some(num_decayed_surbs) = self
             .state
             .surb_decay()
-            .filter(|(decay_window, _)| &self.last_decay.elapsed() >= decay_window)
+            .filter(|(decay_window, _)| &now.saturating_duration_since(self.last_decay) >= decay_window)
             .map(|(_, decay_coeff)| (self.controller.bounds().target() as f64 * decay_coeff).round() as u64)
         {
             current = current.saturating_sub(num_decayed_surbs);
-            self.last_decay = std::time::Instant::now();
+            self.last_decay = now;
             tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
         }
 
@@ -502,7 +650,11 @@ where
             );
         }
 
-        let degraded = self.state.should_sustain_through_return_path_loss();
+        let degraded = self.state.should_sustain_through_return_path_loss_at(now);
+        if !degraded {
+            self.observe_net_consumption(sample_rates, dt);
+        }
+
         if degraded != self.was_degraded {
             // The estimate stops meaning what it meant on both edges: entering, it is inflated by
             // production nobody was seen to consume; leaving, it is a level that was never
@@ -516,7 +668,7 @@ where
                 // the estimate that self-corrects: consumption is observable again, so the buffer
                 // level climbs on its own as production outruns it.
                 current = 0;
-                self.last_decay = std::time::Instant::now();
+                self.last_decay = now;
                 tracing::debug!("return path recovered; restarting closed-loop SURB control");
             }
         }
@@ -525,12 +677,14 @@ where
             // While replies are being lost there is no valid estimate to act on: every SURB the
             // counterparty spends is invisible from here, so the accumulated `produced - consumed`
             // reads as a filling buffer precisely when it is emptying. Drop to open loop and assume
-            // the worst, which drives production to the maximum until replies resume.
+            // the worst: an empty buffer, refilled on top of the last consumption seen while
+            // replies still arrived. The surplus above that consumption decays for as long as the
+            // episode lasts (see `SustainBudget`), so a path that stays dead is not fed forever.
             tracing::debug!(
                 believed = current,
                 "return path degraded; ignoring the counterparty buffer estimate"
             );
-            // Reads as "produce flat out" to the controller below. `SurbSupply` must not read it
+            // Reads as "keep producing" to the controller below. `SurbSupply` must not read it
             // as "the buffer is empty, admit nothing" -- see `return_path_estimate_is_stale`.
             current = 0;
         }
@@ -559,25 +713,66 @@ where
             "estimated SURB buffer change"
         );
 
-        let output = self.controller.next_control_output(current);
+        let limit = self.controller.bounds().output_limit();
+        let congestion_ceiling = match &self.egress_pressure {
+            Some(pressure) => self.congestion.update(now, dt, pressure.last_congested_at(), limit),
+            None => limit,
+        };
+        // While degraded, the consumption held is the last one measured while replies arrived.
+        let sustain_cap = self.sustain.update(
+            now,
+            degraded,
+            self.net_consumption_per_sec,
+            self.controller.bounds().target(),
+        );
+        let ceiling = sustain_cap.map_or(congestion_ceiling, |cap| congestion_ceiling.min(cap));
+
+        let output = self.controller.next_control_output(ControlInput {
+            level: current,
+            net_consumption_per_sec: self.net_consumption_per_sec,
+            dt,
+            ceiling,
+        });
         tracing::trace!(output, "next balancer control output for session");
 
-        // Both ends run this same loop -- the Entry with the PID driving production, the Exit with
-        // the proportional controller gating egress -- so one line covers both and the session id
-        // tells them apart. Rate-limited to one per second so it can run under a full-rate session.
+        // Both ends run this same loop -- the Entry with paced refill driving production, the Exit
+        // with the proportional controller gating egress -- so one line covers both and the session
+        // id tells them apart. Rate-limited to one per second so it can run under a full-rate session.
         //
         // At `debug` rather than `info`: one line per session per second is fine for a handful of
         // sessions and is a lot of formatting work for a node carrying many, none of which an
         // operator needs to see during healthy operation.
-        if self.last_report.elapsed() >= Duration::from_secs(1) {
-            self.last_report = std::time::Instant::now();
+        //
+        // The rates split production by what it costs: `organic_surbs_s` rode along with Session
+        // data for free, `ka_*` is what keep-alives spent on the wire. Without that split the
+        // upstream the balancer spends is invisible, since keep-alives carry no application bytes.
+        let report_window = now.saturating_duration_since(self.last_report);
+        if report_window >= Duration::from_secs(1) {
+            self.last_report = now;
+            let rates = SurbFlowRates::between(&self.last_report_snapshot, &snapshot, report_window);
+            self.last_report_snapshot = snapshot;
+
             tracing::debug!(
                 session = %self.session_id,
                 level = current,
                 target = self.controller.bounds().target(),
                 output,
-                produced = self.surb_estimator.estimate_surbs_produced(),
-                consumed = self.surb_estimator.estimate_surbs_consumed(),
+                produced = snapshot.produced,
+                consumed = snapshot.consumed,
+                consumed_s = rates.consumed.round() as u64,
+                net_consumption_s = self.net_consumption_per_sec.round() as i64,
+                ceiling,
+                backed_off = self.congestion.is_backed_off(),
+                degraded_for_s = self.sustain.episode_duration(now).map(|d| d.as_secs()),
+                egress_delay_ms = self
+                    .egress_pressure
+                    .as_ref()
+                    .map(|p| p.last_sojourn().as_millis() as u64),
+                organic_surbs_s = rates.organic.round() as u64,
+                ka_surbs_s = rates.keep_alive_surbs.round() as u64,
+                ka_pkts_s = rates.keep_alive_packets.round() as u64,
+                ka_bytes_s = rates.keep_alive_wire_bytes().round() as u64,
+                surbs_per_ka_pkt = (rates.surbs_per_keep_alive() * 100.0).round() / 100.0,
                 degraded,
                 distress = self
                     .state
@@ -585,6 +780,15 @@ where
                     .load(std::sync::atomic::Ordering::Relaxed),
                 "surb balancer state"
             );
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            {
+                let sid: &str = self.session_id.as_ref();
+                METRIC_CONSUMED_RATE.set(&[sid], rates.consumed);
+                METRIC_ORGANIC_RATE.set(&[sid], rates.organic);
+                METRIC_KEEP_ALIVE_PACKET_RATE.set(&[sid], rates.keep_alive_packets);
+                METRIC_KEEP_ALIVE_WIRE_RATE.set(&[sid], rates.keep_alive_wire_bytes());
+            }
         }
 
         self.flow_control.adjust_surb_flow(output as usize);
@@ -596,6 +800,7 @@ where
             METRIC_CURRENT_TARGET.set(&[sid], self.controller.bounds().target() as f64);
             METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], error as f64);
             METRIC_CONTROL_OUTPUT.set(&[sid], output as f64);
+            METRIC_EFFECTIVE_CEILING.set(&[sid], ceiling as f64);
             METRIC_SURB_RATE.set(&[sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
@@ -674,13 +879,67 @@ mod tests {
     use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
-    use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
+    use crate::balancer::{
+        AtomicSurbFlowEstimator, MockSurbFlowController,
+        paced::{DEFAULT_RAMP_TIME, DEFAULT_REFILL_HORIZON, PacedRefillController, PacedRefillParams},
+        pid::PidBalancerController,
+    };
 
     #[test]
     fn surb_balancer_config_should_be_convertible_to_atomics() {
         let cfg = SurbBalancerConfig::default();
         let state_data = BalancerStateValues::new(cfg);
         assert_eq!(cfg, state_data.as_config());
+    }
+
+    #[test]
+    fn flow_rates_should_split_production_into_organic_and_keep_alive() {
+        let later = SimpleSurbFlowEstimator {
+            produced: 3_000,
+            consumed: 1_000,
+            keep_alive_surbs: 2_000,
+            keep_alive_packets: 1_000,
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::from_secs(2));
+
+        assert_eq!(
+            SurbFlowRates {
+                consumed: 500.0,
+                organic: 500.0,
+                keep_alive_surbs: 1_000.0,
+                keep_alive_packets: 500.0,
+            },
+            rates
+        );
+        assert_eq!(
+            500.0 * hopr_crypto_packet::prelude::HoprPacket::SIZE as f64,
+            rates.keep_alive_wire_bytes()
+        );
+        assert_eq!(2.0, rates.surbs_per_keep_alive());
+    }
+
+    /// The keep-alive attribution is recorded just before the production it belongs to, so a
+    /// snapshot can land in between. That must not read as negative -- or wrapped -- organic flow.
+    #[test]
+    fn flow_rates_should_not_invent_organic_surbs_from_an_attribution_seen_early() {
+        let later = SimpleSurbFlowEstimator {
+            keep_alive_surbs: 2,
+            keep_alive_packets: 1,
+            ..Default::default()
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::from_secs(1));
+        assert_eq!(0.0, rates.organic);
+    }
+
+    #[test]
+    fn flow_rates_over_an_empty_window_should_be_zero() {
+        let later = SimpleSurbFlowEstimator {
+            produced: 10,
+            ..Default::default()
+        };
+        let rates = SurbFlowRates::between(&SimpleSurbFlowEstimator::default(), &later, Duration::ZERO);
+        assert_eq!(SurbFlowRates::default(), rates);
+        assert_eq!(0.0, rates.surbs_per_keep_alive());
     }
 
     #[test]
@@ -942,9 +1201,9 @@ mod tests {
             ),
         );
 
+        let start = Instant::now();
         let mut last_update = 0;
         for i in 0..steps {
-            std::thread::sleep(step_duration);
             surb_estimator.produced.fetch_add(
                 production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
@@ -954,7 +1213,7 @@ mod tests {
                 std::sync::atomic::Ordering::Relaxed,
             );
 
-            let next_update = balancer.update();
+            let next_update = balancer.update_at(start + step_duration * (i as u32 + 1));
             assert!(
                 i == 0 || next_update > last_update,
                 "{next_update} should be greater than {last_update}"
@@ -995,9 +1254,9 @@ mod tests {
             ),
         );
 
+        let start = Instant::now();
         let mut last_update = 0;
         for i in 0..steps {
-            std::thread::sleep(step_duration);
             surb_estimator.produced.fetch_add(
                 production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
@@ -1007,7 +1266,7 @@ mod tests {
                 std::sync::atomic::Ordering::Relaxed,
             );
 
-            let next_update = balancer.update();
+            let next_update = balancer.update_at(start + step_duration * (i as u32 + 1));
             assert!(
                 i == 0 || next_update < last_update,
                 "{next_update} should be greater than {last_update}"
@@ -1016,62 +1275,106 @@ mod tests {
         }
     }
 
-    /// A balancer whose production follows its own control output, as it does in a live Session.
-    ///
-    /// Returns the balancer, the shared estimator and the latest control output. Production must be
-    /// fed back rather than held constant: with production pinned to consumption the buffer never
-    /// fills, maximum output is the correct answer, and every phase of the test reads the same.
-    #[allow(clippy::type_complexity)]
-    fn balancer_with_feedback(
-        cfg: SurbBalancerConfig,
-    ) -> (
-        SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>,
-        AtomicSurbFlowEstimator,
-        Arc<BalancerStateValues>,
-        Arc<AtomicU64>,
-    ) {
-        let output = Arc::new(AtomicU64::new(0));
-        let output_clone = output.clone();
-        let mut controller = MockSurbFlowController::new();
-        controller.expect_adjust_surb_flow().returning(move |r| {
-            output_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
-        });
+    /// One sampling interval of the closed-loop harness.
+    const TICK: Duration = Duration::from_millis(50);
 
-        let surb_estimator = AtomicSurbFlowEstimator::default();
-        let state: Arc<BalancerStateValues> = Arc::new(cfg.into());
-        let balancer = SurbBalancer::new(
-            HoprPseudonym::random(),
-            PidBalancerController::default(),
-            surb_estimator.clone(),
-            controller,
-            state.clone(),
-        );
+    /// Long enough for a paced refill to reach the setpoint band from empty: about
+    /// `T_ramp + H·ln 10` ≈ 6.6 s at the defaults.
+    const HEALTHY_TICKS: usize = 200;
 
-        (balancer, surb_estimator, state, output)
-    }
-
-    /// One sampling interval: mint at the rate last commanded, and consume `consumed` of them.
-    fn tick(
-        balancer: &mut SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>,
-        surb_estimator: &AtomicSurbFlowEstimator,
-        output: &AtomicU64,
-        consumed: u64,
-    ) {
-        let step = Duration::from_millis(50);
-        std::thread::sleep(step);
-
-        let minted = output.load(std::sync::atomic::Ordering::Relaxed) * step.as_millis() as u64 / 1000;
-        surb_estimator
-            .produced
-            .fetch_add(minted, std::sync::atomic::Ordering::Relaxed);
-        surb_estimator
-            .consumed
-            .fetch_add(consumed, std::sync::atomic::Ordering::Relaxed);
-        balancer.update();
-    }
-
-    /// SURBs the counterparty spends per interval while it is answering normally.
+    /// SURBs the counterparty spends per interval while it is answering normally (800 SURB/s).
     const REPLIES_PER_TICK: u64 = 40;
+
+    /// A balancer whose production follows its own control output, as it does in a live Session,
+    /// on a synthetic clock so that each tick is exactly one sampling interval.
+    ///
+    /// Production must be fed back rather than held constant: with production pinned to
+    /// consumption the buffer never fills, maximum output is the correct answer, and every phase of
+    /// the test reads the same. Minted SURBs are attributed to keep-alives, as the live Entry does,
+    /// so that the balancer does not mistake its own production for organic supply.
+    struct Harness {
+        balancer: SurbBalancer<PacedRefillController, AtomicSurbFlowEstimator, MockSurbFlowController>,
+        estimator: AtomicSurbFlowEstimator,
+        state: Arc<BalancerStateValues>,
+        output: Arc<AtomicU64>,
+        now: Instant,
+    }
+
+    impl Harness {
+        fn new(cfg: SurbBalancerConfig) -> Self {
+            let output = Arc::new(AtomicU64::new(0));
+            let output_clone = output.clone();
+            let mut flow_control = MockSurbFlowController::new();
+            flow_control.expect_adjust_surb_flow().returning(move |r| {
+                output_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
+            });
+
+            let estimator = AtomicSurbFlowEstimator::default();
+            let state: Arc<BalancerStateValues> = Arc::new(cfg.into());
+            let balancer = SurbBalancer::new(
+                HoprPseudonym::random(),
+                PacedRefillController::new(PacedRefillParams::default()),
+                estimator.clone(),
+                flow_control,
+                state.clone(),
+            );
+
+            // The degraded-path deadline is kept relative to `EPOCH`, so it has to exist before the
+            // clock this harness starts from.
+            let _ = *EPOCH;
+            Self {
+                balancer,
+                estimator,
+                state,
+                output,
+                now: Instant::now(),
+            }
+        }
+
+        /// A harness whose keep-alives back off from the returned record of egress congestion, as
+        /// the live Entry's do.
+        fn congestible(cfg: SurbBalancerConfig) -> (Self, Arc<EgressPressure>) {
+            // Created first: congestion is recorded relative to when the record was created.
+            let pressure = Arc::new(EgressPressure::new());
+            let mut harness = Self::new(cfg);
+            harness.balancer = harness.balancer.with_egress_pressure(pressure.clone());
+            (harness, pressure)
+        }
+
+        /// One sampling interval: mint at the rate last commanded, and consume `consumed` of them.
+        fn tick(&mut self, consumed: u64) {
+            self.now += TICK;
+            let minted = self.output() * TICK.as_millis() as u64 / 1000;
+            self.estimator
+                .produced
+                .fetch_add(minted, std::sync::atomic::Ordering::Relaxed);
+            self.estimator
+                .keep_alive_surbs
+                .fetch_add(minted, std::sync::atomic::Ordering::Relaxed);
+            self.estimator
+                .consumed
+                .fetch_add(consumed, std::sync::atomic::Ordering::Relaxed);
+            self.balancer.update_at(self.now);
+        }
+
+        fn run(&mut self, ticks: usize, consumed: u64) {
+            for _ in 0..ticks {
+                self.tick(consumed);
+            }
+        }
+
+        fn output(&self) -> u64 {
+            self.output.load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        fn level(&self) -> u64 {
+            self.state.buffer_level.load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        fn mark_degraded(&self, grace: Duration) {
+            self.state.mark_return_path_degraded_at(self.now, grace);
+        }
+    }
 
     /// Drives a balancer through a healthy stretch, then through one where no reply comes back.
     ///
@@ -1079,23 +1382,19 @@ mod tests {
     /// indistinguishable from inside the balancer -- consumption simply stops -- which is the whole
     /// point: only the caller's `sustain` choice separates a dead return path from an idle peer.
     fn drive_until_replies_stop(cfg: SurbBalancerConfig, mark_degraded: bool) -> (u64, u64) {
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+        let mut harness = Harness::new(cfg);
 
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
-        let healthy = output.load(std::sync::atomic::Ordering::Relaxed);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let healthy = harness.output();
 
         if mark_degraded {
-            state.mark_return_path_degraded(Duration::from_secs(30));
+            harness.mark_degraded(Duration::from_secs(30));
         }
 
         // Replies stop while production continues.
-        for _ in 0..20 {
-            tick(&mut balancer, &surb_estimator, &output, 0);
-        }
+        harness.run(20, 0);
 
-        (healthy, output.load(std::sync::atomic::Ordering::Relaxed))
+        (healthy, harness.output())
     }
 
     fn sustaining_config(sustain: bool) -> SurbBalancerConfig {
@@ -1143,74 +1442,162 @@ mod tests {
         );
     }
 
+    /// While replies are lost, the consumption observed is the loss, not the counterparty's
+    /// spending. Feeding that forward would wind production down exactly as in the idle case, so
+    /// the balancer must hold the last consumption it saw while replies still arrived.
+    #[test_log::test]
+    fn surb_balancer_should_hold_the_last_healthy_consumption_while_degraded() {
+        let mut harness = Harness::new(sustaining_config(true));
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let consumption = (REPLIES_PER_TICK * 1000 / TICK.as_millis() as u64) as f64;
+        assert!(
+            harness.balancer.net_consumption_per_sec >= consumption * 0.95,
+            "precondition: the healthy phase must have measured the consumption, got {}",
+            harness.balancer.net_consumption_per_sec
+        );
+
+        harness.mark_degraded(Duration::from_secs(30));
+        harness.run(100, 0);
+
+        assert!(
+            harness.output() as f64 >= consumption,
+            "five seconds into an outage production must still cover the consumption last seen: {}/s against \
+             {consumption}/s",
+            harness.output()
+        );
+    }
+
+    /// A return path that stays dead must not be fed at the opening rate forever: the surplus decays
+    /// towards the last healthy consumption. It never drops below that consumption, because the
+    /// counterparty keeps spending at about that rate and has to be resupplied for the re-planned
+    /// paths to take over.
+    #[test_log::test]
+    fn a_long_degraded_episode_should_back_off_to_the_healthy_consumption() {
+        let mut harness = Harness::new(sustaining_config(true));
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let consumption = harness.balancer.net_consumption_per_sec;
+
+        harness.mark_degraded(Duration::from_secs(60));
+        let minted_before = harness
+            .estimator
+            .keep_alive_surbs
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let mut highest = 0;
+        for _ in 0..600 {
+            harness.tick(0);
+            highest = highest.max(harness.output());
+        }
+        let minted = harness
+            .estimator
+            .keep_alive_surbs
+            .load(std::sync::atomic::Ordering::Relaxed)
+            - minted_before;
+
+        // Thirty seconds is six half-lives of the surplus.
+        let backed_off = (consumption * (1.0 + 0.5f64.powi(6))).round() as u64 + 1;
+        assert!(
+            harness.output() <= backed_off,
+            "thirty seconds into the episode production must have backed off to about {consumption:.0}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            highest as f64 <= 2.0 * consumption + 1.0,
+            "an episode must never open above twice the healthy consumption, peaked at {highest}/s"
+        );
+        assert!(
+            minted as f64 >= consumption * 30.0 * 0.99,
+            "the counterparty must be resupplied at least at its healthy spending: minted {minted} in 30 s against \
+             {consumption:.0}/s"
+        );
+    }
+
+    /// The loop seen in the field: degraded, recovered for a few seconds, degraded again. Each new
+    /// window must continue the backoff rather than reopen at the full surplus.
+    #[test_log::test]
+    fn a_flapping_return_path_should_not_reopen_at_the_full_surplus() {
+        let mut harness = Harness::new(sustaining_config(true));
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let consumption = harness.balancer.net_consumption_per_sec;
+
+        harness.mark_degraded(Duration::from_secs(10));
+        harness.run(200, 0);
+        // The mark lapses and replies resume for four seconds.
+        harness.run(80, REPLIES_PER_TICK);
+
+        harness.mark_degraded(Duration::from_secs(30));
+        harness.run(20, 0);
+
+        // Fifteen seconds into the episode, not one: three half-lives of surplus are gone.
+        let continued = (consumption * (1.0 + 0.5f64.powi(3))).round() as u64 + 20;
+        assert!(
+            harness.output() <= continued,
+            "a window reopening four seconds after the last must continue its backoff: expected at most \
+             {continued}/s, got {}/s",
+            harness.output()
+        );
+    }
+
     /// Both edges of a degraded window: open loop must engage at once, and let go afterwards.
     #[test_log::test]
     fn surb_balancer_should_return_to_closed_loop_when_the_return_path_recovers() {
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(sustaining_config(true));
+        let mut harness = Harness::new(sustaining_config(true));
 
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
-        let healthy = output.load(std::sync::atomic::Ordering::Relaxed);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let healthy = harness.output();
 
-        state.mark_return_path_degraded(Duration::from_millis(500));
-        tick(&mut balancer, &surb_estimator, &output, 0);
-        let first_degraded = output.load(std::sync::atomic::Ordering::Relaxed);
+        harness.mark_degraded(Duration::from_millis(500));
+        harness.tick(0);
+        let first_degraded = harness.output();
 
+        let mut degraded_peak = first_degraded;
         for _ in 0..9 {
-            tick(&mut balancer, &surb_estimator, &output, 0);
+            harness.tick(0);
+            degraded_peak = degraded_peak.max(harness.output());
         }
 
         // The mark lapses and the counterparty starts answering again.
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
-        let recovered = output.load(std::sync::atomic::Ordering::Relaxed);
+        harness.run(40, REPLIES_PER_TICK);
+        let recovered = harness.output();
 
         assert!(
             first_degraded > healthy,
-            "open loop must engage on the first update after the mark, not ramp towards it: healthy={healthy}/s, \
-             first degraded update={first_degraded}/s"
+            "open loop must start raising production on the first update after the mark: healthy={healthy}/s, first \
+             degraded update={first_degraded}/s"
         );
         assert!(
-            recovered < first_degraded,
-            "once replies are arriving again the controller must return to closed loop rather than stay pinned at \
-             maximum: degraded={first_degraded}/s, recovered={recovered}/s"
+            recovered < degraded_peak,
+            "once replies are arriving again the controller must return to closed loop rather than stay at the \
+             open-loop rate: degraded peak={degraded_peak}/s, recovered={recovered}/s"
         );
     }
 
     /// After the outage the counterparty must be refilled, not merely un-throttled.
     ///
     /// Returning to closed loop is only half the claim: production has to actually climb the curve
-    /// again and restore the buffer. Resetting the controller is what makes that prompt -- the error
-    /// accumulated while the estimate was meaningless would otherwise have to be unwound first.
+    /// again and restore the buffer, within the refill bound the paced controller promises.
     #[test_log::test]
     fn surb_balancer_should_refill_the_counterparty_after_the_return_path_recovers() {
         let cfg = sustaining_config(true);
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+        let mut harness = Harness::new(cfg);
 
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
-        // A band, not the setpoint itself: the controller oscillates around its target, so a
-        // sample taken at an arbitrary tick legitimately sits either side of it.
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        // A band, not the setpoint itself: a sample taken at an arbitrary tick legitimately sits
+        // either side of it.
         let refilled = cfg.target_surb_buffer_size / 2;
         assert!(
-            state.buffer_level.load(std::sync::atomic::Ordering::Relaxed) >= refilled,
+            harness.level() >= refilled,
             "the healthy phase must reach the setpoint band before an outage means anything"
         );
 
         // The return path dies: replies stop, and open loop takes over.
-        state.mark_return_path_degraded(Duration::from_millis(400));
-        for _ in 0..8 {
-            tick(&mut balancer, &surb_estimator, &output, 0);
-        }
+        harness.mark_degraded(Duration::from_millis(400));
+        harness.run(8, 0);
 
         // The mark lapses, the counterparty answers again, and the belief restarts from empty.
         let mut ticks_to_refill = None;
-        for n in 1..=60 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-            if state.buffer_level.load(std::sync::atomic::Ordering::Relaxed) >= refilled {
+        for n in 1..=200 {
+            harness.tick(REPLIES_PER_TICK);
+            if harness.level() >= refilled {
                 ticks_to_refill = Some(n);
                 break;
             }
@@ -1219,11 +1606,100 @@ mod tests {
         let ticks = ticks_to_refill.expect("the counterparty must be refilled to the setpoint after recovery");
         tracing::info!(ticks, "refilled the counterparty after the outage");
 
-        // Each tick is one sampling interval; the balancer samples far more often than this in a
-        // live Session, so a bound in ticks is a bound in sampling intervals, not in wall clock.
+        // Half the gap closes within `H·ln 2` once production has ramped, and ramping takes at
+        // most `T_ramp`.
+        let bound =
+            (DEFAULT_RAMP_TIME.as_secs_f64() + DEFAULT_REFILL_HORIZON.as_secs_f64() * 2f64.ln()) / TICK.as_secs_f64();
         assert!(
-            ticks <= 30,
-            "refilling must ramp rather than crawl: took {ticks} sampling intervals"
+            ticks as f64 <= bound.ceil(),
+            "refilling must stay within the paced bound: took {ticks} sampling intervals, bound {bound:.0}"
+        );
+    }
+
+    /// SURBs piggybacked on Session data refill the buffer for free, so keep-alives only have to
+    /// make up what they do not cover.
+    #[test_log::test]
+    fn organic_supply_should_displace_keep_alive_production() {
+        let mut harness = Harness::new(sustaining_config(false));
+
+        // Every SURB spent is replaced by one riding on a data packet.
+        for _ in 0..HEALTHY_TICKS {
+            harness
+                .estimator
+                .produced
+                .fetch_add(REPLIES_PER_TICK, std::sync::atomic::Ordering::Relaxed);
+            harness.tick(REPLIES_PER_TICK);
+        }
+
+        assert!(
+            harness.level() >= sustaining_config(false).target_surb_buffer_size * 9 / 10,
+            "precondition: keep-alives must still have filled the buffer to the setpoint, got {}",
+            harness.level()
+        );
+        assert!(
+            harness.output() <= 50,
+            "with consumption covered by organic supply, keep-alives only close what is left of the gap: {}/s",
+            harness.output()
+        );
+    }
+
+    /// Keep-alives are what gives way when the local uplink queues: however far below target the
+    /// buffer falls, production must stay under the backed-off ceiling rather than refill the queue.
+    #[test_log::test]
+    fn local_egress_congestion_should_hold_keep_alives_below_the_backed_off_ceiling() {
+        let cfg = sustaining_config(false);
+        let (mut harness, pressure) = Harness::congestible(cfg);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+        let healthy = harness.output();
+
+        // Two seconds of a standing egress queue.
+        let mut highest = 0;
+        for _ in 0..40 {
+            pressure.mark_congested(harness.now);
+            harness.tick(REPLIES_PER_TICK);
+            highest = highest.max(harness.output());
+        }
+
+        // One backoff per half second: 2500 * 0.7^4 = 600.
+        let backed_off = (cfg.max_surbs_per_sec as f64 * 0.7f64.powi(4)).round() as u64;
+        assert!(
+            harness.output() <= backed_off,
+            "production must stay under the backed-off ceiling of {backed_off}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            harness.output() < healthy,
+            "congestion must cut production below the healthy {healthy}/s, got {}/s",
+            harness.output()
+        );
+        assert!(
+            highest <= cfg.max_surbs_per_sec,
+            "the configured limit stays the hard ceiling"
+        );
+    }
+
+    /// Once the uplink has cleared, the ceiling probes back up and the session is refilled.
+    #[test_log::test]
+    fn keep_alive_production_should_recover_once_the_uplink_clears() {
+        let cfg = sustaining_config(false);
+        let (mut harness, pressure) = Harness::congestible(cfg);
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
+
+        for _ in 0..40 {
+            pressure.mark_congested(harness.now);
+            harness.tick(REPLIES_PER_TICK);
+        }
+
+        // Twenty seconds clear: enough to probe back from any backoff and refill.
+        harness.run(400, REPLIES_PER_TICK);
+        assert!(
+            harness.level() >= cfg.target_surb_buffer_size / 2,
+            "the buffer must be refilled once the uplink clears, level {}",
+            harness.level()
+        );
+        assert!(
+            !harness.balancer.congestion.is_backed_off(),
+            "a clear uplink must get the whole limit back"
         );
     }
 
@@ -1238,24 +1714,22 @@ mod tests {
     fn surb_balancer_should_not_believe_a_level_the_counterparty_cannot_hold() {
         const CAPACITY: u64 = 2_000;
 
-        let cfg = sustaining_config(false);
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
-        state.set_counterparty_buffer_capacity(CAPACITY);
+        let mut harness = Harness::new(sustaining_config(false));
+        harness.state.set_counterparty_buffer_capacity(CAPACITY);
 
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
 
         // Replies stop, while production continues from a source the controller does not drive --
         // keep-alives mint on their own schedule, which is how the live estimate ran away.
         for _ in 0..20 {
-            surb_estimator
+            harness
+                .estimator
                 .produced
                 .fetch_add(500, std::sync::atomic::Ordering::Relaxed);
-            tick(&mut balancer, &surb_estimator, &output, 0);
+            harness.tick(0);
         }
 
-        let believed = state.buffer_level.load(std::sync::atomic::Ordering::Relaxed);
+        let believed = harness.level();
         assert!(
             believed <= CAPACITY,
             "the estimate must be bounded by the counterparty's store: believed {believed} against a {CAPACITY}-entry \
@@ -1267,14 +1741,14 @@ mod tests {
     #[test_log::test]
     fn surb_balancer_should_leave_a_healthy_session_untouched_by_the_capacity_bound() {
         let cfg = sustaining_config(false);
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
-        state.set_counterparty_buffer_capacity(cfg.target_surb_buffer_size * 10);
+        let mut harness = Harness::new(cfg);
+        harness
+            .state
+            .set_counterparty_buffer_capacity(cfg.target_surb_buffer_size * 10);
 
-        for _ in 0..40 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
+        harness.run(HEALTHY_TICKS, REPLIES_PER_TICK);
 
-        let level = state.buffer_level.load(std::sync::atomic::Ordering::Relaxed);
+        let level = harness.level();
         assert!(
             level >= cfg.target_surb_buffer_size / 2,
             "a capacity well above the target must not hold the session below its setpoint: level {level}, target {}",

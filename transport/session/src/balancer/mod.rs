@@ -1,4 +1,8 @@
+mod congestion;
 mod controller;
+/// Contains the paced-refill implementation of the [`SurbBalancerController`] trait, which drives
+/// the Entry's keep-alive production.
+pub mod paced;
 /// Contains implementation of the [`SurbBalancerController`] trait using a Proportional Integral Derivative (PID)
 /// controller.
 pub mod pid;
@@ -6,6 +10,7 @@ pub mod pid;
 mod rate_limiting;
 /// Contains a simple proportional output implementation of the [`SurbBalancerController`] trait.
 pub mod simple;
+mod sustain;
 
 pub use controller::{BalancerStateValues, SurbBalancer, SurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
@@ -23,6 +28,26 @@ pub trait SurbFlowEstimator {
     ///
     /// Value returned on each call must be equal or greater to the value returned by a previous call.
     fn estimate_surbs_produced(&self) -> u64;
+
+    /// Of the [produced](SurbFlowEstimator::estimate_surbs_produced) SURBs, how many were delivered
+    /// by keep-alive messages rather than piggybacked on Session data.
+    ///
+    /// A subset of the produced count, never an addition to it. The distinction matters for the
+    /// upstream budget: piggybacked SURBs ride in packets that are sent anyway, whereas every
+    /// keep-alive is a whole packet sent for nothing but its SURBs.
+    ///
+    /// Defaults to zero for estimators that do not tell the two apart.
+    fn estimate_keep_alive_surbs_produced(&self) -> u64 {
+        0
+    }
+
+    /// How many keep-alive messages delivered the
+    /// [keep-alive SURBs](SurbFlowEstimator::estimate_keep_alive_surbs_produced).
+    ///
+    /// Defaults to zero for estimators that do not tell the two apart.
+    fn estimate_keep_alive_packets(&self) -> u64 {
+        0
+    }
 
     /// Subtracts SURBs consumed from SURBs produced, saturating at zero.
     fn saturating_diff(&self) -> u64 {
@@ -89,14 +114,46 @@ impl BalancerControllerBounds {
     }
 }
 
+/// What a [`SurbBalancerController`] is told about the SURB buffer on each sample.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ControlInput {
+    /// Estimated number of SURBs in the buffer.
+    pub level: u64,
+    /// SURBs per second the buffer loses beyond what reaches it without the controller's help,
+    /// smoothed over recent samples.
+    ///
+    /// Consumption minus organic supply. Negative when SURBs piggybacked on Session data alone
+    /// arrive faster than they are spent.
+    pub net_consumption_per_sec: f64,
+    /// Time elapsed since the previous sample.
+    pub dt: std::time::Duration,
+    /// The most the controller may output on this sample.
+    ///
+    /// Controllers also respect their own output limit, so this can only lower it.
+    pub ceiling: u64,
+}
+
+#[cfg(test)]
+impl ControlInput {
+    /// An input carrying only a buffer level, for testing controllers that need nothing else.
+    pub fn at_level(level: u64) -> Self {
+        Self {
+            level,
+            ceiling: u64::MAX,
+            ..Default::default()
+        }
+    }
+}
+
 /// Trait abstracting a controller used in the [`SurbBalancer`].
 pub trait SurbBalancerController {
     /// Gets the current bounds of the controller.
     fn bounds(&self) -> BalancerControllerBounds;
     /// Updates the controller's target (setpoint) and output limit.
     fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds);
-    /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.
-    fn next_control_output(&mut self, current_buffer_level: u64) -> u64;
+    /// Queries the controller for the next control output given what is known about the buffer on
+    /// this sample.
+    fn next_control_output(&mut self, input: ControlInput) -> u64;
     /// Discards accumulated history, leaving the bounds intact.
     ///
     /// Used when the buffer estimate the controller has been acting on stops meaning what it meant
@@ -117,6 +174,10 @@ pub struct SimpleSurbFlowEstimator {
     pub produced: u64,
     /// Number of consumed SURBs.
     pub consumed: u64,
+    /// Of `produced`, the SURBs delivered by keep-alive messages.
+    pub keep_alive_surbs: u64,
+    /// Number of keep-alive messages that delivered `keep_alive_surbs`.
+    pub keep_alive_packets: u64,
 }
 
 impl<T: SurbFlowEstimator> From<&T> for SimpleSurbFlowEstimator {
@@ -124,6 +185,8 @@ impl<T: SurbFlowEstimator> From<&T> for SimpleSurbFlowEstimator {
         Self {
             produced: value.estimate_surbs_produced(),
             consumed: value.estimate_surbs_consumed(),
+            keep_alive_surbs: value.estimate_keep_alive_surbs_produced(),
+            keep_alive_packets: value.estimate_keep_alive_packets(),
         }
     }
 }
@@ -136,6 +199,14 @@ impl SurbFlowEstimator for SimpleSurbFlowEstimator {
     fn estimate_surbs_produced(&self) -> u64 {
         self.produced
     }
+
+    fn estimate_keep_alive_surbs_produced(&self) -> u64 {
+        self.keep_alive_surbs
+    }
+
+    fn estimate_keep_alive_packets(&self) -> u64 {
+        self.keep_alive_packets
+    }
 }
 
 /// An implementation of `SurbFlowEstimator` that tracks the number of produced
@@ -146,6 +217,24 @@ pub struct AtomicSurbFlowEstimator {
     pub consumed: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// Number of produced or received SURBs.
     pub produced: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Of `produced`, the SURBs delivered by keep-alive messages (sent by the Entry, received by
+    /// the Exit). Counted in addition to `produced`, never instead of it.
+    pub keep_alive_surbs: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Number of keep-alive messages that delivered `keep_alive_surbs`.
+    pub keep_alive_packets: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
+
+impl AtomicSurbFlowEstimator {
+    /// Attributes one keep-alive message carrying `surbs` SURBs.
+    ///
+    /// Only the attribution: the same SURBs must also be added to `produced`, which is where the
+    /// buffer estimate reads them from.
+    pub fn record_keep_alive(&self, surbs: u64) {
+        self.keep_alive_surbs
+            .fetch_add(surbs, std::sync::atomic::Ordering::Relaxed);
+        self.keep_alive_packets
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl SurbFlowEstimator for AtomicSurbFlowEstimator {
@@ -155,6 +244,71 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
 
     fn estimate_surbs_produced(&self) -> u64 {
         self.produced.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn estimate_keep_alive_surbs_produced(&self) -> u64 {
+        self.keep_alive_surbs.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn estimate_keep_alive_packets(&self) -> u64 {
+        self.keep_alive_packets.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// The controller that drives the Entry's keep-alive production.
+///
+/// [Paced refill](paced::PacedRefillController) unless `HOPR_BALANCER_CONTROLLER=pid` selects the
+/// [PID controller](pid::PidBalancerController) it replaced, kept as a rollback.
+#[derive(Clone, Debug)]
+pub enum EntryBalancerController {
+    /// Consumption fed forward, refills paced. The default.
+    Paced(paced::PacedRefillController),
+    /// The previous per-sample PID controller.
+    Pid(pid::PidBalancerController),
+}
+
+impl EntryBalancerController {
+    /// Selects the controller from `HOPR_BALANCER_CONTROLLER`, and its parameters from the
+    /// controller's own environment variables.
+    pub fn from_env_or_default() -> Self {
+        match std::env::var("HOPR_BALANCER_CONTROLLER") {
+            Ok(v) if v.trim().eq_ignore_ascii_case("pid") => Self::Pid(pid::PidBalancerController::from_gains(
+                pid::PidControllerGains::from_env_or_default(),
+            )),
+            _ => Self::Paced(paced::PacedRefillController::new(
+                paced::PacedRefillParams::from_env_or_default(),
+            )),
+        }
+    }
+}
+
+impl SurbBalancerController for EntryBalancerController {
+    fn bounds(&self) -> BalancerControllerBounds {
+        match self {
+            Self::Paced(c) => c.bounds(),
+            Self::Pid(c) => c.bounds(),
+        }
+    }
+
+    fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds) {
+        match self {
+            Self::Paced(c) => c.set_target_and_limit(bounds),
+            Self::Pid(c) => c.set_target_and_limit(bounds),
+        }
+    }
+
+    fn next_control_output(&mut self, input: ControlInput) -> u64 {
+        match self {
+            Self::Paced(c) => c.next_control_output(input),
+            Self::Pid(c) => c.next_control_output(input),
+        }
+    }
+
+    fn reset(&mut self) {
+        match self {
+            Self::Paced(c) => c.reset(),
+            Self::Pid(c) => c.reset(),
+        }
     }
 }
 
@@ -185,18 +339,40 @@ mod tests {
         let estimator_1 = SimpleSurbFlowEstimator {
             produced: 10,
             consumed: 5,
+            ..Default::default()
         };
         let estimator_2 = SimpleSurbFlowEstimator {
             produced: 15,
             consumed: 11,
+            ..Default::default()
         };
         let estimator_3 = SimpleSurbFlowEstimator {
             produced: 25,
             consumed: 16,
+            ..Default::default()
         };
         assert_eq!(estimator_1.estimated_surb_buffer_change(&estimator_1), Some(0));
         assert_eq!(estimator_2.estimated_surb_buffer_change(&estimator_1), Some(-1));
         assert_eq!(estimator_3.estimated_surb_buffer_change(&estimator_2), Some(5));
         assert_eq!(estimator_1.estimated_surb_buffer_change(&estimator_2), None);
+    }
+
+    /// The balancer only ever sees snapshots, so an attribution the snapshot drops is invisible.
+    #[test]
+    fn a_snapshot_should_carry_the_keep_alive_attribution() {
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(7, std::sync::atomic::Ordering::Relaxed);
+        estimator.record_keep_alive(2);
+        estimator.record_keep_alive(2);
+
+        let snapshot = SimpleSurbFlowEstimator::from(&estimator);
+        assert_eq!(
+            (7, 4, 2),
+            (
+                snapshot.produced,
+                snapshot.keep_alive_surbs,
+                snapshot.keep_alive_packets
+            )
+        );
     }
 }

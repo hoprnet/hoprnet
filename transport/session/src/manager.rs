@@ -33,11 +33,10 @@ use crate::{
     Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
     SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
-        pid::{PidBalancerController, PidControllerGains},
-        simple::SimpleBalancerController,
+        AtomicSurbFlowEstimator, BalancerStateValues, EntryBalancerController, RateController, RateLimitSinkExt,
+        SurbBalancer, SurbControllerWithCorrection, simple::SimpleBalancerController,
     },
+    egress::EgressPressure,
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG},
     utils,
@@ -593,6 +592,8 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    /// Congestion of the local egress queues, measured by the transport that owns them.
+    egress_pressure: Arc<EgressPressure>,
     cfg: SessionManagerConfig,
 }
 
@@ -606,6 +607,7 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            egress_pressure: self.egress_pressure.clone(),
         }
     }
 }
@@ -763,8 +765,17 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
+            egress_pressure: Arc::new(EgressPressure::new()),
             cfg,
         }
+    }
+
+    /// The record of local egress congestion that this manager's Sessions react to.
+    ///
+    /// The transport carrying this manager's packets must report into it. Until something does,
+    /// egress reads as never congested, so Sessions behave exactly as they would without it.
+    pub fn egress_pressure(&self) -> Arc<EgressPressure> {
+        self.egress_pressure.clone()
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`
@@ -1119,10 +1130,21 @@ where
                         },
                     );
 
+                    // Keep-alives are counted towards `produced` by `full_surb_scoring_sender` like any
+                    // other packet; this only attributes them, so the budget they cost is visible
+                    // apart from the SURBs piggybacked on Session data.
+                    let surb_estimator_for_ka = surb_estimator.clone();
+                    let keep_alive_scoring_sender = full_surb_scoring_sender.with(
+                        move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            surb_estimator_for_ka.record_keep_alive(data.estimate_surbs_with_msg() as u64);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
+
                     // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
-                        full_surb_scoring_sender,
+                        keep_alive_scoring_sender,
                         forward_routing.clone(),
                         if self.cfg.surb_target_notify {
                             SurbNotificationMode::Target
@@ -1138,13 +1160,16 @@ where
                     let balancer = SurbBalancer::new(
                         session_id,
                         // The setpoint and output limit is immediately reconfigured by the SurbBalancer
-                        PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
+                        EntryBalancerController::from_env_or_default(),
                         surb_estimator.clone(),
                         // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
                         // so the correction by this factor is applied.
                         SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
                         surb_mgmt.clone(),
-                    );
+                    )
+                    // Keep-alives only exist for the balancer, so they are what gives way when the
+                    // local uplink cannot keep up.
+                    .with_egress_pressure(self.egress_pressure.clone());
 
                     let (level_stream, balancer_abort_handle) =
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
@@ -1943,12 +1968,21 @@ where
                         && !session_slot.surb_mgmt.is_disabled()
                         && session_slot.surb_mgmt.buffer_level() != msg.additional_data
                     {
-                        // Update the buffer level as sent to us from the Exit
+                        // Update the buffer level as sent to us from the Exit. This is the only
+                        // absolute correction of the dead-reckoned estimate, so it is also the only
+                        // way the level can jump while production is idle -- log the jump itself.
+                        let previous_level = session_slot.surb_mgmt.buffer_level();
                         session_slot
                             .surb_mgmt
                             .buffer_level
                             .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                        debug!(
+                            %session_id,
+                            previous_level,
+                            surb_level = msg.additional_data,
+                            delta = msg.additional_data as i64 - previous_level as i64,
+                            "keep-alive updated SURB buffer size from the Exit"
+                        );
                     }
 
                     // Increase the number of consumed SURBs in the estimator
@@ -1987,6 +2021,7 @@ where
                         .surb_estimator
                         .produced
                         .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                    session_slot.surb_estimator.record_keep_alive(produced);
                     #[cfg(feature = "telemetry")]
                     crate::telemetry::record_session_surb_produced(&session_id, produced);
                 }
@@ -2015,7 +2050,11 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+    use crate::{
+        Capabilities,
+        balancer::{SurbBalancerConfig, SurbFlowEstimator},
+        types::SessionTarget,
+    };
 
     #[test]
     fn session_config_forwards_max_buffered_segments() {
@@ -2280,6 +2319,20 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         mgr.active_sessions().is_empty()
+    }
+
+    /// Polls `condition` until it holds, failing once `within` has passed.
+    async fn eventually(within: Duration, mut condition: impl FnMut() -> anyhow::Result<bool>) -> anyhow::Result<()> {
+        timeout(within, async {
+            loop {
+                if condition()? {
+                    return Ok::<_, anyhow::Error>(());
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("condition did not hold in time")?
     }
 
     #[test_log::test(tokio::test)]
@@ -3321,8 +3374,25 @@ mod tests {
                     .as_secs()
         );
 
+        // The balancer paces keep-alives to what the SURB level needs, about one a second for a target
+        // this small, so a fixed wait alone does not fit the expected number on a loaded machine. Wait
+        // until Bob has received them, too.
+        const KEEP_ALIVE_WAIT: Duration = Duration::from_secs(20);
+        let bob_id = *bob_session.session.id();
+        let bob_keep_alives = || -> anyhow::Result<u64> {
+            Ok(bob_mgr
+                .sessions
+                .get(&bob_id)
+                .ok_or(anyhow!("bob must hold the session slot"))?
+                .surb_estimator
+                .estimate_keep_alive_packets())
+        };
+
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
+        eventually(KEEP_ALIVE_WAIT, || Ok(bob_keep_alives()? >= 5))
+            .await
+            .context("bob must receive five keep-alives reporting the initial target")?;
 
         let new_balancer_cfg = SurbBalancerConfig {
             target_surb_buffer_size: NEXT_BALANCER_TARGET,
@@ -3333,8 +3403,22 @@ mod tests {
         // Update to a higher target
         alice_mgr.update_surb_balancer_config(alice_session.id(), new_balancer_cfg)?;
 
+        // Keep-alives arrive in the order they were sent, so every one from the first to report the
+        // new target onwards reports it as well.
+        eventually(KEEP_ALIVE_WAIT, || {
+            Ok(bob_mgr
+                .get_surb_balancer_config(&bob_id)?
+                .is_some_and(|cfg| cfg.target_surb_buffer_size == NEXT_BALANCER_TARGET))
+        })
+        .await
+        .context("bob must learn the updated target")?;
+        let since_next_target = bob_keep_alives()?;
+
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
+        eventually(KEEP_ALIVE_WAIT, || Ok(bob_keep_alives()? >= since_next_target + 5))
+            .await
+            .context("bob must receive five keep-alives reporting the updated target")?;
 
         // Bob should know about the updated target
         let remote_cfg = bob_mgr

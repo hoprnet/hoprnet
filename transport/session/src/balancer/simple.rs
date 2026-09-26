@@ -1,4 +1,4 @@
-use crate::balancer::{BalancerControllerBounds, SurbBalancerController};
+use crate::balancer::{BalancerControllerBounds, ControlInput, SurbBalancerController};
 
 /// Controller that uses the simple linear formula `limit * min(current / setpoint, 1.0)` to
 /// compute the control output.
@@ -20,9 +20,10 @@ impl SurbBalancerController for SimpleBalancerController {
         self.bounds = bounds;
     }
 
-    fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        let ratio = current_buffer_level as f64 / self.bounds.target() as f64;
-        (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
+    fn next_control_output(&mut self, input: ControlInput) -> u64 {
+        let ratio = input.level as f64 / self.bounds.target() as f64;
+        let output = (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64;
+        output.min(input.ceiling)
     }
 
     fn reset(&mut self) {
@@ -43,7 +44,7 @@ mod tests {
 
         let outputs: Vec<_> = [10, 100, 101]
             .iter()
-            .map(|&level| controller.next_control_output(level))
+            .map(|&level| controller.next_control_output(ControlInput::at_level(level)))
             .collect();
         assert_eq!(outputs, [10, 100, 100]);
         assert_eq!(100, controller.bounds.target());

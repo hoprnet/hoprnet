@@ -84,6 +84,19 @@ where
     }
 }
 
+/// Most keep-alive sends that may be waiting on the Session sink at once.
+///
+/// The keep-alive stream is paced, not back-pressured: it yields at the commanded rate whether or
+/// not the earlier keep-alives were accepted. Unbounded, every keep-alive that meets a full sink
+/// becomes one more pending send -- already counted as produced, because the counting wrapper runs
+/// when the sink takes the item, before it has found room -- and every one of them goes out late,
+/// in a burst, ahead of whatever the Session sends next.
+///
+/// Bounding the sends stops polling the pacer while this many are stuck, so the keep-alive rate
+/// falls to what the sink can take instead of the backlog growing without limit. A sink that keeps
+/// up completes each send on its first poll, so the bound never throttles a healthy session.
+pub(crate) const KEEP_ALIVE_MAX_IN_FLIGHT: usize = 4;
+
 /// Indicates whether the [keep-alive stream](spawn_keep_alive_stream) should notify the Session counterparty
 /// about the SURB target (Entry) or SURB level (Exit).
 #[derive(Debug, Clone)]
@@ -152,7 +165,7 @@ where
                     .map(|data| (fwd_routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
             })
             .map_err(TransportSessionError::from)
-            .try_for_each_concurrent(None, move |msg| {
+            .try_for_each_concurrent(Some(KEEP_ALIVE_MAX_IN_FLIGHT), move |msg| {
                 let mut sender_clone = sender_clone.clone();
                 let keep_alive_diag = keep_alive_diag.clone();
                 keep_alive_diag.wrap(|| async move {
@@ -186,9 +199,95 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
     use anyhow::anyhow;
+    use futures::stream::BoxStream;
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_utils::network_types::crossfire_sink::{CrossfireSinkError, bounded_sink_channel};
 
     use super::*;
+
+    type KeepAliveItem = (DestinationRouting, ApplicationDataOut);
+
+    /// Paces keep-alives at `rate` per second into a sink with `capacity` slots.
+    ///
+    /// The sink sits behind a wrapper that counts each keep-alive where the live Entry counts its
+    /// SURBs as produced, so the count is what the balancer would believe had been delivered. The
+    /// receiving end is returned undrained: whether anything reads it is up to the test.
+    fn counted_keep_alive_stream(
+        capacity: usize,
+        rate: usize,
+    ) -> (Arc<AtomicUsize>, BoxStream<'static, KeepAliveItem>, AbortHandle) {
+        let (sink, rx) = bounded_sink_channel::<KeepAliveItem>(capacity);
+        let counted = Arc::new(AtomicUsize::new(0));
+        let counted_clone = counted.clone();
+        let counting_sink = sink.with(move |item: KeepAliveItem| {
+            counted_clone.fetch_add(1, Ordering::Relaxed);
+            futures::future::ok::<_, CrossfireSinkError>(item)
+        });
+
+        let (controller, abort_handle) = spawn_keep_alive_stream(
+            HoprPseudonym::random(),
+            counting_sink,
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            SurbNotificationMode::DoNotNotify,
+            Arc::new(BalancerStateValues::default()),
+        );
+        controller.set_rate_per_unit(rate, Duration::from_secs(1));
+
+        (counted, rx, abort_handle)
+    }
+
+    /// A sink that has stopped taking keep-alives must stop the pacer too.
+    ///
+    /// Unbounded, each paced keep-alive that meets the full sink queues as one more pending send,
+    /// already counted as produced: about `RATE × 0.3` of them here, where the bound allows the one
+    /// the sink holds plus the ones in flight.
+    #[tokio::test]
+    async fn keep_alives_should_not_pile_up_behind_a_full_sink() -> anyhow::Result<()> {
+        const CAPACITY: usize = 1;
+        const RATE: usize = 1_000;
+        let (counted, _undrained, abort_handle) = counted_keep_alive_stream(CAPACITY, RATE);
+
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        abort_handle.abort();
+
+        let counted = counted.load(Ordering::Relaxed);
+        assert!(
+            counted >= CAPACITY,
+            "precondition: the stream must have started, counted {counted}"
+        );
+        assert!(
+            counted <= CAPACITY + KEEP_ALIVE_MAX_IN_FLIGHT,
+            "a full sink must stop the pacer: counted {counted} keep-alives against {CAPACITY} slot(s) and \
+             {KEEP_ALIVE_MAX_IN_FLIGHT} in flight"
+        );
+        Ok(())
+    }
+
+    /// The bound only bites when the sink is stuck: one that keeps up must still get the paced rate.
+    #[tokio::test]
+    async fn the_in_flight_bound_should_not_throttle_a_sink_that_keeps_up() -> anyhow::Result<()> {
+        const RATE: usize = 200;
+        let (counted, rx, abort_handle) = counted_keep_alive_stream(16, RATE);
+        let _drain = tokio::spawn(rx.for_each(|_| futures::future::ready(())));
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        abort_handle.abort();
+
+        // 500 ms at 200/s is 100; the floor is loose so that a loaded runner cannot fail it, while
+        // still far above the handful a stuck pacer would manage.
+        let counted = counted.load(Ordering::Relaxed);
+        assert!(
+            counted >= 40,
+            "a sink that keeps up must receive the paced rate: counted {counted} in 500 ms at {RATE}/s"
+        );
+        Ok(())
+    }
 
     /// Generator that cycles through 0..4, wrapping at 5 back to 0.
     fn cycling_generator(prev: Option<u8>) -> u8 {
