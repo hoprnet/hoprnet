@@ -120,10 +120,15 @@ where
                 flags: KeepAliveFlag::BalancerTarget.into(),
                 additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
             }),
-            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            // Report the level this side acts on, clamped to the store capacity on every update, not the raw
+            // produced - consumed difference: that difference never subtracts the SURBs the full store evicted, so
+            // after an overflow it tells the Entry the buffer holds several times its capacity, the Entry stops
+            // producing SURBs, and the Exit runs dry and drops every return packet. The estimator stays in the
+            // enum for the callers.
+            SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
                 flags: KeepAliveFlag::BalancerState.into(),
-                additional_data: estimator.saturating_diff(),
+                additional_data: cfg.buffer_level(),
             }),
             SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
