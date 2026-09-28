@@ -16,7 +16,7 @@ use tracing::{Instrument, debug, error, instrument};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
-    balancer::{BalancerStateValues, RateController, RateLimitStreamExt, SurbFlowEstimator},
+    balancer::{BalancerStateValues, RateController, RateLimitStreamExt},
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
