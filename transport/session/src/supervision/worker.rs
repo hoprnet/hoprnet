@@ -284,7 +284,7 @@ async fn worker_loop(
 fn report_fill_stall(supervisor: &mut SessionPixSupervisor) {
     if supervisor.take_fill_stall() {
         #[cfg(feature = "telemetry")]
-        crate::telemetry::record_pix_fill_backoff(crate::telemetry::PixFillBackoff::Stalled);
+        crate::telemetry::pix::record_pix_fill_backoff(crate::telemetry::pix::PixFillBackoff::Stalled);
     }
 }
 
@@ -1135,6 +1135,7 @@ mod tests {
             .send_event(SessionPixEvent::UnverifiableShares {
                 ssa_id: SsaId::new(p, SsaIndex::new(1).expect("index one is non-zero")),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             })
             .await
             .map_err(|()| anyhow::anyhow!("worker stopped"))?;

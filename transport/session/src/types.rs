@@ -9,6 +9,7 @@ use std::{
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::{
+    OffchainPublicKey,
     node::PixDepositData,
     types::{
         internal::{prelude::HoprPseudonym, routing::DestinationRouting},
@@ -359,6 +360,9 @@ pub enum HoprSessionInPixEvent {
     UnverifiableShares {
         ssa_id: SsaId<HoprPseudonym>,
         observed_total: u64,
+        /// Relayer that carried the offending share, for attribution in the close log. Boxed
+        /// because an `OffchainPublicKey` is ~200 bytes and this variant is rare.
+        peer: Box<OffchainPublicKey>,
     },
     /// Reports how far an SSA has got towards recovery.
     ///

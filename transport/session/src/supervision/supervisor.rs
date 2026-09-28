@@ -7,13 +7,13 @@
 
 use std::time::{Duration, Instant};
 
-use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
+use hopr_api::{HoprBalance, OffchainPublicKey, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
 use super::{
     PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig,
     fill::{FillPlanner, FillTarget},
-    telemetry::{PixCycleOutcome, PixCycleSummary, PixGateMode, PixSessionSnapshot, PixTurnEvents},
+    telemetry::{PixCycleOutcome, PixCyclePhase, PixCycleSummary, PixGateMode, PixSessionSnapshot, PixTurnEvents},
 };
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,19 @@ enum SsaPhase {
     Recovered { tombstone_until: Instant },
     /// Phase that will produce a close action on next deadline check.
     Closing,
+}
+
+/// Wei in one µHOPR, the unit `hopr_pix_deposits_*_uhopr_total` counts.
+const WEI_PER_UHOPR: u128 = 1_000_000_000_000;
+
+/// A deposit in µHOPR, saturating rather than wrapping.
+///
+/// Integer because the counters it feeds are, and µHOPR because wei overflows a `u64` at 18 HOPR
+/// while whole HOPR would round every realistic deposit to nothing.
+fn deposit_uhopr(amount: HoprBalance) -> u64 {
+    let wei = amount.amount();
+    let wei = if wei.bits() > 128 { u128::MAX } else { wei.low_u128() };
+    (wei / WEI_PER_UHOPR).min(u64::MAX as u128) as u64
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +81,11 @@ struct PerSsaState {
     deposit_deadline: Option<Instant>,
     recovery_idle_deadline: Option<Instant>,
     recovery_hard_deadline: Option<Instant>,
+
+    /// What the Entry deposited for this cycle, in µHOPR, or zero until the deposit confirms.
+    deposit_uhopr: u64,
+    /// When [`phase`](Self::phase) was entered, for `hopr_pix_cycle_phase_seconds`.
+    phase_entered_at: Instant,
 
     // Progress tracking.
     largest_useful_shares: u64,
@@ -118,14 +136,16 @@ struct PerSsaState {
 }
 
 impl PerSsaState {
-    fn new(ssa_id: SsaId<HoprPseudonym>, batch_id: u32, target_useful_shares: u64, _now: Instant) -> Self {
+    fn new(ssa_id: SsaId<HoprPseudonym>, batch_id: u32, target_useful_shares: u64, now: Instant) -> Self {
         Self {
             ssa_id,
             batch_id,
             phase: SsaPhase::AwaitingCommitment,
+            phase_entered_at: now,
             commitment_deadline: None,
             recommit_deadline: None,
             recommit_attempts: 0,
+            deposit_uhopr: 0,
             deposit_deadline: None,
             recovery_idle_deadline: None,
             recovery_hard_deadline: None,
@@ -142,6 +162,23 @@ impl PerSsaState {
         }
     }
 
+    /// Moves to `phase`, returning how long the outgoing one lasted in milliseconds.
+    ///
+    /// `None` for an outgoing `Recovered` or `Closing`, which have no [`PixCyclePhase`] label — both
+    /// are retained state rather than live state, so neither is measured.
+    fn enter_phase(&mut self, phase: SsaPhase, now: Instant) -> Option<(PixCyclePhase, u64)> {
+        let left = match self.phase {
+            SsaPhase::AwaitingCommitment => Some(PixCyclePhase::AwaitingCommitment),
+            SsaPhase::AwaitingDeposit => Some(PixCyclePhase::AwaitingDeposit),
+            SsaPhase::Recovering => Some(PixCyclePhase::Recovering),
+            SsaPhase::Recovered { .. } | SsaPhase::Closing => None,
+        };
+        let elapsed = now.saturating_duration_since(self.phase_entered_at).as_millis() as u64;
+        self.phase = phase;
+        self.phase_entered_at = now;
+        left.map(|phase| (phase, elapsed))
+    }
+
     /// This cycle's coverage, for the histograms observed once when it finalizes.
     fn telemetry_summary(&self, outcome: PixCycleOutcome, served_total: u64) -> PixCycleSummary {
         PixCycleSummary {
@@ -156,6 +193,7 @@ impl PerSsaState {
             accepted_shares: self.largest_shares_seen,
             useful_shares: self.largest_useful_shares,
             target_useful_shares: self.target_useful_shares,
+            deposit_uhopr: self.deposit_uhopr,
         }
     }
 
@@ -174,6 +212,8 @@ impl PerSsaState {
 /// is precisely when the predecessor's receipt must stop authorizing service.
 struct PaidRecoveryTail {
     ssa_id: SsaId<HoprPseudonym>,
+    /// When the tail took the paid front, for `hopr_pix_cycle_phase_seconds{phase="paid_tail"}`.
+    entered_at: Instant,
     largest_shares_seen: u64,
     served_total_at_last_progress: u64,
     idle_deadline: Option<Instant>,
@@ -323,15 +363,17 @@ impl SessionPixSupervisor {
             SessionPixEvent::RecoveryProgress(progress) => self.on_recovery_progress(progress, now, served_total),
             SessionPixEvent::AlmostRecovered(ssa_id) => self.on_almost_recovered(ssa_id, now),
             SessionPixEvent::Recovered(ssa_id) => self.on_recovered(ssa_id, now, served_total),
-            SessionPixEvent::UnverifiableShares { ssa_id, observed_total } => {
-                self.on_unverifiable_shares(ssa_id, *observed_total, now)
-            }
+            SessionPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total,
+                peer,
+            } => self.on_unverifiable_shares(ssa_id, *observed_total, peer, now),
             SessionPixEvent::SessionClosed { drainable_surbs } => self.on_session_closed(*drainable_surbs, now),
         };
 
         let mut lifecycle_actions = actions;
         lifecycle_actions.extend(self.retry_deferred_successor_request(now));
-        self.consume_paid_tail_at_observed_boundary();
+        self.consume_paid_tail_at_observed_boundary(now);
         self.arm_recovery_clocks_for_earliest(now, served_total);
         let mut actions = if lifecycle_actions
             .iter()
@@ -384,7 +426,15 @@ impl SessionPixSupervisor {
     /// its first snapshot. In every case the observation proves the transport crossed the cycle
     /// boundary. Keeping the old funded receipt beyond it would let an unfunded successor spend the
     /// predecessor's remaining allowance.
-    fn consume_paid_tail_at_observed_boundary(&mut self) {
+    /// Retires the paid tail, latching how long it held the front.
+    fn release_paid_tail(&mut self, now: Instant) {
+        if let Some(tail) = self.paid_recovery_tail.take() {
+            let elapsed = now.saturating_duration_since(tail.entered_at).as_millis() as u64;
+            self.telemetry.phase_durations.push((PixCyclePhase::PaidTail, elapsed));
+        }
+    }
+
+    fn consume_paid_tail_at_observed_boundary(&mut self, now: Instant) {
         let Some(front_idx) = self.earliest_live_idx() else {
             return;
         };
@@ -404,7 +454,7 @@ impl SessionPixSupervisor {
                 successor = %front_id,
                 "successor progress consumed the paid FIFO-tail handoff"
             );
-            self.paid_recovery_tail = None;
+            self.release_paid_tail(now);
         }
     }
 
@@ -471,6 +521,7 @@ impl SessionPixSupervisor {
             },
             paid_tail: u32::from(self.paid_recovery_tail.is_some()),
             predeposit_exposure_packets: predeposit_exposure,
+            stalled_share: u32::from(self.fill.is_stalled()),
             ..Default::default()
         };
 
@@ -625,6 +676,9 @@ impl SessionPixSupervisor {
                         served_total_at_last_progress = tail.served_total_at_last_progress,
                         "closing PIX Session while its paid recovery tail is stalled"
                     );
+                    // The tail is ending here, not merely being abandoned with the Session, so it
+                    // owes its duration like every other phase that reaches a terminal edge.
+                    self.release_paid_tail(now);
                     self.closed = true;
                     return self.with_fill_stopped(vec![SessionPixAction::Close(reason)]);
                 }
@@ -691,7 +745,7 @@ impl SessionPixSupervisor {
                     continue;
                 }
 
-                actions.extend(self.close_ssa_and_collect(i, reason, served_total));
+                actions.extend(self.close_ssa_and_collect(i, reason, served_total, now));
                 continue;
             }
             i += 1;
@@ -722,7 +776,7 @@ impl SessionPixSupervisor {
         // the replacement request in the action stream so the reconstructor drops the old guard
         // before allocating the successor.
         actions.extend(self.retry_deferred_successor_request(now));
-        self.consume_paid_tail_at_observed_boundary();
+        self.consume_paid_tail_at_observed_boundary(now);
 
         // If no SSAs remain, close.
         // Note: a successor request may still be in flight here (RequestSsa
@@ -1000,11 +1054,12 @@ impl SessionPixSupervisor {
             self.cfg.max_deposit_wait,
             self.cfg.ssas_per_request,
         ));
-        ssa.phase = SsaPhase::AwaitingDeposit;
+        let phase_sample = ssa.enter_phase(SsaPhase::AwaitingDeposit, now);
         ssa.deposit_deadline = deposit_deadline;
         ssa.commitment_deadline = None;
         // Nothing is missing any more, so nothing is to be asked for.
         ssa.recommit_deadline = None;
+        self.telemetry.phase_durations.extend(phase_sample);
 
         // Behind the phase guard above, so a repeated `CommitmentVerified` for a cycle that has
         // already moved on counts nothing.
@@ -1055,13 +1110,17 @@ impl SessionPixSupervisor {
 
         // Transition to Recovering. The two recovery clocks are *not* started here — see
         // `arm_recovery_clocks_for_earliest`, which starts them when this cycle's turn comes.
-        ssa.phase = SsaPhase::Recovering;
+        let phase_sample = ssa.enter_phase(SsaPhase::Recovering, now);
         ssa.deposit_deadline = None;
         ssa.served_total_at_last_progress = served_total;
+        self.telemetry.phase_durations.extend(phase_sample);
 
         // Behind both the phase guard and the zero-amount guard above, so a duplicate confirmation
         // and a zero balance — which is not a verdict — both count nothing.
+        ssa.deposit_uhopr = deposit_uhopr(amount);
         self.telemetry.funded = self.telemetry.funded.saturating_add(1);
+        self.telemetry.deposit_confirmed_uhopr =
+            self.telemetry.deposit_confirmed_uhopr.saturating_add(ssa.deposit_uhopr);
 
         // If recovery completed before the deposit arrived, immediately
         // tombstone the SSA — the Recovered event was deferred.
@@ -1096,7 +1155,7 @@ impl SessionPixSupervisor {
     fn on_deposit_observer_closed(
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
-        _now: Instant,
+        now: Instant,
         served_total: u64,
     ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
@@ -1108,7 +1167,7 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed, served_total)
+        self.close_ssa_and_collect(idx, SessionPixCloseReason::DepositObserverClosed, served_total, now)
     }
 
     fn on_recovery_progress(
@@ -1303,7 +1362,7 @@ impl SessionPixSupervisor {
         }
 
         if exhausted {
-            self.paid_recovery_tail = None;
+            self.release_paid_tail(now);
         }
         vec![SessionPixAction::ProgressNotification]
     }
@@ -1448,16 +1507,60 @@ impl SessionPixSupervisor {
         }
     }
 
+    /// Books what a recovered cycle owes the counters and retires it into its tombstone.
+    ///
+    /// Split out because a drain returns before the rest of the transition, and would otherwise
+    /// never book the deposit it just unlocked — making the one outcome the drain exists for read as
+    /// stranded value in `hopr_pix_deposits_recovered_uhopr_total`.
+    fn book_recovered_cycle(&mut self, idx: usize, now: Instant, served_total: u64) {
+        // `Recovered` is a local cryptographic fact, so it supplies the lower bound even if its
+        // final absolute Progress snapshot is delivered just afterwards by a concurrent worker.
+        // Every later tail snapshot must keep these terminal fields exact.
+        let target = self.dims.target_useful_shares();
+        self.ssas[idx].largest_useful_shares = target;
+        self.ssas[idx].largest_shares_seen = self.ssas[idx].largest_shares_seen.max(target);
+        self.ssas[idx].recovered_polynomials = self.dims.polys_per_ssa();
+
+        // Counted here rather than on the `Recovered` event, because that event is not the
+        // transition: `on_recovered` defers it when the cycle is still awaiting its commitment or
+        // deposit, and replays it through this function once both arrive. This is the one place a
+        // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
+        self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
+        // Summarized before the tombstone transition below, and before `paid_recovery_tail` starts
+        // collecting the drain, which belongs to the FIFO rather than to this cycle's recovery. The
+        // terminal fields were just pinned to the target above, so a recovered cycle's useful
+        // fraction is exactly one by construction.
+        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Recovered, served_total);
+        self.telemetry.finalized.push(summary);
+
+        let phase_sample = self.ssas[idx].enter_phase(
+            SsaPhase::Recovered {
+                tombstone_until: now
+                    .checked_add(self.cfg.tombstone_retention_window)
+                    .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
+            },
+            now,
+        );
+        self.telemetry.phase_durations.extend(phase_sample);
+    }
+
     /// Perform the terminal tombstone transition for a fully-recovered SSA.
     /// Called from `on_recovered` (normal Recovering path) and replayed from
     /// `on_deposit_confirmed`/`on_commitment_verified` when `recovered_pending`
     /// was set earlier.
     fn perform_recovered_transition(&mut self, idx: usize, now: Instant, served_total: u64) -> Vec<SessionPixAction> {
+        let next_requested = self.ssas[idx].next_requested;
+        // Read before the cycle is retired below, which would make it terminal and change the answer.
+        let was_front = self.earliest_live_idx() == Some(idx);
+        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
+
+        self.book_recovered_cycle(idx, now, served_total);
+
         // The end of a drain, and the outcome it exists for: the deposit this cycle was paid is
         // released rather than stranded. None of the bookkeeping below is worth doing — the tail
-        // receipt, the tombstone and the gate notification all serve a Session that is about to be
-        // torn down, and `closed` gates every entry point from here on. Returning before the tail is
-        // created also guarantees a drain can never leave one behind.
+        // receipt, the gate notification and the successor request all serve a Session that is about
+        // to be torn down, and `closed` gates every entry point from here on. Returning before the
+        // tail is created also guarantees a drain can never leave one behind.
         if self.draining {
             tracing::info!(
                 ssa_id = %self.ssas[idx].ssa_id,
@@ -1467,18 +1570,6 @@ impl SessionPixSupervisor {
             return self.with_fill_stopped(vec![SessionPixAction::Close(SessionPixCloseReason::Drained)]);
         }
 
-        let next_requested = self.ssas[idx].next_requested;
-        let was_front = self.earliest_live_idx() == Some(idx);
-
-        // `Recovered` is a local cryptographic fact, so it supplies the lower bound even if its
-        // final absolute Progress snapshot is delivered just afterwards by a concurrent worker.
-        // Every later tail snapshot must keep these terminal fields exact.
-        let target = self.dims.target_useful_shares();
-        let max_shares_seen = self.dims.polys_per_ssa() as u64 * self.dims.emitted_shares_per_poly() as u64;
-        self.ssas[idx].largest_useful_shares = target;
-        self.ssas[idx].largest_shares_seen = self.ssas[idx].largest_shares_seen.max(target);
-        self.ssas[idx].recovered_polynomials = self.dims.polys_per_ssa();
-
         if was_front {
             // Replacing rather than accumulating is intentional. Only the immediate recovered
             // predecessor can occupy a FIFO immediately ahead of the live front; accepting an
@@ -1486,6 +1577,7 @@ impl SessionPixSupervisor {
             self.paid_recovery_tail =
                 (self.ssas[idx].largest_shares_seen < max_shares_seen).then(|| PaidRecoveryTail {
                     ssa_id: self.ssas[idx].ssa_id,
+                    entered_at: now,
                     largest_shares_seen: self.ssas[idx].largest_shares_seen,
                     served_total_at_last_progress: served_total,
                     // Recovery itself is fresh, cryptographic progress. Reusing the prior idle
@@ -1499,24 +1591,6 @@ impl SessionPixSupervisor {
                 });
         }
 
-        // Counted here rather than on the `Recovered` event, because that event is not the
-        // transition: `on_recovered` defers it when the cycle is still awaiting its commitment or
-        // deposit, and replays it through this function once both arrive. This is the one place a
-        // cycle becomes terminal-by-recovery, and its callers all guard against reaching it twice.
-        self.telemetry.recovered = self.telemetry.recovered.saturating_add(1);
-        // Summarized from the counters as they stand *now*, before the tombstone transition below —
-        // and before `paid_recovery_tail` starts collecting the drain, which belongs to the FIFO
-        // rather than to this cycle's recovery. The terminal fields were just pinned to the target
-        // above, so a recovered cycle's useful fraction is exactly one by construction.
-        let summary = self.ssas[idx].telemetry_summary(PixCycleOutcome::Recovered, served_total);
-        self.telemetry.finalized.push(summary);
-
-        // Transition to tombstone.
-        self.ssas[idx].phase = SsaPhase::Recovered {
-            tombstone_until: now
-                .checked_add(self.cfg.tombstone_retention_window)
-                .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
-        };
         self.ssas[idx].commitment_deadline = None;
         self.ssas[idx].deposit_deadline = None;
         self.ssas[idx].recovery_idle_deadline = None;
@@ -1580,6 +1654,7 @@ impl SessionPixSupervisor {
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
         observed_total: u64,
+        peer: &OffchainPublicKey,
         _now: Instant,
     ) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
@@ -1596,6 +1671,7 @@ impl SessionPixSupervisor {
 
         tracing::warn!(
             %ssa_id,
+            %peer,
             observed_total,
             phase = ?self.ssas[idx].phase,
             "closing PIX session: a polynomial's share set failed to open its commitment"
@@ -1699,6 +1775,7 @@ impl SessionPixSupervisor {
         idx: usize,
         reason: SessionPixCloseReason,
         served_total: u64,
+        now: Instant,
     ) -> Vec<SessionPixAction> {
         if matches!(self.ssas[idx].phase, SsaPhase::Closing) {
             return Vec::new();
@@ -1737,7 +1814,8 @@ impl SessionPixSupervisor {
             "closing PIX SSA"
         );
 
-        self.ssas[idx].phase = SsaPhase::Closing;
+        let phase_sample = self.ssas[idx].enter_phase(SsaPhase::Closing, now);
+        self.telemetry.phase_durations.extend(phase_sample);
 
         if self.ssas.len() == 1 {
             self.closed = true;
@@ -2099,6 +2177,50 @@ mod tests {
 
     fn _small_balance() -> HoprBalance {
         HoprBalance::new_base(1)
+    }
+
+    /// Each phase is timed from when it was entered to when it was left, and only on leaving.
+    #[test]
+    fn a_cycle_is_timed_in_each_phase_it_leaves() {
+        let p = pseudonym();
+        let t0 = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, t0);
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), t0, 0);
+        assert!(
+            sup.take_telemetry_events().phase_durations.is_empty(),
+            "a cycle that has not left a phase has nothing to time"
+        );
+
+        // Three seconds awaiting the commitment, then seven awaiting the deposit.
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), t0 + Duration::from_secs(3), 0);
+        assert_eq!(
+            vec![(PixCyclePhase::AwaitingCommitment, 3_000)],
+            sup.take_telemetry_events().phase_durations
+        );
+
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            t0 + Duration::from_secs(10),
+            0,
+        );
+        assert_eq!(
+            vec![(PixCyclePhase::AwaitingDeposit, 7_000)],
+            sup.take_telemetry_events().phase_durations,
+            "the clock restarts at each transition rather than measuring from the request"
+        );
+
+        // Recovery runs for a minute. The tombstone it leaves is not a phase, so nothing further is
+        // timed for this cycle.
+        sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(70), 0);
+        assert_eq!(
+            vec![(PixCyclePhase::Recovering, 60_000)],
+            sup.take_telemetry_events().phase_durations
+        );
     }
 
     // ---------------------------------------------------------------
@@ -3521,6 +3643,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
@@ -3556,6 +3679,7 @@ mod tests {
                 &SessionPixEvent::UnverifiableShares {
                     ssa_id: id,
                     observed_total,
+                    peer: crate::supervision::test_peer(),
                 },
                 now,
                 0,
@@ -3600,6 +3724,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: ids[2],
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             now,
             0,
@@ -4472,6 +4597,7 @@ mod tests {
             SessionPixEvent::UnverifiableShares {
                 ssa_id: ssa_id(p, 2),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
         ] {
             assert!(
@@ -5101,6 +5227,15 @@ mod tests {
             ),
             "tail trickle must not move the predecessor's absolute deadline: {actions:?}"
         );
+        // The tail took the front at +1 s and ends here, so it owes its 20 s like any other phase
+        // that reaches a terminal edge — being ended by a deadline is still ending.
+        assert_eq!(
+            Some(&(PixCyclePhase::PaidTail, 20_000)),
+            sup.take_telemetry_events()
+                .phase_durations
+                .iter()
+                .find(|(phase, _)| *phase == PixCyclePhase::PaidTail)
+        );
     }
 
     /// Recovered does not mean replayable: only the immediate predecessor owns the one tail slot.
@@ -5163,6 +5298,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
                 observed_total: 5,
+                peer: crate::supervision::test_peer(),
             },
             start,
             100,
@@ -5581,6 +5717,7 @@ mod tests {
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: ssa_id(p, 1),
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             },
             t0 + Duration::from_secs(2),
             0,
@@ -5881,6 +6018,46 @@ mod tests {
         );
     }
 
+    /// A completed drain books its deposit as recovered, not as stranded.
+    ///
+    /// The drain exists to un-strand a deposit, so it is the one close path that must never leave
+    /// its value out of `hopr_pix_deposits_recovered_uhopr_total`. It returns early from the
+    /// recovered transition, which is what previously skipped the summary the counter reads.
+    #[test]
+    fn a_completed_drain_books_the_deposit_it_unlocked_as_recovered() {
+        let t0 = Instant::now();
+        let (mut sup, p) = funded_at_front(default_cfg(), fill_dims(), t0);
+        let id = ssa_id(p, 1);
+        // `funded_at_front` confirms `sufficient_balance()`, which is 1000 HOPR.
+        assert_eq!(1_000_000_000, sup.take_telemetry_events().deposit_confirmed_uhopr);
+
+        sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: max_cycle_shares(&sup),
+            },
+            t0 + Duration::from_secs(2),
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), t0 + Duration::from_secs(4), 0);
+
+        let events = sup.take_telemetry_events();
+        assert_eq!(
+            1, events.recovered,
+            "a drained cycle recovered, so it counts as recovered"
+        );
+        let recovered: Vec<_> = events
+            .finalized
+            .iter()
+            .filter(|summary| summary.outcome == PixCycleOutcome::Recovered)
+            .collect();
+        assert_eq!(
+            1,
+            recovered.len(),
+            "the drain must summarize its cycle, or the value it unlocked reads as stranded"
+        );
+        assert_eq!(1_000_000_000, recovered[0].deposit_uhopr);
+    }
+
     /// A drain that stops making progress is closed by the idle deadline rather than re-armed.
     ///
     /// The idle rule normally re-arms whenever no *gated* service was consumed since the last
@@ -6039,6 +6216,10 @@ mod tests {
         assert_eq!(
             PixTurnEvents {
                 committed: 1,
+                // Zero because this fixture drives every transition at `t0`; that the sample is
+                // latched at all is the assertion. `a_cycle_is_timed_in_each_phase_it_leaves`
+                // covers the durations themselves.
+                phase_durations: vec![(PixCyclePhase::AwaitingCommitment, 0)],
                 ..Default::default()
             },
             sup.take_telemetry_events()
@@ -6061,6 +6242,10 @@ mod tests {
         assert_eq!(
             PixTurnEvents {
                 funded: 1,
+                // `sufficient_balance()` is 1000 HOPR; confirming it books the value alongside the
+                // count, in the same turn.
+                deposit_confirmed_uhopr: 1_000_000_000,
+                phase_durations: vec![(PixCyclePhase::AwaitingDeposit, 0)],
                 ..Default::default()
             },
             sup.take_telemetry_events()
@@ -6093,6 +6278,9 @@ mod tests {
                 accepted_shares: sup.dims.target_useful_shares(),
                 useful_shares: sup.dims.target_useful_shares(),
                 target_useful_shares: sup.dims.target_useful_shares(),
+                // `sufficient_balance()` is 1000 HOPR, so the deposit the fixture confirmed reaches
+                // the summary that decides how much value this recovery unlocked.
+                deposit_uhopr: 1_000_000_000,
             }],
             events.finalized,
             "a recovered cycle is summarized exactly once, at full useful coverage"
@@ -6199,6 +6387,7 @@ mod tests {
                     &SessionPixEvent::UnverifiableShares {
                         ssa_id: ssa_id(p, 1),
                         observed_total: 1,
+                        peer: crate::supervision::test_peer(),
                     },
                     t0,
                     0,
@@ -6637,6 +6826,7 @@ mod tests {
             accepted_shares: 0,
             useful_shares: 0,
             target_useful_shares: 0,
+            deposit_uhopr: 0,
         };
         assert_eq!(None, summary.useful_fraction());
         assert_eq!(None, summary.accepted_fraction());
@@ -6651,6 +6841,7 @@ mod tests {
             accepted_shares: 768,
             useful_shares: 512,
             target_useful_shares: 512,
+            deposit_uhopr: 0,
         };
         assert_eq!(Some(1.0), summary.useful_fraction());
         assert_eq!(Some(1.5), summary.accepted_fraction());

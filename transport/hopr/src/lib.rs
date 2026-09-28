@@ -1524,7 +1524,11 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
             if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+                    ssa_id,
+                    observed_total,
+                    peer,
+                })
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");

@@ -690,6 +690,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     let event = HoprSessionInPixEvent::UnverifiableShares {
         ssa_id,
         observed_total: 1,
+        peer: Box::new(*hopr_api::OffchainKeypair::random().public()),
     };
 
     let result = mgr.dispatch_pix_event(event).await;
