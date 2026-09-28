@@ -1704,7 +1704,8 @@ where
                         .as_secs()
             };
 
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -1715,7 +1716,7 @@ where
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_clone
+                            surb_estimator_tx
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
@@ -1726,11 +1727,10 @@ where
                         .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        // Count the number of SURBs delivered with each incoming packet
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        surb_estimator_rx.record_incoming(produced, evicted);
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -2017,6 +2017,52 @@ mod tests {
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
+    /// `record_incoming` must keep the estimator's held count (`saturating_diff`) equal to what a
+    /// bounded store of capacity `CAP` would actually hold across a fill-past-capacity-then-drain
+    /// sequence. The eviction term is what makes the held count fall back to zero once the overflow is
+    /// drained, instead of staying inflated by the evicted surplus for the life of the session.
+    #[test]
+    fn record_incoming_tracks_a_bounded_store_through_overflow_and_drain() {
+        use crate::balancer::SurbFlowEstimator;
+
+        const CAP: u64 = 100;
+        let estimator = AtomicSurbFlowEstimator::default();
+
+        // Model of the real ring buffer: occupancy capped at CAP, oldest evicted on overflow.
+        let mut occupancy: u64 = 0;
+
+        // A model receive: `batch` SURBs arrive; the store keeps them and evicts the overflow.
+        let mut receive = |batch: u64| {
+            let evicted = (occupancy + batch).saturating_sub(CAP);
+            occupancy = (occupancy + batch).min(CAP);
+            estimator.record_incoming(batch, evicted);
+        };
+
+        // Fill well past capacity in several bursts.
+        for _ in 0..5 {
+            receive(40);
+        }
+        assert_eq!(occupancy, CAP, "the model store is full");
+        assert_eq!(
+            estimator.saturating_diff(),
+            CAP,
+            "held count tracks a full store, not the {}-SURB total received",
+            5 * 40
+        );
+
+        // Drain the whole store via consumption (each spent SURB leaves the buffer).
+        for _ in 0..CAP {
+            estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            occupancy -= 1;
+        }
+        assert_eq!(occupancy, 0, "the model store is empty");
+        assert_eq!(
+            estimator.saturating_diff(),
+            0,
+            "held count returns to zero after the drain; the evicted surplus is not counted as held"
+        );
+    }
+
     #[test]
     fn session_config_forwards_max_buffered_segments() {
         assert_eq!(
@@ -2201,6 +2247,28 @@ mod tests {
         assert_eq!(
             PacketSignals::from(PacketSignal::SurbDistress),
             info.signals_to_destination
+        );
+        Ok(())
+    }
+
+    /// Entry side of the documented capacity<target tradeoff: when the Exit's real store is smaller
+    /// than the Entry's target, the level it truthfully reports plateaus below target (pinned from the
+    /// Exit side in `balancer/controller.rs`), so the Entry keeps minting — it cannot tell "full at a
+    /// level below my target" from "still filling". Pinned so the follow-up distress-based capacity
+    /// guesstimate changes this deliberately and visibly, not by accident.
+    #[test]
+    fn organic_minting_continues_when_the_counterparty_store_is_smaller_than_the_target() -> anyhow::Result<()> {
+        const EXIT_CAPACITY: u64 = 500;
+        const ENTRY_TARGET: u64 = 2_000;
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, false, &gate_state(ENTRY_TARGET, EXIT_CAPACITY));
+
+        assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
+        assert_eq!(
+            1,
+            data.estimate_surbs_with_msg(),
+            "the Entry keeps minting toward a target the smaller store can never reach"
         );
         Ok(())
     }
