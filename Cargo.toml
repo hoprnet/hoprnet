@@ -135,7 +135,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
 hopr-api = { version = "2.0.0" }
-hopr-types = { version = "2.3.0", features = ["use-bindings"] }
+hopr-types = { version = "4.0.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.9.3", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
