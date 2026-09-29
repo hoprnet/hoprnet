@@ -34,7 +34,7 @@ use crate::{
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
+        SurbControllerWithCorrection, SurbFlowEstimator,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
@@ -422,7 +422,20 @@ type SessionNotifiers = (
 // Sink for processing Start protocol messages.
 // Must be within Arc to be shared across SessionManager clones.
 // The inner OnceLock is set once in `start()` and read in `dispatch_message`.
-type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol)>>>>;
+type StartProtocolMsgSink =
+    Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol, IncomingSurbCounts)>>>>;
+
+/// SURBs an incoming packet delivered into the local store, carried alongside the Start-protocol
+/// message. `dispatch_message` consumes the packet info to build the message, so the counts a
+/// keep-alive needs to book (see `handle_keep_alive`) would otherwise be gone by the time the
+/// off-thread worker runs.
+#[derive(Clone, Copy, Debug, Default)]
+struct IncomingSurbCounts {
+    /// SURBs the arriving packet stored (`num_saved_surbs`).
+    saved: u64,
+    /// Older SURBs the full store evicted to make room (`num_evicted_surbs`).
+    evicted: u64,
+}
 
 /// Manages lifecycles of Sessions.
 ///
@@ -863,7 +876,7 @@ where
             "session_start_protocol_processor",
             start_protocol_rx.into_stream().for_each_concurrent(
                 Some(self.cfg.maximum_sessions + 10),
-                move |(pseudonym, protocol_msg)| {
+                move |(pseudonym, protocol_msg, surb_counts)| {
                     let myself = myself.clone();
                     async move {
                         let result = match protocol_msg {
@@ -874,7 +887,7 @@ where
                             HoprStartProtocol::SessionError(error_type) => {
                                 myself.handle_session_error(error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg, surb_counts).await,
                         };
 
                         if let Err(error) = result {
@@ -1091,9 +1104,7 @@ where
                         msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             let produced = data.estimate_surbs_with_msg() as u64;
                             // Count how many SURBs we sent with each packet
-                            surb_estimator_clone
-                                .produced
-                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                            surb_estimator_clone.record_produced(produced);
                             #[cfg(feature = "telemetry")]
                             crate::telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
@@ -1219,9 +1230,7 @@ where
                             session_rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
-                                surb_estimator_for_rx
-                                    .consumed
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                surb_estimator_for_rx.record_consumed(1);
                                 #[cfg(feature = "telemetry")]
                                 crate::telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
@@ -1415,14 +1424,8 @@ where
     pub fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
         match self.sessions.get(id) {
             Some(session) => Ok((
-                session
-                    .surb_estimator
-                    .produced
-                    .load(std::sync::atomic::Ordering::Relaxed),
-                session
-                    .surb_estimator
-                    .consumed
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                session.surb_estimator.estimate_surbs_produced(),
+                session.surb_estimator.estimate_surbs_consumed(),
             )),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
@@ -1478,11 +1481,19 @@ where
                     .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
             }
 
+            // Captured before `try_from` consumes `in_data.data` together with the packet info: a
+            // keep-alive delivering SURBs into this node's store needs them booked, and the worker that
+            // runs `handle_keep_alive` never sees the packet info otherwise.
+            let surb_counts = IncomingSurbCounts {
+                saved: in_data.packet_info.num_saved_surbs as u64,
+                evicted: in_data.packet_info.num_evicted_surbs as u64,
+            };
+
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 start_protocol_tx
-                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
+                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?, surb_counts))
                     .map_err(|error| {
                         error!(%error, "failed to send Start protocol message to processing task");
                         SessionManagerError::other(error)
@@ -1704,7 +1715,8 @@ where
                         .as_secs()
             };
 
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -1715,9 +1727,7 @@ where
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_clone
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            surb_estimator_tx.record_consumed(1);
                             #[cfg(feature = "telemetry")]
                             crate::telemetry::record_session_surb_consumed(&session_id, 1);
                             futures::future::ok::<_, S::Error>((routing, data))
@@ -1726,11 +1736,10 @@ where
                         .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        // Count the number of SURBs delivered with each incoming packet
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        surb_estimator_rx.record_incoming(produced, evicted);
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -1782,9 +1791,7 @@ where
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each sent keepalive consumes 1 SURB
-                            surb_estimator_clone
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            surb_estimator_clone.record_consumed(1);
                             #[cfg(feature = "telemetry")]
                             crate::telemetry::record_session_surb_consumed(&session_id, 1);
                             futures::future::ok::<_, S::Error>((routing, data))
@@ -1932,7 +1939,11 @@ where
         Ok(())
     }
 
-    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> crate::errors::Result<()> {
+    async fn handle_keep_alive(
+        &self,
+        msg: KeepAliveMessage<SessionId>,
+        surb_counts: IncomingSurbCounts,
+    ) -> crate::errors::Result<()> {
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -1952,10 +1963,7 @@ where
                     }
 
                     // Increase the number of consumed SURBs in the estimator
-                    session_slot
-                        .surb_estimator
-                        .consumed
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    session_slot.surb_estimator.record_consumed(1);
                     #[cfg(feature = "telemetry")]
                     crate::telemetry::record_session_surb_consumed(&session_id, 1);
                 }
@@ -1980,15 +1988,17 @@ where
                         debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
                     }
 
-                    // Increase the number of received SURBs in the estimator.
-                    // Typically, 2 SURBs per Keep-Alive message
-                    let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                    // Book the SURBs this keep-alive actually delivered into our store, net of any the
+                    // full store evicted on arrival -- exactly as the data path does (see
+                    // `record_incoming`). Booking a fixed MIN_SURBS_PER_MESSAGE regardless over-counts
+                    // both a keep-alive that carried fewer (a capped or distressed Entry) and one whose
+                    // SURBs the full store dropped; either way the held estimate inflates and stays
+                    // inflated for the life of the session, throttling the Entry into starvation.
                     session_slot
                         .surb_estimator
-                        .produced
-                        .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        .record_incoming(surb_counts.saved, surb_counts.evicted);
                     #[cfg(feature = "telemetry")]
-                    crate::telemetry::record_session_surb_produced(&session_id, produced);
+                    crate::telemetry::record_session_surb_produced(&session_id, surb_counts.saved);
                 }
             }
         } else {
@@ -2016,6 +2026,283 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    /// `record_incoming` must keep the estimator's held count (`saturating_diff`) equal to what a
+    /// bounded store of capacity `CAP` would actually hold across a fill-past-capacity-then-drain
+    /// sequence. The eviction term is what makes the held count fall back to zero once the overflow is
+    /// drained, instead of staying inflated by the evicted surplus for the life of the session.
+    #[test]
+    fn record_incoming_tracks_a_bounded_store_through_overflow_and_drain() {
+        use crate::balancer::SurbFlowEstimator;
+
+        const CAP: u64 = 100;
+        let estimator = AtomicSurbFlowEstimator::default();
+
+        // Model of the real ring buffer: occupancy capped at CAP, oldest evicted on overflow.
+        let mut occupancy: u64 = 0;
+
+        // A model receive: `batch` SURBs arrive; the store keeps them and evicts the overflow.
+        let mut receive = |batch: u64| {
+            let evicted = (occupancy + batch).saturating_sub(CAP);
+            occupancy = (occupancy + batch).min(CAP);
+            estimator.record_incoming(batch, evicted);
+        };
+
+        // Fill well past capacity in several bursts.
+        for _ in 0..5 {
+            receive(40);
+        }
+        assert_eq!(occupancy, CAP, "the model store is full");
+        assert_eq!(
+            estimator.saturating_diff(),
+            CAP,
+            "held count tracks a full store, not the {}-SURB total received",
+            5 * 40
+        );
+
+        // Drain the whole store via consumption (each spent SURB leaves the buffer).
+        for _ in 0..CAP {
+            estimator.record_consumed(1);
+            occupancy -= 1;
+        }
+        assert_eq!(occupancy, 0, "the model store is empty");
+        assert_eq!(
+            estimator.saturating_diff(),
+            0,
+            "held count returns to zero after the drain; the evicted surplus is not counted as held"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // SURB counting — Entry (client) and Exit integration
+    //
+    // These drive the real `dispatch_message` -> Start-protocol worker -> `handle_keep_alive` path on
+    // a started manager, so the estimator is exercised exactly as in production. They pin what the
+    // keep-alive accounting path does and does not count, per the #8452 review.
+    // ---------------------------------------------------------------
+
+    /// A started manager plus the channels it needs kept alive (dropping either would close the
+    /// sender/notifier and make dispatch fail before reaching `handle_keep_alive`).
+    fn started_manager() -> (
+        TestManager,
+        futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+    ) {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(tx, new_session_tx).expect("manager starts");
+        (mgr, rx, new_session_rx)
+    }
+
+    /// The SURB estimator counters (produced, consumed, evicted) for a session.
+    fn estimator_counts(mgr: &TestManager, pseudonym: HoprPseudonym) -> (u64, u64, u64) {
+        let slot = mgr.sessions.get(&pseudonym).expect("session slot must exist");
+        (
+            slot.surb_estimator.estimate_surbs_produced(),
+            slot.surb_estimator.estimate_surbs_consumed(),
+            slot.surb_estimator.estimate_surbs_evicted(),
+        )
+    }
+
+    /// An Entry->Exit keep-alive (`BalancerTarget`) carrying `MIN_SURBS_PER_MESSAGE` SURBs, all saved
+    /// into the store on arrival, with `evicted` older ones the full store dropped to make room (the
+    /// decoder records the pair in `num_saved_surbs`/`num_evicted_surbs`).
+    fn entry_keepalive(session_id: SessionId, target: u64, evicted: usize) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::try_from(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: target,
+            }))?,
+            packet_info: IncomingPacketInfo {
+                num_saved_surbs: KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE,
+                num_evicted_surbs: evicted,
+                ..Default::default()
+            },
+        })
+    }
+
+    /// Poll until the estimator field selected by `field` reaches `want` (the keep-alive worker runs
+    /// off-thread), or fail the test.
+    async fn wait_for(mgr: &TestManager, pseudonym: HoprPseudonym, field: impl Fn((u64, u64, u64)) -> u64, want: u64) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while field(estimator_counts(mgr, pseudonym)) < want {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("keep-alive should have been accounted within the timeout");
+    }
+
+    /// Baseline (passes today): the Exit counts the SURBs an Entry keep-alive delivers as produced.
+    #[test_log::test(tokio::test)]
+    async fn exit_counts_produced_from_an_entry_keepalive() -> anyhow::Result<()> {
+        let (mgr, _sender_rx, _notif_rx) = started_manager();
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        mgr.dispatch_message(pseudonym, entry_keepalive(pseudonym, 100, 0)?)?;
+        wait_for(&mgr, pseudonym, |c| c.0, 1).await;
+
+        let (produced, ..) = estimator_counts(&mgr, pseudonym);
+        assert_eq!(
+            produced,
+            KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
+            "the Exit must count the SURBs an Entry keep-alive carries"
+        );
+        Ok(())
+    }
+
+    /// CR-3 (expected to FAIL on #8452): SURBs a keep-alive delivers into a full Exit store are
+    /// counted as produced, but `dispatch_message` drops `num_evicted_surbs` before `handle_keep_alive`,
+    /// so their evictions are never counted and the held level inflates. If every delivered SURB is
+    /// evicted, the held level must not move.
+    #[test_log::test(tokio::test)]
+    async fn exit_keepalive_evictions_must_not_inflate_the_held_level() -> anyhow::Result<()> {
+        let (mgr, _sender_rx, _notif_rx) = started_manager();
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let min = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE;
+        // Store is full: every SURB the keep-alive delivers evicts an older one.
+        mgr.dispatch_message(pseudonym, entry_keepalive(pseudonym, 100, min)?)?;
+        wait_for(&mgr, pseudonym, |c| c.0, 1).await;
+
+        let (produced, consumed, evicted) = estimator_counts(&mgr, pseudonym);
+        let held = produced.saturating_sub(consumed).saturating_sub(evicted);
+        assert_eq!(
+            held, 0,
+            "a keep-alive whose delivered SURBs all evicted must leave the held level unchanged; produced={produced} \
+             consumed={consumed} evicted={evicted}"
+        );
+        Ok(())
+    }
+
+    /// Baseline (passes today): the Entry counts a reply keep-alive as one consumed SURB and adopts
+    /// the Exit's reported level.
+    #[test_log::test(tokio::test)]
+    async fn entry_counts_consumed_and_adopts_reported_level() -> anyhow::Result<()> {
+        let (mgr, _sender_rx, _notif_rx) = started_manager();
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+
+        const REPORTED: u64 = 42;
+        let ka = ApplicationDataIn {
+            data: ApplicationData::try_from(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: pseudonym,
+                flags: KeepAliveFlag::BalancerState.into(),
+                additional_data: REPORTED,
+            }))?,
+            packet_info: Default::default(),
+        };
+        mgr.dispatch_message(pseudonym, ka)?;
+        wait_for(&mgr, pseudonym, |c| c.1, 1).await;
+
+        assert_eq!(
+            REPORTED,
+            mgr.sessions.get(&pseudonym).expect("slot").surb_mgmt.buffer_level(),
+            "the Entry must adopt the Exit's reported level"
+        );
+        Ok(())
+    }
+
+    /// CR-2 tradeoff, pinned. Once the counter is accurate, an Exit store smaller than the Entry
+    /// target reports a level that plateaus below target and can never reach it, so the Entry keeps
+    /// minting into a store that only evicts. That is the documented cost of P1: the clamp deliberately
+    /// refuses to pin the level below target (`clamp_to_counterparty_capacity`), because pinning it
+    /// there would hold production at maximum forever -- a worse failure. Closing this needs the Entry
+    /// to *infer* the Exit's real capacity from the plateau and cap its target there, which is #8454.
+    /// This test pins the P1 behaviour (keep minting) so #8454 flipping it to stop is a deliberate,
+    /// visible change rather than a silent one -- it is unreachable in a homogeneous network, where
+    /// `target <= 2/3 * rb_capacity < rb_capacity`.
+    #[test]
+    fn entry_keeps_minting_when_exit_store_is_smaller_than_target() {
+        const EXIT_CAPACITY: u64 = 500;
+        const ENTRY_TARGET: u64 = 2_000;
+        let state = gate_state(ENTRY_TARGET, EXIT_CAPACITY);
+        state.set_counterparty_buffer_capacity(EXIT_CAPACITY);
+        assert_eq!(
+            1,
+            state.organic_surbs_per_packet(),
+            "P1 tradeoff: a truthful level that plateaus below an unreachable target keeps the Entry minting; #8454 \
+             closes this by inferring the Exit's capacity"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Adversarial: the scenarios the baseline tests above deliberately do not cover, drawn from the
+    // SURB-balancer gotchas (hopr-debug). These push the *accounting* to the edge the emergent
+    // dynamics reach in the field.
+    // ---------------------------------------------------------------
+
+    /// Adversarial CR-3 (expected to FAIL on #8452): the balancer keep-alive stream is the Exit's
+    /// primary replenishment path, and an abandoned/over-minting Entry keeps delivering SURBs into a
+    /// full store long after they can be held (`abandoned-session-keeps-replenishing`,
+    /// `surb-ratio-is-comparative-only`). Every such keep-alive is counted as `produced` with its
+    /// evictions dropped, so the estimated held level grows without bound instead of pinning at the
+    /// store's real occupancy — the counting-side shape of the `london-01` inflation.
+    #[test_log::test(tokio::test)]
+    async fn sustained_keepalive_replenishment_into_a_full_store_must_not_inflate_without_bound() -> anyhow::Result<()>
+    {
+        let (mgr, _sender_rx, _notif_rx) = started_manager();
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let min = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE;
+        const ROUNDS: u64 = 8;
+        // Every keep-alive delivers into an already-full store: all its SURBs evict.
+        for _ in 0..ROUNDS {
+            mgr.dispatch_message(pseudonym, entry_keepalive(pseudonym, 100, min)?)?;
+        }
+        wait_for(&mgr, pseudonym, |c| c.0, ROUNDS * min as u64).await;
+
+        let (produced, consumed, evicted) = estimator_counts(&mgr, pseudonym);
+        let held = produced.saturating_sub(consumed).saturating_sub(evicted);
+        assert_eq!(
+            held, 0,
+            "sustained replenishment into a full store must leave the held level pinned at occupancy, not grow by \
+             {min} every keep-alive; after {ROUNDS} rounds produced={produced} consumed={consumed} evicted={evicted} \
+             held={held}"
+        );
+        Ok(())
+    }
+
+    /// Adversarial (expected to FAIL on #8452): the keep-alive path counts a *fixed*
+    /// `MIN_SURBS_PER_MESSAGE` as produced, ignoring how many SURBs the packet actually delivered
+    /// (`num_saved_surbs`) — unlike the data path, which counts the real figure. An Entry that capped
+    /// its organic SURBs (near target, or under distress) sends a keep-alive carrying fewer, and the
+    /// Exit over-counts the difference permanently.
+    #[test_log::test(tokio::test)]
+    async fn exit_keepalive_produced_must_reflect_actual_delivered_not_a_fixed_count() -> anyhow::Result<()> {
+        let (mgr, _sender_rx, _notif_rx) = started_manager();
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        // The keep-alive actually delivered a single SURB (the Entry capped its organic production).
+        const ACTUALLY_DELIVERED: usize = 1;
+        let ka = ApplicationDataIn {
+            data: ApplicationData::try_from(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: pseudonym,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: 100,
+            }))?,
+            packet_info: IncomingPacketInfo {
+                num_saved_surbs: ACTUALLY_DELIVERED,
+                ..Default::default()
+            },
+        };
+        mgr.dispatch_message(pseudonym, ka)?;
+        wait_for(&mgr, pseudonym, |c| c.0, 1).await;
+
+        let (produced, ..) = estimator_counts(&mgr, pseudonym);
+        assert_eq!(
+            produced, ACTUALLY_DELIVERED as u64,
+            "the Exit must count the SURBs the keep-alive actually delivered ({ACTUALLY_DELIVERED}), not a fixed \
+             MIN_SURBS_PER_MESSAGE; counted produced={produced}"
+        );
+        Ok(())
+    }
 
     #[test]
     fn session_config_forwards_max_buffered_segments() {
@@ -2201,6 +2488,28 @@ mod tests {
         assert_eq!(
             PacketSignals::from(PacketSignal::SurbDistress),
             info.signals_to_destination
+        );
+        Ok(())
+    }
+
+    /// Entry side of the documented capacity<target tradeoff: when the Exit's real store is smaller
+    /// than the Entry's target, the level it truthfully reports plateaus below target (pinned from the
+    /// Exit side in `balancer/controller.rs`), so the Entry keeps minting — it cannot tell "full at a
+    /// level below my target" from "still filling". Pinned so the follow-up distress-based capacity
+    /// guesstimate changes this deliberately and visibly, not by accident.
+    #[test]
+    fn organic_minting_continues_when_the_counterparty_store_is_smaller_than_the_target() -> anyhow::Result<()> {
+        const EXIT_CAPACITY: u64 = 500;
+        const ENTRY_TARGET: u64 = 2_000;
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, false, &gate_state(ENTRY_TARGET, EXIT_CAPACITY));
+
+        assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
+        assert_eq!(
+            1,
+            data.estimate_surbs_with_msg(),
+            "the Entry keeps minting toward a target the smaller store can never reach"
         );
         Ok(())
     }
@@ -3117,13 +3426,20 @@ mod tests {
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
+                // Model what the decoder records on arrival: the SURBs this keep-alive carried enter
+                // Bob's store. Without it the real accounting has nothing to count and Bob's level never
+                // rises off zero.
+                let saved = data.estimate_surbs_with_msg();
                 Box::pin(async move {
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info: IncomingPacketInfo {
+                                    num_saved_surbs: saved,
+                                    ..Default::default()
+                                },
                             },
                         )
                         ?;
@@ -3145,13 +3461,18 @@ mod tests {
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
+                // As above: the keep-alive's SURBs enter Bob's store on arrival.
+                let saved = data.estimate_surbs_with_msg();
                 Box::pin(async move {
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info: IncomingPacketInfo {
+                                    num_saved_surbs: saved,
+                                    ..Default::default()
+                                },
                             },
                         )
                         ?;

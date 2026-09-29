@@ -147,8 +147,9 @@ pub struct IncomingPacketInfo {
     /// How many already-held SURBs were evicted while inserting this packet's because this sender's
     /// SURB buffer was full.
     ///
-    /// The arriving SURBs are retained and the oldest queued ones are dropped. Exposed for
-    /// observability only; sessions deliberately do not feed it back into the SURB flow estimate.
+    /// The arriving SURBs are retained and the oldest queued ones are dropped. The Exit's session
+    /// counts these toward its SURB flow estimate (an evicted SURB has left the buffer just as a spent
+    /// one has), so the level it reports tracks what the store actually holds.
     pub num_evicted_surbs: usize,
 }
 

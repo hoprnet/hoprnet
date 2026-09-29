@@ -120,11 +120,15 @@ where
                 flags: KeepAliveFlag::BalancerTarget.into(),
                 additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
             }),
-            // Report the level this side acts on, clamped to the store capacity on every update, not the raw
-            // produced - consumed difference: that difference never subtracts the SURBs the full store evicted, so
-            // after an overflow it tells the Entry the buffer holds several times its capacity, the Entry stops
-            // producing SURBs, and the Exit runs dry and drops every return packet. The estimator stays in the
-            // enum for the callers.
+            // Report the level this side acts on: the accumulator the balancer maintains, which is fed
+            // by `produced - consumed - evicted` and bounded on every update by `max(store capacity,
+            // target)` (see `clamp_to_counterparty_capacity`) -- so it tracks what the store actually
+            // holds, except that a target above the store's capacity relaxes the bound to that target
+            // rather than pinning production at maximum forever. This is unlike a raw `produced -
+            // consumed` difference, which ignored the SURBs the full store evicted and after an
+            // overflow told the Entry the buffer held several times its capacity -- stopping the Entry,
+            // draining the Exit, and dropping every return packet. The estimator stays in the enum for
+            // the callers.
             SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
                 flags: KeepAliveFlag::BalancerState.into(),

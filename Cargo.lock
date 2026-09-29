@@ -4537,7 +4537,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.30.0"
+version = "0.30.3"
 dependencies = [
  "anyhow",
  "async-trait",
