@@ -185,7 +185,7 @@ impl SurbFlowEstimator for SimpleSurbFlowEstimator {
 /// An implementation of `SurbFlowEstimator` backed by atomics.
 ///
 /// `net` is the authoritative held count and the only field correctness-critical readers should
-/// consult (via [`net_held`](SurbFlowEstimator::net_held)): being a single atomic, a snapshot of it
+/// consult (via the `net_held` accessor): being a single atomic, a snapshot of it
 /// cannot tear. The three counters beside it are cumulative totals kept for observability (telemetry
 /// gauges, the balancer trace, cross-node conservation checks) and may read slightly inconsistent
 /// with each other and with `net` under concurrency -- which is why nothing that must be correct reads
