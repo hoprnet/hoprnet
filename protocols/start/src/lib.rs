@@ -82,7 +82,7 @@ pub struct StartErrorType<I> {
 /// - `C` are session capabilities
 ///
 /// The `additional_data` are set dependent on the `capabilities`
-/// or set to `0x0000000000000000` to be ignored.
+/// or set to `0` to be ignored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartInitiation<T, C> {
     /// Random challenge for this initiation.
@@ -93,14 +93,15 @@ pub struct StartInitiation<T, C> {
     ///
     /// This might also contain information required for the PIX protocol.
     pub capabilities: C,
-    /// Additional options (might be `capabilities` dependent), ignored if `0x0000000000000000`.
+    /// Additional options (might be `capabilities` dependent), ignored if `0`.
     ///
-    /// When PIX is offered, the upper 32 bits are the
-    /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
+    /// The most significant 64 bits carry the negotiated options: when PIX is offered, the upper
+    /// 32 bits of them are the [`PixParams`](hopr_protocol_pix::PixParams) word — see
     /// [`PixParams::into_additional_data`](hopr_protocol_pix::PixParams::into_additional_data) —
-    /// and the lower 32 bits are the SURB balancer target. The field is then fully allocated;
-    /// there is no room left in it to negotiate anything further.
-    pub additional_data: u64,
+    /// and the lower 32 bits of them are the SURB balancer target.
+    ///
+    /// The least significant 64 bits are currently unused and must be set to `0`.
+    pub additional_data: u128,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -497,7 +498,7 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
     /// Fixed [`Tag`] of every protocol message.
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
-    pub const START_PROTOCOL_VERSION: u8 = 0x03;
+    pub const START_PROTOCOL_VERSION: u8 = 0x04;
 
     /// How many commitment entries one [`SsaCommit`](StartProtocol::SsaCommit) message can carry,
     /// for each of the two delivery phases.
@@ -878,7 +879,7 @@ where
         Ok(
             match StartProtocolDiscriminants::from_repr(disc).ok_or(StartProtocolError::UnknownMessage)? {
                 StartProtocolDiscriminants::StartSession => {
-                    if body.len() < size_of::<StartChallenge>() + 1 + size_of::<u64>() {
+                    if body.len() < size_of::<StartChallenge>() + 1 + size_of::<u128>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -891,12 +892,12 @@ where
                         capabilities: body[size_of::<StartChallenge>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("init.capabilities".into()))?,
-                        additional_data: u64::from_be_bytes(
-                            body[size_of::<StartChallenge>() + 1..size_of::<StartChallenge>() + 1 + size_of::<u64>()]
+                        additional_data: u128::from_be_bytes(
+                            body[size_of::<StartChallenge>() + 1..size_of::<StartChallenge>() + 1 + size_of::<u128>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.additional_data".into()))?,
                         ),
-                        target: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>() + 1 + size_of::<u64>()..])?,
+                        target: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>() + 1 + size_of::<u128>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
@@ -1308,7 +1309,7 @@ mod tests {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
             capabilities: Default::default(),
-            additional_data: 0x12345678,
+            additional_data: 0x1234_5678_9abc_def0_0000_0000_0000_0000,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -1328,7 +1329,7 @@ mod tests {
                 challenge: 0,
                 target: "127.0.0.1:1234".to_string(),
                 capabilities: 0xff,
-                additional_data: 0xffffffff,
+                additional_data: (u64::MAX as u128) << 64,
             });
 
         // Two SURBs are needed because if the server wants to establish PIX, it needs to send an additional
