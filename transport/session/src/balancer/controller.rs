@@ -467,12 +467,11 @@ where
 
         self.last_update = std::time::Instant::now();
 
-        // Take a snapshot of the active SURB estimator and calculate the balance change
+        // Take a snapshot of the active SURB estimator and calculate the balance change. The change is
+        // one coherent subtraction over the net held count (a single atomic), so it never reads
+        // non-monotonically and a negative result is a legitimate drain.
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
-        let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
-            tracing::error!("non-monotonic change in SURB estimators");
-            return current;
-        };
+        let target_buffer_change = snapshot.estimated_surb_buffer_change(&self.last_estimator_state);
 
         self.last_estimator_state = snapshot;
         current = current.saturating_add_signed(target_buffer_change);
@@ -951,14 +950,9 @@ mod tests {
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_estimator.produced.fetch_add(
-                production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
-                std::sync::atomic::Ordering::Relaxed,
-            );
-            surb_estimator.consumed.fetch_add(
-                consumption_rate * step_duration.as_secs(),
-                std::sync::atomic::Ordering::Relaxed,
-            );
+            surb_estimator
+                .record_produced(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs());
+            surb_estimator.record_consumed(consumption_rate * step_duration.as_secs());
 
             let next_update = balancer.update();
             assert!(
@@ -1004,14 +998,9 @@ mod tests {
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_estimator.produced.fetch_add(
-                production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
-                std::sync::atomic::Ordering::Relaxed,
-            );
-            surb_estimator.consumed.fetch_add(
-                consumption_rate * step_duration.as_secs(),
-                std::sync::atomic::Ordering::Relaxed,
-            );
+            surb_estimator
+                .record_produced(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs());
+            surb_estimator.record_consumed(consumption_rate * step_duration.as_secs());
 
             let next_update = balancer.update();
             assert!(
@@ -1067,12 +1056,8 @@ mod tests {
         std::thread::sleep(step);
 
         let minted = output.load(std::sync::atomic::Ordering::Relaxed) * step.as_millis() as u64 / 1000;
-        surb_estimator
-            .produced
-            .fetch_add(minted, std::sync::atomic::Ordering::Relaxed);
-        surb_estimator
-            .consumed
-            .fetch_add(consumed, std::sync::atomic::Ordering::Relaxed);
+        surb_estimator.record_produced(minted);
+        surb_estimator.record_consumed(consumed);
         balancer.update();
     }
 
@@ -1255,9 +1240,7 @@ mod tests {
         // Replies stop, while production continues from a source the controller does not drive --
         // keep-alives mint on their own schedule, which is how the live estimate ran away.
         for _ in 0..20 {
-            surb_estimator
-                .produced
-                .fetch_add(500, std::sync::atomic::Ordering::Relaxed);
+            surb_estimator.record_produced(500);
             tick(&mut balancer, &surb_estimator, &output, 0);
         }
 
@@ -1337,7 +1320,7 @@ mod tests {
 
         // Drain the store: every spent SURB leaves the buffer.
         for _ in 0..(CAPACITY / 200) {
-            est.consumed.fetch_add(200, Ordering::Relaxed);
+            est.record_consumed(200);
             occupancy -= 200;
             std::thread::sleep(Duration::from_millis(12));
             balancer.update();
@@ -1381,6 +1364,49 @@ mod tests {
             believed < cfg.target_surb_buffer_size,
             "an accurate level cannot reach a target above the store's capacity: {believed} < {}",
             cfg.target_surb_buffer_size
+        );
+    }
+
+    /// CR-1 resolved: a delivery that evicts moves the held count by one coherent step, so a small
+    /// believed level cannot be over-counted by a torn read. Previously the eviction and its matching
+    /// production landed in separate atomics; a snapshot taken between them read the change too negative,
+    /// `saturating_add_signed` clamped the surplus away at zero, and the next tick's positive delta
+    /// telescoped only the production back -- settling the level above true occupancy. With the held
+    /// count behind a single atomic there is no such window: a packet delivering 10 into a store that
+    /// evicts 8, on a level of 3, lands at exactly 5.
+    #[test_log::test]
+    fn a_delivery_that_evicts_is_accounted_coherently_on_a_small_level() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        // No decay and an unbounded capacity clamp (default 0), so only the change under test moves
+        // the level.
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+            sustain_on_return_path_loss: false,
+        };
+        let (mut balancer, est, state, _output) = balancer_with_feedback(cfg);
+
+        // Baseline: last_estimator_state becomes net=1000.
+        est.record_produced(1000);
+        std::thread::sleep(Duration::from_millis(12));
+        balancer.update();
+
+        // The level has since drained to a small value.
+        state.buffer_level.store(3, Relaxed);
+
+        // A packet delivers 10 SURBs into the full store, 8 of which evict older ones: one coherent
+        // net change of +2, with no window in which the eviction is visible without the production.
+        est.record_incoming(10, 8);
+        std::thread::sleep(Duration::from_millis(12));
+        balancer.update();
+
+        // Net change is +2 (10 delivered - 8 evicted); on a level of 3 that is 5.
+        assert_eq!(
+            5,
+            state.buffer_level.load(Relaxed),
+            "the delivery net of eviction must be accounted exactly; the level must not over-count"
         );
     }
 
