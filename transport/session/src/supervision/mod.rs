@@ -659,12 +659,12 @@ pub struct SupervisorConfig {
     ///   the current cycle's bounded predeposit allowance.
     ///
     /// **Must not exceed the peer Entry's `max_ssas_per_request`.** The batch size is not negotiated
-    /// — `StartSession.additional_data` is fully allocated (PIX dimensions in the upper 32 bits, SURB
-    /// balancer target in the lower 32), so the Entry cannot advertise its cap and the Exit cannot
-    /// learn it. An Entry that finds a batch too large refuses it in full and replies with an
-    /// `UnacceptablePixParams` `SessionError`, which closes the Session on both sides in about a round
-    /// trip. Every such Session is still lost; the reply only makes the failure immediate and
-    /// attributable instead of surfacing as a commitment timeout.
+    /// — the options word in the most significant 64 bits of `StartSession.additional_data` is fully
+    /// allocated (PIX dimensions and SURB balancer target), and its least significant 64 bits are not
+    /// yet used for this, so the Entry does not advertise its cap and the Exit cannot learn it. An Entry that finds a
+    /// batch too large refuses it in full and replies with an `UnacceptablePixParams` `SessionError`, which closes
+    /// the Session on both sides in about a round trip. Every such Session is still lost; the reply only makes the
+    /// failure immediate and attributable instead of surfacing as a commitment timeout.
     ///
     /// Range-checked by [`validate_pix_supervision`] and clamped where it is read, so it can never
     /// exceed `MAX_SSA_BATCH_SIZE`.
