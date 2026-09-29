@@ -1122,8 +1122,8 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// An Exit batching above the Entry's cap must fail fast on a `SessionError`, not linger until its own
 /// deposit kill switch fires.
 ///
-/// The batch size is not negotiated — `StartSession.additional_data` has no room to advertise the
-/// Entry's cap — so this misconfiguration is reachable and, without the `SessionError`, silent: the
+/// The batch size is not negotiated — the Entry does not advertise its cap in
+/// `StartSession.additional_data` — so this misconfiguration is reachable and, without the `SessionError`, silent: the
 /// Exit has armed its kill switches, will never receive an `SsaCommit`, and has no event that could
 /// make it re-request. It would serve the Session unincentivized for
 /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)` — 240 s at the defaults used here —

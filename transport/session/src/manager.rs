@@ -1013,8 +1013,8 @@ impl Drop for PixFillControl {
 /// *ceiling* rather than the value used, and it has to be, because the two sides of the comparison
 /// are chosen by different nodes. The reserve is measured against the Exit's estimate of its own SURB
 /// buffer for the Session, and how deep that buffer is is the *Entry's* decision — it announces its
-/// balancer target in the lower 32 bits of `StartInitiation::additional_data`. An operator sizing the
-/// reserve against a production buffer therefore also decides, unintentionally, that every Session
+/// balancer target in the lower 32 bits of the options word in `StartInitiation::additional_data`. An operator sizing
+/// the reserve against a production buffer therefore also decides, unintentionally, that every Session
 /// whose Entry asks for a shallower one can never be filled at all: the estimate never reaches the
 /// reserve, every fill packet is withheld, and the funded cycle strands on `max_recovery_time` while
 /// the logs report only a backoff.
@@ -1325,6 +1325,25 @@ impl EffectivePixAdmission {
     }
 }
 
+/// Bit position of the 64-bit options word within `StartInitiation::additional_data`.
+///
+/// The options word (PIX parameters and SURB balancer target) occupies the most significant 64 bits;
+/// the least significant 64 bits are currently unused and always sent as `0`.
+const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
+
+/// Places the 64-bit options word into the most significant half of `StartInitiation::additional_data`,
+/// leaving the (currently unused) least significant half zero.
+#[inline]
+const fn into_initiation_additional_data(options: u64) -> u128 {
+    (options as u128) << INITIATION_OPTIONS_SHIFT
+}
+
+/// Inverse of [`into_initiation_additional_data`], ignoring the least significant half.
+#[inline]
+const fn initiation_options(additional_data: u128) -> u64 {
+    (additional_data >> INITIATION_OPTIONS_SHIFT) as u64
+}
+
 /// Decodes the incentivization the Entry offered, before anyone is asked what to do about it.
 ///
 /// `Ok(None)` is a peer that offered none. `Err` is one whose offer this node cannot read or
@@ -1342,7 +1361,7 @@ fn decode_pix_offer(
 
     // Unpacking is what enforces the protocol ranges on the three dimensions, and what rejects a
     // suite identifier no curve claims — leaving only "a known curve, but not ours" below.
-    let params = PixParams::try_from_additional_data(req.additional_data).map_err(|error| {
+    let params = PixParams::try_from_additional_data(initiation_options(req.additional_data)).map_err(|error| {
         debug!(
             challenge = req.challenge,
             %error,
@@ -1856,12 +1875,12 @@ impl PixToolbox {
 ///
 /// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
 /// Address) parameters — a [`PixParams`] quadruple of `polys_per_ssa`, `shares_per_poly`,
-/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the
-/// `StartSession.additional_data` field, via [`PixParams::into_additional_data`]. The first two
-/// describe how many polynomials and shares each SSA will use; the third is how many extra shares
-/// per polynomial the Entry emits to absorb losses. Those three define the data quota per SSA, which
-/// is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free,
-/// since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
+/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the 64-bit options word
+/// carried in the most significant 64 bits of the `StartSession.additional_data` field, via
+/// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares each
+/// SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb losses. Those three define
+/// the data quota per SSA, which is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather
+/// than free, since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
 ///
 /// The fourth is not a dimension and does not enter the quota: it names the elliptic curve the
 /// Entry's build instantiates PIX over, which fixes the width of every curve-sized field later in
@@ -2629,7 +2648,7 @@ where
 
         let mut additional_data = 0_u64;
 
-        // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
+        // SURB balancer target announcement is encoded in the lower 32-bits of the options word
         if !cfg.capabilities.contains(Capability::NoRateControl) {
             additional_data |= cfg
                 .surb_management
@@ -2645,7 +2664,7 @@ where
                 .min(u32::MAX as u64);
         }
 
-        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // PIX quota parameter announcement is encoded in the upper 32-bits of the options word.
         // Run these validations BEFORE reserving the initiation challenge slot so that a
         // repeated invalid request cannot exhaust all challenge slots.
         if cfg.capabilities.contains(Capability::UsePIX) {
@@ -2705,7 +2724,7 @@ where
             challenge,
             target,
             capabilities: HoprSessionCapabilities(cfg.capabilities),
-            additional_data,
+            additional_data: into_initiation_additional_data(additional_data),
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -4739,15 +4758,15 @@ where
         // The SURB buffer target the Entry asked for, resolved once for both branches below.
         //
         // The Session request carries a "hint" as additional data telling what the Session initiator
-        // has configured as its target buffer size in the Balancer. The lower 32 bits contain the
-        // SURB target; the upper 32 bits carry PIX parameters and must be masked out.
+        // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
+        // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
         // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
         // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
         // figure, and on that branch the fallback below — the same one the balancer would have used —
         // is the only estimate of the buffer there is.
         let announced_surb_target = {
-            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            let surb_target = initiation_options(session_req.additional_data) as u32;
             if surb_target > 0 {
                 (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
@@ -5896,10 +5915,12 @@ mod tests {
     /// Tests go through the same packing production does. They used to write the shifts out by
     /// hand, which meant a change to the layout altered what every one of them was asserting
     /// without altering a single line of them — plain `u64` literals type-check against anything.
-    fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u64 {
-        PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
-            .expect("test dimensions must be valid")
-            .into_additional_data(0)
+    fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u128 {
+        into_initiation_additional_data(
+            PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
+                .expect("test dimensions must be valid")
+                .into_additional_data(0),
+        )
     }
 
     /// The default test dimensions: the smallest legal split, with the surplus the test generators
@@ -5909,8 +5930,8 @@ mod tests {
     }
 
     /// [`small_pix_params`] as an Entry offering them would pack them into `additional_data`.
-    fn small_pix_additional_data() -> u64 {
-        small_pix_params().into_additional_data(0)
+    fn small_pix_additional_data() -> u128 {
+        into_initiation_additional_data(small_pix_params().into_additional_data(0))
     }
 
     /// Surplus used by the small test `SsaGeneratorConfig`s below. Non-zero and different from
@@ -7047,7 +7068,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(capabilities | Capability::UsePIX),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -8277,7 +8298,7 @@ mod tests {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
                     capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                    additional_data: params.into_additional_data(0),
+                    additional_data: into_initiation_additional_data(params.into_additional_data(0)),
                 },
             )
         };
@@ -8627,7 +8648,7 @@ mod tests {
 
         // Zero polynomials is outside the protocol range, so unpacking refuses it outright.
         let unreadable = StartInitiation {
-            additional_data: ((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40),
+            additional_data: into_initiation_additional_data(((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40)),
             ..pix_offer()
         };
         mgr.handle_incoming_session_initiation(HoprPseudonym::random(), unreadable)
@@ -10758,7 +10779,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -10893,7 +10914,7 @@ mod tests {
             challenge: MIN_CHALLENGE,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-            additional_data: DEFAULT_PIX_PARAMS.into_additional_data(0),
+            additional_data: into_initiation_additional_data(DEFAULT_PIX_PARAMS.into_additional_data(0)),
         };
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
@@ -11636,7 +11657,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -13689,7 +13710,7 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data,
+            additional_data: into_initiation_additional_data(additional_data),
         };
         // Packed by hand rather than through `pix_additional_data`, because that helper refuses to
         // build the very values under test. The layout it mirrors is pinned in `PixParams`' own
@@ -13762,9 +13783,11 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: PixParams::try_new(8192, 128, 37, suite)
-                .expect("test dimensions must be valid")
-                .into_additional_data(0),
+            additional_data: into_initiation_additional_data(
+                PixParams::try_new(8192, 128, 37, suite)
+                    .expect("test dimensions must be valid")
+                    .into_additional_data(0),
+            ),
         };
 
         let foreign = match LOCAL_PIX_SUITE {
@@ -13786,7 +13809,9 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+            additional_data: into_initiation_additional_data(
+                (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+            ),
         };
         assert!(
             decode_and_check(&mgr, &unknown).is_none(),
@@ -13850,7 +13875,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;

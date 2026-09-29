@@ -155,7 +155,7 @@ hopr-protocol-pix = { version = "0.2.0", path = "protocols/pix", default-feature
   "rayon",
 ] }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
-hopr-protocol-start = { version = "2.0.0", path = "protocols/start", default-features = false }
+hopr-protocol-start = { version = "3.0.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.7.0" }
 hopr-transport = { version = "0.50.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
