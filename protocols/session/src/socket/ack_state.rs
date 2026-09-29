@@ -671,12 +671,14 @@ mod tests {
 
     use super::*;
     use crate::{
+        MAX_SESSION_MTU,
         processing::types::{FrameBuilder, FrameDashMap, FrameMap},
         protocol::SeqNum,
         utils::segment,
     };
 
-    const FRAME_SIZE: usize = 1500;
+    /// The frame size production actually feeds a Session.
+    const FRAME_SIZE: usize = MAX_SESSION_MTU;
 
     const MTU: usize = 1000;
 

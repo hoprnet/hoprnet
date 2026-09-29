@@ -38,7 +38,7 @@ use {
 
 const FUNDING_AMOUNT: &str = "15000 wxHOPR";
 
-// PIX params: 8 polys × 2 shares × ~1440 bytes = ~23 KB per SSA cycle
+// PIX params: 8 polys × (2 + 2) shares × one packet payload per share, per SSA cycle.
 const PIX_POLYS: u16 = 8;
 const PIX_SHARES: u8 = 2;
 
@@ -63,6 +63,16 @@ const PIX_PARAMS: hopr_lib::PixParams =
         Ok(params) => params,
         Err(_) => panic!("test PIX parameters must be within the protocol ranges"),
     };
+
+/// Quota one SSA cycle costs, as the Exit computes it when deciding whether to accept the Session.
+///
+/// Mirrors `pix_params_to_quota`: `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`. Derived
+/// rather than written as a literal because the payload size is a build-time constant that moves —
+/// a hard-coded ceiling here does not fail loudly when it goes stale, it just makes every PIX
+/// session in this file get rejected with `UnacceptablePixParams` after a cluster has booted.
+const PIX_QUOTA_PER_SSA: u64 = PIX_POLYS as u64
+    * (PIX_SHARES as u64 + PIX_SURPLUS as u64)
+    * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
 
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///
@@ -294,7 +304,7 @@ async fn establish_pix_session_with(
                 capabilities,
                 pseudonym: None,
                 surb_management,
-                always_max_out_surbs: false,
+                max_surbs_per_data_packet: 1,
                 flow_control: None,
                 max_frames_behind_gap: None,
             },
@@ -324,7 +334,7 @@ async fn establish_pix_session_with(
 #[cfg(feature = "session-client")]
 fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -> IncomingSessionPixConfig {
     IncomingSessionPixConfig {
-        quota_range: 0..=100_000,
+        quota_range: 0..=PIX_QUOTA_PER_SSA,
         enforce_pix: false,
         max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
         supervision: SupervisorConfig {
@@ -614,7 +624,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
             // Session at these dimensions.
@@ -811,7 +821,7 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
             // Session at these dimensions.
@@ -983,7 +993,7 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
             // Session at these dimensions.
@@ -1123,7 +1133,7 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
             // Session at these dimensions.
@@ -1537,7 +1547,7 @@ async fn fill_resumes_after_organic_traffic_stops(#[case] hops: usize) -> anyhow
     );
 
     let mut drained = Vec::new();
-    while let Ok(Some(milestone)) = milestones.try_next() {
+    while let Ok(milestone) = milestones.try_recv() {
         drained.push(milestone);
     }
     assert!(
@@ -1645,7 +1655,7 @@ async fn recovery_hard_deadline_closes_a_session_fill_cannot_supply(#[case] hops
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
-            quota_range: 0..=100_000,
+            quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
@@ -1769,7 +1779,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
                 pseudonym: None,
                 surb_management: None,
-                always_max_out_surbs: false,
+                max_surbs_per_data_packet: 1,
                 flow_control: None,
                 max_frames_behind_gap: None,
             },

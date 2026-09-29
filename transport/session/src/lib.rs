@@ -142,23 +142,22 @@ pub struct SessionClientConfig {
     /// Enable automatic SURB management for the Session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
-    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
+    /// Sets the maximum number of SURBs sent with Session data packets (if they fit).
     ///
     /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
-    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
-    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    /// carry the maximum number of SURBs possible. Setting this to a higher number will put additional CPU
+    /// pressure on the local node as it will generate the given number of SURBs for each data packet.
     ///
-    /// It also opts out of the SURB balancer's control over organic production entirely. With the
-    /// default `false`, a data packet carries *at most* one SURB and none at all while the
-    /// counterparty is estimated to be at its target buffer size — which is what stops SURBs (and
-    /// the PIX shares they carry) being delivered into a full buffer that discards them. Setting
-    /// this to `true` keeps producing regardless of that estimate.
+    /// The default `1` follows the balancer's target: data packets carry no SURBs while the
+    /// counterparty is estimated to have a full buffer. Values greater than `1` bypass this gate;
+    /// use them only if the underlying traffic is highly asymmetric. Setting this to `0` leaves
+    /// all SURB production to the SURB balancer (if configured).
     ///
-    /// Set this to `true` only when the underlying traffic is highly asymmetric.
+    /// The maximum number is naturally limited by the maximum payload size of a HOPR packet.
     ///
-    /// Default is `false`.
-    #[default(false)]
-    pub always_max_out_surbs: bool,
+    /// Default is `1`.
+    #[default(1)]
+    pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session.
     ///
     /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the
@@ -199,7 +198,7 @@ mod tests {
     #[test]
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
-        assert_eq!(1020, SESSION_MTU); // Needs to be changed when HOPR packet payload size changes
+        assert_eq!(1452, SESSION_MTU); // Needs to be changed when the Session MTU cap changes
     }
 
     #[test]
@@ -278,22 +277,18 @@ mod tests {
 
     #[test]
     fn hopr_start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
+        let keep_alive = KeepAliveMessage {
             session_id: HoprPseudonym::random(),
             flags: None.into(),
             additional_data: 0xffffffff,
-        });
-        let len = msg.encode()?.1.len();
-        assert_eq!(
-            KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE,
-            HoprPacket::MAX_SURBS_IN_PACKET
-        );
-        assert!(
-            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
-            "Hopr KeepAlive message size ({}) must allow for at least {} SURBs in packet",
-            len,
-            HoprPacket::MAX_SURBS_IN_PACKET
-        );
+        };
+        let capacity = keep_alive.max_surbs()?;
+        let data = ApplicationData::try_from(HoprStartProtocol::KeepAlive(keep_alive))?;
+
+        // Eight generation-tagged SURBs fit in an empty packet, but the keep-alive and its tag
+        // together need one byte more than the remaining space.
+        assert_eq!(capacity, 7);
+        assert_eq!(capacity, HoprPacket::max_surbs_with_message(data.total_len()));
 
         Ok(())
     }

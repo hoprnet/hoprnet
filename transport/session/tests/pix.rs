@@ -407,7 +407,7 @@ async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let ssa_gen_config = SsaGeneratorConfig {
-        polynomials_per_ssa: 64,
+        polynomials_per_ssa: 128,
         threshold: 64,
         surplus_shares: 16,
     };

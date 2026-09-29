@@ -455,7 +455,7 @@
 //! | `commitment_recommit_interval` | 3 s | A *single lost packet* costing the whole Session. A commitment set ships as hundreds of messages and is unusable until every one lands, so without this a drop stranded the cycle on the deadline above — after the Entry had already been told to fund it. The one parameter here that buys liveness rather than bounding an attack; it bounds nothing itself. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
-//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets of *full emission*, ~61 min, at the defaults — or it closes honest Sessions instead. That is the quantity `quota_range` prices and `validate_incoming_session_pix_config` enforces; the *last useful share* lands earlier, at 651 264, which is the figure the "why two hours" argument on [`SupervisorConfig::max_recovery_time`] uses. |
+//! | `max_recovery_time` | 4 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets of *full emission*, ~192 min, at the defaults — or it closes honest Sessions instead. That is the quantity `quota_range` prices and `validate_incoming_session_pix_config` enforces; the *last useful share* lands earlier, at 651 264, which is the figure the "why four hours" argument on [`SupervisorConfig::max_recovery_time`] uses. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
@@ -515,7 +515,7 @@
 //! `1..=MAX_FILL_RATE`, and a non-zero `min_surb_reserve`. One further constraint cannot be decided
 //! here because it spans the quota: `validate_incoming_session_pix_config` requires `max_rate` to
 //! clear the rate a cycle of the *widest accepted quota* needs to finish inside
-//! `finish_fraction × max_recovery_time`, which is 128 packets/s at the shipped defaults.
+//! `finish_fraction × max_recovery_time`, which is 64 packets/s at the shipped defaults.
 //!
 //! ### The surplus run, and why it no longer constrains anything
 //!
@@ -777,10 +777,10 @@ pub struct SupervisorConfig {
     /// This is a **resource backstop** (session slot + reconstructor memory),
     /// not the anti-drip mechanism. The service-gated idle rule is.
     ///
-    /// ## Why two hours, and not one
+    /// ## Why four hours
     ///
     /// It has to cover the *whole* of a cycle at the dimensions the node will accept, and at the
-    /// default dimensions one cycle does not fit in an hour. Emission runs in lockstep over windows
+    /// default dimensions one cycle needs more than three hours. Emission runs in lockstep over windows
     /// of [`SHARE_EMISSION_WINDOW`](hopr_protocol_pix::SHARE_EMISSION_WINDOW) polynomials, so with
     /// 8192 polynomials the last useful share of the cycle lands at
     ///
@@ -788,9 +788,9 @@ pub struct SupervisorConfig {
     /// (31 full windows x 80 emitted + 1 window x 64 useful) x 256 = 651 264 packets
     /// ```
     ///
-    /// which is just over **60 minutes** at the 1.5 Mbps per-Session cap this crate documents, before
-    /// any mixing latency or loss. A one-hour ceiling closes an honest, fully saturated Session at
-    /// the default configuration with its last useful share only about 18 seconds away — and the
+    /// which is about **190 minutes** at the 1.5 Mbps per-Session cap this crate documents, before
+    /// any mixing latency or loss. A two-hour ceiling closes an honest, fully saturated Session
+    /// at the default configuration before its last useful share arrives — and the
     /// partial cycle is worth nothing, since the SSA is the sum of every polynomial's constant term.
     ///
     /// This is deliberately not the same count as the 655 360 quoted in the module documentation's
@@ -800,13 +800,12 @@ pub struct SupervisorConfig {
     /// *useful* share lands, which is the point this argument is about — a deadline that clears the
     /// useful shares but not the surplus tail still collects a payable cycle.
     ///
-    /// Two hours is the value the worked profile in the module documentation already used, and it
-    /// keeps this instrument where it belongs: far enough out that
+    /// Four hours leaves room for the larger packet payload and keeps this instrument far enough out that
     /// [`max_recovery_idle`](Self::max_recovery_idle) is what actually binds.
     ///
     /// The clock starts when the cycle reaches the paid transport front. That is deliberately later
     /// than merely becoming the earliest unrecovered record: the predecessor's buffered surplus tail
-    /// can still occupy ~4096 packets, ~23 s at that rate, and remains bounded by the predecessor's
+    /// can still occupy ~4096 packets, ~72 s at that rate, and remains bounded by the predecessor's
     /// original hard clock. Starting the successor at the FIFO boundary prevents that pipeline delay
     /// from being charged twice. A funded cycle that reaches the front and is never served is still
     /// caught.
@@ -815,8 +814,8 @@ pub struct SupervisorConfig {
     /// accept, so a raised `quota_range` that outgrows it is refused at load rather than discovered
     /// one closed Session at a time.
     ///
-    /// Default: 2 hours.
-    #[default(Duration::from_secs(7200))]
+    /// Default: 4 hours.
+    #[default(Duration::from_secs(14400))]
     #[serde(with = "humantime_serde")]
     pub max_recovery_time: Duration,
 
@@ -1074,8 +1073,8 @@ pub struct PixFillConfig {
     /// that, so a cap set below it is refused at load rather than discovered one stranded deposit at a
     /// time.
     ///
-    /// Default: 250 packets/s, which is ~2 Mbps at `HoprPacket::PAYLOAD_SIZE` and about twice the
-    /// 128 packets/s the shipped defaults require.
+    /// Default: 250 packets/s, which is ~6.5 Mbps at `HoprPacket::PAYLOAD_SIZE` and about four times the
+    /// 64 packets/s the shipped defaults require.
     #[default(250)]
     pub max_rate: u32,
 
