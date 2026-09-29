@@ -100,7 +100,8 @@ pub struct StartInitiation<T, C> {
     /// [`PixParams::into_additional_data`](hopr_protocol_pix::PixParams::into_additional_data) —
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
-    /// The least significant 64 bits are currently unused and must be set to `0`.
+    /// The least significant 64 bits are currently unused: senders must set them to `0` and
+    /// receivers ignore them, so that they can be allocated later without breaking older decoders.
     pub additional_data: u128,
 }
 
@@ -1329,7 +1330,7 @@ mod tests {
                 challenge: 0,
                 target: "127.0.0.1:1234".to_string(),
                 capabilities: 0xff,
-                additional_data: (u64::MAX as u128) << 64,
+                additional_data: (u64::MAX as u128) << u64::BITS,
             });
 
         // Two SURBs are needed because if the server wants to establish PIX, it needs to send an additional

@@ -210,7 +210,7 @@ mod tests {
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
             capabilities: Capabilities::full().into(),
-            additional_data: (u64::MAX as u128) << 64,
+            additional_data: (u64::MAX as u128) << u64::BITS,
         });
 
         assert!(
@@ -264,7 +264,7 @@ mod tests {
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
             capabilities: Capabilities::full().into(),
-            additional_data: (u64::MAX as u128) << 64,
+            additional_data: (u64::MAX as u128) << u64::BITS,
         });
         let len = msg.encode()?.1.len();
         assert!(
