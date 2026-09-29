@@ -193,12 +193,14 @@ impl SurbFlowEstimator for SimpleSurbFlowEstimator {
 /// counters directly.
 #[derive(Clone, Debug, Default)]
 pub struct AtomicSurbFlowEstimator {
-    /// Number of consumed SURBs (observability).
-    pub consumed: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    /// Number of produced or received SURBs (observability).
-    pub produced: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    /// Number of received SURBs the buffer evicted on overflow (observability).
-    pub evicted: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Number of consumed SURBs (observability). Private: read via
+    /// [`estimate_surbs_consumed`](SurbFlowEstimator::estimate_surbs_consumed), written only through the
+    /// `record_*` methods, so callers cannot mutate it out of step with `net`.
+    consumed: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Number of produced or received SURBs (observability). Private; see `consumed`.
+    produced: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Number of received SURBs the buffer evicted on overflow (observability). Private; see `consumed`.
+    evicted: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// Coherent held count: `produced - consumed - evicted`, maintained as a single atomic.
     net: std::sync::Arc<std::sync::atomic::AtomicI64>,
 }

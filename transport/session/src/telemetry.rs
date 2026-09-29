@@ -7,7 +7,7 @@ use std::{
 use hopr_protocol_session::SessionMessageDiscriminants;
 
 pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
-use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
+use crate::{Capability, HoprSessionConfig, SessionId, balancer::SurbFlowEstimator, types::SESSION_SOCKET_CAPACITY};
 
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
@@ -384,8 +384,8 @@ fn refresh_surb_gauges(session_id: &SessionId, runtime: &mut SessionRuntimeState
         return;
     };
 
-    let produced = surb.estimator.produced.load(std::sync::atomic::Ordering::Relaxed);
-    let consumed = surb.estimator.consumed.load(std::sync::atomic::Ordering::Relaxed);
+    let produced = surb.estimator.estimate_surbs_produced();
+    let consumed = surb.estimator.estimate_surbs_consumed();
     let total = produced.saturating_sub(consumed);
 
     let elapsed_us = now_us.saturating_sub(surb.last_snapshot_us);

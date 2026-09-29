@@ -34,7 +34,7 @@ use crate::{
     SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
+        SurbControllerWithCorrection, SurbFlowEstimator,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
@@ -1424,14 +1424,8 @@ where
     pub fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
         match self.sessions.get(id) {
             Some(session) => Ok((
-                session
-                    .surb_estimator
-                    .produced
-                    .load(std::sync::atomic::Ordering::Relaxed),
-                session
-                    .surb_estimator
-                    .consumed
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                session.surb_estimator.estimate_surbs_produced(),
+                session.surb_estimator.estimate_surbs_consumed(),
             )),
             None => Err(SessionManagerError::NonExistingSession.into()),
         }
@@ -2103,12 +2097,11 @@ mod tests {
 
     /// The SURB estimator counters (produced, consumed, evicted) for a session.
     fn estimator_counts(mgr: &TestManager, pseudonym: HoprPseudonym) -> (u64, u64, u64) {
-        use std::sync::atomic::Ordering::Relaxed;
         let slot = mgr.sessions.get(&pseudonym).expect("session slot must exist");
         (
-            slot.surb_estimator.produced.load(Relaxed),
-            slot.surb_estimator.consumed.load(Relaxed),
-            slot.surb_estimator.evicted.load(Relaxed),
+            slot.surb_estimator.estimate_surbs_produced(),
+            slot.surb_estimator.estimate_surbs_consumed(),
+            slot.surb_estimator.estimate_surbs_evicted(),
         )
     }
 
