@@ -1013,8 +1013,8 @@ impl Drop for PixFillControl {
 /// *ceiling* rather than the value used, and it has to be, because the two sides of the comparison
 /// are chosen by different nodes. The reserve is measured against the Exit's estimate of its own SURB
 /// buffer for the Session, and how deep that buffer is is the *Entry's* decision — it announces its
-/// balancer target in the lower 32 bits of `StartInitiation::additional_data`. An operator sizing the
-/// reserve against a production buffer therefore also decides, unintentionally, that every Session
+/// balancer target in the lower 32 bits of the options word in `StartInitiation::additional_data`. An operator sizing
+/// the reserve against a production buffer therefore also decides, unintentionally, that every Session
 /// whose Entry asks for a shallower one can never be filled at all: the estimate never reaches the
 /// reserve, every fill packet is withheld, and the funded cycle strands on `max_recovery_time` while
 /// the logs report only a backoff.
@@ -1873,12 +1873,12 @@ impl PixToolbox {
 ///
 /// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
 /// Address) parameters — a [`PixParams`] quadruple of `polys_per_ssa`, `shares_per_poly`,
-/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the
-/// `StartSession.additional_data` field, via [`PixParams::into_additional_data`]. The first two
-/// describe how many polynomials and shares each SSA will use; the third is how many extra shares
-/// per polynomial the Entry emits to absorb losses. Those three define the data quota per SSA, which
-/// is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free,
-/// since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
+/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the 64-bit options word
+/// carried in the most significant 64 bits of the `StartSession.additional_data` field, via
+/// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares each
+/// SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb losses. Those three define
+/// the data quota per SSA, which is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather
+/// than free, since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
 ///
 /// The fourth is not a dimension and does not enter the quota: it names the elliptic curve the
 /// Entry's build instantiates PIX over, which fixes the width of every curve-sized field later in
@@ -4753,8 +4753,8 @@ where
         // The SURB buffer target the Entry asked for, resolved once for both branches below.
         //
         // The Session request carries a "hint" as additional data telling what the Session initiator
-        // has configured as its target buffer size in the Balancer. The lower 32 bits contain the
-        // SURB target; the upper 32 bits carry PIX parameters and must be masked out.
+        // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
+        // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
         // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
         // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this

@@ -81,7 +81,7 @@ const _: () = assert!(
 /// dimensions and the curve suite they are dimensions of.
 ///
 /// The same quadruple is packed into two different wire fields — the `SsaRequest` `params` word and
-/// the upper half of `StartInitiation::additional_data` — and both go through this type. Every
+/// the options word of `StartInitiation::additional_data` — and both go through this type. Every
 /// earlier version of this had the shifts written out by hand at each site, in two mutually
 /// inconsistent shapes, which is why the packing lives behind a constructor rather than in the
 /// callers.
@@ -234,18 +234,19 @@ impl PixParams {
         )
     }
 
-    /// Packs into the upper half of a `StartInitiation::additional_data` word, leaving `surb_target`
-    /// in the lower half.
+    /// Packs into the upper half of the 64-bit options word carried in the most significant 64 bits
+    /// of `StartInitiation::additional_data`, leaving `surb_target` in the lower half of that word.
     ///
-    /// The two halves are the whole of that field: there is no room left in it to negotiate anything
-    /// further.
+    /// The options word is fully allocated by these two halves; the least significant 64 bits of
+    /// `StartInitiation::additional_data` are currently unused and remain available for negotiating
+    /// anything further.
     #[inline]
     pub const fn into_additional_data(self, surb_target: u32) -> u64 {
         ((self.to_u32() as u64) << ADDITIONAL_DATA_SHIFT) | surb_target as u64
     }
 
     /// Inverse of [`into_additional_data`](Self::into_additional_data), ignoring the SURB target in
-    /// the lower half.
+    /// the lower half of the options word.
     pub const fn try_from_additional_data(additional_data: u64) -> Result<Self, InvalidPixParams> {
         Self::try_from_u32((additional_data >> ADDITIONAL_DATA_SHIFT) as u32)
     }
