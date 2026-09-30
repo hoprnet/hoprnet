@@ -1,5 +1,6 @@
+---
 name: Bug report
-description: Report a bug. The required fields feed the A2 handoff contract so an agent (or human) can reproduce it. See docs/a2-handoff-contract.md.
+description: Report a bug. The required fields feed the A2 handoff contract so an agent (or human) can reproduce it. See https://github.com/hoprnet/zelus/blob/main/docs/a2-handoff-contract.md.
 labels:
   - intake
 body:
@@ -27,7 +28,7 @@ body:
     id: library_versions
     attributes:
       label: Library / crate versions
-      description: Relevant library or crate versions, if known (the analyzer also extracts these from logs).
+      description: Relevant library/crate versions as a per-crate mapping (e.g. hopr-lib 4.0.5, hopr-transport-session 0.30.3), if known — the analyzer also extracts these from logs.
       placeholder: "hopr-lib: …, hopr-transport-session: …"
     validations:
       required: false
