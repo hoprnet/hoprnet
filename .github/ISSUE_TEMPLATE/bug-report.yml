@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a bug. The required fields feed the A2 handoff contract so an agent (or human) can reproduce it. See docs/a2-handoff-contract.md.
+labels:
+  - intake
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in the fields below. They map to the A2 handoff contract — the machine-readable
+        record an agent needs to reproduce the bug. Attach logs (a file or a `.tar.gz`) where asked.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong, in one or two sentences.
+    validations:
+      required: true
+  - type: input
+    id: app_versions
+    attributes:
+      label: Application version(s)
+      description: e.g. hoprd 4.1.0, edge-client 4.1.0, gnosis_vpn 1.2.3
+      placeholder: "hoprd: …, edge-client: …, gnosis_vpn: …"
+    validations:
+      required: true
+  - type: input
+    id: library_versions
+    attributes:
+      label: Library / crate versions
+      description: Relevant library or crate versions, if known (the analyzer also extracts these from logs).
+      placeholder: "hopr-lib: …, hopr-transport-session: …"
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / topology
+      description: Local cluster, testnet, path shape (client → relay(s) → exit), OS, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: repro_command
+    attributes:
+      label: Exact reproduction command
+      description: The exact command(s) that reproduce the behaviour.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: seed
+    attributes:
+      label: Seed
+      description: Seed, if the bug was found via a chaos / randomised run.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Attach the log file or archive (drag-and-drop), or paste a relevant excerpt. Client logs first; relay/exit logs if available.
+    validations:
+      required: true
