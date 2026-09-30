@@ -1,14 +1,14 @@
 ---
 name: Bug report
-description: Report a bug. The required fields feed the A2 handoff contract so an agent (or human) can reproduce it. See https://github.com/hoprnet/zelus/blob/main/docs/a2-handoff-contract.md.
+description: Report a bug. The fields below capture what an agent or human needs to reproduce it.
 labels:
   - intake
 body:
   - type: markdown
     attributes:
       value: |
-        Fill in the fields below. They map to the A2 handoff contract — the machine-readable
-        record an agent needs to reproduce the bug. Attach logs (a file or a `.tar.gz`) where asked.
+        Fill in the fields below — they are the details needed to reproduce the bug.
+        Attach logs (a file or a `.tar.gz`) where asked.
   - type: textarea
     id: summary
     attributes:
