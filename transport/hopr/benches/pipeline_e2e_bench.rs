@@ -191,10 +191,8 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     });
 
     let mixer_cfg = MixerConfig {
-        min_delay: Duration::from_nanos(1),
-        delay_range: Duration::from_nanos(1),
         capacity: 20_000,
-        ..Default::default()
+        ..MixerConfig::new_uniform(Duration::from_nanos(1), Duration::from_nanos(1))
     };
 
     let mut group = c.benchmark_group("pipeline_e2e_forward");

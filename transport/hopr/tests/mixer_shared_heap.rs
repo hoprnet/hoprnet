@@ -33,7 +33,7 @@ const PROCESSING_LEEWAY: Duration = Duration::from_millis(500);
 /// Items from different `Sender` clones appear interleaved in the receiver output.
 #[tokio::test(flavor = "current_thread")]
 async fn wire_mixer_interleaves_across_clones() -> anyhow::Result<()> {
-    let cfg = MixerConfig::default(); // 10..210ms uniform random delay
+    let cfg = MixerConfig::default(); // wire mixer applies the uniform default 0..20ms random delay
     let (tx_a, rx) = channel::<(u8, u32)>(cfg);
     let tx_b = tx_a.clone();
 
