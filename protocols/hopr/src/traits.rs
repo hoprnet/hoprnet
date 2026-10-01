@@ -29,8 +29,22 @@ pub trait SurbStore {
     /// ones, along with how many had to be dropped to make room. The eviction count must not be
     /// discarded lightly: it is the only evidence that the sender is over-producing. Evictions fall on
     /// share-less SURBs first, so an evicted SURB takes an undelivered PIX share with it only once the
-    /// buffer holds nothing but share-bearing ones.
+    /// buffer holds nothing but share-bearing ones; [`SurbInsertOutcome::evicted_shares`] is the exact
+    /// number of shares lost that way.
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome;
+
+    /// How many SURBs are held for `pseudonym` in each of the store's tiers, as `(share-bearing,
+    /// share-less)`, or `None` if the store holds no SURBs for it or does not tell its SURBs apart that
+    /// way.
+    ///
+    /// For observability only (it feeds a trace line), so it may take a lock and need not be cheap.
+    /// The two numbers add up to [`SurbInsertOutcome::retained`] as of the last insert, unless a pop
+    /// or another insert got in between.
+    ///
+    /// Defaults to `None`, for stores that keep no such tiers.
+    fn tier_lens(&self, _pseudonym: &HoprPseudonym) -> Option<(usize, usize)> {
+        None
+    }
 
     /// Stores the given [`opener`](ReplyOpener) for the given [`sender_id`](HoprSenderId).
     ///

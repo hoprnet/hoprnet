@@ -61,7 +61,10 @@ impl PartialEq for HoprCodecConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    };
 
     use hopr_api::types::{
         crypto::prelude::*,
@@ -77,8 +80,8 @@ mod tests {
     use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
     use crate::{
-        HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, OutgoingPacket, PacketDecoder, PacketEncoder,
-        SurbStore, codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
+        AuxiliaryPacketInfo, HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, OutgoingPacket, PacketDecoder,
+        PacketEncoder, SurbStore, SurbStoreConfig, codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
     };
 
     type TestEncoder = HoprEncoder<
@@ -359,6 +362,113 @@ mod tests {
             .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
 
         f.sender_assert_reply(fwd_packet.data, resp)?;
+
+        Ok(())
+    }
+
+    /// Counts the events by level. `enabled` is always true, so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct LevelCounter {
+        warnings: AtomicU64,
+        debugs: AtomicU64,
+    }
+
+    impl tracing::Subscriber for LevelCounter {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            match *event.metadata().level() {
+                tracing::Level::WARN => self.warnings.fetch_add(1, Ordering::Relaxed),
+                tracing::Level::DEBUG => self.debugs.fetch_add(1, Ordering::Relaxed),
+                _ => 0,
+            };
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    /// A sender that bypasses the balancer gate keeps the Exit's share-less tier full, so each packet it
+    /// sends evicts share-less SURBs although no share is lost. The decoder reports that at debug level
+    /// only: the store's interval summary carries the warning, which a lost share always triggers, so such
+    /// a flood must not log once per packet.
+    #[tokio::test]
+    async fn decode_should_not_warn_per_packet_when_a_full_buffer_drops_share_less_surbs() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let pseudonym = HoprPseudonym::random();
+
+        // A packet carrying a return path, sent as far as the relay's output, which is what the receiver gets.
+        let from_relay = || -> anyhow::Result<bytes::Bytes> {
+            let out_packet = f.sender_encoder.encode_packet(
+                b"some random message to encode and decode",
+                ResolvedTransportRouting::Forward {
+                    pseudonym,
+                    forward_path: f.forward_path.clone(),
+                    return_paths: vec![f.return_path.clone()],
+                },
+                None,
+                None,
+            )?;
+            let fwd_packet = f
+                .relay_decoder
+                .decode(f.sender.offchain_key.public().into(), out_packet.data)?;
+            let fwd_packet = fwd_packet
+                .try_as_forwarded()
+                .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+            Ok(fwd_packet.data)
+        };
+        let receive = |data: bytes::Bytes| -> anyhow::Result<AuxiliaryPacketInfo> {
+            let in_packet = f.receiver_decoder.decode(f.relay.offchain_key.public().into(), data)?;
+            let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+            Ok(in_packet.info)
+        };
+
+        // The first packet leaves a real, share-less SURB behind. Take it, and fill the buffer to capacity
+        // with copies of it, as a sender that has been outproducing the Exit for a while would have.
+        receive(from_relay()?)?;
+        let surb = f
+            .receiver
+            .surb_store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("the first packet must have left a SURB behind"))?
+            .surb;
+        let capacity = SurbStoreConfig::default().rb_capacity;
+        let filled = f.receiver.surb_store.insert_surbs(
+            pseudonym,
+            (0..capacity as u64).map(|i| (i.to_be_bytes(), surb.clone())).collect(),
+        );
+        assert_eq!(capacity, filled.retained, "precondition: the buffer is full");
+
+        // Only the receiver's decode is recorded: the fixture's relay logs warnings of its own.
+        let data = from_relay()?;
+        let log = Arc::new(LevelCounter::default());
+        let info = tracing::subscriber::with_default(log.clone(), || receive(data))?;
+
+        assert!(info.num_surbs > 0, "the packet must carry a return path");
+        assert_eq!(
+            info.num_surbs, info.num_evicted_surbs,
+            "each SURB of the packet costs the full buffer one, and that total is what the layers above are told"
+        );
+        assert_eq!(
+            0,
+            log.warnings.load(Ordering::Relaxed),
+            "no share was lost, and the store's summary carries the warning, not the decoder"
+        );
+        assert!(
+            log.debugs.load(Ordering::Relaxed) > 0,
+            "the overflow is still reported, at debug level"
+        );
 
         Ok(())
     }
