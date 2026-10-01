@@ -1255,7 +1255,7 @@ where
                     Ok(session)
                 } else {
                     // Routine for short-lived sessions (health checks, bridges); not a fault.
-                    debug!(%session_id, "session ready without SURB balancing");
+                    tracing::debug!(%session_id, "session ready without SURB balancing");
 
                     // Disabled SURB management: a default state has a zero target, which reads as
                     // `is_disabled()` and so caps organic SURBs at one per packet — this branch's
