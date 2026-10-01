@@ -146,7 +146,7 @@ hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 hopr-crypto-packet = { version = "2.1.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "5.0.0-rc.2", path = "hopr/hopr-lib" }
+hopr-lib = { version = "5.0.0-rc.5", path = "hopr/hopr-lib" }
 hopr-protocol-app = { version = "1.2.0", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "6.4.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
