@@ -5080,16 +5080,16 @@ where
             match &session_slot.routing_opts {
                 // Session is outgoing - keep-alive was received from the Exit
                 DestinationRouting::Forward { .. } => {
-                    if msg.flags.contains(KeepAliveFlag::BalancerState)
-                        && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot.surb_mgmt.buffer_level() != msg.additional_data
-                    {
-                        // Update the buffer level as sent to us from the Exit
-                        session_slot
-                            .surb_mgmt
-                            .buffer_level
-                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                    if msg.flags.contains(KeepAliveFlag::BalancerState) && !session_slot.surb_mgmt.is_disabled() {
+                        // Record the reported level and let it infer the counterparty's real store
+                        // capacity from a plateau. Every report is fed in, including one that repeats
+                        // the last value -- a level that stops rising while we are still minting is
+                        // exactly the plateau signal, so this must not dedup equal reports.
+                        let changed = session_slot.surb_mgmt.buffer_level() != msg.additional_data;
+                        session_slot.surb_mgmt.observe_reported_level(msg.additional_data);
+                        if changed {
+                            debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                        }
                     }
 
                     // Increase the number of consumed SURBs in the estimator
@@ -6139,12 +6139,13 @@ mod tests {
         );
     }
 
-    /// Entry side of the documented capacity<target tradeoff: when the Exit's real store is smaller
-    /// than the Entry's target, the level it truthfully reports plateaus below target, so the Entry
-    /// keeps minting -- it cannot tell "full at a level below my target" from "still filling". Pinned
-    /// so the follow-up distress-based capacity guesstimate changes this deliberately and visibly.
+    /// The gate primitive itself mints whenever the level is below the effective target. A level
+    /// short of target with no capacity inferred yet still mints -- the stop for a smaller-than-target
+    /// store comes from inferring its capacity over successive reports (see
+    /// `a_plateau_below_target_infers_the_counterparty_capacity` in `balancer/controller.rs`), which
+    /// lowers the effective target rather than changing this primitive.
     #[test]
-    fn organic_minting_continues_when_the_counterparty_store_is_smaller_than_the_target() -> anyhow::Result<()> {
+    fn organic_minting_continues_below_target_without_an_inferred_capacity() -> anyhow::Result<()> {
         const EXIT_CAPACITY: u64 = 500;
         const ENTRY_TARGET: u64 = 2_000;
 
@@ -6155,7 +6156,7 @@ mod tests {
         assert_eq!(
             1,
             data.estimate_surbs_with_msg(),
-            "the Entry keeps minting toward a target the smaller store can never reach"
+            "below the effective target with no inferred capacity, the Entry mints"
         );
         Ok(())
     }
