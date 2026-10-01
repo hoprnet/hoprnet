@@ -151,7 +151,9 @@ pub struct IncomingPacketInfo {
     /// surplus was destroyed rather than queued. Under PIX a destroyed share-bearing SURB also destroys
     /// the partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
     /// used. The store gives up share-less SURBs first, so the count is an upper bound on the shares
-    /// lost; it is not a bandwidth statistic but a loss counter.
+    /// lost; the exact number is the store's own, reported in its eviction summary (the `ring_share`
+    /// value of the `cache` label of `hopr_surb_store_evictions_count`). This is not a bandwidth
+    /// statistic but a loss counter.
     ///
     /// The Exit's session counts these toward its SURB flow estimate — an evicted SURB has left the
     /// buffer just as a spent one has — so the level it reports tracks what the store actually holds.
