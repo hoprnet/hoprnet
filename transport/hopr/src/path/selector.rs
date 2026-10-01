@@ -260,6 +260,20 @@ fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithM
         .collect()
 }
 
+/// Number of distinct first relayers across `paths`.
+///
+/// The first relayer is the only node the destination gets to pick when it uses a SURB, so this is
+/// the count that decides whether the return-path degradation detector has a sibling to corroborate
+/// against: a value of 1 is the blind spot where a dead relayer is indistinguishable from a quiet
+/// peer. Paths with no hops (`path` empty) contribute nothing — a 0-hop return has no relayer.
+pub(crate) fn distinct_first_relayers(paths: &[PathWithMetrics]) -> usize {
+    paths
+        .iter()
+        .filter_map(|p| p.path.first())
+        .collect::<std::collections::HashSet<_>>()
+        .len()
+}
+
 /// Compute candidate paths from `src` to `dest` through `graph`.
 ///
 /// `length` is the number of edges to traverse (= intermediate hops + 1).
@@ -515,14 +529,30 @@ where
         }
 
         if paths.is_empty() {
-            Err(PathPlannerError::Path(PathError::PathNotFound(
+            return Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops,
                 src.to_string(),
                 dest.to_string(),
-            )))
-        } else {
-            Ok(prune_for_consistency(paths, self.anonymity_floor, hops))
+            )));
         }
+
+        let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
+        let relayer_set = pruned
+            .iter()
+            .filter_map(|p| p.path.first())
+            .collect::<std::collections::HashSet<_>>();
+        tracing::debug!(
+            %src,
+            %dest,
+            hops,
+            direction,
+            survived = pruned.len(),
+            distinct_relayers = relayer_set.len(),
+            first_relayers = ?relayer_set,
+            "pruned candidate paths",
+        );
+
+        Ok(pruned)
     }
 }
 
@@ -1086,6 +1116,36 @@ mod tests {
         // The best path per relayer is the one kept, so latency still drives the choice within
         // each relayer.
         assert_eq!(Some(10), result[0].total_latency_ms, "still latency-ordered");
+    }
+
+    #[test]
+    fn distinct_first_relayers_counts_unique_first_hops() {
+        // Three paths, two of them via the same relayer → two distinct first relayers. Paths with
+        // no hops contribute nothing.
+        let paths = vec![
+            make_path_via(1, 10),
+            make_path_via(1, 20),
+            make_path_via(2, 30),
+            make_path_with_latency(Some(40)), // empty path
+        ];
+        assert_eq!(2, distinct_first_relayers(&paths));
+    }
+
+    #[test]
+    fn floor_zero_keeps_all_distinct_relayers_unlike_a_small_cap() {
+        // Ten qualifying paths, each via a distinct relayer. This is the "if 10 qualify, use 10"
+        // case: with the cap disabled (floor = 0) every relayer survives, so the return-path
+        // degradation detector always has siblings to corroborate against. A small cap (2) throws
+        // eight good relayers away — the collapse that made the 2026-08-28 outage undetectable.
+        let candidates: Vec<_> = (1..=10u8).map(|i| make_path_via(i, i as u32 * 10)).collect();
+
+        let uncapped = prune_for_consistency(candidates.clone(), 0, 1);
+        assert_eq!(10, uncapped.len(), "floor = 0 disables pruning: all candidates survive");
+        assert_eq!(10, distinct_first_relayers(&uncapped), "all ten relayers kept");
+
+        let capped = prune_for_consistency(candidates, 2, 1);
+        assert_eq!(2, capped.len(), "floor = 2 caps survivors at two");
+        assert_eq!(2, distinct_first_relayers(&capped));
     }
 
     #[test]
