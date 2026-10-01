@@ -153,8 +153,9 @@ pub struct IncomingPacketInfo {
     /// used. The store gives up share-less SURBs first, so the count is an upper bound on the shares
     /// lost; it is not a bandwidth statistic but a loss counter.
     ///
-    /// Reported for observability, and deliberately not fed back into the SURB flow estimator — see
-    /// the note on the field it would correct in `hopr-transport-session`'s `BalancerStateValues`.
+    /// The Exit's session counts these toward its SURB flow estimate — an evicted SURB has left the
+    /// buffer just as a spent one has — so the level it reports tracks what the store actually holds.
+    /// See `hopr-transport-session`'s `BalancerStateValues::counterparty_buffer_capacity`.
     pub num_evicted_surbs: usize,
 }
 

@@ -2180,6 +2180,23 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     }
 }
 
+/// Books an incoming packet's SURBs into the Exit's flow estimator.
+///
+/// `saved` SURBs entered the store and `evicted` older ones were dropped to make room for them. Both
+/// are recorded so that `produced - consumed - evicted` tracks what the store actually holds: without
+/// the eviction term the estimate stays inflated by every SURB the full store ever discarded, long
+/// after they are gone -- which leaves the keep-alive level report and the PIX fill reserve both
+/// reading a level that never falls. Split out from the receive closure so the accounting can be
+/// unit-tested on its own.
+fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evicted: u64) {
+    estimator
+        .produced
+        .fetch_add(saved, std::sync::atomic::Ordering::Relaxed);
+    estimator
+        .evicted
+        .fetch_add(evicted, std::sync::atomic::Ordering::Relaxed);
+}
+
 async fn send_via_msg_sender<S, D>(
     msg_sender: &mut S,
     routing: DestinationRouting,
@@ -4792,7 +4809,8 @@ where
 
             let target_surb_buffer_size = announced_surb_target;
 
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
             // so the egress path never has to look inside the `OnceLock` again.
             let egress_gate = slot.pix_egress_gate.get().cloned();
@@ -4807,7 +4825,7 @@ where
                         .sink_map_err(std::io::Error::other)
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_clone
+                            surb_estimator_tx
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
@@ -4818,11 +4836,10 @@ where
                         .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        // Count the number of SURBs delivered with each incoming packet
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        account_incoming_surbs(&surb_estimator_rx, produced, evicted);
                         #[cfg(feature = "telemetry")]
                         telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -4880,7 +4897,8 @@ where
             // opts out of rate control is exactly the one that could drain the most service before
             // funding, so leaving this path ungated would make the predeposit budget optional.
             let egress_gate = slot.pix_egress_gate.get().cloned();
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -4894,7 +4912,7 @@ where
                             // reserve that either never binds or never releases. `NoRateControl` is
                             // also the branch that can drain SURBs fastest, so it is the one where
                             // that matters most.
-                            surb_estimator_clone
+                            surb_estimator_tx
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
@@ -4903,10 +4921,10 @@ where
                         },
                     ),
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        account_incoming_surbs(&surb_estimator_rx, produced, evicted);
                         #[cfg(feature = "telemetry")]
                         telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -5062,16 +5080,16 @@ where
             match &session_slot.routing_opts {
                 // Session is outgoing - keep-alive was received from the Exit
                 DestinationRouting::Forward { .. } => {
-                    if msg.flags.contains(KeepAliveFlag::BalancerState)
-                        && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot.surb_mgmt.buffer_level() != msg.additional_data
-                    {
-                        // Update the buffer level as sent to us from the Exit
-                        session_slot
-                            .surb_mgmt
-                            .buffer_level
-                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                    if msg.flags.contains(KeepAliveFlag::BalancerState) && !session_slot.surb_mgmt.is_disabled() {
+                        // Record the reported level and let it infer the counterparty's real store
+                        // capacity from a plateau. Every report is fed in, including one that repeats
+                        // the last value -- a level that stops rising while we are still minting is
+                        // exactly the plateau signal, so this must not dedup equal reports.
+                        let changed = session_slot.surb_mgmt.buffer_level() != msg.additional_data;
+                        session_slot.surb_mgmt.observe_reported_level(msg.additional_data);
+                        if changed {
+                            debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                        }
                     }
 
                     // Increase the number of consumed SURBs in the estimator
@@ -6081,6 +6099,68 @@ mod tests {
         Ok(data)
     }
 
+    /// `account_incoming_surbs` must keep the estimator's held count (`saturating_diff`) equal to
+    /// what a bounded store of capacity `CAP` would actually hold across a fill-past-capacity-then-drain
+    /// sequence. The eviction term is what makes the held count fall back to zero once the overflow is
+    /// drained -- and so what stops the keep-alive report and the PIX fill reserve from reading a level
+    /// that never falls.
+    #[test]
+    fn account_incoming_surbs_tracks_a_bounded_store_through_overflow_and_drain() {
+        const CAP: u64 = 100;
+        let estimator = AtomicSurbFlowEstimator::default();
+        let mut occupancy: u64 = 0;
+
+        let mut receive = |batch: u64| {
+            let evicted = (occupancy + batch).saturating_sub(CAP);
+            occupancy = (occupancy + batch).min(CAP);
+            account_incoming_surbs(&estimator, batch, evicted);
+        };
+
+        for _ in 0..5 {
+            receive(40);
+        }
+        assert_eq!(occupancy, CAP, "the model store is full");
+        assert_eq!(
+            estimator.saturating_diff(),
+            CAP,
+            "held count tracks a full store, not the {}-SURB total received",
+            5 * 40
+        );
+
+        for _ in 0..CAP {
+            estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            occupancy -= 1;
+        }
+        assert_eq!(occupancy, 0, "the model store is empty");
+        assert_eq!(
+            estimator.saturating_diff(),
+            0,
+            "held count returns to zero after the drain; the evicted surplus is not counted as held"
+        );
+    }
+
+    /// The gate primitive itself mints whenever the level is below the effective target. A level
+    /// short of target with no capacity inferred yet still mints -- the stop for a smaller-than-target
+    /// store comes from inferring its capacity over successive reports (see
+    /// `a_plateau_below_target_infers_the_counterparty_capacity` in `balancer/controller.rs`), which
+    /// lowers the effective target rather than changing this primitive.
+    #[test]
+    fn organic_minting_continues_below_target_without_an_inferred_capacity() -> anyhow::Result<()> {
+        const EXIT_CAPACITY: u64 = 500;
+        const ENTRY_TARGET: u64 = 2_000;
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &gate_state(ENTRY_TARGET, EXIT_CAPACITY));
+
+        assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
+        assert_eq!(
+            1,
+            data.estimate_surbs_with_msg(),
+            "below the effective target with no inferred capacity, the Entry mints"
+        );
+        Ok(())
+    }
+
     #[test]
     fn cap_organic_surbs_should_zero_the_packet_once_the_counterparty_is_at_target() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
@@ -6778,6 +6858,32 @@ mod tests {
             0,
             probe::get("sessions_stalled/surb_starved"),
             "a session that dies mid-stall must not leave the gauge standing"
+        );
+    }
+
+    /// The fill reserve reads the estimator's held count, which must not stay inflated by evicted
+    /// SURBs. After an overflow drains, the real store is empty, yet a raw `produced - consumed` would
+    /// still read far above the reserve and admit fill into an empty buffer -- the exact failure the
+    /// reserve exists to prevent (a return packet that finds no SURB stalls every packet the node
+    /// originates). With evictions counted, the held count is what the store holds, so fill is withheld.
+    #[test]
+    fn the_fill_reserve_is_not_defeated_by_a_post_overflow_estimate() {
+        use std::sync::atomic::Ordering;
+
+        const RESERVE: u64 = 100;
+        let control = fill_control(None, RESERVE);
+        let now = Instant::now();
+
+        // Post-overflow-drain: 1000 SURBs arrived, the full store evicted 900 of them, and the 100 it
+        // actually held were all spent. The store is empty; `produced - consumed` alone reads 900.
+        control.estimator.produced.fetch_add(1000, Ordering::Relaxed);
+        control.estimator.evicted.fetch_add(900, Ordering::Relaxed);
+        control.estimator.consumed.fetch_add(100, Ordering::Relaxed);
+
+        assert_eq!(0, control.drainable_surbs(), "an empty store has nothing to drain");
+        assert!(
+            !control.admit_at(now),
+            "fill must be withheld: the real held count is below the reserve"
         );
     }
 
