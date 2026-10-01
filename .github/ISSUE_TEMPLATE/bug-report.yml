@@ -9,6 +9,9 @@ body:
       value: |
         Fill in the fields below — they are the details needed to reproduce the bug.
         Attach logs (a file or a `.tar.gz`) where asked.
+
+        **Redact secrets first.** This is a public issue — remove API tokens, passwords,
+        private keys, and other credentials from commands, config, and logs before posting.
   - type: textarea
     id: summary
     attributes:
@@ -58,6 +61,6 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Attach the log file or archive (drag-and-drop), or paste a relevant excerpt. Client logs first; relay/exit logs if available.
+      description: Attach the log file or archive (drag-and-drop), or paste a relevant excerpt — redact any credentials first. Client logs first; relay/exit logs if available.
     validations:
       required: true
