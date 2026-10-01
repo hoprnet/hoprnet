@@ -1254,7 +1254,8 @@ where
                     slot_guard.commit();
                     Ok(session)
                 } else {
-                    warn!(%session_id, "session ready without SURB balancing");
+                    // Routine for short-lived sessions (health checks, bridges); not a fault.
+                    tracing::debug!(%session_id, "session ready without SURB balancing");
 
                     // Disabled SURB management: a default state has a zero target, which reads as
                     // `is_disabled()` and so caps organic SURBs at one per packet — this branch's
