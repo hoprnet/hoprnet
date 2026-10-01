@@ -134,23 +134,29 @@ pub struct BalancerStateValues {
     pub sustain_on_return_path_loss: AtomicBool,
     /// How many SURBs the counterparty can physically hold, or 0 when unknown.
     ///
-    /// The estimate is `produced - consumed`, and consumption is only observed once a reply
-    /// arrives -- so a return path that drops replies lets the believed level grow without bound.
-    /// The counterparty's store is a ring buffer that evicts the oldest entry on overflow, so
-    /// everything above its capacity was discarded on arrival and was never a real level. Measured
-    /// during an outage: 51 917 believed against a 15 000-entry store.
+    /// The level estimate is `produced - consumed - evicted`. The Exit observes its own store's
+    /// evictions first-hand (`num_evicted_surbs` on each incoming packet) and counts them, so the
+    /// level it reports tracks what the store actually holds instead of growing without bound when a
+    /// return path drops replies -- consumption alone is observed only once a reply arrives, and
+    /// before evictions were counted the belief ran away (measured during an outage: 51 917 believed
+    /// against a 15 000-entry store).
     ///
-    /// ## Why evictions are not subtracted from the level
+    /// This capacity still bounds the level, as defense-in-depth, via the `max(capacity, target)`
+    /// clamp below: it covers the paths that cannot see evictions -- the Entry's own
+    /// `produced - consumed` belief between the Exit's reports, and any session whose capacity is
+    /// unknown. The bound is `max(capacity, target)` rather than `capacity` so a target above the
+    /// counterparty's real store does not pin the error permanently negative and hold production at
+    /// maximum forever.
     ///
-    /// The counterparty reports its evictions (`num_evicted_surbs` on the incoming packet), so the
-    /// level could be corrected to the exact truth instead of merely bounded here. It deliberately
-    /// is not, because the clamp below is `max(capacity, target)` rather than `capacity`: a level
-    /// inflated past a full buffer still climbs to the target and shuts organic production off,
-    /// whereas an accurate level pins at the counterparty's real capacity. If that capacity is below
-    /// the target -- which nothing prevents, since this figure is the *local* store size and the
-    /// counterparty may be smaller -- the accurate level never reaches the target, production never
-    /// stops, and the buffer evicts forever. The imprecise estimate fails safe and the precise one
-    /// does not, so the eviction count stays an observability signal.
+    /// ## When the store is smaller than the target
+    ///
+    /// With an accurate level, a counterparty whose store is *smaller* than the target reports a level
+    /// that plateaus at its real capacity and never reaches target, which on its own would leave
+    /// organic production running and the full buffer evicting. That corner is closed by
+    /// [`observed_counterparty_capacity`](Self::observed_counterparty_capacity), which infers the real
+    /// capacity from the plateau and caps the effective target there. It is unreachable with
+    /// homogeneous configuration (`target <= 2/3` of the store) in any case; it needs the Entry's store
+    /// to exceed ~1.5x the Exit's.
     pub counterparty_buffer_capacity: AtomicU64,
     /// Milliseconds from the crate-internal `EPOCH` monotonic origin until which the return path
     /// counts as degraded.
@@ -172,7 +178,32 @@ pub struct BalancerStateValues {
     /// every return packet and strips them once its pool recovers, so the next healthy packet
     /// resets this.
     pub counterparty_in_surb_distress: AtomicBool,
+    /// The counterparty's real store capacity, inferred from where its reported level plateaus, or
+    /// `0` when not yet inferred.
+    ///
+    /// Closes the `capacity < target` corner noted on
+    /// [`counterparty_buffer_capacity`](Self::counterparty_buffer_capacity): when the reported level
+    /// stops rising while the Entry is still minting toward the target and the counterparty is not in
+    /// distress, its store is full at a level below the target, and that level is its real capacity.
+    /// [`organic_surbs_per_packet`](Self::organic_surbs_per_packet) then stops production at
+    /// `min(target, this)` instead of a target the store can never reach.
+    ///
+    /// Biased hard against firing, since a false positive under-supplies the counterparty (see the
+    /// destructive-recovery note in the SURB balancer gotchas): it takes several consecutive
+    /// non-rising reports (see [`observe_reported_level`](Self::observe_reported_level)), and a
+    /// [`SurbDistress`](hopr_crypto_packet::prelude::PacketSignal::SurbDistress) signal discards it
+    /// outright -- a counterparty short of SURBs is not full. Set back to `0` (re-probe) if the level
+    /// later rises above it.
+    pub observed_counterparty_capacity: AtomicU64,
+    /// Consecutive reported levels that did not rise while below target -- the plateau hysteresis
+    /// behind [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
+    pub capacity_plateau_count: AtomicU64,
 }
+
+/// Consecutive non-rising reported levels (below target, no distress) before the counterparty's
+/// store capacity is inferred. Small, but greater than one: a single flat sample is ordinary churn,
+/// and the cost of a false inference is under-supplying the counterparty, so the bar errs high.
+pub(crate) const CAPACITY_PLATEAU_THRESHOLD: u64 = 3;
 
 impl BalancerStateValues {
     /// Constructor from a [`SurbBalancerConfig`].
@@ -239,10 +270,54 @@ impl BalancerStateValues {
     /// is a superset of `SurbDistress` on the wire, so `contains` catches both, whereas an equality
     /// match against `SurbDistress` would silently ignore the more severe of the two.
     pub fn observe_counterparty_signals(&self, signals: PacketSignals) {
-        self.counterparty_in_surb_distress.store(
-            signals.contains(PacketSignal::SurbDistress),
-            std::sync::atomic::Ordering::Relaxed,
-        );
+        let distress = signals.contains(PacketSignal::SurbDistress);
+        self.counterparty_in_surb_distress
+            .store(distress, std::sync::atomic::Ordering::Relaxed);
+
+        if distress {
+            // A counterparty short of SURBs is not full: discard any inferred capacity so the Entry
+            // resumes producing toward the full target and re-probes once distress clears. This is the
+            // corrective that keeps a too-low capacity guess from starving the counterparty.
+            self.observed_counterparty_capacity
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+            self.capacity_plateau_count
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Records the SURB level the counterparty reported, and infers its real store capacity from a
+    /// plateau in that level.
+    ///
+    /// Called on every `BalancerState` keep-alive, including one that repeats the last value -- a
+    /// level that stops rising while the Entry is still minting toward the target is the plateau
+    /// signal. See [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
+    pub fn observe_reported_level(&self, new_level: u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let prev = self.buffer_level.load(Relaxed);
+        let target = self.target_surb_buffer_size.load(Relaxed);
+        let distress = self.counterparty_in_surb_distress.load(Relaxed);
+        let inferred = self.observed_counterparty_capacity.load(Relaxed);
+
+        if inferred != 0 && new_level > inferred {
+            // The counterparty is holding more than we inferred, so the store is larger than the
+            // plateau suggested (or has grown). Forget the guess and probe again.
+            self.observed_counterparty_capacity.store(0, Relaxed);
+            self.capacity_plateau_count.store(0, Relaxed);
+        } else if inferred == 0 && !distress && new_level > 0 && new_level < target && new_level <= prev {
+            // Below target with no distress, yet the level is not rising: the Entry is minting toward
+            // the target but the counterparty is not accepting more, so its store is full at a level
+            // below the target. Require several consecutive such reports before acting.
+            let plateau = self.capacity_plateau_count.fetch_add(1, Relaxed) + 1;
+            if plateau >= CAPACITY_PLATEAU_THRESHOLD {
+                self.observed_counterparty_capacity.store(new_level, Relaxed);
+            }
+        } else {
+            // Rising, at/above target, in distress, or refilling below an inferred cap: not a plateau.
+            self.capacity_plateau_count.store(0, Relaxed);
+        }
+
+        self.buffer_level.store(new_level, Relaxed);
     }
 
     /// How many SURBs an outgoing Session data packet should carry along with its payload.
@@ -276,11 +351,18 @@ impl BalancerStateValues {
             return 1;
         }
 
-        if self.buffer_level() >= self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) {
-            0
-        } else {
-            1
-        }
+        // Stop at the counterparty's real capacity when it is known to be smaller than the target:
+        // filling past a store that cannot grow only evicts, which under PIX destroys SSA shares.
+        let target = self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed);
+        let effective_target = match self
+            .observed_counterparty_capacity
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            0 => target,
+            capacity => target.min(capacity),
+        };
+
+        if self.buffer_level() >= effective_target { 0 } else { 1 }
     }
 
     /// Marks the return path as degraded for the next `grace` period.
@@ -1280,6 +1362,236 @@ mod tests {
             level >= cfg.target_surb_buffer_size / 2,
             "a capacity well above the target must not hold the session below its setpoint: level {level}, target {}",
             cfg.target_surb_buffer_size
+        );
+    }
+
+    /// Exit side, common case: with evictions counted, the reported level equals what the store
+    /// actually holds -- it rises only to the real capacity during an overflow, and falls back to
+    /// empty as the overflow drains, rather than staying inflated by the discarded surplus.
+    ///
+    /// The sibling test above bounds an eviction-blind estimate with the clamp; this one asserts the
+    /// stronger property the eviction term buys: the level *tracks* occupancy instead of merely being
+    /// capped by it.
+    #[test_log::test]
+    fn surb_balancer_level_tracks_true_occupancy_once_evictions_are_counted() {
+        use std::sync::atomic::Ordering;
+
+        const CAPACITY: u64 = 2_000;
+        let cfg = sustaining_config(false);
+        let (mut balancer, est, state, _output) = balancer_with_feedback(cfg);
+        state.set_counterparty_buffer_capacity(CAPACITY);
+
+        // Overflow the store: each receive is mirrored into the estimator the way the Exit rx does --
+        // the batch into `produced`, the overflow into `evicted`.
+        let mut occupancy = 0u64;
+        for _ in 0..10 {
+            let batch = 500u64;
+            let evicted = (occupancy + batch).saturating_sub(CAPACITY);
+            occupancy = (occupancy + batch).min(CAPACITY);
+            est.produced.fetch_add(batch, Ordering::Relaxed);
+            est.evicted.fetch_add(evicted, Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(12));
+            balancer.update();
+        }
+        assert_eq!(occupancy, CAPACITY, "the model store is full");
+        assert_eq!(
+            state.buffer_level.load(Ordering::Relaxed),
+            CAPACITY,
+            "the level equals the full store, not the {} SURBs received",
+            10 * 500
+        );
+
+        // Drain the store: every spent SURB leaves the buffer.
+        for _ in 0..(CAPACITY / 200) {
+            est.consumed.fetch_add(200, Ordering::Relaxed);
+            occupancy -= 200;
+            std::thread::sleep(Duration::from_millis(12));
+            balancer.update();
+        }
+        assert_eq!(occupancy, 0, "the model store is empty");
+        assert_eq!(
+            state.buffer_level.load(Ordering::Relaxed),
+            0,
+            "the level falls back to empty as the store drains; the evicted surplus is not held forever"
+        );
+    }
+
+    /// Exit side of the capacity<target case: when the store is smaller than the target, an accurate
+    /// level plateaus at the real capacity and never reaches the target. That plateau is the input the
+    /// Entry infers its counterparty's capacity from (see
+    /// `a_plateau_below_target_infers_the_counterparty_capacity`), which is what stops the Entry
+    /// minting into a full store below its target.
+    #[test_log::test]
+    fn surb_balancer_level_plateaus_at_capacity_when_store_is_smaller_than_target() {
+        use std::sync::atomic::Ordering;
+
+        const CAPACITY: u64 = 500;
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 2_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+            sustain_on_return_path_loss: false,
+        };
+        let (mut balancer, est, state, _output) = balancer_with_feedback(cfg);
+        state.set_counterparty_buffer_capacity(CAPACITY);
+
+        let mut occupancy = 0u64;
+        for _ in 0..20 {
+            let batch = 200u64;
+            let evicted = (occupancy + batch).saturating_sub(CAPACITY);
+            occupancy = (occupancy + batch).min(CAPACITY);
+            est.produced.fetch_add(batch, Ordering::Relaxed);
+            est.evicted.fetch_add(evicted, Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(12));
+            balancer.update();
+        }
+
+        let believed = state.buffer_level.load(Ordering::Relaxed);
+        assert_eq!(occupancy, CAPACITY);
+        assert_eq!(
+            believed, CAPACITY,
+            "the level reflects the real store, capped at its true capacity"
+        );
+        assert!(
+            believed < cfg.target_surb_buffer_size,
+            "an accurate level cannot reach a target above the store's capacity: {believed} < {}",
+            cfg.target_surb_buffer_size
+        );
+    }
+
+    /// A state at the given target with no capacity inferred yet, ready to receive reported levels.
+    fn capacity_probe_state(target: u64) -> BalancerStateValues {
+        BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: target,
+            ..Default::default()
+        })
+    }
+
+    /// Feed a level that repeats (a plateau) below target with no distress: after the threshold, the
+    /// real capacity is inferred and organic production stops there instead of chasing an unreachable
+    /// target.
+    #[test]
+    fn a_plateau_below_target_infers_the_counterparty_capacity() {
+        use std::sync::atomic::Ordering;
+
+        const TARGET: u64 = 2_000;
+        const CAPACITY: u64 = 500;
+        let state = capacity_probe_state(TARGET);
+
+        // Fill up to the store's ceiling.
+        for level in [100, 300, CAPACITY] {
+            state.observe_reported_level(level);
+            assert_eq!(
+                1,
+                state.organic_surbs_per_packet(),
+                "still below capacity, keep minting"
+            );
+        }
+
+        // The level now plateaus at the ceiling: the store is full below the target.
+        for _ in 0..CAPACITY_PLATEAU_THRESHOLD {
+            state.observe_reported_level(CAPACITY);
+        }
+
+        assert_eq!(
+            CAPACITY,
+            state.observed_counterparty_capacity.load(Ordering::Relaxed),
+            "the plateau level is inferred as the real capacity"
+        );
+        assert_eq!(
+            0,
+            state.organic_surbs_per_packet(),
+            "production stops at the real capacity, not the unreachable target"
+        );
+    }
+
+    /// One flat report is churn, not a plateau: the capacity must not be inferred from it.
+    #[test]
+    fn a_single_flat_report_does_not_infer_capacity() {
+        use std::sync::atomic::Ordering;
+
+        let state = capacity_probe_state(2_000);
+        state.observe_reported_level(500);
+        state.observe_reported_level(500);
+
+        assert_eq!(0, state.observed_counterparty_capacity.load(Ordering::Relaxed));
+        assert_eq!(
+            1,
+            state.organic_surbs_per_packet(),
+            "one flat sample must not stop production"
+        );
+    }
+
+    /// A level that rises again resets the plateau: a counterparty still accepting SURBs is not full.
+    #[test]
+    fn a_rising_level_resets_the_plateau() {
+        use std::sync::atomic::Ordering;
+
+        let state = capacity_probe_state(2_000);
+        state.observe_reported_level(500);
+        state.observe_reported_level(500);
+        // A rise before the threshold clears the count.
+        state.observe_reported_level(600);
+        state.observe_reported_level(600);
+
+        assert_eq!(
+            0,
+            state.observed_counterparty_capacity.load(Ordering::Relaxed),
+            "the plateau restarted at the higher level, so nothing is inferred yet"
+        );
+    }
+
+    /// Distress discards an inferred capacity: a counterparty short of SURBs is not full, so the Entry
+    /// must resume producing toward the full target.
+    #[test]
+    fn distress_discards_the_inferred_capacity() {
+        use std::sync::atomic::Ordering;
+
+        const CAPACITY: u64 = 500;
+        let state = capacity_probe_state(2_000);
+        for _ in 0..CAPACITY_PLATEAU_THRESHOLD + 1 {
+            state.observe_reported_level(CAPACITY);
+        }
+        assert_eq!(CAPACITY, state.observed_counterparty_capacity.load(Ordering::Relaxed));
+
+        state.observe_counterparty_signals(PacketSignal::SurbDistress.into());
+
+        assert_eq!(
+            0,
+            state.observed_counterparty_capacity.load(Ordering::Relaxed),
+            "distress clears the inferred capacity"
+        );
+        assert_eq!(1, state.organic_surbs_per_packet(), "and production resumes");
+    }
+
+    /// After inference, the counterparty draining and refilling toward the inferred capacity must not
+    /// clear it -- only a level rising *above* the inferred capacity means the store can hold more.
+    #[test]
+    fn refilling_below_the_inferred_capacity_keeps_it_but_a_higher_level_clears_it() {
+        use std::sync::atomic::Ordering;
+
+        const CAPACITY: u64 = 500;
+        let state = capacity_probe_state(2_000);
+        for _ in 0..CAPACITY_PLATEAU_THRESHOLD + 1 {
+            state.observe_reported_level(CAPACITY);
+        }
+        assert_eq!(CAPACITY, state.observed_counterparty_capacity.load(Ordering::Relaxed));
+
+        // Drain and refill toward the cap: the inference stands.
+        state.observe_reported_level(300);
+        state.observe_reported_level(450);
+        assert_eq!(
+            CAPACITY,
+            state.observed_counterparty_capacity.load(Ordering::Relaxed),
+            "a refill up to the inferred capacity does not forget it"
+        );
+
+        // A level above the inferred capacity means the store grew: re-probe.
+        state.observe_reported_level(CAPACITY + 200);
+        assert_eq!(
+            0,
+            state.observed_counterparty_capacity.load(Ordering::Relaxed),
+            "a level above the inferred capacity forgets it"
         );
     }
 
