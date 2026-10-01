@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["PathWithMetrics"],"trait":["BackgroundPathCacheRefreshable","PathSelector"]};
