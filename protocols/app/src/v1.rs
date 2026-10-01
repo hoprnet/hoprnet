@@ -148,9 +148,10 @@ pub struct IncomingPacketInfo {
     /// already full.
     ///
     /// Non-zero means the sender is producing SURBs faster than this side can hold them, and the
-    /// surplus was destroyed rather than queued. Under PIX each destroyed SURB also destroys the
-    /// partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
-    /// used — so this is not a bandwidth statistic but a loss counter.
+    /// surplus was destroyed rather than queued. Under PIX a destroyed share-bearing SURB also destroys
+    /// the partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
+    /// used. The store gives up share-less SURBs first, so the count is an upper bound on the shares
+    /// lost; it is not a bandwidth statistic but a loss counter.
     ///
     /// Reported for observability, and deliberately not fed back into the SURB flow estimator — see
     /// the note on the field it would correct in `hopr-transport-session`'s `BalancerStateValues`.

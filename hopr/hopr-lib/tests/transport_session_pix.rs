@@ -286,6 +286,25 @@ async fn establish_pix_session_with(
     surb_management: Option<hopr_lib::SurbBalancerConfig>,
     rate_control: bool,
 ) -> anyhow::Result<hopr_lib::HoprSession> {
+    establish_pix_session_with_surbs(cluster, hops, surb_management, rate_control, 1).await
+}
+
+/// As [`establish_pix_session_with`], but with the number of SURBs each organic data packet may carry
+/// under the caller's control (`HoprSessionClientConfig::max_surbs_per_data_packet`).
+///
+/// Everything else here pins it to `1`, which follows the Entry's SURB balancer: a packet carries a
+/// SURB only while the Exit is estimated to be below the balancer's target. `usize::MAX` lifts the cap,
+/// so every packet carries as many SURBs as fit beside its payload, whatever the balancer says. That is
+/// the production shape [`capture_n_hop_pix_session`] needs to reproduce an Entry that out-produces its
+/// Exit.
+#[cfg(feature = "session-client")]
+async fn establish_pix_session_with_surbs(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+    surb_management: Option<hopr_lib::SurbBalancerConfig>,
+    rate_control: bool,
+    max_surbs_per_data_packet: usize,
+) -> anyhow::Result<hopr_lib::HoprSession> {
     let routing = hops.try_into()?;
     let ip = IpOrHost::from_str(":0")?;
     let capabilities = if rate_control {
@@ -304,7 +323,7 @@ async fn establish_pix_session_with(
                 capabilities,
                 pseudonym: None,
                 surb_management,
-                max_surbs_per_data_packet: 1,
+                max_surbs_per_data_packet,
                 flow_control: None,
                 max_frames_behind_gap: None,
             },
@@ -601,9 +620,10 @@ impl EchoStopCell {
 
 #[cfg(feature = "session-client")]
 #[rstest]
-#[case(1)]
-#[case(2)]
-#[case(3)]
+#[case(1, 1)]
+#[case(1, usize::MAX)]
+#[case(2, 1)]
+#[case(3, 1)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
@@ -613,7 +633,21 @@ impl EchoStopCell {
 /// node is built with the correct transport role. The Exit accepts tiny PIX
 /// quotas. Keeps symmetric 32-byte traffic flowing Entry↔Exit while observing
 /// the PIX event cycle repeat 3 times.
-async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
+///
+/// The second case parameter is the Entry's `max_surbs_per_data_packet`. `1` follows the SURB balancer's
+/// gate, the shipped default. `usize::MAX` lifts the cap, so every 32-byte packet carries as many SURBs
+/// as fit beside its payload, and that case reproduces hoprnet#8466. The Entry then out-produces the
+/// Exit, which spends one SURB per echoed reply. A PIX share is sealed into a SURB when the Entry mints
+/// it and reaches the Exit only when the Exit *uses* that SURB, and the Entry has no share left to seal
+/// once it has emitted the committed cycle: from then on every SURB it mints is share-less. The next
+/// cycle's shares are minted only after the Exit requests that cycle, so they queue behind an
+/// ever-growing share-less backlog. Without an Exit SURB store that hands out share-bearing SURBs first,
+/// a later SSA is never recovered and the supervisor closes the Session as idle. That case observes one
+/// cycle more than the others, because the early cycles still slip through; see `target_cycles` below.
+async fn capture_n_hop_pix_session(
+    #[case] hops: usize,
+    #[case] max_surbs_per_data_packet: usize,
+) -> anyhow::Result<()> {
     // 2-hop and 3-hop tests are too slow under coverage instrumentation
     #[allow(unexpected_cfgs)]
     if cfg!(coverage) && hops > 1 {
@@ -646,7 +680,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
 
     // ── Establish PIX-enabled session: Entry → Exit, n-hop ────────────────
     tracing::info!("establishing PIX session");
-    let session = establish_pix_session(&cluster, hops).await?;
+    let session = establish_pix_session_with_surbs(&cluster, hops, None, false, max_surbs_per_data_packet).await?;
     tracing::info!("session established");
 
     // ── Background data task: keep traffic flowing symmetrically ──────────
@@ -678,7 +712,20 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     });
 
     // ── Observe PIX event cycles ──────────────────────────────────────────
-    let target_cycles = 3u32;
+    // Three cycles are plenty while the Entry's SURB supply follows the balancer's gate. With the cap
+    // lifted they cannot tell a fixed Exit store from an unfixed one: the share-less backlog compounds,
+    // because each cycle's shares queue behind everything the Entry minted while the previous cycle's
+    // were being consumed, so the wait grows roughly (SURBs per packet - 1)-fold per cycle. Measured on
+    // this cluster against the plain FIFO store that predates the share-first tiers, SSA #2 waited ~9 s
+    // and SSA #3 57-60 s, just inside the 60 s `max_recovery_idle`, so three cycles still passed. SSA #4
+    // received no useful share for the whole idle window and was closed as `RecoveryIdle` with
+    // `largest_useful_shares=0`, the failure reported in hoprnet#8466. That fourth cycle is what makes
+    // this case a reproduction.
+    let target_cycles = if max_surbs_per_data_packet == usize::MAX {
+        4u32
+    } else {
+        3u32
+    };
     let mut new_deposit_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
     let mut deposit_received_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
     let mut pk_recovered_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
@@ -775,7 +822,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     // ── Stop background data task ─────────────────────────────────────────
     bg_handle.abort();
 
-    tracing::info!(hops, "PIX multi-cycle session test PASSED");
+    tracing::info!(hops, max_surbs_per_data_packet, "PIX multi-cycle session test PASSED");
     Ok(())
 }
 

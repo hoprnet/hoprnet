@@ -43,12 +43,16 @@ pub struct AuxiliaryPacketInfo {
     /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
     /// already full.
     ///
-    /// This is the only point at which an overflow is visible, and the cost is higher than a wasted
-    /// SURB: each one carries a partial SSA share that reaches the reconstructor only when the SURB
-    /// is *used*, so an eviction destroys the share. The redundancy budget that absorbs those losses
-    /// is a fixed surplus per polynomial, and emission is windowed, so on deployed dimensions a
-    /// burst of roughly `surplus × SHARE_EMISSION_WINDOW` evictions is enough to put polynomials
-    /// below their threshold — and a cycle short of recovery is worth nothing at all. See
+    /// This is the only point at which an overflow is visible. The store gives up share-less SURBs
+    /// first, and refuses a share-less newcomer before it evicts a share-bearing SURB, so what an
+    /// eviction costs depends on what the buffer holds. A share-less SURB is only a lost return path.
+    /// A share-bearing one carries a partial SSA share that reaches the reconstructor only when the
+    /// SURB is *used*, so evicting it destroys the share. That only happens once the buffer holds
+    /// nothing but shares, which makes the count an upper bound on the shares lost. The redundancy
+    /// budget that absorbs those losses is a fixed surplus per polynomial, and emission is windowed,
+    /// so on deployed dimensions a burst of roughly `surplus × SHARE_EMISSION_WINDOW` evicted
+    /// share-bearing SURBs is enough to put polynomials below their threshold — and a cycle short of
+    /// recovery is worth nothing at all. See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
     /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
     ///
@@ -187,16 +191,19 @@ pub struct FoundSurb {
 
 /// What storing SURBs via `SurbStore::insert_surbs` did to the ring buffer.
 ///
-/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops its
-/// oldest entry and the caller sees only that the insert "succeeded". That count is the only local
-/// evidence that the sender is producing faster than this side can hold, and under PIX it is also a
-/// tally of destroyed SSA shares — a share reaches the reconstructor only when its SURB is *used*,
-/// so an evicted SURB takes its share with it permanently.
+/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops a
+/// SURB to make room — a share-less one whenever there is one to drop — and the caller sees only that
+/// the insert "succeeded". That count is the only local evidence that the sender is producing faster
+/// than this side can hold, and under PIX it is also an upper bound on the destroyed SSA shares — a
+/// share reaches the reconstructor only when its SURB is *used*, so an evicted share-bearing SURB
+/// takes its share with it permanently, and that happens only once the buffer holds nothing but shares.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SurbInsertOutcome {
     /// Number of SURBs held for the pseudonym after the insert.
     pub retained: usize,
-    /// Number of SURBs dropped to make room during this insert, oldest first.
+    /// Number of SURBs dropped to make room during this insert: share-less ones first, oldest first, and
+    /// the oldest share-bearing one only once none remain. A share-less SURB turned away because the buffer
+    /// held nothing but shares counts as well.
     pub evicted: usize,
 }
 
