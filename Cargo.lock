@@ -4330,7 +4330,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-pix"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4441,7 +4441,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.51.0"
+version = "0.52.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4582,7 +4582,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.32.0"
+version = "0.33.0"
 dependencies = [
  "anyhow",
  "async-trait",

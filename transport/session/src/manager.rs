@@ -24,7 +24,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
+    prelude::{HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
@@ -61,8 +61,8 @@ use crate::{
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
         HoprPixDepositPayload, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-        LOCAL_PIX_SUITE, SESSION_APPLICATION_TAG, SessionAdmissionSink, SsaQuota, deposit_data_for_batch,
-        pix_params_to_quota,
+        LOCAL_PIX_SUITE, PIX_QUOTA_BYTES_PER_SHARE, SESSION_APPLICATION_TAG, SessionAdmissionSink, SsaQuota,
+        deposit_data_for_batch, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -287,9 +287,9 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 ///
 /// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
-/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × (threshold + surplus)`, an over-estimate by that whole second
-///   factor, since a cycle carries one constant term per polynomial and nothing else. The quota alone does not reveal
-///   how the product splits, so the over-estimate cannot be undone from it.
+/// * `quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE` is `polys × (threshold + surplus)`, an over-estimate by that whole
+///   second factor, since a cycle carries one constant term per polynomial and nothing else. The quota alone does not
+///   reveal how the product splits, so the over-estimate cannot be undone from it.
 /// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
 ///   quota says. It therefore bounds the commitments a cycle can ever deliver.
 ///
@@ -310,8 +310,7 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 /// allocation. Ordinary Start traffic is one message per session *in flight*, not one per session
 /// the node will ever manage, so [`MAX_CONCURRENT_START_EXCHANGES`] is the honest bound.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
-    let max_commitments =
-        (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
+    let max_commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
     let ssas_per_request = cfg.pix_config.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u64;
 
@@ -327,17 +326,14 @@ pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
 pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
-/// Per-Session return-path rate used to size the PIX recovery deadline, in packets per second.
+/// Fastest return-path rate a Session is assumed to sustain, in packets per second.
 ///
-/// This is 1.5 Mbps divided by the HOPR packet payload size. A slower Session needs a longer
-/// deadline, so this is the loosest useful bound for rejecting a deadline that no fully saturated
-/// Session could meet.
-pub const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / HoprPacket::PAYLOAD_SIZE as u64;
-
-const _: () = assert!(
-    ASSUMED_SESSION_PACKET_RATE > 0,
-    "HoprPacket::PAYLOAD_SIZE leaves the assumed PIX Session packet rate at zero"
-);
+/// Bounds the PIX `max_recovery_time` from below: a deadline this rate cannot meet is treated as one
+/// no Session can, so without fill it is the floor itself, and with fill it caps the `fill.max_rate`
+/// the floor may count on. Stated in packets, because per-packet work is what limits a Session, so it does not
+/// move with any packet or segment size; it carries ≈ 58 Mbps of Session data at full
+/// [`SESSION_MTU`] segments.
+pub const MAX_ASSUMED_SESSION_PACKET_RATE: u64 = 5000;
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
@@ -446,7 +442,7 @@ pub fn cycle_budget_for(params: &PixParams, ssas_per_request: usize) -> u64 {
 /// Used to reject a [`IncomingSessionPixConfig::max_live_cycle_bytes`] that could never admit even
 /// one Session at the dimensions its own `quota_range` advertises.
 pub fn max_cycle_budget_for_quota(quota_bytes: u64, ssas_per_request: usize) -> u64 {
-    let quota_shares = quota_bytes / HoprPacket::PAYLOAD_SIZE as u64;
+    let quota_shares = quota_bytes / PIX_QUOTA_BYTES_PER_SHARE;
 
     (hopr_protocol_pix::MIN_POLY_THRESHOLD..=hopr_protocol_pix::MAX_POLY_THRESHOLD)
         .filter_map(|threshold| {
@@ -1209,12 +1205,12 @@ pub struct IncomingSessionPixConfig {
     /// them must widen this range explicitly.
     ///
     /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
-    /// PAYLOAD_SIZE` — so this bounds the traffic actually served rather than the fraction of it the
-    /// threshold accounts for. It used to bound only the latter, which understated the exposure by
-    /// the surplus factor: 1.25× at the deployed dimensions.
+    /// PIX_QUOTA_BYTES_PER_SHARE` — so this bounds the traffic actually served rather than the
+    /// fraction of it the threshold accounts for. It used to bound only the latter, which understated
+    /// the exposure by the surplus factor: 1.25× at the deployed dimensions.
     ///
     /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
-    /// (≈ 162 MiB to ≈ 649 MiB, inclusive).
+    /// (≈ 227 MiB to ≈ 908 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Ceiling on the live Exit-side reconstructor state this node will commit to, in bytes.
@@ -1392,45 +1388,47 @@ fn decode_pix_offer(
 
 /// Validates the incoming-PIX invariants that span quota, supervision and memory settings.
 ///
-/// `assumed_session_packet_rate` is explicit because the deadline is meaningful only relative to
-/// the rate a caller expects a Session to sustain.
+/// `max_session_packet_rate` is the fastest a Session is assumed to go. Without fill it bounds
+/// `max_recovery_time` directly; with fill it caps the `fill.max_rate` the deadline may count on.
 pub fn validate_incoming_session_pix_config(
     cfg: &IncomingSessionPixConfig,
-    assumed_session_packet_rate: u64,
+    max_session_packet_rate: u64,
 ) -> errors::Result<()> {
     if cfg.quota_range.is_empty() {
         return Err(TransportSessionError::InvalidConfig(
             "PIX quota_range must be non-empty (start must not exceed end)".into(),
         ));
     }
-    if assumed_session_packet_rate == 0 {
+    if max_session_packet_rate == 0 {
         return Err(TransportSessionError::InvalidConfig(
-            "assumed PIX Session packet rate must be non-zero".into(),
+            "maximum assumed PIX Session packet rate must be non-zero".into(),
+        ));
+    }
+    // Named here although `validate_pix_supervision` also refuses it, because that runs later on both
+    // paths: with fill enabled a zero deadline would otherwise surface as an infinite fill rate.
+    if cfg.supervision.max_recovery_time.is_zero() {
+        return Err(TransportSessionError::InvalidConfig(
+            "PIX max_recovery_time must be non-zero".into(),
         ));
     }
 
-    let worst_cycle_packets = *cfg.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
-    let needed = Duration::from_secs(worst_cycle_packets.div_ceil(assumed_session_packet_rate));
-    if cfg.supervision.max_recovery_time < needed {
-        return Err(TransportSessionError::InvalidConfig(format!(
-            "PIX max_recovery_time is {:?}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
-             packets and needs at least {needed:?} at {assumed_session_packet_rate} packets/s",
-            cfg.supervision.max_recovery_time,
-            cfg.quota_range.end(),
-        )));
-    }
+    let worst_cycle_packets = *cfg.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
 
-    // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs, or
-    // the mechanism that exists to complete idle cycles cannot complete the very ones it admits. The
-    // arithmetic is the planner's own, taken at the moment fill starts: the whole cycle remains, the
-    // aim point sits `finish_fraction` of the way through `max_recovery_time`, and the loss margin is
-    // paid on top. `max_recovery_time` is the *configured* per-cycle budget rather than a deadline
-    // observed at run time, so this is a property of the configuration and can be decided here.
-    //
-    // Checked only when fill is enabled: an Exit that has turned it off is choosing the pre-fill
-    // behaviour, where the cap is inert and refusing a Session over it would be refusing it over a
-    // value nothing reads.
+    // `max_recovery_time` has to leave a cycle of the widest accepted quota time to complete, and what
+    // completes it depends on fill. With fill enabled the Exit finishes an under-served cycle itself, so
+    // the bound is the fill ceiling's own arithmetic below. Without it only application traffic does,
+    // and the Exit has no rate of its own to reason from.
     if cfg.supervision.fill.enabled {
+        // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs,
+        // or the mechanism that exists to complete idle cycles cannot complete the very ones it
+        // admits. The arithmetic is the planner's own, taken at the moment fill starts: the whole
+        // cycle remains, the aim point sits `finish_fraction` of the way through `max_recovery_time`,
+        // and the loss margin is paid on top. `max_recovery_time` is the *configured* per-cycle budget
+        // rather than a deadline observed at run time, so this is a property of the configuration and
+        // can be decided here.
+        //
+        // The ceiling counts only up to `max_session_packet_rate`: fill faster than any Session is
+        // assumed to carry cannot finish a cycle any sooner.
         let fill = &cfg.supervision.fill;
         // Before the arithmetic, not after it. `validate_pix_supervision` also range-checks these two,
         // but it runs later on both paths that reach here — `SessionManager::start` calls this first,
@@ -1440,21 +1438,39 @@ pub fn validate_incoming_session_pix_config(
         crate::supervision::validate_fill_fractions(fill)?;
 
         let horizon = cfg.supervision.max_recovery_time.mul_f64(fill.finish_fraction);
-        // Guarded rather than assumed non-zero: both factors are validated elsewhere, and a divide by
-        // zero here would report an infinite requirement for a configuration whose real fault is
-        // named by its own validator.
+        // Still guarded although both factors are non-zero: a nanosecond-scale deadline times a
+        // fraction rounds to zero, and dividing by it would report an infinite requirement.
         let floor = if horizon.is_zero() {
             u64::MAX
         } else {
             (worst_cycle_packets as f64 * (1.0 + fill.loss_margin) / horizon.as_secs_f64()).ceil() as u64
         };
-        if (fill.max_rate as u64) < floor {
+        if (fill.max_rate as u64).min(max_session_packet_rate) < floor {
+            let remedy = if floor > max_session_packet_rate {
+                "raise max_recovery_time"
+            } else {
+                "raise fill.max_rate or max_recovery_time"
+            };
             return Err(TransportSessionError::InvalidConfig(format!(
-                "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} packets \
-                 and needs at least {floor} packets/s to finish inside {horizon:?} with a {} loss margin",
+                "PIX fill.max_rate is {} (counted up to {max_session_packet_rate} packets/s), but the largest \
+                 accepted quota ({} bytes) is {worst_cycle_packets} packets and needs at least {floor} packets/s to \
+                 finish inside {horizon:?} with a {} loss margin; {remedy}",
                 fill.max_rate,
                 cfg.quota_range.end(),
                 fill.loss_margin,
+            )));
+        }
+    } else {
+        // Refused only if even a Session at the fastest assumed rate could not finish a cycle in time,
+        // so this rejects a deadline that is impossible rather than one that is merely tight.
+        let needed = Duration::from_secs(worst_cycle_packets.div_ceil(max_session_packet_rate));
+        if cfg.supervision.max_recovery_time < needed {
+            return Err(TransportSessionError::InvalidConfig(format!(
+                "PIX max_recovery_time is {:?}, but with fill disabled the largest accepted quota ({} bytes) is \
+                 {worst_cycle_packets} packets and needs at least {needed:?} even at {max_session_packet_rate} \
+                 packets/s",
+                cfg.supervision.max_recovery_time,
+                cfg.quota_range.end(),
             )));
         }
     }
@@ -1879,7 +1895,7 @@ impl PixToolbox {
 /// carried in the most significant 64 bits of the `StartSession.additional_data` field, via
 /// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares each
 /// SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb losses. Those three define
-/// the data quota per SSA, which is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather
+/// the data quota per SSA, which is `polys × (threshold + surplus) × SESSION_MTU` — the surplus is priced in rather
 /// than free, since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
 ///
 /// The fourth is not a dimension and does not enter the quota: it names the elliptic curve the
@@ -1901,7 +1917,7 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈162 MiB–649 MiB). Dynamic admission checks
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈227 MiB–908 MiB). Dynamic admission checks
 ///   the smallest `batch_size × quota_per_ssa` up to the configured maximum; fixed admission checks the per-SSA quota
 ///   itself and retains the configured exact batch.
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
@@ -2367,10 +2383,9 @@ where
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
-            // Idle rather than live TTL, and generous: the entry must outlive the gap between two
-            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~192 min at the
-            // deployed dimensions and the documented rate cap. Matches the generator's own
-            // per-pseudonym cache, which is what the guarded region reads.
+            // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
+            // race for it, and one evicted between two cycles is simply recreated by the next request.
+            // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
             ssa_request_locks: moka::future::Cache::builder()
                 .time_to_idle(Duration::from_secs(1800))
                 .build(),
@@ -2410,7 +2425,7 @@ where
         // `AlreadyStarted`: neither running nor recoverable, out of what is an ordinary configuration
         // error the caller could have corrected and retried on the same instance.
         if let Some(pix) = pix.as_ref() {
-            validate_incoming_session_pix_config(&self.cfg.pix_config, ASSUMED_SESSION_PACKET_RATE)?;
+            validate_incoming_session_pix_config(&self.cfg.pix_config, MAX_ASSUMED_SESSION_PACKET_RATE)?;
 
             // The authoritative cross-component check, and the first moment it can be made: the
             // supervisor's deadlines are meaningless without the reconstructor lifetimes they race
@@ -10477,7 +10492,7 @@ mod tests {
                 finish_fraction,
                 ..Default::default()
             });
-            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
             assert!(
                 matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.finish_fraction")),
                 "a finish_fraction of {finish_fraction} must be refused rather than multiplied, got {outcome:?}"
@@ -10489,15 +10504,39 @@ mod tests {
                 loss_margin,
                 ..Default::default()
             });
-            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
             assert!(
                 matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.loss_margin")),
                 "a loss_margin of {loss_margin} must be refused, got {outcome:?}"
             );
         }
 
-        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), ASSUMED_SESSION_PACKET_RATE)
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), MAX_ASSUMED_SESSION_PACKET_RATE)
             .expect("the shipped defaults must still validate");
+    }
+
+    /// A zero recovery deadline must be named as such on both fill paths, rather than reaching the
+    /// fill arithmetic and being reported as an infinite rate requirement.
+    #[test]
+    fn a_zero_recovery_deadline_is_refused_as_zero_with_and_without_fill() {
+        for enabled in [true, false] {
+            let cfg = IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    max_recovery_time: Duration::ZERO,
+                    fill: crate::supervision::PixFillConfig {
+                        enabled,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("max_recovery_time must be non-zero")),
+                "with fill enabled = {enabled}, a zero deadline must be refused as zero, got {outcome:?}"
+            );
+        }
     }
 
     /// The fill heartbeat is clamped at *both* ends for a programmatically assembled config.
@@ -13328,8 +13367,7 @@ mod tests {
 
         // Number of commitments implied by the largest quota this node accepts, clamped by the
         // number of polynomials it would actually admit.
-        let commitments =
-            (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
+        let commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
         let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
 
         assert!(
