@@ -552,7 +552,7 @@
 //! ## Worked example
 //!
 //! A profile of **~602 packets/s sustained per direction** and **5–6 s on-chain settlement** for an
-//! SSA deposit. At full [`SESSION_MTU`](crate::SESSION_MTU) segments that is ≈ 7 Mbps of Session
+//! SSA deposit. At full `SESSION_MTU` segments that is ≈ 7 Mbps of Session
 //! data each way, and every return packet carries one SURB and one share.
 //!
 //! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` with the
@@ -781,7 +781,7 @@ pub struct SupervisorConfig {
     ///
     /// It has to leave a whole cycle at the dimensions the node accepts time to complete, but that
     /// floor is far below four hours: ~61 min with fill at its default ceiling, ~2 min without fill
-    /// at [`MAX_ASSUMED_SESSION_PACKET_RATE`](crate::MAX_ASSUMED_SESSION_PACKET_RATE). A cycle cut
+    /// at `MAX_ASSUMED_SESSION_PACKET_RATE`. A cycle cut
     /// short is worth nothing, since the SSA is the sum of every polynomial's constant term, so the
     /// margin is cheap.
     ///
@@ -1059,7 +1059,7 @@ pub struct PixFillConfig {
     /// `finish_fraction × max_recovery_time`. `validate_incoming_session_pix_config` enforces exactly
     /// that, so a cap set below it is refused at load rather than discovered one stranded deposit at a
     /// time. It counts the cap only up to
-    /// [`MAX_ASSUMED_SESSION_PACKET_RATE`](crate::MAX_ASSUMED_SESSION_PACKET_RATE), since fill faster
+    /// `MAX_ASSUMED_SESSION_PACKET_RATE`, since fill faster
     /// than a Session is assumed to carry finishes nothing sooner.
     ///
     /// Default: 250 packets/s, which is ~2.9 Mbps of Session data at full `SESSION_MTU` segments and
