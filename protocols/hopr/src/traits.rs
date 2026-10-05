@@ -27,8 +27,9 @@ pub trait SurbStore {
     ///
     /// Returns the total number of SURBs available for that `pseudonym` including the newly inserted
     /// ones, along with how many had to be dropped to make room. The eviction count must not be
-    /// discarded lightly: it is the only evidence that the sender is over-producing, and each
-    /// evicted SURB takes an undelivered PIX share with it.
+    /// discarded lightly: it is the only evidence that the sender is over-producing. Evictions fall on
+    /// share-less SURBs first, so an evicted SURB takes an undelivered PIX share with it only once the
+    /// buffer holds nothing but share-bearing ones.
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome;
 
     /// Stores the given [`opener`](ReplyOpener) for the given [`sender_id`](HoprSenderId).

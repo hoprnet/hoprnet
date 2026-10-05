@@ -253,16 +253,20 @@ where
                     info.num_evicted_surbs = outcome.evicted;
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
 
-                    // Warn rather than trace: an overflow is silent everywhere else, and it is not a
-                    // wasted SURB but a destroyed PIX share. Without this line the only way to learn
-                    // that a buffer is overflowing is to infer it from a balancer estimate that
-                    // outgrew the store it describes, which is how it was found the first time.
+                    // Warn rather than trace: an overflow is silent everywhere else, and it is the only
+                    // visible sign that the sender is producing SURBs faster than this side can hold them.
+                    // The store gives up share-less SURBs first and refuses a share-less newcomer before it
+                    // evicts a share-bearing SURB, so a dropped SURB is a lost PIX share only once the buffer
+                    // holds nothing but shares. Without this line the only way to learn that a buffer is
+                    // overflowing is to infer it from a balancer estimate that outgrew the store it
+                    // describes, which is how it was found the first time.
                     if outcome.evicted > 0 {
                         tracing::warn!(
                             pseudonym = %incoming.sender,
                             evicted = outcome.evicted,
                             retained = outcome.retained,
-                            "SURB buffer full; dropped the oldest SURBs and the PIX shares they carried"
+                            "SURB buffer full; dropped SURBs to make room (share-less first; \
+                             a dropped share-bearing SURB is a lost PIX share)"
                         );
                     }
                 }
