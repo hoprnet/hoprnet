@@ -66,13 +66,13 @@ const PIX_PARAMS: hopr_lib::PixParams =
 
 /// Quota one SSA cycle costs, as the Exit computes it when deciding whether to accept the Session.
 ///
-/// Mirrors `pix_params_to_quota`: `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`. Derived
-/// rather than written as a literal because the payload size is a build-time constant that moves —
+/// Mirrors `pix_params_to_quota`: `polys × (shares + surplus) × PIX_QUOTA_BYTES_PER_SHARE`. Derived
+/// rather than written as a literal because the share size is a build-time constant that moves —
 /// a hard-coded ceiling here does not fail loudly when it goes stale, it just makes every PIX
 /// session in this file get rejected with `UnacceptablePixParams` after a cluster has booted.
 const PIX_QUOTA_PER_SSA: u64 = PIX_POLYS as u64
     * (PIX_SHARES as u64 + PIX_SURPLUS as u64)
-    * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
+    * hopr_lib::exports::transport::session::PIX_QUOTA_BYTES_PER_SHARE;
 
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///
@@ -1889,7 +1889,7 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
     // node announces, and the node announces whatever its configured dimensions assemble into.
     let quota_per_ssa = PIX_PARAMS.polys_per_ssa() as u64
         * PIX_PARAMS.emitted_shares_per_poly() as u64
-        * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
+        * hopr_lib::exports::transport::session::PIX_QUOTA_BYTES_PER_SHARE;
     let accepted_batch_quota = quota_per_ssa * SSA_BATCH as u64;
 
     // The Exit's range admits the Entry's dimensions only as a batch of SSA_BATCH, and the Entry has

@@ -18,7 +18,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
+    prelude::{HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
 use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
@@ -172,9 +172,17 @@ pub(crate) fn deposit_data_for_batch(
 /// whole cycle, surplus included — see [`pix_params_to_quota`].
 ///
 /// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
+/// [`PIX_QUOTA_BYTES_PER_SHARE`] is the one conversion between the two.
 pub type SsaQuota = u64;
 
-/// What a single SSA deposit buys: every Exit → Entry payload byte the cycle carries.
+/// Bytes of quota one PIX share is priced at: the Session data the packet it rides on can carry.
+///
+/// [`SESSION_MTU`] rather than `HoprPacket::PAYLOAD_SIZE`, because a Session packet carries one
+/// segment and the rest of the HOPR payload is SURBs or padding. Every conversion between a quota
+/// and a packet count goes through this, so the two stay in step.
+pub const PIX_QUOTA_BYTES_PER_SHARE: SsaQuota = SESSION_MTU as SsaQuota;
+
+/// What a single SSA deposit buys: every Exit → Entry Session byte the cycle can carry.
 ///
 /// Counts [`PixParams::emitted_shares_per_poly`], i.e. `threshold + surplus`, and not the threshold
 /// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
@@ -190,9 +198,7 @@ pub type SsaQuota = u64;
 /// (`drain_shares_by_polynomial` in `hopr-protocol-pix`), which pin a cycle's emission at
 /// `polys × (threshold + surplus)`. Change either expression and the other has to move with it.
 pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
-    params.polys_per_ssa() as SsaQuota
-        * params.emitted_shares_per_poly() as SsaQuota
-        * HoprPacket::PAYLOAD_SIZE as SsaQuota
+    params.polys_per_ssa() as SsaQuota * params.emitted_shares_per_poly() as SsaQuota * PIX_QUOTA_BYTES_PER_SHARE
 }
 
 /// Default number of polynomials ("SSA parts") a single SSA is split into.
@@ -201,7 +207,7 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
 /// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
 /// Both must be derived from it so the two cannot drift apart: the Exit computes the
-/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if neither
+/// offered quota as `polys × (shares + surplus) × SESSION_MTU` and rejects the Session if neither
 /// it nor an allowed dynamic batch brings the total inside the configured range. At the default
 /// batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
 /// every PIX Session fail to establish.
@@ -972,7 +978,7 @@ mod tests {
         for (polys, threshold, surplus) in [(1u16, 2u8, 0u8), (8, 2, 2), (8192, 64, 32), (16192, 255, 255)] {
             let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
             assert_eq!(
-                polys as u64 * (threshold as u64 + surplus as u64) * HoprPacket::PAYLOAD_SIZE as u64,
+                polys as u64 * (threshold as u64 + surplus as u64) * SESSION_MTU as u64,
                 pix_params_to_quota(&params),
                 "the quota must cover every share the cycle emits"
             );
@@ -1010,7 +1016,7 @@ mod tests {
         assert_eq!(
             DEFAULT_PIX_POLYS_PER_SSA as u64
                 * (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64)
-                * HoprPacket::PAYLOAD_SIZE as u64,
+                * SESSION_MTU as u64,
             DEFAULT_PIX_SSA_QUOTA
         );
         // Anchored on the ratio function rather than on a restatement of it. This line used to read

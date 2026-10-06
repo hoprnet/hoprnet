@@ -246,6 +246,10 @@ pub struct SsaReconstructorConfig {
     /// comparing against the benchmark suite's own model of production — 100 Sessions at 1.5 Mbps,
     /// 18.75 MiB/s — which understates real per-Session rate by 13×. The rates here are also
     /// measured at 4096 polynomials rather than the 512 used previously, which costs about 5 %.
+    ///
+    /// All of these were measured at 1038 B of quota per share. A share is now priced at the 1452 B
+    /// Session MTU, so the same work is ≈ 1.4× more quota: 130.2 MiB/s becomes ≈ 182 MiB/s, and the
+    /// headroom at the top of the range ≈ 2.5×.
     #[default(Self::DEFAULT_USE_BATCH_VERIFICATION)]
     pub use_batch_verification: bool,
     /// Fraction of reconstructed polynomials at which to emit an early recovery
@@ -513,8 +517,8 @@ pub const MAX_DEFERRED_ACKS_PER_POLYNOMIAL: usize = 128;
 /// drain discards any acknowledgement whose share has already left `awaiting_acks`, and that cache
 /// expires entries after
 /// `max_ack_await_time` (30 s by default). An older deferral is therefore provably dead, so the
-/// ceiling only has to cover the shares one cycle can receive inside that window: ~181 shares/s at
-/// the deployed 1.5 Mbps per-Session cap, so ~5 400. 8192 leaves ~1.5× headroom and costs at most
+/// ceiling only has to cover the shares one cycle can receive inside that window: ~181 shares/s,
+/// the per-Session rate this was sized at, so ~5 400. 8192 covers up to ~273 shares/s and costs at most
 /// ~786 KB per cycle.
 ///
 /// Public for the same reason as [`MAX_DEFERRED_ACKS_PER_POLYNOMIAL`].
