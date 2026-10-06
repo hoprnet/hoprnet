@@ -33,7 +33,7 @@ use test_log::test;
 use tokio::time as tokio_time;
 
 /// What one SSA cycle at these dimensions costs, mirroring the Exit's own accounting:
-/// `polys × (threshold + surplus) × PAYLOAD_SIZE`.
+/// `polys × (threshold + surplus) × PIX_QUOTA_BYTES_PER_SHARE`.
 ///
 /// Derived per test rather than pinned to a round number, because `quota_range` has to satisfy two
 /// bounds at once and a literal only ever satisfies one on purpose: wide enough to accept what the
@@ -43,7 +43,7 @@ use tokio::time as tokio_time;
 fn cycle_quota(params: &PixParams) -> u64 {
     params.polys_per_ssa() as u64
         * params.emitted_shares_per_poly() as u64
-        * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64
+        * hopr_transport_session::PIX_QUOTA_BYTES_PER_SHARE
 }
 
 /// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
