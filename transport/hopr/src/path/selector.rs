@@ -517,6 +517,16 @@ where
             found
         };
 
+        // GNO-805: drop any path whose weakest edge cannot fund a single ticket — a channel
+        // balance below one ticket face value floors `fundable_tickets_floor` to `Some(0)`.
+        // Routing over such an edge dies with "balance of channel too low", so excluding it here
+        // is what keeps selection off a starved channel. `None` (face value unknown) is left in
+        // place: absence of pricing is not evidence of insufficiency.
+        let paths: Vec<PathWithMetrics> = paths
+            .into_iter()
+            .filter(|p| p.fundable_tickets_floor != Some(0))
+            .collect();
+
         for (i, pwm) in paths.iter().enumerate() {
             tracing::debug!(
                 direction,
@@ -636,6 +646,92 @@ mod tests {
         mark_edge_full(&graph, &dest, &hop);
         mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
+    }
+
+    /// Like `mark_edge_full` but with an explicit balance, to model a starved channel.
+    fn mark_edge_balance(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey, balance: u64) {
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                balance,
+            ))));
+        });
+    }
+
+    // GNO-805 (slice 4A): a channel below one ticket face value funds zero tickets and must not be
+    // routed over. Face value is set to 1000; `mark_edge_full` records a balance of 1000 (== one
+    // ticket), a starved edge records 999 (< one ticket → floor Some(0)).
+
+    #[tokio::test]
+    async fn starved_channel_is_excluded_when_an_alternative_exists() -> anyhow::Result<()> {
+        // Diamond: me → hopA → dest (healthy) and me → hopB → dest (me→hopB starved).
+        let me = pubkey(&SECRET_0);
+        let hop_a = pubkey(&SECRET_1);
+        let hop_b = pubkey(&SECRET_2);
+        let dest = pubkey(&SECRET_3);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(hop_a);
+        graph.add_node(hop_b);
+        graph.add_node(dest);
+        graph.add_edge(&me, &hop_a).unwrap();
+        graph.add_edge(&hop_a, &dest).unwrap();
+        mark_edge_full(&graph, &me, &hop_a);
+        mark_edge_full(&graph, &hop_a, &dest);
+        graph.add_edge(&me, &hop_b).unwrap();
+        graph.add_edge(&hop_b, &dest).unwrap();
+        mark_edge_balance(&graph, &me, &hop_b, 999); // below the 1000 face value → 0 fundable tickets
+        mark_edge_full(&graph, &hop_b, &dest);
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::from(1000u64));
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let paths = selector.select_path(me, dest, 1)?;
+
+        assert!(!paths.is_empty(), "the healthy hopA path must survive");
+        assert!(
+            paths.iter().all(|p| p.path.first() != Some(&hop_b)),
+            "no selected path may route over the starved me→hopB channel"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn only_starved_path_returns_no_path() -> anyhow::Result<()> {
+        // Single route me → hop → dest, but me→hop is below one ticket face value.
+        let me = pubkey(&SECRET_0);
+        let hop = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(hop);
+        graph.add_node(dest);
+        graph.add_edge(&me, &hop).unwrap();
+        graph.add_edge(&hop, &dest).unwrap();
+        mark_edge_balance(&graph, &me, &hop, 999);
+        mark_edge_full(&graph, &hop, &dest);
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::from(1000u64));
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let err = selector.select_path(me, dest, 1).unwrap_err();
+        assert!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "a route whose only channel is starved must be NoPath, not routed anyway: {err}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn channel_at_exactly_one_ticket_face_value_is_admitted() -> anyhow::Result<()> {
+        // Boundary is inclusive: balance == one ticket face value funds exactly one ticket.
+        let (me, _hop, dest, graph) = two_hop_graph();
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::from(1000u64)); // == mark_edge_full balance
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let paths = selector.select_path(me, dest, 1)?;
+        assert!(
+            !paths.is_empty(),
+            "a channel exactly at one ticket face value must remain selectable"
+        );
+        Ok(())
     }
 
     #[tokio::test]
