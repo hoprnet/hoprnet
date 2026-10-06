@@ -76,6 +76,26 @@ pub struct PathPlannerConfig {
     /// re-weighted rather than one that expired under it.
     #[default(Duration::from_secs(5))]
     pub refresh_period: Duration,
+    /// How long an entry keeps serving its last candidates once the background refresh finds none.
+    ///
+    /// A refresh that comes back empty leaves the entry in place, but [`Self::cache_ttl`] used to
+    /// expire it moments later anyway, into "no path" for every packet until the graph recovered.
+    /// One acknowledgment report that read a cold burst as loss was enough: the relay's edge dipped
+    /// below [`Self::min_ack_rate`] for a single counter flush, and a working 1-hop route was gone
+    /// for 5 s (hoprnet#8484). So the refresh re-inserts such an entry unchanged, for as long as its
+    /// candidates are younger than this. Age counts from when the selector last produced them, not
+    /// from the last re-insertion, so an entry nothing can replace is still dropped eventually: at
+    /// most `max_stale_age + cache_ttl` after its last successful refresh.
+    ///
+    /// Only an entry with no replacement at all is kept. When the selector offers any candidate,
+    /// the entry is replaced as before. The first refresh that can find nothing runs at least one
+    /// [`Self::refresh_period`] after the candidates were selected, so any value up to that period
+    /// disables this, zero included.
+    ///
+    /// Defaults to 30 s, two counter flushes: long enough to ride out one bad report, short
+    /// enough that a route which is really gone stops being served.
+    #[default(Duration::from_secs(30))]
+    pub max_stale_age: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
     #[default = 50]
@@ -259,9 +279,11 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
 /// necessarily agree: a divergence here would make a session's weights depend on which of the three
 /// happened to run last.
 ///
-/// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
-/// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
-/// alone. `Err` is reserved for a selector that actually failed.
+/// `Ok(None)` means the selector offered nothing, or nothing survived validation. `Err` is a
+/// selector that failed, which includes [`HoprGraphPathSelector`](super::HoprGraphPathSelector)
+/// finding no path at all. Callers decide what either means — a fill turns it into
+/// `PathNotFound`, a refresh keeps the existing entry serving (see
+/// [`PathPlannerConfig::max_stale_age`]).
 #[allow(clippy::too_many_arguments)]
 async fn rebuild_candidates<R, S>(
     resolver: &R,
@@ -392,7 +414,34 @@ fn weights_moved(
 /// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice. Resolving
 /// first makes lookup and insertion agree by construction.
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
-type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
+type PlannerCacheValue = Arc<CachedPaths>;
+
+/// A cached candidate set, and when the selector produced it.
+///
+/// `selected_at` is not the cache insertion time. The background refresh re-inserts an entry it
+/// could not replace, to keep it serving, and the entry keeps its `selected_at` through that. This is
+/// what bounds how long it may be kept that way: see [`PathPlannerConfig::max_stale_age`].
+struct CachedPaths {
+    paths: hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+    selected_at: std::time::Instant,
+}
+
+impl CachedPaths {
+    fn new(paths: hopr_utils::statistics::WeightedCollection<ValidatedPath>) -> Self {
+        Self {
+            paths,
+            selected_at: std::time::Instant::now(),
+        }
+    }
+}
+
+impl std::ops::Deref for CachedPaths {
+    type Target = hopr_utils::statistics::WeightedCollection<ValidatedPath>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.paths
+    }
+}
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
@@ -415,6 +464,7 @@ pub struct PathPlanner<Surb, R, S> {
     selector: Arc<S>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
+    max_stale_age: Duration,
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
@@ -442,6 +492,7 @@ where
             selector: Arc::new(selector),
             cache,
             refresh_period: config.refresh_period,
+            max_stale_age: config.max_stale_age,
             weighting: WeightingParams {
                 latency_halflife: config.latency_halflife,
                 capacity_reference: config.capacity_reference,
@@ -560,7 +611,7 @@ where
                     &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
                 )
                 .await?
-                .map(Arc::new)
+                .map(|paths| Arc::new(CachedPaths::new(paths)))
                 .ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
                 })
@@ -610,11 +661,20 @@ where
                 let key = (src_key, dest_key, hops);
                 // A fresh entry counts as moved -- there was no previous distribution to compare
                 // against, so nothing here can say the traffic stayed put.
-                let shifted = match self.cache.get(&key).await {
-                    Some(previous) => weights_moved(&previous, &weighted),
-                    None => true,
-                };
-                self.cache.insert(key, Arc::new(weighted)).await;
+                let mut shifted = true;
+                // Through `and_compute_with`, like the background refresh keeping an entry alive
+                // (`keep_serving`): moka serialises only compute calls on a key, so a plain insert
+                // here could land between that one's read and its write, and be overwritten by the
+                // stale entry it was meant to replace.
+                self.cache
+                    .entry(key)
+                    .and_compute_with(|previous| {
+                        if let Some(previous) = previous {
+                            shifted = weights_moved(previous.value(), &weighted);
+                        }
+                        futures::future::ready(moka::ops::compute::Op::Put(Arc::new(CachedPaths::new(weighted))))
+                    })
+                    .await;
                 if shifted {
                     moved += 1;
                 }
@@ -852,6 +912,7 @@ where
         let resolver = self.resolver.clone();
         let selector = self.selector.clone();
         let refresh_period = self.refresh_period;
+        let max_stale_age = self.max_stale_age;
         let weighting = self.weighting;
         let me = self.me;
 
@@ -863,38 +924,91 @@ where
             let cache = cache.clone();
             let resolver = resolver.clone();
             let selector = selector.clone();
-            let weighting = weighting;
 
             async move {
-                for (key, _) in cache.iter() {
-                    let (src_key, dest_key, hops_u32) = {
-                        let k = key.as_ref();
-                        (k.0, k.1, k.2)
-                    };
-
-                    if hops_u32 == 0 {
-                        continue;
-                    }
-
-                    // The key already holds resolved offchain keys, which is what the selector
-                    // wants -- so nothing has to be resolved again here.
-                    if let Ok(Some(weighted)) = rebuild_candidates(
-                        &*resolver,
-                        &*selector,
-                        weighting,
-                        me,
-                        src_key,
-                        dest_key,
-                        hops_u32 as usize,
-                        "background-refresh",
-                    )
-                    .await
-                    {
-                        cache.insert((src_key, dest_key, hops_u32), Arc::new(weighted)).await;
-                    }
-                }
+                refresh_cached_entries(&cache, &*resolver, &*selector, weighting, me, max_stale_age).await;
             }
         })
+    }
+}
+
+/// Re-inserts `swept` under `key`, restarting its TTL, if it is still the entry cached there.
+///
+/// Returns whether it was. The check and the write are one `and_compute_with`, which moka serialises
+/// against every other compute call on the key. `recompute_paths_from` writes through one too, so a
+/// route it installs after the sweep read the cache cannot be overwritten by the stale one. A fill
+/// only writes when the key is vacant, which this then leaves alone.
+async fn keep_serving(
+    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    key: PlannerCacheKey,
+    swept: &PlannerCacheValue,
+) -> bool {
+    let kept = cache
+        .entry(key)
+        .and_compute_with(|current| {
+            futures::future::ready(match current {
+                Some(current) if Arc::ptr_eq(current.value(), swept) => {
+                    moka::ops::compute::Op::Put(current.into_value())
+                }
+                _ => moka::ops::compute::Op::Nop,
+            })
+        })
+        .await;
+    matches!(kept, moka::ops::compute::CompResult::ReplacedWith(_))
+}
+
+/// One sweep of the background refresh: rebuilds every cached multi-hop entry from the current graph.
+///
+/// An entry the rebuild finds no candidates for is kept serving what it holds, by re-inserting it
+/// unchanged ([`keep_serving`]), while it is younger than `max_stale_age` (see
+/// [`PathPlannerConfig::max_stale_age`]).
+async fn refresh_cached_entries<R, S>(
+    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    resolver: &R,
+    selector: &S,
+    weighting: WeightingParams,
+    me: OffchainPublicKey,
+    max_stale_age: Duration,
+) where
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
+    S: PathSelector,
+{
+    for (key, swept) in cache.iter() {
+        let key = *key.as_ref();
+        let (src_key, dest_key, hops_u32) = key;
+
+        if hops_u32 == 0 {
+            continue;
+        }
+
+        // The key already holds resolved offchain keys, which is what the selector
+        // wants -- so nothing has to be resolved again here.
+        match rebuild_candidates(
+            resolver,
+            selector,
+            weighting,
+            me,
+            src_key,
+            dest_key,
+            hops_u32 as usize,
+            "background-refresh",
+        )
+        .await
+        {
+            Ok(Some(weighted)) => cache.insert(key, Arc::new(CachedPaths::new(weighted))).await,
+            // Nothing to replace the entry with. Leaving it alone is not enough to keep it: its TTL
+            // runs on regardless, so it is re-inserted, which restarts the TTL, until it is too old.
+            _ => {
+                if swept.selected_at.elapsed() < max_stale_age && keep_serving(cache, key, &swept).await {
+                    tracing::debug!(
+                        destination = %dest_key,
+                        hops = hops_u32,
+                        stale_for = ?swept.selected_at.elapsed(),
+                        "refresh found no path, keeping the cached candidates serving"
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -902,6 +1016,7 @@ where
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Context as _;
     use bimap::BiMap;
     use futures::stream::{self, BoxStream};
     use hex_literal::hex;
@@ -2053,6 +2168,208 @@ mod tests {
             set_before,
             "the previous candidates must survive a fruitless recompute"
         );
+    }
+
+    // ── keeping an entry serving when the refresh finds nothing ──────────────
+
+    /// `me -> a -> dest`, sharing its graph with the test so the test can degrade the route.
+    fn forward_planner(cfg: PathPlannerConfig) -> (TestPlanner, ChannelGraph) {
+        let (me, a, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_A), pubkey(&SECRET_DEST));
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(dest);
+        for (src, dst) in [(me, a), (a, dest)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
+    fn one_hop_to_dest() -> DestinationRouting {
+        DestinationRouting::Forward {
+            destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+            pseudonym: None,
+            forward_options: RoutingOptions::Hops(1.try_into().expect("valid 1")),
+            return_options: None,
+        }
+    }
+
+    /// One background-refresh sweep, as the refresh loop runs it on every tick.
+    async fn sweep(planner: &TestPlanner) {
+        refresh_cached_entries(
+            &planner.cache,
+            &*planner.resolver,
+            &*planner.selector,
+            planner.weighting,
+            planner.me,
+            planner.max_stale_age,
+        )
+        .await;
+    }
+
+    /// Scores `me -> a` the way the counter flush scored a cold burst in hoprnet#8484: every packet
+    /// sent, none acknowledged yet. That takes the edge below `min_ack_rate`, and with it the only route.
+    fn report_unacknowledged_burst(graph: &ChannelGraph) {
+        use hopr_api::graph::traits::EdgeWeightType;
+        graph.upsert_edge(&pubkey(&SECRET_ME), &pubkey(&SECRET_A), |obs| {
+            obs.record(EdgeWeightType::ImmediateProtocolConformance {
+                num_packets: 500,
+                num_acks: 0,
+            });
+        });
+    }
+
+    /// TTL of the planners in the keep-serving tests. Seconds rather than milliseconds so the tests'
+    /// real-time sleeps keep a wide margin on each side of the moka expiry they straddle.
+    const KEEP_TEST_TTL: Duration = Duration::from_secs(2);
+
+    /// A refresh that finds no route at all must keep the cached one serving past its TTL.
+    ///
+    /// A refresh that comes back empty already left the entry in place, but the TTL expired it
+    /// moments later regardless, and from then on every packet failed with `PathNotFound` until the
+    /// graph recovered. In hoprnet#8484 that was a 5 s outage of a working 1-hop route, caused by one
+    /// acknowledgment report.
+    #[tokio::test]
+    async fn a_refresh_that_finds_no_path_should_keep_the_cached_route_serving() -> anyhow::Result<()> {
+        let (planner, graph) = forward_planner(PathPlannerConfig {
+            cache_ttl: KEEP_TEST_TTL,
+            ..small_config()
+        });
+        let key = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST), 1);
+        planner
+            .resolve_routing(100, 0, one_hop_to_dest())
+            .await
+            .context("the healthy route must resolve")?;
+        let filled = planner.cache.get(&key).await.context("the fill must cache the route")?;
+
+        report_unacknowledged_burst(&graph);
+        tokio::time::sleep(KEEP_TEST_TTL / 2).await;
+        sweep(&planner).await;
+        // Past the TTL of the entry the fill inserted, so only the sweep can have kept it, and
+        // well inside the TTL the sweep restarted.
+        tokio::time::sleep(KEEP_TEST_TTL * 7 / 10).await;
+
+        let kept = planner
+            .cache
+            .get(&key)
+            .await
+            .context("the entry must outlive its TTL while the refresh finds no replacement")?;
+        assert!(
+            Arc::ptr_eq(&filled, &kept),
+            "the sweep must have kept the very entry the fill made, not built a new one"
+        );
+        planner
+            .resolve_routing(100, 0, one_hop_to_dest())
+            .await
+            .context("the cached route must keep serving while the refresh finds none")?;
+        Ok(())
+    }
+
+    /// An entry nothing can replace is kept only while its candidates are younger than
+    /// `max_stale_age`. Past that it expires, so a route that is really gone stops being served.
+    ///
+    /// This is also what shows the degraded edge really leaves the selector with nothing: with the
+    /// entry gone, resolution has to ask it again, and fails.
+    #[tokio::test]
+    async fn a_refresh_should_let_an_entry_expire_once_it_is_older_than_max_stale_age() -> anyhow::Result<()> {
+        let (planner, graph) = forward_planner(PathPlannerConfig {
+            cache_ttl: KEEP_TEST_TTL,
+            max_stale_age: Duration::ZERO,
+            ..small_config()
+        });
+        planner
+            .resolve_routing(100, 0, one_hop_to_dest())
+            .await
+            .context("the healthy route must resolve")?;
+
+        report_unacknowledged_burst(&graph);
+        tokio::time::sleep(KEEP_TEST_TTL / 2).await;
+        sweep(&planner).await;
+        tokio::time::sleep(KEEP_TEST_TTL * 7 / 10).await;
+
+        let res = planner.resolve_routing(100, 0, one_hop_to_dest()).await;
+        assert!(
+            res.is_err(),
+            "an entry past max_stale_age must expire into the selector's verdict"
+        );
+        Ok(())
+    }
+
+    /// The sweep reads an entry, rebuilds, and only then keeps it. A route a recompute installed in
+    /// between is newer than what the sweep read, and must not be replaced by it.
+    #[tokio::test]
+    async fn keeping_an_entry_should_not_overwrite_one_that_replaced_it_meanwhile() -> anyhow::Result<()> {
+        let (planner, _graph) = forward_planner(small_config());
+        planner
+            .resolve_routing(100, 0, one_hop_to_dest())
+            .await
+            .context("the healthy route must resolve")?;
+        let key = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST), 1);
+        let swept = planner.cache.get(&key).await.context("the fill must cache the route")?;
+
+        let replacement = Arc::new(CachedPaths::new(hopr_utils::statistics::WeightedCollection::new(
+            swept.iter().cloned().collect(),
+        )));
+        planner.cache.insert(key, replacement.clone()).await;
+
+        assert!(
+            !keep_serving(&planner.cache, key, &swept).await,
+            "a superseded entry must not be kept"
+        );
+        let cached = planner
+            .cache
+            .get(&key)
+            .await
+            .context("the replacement must stay cached")?;
+        assert!(
+            Arc::ptr_eq(&cached, &replacement),
+            "the replacement must survive the attempt to keep the entry it superseded"
+        );
+        Ok(())
+    }
+
+    /// A refresh that does find candidates replaces the entry, as before: the kept entry is only
+    /// ever a fallback for having nothing at all.
+    #[tokio::test]
+    async fn a_refresh_that_finds_a_path_should_replace_the_entry() -> anyhow::Result<()> {
+        let (planner, _graph) = forward_planner(small_config());
+        planner
+            .resolve_routing(100, 0, one_hop_to_dest())
+            .await
+            .context("the healthy route must resolve")?;
+        let key = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST), 1);
+        let filled = planner.cache.get(&key).await.context("the fill must cache the route")?;
+
+        sweep(&planner).await;
+
+        let refreshed = planner.cache.get(&key).await.context("the refresh must keep the key")?;
+        assert!(
+            !Arc::ptr_eq(&filled, &refreshed),
+            "a refresh with candidates must install a freshly selected entry"
+        );
+        assert!(refreshed.selected_at > filled.selected_at);
+        Ok(())
     }
 
     /// A recompute is addressed at one counterparty, so it must not sweep the whole cache.
