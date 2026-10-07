@@ -1,6 +1,10 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
 };
 
 use dashmap::DashMap;
@@ -35,15 +39,24 @@ impl PeerProtocolCounters {
         self.acks_received.fetch_add(count, Ordering::Relaxed);
     }
 
+    /// Swap the sent-message counter to 0, returning the accumulated value.
+    #[inline]
+    pub fn take_sent(&self) -> u64 {
+        self.messages_sent.swap(0, Ordering::Relaxed)
+    }
+
+    /// Swap the acknowledgment counter to 0, returning the accumulated value.
+    #[inline]
+    pub fn take_acks(&self) -> u64 {
+        self.acks_received.swap(0, Ordering::Relaxed)
+    }
+
     /// Swap both counters to 0, returning accumulated values.
     ///
     /// Each counter is swapped independently via its own atomic operation;
     /// there is no single atomic snapshot of the pair.
     pub fn take(&self) -> (u64, u64) {
-        (
-            self.messages_sent.swap(0, Ordering::Relaxed),
-            self.acks_received.swap(0, Ordering::Relaxed),
-        )
+        (self.take_sent(), self.take_acks())
     }
 }
 
@@ -66,6 +79,43 @@ impl PeerProtocolCounterRegistry {
             .clone()
     }
 
+    /// Drains the counters for one conformance report, giving every packet in it `ack_grace` to be
+    /// acknowledged.
+    ///
+    /// [`Self::drain`] reads both counters at the same instant, so a packet still in flight then is
+    /// reported as sent but never acknowledged. In steady traffic that is a sliver of the window. A
+    /// burst that starts just before the flush, though, is in flight almost entirely: the report
+    /// reads as an acknowledgment rate near zero, the edge falls below the path planner's
+    /// `min_ack_rate`, and it stays out of path selection until the next report (hoprnet#8484).
+    ///
+    /// So the sent counts are taken first, and the acknowledgments only `ack_grace` later. Packets
+    /// sent during the grace stay counted for the next report. Their acknowledgments that arrive
+    /// within it are credited to this one, a report early. The decayed totals the graph keeps absorb
+    /// that: a report later, a burst's acknowledgments still weigh 0.9 against its packets.
+    ///
+    /// Returns `(peer, msgs_sent, acks_received)` for non-zero entries, like [`Self::drain`].
+    pub async fn drain_settled(&self, ack_grace: Duration) -> Vec<(OffchainPublicKey, u64, u64)> {
+        let sent = self
+            .inner
+            .iter()
+            .map(|entry| (*entry.key(), entry.value().take_sent()))
+            .filter(|(_, sent)| *sent > 0)
+            .collect::<HashMap<_, _>>();
+
+        if !ack_grace.is_zero() {
+            futures_timer::Delay::new(ack_grace).await;
+        }
+
+        self.inner
+            .iter()
+            .filter_map(|entry| {
+                let sent = sent.get(entry.key()).copied().unwrap_or_default();
+                let received = entry.value().take_acks();
+                (sent > 0 || received > 0).then_some((*entry.key(), sent, received))
+            })
+            .collect()
+    }
+
     /// Swap all counters to 0, returning `(peer, msgs_sent, acks_received)` for non-zero entries.
     pub fn drain(&self) -> Vec<(OffchainPublicKey, u64, u64)> {
         self.inner
@@ -84,6 +134,8 @@ impl PeerProtocolCounterRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use anyhow::Context;
     use hopr_api::types::crypto::prelude::{Keypair, OffchainKeypair};
 
@@ -198,5 +250,77 @@ mod tests {
 
         let second_drain = registry.drain();
         assert!(second_drain.is_empty(), "counters should be zero after drain");
+    }
+
+    #[tokio::test]
+    async fn drain_settled_should_credit_acks_that_arrive_within_the_grace() -> anyhow::Result<()> {
+        let registry = PeerProtocolCounterRegistry::default();
+        let peer = *OffchainKeypair::random().public();
+        let counters = registry.get_or_create(&peer);
+
+        // A burst whose acknowledgments are all still in flight when the flush starts.
+        for _ in 0..10 {
+            counters.record_message_sent();
+        }
+
+        // Drive the drain into its grace deterministically rather than racing a timer: the first
+        // poll takes the `sent` snapshot and starts the grace, so the acks recorded next are
+        // guaranteed to land inside the window before `take_acks` reads them. A starved executor
+        // could otherwise let the grace timer and an ack timer fire together, with the drain polled
+        // first and reading zero acks.
+        let mut drained = std::pin::pin!(registry.drain_settled(Duration::from_millis(50)));
+        anyhow::ensure!(
+            futures::poll!(drained.as_mut()).is_pending(),
+            "the drain must be waiting out its grace before the acks are recorded"
+        );
+        counters.record_acks_received(10);
+        let drained = drained.await;
+
+        let (_, sent, received) = drained.first().context("the peer must be reported")?;
+        assert_eq!(
+            (*sent, *received),
+            (10, 10),
+            "acknowledgments arriving within the grace must be credited"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn drain_settled_should_carry_packets_sent_during_the_grace_into_the_next_report() -> anyhow::Result<()> {
+        let registry = PeerProtocolCounterRegistry::default();
+        let peer = *OffchainKeypair::random().public();
+        let counters = registry.get_or_create(&peer);
+
+        counters.record_message_sent();
+
+        // First poll takes the `sent` snapshot (one packet) and starts the grace; the packets
+        // recorded next therefore land after the snapshot, inside the grace, with no dependence on
+        // timer order.
+        let mut first = std::pin::pin!(registry.drain_settled(Duration::from_millis(50)));
+        anyhow::ensure!(
+            futures::poll!(first.as_mut()).is_pending(),
+            "the drain must be waiting out its grace before the in-grace packets are recorded"
+        );
+        counters.record_message_sent();
+        counters.record_message_sent();
+        let first = first.await;
+        let (_, sent, _) = first.first().context("the peer must be reported")?;
+        assert_eq!(*sent, 1, "only the packet sent before the grace belongs to this report");
+
+        let second = registry.drain_settled(Duration::ZERO).await;
+        let (_, sent, _) = second.first().context("the carried packets must be reported")?;
+        assert_eq!(*sent, 2, "packets sent during the grace must be reported next time");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn drain_settled_should_report_only_active_peers() {
+        let registry = PeerProtocolCounterRegistry::default();
+        registry.get_or_create(OffchainKeypair::random().public());
+
+        assert!(
+            registry.drain_settled(Duration::ZERO).await.is_empty(),
+            "a peer with nothing sent or received must not be reported"
+        );
     }
 }
