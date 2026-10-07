@@ -96,7 +96,12 @@ pub(super) async fn process_chain_events<C, G, S>(
             | ChainEvent::ChannelClosureInitiated(channel)
             | ChainEvent::ChannelClosed(channel)
             | ChainEvent::ChannelBalanceIncreased(channel, _)
-            | ChainEvent::ChannelBalanceDecreased(channel, _) => {
+            | ChainEvent::ChannelBalanceDecreased(channel, _)
+            // A redemption decreases the channel's on-chain balance but arrives as its own event,
+            // not `ChannelBalanceDecreased`. Fold it in here so the graph edge tracks the drain;
+            // otherwise path selection keeps routing over a channel the ticket factory can no
+            // longer fund (GNO-805). The carried `ChannelEntry` holds the post-redemption balance.
+            | ChainEvent::TicketRedeemed(channel, _) => {
                 let src_addr = channel.source;
                 let dst_addr = channel.destination;
 
@@ -202,7 +207,6 @@ pub(super) async fn process_chain_events<C, G, S>(
                 *ticket_price.write() = price;
                 push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
-            _ => {}
         }
     }
 }
@@ -611,6 +615,39 @@ mod tests {
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(50u64)));
+    }
+
+    #[tokio::test]
+    async fn ticket_redeemed_records_updated_balance() {
+        // A redemption drains a channel's on-chain balance, but it arrives as `TicketRedeemed`,
+        // not `ChannelBalanceDecreased`. The graph must still learn the new balance, otherwise path
+        // selection keeps routing over a channel the ticket factory can no longer fund (GNO-805).
+        let (src_offchain, src_chain) = make_keypairs();
+        let (dst_offchain, dst_chain) = make_keypairs();
+        let src_addr = src_chain.public().to_address();
+        let dst_addr = dst_chain.public().to_address();
+
+        let graph = RecordingGraph::default();
+        let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
+
+        // Post-redemption the channel is still Open but holds only 3; its balance must be recorded.
+        run(
+            vec![ChainEvent::TicketRedeemed(
+                channel(src_addr, dst_addr, 3, ChannelStatus::Open),
+                None,
+            )],
+            stub,
+            graph.clone(),
+            src_addr,
+            *src_offchain.public(),
+            HoprBalance::from(10u64),
+            WinningProbability::ALWAYS,
+        )
+        .await;
+
+        let edges = graph.edges();
+        assert_eq!(edges.len(), 1, "redemption must record a graph edge balance update");
+        assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(3u64)));
     }
 
     #[tokio::test]
