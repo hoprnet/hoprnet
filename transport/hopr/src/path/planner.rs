@@ -915,6 +915,7 @@ where
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Context;
     use bimap::BiMap;
     use futures::stream::{self, BoxStream};
     use hex_literal::hex;
@@ -1889,7 +1890,7 @@ mod tests {
     /// clobbered by the sweep's older selection, putting new-generation SURBs back on the route the
     /// recompute had just moved away from.
     #[tokio::test]
-    async fn a_background_refresh_must_not_overwrite_a_recomputed_route() {
+    async fn a_background_refresh_must_not_overwrite_a_recomputed_route() -> anyhow::Result<()> {
         let (planner, _graph) = two_relayer_return_planner();
         let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
 
@@ -1902,7 +1903,7 @@ mod tests {
             .cache
             .get(&key)
             .await
-            .expect("the recompute should cache a route");
+            .context("the recompute should cache a route")?;
         assert!(
             !Arc::ptr_eq(&swept, &recomputed),
             "precondition: the recompute installed a new entry"
@@ -1912,11 +1913,12 @@ mod tests {
         let wrote = put_if_unchanged(&planner.cache, key, &swept, swept.clone()).await;
         assert!(!wrote, "the sweep must not write over the entry the recompute replaced");
 
-        let current = planner.cache.get(&key).await.expect("the entry is still cached");
+        let current = planner.cache.get(&key).await.context("the entry is still cached")?;
         assert!(
             Arc::ptr_eq(&current, &recomputed),
             "the recomputed route is the one still served"
         );
+        Ok(())
     }
 
     /// Share of the collection's total weight held by candidates whose first hop is `relayer`.

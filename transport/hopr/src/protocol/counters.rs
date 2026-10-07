@@ -263,14 +263,18 @@ mod tests {
             counters.record_message_sent();
         }
 
-        let late_acks = {
-            let counters = counters.clone();
-            async move {
-                futures_timer::Delay::new(Duration::from_millis(20)).await;
-                counters.record_acks_received(10);
-            }
-        };
-        let (drained, _) = futures::join!(registry.drain_settled(Duration::from_millis(200)), late_acks);
+        // Drive the drain into its grace deterministically rather than racing a timer: the first
+        // poll takes the `sent` snapshot and starts the grace, so the acks recorded next are
+        // guaranteed to land inside the window before `take_acks` reads them. A starved executor
+        // could otherwise let the grace timer and an ack timer fire together, with the drain polled
+        // first and reading zero acks.
+        let mut drained = std::pin::pin!(registry.drain_settled(Duration::from_millis(50)));
+        anyhow::ensure!(
+            futures::poll!(drained.as_mut()).is_pending(),
+            "the drain must be waiting out its grace before the acks are recorded"
+        );
+        counters.record_acks_received(10);
+        let drained = drained.await;
 
         let (_, sent, received) = drained.first().context("the peer must be reported")?;
         assert_eq!(
@@ -288,15 +292,18 @@ mod tests {
         let counters = registry.get_or_create(&peer);
 
         counters.record_message_sent();
-        let in_grace = {
-            let counters = counters.clone();
-            async move {
-                futures_timer::Delay::new(Duration::from_millis(20)).await;
-                counters.record_message_sent();
-                counters.record_message_sent();
-            }
-        };
-        let (first, _) = futures::join!(registry.drain_settled(Duration::from_millis(200)), in_grace);
+
+        // First poll takes the `sent` snapshot (one packet) and starts the grace; the packets
+        // recorded next therefore land after the snapshot, inside the grace, with no dependence on
+        // timer order.
+        let mut first = std::pin::pin!(registry.drain_settled(Duration::from_millis(50)));
+        anyhow::ensure!(
+            futures::poll!(first.as_mut()).is_pending(),
+            "the drain must be waiting out its grace before the in-grace packets are recorded"
+        );
+        counters.record_message_sent();
+        counters.record_message_sent();
+        let first = first.await;
         let (_, sent, _) = first.first().context("the peer must be reported")?;
         assert_eq!(*sent, 1, "only the packet sent before the grace belongs to this report");
 
