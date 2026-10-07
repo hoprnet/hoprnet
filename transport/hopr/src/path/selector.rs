@@ -384,9 +384,16 @@ where
         // The caller's snapshot, so both phases of one query cost against the same face value.
         ticket_face_value: Option<hopr_api::graph::traits::Balance>,
     ) -> Vec<PathWithMetrics> {
+        // `forward_without_self_loopback` counts the *finished* path length — the one that includes
+        // the `dest` edge appended below — not the shorter traversal depth. Passing the search depth
+        // understates it by one: for a 1-hop path it collapses `length` to 1, so the first
+        // (monetized) edge is funding-checked with zero remaining hops, waiving the check and
+        // selecting a channel that cannot fund the first-hop ticket (GNO-805). Search `shorter_length`
+        // edges, but cost them against the finished length.
+        let finished_length = shorter_length.saturating_add(1);
         let value_fn = MetricsValueFn {
             inner: EdgeValueFn::forward_without_self_loopback(
-                shorter_length,
+                finished_length,
                 self.edge_penalty,
                 self.min_ack_rate,
                 ticket_face_value,
@@ -1384,6 +1391,122 @@ mod tests {
             paths[0].fundable_tickets_floor,
             Some(200),
             "floor must be the smaller of 500 and 200"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn starved_first_hop_channel_must_not_be_selected() -> anyhow::Result<()> {
+        // GNO-805: the client's own outgoing channel — the first, monetized hop — drains below one
+        // ticket face value. The first-hop ticket can then no longer be created (hopr-ticket-manager
+        // rejects it with "balance of channel is too low"), so path selection must not hand out that
+        // route at all. Phase 1 (`forward`) rejects it correctly; the regression is Phase 2
+        // (`forward_without_self_loopback`), which for a 1-hop target searches a single edge with
+        // `length = 1` and so checks `balance_suffices(balance, 0, face)` — zero remaining hops
+        // waives the funding check and re-admits the drained hop.
+        let me = pubkey(&SECRET_0);
+        let relay = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+
+        // Face value 100; MIN_BALANCE_HEADROOM = 2, so a 1-hop first edge needs >= 200.
+        let face = hopr_api::graph::traits::Balance::from(100u64);
+
+        let build = |first_hop_balance: u64| {
+            let graph = ChannelGraph::new(me);
+            graph.add_node(relay);
+            graph.add_node(dest);
+            graph.set_ticket_face_value(face);
+            // me -> relay: the monetized first hop, drained or funded per the argument.
+            graph.upsert_edge(&me, &relay, |obs| {
+                obs.record(EdgeWeightType::Connected(true));
+                obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                    first_hop_balance,
+                ))));
+            });
+            // relay -> dest: healthy; the final hop is not monetized regardless.
+            mark_edge_full(&graph, &relay, &dest);
+            graph.add_edge(&me, &relay).unwrap();
+            graph.add_edge(&relay, &dest).unwrap();
+            graph
+        };
+
+        // Control: a funded first hop yields a usable path, proving the topology is otherwise valid
+        // and that a later PathNotFound is caused by the drain, not a missing route.
+        let funded = test_selector(me, build(10_000), MAX_PATHS);
+        let healthy = funded.select_path(me, dest, 1).context("funded first hop must route")?;
+        assert!(!healthy.is_empty(), "a funded first hop must be selectable");
+        assert_eq!(healthy[0].path.first(), Some(&relay), "route must go via the relay");
+
+        // The bug: first hop drained to 50 — below one face value (100) and the 200 headroom floor.
+        let starved = test_selector(me, build(50), MAX_PATHS);
+        let result = starved.select_path(me, dest, 1);
+        assert!(
+            matches!(result, Err(PathPlannerError::Path(PathError::PathNotFound(..)))),
+            "a first hop that cannot fund a single ticket must not be selected, got: {result:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn starved_intermediate_hop_via_extended_search_must_not_be_selected() -> anyhow::Result<()> {
+        // Same off-by-one, one hop deeper. With no relay -> dest channel, a 2-hop request falls to
+        // the Phase 2 extended search (me -> a -> b, dest appended). `b` is the last *searched*
+        // edge but still a monetized hop. The understated length waived its funding via the
+        // intermediate `require_funding` branch collapsing to zero remaining hops; costing against
+        // the finished length keeps the check at one ticket.
+        let me = pubkey(&SECRET_0);
+        let a = pubkey(&SECRET_1);
+        let b = pubkey(&SECRET_2);
+        let dest = pubkey(&SECRET_3);
+
+        let face = hopr_api::graph::traits::Balance::from(100u64);
+
+        let build = |second_hop_balance: u64| {
+            let graph = ChannelGraph::new(me);
+            for n in [a, b, dest] {
+                graph.add_node(n);
+            }
+            graph.set_ticket_face_value(face);
+            // me -> a: healthy and well funded.
+            graph.upsert_edge(&me, &a, |obs| {
+                obs.record(EdgeWeightType::Connected(true));
+                obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                    10_000u64,
+                ))));
+            });
+            // a -> b: the monetized hop under test.
+            graph.upsert_edge(&a, &b, |obs| {
+                obs.record(EdgeWeightType::Connected(true));
+                obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                    second_hop_balance,
+                ))));
+            });
+            // No b -> dest edge: forces the Phase 2 extended search (last hop assumed by anybody).
+            graph.add_edge(&me, &a).unwrap();
+            graph.add_edge(&a, &b).unwrap();
+            graph
+        };
+
+        // Control: a funded second hop routes via the extended search.
+        let funded = test_selector(me, build(10_000), MAX_PATHS);
+        let healthy = funded
+            .select_path(me, dest, 2)
+            .context("funded second hop must route")?;
+        assert!(!healthy.is_empty(), "a funded second hop must be selectable");
+        assert_eq!(healthy[0].path.first(), Some(&a), "route must start at the first relay");
+
+        // The bug: second hop drained to 50 — below one face value (100).
+        let starved = test_selector(me, build(50), MAX_PATHS);
+        let result = starved.select_path(me, dest, 2);
+        assert!(
+            matches!(result, Err(PathPlannerError::Path(PathError::PathNotFound(..)))),
+            "a monetized intermediate hop that cannot fund a ticket must not be selected, got: {result:?}"
         );
         Ok(())
     }
