@@ -88,9 +88,9 @@ pub struct PathPlannerConfig {
     /// most `max_stale_age + cache_ttl` after its last successful refresh.
     ///
     /// Only an entry with no replacement at all is kept. When the selector offers any candidate,
-    /// the entry is replaced as before. The first refresh that can find nothing runs at least one
-    /// [`Self::refresh_period`] after the candidates were selected, so any value up to that period
-    /// disables this, zero included.
+    /// the entry is replaced as before. Only zero disables this: an entry a fill selected is not
+    /// aligned to the sweep ticks, so the first refresh that finds nothing can run well inside one
+    /// [`Self::refresh_period`] of the fill and keep it.
     ///
     /// Defaults to 30 s, two counter flushes: long enough to ride out one bad report, short
     /// enough that a route which is really gone stops being served.
@@ -450,12 +450,13 @@ impl std::ops::Deref for CachedPaths {
 /// their traversal cost, keyed by `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
-/// the chain resolver, and stores an `Arc<WeightedCollection<ValidatedPath>>` in the
-/// cache. On a cache hit a candidate is picked via weighted random selection (higher
-/// cost = higher quality = higher probability).
+/// the chain resolver, and stores the weighted candidates, with the time they were
+/// selected, in the cache (`CachedPaths`). On a cache hit a candidate is picked via
+/// weighted random selection (higher cost = higher quality = higher probability).
 ///
 /// A background sweep (`background_refresh`) can be spawned to
-/// proactively re-warm the cache for all previously-seen keys.
+/// proactively re-warm the cache for all previously-seen keys. An entry it finds no
+/// replacement for keeps serving for up to [`PathPlannerConfig::max_stale_age`].
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {
     me: OffchainPublicKey,
