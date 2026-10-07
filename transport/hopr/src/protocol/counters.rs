@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -93,25 +92,27 @@ impl PeerProtocolCounterRegistry {
     /// within it are credited to this one, a report early. The decayed totals the graph keeps absorb
     /// that: a report later, a burst's acknowledgments still weigh 0.9 against its packets.
     ///
+    /// A peer first seen during the grace is left for the next report.
+    ///
     /// Returns `(peer, msgs_sent, acks_received)` for non-zero entries, like [`Self::drain`].
     pub async fn drain_settled(&self, ack_grace: Duration) -> Vec<(OffchainPublicKey, u64, u64)> {
-        let sent = self
+        // Each peer's counters are held through the grace, so its acks are taken without a second
+        // lookup. Collected before the await: no map guard may be held across it.
+        let pending = self
             .inner
             .iter()
-            .map(|entry| (*entry.key(), entry.value().take_sent()))
-            .filter(|(_, sent)| *sent > 0)
-            .collect::<HashMap<_, _>>();
+            .map(|entry| (*entry.key(), entry.value().clone(), entry.value().take_sent()))
+            .collect::<Vec<_>>();
 
         if !ack_grace.is_zero() {
             futures_timer::Delay::new(ack_grace).await;
         }
 
-        self.inner
-            .iter()
-            .filter_map(|entry| {
-                let sent = sent.get(entry.key()).copied().unwrap_or_default();
-                let received = entry.value().take_acks();
-                (sent > 0 || received > 0).then_some((*entry.key(), sent, received))
+        pending
+            .into_iter()
+            .filter_map(|(peer, counters, sent)| {
+                let received = counters.take_acks();
+                (sent > 0 || received > 0).then_some((peer, sent, received))
             })
             .collect()
     }
