@@ -663,10 +663,10 @@ where
                 // A fresh entry counts as moved -- there was no previous distribution to compare
                 // against, so nothing here can say the traffic stayed put.
                 let mut shifted = true;
-                // Through `and_compute_with`, like the background refresh keeping an entry alive
-                // (`keep_serving`): moka serialises only compute calls on a key, so a plain insert
-                // here could land between that one's read and its write, and be overwritten by the
-                // stale entry it was meant to replace.
+                // Through `and_compute_with`, like every write of the background refresh
+                // (`put_if_unchanged`): moka serialises only compute calls on a key, so a plain
+                // insert here could land between that one's read and its write, and be overwritten
+                // by the older entry it was meant to replace.
                 self.cache
                     .entry(key)
                     .and_compute_with(|previous| {
@@ -933,36 +933,39 @@ where
     }
 }
 
-/// Re-inserts `swept` under `key`, restarting its TTL, if it is still the entry cached there.
+/// Writes `value` under `key`, restarting the entry's TTL, if `swept` is still the entry cached
+/// there. Returns whether it was.
 ///
-/// Returns whether it was. The check and the write are one `and_compute_with`, which moka serialises
-/// against every other compute call on the key. `recompute_paths_from` writes through one too, so a
-/// route it installs after the sweep read the cache cannot be overwritten by the stale one. A fill
-/// only writes when the key is vacant, which this then leaves alone.
-async fn keep_serving(
+/// The background refresh reads an entry, rebuilds it from the graph, and writes only after the
+/// rebuild's awaits. A `recompute_paths_from` that ran meanwhile built from newer evidence, so the
+/// refresh's write must not land on top of it, whether that write is a rebuilt entry or the swept
+/// one kept serving. The check and the write are one `and_compute_with`, which moka serialises against
+/// every other compute call on the key, and the recompute writes through one too. A key that went
+/// vacant is left to the next fill.
+async fn put_if_unchanged(
     cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     key: PlannerCacheKey,
     swept: &PlannerCacheValue,
+    value: PlannerCacheValue,
 ) -> bool {
-    let kept = cache
+    let written = cache
         .entry(key)
         .and_compute_with(|current| {
             futures::future::ready(match current {
-                Some(current) if Arc::ptr_eq(current.value(), swept) => {
-                    moka::ops::compute::Op::Put(current.into_value())
-                }
+                Some(current) if Arc::ptr_eq(current.value(), swept) => moka::ops::compute::Op::Put(value),
                 _ => moka::ops::compute::Op::Nop,
             })
         })
         .await;
-    matches!(kept, moka::ops::compute::CompResult::ReplacedWith(_))
+    matches!(written, moka::ops::compute::CompResult::ReplacedWith(_))
 }
 
 /// One sweep of the background refresh: rebuilds every cached multi-hop entry from the current graph.
 ///
 /// An entry the rebuild finds no candidates for is kept serving what it holds, by re-inserting it
-/// unchanged ([`keep_serving`]), while it is younger than `max_stale_age` (see
-/// [`PathPlannerConfig::max_stale_age`]).
+/// unchanged, while it is younger than `max_stale_age` (see [`PathPlannerConfig::max_stale_age`]).
+/// Either write goes through [`put_if_unchanged`], so it never replaces an entry installed after the
+/// sweep read the cache.
 async fn refresh_cached_entries<R, S>(
     cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     resolver: &R,
@@ -996,11 +999,15 @@ async fn refresh_cached_entries<R, S>(
         )
         .await
         {
-            Ok(Some(weighted)) => cache.insert(key, Arc::new(CachedPaths::new(weighted))).await,
+            Ok(Some(weighted)) => {
+                put_if_unchanged(cache, key, &swept, Arc::new(CachedPaths::new(weighted))).await;
+            }
             // Nothing to replace the entry with. Leaving it alone is not enough to keep it: its TTL
             // runs on regardless, so it is re-inserted, which restarts the TTL, until it is too old.
             _ => {
-                if swept.selected_at.elapsed() < max_stale_age && keep_serving(cache, key, &swept).await {
+                if swept.selected_at.elapsed() < max_stale_age
+                    && put_if_unchanged(cache, key, &swept, swept.clone()).await
+                {
                     tracing::debug!(
                         destination = %dest_key,
                         hops = hops_u32,
@@ -2317,10 +2324,11 @@ mod tests {
         Ok(())
     }
 
-    /// The sweep reads an entry, rebuilds, and only then keeps it. A route a recompute installed in
-    /// between is newer than what the sweep read, and must not be replaced by it.
+    /// The sweep reads an entry, rebuilds it, and writes only after the rebuild's awaits. A route a
+    /// recompute installed in between was built from newer evidence, and must survive both writes the
+    /// sweep can make: the entry it rebuilt, and the entry it read, kept serving.
     #[tokio::test]
-    async fn keeping_an_entry_should_not_overwrite_one_that_replaced_it_meanwhile() -> anyhow::Result<()> {
+    async fn a_sweep_should_not_overwrite_an_entry_replaced_meanwhile() -> anyhow::Result<()> {
         let (planner, _graph) = forward_planner(small_config());
         planner
             .resolve_routing(100, 0, one_hop_to_dest())
@@ -2328,14 +2336,21 @@ mod tests {
             .context("the healthy route must resolve")?;
         let key = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST), 1);
         let swept = planner.cache.get(&key).await.context("the fill must cache the route")?;
+        let copy_of = |paths: &PlannerCacheValue| {
+            Arc::new(CachedPaths::new(hopr_utils::statistics::WeightedCollection::new(
+                paths.iter().cloned().collect(),
+            )))
+        };
 
-        let replacement = Arc::new(CachedPaths::new(hopr_utils::statistics::WeightedCollection::new(
-            swept.iter().cloned().collect(),
-        )));
+        let replacement = copy_of(&swept);
         planner.cache.insert(key, replacement.clone()).await;
 
         assert!(
-            !keep_serving(&planner.cache, key, &swept).await,
+            !put_if_unchanged(&planner.cache, key, &swept, copy_of(&swept)).await,
+            "a rebuild of the superseded entry must not be written"
+        );
+        assert!(
+            !put_if_unchanged(&planner.cache, key, &swept, swept.clone()).await,
             "a superseded entry must not be kept"
         );
         let cached = planner
@@ -2345,7 +2360,7 @@ mod tests {
             .context("the replacement must stay cached")?;
         assert!(
             Arc::ptr_eq(&cached, &replacement),
-            "the replacement must survive the attempt to keep the entry it superseded"
+            "the replacement must survive both writes of the sweep that read its predecessor"
         );
         Ok(())
     }
