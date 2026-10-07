@@ -94,6 +94,10 @@ impl PeerProtocolCounterRegistry {
     ///
     /// A peer first seen during the grace is left for the next report.
     ///
+    /// Not cancellation safe: the sent counts are taken before the grace, so dropping the future
+    /// while it waits loses them from every report. The acknowledgments are only taken after the
+    /// grace and stay counted. The flush task is only dropped when the transport stops.
+    ///
     /// Returns `(peer, msgs_sent, acks_received)` for non-zero entries, like [`Self::drain`].
     pub async fn drain_settled(&self, ack_grace: Duration) -> Vec<(OffchainPublicKey, u64, u64)> {
         // Each peer's counters are held through the grace, so its acks are taken without a second

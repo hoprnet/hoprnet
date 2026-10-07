@@ -2009,6 +2009,35 @@ mod tests {
         Ok(())
     }
 
+    /// The counterpart of the test above: while the entry the sweep read is still the one cached,
+    /// its rebuild must land. Without this, a `put_if_unchanged` that never wrote would pass too.
+    #[tokio::test]
+    async fn a_background_refresh_should_replace_an_unchanged_entry() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_return_planner();
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+        fill_return_cache(&planner).await;
+
+        // Read the entry the way the sweep does, from the cache iterator.
+        let (_, swept) = planner
+            .cache
+            .iter()
+            .find(|(k, _)| **k == key)
+            .context("the filled entry should be iterable")?;
+        let rebuilt = Arc::new(hopr_utils::statistics::WeightedCollection::new(
+            swept.iter().cloned().collect(),
+        ));
+
+        let wrote = put_if_unchanged(&planner.cache, key, &swept, rebuilt.clone()).await;
+        assert!(wrote, "the rebuild of an unchanged entry must be written");
+
+        let current = planner.cache.get(&key).await.context("the entry is still cached")?;
+        assert!(
+            Arc::ptr_eq(&current, &rebuilt),
+            "the rebuilt route is the one now served"
+        );
+        Ok(())
+    }
+
     /// Share of the collection's total weight held by candidates whose first hop is `relayer`.
     ///
     /// This -- not the raw weight -- is what decides how much of a session's return stream rides on

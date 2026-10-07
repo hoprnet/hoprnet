@@ -186,24 +186,38 @@ fn apply_conformance_report(graph: &ChannelGraph, src: &OffchainPublicKey, repor
     }
 }
 
-/// A cold burst of 10 packets to the relay whose Proof-of-Relay acknowledgments arrive 20 ms after
-/// the flush begins, drained with `grace`. A zero grace reproduces the flush as it shipped, reading
-/// both counters at the same instant.
-async fn cold_burst_report(relay: &OffchainPublicKey, grace: Duration) -> Vec<(OffchainPublicKey, u64, u64)> {
+/// A cold burst of 10 packets to the relay whose Proof-of-Relay acknowledgments arrive only after the
+/// flush began, drained with `grace`. A zero grace reproduces the flush as it shipped, reading both
+/// counters at the same instant.
+///
+/// The ordering is driven by polls, not by racing two timers, as in the `protocol::counters` unit
+/// tests: a stalled executor could otherwise poll the drain past its grace before the acks are
+/// recorded, and the graced report would read none.
+async fn cold_burst_report(
+    relay: &OffchainPublicKey,
+    grace: Duration,
+) -> anyhow::Result<Vec<(OffchainPublicKey, u64, u64)>> {
     let registry = PeerProtocolCounterRegistry::default();
     let counters = registry.get_or_create(relay);
     for _ in 0..10 {
         counters.record_message_sent();
     }
-    let late_acks = {
-        let counters = counters.clone();
-        async move {
-            futures_timer::Delay::new(Duration::from_millis(20)).await;
-            counters.record_acks_received(10);
-        }
-    };
-    let (report, _) = futures::join!(registry.drain_settled(grace), late_acks);
-    report
+
+    let mut drain = std::pin::pin!(registry.drain_settled(grace));
+    if grace.is_zero() {
+        // Nothing to wait for: the report is complete before the acks arrive.
+        let report = drain.await;
+        counters.record_acks_received(10);
+        return Ok(report);
+    }
+
+    // The first poll takes the sent snapshot and starts the grace, so the acks land inside it.
+    anyhow::ensure!(
+        futures::poll!(drain.as_mut()).is_pending(),
+        "the drain must be waiting out its grace before the acks are recorded"
+    );
+    counters.record_acks_received(10);
+    Ok(drain.await)
 }
 
 /// Reproduces hoprnet#8484 across counter report, graph edge weight, and path selection.
@@ -229,7 +243,7 @@ async fn a_cold_burst_flush_decides_whether_the_one_hop_route_survives() -> anyh
         selector.select_path(me, dest, 1).is_ok(),
         "precondition: the 1-hop route exists before the flush"
     );
-    apply_conformance_report(&graph, &me, &cold_burst_report(&relay, Duration::ZERO).await);
+    apply_conformance_report(&graph, &me, &cold_burst_report(&relay, Duration::ZERO).await?);
     assert!(
         matches!(
             selector.select_path(me, dest, 1),
@@ -243,7 +257,7 @@ async fn a_cold_burst_flush_decides_whether_the_one_hop_route_survives() -> anyh
     apply_conformance_report(
         &graph,
         &me,
-        &cold_burst_report(&relay, Duration::from_millis(200)).await,
+        &cold_burst_report(&relay, Duration::from_millis(200)).await?,
     );
     assert!(
         selector.select_path(me, dest, 1).is_ok(),
