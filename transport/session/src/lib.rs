@@ -25,9 +25,9 @@ use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
 pub use manager::{
-    ASSUMED_SESSION_PACKET_RATE, DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST,
-    DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult, DropReason, IncomingSessionPixConfig, MAX_OVERLAPPING_BATCHES,
-    MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, cycle_budget_for,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult,
+    DropReason, IncomingSessionPixConfig, MAX_ASSUMED_SESSION_PACKET_RATE, MAX_OVERLAPPING_BATCHES, MAX_SSA_BATCH_SIZE,
+    MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, cycle_budget_for,
     max_cycle_budget_for_quota, validate_incoming_session_pix_config,
 };
 pub use supervision::{FillRate, PixFillConfig, SupervisorConfig, validate_pix_supervision};
@@ -54,8 +54,8 @@ pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg
 pub use types::{
     AgreedSsaQuota, ClosureReason, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
     DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
-    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE, ServiceId, SessionAdmissionReply,
-    SessionAdmissionSink, SessionId, SessionTarget,
+    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE, PIX_QUOTA_BYTES_PER_SHARE, ServiceId,
+    SessionAdmissionReply, SessionAdmissionSink, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::{transfer_session, transfer_session_datagram};
