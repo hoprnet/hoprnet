@@ -4399,7 +4399,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.48.5"
+version = "0.48.6"
 dependencies = [
  "ahash",
  "anyhow",

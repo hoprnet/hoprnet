@@ -394,6 +394,33 @@ fn weights_moved(
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
 type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
 
+/// Writes `value` under `key` only if `swept` is still the entry cached there, returning whether it
+/// was.
+///
+/// The background refresh reads an entry, rebuilds it from the graph across awaits, then writes. A
+/// [`PathPlanner::recompute_paths_from`] that ran in between built from newer SURB evidence, so the
+/// refresh's older selection must not land on top of it. The check and the write are one
+/// `and_compute_with`, which moka serialises against every other compute call on the key, and the
+/// recompute writes through one too — a plain insert would otherwise slip between this read and write.
+/// A key that went vacant meanwhile is left to the next fill.
+async fn put_if_unchanged(
+    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    key: PlannerCacheKey,
+    swept: &PlannerCacheValue,
+    value: PlannerCacheValue,
+) -> bool {
+    let written = cache
+        .entry(key)
+        .and_compute_with(|current| {
+            futures::future::ready(match current {
+                Some(current) if Arc::ptr_eq(current.value(), swept) => moka::ops::compute::Op::Put(value),
+                _ => moka::ops::compute::Op::Nop,
+            })
+        })
+        .await;
+    matches!(written, moka::ops::compute::CompResult::ReplacedWith(_))
+}
+
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
@@ -610,11 +637,19 @@ where
                 let key = (src_key, dest_key, hops);
                 // A fresh entry counts as moved -- there was no previous distribution to compare
                 // against, so nothing here can say the traffic stayed put.
-                let shifted = match self.cache.get(&key).await {
-                    Some(previous) => weights_moved(&previous, &weighted),
-                    None => true,
-                };
-                self.cache.insert(key, Arc::new(weighted)).await;
+                let mut shifted = true;
+                // Through `and_compute_with`, like the background refresh's `put_if_unchanged`: moka
+                // serialises only compute calls on a key, so a plain insert here could land between
+                // the refresh's read and write and be overwritten by the older entry it rebuilt.
+                self.cache
+                    .entry(key)
+                    .and_compute_with(|previous| {
+                        if let Some(previous) = previous {
+                            shifted = weights_moved(previous.value(), &weighted);
+                        }
+                        futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
+                    })
+                    .await;
                 if shifted {
                     moved += 1;
                 }
@@ -841,7 +876,7 @@ where
             let weighting = weighting;
 
             async move {
-                for (key, _) in cache.iter() {
+                for (key, swept) in cache.iter() {
                     let (src_key, dest_key, hops_u32) = {
                         let k = key.as_ref();
                         (k.0, k.1, k.2)
@@ -865,7 +900,10 @@ where
                     )
                     .await
                     {
-                        cache.insert((src_key, dest_key, hops_u32), Arc::new(weighted)).await;
+                        // Only if this is still the entry the sweep read: a `recompute_paths_from`
+                        // that ran during the rebuild built from newer evidence, and its route must
+                        // not be overwritten by this older selection.
+                        put_if_unchanged(&cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
                     }
                 }
             }
@@ -1843,6 +1881,42 @@ mod tests {
             .get(&(pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1))
             .await
             .expect("the return path should be cached after resolution")
+    }
+
+    /// A background refresh must not overwrite a route a `recompute_paths_from` installed from newer
+    /// evidence while the sweep was rebuilding (raised on hoprnet#8486). The sweep reads an entry,
+    /// rebuilds across awaits, then writes; a recompute that lands in between would otherwise be
+    /// clobbered by the sweep's older selection, putting new-generation SURBs back on the route the
+    /// recompute had just moved away from.
+    #[tokio::test]
+    async fn a_background_refresh_must_not_overwrite_a_recomputed_route() {
+        let (planner, _graph) = two_relayer_return_planner();
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+
+        // The sweep reads the entry it is about to rebuild from.
+        let swept = fill_return_cache(&planner).await;
+
+        // A recompute from newer evidence installs a different entry at the same key.
+        planner.recompute_paths_from(&pubkey(&SECRET_DEST)).await;
+        let recomputed = planner
+            .cache
+            .get(&key)
+            .await
+            .expect("the recompute should cache a route");
+        assert!(
+            !Arc::ptr_eq(&swept, &recomputed),
+            "precondition: the recompute installed a new entry"
+        );
+
+        // The sweep now writes its (older) rebuild. It must not land on the recomputed route.
+        let wrote = put_if_unchanged(&planner.cache, key, &swept, swept.clone()).await;
+        assert!(!wrote, "the sweep must not write over the entry the recompute replaced");
+
+        let current = planner.cache.get(&key).await.expect("the entry is still cached");
+        assert!(
+            Arc::ptr_eq(&current, &recomputed),
+            "the recomputed route is the one still served"
+        );
     }
 
     /// Share of the collection's total weight held by candidates whose first hop is `relayer`.
