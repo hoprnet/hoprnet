@@ -1606,6 +1606,71 @@ mod tests {
         );
     }
 
+    /// Reproduces the balancer state seen in the `gnosis_vpn-20260824-101952.log` outage (India
+    /// exit `0x1062..8106`): under sustained return-path loss the entry's counterparty-buffer
+    /// estimate (`produced - consumed`, clamped to the store) pins at/above target because
+    /// `consumed` stops advancing -- the replies that would retire it never arrive -- and the PID
+    /// winds production down to zero. The live `surb balancer state` lines read
+    /// `level=15000 target=9766 output=0 degraded=false` for the whole 15-minute session.
+    ///
+    /// Scope: this guards only the entry-side balancer behaviour the logs show directly -- the
+    /// estimate pinning and the output collapse. It deliberately makes no claim about the exit's
+    /// real SURB store or whether the counterparty starves. The estimate is not a proxy for that
+    /// store: `update` documents that `produced - consumed` "reads as a filling buffer precisely
+    /// when it is emptying" during return-path loss, so a pinned `level` says nothing about how
+    /// many SURBs the exit actually holds. Whether the throttle-to-zero contributes to the outage
+    /// is a separate question this test does not address; it only nails down the observed state so
+    /// a change in it is noticed.
+    #[test_log::test]
+    fn surb_balancer_pins_estimate_and_collapses_output_under_return_path_loss() {
+        use std::sync::atomic::Ordering;
+
+        // The live 15 000-entry counterparty store the estimate is clamped to.
+        const COUNTERPARTY_CAPACITY: u64 = 15_000;
+
+        // The configuration a gnosis_vpn tunnel session actually ran with: SURB balancing on, but
+        // no opt-in to sustain production through return-path loss.
+        let cfg = sustaining_config(false);
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+        state.set_counterparty_buffer_capacity(COUNTERPARTY_CAPACITY);
+
+        // Healthy stretch: replies arrive, and the buffer holds at the setpoint.
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+
+        // The return path goes silent and #8345 marks it degraded on this session's balancer.
+        state.mark_return_path_degraded(Duration::from_secs(30));
+
+        // Replies stop arriving (`consumed` no longer advances). The entry keeps minting what its
+        // controller last commanded; with `consumed` frozen the estimate climbs to the store cap
+        // and the PID drives the commanded rate down to zero.
+        let step = Duration::from_millis(50);
+        for _ in 0..60 {
+            std::thread::sleep(step);
+            let minted = output.load(Ordering::Relaxed) * step.as_millis() as u64 / 1000;
+            surb_estimator.produced.fetch_add(minted, Ordering::Relaxed);
+            // `consumed` stays flat: nothing comes back over the dead return path.
+            balancer.update();
+        }
+
+        // The field `level >= target`: the estimate is pinned at/above target.
+        assert!(
+            state.buffer_level.load(Ordering::Relaxed) >= cfg.target_surb_buffer_size,
+            "the counterparty-buffer estimate must pin at/above target while replies are lost, reproducing the field \
+             `level >= target` state: level={}",
+            state.buffer_level.load(Ordering::Relaxed)
+        );
+
+        // The field `output=0`: production has collapsed to zero.
+        assert_eq!(
+            output.load(Ordering::Relaxed),
+            0,
+            "production must collapse to zero once the estimate pins above target, reproducing the field `output=0` \
+             state"
+        );
+    }
+
     #[test_log::test(tokio::test)]
     async fn surb_balancer_should_start_decrease_level_when_above_target_and_decay_enabled() {
         const NUM_STEPS: usize = 5;
