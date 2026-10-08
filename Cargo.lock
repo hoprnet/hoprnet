@@ -4528,15 +4528,16 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d459553efbe69953a146dc6e3281a51ca5e6934659bb36b58b8a5930d7690d77"
+checksum = "30deaabede896b2a6528fcb465e7058d944f5a4889b546741570d5d89a7f7e91"
 dependencies = [
  "async-broadcast",
  "async-trait",
  "backon",
  "dashmap",
  "futures",
+ "futures-timer",
  "hopr-api",
  "hopr-utilities",
  "libp2p",
