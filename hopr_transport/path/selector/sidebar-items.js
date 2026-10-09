@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compute_paths","distinct_first_relayers","opt_min","prune_for_consistency","take_relayer_diverse"],"struct":["HoprGraphPathSelector","MetricsValueFn","PathCostWithMetrics"]};

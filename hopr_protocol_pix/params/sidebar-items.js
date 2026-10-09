@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ADDITIONAL_DATA_SHIFT","POLYS_MASK","POLYS_SHIFT","SHARES_SHIFT","SUITE_SHIFT"],"enum":["InvalidPixParams","PixSuite"],"struct":["PixParams"]};
