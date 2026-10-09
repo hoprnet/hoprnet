@@ -233,7 +233,8 @@ similar.opt-level = 3
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 
 # Development only: build against the unreleased CORE-1024 branches of the upstream repos.
-# Run `fill-revs.sh` to set the revisions, and remove this section once the crates are released.
+# Keep these patches while testing the linked PRs. After the upstream crates are released,
+# raise their minimum versions, remove these patches, and regenerate Cargo.lock.
 [patch.crates-io]
 hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "q-core-1024-jura-prod-safes-wxhopr-allowance-exhausted-all-channel" }
 hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "q-core-1024-jura-prod-safes-wxhopr-allowance-exhausted-all-channel" }
