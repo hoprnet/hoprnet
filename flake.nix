@@ -333,7 +333,10 @@
               generate-metrics-docs = {
                 enable = true;
                 name = "METRICS.md must stay in sync with code";
-                entry = "bash .github/scripts/generate-metrics-docs.sh --fix";
+                entry = "${pkgs.writeShellScript "generate-metrics-docs" ''
+                  export PATH="${pkgs.gawk}/bin:$PATH"
+                  exec ${pkgs.bash}/bin/bash .github/scripts/generate-metrics-docs.sh "$@"
+                ''} --fix";
                 files = "(METRICS\\.md|\\.rs)$";
                 pass_filenames = false;
                 language = "system";

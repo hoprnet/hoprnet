@@ -213,6 +213,8 @@ pub(super) async fn process_chain_events<C, G, S>(
             | ChainEvent::ServiceTypeUpdateBurnChanged(..)
             | ChainEvent::ServiceTypeRegistrationFeeChanged(_)
             | ChainEvent::ServiceRegistryPointerChanged(_) => {}
+            // Consumed by the auto approval strategy; the network graph does not depend on it.
+            ChainEvent::SafeAllowanceChanged(..) => {}
         }
     }
 }
