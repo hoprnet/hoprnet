@@ -644,13 +644,22 @@ where
                                     if connected {
                                         surb_store.mark_relayer_reachable(&relayer);
                                     } else if surb_store.mark_relayer_unreachable(&relayer) {
-                                        // The purge walks every stored SURB: keep it off this event loop, which
-                                        // also feeds the graph. Marking first already keeps the relayer out of
-                                        // every pop and insert; a reconnect before the purge runs makes it keep them.
+                                        // The purge walks every stored SURB: run it on the CPU pool, off this event
+                                        // loop, which also feeds the graph. Marking first already keeps the relayer
+                                        // out of every pop and insert; a reconnect before the purge runs makes it
+                                        // keep them. Should the pool refuse the task, those SURBs are still never
+                                        // handed out, only counted in `remaining` until popped.
                                         let surb_store = surb_store.clone();
-                                        drop(hopr_utils::runtime::prelude::spawn_blocking(move || {
-                                            surb_store.purge_unusable_surbs()
-                                        }));
+                                        spawn(async move {
+                                            if let Err(error) = hopr_utils::parallelize::cpu::spawn_blocking(
+                                                move || surb_store.purge_unusable_surbs(),
+                                                "surb_purge",
+                                            )
+                                            .await
+                                            {
+                                                tracing::warn!(%error, "could not purge SURBs through an unreachable relayer");
+                                            }
+                                        });
                                     }
                                     tracing::debug!(%peer_id, connected, "SURB first-relayer reachability follows the connection");
                                 }

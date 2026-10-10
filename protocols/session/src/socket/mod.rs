@@ -56,7 +56,8 @@ pub struct SessionSocketConfig {
     #[default(0)]
     pub max_buffered_segments: usize,
     /// Capacity of the frame reconstructor, the maximum number of incomplete frames, before
-    /// they are dropped.
+    /// they are dropped. On datagram sessions it also bounds how many delivered frame IDs past the
+    /// oldest gap are remembered to drop repeats.
     ///
     /// Default is 8192.
     #[default(8192)]
@@ -273,7 +274,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     let frame = frame.0;
                     // A segment can arrive twice (a retransmitting or replaying peer): deliver each frame once.
                     if !delivered.insert(frame.frame_id) {
-                        tracing::debug!(frame_id = frame.frame_id, "dropping an already delivered datagram");
+                        tracing::debug!(
+                            frame_id = frame.frame_id,
+                            "dropping a datagram already delivered or given up on"
+                        );
                         return future::ready(None);
                     }
                     // The reassembler drops segments of frames at or below this, as on the ordered path.
@@ -679,14 +683,14 @@ impl DeliveredFrames {
         if id <= self.floor || !self.above.insert(id) {
             return false;
         }
-        while self.above.remove(&(self.floor + 1)) {
+        while self.above.remove(&self.floor.saturating_add(1)) {
             self.floor += 1;
         }
         while self.above.len() > self.capacity {
             if let Some(lowest) = self.above.pop_first() {
                 self.floor = lowest;
             }
-            while self.above.remove(&(self.floor + 1)) {
+            while self.above.remove(&self.floor.saturating_add(1)) {
                 self.floor += 1;
             }
         }
@@ -699,7 +703,7 @@ impl DeliveredFrames {
 
     /// Whether every frame before `id` is in (or given up on).
     fn all_delivered_before(&self, id: FrameId) -> bool {
-        self.floor + 1 >= id
+        self.floor.saturating_add(1) >= id
     }
 }
 
