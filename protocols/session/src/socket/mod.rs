@@ -208,7 +208,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Pipeline OUT: Packets incoming from Downstream
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
-        let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
+        let reassembled = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 let _span = stage1_span.enter();
@@ -254,43 +254,65 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
-            })
-            // Put the frames into the correct sequence by Frame Ids
-            .sequencer_with(crate::processing::SequencerConfig {
-                max_wait: cfg.frame_timeout,
-                capacity: cfg.capacity,
-                max_item_age: cfg.max_frame_age,
-                max_frames_behind_gap: cfg.max_frames_behind_gap,
-            })
-            // Discard frames missing from the sequence
-            .filter_map(move |maybe_frame| {
-                let _span = stage3_span.enter();
-                future::ready(match maybe_frame {
-                    Ok(frame) => {
-                        last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
-                        if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
-                            packets_in_abort_handle.abort();
-                        }
-                        #[cfg(feature = "telemetry")]
-                        s3.frame_emitted();
-                        Some(Ok(frame.0))
+            });
+
+        // Datagram (UDP-like) sessions get no reordering: a frame goes up the moment it is complete. Holding later
+        // frames back for a missing one turns every lost datagram into a frame_timeout stall of everything behind
+        // it; the datagram protocol above (WireGuard, and TCP inside it) copes with loss and reordering itself, but
+        // not with multi-second stalls (a relay outage left a WireGuard tunnel stalled until its watchdog reconnected).
+        let downstream_frames_out = if cfg.datagram {
+            reassembled
+                .filter_map(move |frame| {
+                    let frame = frame.0;
+                    if frame.is_terminating {
+                        tracing::warn!("terminating frame received");
+                        packets_in_abort_handle.abort();
                     }
-                    // Downstream skips discarded frames
-                    Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::error!(frame_id, "frame discarded");
-                        #[cfg(feature = "telemetry")]
-                        s3.frame_discarded();
-                        None
-                    }
-                    Err(err) => {
-                        #[cfg(feature = "telemetry")]
-                        s3.error();
-                        Some(Err(std::io::Error::other(err)))
-                    }
+                    #[cfg(feature = "telemetry")]
+                    s3.frame_emitted();
+                    future::ready(Some(Ok::<_, std::io::Error>(frame)))
                 })
-            })
-            .into_async_read();
+                .boxed()
+        } else {
+            reassembled
+                // Put the frames into the correct sequence by Frame Ids
+                .sequencer_with(crate::processing::SequencerConfig {
+                    max_wait: cfg.frame_timeout,
+                    capacity: cfg.capacity,
+                    max_item_age: cfg.max_frame_age,
+                    max_frames_behind_gap: cfg.max_frames_behind_gap,
+                })
+                // Discard frames missing from the sequence
+                .filter_map(move |maybe_frame| {
+                    let _span = stage3_span.enter();
+                    future::ready(match maybe_frame {
+                        Ok(frame) => {
+                            last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
+                            if frame.0.is_terminating {
+                                tracing::warn!("terminating frame received");
+                                packets_in_abort_handle.abort();
+                            }
+                            #[cfg(feature = "telemetry")]
+                            s3.frame_emitted();
+                            Some(Ok(frame.0))
+                        }
+                        // Downstream skips discarded frames
+                        Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
+                            tracing::error!(frame_id, "frame discarded");
+                            #[cfg(feature = "telemetry")]
+                            s3.frame_discarded();
+                            None
+                        }
+                        Err(err) => {
+                            #[cfg(feature = "telemetry")]
+                            s3.error();
+                            Some(Err(std::io::Error::other(err)))
+                        }
+                    })
+                })
+                .boxed()
+        }
+        .into_async_read();
 
         Ok(Self {
             state: Stateless::new(id),
@@ -670,6 +692,61 @@ mod tests {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
         }
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_datagram_socket_should_not_hold_datagrams_behind_a_lost_one() -> anyhow::Result<()> {
+        // The first datagram is lost. The ones after it must arrive at once, not after `frame_timeout`:
+        // a datagram session has no use for ordering, and holding frames back stalls everything behind a loss.
+        let net_cfg = FaultyNetworkConfig {
+            ids_to_drop: HashSet::from_iter([0]),
+            ..Default::default()
+        };
+        let (alice, bob) = setup_alice_bob::<MTU>(net_cfg, None, None);
+
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            frame_timeout: Duration::from_secs(5),
+            datagram: true,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        for i in 0..3u8 {
+            alice_socket.write_all(&[i; 100]).await?;
+            alice_socket.flush().await?;
+        }
+
+        let mut buf = [0u8; 100];
+        for expected in 1..3u8 {
+            bob_socket
+                .read_exact(&mut buf)
+                .timeout(futures_time::time::Duration::from_secs(1))
+                .await??;
+            assert_eq!(
+                [expected; 100], buf,
+                "datagram {expected} must not wait for the lost datagram 0"
+            );
+        }
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
 
         Ok(())
     }
