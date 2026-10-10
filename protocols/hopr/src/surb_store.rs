@@ -461,6 +461,18 @@ impl SurbStore for MemorySurbStore {
             .filter(|(_, surb)| self.is_surb_usable(surb))
             .collect();
         let refused = offered - usable.len();
+        if usable.is_empty() {
+            // Nothing to store: report into an existing buffer (keeping its pending purge count), but
+            // don't allocate a full-capacity one for a pseudonym that has none, or a batch refused
+            // during an outage could push buffers holding usable SURBs out of the cache.
+            let mut outcome = self
+                .surbs_per_pseudonym
+                .get(&pseudonym)
+                .map(|buffer| buffer.push(usable))
+                .unwrap_or_default();
+            outcome.purged += refused;
+            return outcome;
+        }
         let mut outcome = self
             .surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
@@ -808,6 +820,31 @@ mod tests {
             "SURBs through the unreachable relayer must not count"
         );
         assert_eq!(0, store.purge_unusable_surbs(), "nothing unusable was stored");
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_not_allocate_a_buffer_for_a_refused_only_batch() -> anyhow::Result<()> {
+        let dead = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.mark_relayer_unreachable(&dead);
+        let outcome = store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(dead, TWO_HOP)?),
+            ],
+        );
+
+        assert_eq!(2, outcome.purged, "the refused SURBs must be reported as purged");
+        assert_eq!(0, outcome.retained);
+        assert!(
+            !store.surbs_per_pseudonym.contains_key(&pseudonym),
+            "a refused-only batch must not create a buffer"
+        );
 
         Ok(())
     }
