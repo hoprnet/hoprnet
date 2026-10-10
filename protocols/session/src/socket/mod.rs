@@ -27,7 +27,7 @@ use {
 use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
+    protocol::{FrameId, OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -261,17 +261,48 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // it; the datagram protocol above (WireGuard, and TCP inside it) copes with loss and reordering itself, but
         // not with multi-second stalls (a relay outage left a WireGuard tunnel stalled until its watchdog reconnected).
         let downstream_frames_out = if cfg.datagram {
+            let mut delivered = DeliveredFrames::new(cfg.capacity);
+            let mut terminating_id = None;
+            let (terminated_tx, terminated_rx) = futures::channel::oneshot::channel::<()>();
+            let mut terminated_tx = Some(terminated_tx);
+            let packets_in_abort_after_grace = packets_in_abort_handle.clone();
+            let grace = cfg.frame_timeout;
             reassembled
                 .filter_map(move |frame| {
                     let _span = stage3_span.enter();
                     let frame = frame.0;
+                    // A segment can arrive twice (a retransmitting or replaying peer): deliver each frame once.
+                    if !delivered.insert(frame.frame_id) {
+                        tracing::debug!(frame_id = frame.frame_id, "dropping an already delivered datagram");
+                        return future::ready(None);
+                    }
+                    // The reassembler drops segments of frames at or below this, as on the ordered path.
+                    last_emitted_frame_clone.store(delivered.floor(), std::sync::atomic::Ordering::Relaxed);
                     if frame.is_terminating {
                         tracing::warn!("terminating frame received");
-                        packets_in_abort_handle.abort();
+                        terminating_id = Some(frame.frame_id);
+                    }
+                    // Without ordering, the terminating frame can overtake datagrams sent before it. End the
+                    // reception once every frame before it is in, or `frame_timeout` after it at the latest.
+                    if let Some(terminating_id) = terminating_id {
+                        if delivered.all_delivered_before(terminating_id) {
+                            packets_in_abort_handle.abort();
+                        } else if let Some(tx) = terminated_tx.take() {
+                            let _ = tx.send(());
+                        }
                     }
                     #[cfg(feature = "telemetry")]
                     s3.frame_emitted();
                     future::ready(Some(Ok::<_, std::io::Error>(frame)))
+                })
+                .take_until(async move {
+                    if terminated_rx.await.is_ok() {
+                        futures_time::task::sleep(grace.into()).await;
+                        tracing::debug!("datagrams sent before the terminating frame did not arrive in time");
+                        packets_in_abort_after_grace.abort();
+                    } else {
+                        future::pending::<()>().await
+                    }
                 })
                 .boxed()
         } else {
@@ -624,6 +655,54 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncWrite 
     }
 }
 
+/// The frame IDs a datagram session has delivered, to drop repeats without imposing an order.
+///
+/// Everything at or below `floor` counts as delivered (or lost for good); `above` holds the delivered IDs
+/// past it. The floor advances over contiguous IDs, and over the lowest held ones beyond `capacity`.
+struct DeliveredFrames {
+    floor: FrameId,
+    above: std::collections::BTreeSet<FrameId>,
+    capacity: usize,
+}
+
+impl DeliveredFrames {
+    fn new(capacity: usize) -> Self {
+        Self {
+            floor: 0,
+            above: Default::default(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Records `id` as delivered; `false` if it was delivered before (or is below the floor).
+    fn insert(&mut self, id: FrameId) -> bool {
+        if id <= self.floor || !self.above.insert(id) {
+            return false;
+        }
+        while self.above.remove(&(self.floor + 1)) {
+            self.floor += 1;
+        }
+        while self.above.len() > self.capacity {
+            if let Some(lowest) = self.above.pop_first() {
+                self.floor = lowest;
+            }
+            while self.above.remove(&(self.floor + 1)) {
+                self.floor += 1;
+            }
+        }
+        true
+    }
+
+    fn floor(&self) -> FrameId {
+        self.floor
+    }
+
+    /// Whether every frame before `id` is in (or given up on).
+    fn all_delivered_before(&self, id: FrameId) -> bool {
+        self.floor + 1 >= id
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -750,6 +829,157 @@ mod tests {
         bob_socket.close().await?;
 
         Ok(())
+    }
+
+    /// A packet pipe whose delivery order the test decides: writes are captured, reads come from a queue.
+    struct HandFedPipe {
+        written: futures::channel::mpsc::UnboundedSender<Box<[u8]>>,
+        to_read: futures::channel::mpsc::UnboundedReceiver<Box<[u8]>>,
+    }
+
+    impl futures::io::AsyncWrite for HandFedPipe {
+        fn poll_write(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+            buf: &[u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            let _ = self.written.unbounded_send(buf.into());
+            std::task::Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            self.written.close_channel();
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    impl futures::io::AsyncRead for HandFedPipe {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &mut [u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            match futures::StreamExt::poll_next_unpin(&mut self.to_read, cx) {
+                std::task::Poll::Ready(Some(packet)) => {
+                    let len = buf.len().min(packet.len());
+                    buf[..len].copy_from_slice(&packet[..len]);
+                    std::task::Poll::Ready(Ok(len))
+                }
+                std::task::Poll::Ready(None) => std::task::Poll::Ready(Ok(0)),
+                std::task::Poll::Pending => std::task::Poll::Pending,
+            }
+        }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_datagram_socket_should_deliver_datagrams_overtaken_by_the_terminating_frame()
+    -> anyhow::Result<()> {
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            frame_timeout: Duration::from_secs(5),
+            datagram: true,
+            ..Default::default()
+        };
+
+        // Alice sends three datagrams and closes; capture what she puts on the wire.
+        let (alice_out, mut wire) = futures::channel::mpsc::unbounded();
+        let (_alice_in_tx, alice_in) = futures::channel::mpsc::unbounded();
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            HandFedPipe {
+                written: alice_out,
+                to_read: alice_in,
+            },
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        for i in 0..3u8 {
+            alice_socket.write_all(&[i; 100]).await?;
+            alice_socket.flush().await?;
+        }
+        alice_socket.close().await?;
+
+        let mut packets = Vec::new();
+        while let Some(packet) = wire.next().await {
+            packets.push(packet);
+        }
+        assert_eq!(4, packets.len(), "three datagrams and the terminating frame");
+
+        // The terminating frame overtakes the three datagrams sent before it.
+        let terminating = packets.pop().expect("four packets");
+        packets.insert(0, terminating);
+
+        let (bob_in_tx, bob_in) = futures::channel::mpsc::unbounded();
+        let (bob_out, _bob_wire) = futures::channel::mpsc::unbounded();
+        for packet in packets {
+            bob_in_tx.unbounded_send(packet)?;
+        }
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            HandFedPipe {
+                written: bob_out,
+                to_read: bob_in,
+            },
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let mut received = Vec::new();
+        bob_socket
+            .read_to_end(&mut received)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        for i in 0..3u8 {
+            assert!(
+                received.chunks(100).any(|d| d == [i; 100]),
+                "datagram {i} was lost behind the terminating frame"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn delivered_frames_should_drop_repeats_but_not_reordered_frames() {
+        let mut d = DeliveredFrames::new(4);
+        assert!(d.insert(2));
+        assert!(d.insert(1));
+        assert_eq!(2, d.floor());
+        assert!(!d.insert(2), "a repeat below the floor");
+        assert!(d.insert(5));
+        assert!(!d.insert(5), "a repeat above the floor");
+        assert!(d.insert(4), "an earlier frame arriving late is still delivered");
+        assert!(!d.all_delivered_before(5));
+        assert!(d.insert(3));
+        assert!(d.all_delivered_before(6));
+        assert_eq!(5, d.floor());
+    }
+
+    #[test]
+    fn delivered_frames_should_give_up_on_old_gaps_beyond_capacity() {
+        let mut d = DeliveredFrames::new(2);
+        for id in [3, 4, 5] {
+            assert!(d.insert(id));
+        }
+        // Frames 1 and 2 never came; holding 3 IDs past the gap exceeds the capacity of 2, so the floor
+        // jumps past the gap to 3, and on over the contiguous 4 and 5.
+        assert_eq!(5, d.floor());
+        assert!(!d.insert(2), "too late, given up on");
+        assert!(d.all_delivered_before(6));
+        assert!(d.insert(7));
+        assert!(!d.all_delivered_before(7), "6 is still missing");
     }
 
     #[test_log::test(tokio::test)]
