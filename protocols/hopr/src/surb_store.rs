@@ -267,6 +267,9 @@ pub struct MemorySurbStore {
     /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
     /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
     invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
+    /// Relayers this node has lost its connection to. Kept apart from `invalidated_relayers`, so a
+    /// reconnect never makes a relayer usable again while its channel is closing.
+    unreachable_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
     reporters: Arc<EvictionReporters>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -303,8 +306,34 @@ impl MemorySurbStore {
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             invalidated_relayers: Default::default(),
+            unreachable_relayers: Default::default(),
             reporters,
             cfg: cfg.into(),
+        }
+    }
+
+    /// Marks `relayer` unreachable and purges every stored SURB whose return path starts with it, at once.
+    ///
+    /// For a relayer that is gone rather than unpayable (that is [`SurbStore::invalidate_relayer`]): a
+    /// lazily skipped SURB still counts as left ([`FoundSurb::remaining`]) until a pop reaches it, which
+    /// hides the real shortage from the SURB distress signal, so the counterparty is never asked to refill
+    /// while replies go unrouted (return latency grew to 20 s after a relay outage). Purged SURBs do not
+    /// come back on [`MemorySurbStore::mark_relayer_reachable`]; fresh ones do. Returns how many were purged.
+    pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) -> usize {
+        self.unreachable_relayers.write().insert(*relayer);
+        let mut purged = 0;
+        for (_, rb) in self.surbs_per_pseudonym.iter() {
+            purged += rb.retain(|surb| self.is_surb_usable(surb));
+        }
+        tracing::debug!(%relayer, purged, "purged stored SURBs whose return path starts with an unreachable relayer");
+        purged
+    }
+
+    /// Reverts [`MemorySurbStore::mark_relayer_unreachable`] once the connection to `relayer` is back.
+    /// A relayer invalidated for its channel ([`SurbStore::invalidate_relayer`]) stays invalid.
+    pub fn mark_relayer_reachable(&self, relayer: &HoprKeyIdent) {
+        if self.unreachable_relayers.write().remove(relayer) {
+            tracing::debug!(%relayer, "relayer is reachable again for SURB return paths");
         }
     }
 
@@ -335,7 +364,8 @@ impl MemorySurbStore {
                 false
             }
             _ => {
-                let usable = !self.invalidated_relayers.read().contains(&surb.first_relayer);
+                let usable = !self.invalidated_relayers.read().contains(&surb.first_relayer)
+                    && !self.unreachable_relayers.read().contains(&surb.first_relayer);
                 if !usable {
                     tracing::trace!(
                         first_relayer = %surb.first_relayer,
@@ -514,6 +544,14 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
+    /// Keeps only the SURBs `keep` accepts; returns how many were removed.
+    pub fn retain<F: Fn(&S) -> bool>(&self, keep: F) -> usize {
+        let mut rb = self.surbs.lock();
+        let before = rb.len();
+        rb.retain(|(_, surb)| keep(surb));
+        before - rb.len()
+    }
+
     /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
     ///
     /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
@@ -618,6 +656,69 @@ mod tests {
     const TWO_HOP: u8 = 2;
     /// A return path straight to the recipient, which needs no payment channel.
     const DIRECT: u8 = 1;
+
+    #[test]
+    fn memory_surb_store_purge_should_leave_only_usable_surbs_counted_as_remaining() -> anyhow::Result<()> {
+        let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(alive, TWO_HOP)?),
+                ([3u8; 8], surb_via(dead, TWO_HOP)?),
+                ([4u8; 8], surb_via(alive, TWO_HOP)?),
+                ([5u8; 8], surb_via(dead, TWO_HOP)?),
+            ],
+        );
+
+        assert_eq!(3, store.mark_relayer_unreachable(&dead));
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        // Only the other healthy SURB is left: the dead ones must not count towards `remaining`,
+        // or the distress signal (driven by it) cannot see the shortage.
+        assert_eq!(1, found.remaining, "invalidated SURBs must be purged at once");
+
+        // Back online: fresh SURBs through it are usable again.
+        store.mark_relayer_reachable(&dead);
+        store.insert_surbs(pseudonym, vec![([6u8; 8], surb_via(dead, TWO_HOP)?)]);
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        assert_eq!(
+            1, found.remaining,
+            "a fresh SURB through the reconnected relayer must count"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_reconnect_should_not_revalidate_a_relayer_whose_channel_is_closing() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.invalidate_relayer(&relayer);
+        store.mark_relayer_unreachable(&relayer);
+        store.mark_relayer_reachable(&relayer);
+
+        store.insert_surbs(pseudonym, vec![([1u8; 8], surb_via(relayer, TWO_HOP)?)]);
+        assert!(
+            store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
+            "a reconnect must not lift the channel invalidation"
+        );
+
+        store.revalidate_relayer(&relayer);
+        store.insert_surbs(pseudonym, vec![([2u8; 8], surb_via(relayer, TWO_HOP)?)]);
+        assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated() -> anyhow::Result<()> {

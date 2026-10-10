@@ -621,16 +621,34 @@ where
     {
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
+        // A relay we lose the connection to is no use as the first hop of a stored SURB: replying through it
+        // loses the packet. Purge those SURBs and refuse that relay until it connects again (an exit kept
+        // spending SURBs through a silent relay long after it went away, stalling the session's return path).
+        let surb_store = transport_api.surb_store().clone();
+        let key_ids = chain_api.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
+                    let surb_store = surb_store.clone();
+                    let key_ids = key_ids.clone();
                     async move {
                         let (peer_id, connected) = match event {
                             hopr_api::network::NetworkEvent::PeerConnected(p) => (p, true),
                             hopr_api::network::NetworkEvent::PeerDisconnected(p) => (p, false),
                         };
                         if let Ok(opk) = hopr_api::OffchainPublicKey::from_peerid(&peer_id) {
+                            {
+                                use hopr_api::chain::KeyIdMapping;
+                                if let Some(relayer) = key_ids.key_id_mapper_ref().map_key_to_id(&opk) {
+                                    if connected {
+                                        surb_store.mark_relayer_reachable(&relayer);
+                                    } else {
+                                        surb_store.mark_relayer_unreachable(&relayer);
+                                    }
+                                    tracing::debug!(%peer_id, connected, "SURB first-relayer reachability follows the connection");
+                                }
+                            }
                             graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<
                                 hopr_transport::NeighborTelemetry,
                                 hopr_transport::PathTelemetry,
