@@ -263,6 +263,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let downstream_frames_out = if cfg.datagram {
             reassembled
                 .filter_map(move |frame| {
+                    let _span = stage3_span.enter();
                     let frame = frame.0;
                     if frame.is_terminating {
                         tracing::warn!("terminating frame received");

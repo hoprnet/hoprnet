@@ -319,8 +319,13 @@ impl MemorySurbStore {
     /// hides the real shortage from the SURB distress signal, so the counterparty is never asked to refill
     /// while replies go unrouted (return latency grew to 20 s after a relay outage). Purged SURBs do not
     /// come back on [`MemorySurbStore::mark_relayer_reachable`]; fresh ones do. Returns how many were purged.
+    ///
+    /// A relayer already marked unreachable is not scanned for again: a flapping relay or a run of failed
+    /// redials towards it would otherwise rescan every stored SURB on each event.
     pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) -> usize {
-        self.unreachable_relayers.write().insert(*relayer);
+        if !self.unreachable_relayers.write().insert(*relayer) {
+            return 0;
+        }
         let mut purged = 0;
         for (_, rb) in self.surbs_per_pseudonym.iter() {
             purged += rb.retain(|surb| self.is_surb_usable(surb));
@@ -545,6 +550,10 @@ impl<S> SurbRingBuffer<S> {
     }
 
     /// Keeps only the SURBs `keep` accepts; returns how many were removed.
+    ///
+    /// Unlike [`Self::pop_next_valid`], `keep` runs while this buffer's lock is held: it must not take this
+    /// lock, nor any lock whose holder may wait for this one. [`MemorySurbStore`] passes a predicate that
+    /// only takes read locks on its relayer sets.
     pub fn retain<F: Fn(&S) -> bool>(&self, keep: F) -> usize {
         let mut rb = self.surbs.lock();
         let before = rb.len();
@@ -675,6 +684,11 @@ mod tests {
         );
 
         assert_eq!(3, store.mark_relayer_unreachable(&dead));
+        assert_eq!(
+            0,
+            store.mark_relayer_unreachable(&dead),
+            "an unreachable relayer is not rescanned"
+        );
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
