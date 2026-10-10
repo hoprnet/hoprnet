@@ -643,8 +643,14 @@ where
                                 if let Some(relayer) = key_ids.key_id_mapper_ref().map_key_to_id(&opk) {
                                     if connected {
                                         surb_store.mark_relayer_reachable(&relayer);
-                                    } else {
-                                        surb_store.mark_relayer_unreachable(&relayer);
+                                    } else if surb_store.mark_relayer_unreachable(&relayer) {
+                                        // The purge walks every stored SURB: keep it off this event loop, which
+                                        // also feeds the graph. Marking first already keeps the relayer out of
+                                        // every pop and insert; a reconnect before the purge runs makes it keep them.
+                                        let surb_store = surb_store.clone();
+                                        drop(hopr_utils::runtime::prelude::spawn_blocking(move || {
+                                            surb_store.purge_unusable_surbs()
+                                        }));
                                     }
                                     tracing::debug!(%peer_id, connected, "SURB first-relayer reachability follows the connection");
                                 }

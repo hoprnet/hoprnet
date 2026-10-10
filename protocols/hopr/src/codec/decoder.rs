@@ -268,7 +268,11 @@ where
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    info.num_evicted_surbs = outcome.evicted;
+                    // Purged and refused SURBs come off the session's level estimate like evictions do.
+                    info.num_evicted_surbs = outcome.evicted + outcome.purged;
+                    if outcome.purged > 0 {
+                        tracing::debug!(pseudonym = %incoming.sender, purged = outcome.purged, "SURBs dropped as unusable");
+                    }
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
 
                     // Warn rather than trace: an overflow is silent everywhere else. Without this

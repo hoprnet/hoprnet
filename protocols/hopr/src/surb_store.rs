@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -312,26 +312,48 @@ impl MemorySurbStore {
         }
     }
 
-    /// Marks `relayer` unreachable and purges every stored SURB whose return path starts with it, at once.
+    /// Marks `relayer` unreachable: no SURB whose return path starts with it is handed out or stored from
+    /// now on. Returns whether it was reachable until now.
     ///
-    /// For a relayer that is gone rather than unpayable (that is [`SurbStore::invalidate_relayer`]): a
-    /// lazily skipped SURB still counts as left ([`FoundSurb::remaining`]) until a pop reaches it, which
-    /// hides the real shortage from the SURB distress signal, so the counterparty is never asked to refill
-    /// while replies go unrouted (return latency grew to 20 s after a relay outage). Purged SURBs do not
-    /// come back on [`MemorySurbStore::mark_relayer_reachable`]; fresh ones do. Returns how many were purged.
+    /// For a relayer that is gone rather than unpayable (that is [`SurbStore::invalidate_relayer`]). Kept
+    /// apart from channel invalidation, so that [`MemorySurbStore::mark_relayer_reachable`] on a reconnect
+    /// never lifts the invalidation of a relayer whose channel is closing.
     ///
-    /// A relayer already marked unreachable is not scanned for again: a flapping relay or a run of failed
-    /// redials towards it would otherwise rescan every stored SURB on each event.
-    pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) -> usize {
-        if !self.unreachable_relayers.write().insert(*relayer) {
-            return 0;
-        }
+    /// SURBs already stored through it stay until [`MemorySurbStore::purge_unusable_surbs`] runs; call it
+    /// when this returns `true`.
+    pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) -> bool {
+        self.unreachable_relayers.write().insert(*relayer)
+    }
+
+    /// Removes every stored SURB that can no longer be used ([`Self::is_surb_usable`]); returns how many.
+    ///
+    /// Lazily skipped SURBs would still count in [`FoundSurb::remaining`] until a pop reached them, hiding
+    /// the shortage from the SURB distress signal, so the counterparty would never be asked to refill while
+    /// replies go unrouted (return latency grew to 20 s after a relay outage). Walks every pseudonym's ring
+    /// buffer: run it off latency-sensitive tasks.
+    pub fn purge_unusable_surbs(&self) -> usize {
         let mut purged = 0;
         for (_, rb) in self.surbs_per_pseudonym.iter() {
             purged += rb.retain(|surb| self.is_surb_usable(surb));
         }
-        tracing::debug!(%relayer, purged, "purged stored SURBs whose return path starts with an unreachable relayer");
+        tracing::debug!(
+            purged,
+            "purged stored SURBs whose return path starts with an unusable relayer"
+        );
         purged
+    }
+
+    /// How many stored SURBs have a return path starting with `relayer`, without consuming any.
+    pub fn count_surbs_through(&self, relayer: &HoprKeyIdent) -> usize {
+        self.surbs_per_pseudonym
+            .iter()
+            .map(|(_, rb)| rb.count(|surb: &HoprSurb| surb.first_relayer == *relayer))
+            .sum()
+    }
+
+    /// Whether `relayer` is marked unreachable ([`Self::mark_relayer_unreachable`]).
+    pub fn is_relayer_unreachable(&self, relayer: &HoprKeyIdent) -> bool {
+        self.unreachable_relayers.read().contains(relayer)
     }
 
     /// Reverts [`MemorySurbStore::mark_relayer_unreachable`] once the connection to `relayer` is back.
@@ -342,12 +364,14 @@ impl MemorySurbStore {
         }
     }
 
-    /// Whether `relayer` is currently unusable as a return path's first hop.
+    /// Whether `relayer` is invalidated for its channel ([`SurbStore::invalidate_relayer`]). A relayer can
+    /// also be unusable because it is unreachable ([`Self::mark_relayer_unreachable`]); this does not say so.
     pub fn is_relayer_invalidated(&self, relayer: &HoprKeyIdent) -> bool {
         self.invalidated_relayers.read().contains(relayer)
     }
 
-    /// Whether a stored SURB can still be used to reply: its first relayer must still be payable.
+    /// Whether a stored SURB can still be used to reply: its first relayer must still be payable (not
+    /// invalidated for its channel) and reachable (not marked unreachable).
     ///
     /// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
     /// channel (RFC-0003 §3.2, RFC-0006 §6.1). Without that exemption, closing an unrelated channel
@@ -424,11 +448,21 @@ impl SurbStore for MemorySurbStore {
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
-        self.surbs_per_pseudonym
+        // SURBs through a relayer that is already unusable would only inflate `FoundSurb::remaining`.
+        let offered = surbs.len();
+        let usable: Vec<_> = surbs
+            .into_iter()
+            .filter(|(_, surb)| self.is_surb_usable(surb))
+            .collect();
+        let refused = offered - usable.len();
+        let mut outcome = self
+            .surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
             .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY), self.cfg.pop_order))
             .value()
-            .push(surbs)
+            .push(usable);
+        outcome.purged += refused;
+        outcome
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
@@ -513,6 +547,8 @@ pub struct SurbRingBuffer<S> {
     surbs: Arc<parking_lot::Mutex<VecDeque<(HoprSurbId, S)>>>,
     capacity: usize,
     pop_order: SurbPopOrder,
+    /// SURBs removed by [`Self::retain`] and not yet reported by a [`Self::push`].
+    unreported_purged: Arc<AtomicUsize>,
 }
 
 impl<S> SurbRingBuffer<S> {
@@ -524,6 +560,7 @@ impl<S> SurbRingBuffer<S> {
             surbs: Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(capacity))),
             capacity,
             pop_order,
+            unreported_purged: Default::default(),
         }
     }
 
@@ -546,7 +583,14 @@ impl<S> SurbRingBuffer<S> {
         SurbInsertOutcome {
             retained: rb.len(),
             evicted,
+            purged: self.unreported_purged.swap(0, Ordering::Relaxed),
         }
+    }
+
+    /// How many held SURBs `matches` accepts, without removing any. `matches` runs under the buffer's
+    /// lock, as for [`Self::retain`].
+    pub fn count<F: Fn(&S) -> bool>(&self, matches: F) -> usize {
+        self.surbs.lock().iter().filter(|(_, surb)| matches(surb)).count()
     }
 
     /// Keeps only the SURBs `keep` accepts; returns how many were removed.
@@ -558,7 +602,9 @@ impl<S> SurbRingBuffer<S> {
         let mut rb = self.surbs.lock();
         let before = rb.len();
         rb.retain(|(_, surb)| keep(surb));
-        before - rb.len()
+        let removed = before - rb.len();
+        self.unreported_purged.fetch_add(removed, Ordering::Relaxed);
+        removed
     }
 
     /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
@@ -683,12 +729,16 @@ mod tests {
             ],
         );
 
-        assert_eq!(3, store.mark_relayer_unreachable(&dead));
-        assert_eq!(
-            0,
-            store.mark_relayer_unreachable(&dead),
-            "an unreachable relayer is not rescanned"
+        assert!(store.mark_relayer_unreachable(&dead));
+        assert!(
+            !store.mark_relayer_unreachable(&dead),
+            "already unreachable: nothing new to purge"
         );
+        assert_eq!(3, store.purge_unusable_surbs());
+        // The next insert reports them, so the session's level estimate can drop them like evictions.
+        let outcome = store.insert_surbs(pseudonym, vec![([7u8; 8], surb_via(dead, TWO_HOP)?)]);
+        assert_eq!(4, outcome.purged, "3 purged before, 1 refused now");
+        assert_eq!(0, store.insert_surbs(pseudonym, vec![]).purged, "reported once");
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
@@ -707,6 +757,35 @@ mod tests {
             1, found.remaining,
             "a fresh SURB through the reconnected relayer must count"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_not_store_surbs_through_an_unreachable_relayer() -> anyhow::Result<()> {
+        let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.mark_relayer_unreachable(&dead);
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(alive, TWO_HOP)?),
+                ([3u8; 8], surb_via(dead, TWO_HOP)?),
+                ([4u8; 8], surb_via(alive, TWO_HOP)?),
+            ],
+        );
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        assert_eq!(
+            1, found.remaining,
+            "SURBs through the unreachable relayer must not count"
+        );
+        assert_eq!(0, store.purge_unusable_surbs(), "nothing unusable was stored");
 
         Ok(())
     }
@@ -868,14 +947,16 @@ mod tests {
         assert_eq!(
             SurbInsertOutcome {
                 retained: 2,
-                evicted: 0
+                evicted: 0,
+                purged: 0,
             },
             rb.push([([1u8; 8], 0), ([2u8; 8], 0)])
         );
         assert_eq!(
             SurbInsertOutcome {
                 retained: 4,
-                evicted: 0
+                evicted: 0,
+                purged: 0,
             },
             rb.push([([3u8; 8], 0), ([4u8; 8], 0)])
         );
@@ -894,7 +975,8 @@ mod tests {
         assert_eq!(
             SurbInsertOutcome {
                 retained: 2,
-                evicted: 1
+                evicted: 1,
+                purged: 0,
             },
             outcome,
             "a 3-element push into a 2-slot buffer drops exactly one"
@@ -922,14 +1004,16 @@ mod tests {
         assert_eq!(
             SurbInsertOutcome {
                 retained: 2,
-                evicted: 1
+                evicted: 1,
+                purged: 0,
             },
             rb.push([([3u8; 8], 0)])
         );
         assert_eq!(
             SurbInsertOutcome {
                 retained: 2,
-                evicted: 2
+                evicted: 2,
+                purged: 0,
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)])
         );
