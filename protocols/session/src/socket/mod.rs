@@ -711,6 +711,7 @@ impl DeliveredFrames {
 mod tests {
     use std::collections::HashSet;
 
+    use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use futures_time::future::FutureExt;
     use hopr_crypto_packet::prelude::HoprPacket;
@@ -921,7 +922,7 @@ mod tests {
         assert_eq!(4, packets.len(), "three datagrams and the terminating frame");
 
         // The terminating frame overtakes the three datagrams sent before it.
-        let terminating = packets.pop().expect("four packets");
+        let terminating = packets.pop().context("four packets")?;
         packets.insert(0, terminating);
 
         let (bob_in_tx, bob_in) = futures::channel::mpsc::unbounded();

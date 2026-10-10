@@ -434,14 +434,20 @@ impl SurbStore for MemorySurbStore {
             // ring buffer and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
             // when there is a single SURB in the RB.
+            //
+            // An unusable match is discarded like in the pseudonym branch, so a SURB through a relayer
+            // marked unreachable is not handed out before the background purge reaches it.
             SurbMatcher::Exact(id) => {
-                surbs_for_pseudonym
-                    .pop_one_if_has_id(&id.surb_id())
-                    .map(|popped_surb| FoundSurb {
-                        sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                        surb: popped_surb.surb,
-                        remaining: popped_surb.remaining, // = likely 0
-                    })
+                let popped_surb = surbs_for_pseudonym.pop_one_if_has_id(&id.surb_id())?;
+                if !self.is_surb_usable(&popped_surb.surb) {
+                    surbs_for_pseudonym.note_discarded(1);
+                    return None;
+                }
+                Some(FoundSurb {
+                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                    surb: popped_surb.surb,
+                    remaining: popped_surb.remaining, // = likely 0
+                })
             }
         }
     }
@@ -616,23 +622,39 @@ impl<S> SurbRingBuffer<S> {
     ///
     /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
     /// calling it inside the critical section would invite lock-order inversion.
+    ///
+    /// Discarded entries are reported as purged, like those removed by [`SurbRingBuffer::retain`].
     pub fn pop_next_valid<F>(&self, is_valid: F) -> Option<PoppedSurb<S>>
     where
         F: Fn(&HoprSurbId, &S) -> bool,
     {
-        loop {
+        let mut discarded = 0;
+        let found = loop {
             let (id, surb, remaining) = {
                 let mut rb = self.surbs.lock();
-                let (id, surb) = match self.pop_order {
-                    SurbPopOrder::Fifo => rb.pop_front()?,
-                    SurbPopOrder::Lifo => rb.pop_back()?,
+                let next = match self.pop_order {
+                    SurbPopOrder::Fifo => rb.pop_front(),
+                    SurbPopOrder::Lifo => rb.pop_back(),
+                };
+                let Some((id, surb)) = next else {
+                    break None;
                 };
                 (id, surb, rb.len())
             };
 
             if is_valid(&id, &surb) {
-                return Some(PoppedSurb { id, surb, remaining });
+                break Some(PoppedSurb { id, surb, remaining });
             }
+            discarded += 1;
+        };
+        self.note_discarded(discarded);
+        found
+    }
+
+    /// Counts `n` SURBs taken out of the buffer without being used, to be reported as purged.
+    pub fn note_discarded(&self, n: usize) {
+        if n > 0 {
+            self.unreported_purged.fetch_add(n, Ordering::Relaxed);
         }
     }
 
@@ -786,6 +808,55 @@ mod tests {
             "SURBs through the unreachable relayer must not count"
         );
         assert_eq!(0, store.purge_unusable_surbs(), "nothing unusable was stored");
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_exact_match_should_not_hand_out_a_surb_through_an_unreachable_relayer() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let surb_id = [1u8; 8];
+
+        store.insert_surbs(pseudonym, vec![(surb_id, surb_via(relayer, TWO_HOP)?)]);
+        // Marked, but the background purge has not run yet.
+        store.mark_relayer_unreachable(&relayer);
+
+        let exact = SurbMatcher::Exact(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id));
+        assert!(
+            store.find_surb(exact).is_none(),
+            "an exact match through an unreachable relayer must not be handed out"
+        );
+        let outcome = store.insert_surbs(pseudonym, vec![]);
+        assert_eq!(1, outcome.purged, "the discarded SURB must be reported as purged");
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_pop_should_report_discarded_surbs_as_purged() -> anyhow::Result<()> {
+        let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(alive, TWO_HOP)?),
+                ([3u8; 8], surb_via(dead, TWO_HOP)?),
+            ],
+        );
+        // Marked, but the background purge has not run yet: the pop discards the SURB through the
+        // dead relayer that sits at its end of the buffer (either pop order).
+        store.mark_relayer_unreachable(&dead);
+
+        store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected the usable SURB"))?;
+        let outcome = store.insert_surbs(pseudonym, vec![]);
+        assert_eq!(1, outcome.purged, "the discarded SURB must be reported as purged");
 
         Ok(())
     }
