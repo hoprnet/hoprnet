@@ -57,6 +57,8 @@
     {
       "description": "Disable known-incompatible crate updates",
       "matchPackageNames": [
+        "libp2p",
+        "multiaddr",
         "libp2p-stream",
         "parameterized",
         "cipher",
