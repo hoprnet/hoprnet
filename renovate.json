@@ -125,15 +125,13 @@
       "allowedVersions": "/^0\\.5\\./"
     },
     {
-      "description": "Disable Cargo dependency updates on release/4.0",
+      "description": "Disable Cargo dependency updates",
       "matchManagers": ["cargo"],
-      "matchBaseBranches": ["release/4.0"],
       "enabled": false
     },
     {
-      "description": "Allow HOPR Cargo patch updates on release/4.0",
+      "description": "Allow HOPR Cargo patch updates",
       "matchManagers": ["cargo"],
-      "matchBaseBranches": ["release/4.0"],
       "matchPackageNames": ["/^hopr-/"],
       "matchUpdateTypes": ["patch"],
       "enabled": true
