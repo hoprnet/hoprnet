@@ -242,6 +242,11 @@ where
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
                         } else if this.last_emitted.elapsed() >= *this.max_wait
+                            // The frame waiting right behind the gap has itself been held for max_wait: the
+                            // gap is lost, whatever was emitted in between. Timing gaps only from the last
+                            // emission drains a buffer of K interleaved gaps at one gap per max_wait (K x 3 s
+                            // of head-of-line blocking after a relay outage, every new frame queued behind it).
+                            || next.buffered_at.elapsed() >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
                             // The sequence has moved far enough past the gap to conclude the
                             // missing frame was lost rather than reordered. Waiting out `max_wait`
@@ -802,6 +807,37 @@ mod tests {
         assert!(matches!(rx.next().await, Some(Ok(6))));
         assert!(matches!(rx.next().await, Some(Ok(7))));
         assert!(matches!(rx.next().await, Some(Ok(8))));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_drain_interleaved_gaps_once_the_held_frames_are_old() -> anyhow::Result<()> {
+        // After a relay outage the buffer holds frames with gaps between them (1 of every 2 lost here).
+        // Every held frame has already waited out the timeout once the first gap is abandoned, so the
+        // rest must follow at once, not one gap per timeout window (5 windows here, dozens in the field).
+        let timeout = Duration::from_millis(50);
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        pin_mut!(tx);
+        tx.send_all(&mut futures::stream::iter([1u32, 3, 5, 7, 9, 11]).map(Ok))
+            .await?;
+
+        let rx = rx.sequencer(timeout, 4096);
+        pin_mut!(rx);
+
+        assert_eq!(Some(1), rx.try_next().await?);
+        let now = Instant::now();
+        for frame in [3u32, 5, 7, 9, 11] {
+            assert!(matches!(rx.next().await, Some(Err(SessionError::FrameDiscarded(id))) if id == frame - 1));
+            assert_eq!(Some(frame), rx.try_next().await?);
+        }
+        assert!(
+            now.elapsed() < 3 * timeout,
+            "interleaved gaps took {:?} to drain, expected about one {:?} window",
+            now.elapsed(),
+            timeout
+        );
 
         Ok(())
     }

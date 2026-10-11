@@ -188,6 +188,10 @@ pub struct SurbInsertOutcome {
     pub retained: usize,
     /// Number of SURBs dropped to make room during this insert, oldest first.
     pub evicted: usize,
+    /// Number of SURBs dropped as unusable without being used: those purged from the buffer since the
+    /// previous insert (their first relayer became unreachable), and those of this insert refused for
+    /// the same reason. Like `evicted`, they must come off the level the session estimates.
+    pub purged: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.
