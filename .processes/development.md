@@ -260,7 +260,7 @@ It's possible that throughout the planned sprint, we encounter a bag of issues t
 All HOPR repositories must support at most these issue templates, more templates may be added which make sense for each specific repository.
 
 - [Epic Template](./.github/ISSUE_TEMPLATE/epic.md)
-- [Bug Template](./.github/ISSUE_TEMPLATE/bug.md)
+- [Bug Template](../.github/ISSUE_TEMPLATE/bug-report.yml)
 - [Feature Template](./.github/ISSUE_TEMPLATE/feature.md)
 - [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
 - [Bounty Template](./.github/ISSUE_TEMPLATE/bounty.md) ([learn more](./bounty.md))

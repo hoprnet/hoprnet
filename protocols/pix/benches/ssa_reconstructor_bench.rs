@@ -84,9 +84,9 @@ const COMMITMENTS_PER_SSA_COMMIT_MSG: usize = 28;
 /// Bytes of Session quota that one share corresponds to.
 ///
 /// One SURB carries exactly one PIX share, so one verified share is one delivered packet's
-/// worth of quota. Mirrors `HoprPacket::PAYLOAD_SIZE`; hard-coded because
-/// `hopr-crypto-packet` sits above this crate.
-const QUOTA_BYTES_PER_SHARE: u64 = 1038;
+/// worth of quota. Mirrors `PIX_QUOTA_BYTES_PER_SHARE`, the Session MTU; hard-coded because
+/// `hopr-transport-session` sits above this crate.
+const QUOTA_BYTES_PER_SHARE: u64 = 1452;
 
 /// Acknowledgements in one realistic `acknowledge_shares` call.
 ///

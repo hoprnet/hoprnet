@@ -39,7 +39,7 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
                 capabilities: SessionCapabilities::empty(),
                 pseudonym: None,
                 surb_management: None,
-                always_max_out_surbs: false,
+                max_surbs_per_data_packet: 1,
                 flow_control: None,
                 max_frames_behind_gap: None,
             },

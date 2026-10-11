@@ -47,8 +47,9 @@ const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 /// Mirrors `MIN_COMMITMENTS_PER_SSA_COMMIT_MSG` in `transport/session/src/manager.rs`.
 const COMMITMENTS_PER_SSA_COMMIT_MSG: usize = 28;
 
-/// Mirrors `HoprPacket::PAYLOAD_SIZE`.
-const QUOTA_BYTES_PER_SHARE: u64 = 1038;
+/// Mirrors `PIX_QUOTA_BYTES_PER_SHARE` in `hopr-transport-session`: a share is priced at one
+/// Session segment, `SESSION_MTU`.
+const QUOTA_BYTES_PER_SHARE: u64 = 1452;
 
 /// Surplus shares emitted per polynomial beyond the threshold.
 ///
@@ -449,7 +450,7 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     // The whole wire order: one constant term per polynomial. The closing message publishes the
     // SSA commitment, the part accumulator and every part builder at once, so this is the
     // expected peak. At the modelled line rate it lands inside the first fraction of a percent
-    // of the cycle: ~0.3 MiB of commitments against 519 MiB of payload.
+    // of the cycle: ~0.3 MiB of commitments against ~908 MiB of quota.
     for chunk in constant_terms.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
         reconstructor
             .insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), chunk.iter().copied())

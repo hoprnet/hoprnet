@@ -18,23 +18,24 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
+    prelude::{HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
 use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SegmentRequest,
+    SeqIndicator, SessionSocketConfig, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
+    session_frame_size,
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
 use tracing::{debug, instrument, warn};
 
 use crate::{
-    Capabilities, Capability,
+    Capabilities, Capability, SESSION_MTU,
     balancer::BalancerStateValues,
     errors::{SessionManagerError, TransportSessionError},
     flow_control::{PacedWriter, SurbSupply},
@@ -171,9 +172,17 @@ pub(crate) fn deposit_data_for_batch(
 /// whole cycle, surplus included — see [`pix_params_to_quota`].
 ///
 /// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
+/// [`PIX_QUOTA_BYTES_PER_SHARE`] is the one conversion between the two.
 pub type SsaQuota = u64;
 
-/// What a single SSA deposit buys: every Exit → Entry payload byte the cycle carries.
+/// Bytes of quota one PIX share is priced at: the Session data the packet it rides on can carry.
+///
+/// [`SESSION_MTU`] rather than `HoprPacket::PAYLOAD_SIZE`, because a Session packet carries one
+/// segment and the rest of the HOPR payload is SURBs or padding. Every conversion between a quota
+/// and a packet count goes through this, so the two stay in step.
+pub const PIX_QUOTA_BYTES_PER_SHARE: SsaQuota = SESSION_MTU as SsaQuota;
+
+/// What a single SSA deposit buys: every Exit → Entry Session byte the cycle can carry.
 ///
 /// Counts [`PixParams::emitted_shares_per_poly`], i.e. `threshold + surplus`, and not the threshold
 /// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
@@ -189,9 +198,7 @@ pub type SsaQuota = u64;
 /// (`drain_shares_by_polynomial` in `hopr-protocol-pix`), which pin a cycle's emission at
 /// `polys × (threshold + surplus)`. Change either expression and the other has to move with it.
 pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
-    params.polys_per_ssa() as SsaQuota
-        * params.emitted_shares_per_poly() as SsaQuota
-        * HoprPacket::PAYLOAD_SIZE as SsaQuota
+    params.polys_per_ssa() as SsaQuota * params.emitted_shares_per_poly() as SsaQuota * PIX_QUOTA_BYTES_PER_SHARE
 }
 
 /// Default number of polynomials ("SSA parts") a single SSA is split into.
@@ -200,7 +207,7 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
 /// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
 /// Both must be derived from it so the two cannot drift apart: the Exit computes the
-/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if neither
+/// offered quota as `polys × (shares + surplus) × SESSION_MTU` and rejects the Session if neither
 /// it nor an allowed dynamic batch brings the total inside the configured range. At the default
 /// batch ceiling of one, a hard-coded range that no longer matches the dimension defaults makes
 /// every PIX Session fail to establish.
@@ -478,8 +485,11 @@ pub struct HoprSessionConfig {
     pub capabilities: Capabilities,
     /// Expected frame size of the Session protocol socket.
     ///
-    /// Default is 1500.
-    #[default(1500)]
+    /// Clamped to the socket's supported frame size range — see
+    /// [`session_frame_size`].
+    ///
+    /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
+    #[default(SESSION_MTU)]
     pub frame_mtu: usize,
     /// Maximum amount of time an incomplete frame can be kept in the buffer.
     ///
@@ -550,7 +560,7 @@ impl HoprSession {
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
-        cfg: HoprSessionConfig,
+        mut cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
@@ -561,6 +571,17 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
+        if cfg.capabilities.contains(Capability::Segmentation) {
+            let mut max_segments = (SeqIndicator::MAX + 1) as usize;
+            if cfg.capabilities.contains(Capability::RetransmissionAck)
+                || cfg.capabilities.contains(Capability::RetransmissionNack)
+            {
+                max_segments = max_segments
+                    .min(SegmentRequest::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MISSING_SEGMENTS_PER_FRAME);
+            }
+            // Use the same effective frame size for the socket and its delivery accounting.
+            cfg.frame_mtu = session_frame_size::<{ ApplicationData::PAYLOAD_SIZE }>(cfg.frame_mtu, max_segments);
+        }
         let routing_clone = routing.clone();
 
         #[cfg(feature = "telemetry")]
@@ -825,7 +846,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::{AsyncReadExt, AsyncWriteExt};
+    use futures::{AsyncReadExt, AsyncWriteExt, FutureExt};
     use hopr_api::types::{
         crypto::prelude::*,
         crypto_random::Randomizable,
@@ -957,7 +978,7 @@ mod tests {
         for (polys, threshold, surplus) in [(1u16, 2u8, 0u8), (8, 2, 2), (8192, 64, 32), (16192, 255, 255)] {
             let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
             assert_eq!(
-                polys as u64 * (threshold as u64 + surplus as u64) * HoprPacket::PAYLOAD_SIZE as u64,
+                polys as u64 * (threshold as u64 + surplus as u64) * SESSION_MTU as u64,
                 pix_params_to_quota(&params),
                 "the quota must cover every share the cycle emits"
             );
@@ -995,7 +1016,7 @@ mod tests {
         assert_eq!(
             DEFAULT_PIX_POLYS_PER_SSA as u64
                 * (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64)
-                * HoprPacket::PAYLOAD_SIZE as u64,
+                * SESSION_MTU as u64,
             DEFAULT_PIX_SSA_QUOTA
         );
         // Anchored on the ratio function rather than on a restatement of it. This line used to read
@@ -1150,6 +1171,51 @@ mod tests {
     }
 
     // --- Existing tests ---
+
+    #[test_log::test(tokio::test)]
+    async fn session_flow_control_should_use_effective_frame_size() -> anyhow::Result<()> {
+        use hopr_protocol_session::types::{FrameAcknowledgements, SessionMessage};
+
+        let id = HoprPseudonym::random();
+        let (mut incoming, rx) = futures::channel::mpsc::channel(1);
+        let mut session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::RetransmissionAck.into(),
+                frame_mtu: 1, // The socket clamps this up to one full segment.
+                ..Default::default()
+            },
+            (futures::sink::drain(), rx),
+            None,
+            None,
+            Some(FlowControlConfig {
+                min_window_size: SESSION_MTU,
+                max_window_size: SESSION_MTU,
+                ..Default::default()
+            }),
+        )?;
+        let frame = vec![7u8; SESSION_MTU];
+        session.write_all(&frame).await?;
+        session.flush().await?;
+
+        let ack =
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::Acknowledge(FrameAcknowledgements::try_from(vec![1])?);
+        incoming
+            .send(ApplicationDataIn {
+                data: ApplicationData::new(SESSION_APPLICATION_TAG, ack.into_encoded().into_vec())?,
+                packet_info: Default::default(),
+            })
+            .await?;
+        // Process the acknowledgement; no application payload is available to read.
+        assert!(session.read(&mut [0u8; 1]).now_or_never().is_none());
+
+        tokio::time::timeout(Duration::from_millis(100), session.write_all(&frame))
+            .await
+            .context("one frame acknowledgement must release a full frame's send window")??;
+        assert_eq!(session.config().frame_mtu, SESSION_MTU);
+        Ok(())
+    }
 
     #[test_log::test(tokio::test)]
     async fn test_session_bidirectional_flow_without_segmentation() -> anyhow::Result<()> {

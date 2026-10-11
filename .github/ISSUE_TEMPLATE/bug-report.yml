@@ -1,0 +1,66 @@
+---
+name: Bug report
+description: Report a bug. The fields below capture what an agent or human needs to reproduce it.
+labels:
+  - intake
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in the fields below — they are the details needed to reproduce the bug.
+        Attach logs (a file or a `.tar.gz`) where asked.
+
+        **Redact secrets first.** This is a public issue — remove API tokens, passwords,
+        private keys, and other credentials from commands, config, and logs before posting.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong, in one or two sentences.
+    validations:
+      required: true
+  - type: input
+    id: app_versions
+    attributes:
+      label: Application version(s)
+      description: e.g. hoprd 4.1.0, edge-client 4.1.0, gnosis_vpn 1.2.3
+      placeholder: "hoprd: …, edge-client: …, gnosis_vpn: …"
+    validations:
+      required: true
+  - type: input
+    id: library_versions
+    attributes:
+      label: Library / crate versions
+      description: Relevant library/crate versions as a per-crate mapping (e.g. hopr-lib 4.0.5, hopr-transport-session 0.30.3), if known — the analyzer also extracts these from logs.
+      placeholder: "hopr-lib: …, hopr-transport-session: …"
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / topology
+      description: Local cluster, testnet, path shape (client → relay(s) → exit), OS, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: repro_command
+    attributes:
+      label: Exact reproduction command
+      description: The exact command(s) that reproduce the behaviour.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: seed
+    attributes:
+      label: Seed
+      description: Seed, if the bug was found via a chaos / randomised run.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Attach the log file or archive (drag-and-drop), or paste a relevant excerpt — redact any credentials first. Client logs first; relay/exit logs if available.
+    validations:
+      required: true
