@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -14,6 +14,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
+use parking_lot::Mutex;
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
@@ -272,6 +273,7 @@ async fn rebuild_candidates<R, S>(
     dest_key: OffchainPublicKey,
     hops: usize,
     kind: &'static str,
+    collapsed_diversity: &Mutex<HashSet<PlannerCacheKey>>,
 ) -> Result<Option<hopr_utils::statistics::WeightedCollection<ValidatedPath>>>
 where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
@@ -282,9 +284,12 @@ where
     let chain_resolver = ChainPathResolver::from(resolver);
     let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
     let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-    for mut pwc in candidates {
-        let path_nodes = std::mem::take(&mut pwc.path);
-        let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+    for pwc in candidates {
+        // Clone the nodes for validation rather than moving them out of `pwc`: the path is needed
+        // intact in `path_metrics` so the relayer-diversity count below sees the real first hops. An
+        // earlier `std::mem::take` emptied it here, which made `distinct_first_relayers` always read
+        // zero and fire the collapse WARN on every return path, healthy or not (issue #8502).
+        let node_ids: Vec<NodeId> = pwc.path.iter().cloned().map(NodeId::Offchain).collect::<Vec<_>>();
         match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
             Ok(vp) => {
                 valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
@@ -302,14 +307,29 @@ where
     // reflect what a session can actually draw from.
     if src_key != me && hops > 0 && !path_metrics.is_empty() {
         let relayers = super::selector::distinct_first_relayers(&path_metrics);
+        let key: PlannerCacheKey = (src_key, dest_key, hops as u32);
+        // Log on the transition, not on every rebuild: the WARN re-fired on every lazy fill,
+        // recompute and background sweep while the condition persisted, which on a healthy client is
+        // hundreds of identical lines a minute and reads as an incident in field triage (issue #8502).
+        let mut collapsed = collapsed_diversity.lock();
         if relayers <= 1 {
-            tracing::warn!(
+            if collapsed.insert(key) {
+                tracing::warn!(
+                    src = %src_key,
+                    kind,
+                    distinct_relayers = relayers,
+                    candidates = path_metrics.len(),
+                    "return-path relayer diversity collapsed to a single relayer; degradation detection \
+                     cannot corroborate a dead relayer for this destination",
+                );
+            }
+        } else if collapsed.remove(&key) {
+            tracing::info!(
                 src = %src_key,
                 kind,
                 distinct_relayers = relayers,
                 candidates = path_metrics.len(),
-                "return-path relayer diversity collapsed to a single relayer; degradation detection \
-                 cannot corroborate a dead relayer for this destination",
+                "return-path relayer diversity recovered for this destination",
             );
         }
     }
@@ -441,6 +461,11 @@ pub struct PathPlanner<Surb, R, S> {
     resolver: Arc<R>,
     selector: Arc<S>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    /// Keys currently in the collapsed return-path diversity state, so the WARN fires once on the
+    /// transition into it (and an INFO once on recovery) rather than on every rebuild while it
+    /// persists -- lazy fill, recompute and background sweep all funnel through `rebuild_candidates`
+    /// and share this set (issue #8502).
+    collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>>,
     refresh_period: Duration,
     weighting: WeightingParams,
     return_path_weight_temper: f64,
@@ -468,6 +493,7 @@ where
             resolver: Arc::new(resolver),
             selector: Arc::new(selector),
             cache,
+            collapsed_diversity: Arc::new(Mutex::new(HashSet::new())),
             refresh_period: config.refresh_period,
             weighting: WeightingParams {
                 latency_halflife: config.latency_halflife,
@@ -476,6 +502,13 @@ where
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
         }
+    }
+
+    /// Test-only count of `(src, dest, hops)` keys currently flagged as having collapsed
+    /// return-path relayer diversity, used to assert the WARN fires on the transition only.
+    #[cfg(test)]
+    fn collapsed_diversity_len(&self) -> usize {
+        self.collapsed_diversity.lock().len()
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -579,12 +612,21 @@ where
         let selector = self.selector.clone();
         let weighting = self.weighting;
         let me = self.me;
+        let collapsed_diversity = self.collapsed_diversity.clone();
 
         self.cache
             .try_get_with(cache_key, async move {
                 trace!(hops = hops_usize, "path cache miss, querying selector");
                 rebuild_candidates(
-                    &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
+                    &*resolver,
+                    &*selector,
+                    weighting,
+                    me,
+                    src_key,
+                    dest_key,
+                    hops_usize,
+                    "fill",
+                    &collapsed_diversity,
                 )
                 .await?
                 .map(Arc::new)
@@ -631,6 +673,7 @@ where
                 dest_key,
                 hops as usize,
                 "recompute",
+                &self.collapsed_diversity,
             )
             .await
             {
@@ -889,6 +932,7 @@ where
         let refresh_period = self.refresh_period;
         let weighting = self.weighting;
         let me = self.me;
+        let collapsed_diversity = self.collapsed_diversity.clone();
 
         // run at a non-zero interval
         futures_time::stream::interval(futures_time::time::Duration::from_millis(
@@ -899,6 +943,7 @@ where
             let resolver = resolver.clone();
             let selector = selector.clone();
             let weighting = weighting;
+            let collapsed_diversity = collapsed_diversity.clone();
 
             async move {
                 for (key, swept) in cache.iter() {
@@ -922,6 +967,7 @@ where
                         dest_key,
                         hops_u32 as usize,
                         "background-refresh",
+                        &collapsed_diversity,
                     )
                     .await
                     {
@@ -1970,6 +2016,54 @@ mod tests {
             .get(&(pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1))
             .await
             .expect("the return path should be cached after resolution")
+    }
+
+    /// The diversity-collapse WARN must fire on the transition into the collapsed state, not on
+    /// every rebuild while it persists (issue #8502): the collapsed-key set records the key on the
+    /// first rebuild and a repeated rebuild of the same still-collapsed key does not re-record it, so
+    /// the WARN is gated to the one transition.
+    ///
+    /// The inverse `remove` that clears the key on recovery (re-arming the WARN) is not driven here:
+    /// the selector's candidate set is fixed for a given planner, so a live collapse->recovery
+    /// transition on one key cannot be produced through this harness.
+    #[tokio::test]
+    async fn diversity_collapse_is_recorded_once_not_per_rebuild() {
+        let dest = pubkey(&SECRET_DEST);
+
+        // Floor 1 caps the two relayers onto one, so the return path's diversity collapses.
+        let (collapsed, _g) = two_relayer_return_planner_with_floor(1);
+        fill_return_cache(&collapsed).await;
+        assert_eq!(
+            collapsed.collapsed_diversity_len(),
+            1,
+            "the first rebuild of a collapsed return path must record it"
+        );
+        // A repeated rebuild of the same still-collapsed key must not re-record it: the set is
+        // unchanged, so the WARN is gated to the single transition.
+        collapsed.recompute_paths_from(&dest).await;
+        assert_eq!(
+            collapsed.collapsed_diversity_len(),
+            1,
+            "a repeated rebuild of a still-collapsed key must not re-record it"
+        );
+    }
+
+    /// A return path that keeps every relayer must not record a collapse at all, so the WARN gate
+    /// only trips on a real single-relayer collapse (issue #8502).
+    #[tokio::test]
+    async fn diverse_return_path_records_no_collapse() {
+        let (diverse, _g) = two_relayer_return_planner_with_floor(0);
+        let paths = fill_return_cache(&diverse).await;
+        assert_eq!(
+            2,
+            candidate_set(&paths).len(),
+            "vacuity guard: both relayers must survive"
+        );
+        assert_eq!(
+            diverse.collapsed_diversity_len(),
+            0,
+            "a diverse return path must not record a collapse"
+        );
     }
 
     /// A background refresh must not overwrite a route a `recompute_paths_from` installed from newer
