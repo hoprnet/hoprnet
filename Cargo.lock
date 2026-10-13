@@ -4132,9 +4132,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "4.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20b3701bf6462bff1b49a5f37d148e79b73174ae111046c65d3c723c6372f29a"
+version = "4.4.0"
+source = "git+https://github.com/hoprnet/hopr-api.git?branch=kauki%2Ffix%2Fgraph%2Fdrop-balance-headroom#599f96abb52d946b69be4f35617f294f7fe74c5e"
 dependencies = [
  "async-trait",
  "atomic_enum",
