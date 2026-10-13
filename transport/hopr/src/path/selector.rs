@@ -1408,7 +1408,7 @@ mod tests {
         let relay = pubkey(&SECRET_1);
         let dest = pubkey(&SECRET_2);
 
-        // Face value 100; MIN_BALANCE_HEADROOM = 2, so a 1-hop first edge needs >= 200.
+        // Face value 100; a monetized first edge needs >= one full-path winning ticket = 100.
         let face = hopr_api::graph::traits::Balance::from(100u64);
 
         let build = |first_hop_balance: u64| {
@@ -1439,13 +1439,54 @@ mod tests {
         assert!(!healthy.is_empty(), "a funded first hop must be selectable");
         assert_eq!(healthy[0].path.first(), Some(&relay), "route must go via the relay");
 
-        // The bug: first hop drained to 50 — below one face value (100) and the 200 headroom floor.
+        // The bug: first hop drained to 50 — below one face value (100), so it cannot fund a ticket.
         let starved = test_selector(me, build(50), MAX_PATHS);
         let result = starved.select_path(me, dest, 1);
         assert!(
             matches!(result, Err(PathPlannerError::Path(PathError::PathNotFound(..)))),
             "a first hop that cannot fund a single ticket must not be selected, got: {result:?}"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn first_hop_funded_for_one_ticket_is_selectable() -> anyhow::Result<()> {
+        // Regression for the removed balance headroom (hopr-api#144): the selector used to require a
+        // first edge to hold twice the path's ticket cost (`MIN_BALANCE_HEADROOM = 2`), so a channel
+        // with enough for one winning ticket but less than two was pruned despite being fundable. The
+        // planner now requires only one full-path winning ticket, so such a channel must route.
+        let me = pubkey(&SECRET_0);
+        let relay = pubkey(&SECRET_1);
+        let dest = pubkey(&SECRET_2);
+
+        // Face value 100; first hop at 150 — above one winning ticket (100), below the old 2x = 200
+        // headroom. Selectable now, pruned before.
+        let face = hopr_api::graph::traits::Balance::from(100u64);
+        let graph = ChannelGraph::new(me);
+        graph.add_node(relay);
+        graph.add_node(dest);
+        graph.set_ticket_face_value(face);
+        graph.upsert_edge(&me, &relay, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                150u64,
+            ))));
+        });
+        mark_edge_full(&graph, &relay, &dest);
+        graph.add_edge(&me, &relay).unwrap();
+        graph.add_edge(&relay, &dest).unwrap();
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let paths = selector
+            .select_path(me, dest, 1)
+            .context("a first hop funded for one winning ticket must route")?;
+        assert!(
+            !paths.is_empty(),
+            "a first hop funded for one winning ticket must be selectable"
+        );
+        assert_eq!(paths[0].path.first(), Some(&relay), "route must go via the relay");
         Ok(())
     }
 
