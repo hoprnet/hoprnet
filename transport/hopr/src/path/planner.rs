@@ -253,6 +253,51 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
     weights.iter().map(|w| w.max(0.0).powf(temper)).collect()
 }
 
+/// What a rebuild observed about return-path relayer diversity for its key.
+///
+/// Returned by [`rebuild_candidates`] rather than acted on inside it, so the caller applies the
+/// transition to the shared tracker only once the rebuilt path actually reaches the cache. A
+/// background refresh whose stale path is rejected by `put_if_unchanged` must not move the tracker
+/// or log a recovery (issue #8502).
+struct DiversityObservation {
+    key: PlannerCacheKey,
+    collapsed: bool,
+    distinct_relayers: usize,
+    candidates: usize,
+}
+
+/// Records a diversity transition and logs it once: a WARN when a key first collapses to a single
+/// relayer, an INFO when it first recovers. Idempotent across repeated rebuilds of the same state,
+/// so the WARN fires on the transition, not on every rebuild.
+fn apply_diversity_transition(
+    collapsed_diversity: &Mutex<HashSet<PlannerCacheKey>>,
+    src_key: &OffchainPublicKey,
+    kind: &str,
+    obs: &DiversityObservation,
+) {
+    let mut collapsed = collapsed_diversity.lock();
+    if obs.collapsed {
+        if collapsed.insert(obs.key) {
+            tracing::warn!(
+                src = %src_key,
+                kind,
+                distinct_relayers = obs.distinct_relayers,
+                candidates = obs.candidates,
+                "return-path relayer diversity collapsed to a single relayer; degradation detection \
+                 cannot corroborate a dead relayer for this destination",
+            );
+        }
+    } else if collapsed.remove(&obs.key) {
+        tracing::info!(
+            src = %src_key,
+            kind,
+            distinct_relayers = obs.distinct_relayers,
+            candidates = obs.candidates,
+            "return-path relayer diversity recovered for this destination",
+        );
+    }
+}
+
 /// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
 /// whatever the graph currently says.
 ///
@@ -273,8 +318,12 @@ async fn rebuild_candidates<R, S>(
     dest_key: OffchainPublicKey,
     hops: usize,
     kind: &'static str,
-    collapsed_diversity: &Mutex<HashSet<PlannerCacheKey>>,
-) -> Result<Option<hopr_utils::statistics::WeightedCollection<ValidatedPath>>>
+) -> Result<
+    Option<(
+        hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+        Option<DiversityObservation>,
+    )>,
+>
 where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
     S: PathSelector,
@@ -305,34 +354,18 @@ where
     // re-planned. Checked here, after validation, rather than in the selector: validation can reject
     // every candidate through one of several relayers the selector saw, so only the survivors here
     // reflect what a session can actually draw from.
-    if src_key != me && hops > 0 && !path_metrics.is_empty() {
-        let relayers = super::selector::distinct_first_relayers(&path_metrics);
-        let key: PlannerCacheKey = (src_key, dest_key, hops as u32);
-        // Log on the transition, not on every rebuild: the WARN re-fired on every lazy fill,
-        // recompute and background sweep while the condition persisted, which on a healthy client is
-        // hundreds of identical lines a minute and reads as an incident in field triage (issue #8502).
-        let mut collapsed = collapsed_diversity.lock();
-        if relayers <= 1 {
-            if collapsed.insert(key) {
-                tracing::warn!(
-                    src = %src_key,
-                    kind,
-                    distinct_relayers = relayers,
-                    candidates = path_metrics.len(),
-                    "return-path relayer diversity collapsed to a single relayer; degradation detection \
-                     cannot corroborate a dead relayer for this destination",
-                );
-            }
-        } else if collapsed.remove(&key) {
-            tracing::info!(
-                src = %src_key,
-                kind,
-                distinct_relayers = relayers,
-                candidates = path_metrics.len(),
-                "return-path relayer diversity recovered for this destination",
-            );
+    // Observe diversity here but do not act on it: the caller applies the transition only once this
+    // rebuild's path reaches the cache, so a refresh whose stale path loses the `put_if_unchanged`
+    // race cannot flip the tracker or log a spurious recovery (issue #8502).
+    let diversity = (src_key != me && hops > 0 && !path_metrics.is_empty()).then(|| {
+        let distinct_relayers = super::selector::distinct_first_relayers(&path_metrics);
+        DiversityObservation {
+            key: (src_key, dest_key, hops as u32),
+            collapsed: distinct_relayers <= 1,
+            distinct_relayers,
+            candidates: path_metrics.len(),
         }
-    }
+    });
 
     if valid_paths.is_empty() {
         return Ok(None);
@@ -356,7 +389,7 @@ where
             "weighted candidate path",
         );
     }
-    Ok(Some(weighted))
+    Ok(Some((weighted, diversity)))
 }
 
 /// Smallest change in a candidate's share of the draws that counts as traffic having moved.
@@ -618,18 +651,16 @@ where
             .try_get_with(cache_key, async move {
                 trace!(hops = hops_usize, "path cache miss, querying selector");
                 rebuild_candidates(
-                    &*resolver,
-                    &*selector,
-                    weighting,
-                    me,
-                    src_key,
-                    dest_key,
-                    hops_usize,
-                    "fill",
-                    &collapsed_diversity,
+                    &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
                 )
                 .await?
-                .map(Arc::new)
+                // A fill always becomes the cache entry, so its transition can be applied here.
+                .map(|(weighted, diversity)| {
+                    if let Some(obs) = diversity {
+                        apply_diversity_transition(&collapsed_diversity, &src_key, "fill", &obs);
+                    }
+                    Arc::new(weighted)
+                })
                 .ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
                 })
@@ -664,7 +695,7 @@ where
 
         let mut moved = 0usize;
         for (src_key, dest_key, hops) in keys {
-            if let Ok(Some(weighted)) = rebuild_candidates(
+            if let Ok(Some((weighted, diversity))) = rebuild_candidates(
                 &*self.resolver,
                 &*self.selector,
                 self.weighting,
@@ -673,7 +704,6 @@ where
                 dest_key,
                 hops as usize,
                 "recompute",
-                &self.collapsed_diversity,
             )
             .await
             {
@@ -693,6 +723,10 @@ where
                         futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
                     })
                     .await;
+                // The recompute always installs, so its diversity transition always applies.
+                if let Some(obs) = diversity {
+                    apply_diversity_transition(&self.collapsed_diversity, &src_key, "recompute", &obs);
+                }
                 if shifted {
                     moved += 1;
                 }
@@ -958,7 +992,7 @@ where
 
                     // The key already holds resolved offchain keys, which is what the selector
                     // wants -- so nothing has to be resolved again here.
-                    if let Ok(Some(weighted)) = rebuild_candidates(
+                    if let Ok(Some((weighted, diversity))) = rebuild_candidates(
                         &*resolver,
                         &*selector,
                         weighting,
@@ -967,14 +1001,19 @@ where
                         dest_key,
                         hops_u32 as usize,
                         "background-refresh",
-                        &collapsed_diversity,
                     )
                     .await
                     {
                         // Only if this is still the entry the sweep read: a `recompute_paths_from`
                         // that ran during the rebuild built from newer evidence, and its route must
                         // not be overwritten by this older selection.
-                        put_if_unchanged(&cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
+                        let installed =
+                            put_if_unchanged(&cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
+                        // Apply the diversity transition only when this rebuild's path actually landed;
+                        // a rejected stale refresh must not move the tracker or log a recovery (#8502).
+                        if installed && let Some(obs) = diversity {
+                            apply_diversity_transition(&collapsed_diversity, &src_key, "background-refresh", &obs);
+                        }
                     }
                 }
             }
