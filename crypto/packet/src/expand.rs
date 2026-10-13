@@ -13,7 +13,7 @@ use crate::{HoprSphinxSuite, sphinx::prelude::SphinxSuite};
 /// rather than by widening the types that carry a path.
 ///
 /// Expansion is CPU-intensive and a sender keeps using the same handful of relays, so
-/// implementations are free to memoize; see [`CachingKeyExpander`] in `hopr-protocol-hopr`.
+/// implementations are free to memoize; see `CachingKeyExpander` in `hopr-protocol-hopr`.
 pub trait KeyExpander: Sync {
     /// Returns the expanded form of `key`, failing if it is not a point on the curve.
     fn expand(&self, key: &OffchainPublicKey) -> Result<ExpandedOffchainPublicKey>;
