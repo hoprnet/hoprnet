@@ -231,10 +231,3 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
-
-# TEMPORARY dev-pin (hopr-api#144): redirects the whole graph — including the transitive
-# hopr-utilities -> hopr-api edge the test chain connector's trait impls live on — to the
-# unpublished 4.4.0 branch, so everything resolves to one hopr-api version. Drop this section once
-# hopr-api 4.4.0 is published to crates.io.
-[patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api.git", branch = "kauki/fix/graph/drop-balance-headroom" }
