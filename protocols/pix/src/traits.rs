@@ -39,7 +39,7 @@ pub enum ShareResolution<P, A> {
     /// `peer` identifies who relayed the share that triggered this emission, for attribution only.
     InvalidShares {
         /// Relayer whose acknowledgement carried the offending share.
-        peer: Box<OffchainPublicKey>,
+        peer: OffchainPublicKey,
         /// SSA the offending share belongs to.
         ssa_id: SsaId<P>,
         /// Total invalid shares seen for this SSA across all peers.
@@ -287,7 +287,7 @@ mod tests {
 
     fn invalid(peer: OffchainPublicKey, id: SsaId<SimplePseudonym>, total: u64) -> Resolution {
         ShareResolution::InvalidShares {
-            peer: Box::new(peer),
+            peer,
             ssa_id: id,
             observed_total: total,
         }

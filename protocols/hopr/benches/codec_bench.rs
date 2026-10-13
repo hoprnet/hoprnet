@@ -131,10 +131,14 @@ fn hopr_encoder_bench(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("{}hop_{}surbs_{}b", hops, rps, data.len())),
             &routing,
             |b, routing| {
+                // The encoder is built once, as a node builds it once: it owns a SURB store, a
+                // ticket factory backed by a redb file and a memoizing key expander, none of
+                // which a per-iteration rebuild would let warm up.
+                let encoder = create_encoder(&sender);
                 b.iter_batched(
-                    || (create_encoder(&sender), data.clone(), routing.clone()),
-                    |(encoder, data, routing)| encoder.encode_packet(data, routing, None, None).unwrap(),
-                    BatchSize::PerIteration,
+                    || (data.clone(), routing.clone()),
+                    |(data, routing)| encoder.encode_packet(data, routing, None, None).unwrap(),
+                    BatchSize::SmallInput,
                 )
             },
         );
@@ -150,10 +154,11 @@ fn hopr_encoder_bench(c: &mut Criterion) {
                 let acks = (0..*num_acks)
                     .map(|_| VerifiedAcknowledgement::random(&PEERS[0].1))
                     .collect::<Vec<_>>();
+                let encoder = create_encoder(&sender);
                 b.iter_batched(
-                    || (create_encoder(&sender), acks.clone()),
-                    |(encoder, acks)| encoder.encode_acknowledgements(&acks, &ack_recipient).unwrap(),
-                    BatchSize::PerIteration,
+                    || acks.clone(),
+                    |acks| encoder.encode_acknowledgements(&acks, &ack_recipient).unwrap(),
+                    BatchSize::SmallInput,
                 )
             },
         );

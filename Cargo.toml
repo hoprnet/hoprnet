@@ -138,9 +138,9 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "4.3.2" }
-hopr-types = { version = "4.1.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.17.3", default-features = false }
+hopr-api = { version = "5.0.0" }
+hopr-types = { version = "5.0.0", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.18.0", default-features = false }
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 
 hopr-crypto-packet = { version = "2.1.0", path = "crypto/packet", default-features = false, features = [
@@ -162,7 +162,7 @@ hopr-transport-mixer = { version = "0.5.0", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.33.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.28.0" }
+hopr-chain-connector = { version = "0.29.0" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.6.0", default-features = false }
@@ -231,3 +231,20 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+# Points at the branch carrying the compact/expanded `OffchainPublicKey` split
+# (hopr-types#52). Drop this once hopr-types 5.0 is published; the same pattern is
+# already used between hopr-impls and hopr-api.
+[patch.crates-io]
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/extended-offchain-key" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/extended-offchain-key" }
+hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", branch = "lukas/extended-offchain-key" }
+# Every hopr-impls crate must come from the branch too, not just be *built against* the patched
+# hopr-types: a published build would pick up the compact key's length-only parser without the
+# curve check that compensates for it, and admit off-curve keys into the account tables. Pulling
+# only some of them would also put two hopr-types majors in the graph.
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }
+hopr-ticket-manager = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }
+hopr-transport-p2p = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }
+hopr-ct-full-network = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "lukas/extended-offchain-key" }

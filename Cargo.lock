@@ -1802,7 +1802,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hex",
- "hopr-types",
+ "hopr-types 4.1.0",
  "http",
  "indexmap 2.14.2",
  "launchdarkly-sdk-transport",
@@ -4132,9 +4132,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "4.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20b3701bf6462bff1b49a5f37d148e79b73174ae111046c65d3c723c6372f29a"
+version = "5.0.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fextended-offchain-key#fbf289ceba5c94795ef8eb8adbc5f3cacf4bd817"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4142,7 +4141,7 @@ dependencies = [
  "chrono",
  "futures",
  "futures-concurrency",
- "hopr-types",
+ "hopr-types 5.0.0",
  "libp2p-identity",
  "serde",
  "serde_bytes",
@@ -4171,9 +4170,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aa0ec8acc3a19e49b7e5b7eac42a4cd1edb9225cfc3655a29fb21074f4bcb73"
+version = "0.29.0"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=lukas%2Fextended-offchain-key#6bd4595f09eb0580ca1dac6a4e83dbe641a42841"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4212,7 +4210,7 @@ dependencies = [
  "flagset",
  "hex-literal",
  "hopr-protocol-pix",
- "hopr-types",
+ "hopr-types 5.0.0",
  "hopr-utilities",
  "lazy_static",
  "mimalloc",
@@ -4231,8 +4229,7 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95cfe06f2b8a510183e0da5d12a7fb5063711274e31a19411ecd0a4e4fe7f9c6"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=lukas%2Fextended-offchain-key#6bd4595f09eb0580ca1dac6a4e83dbe641a42841"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4296,8 +4293,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009f463e7c597f55aa8fda7b5a4c5df5d28cec3f119e9cc13b94628c7cc2c386"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=lukas%2Fextended-offchain-key#6bd4595f09eb0580ca1dac6a4e83dbe641a42841"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4320,7 +4316,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-types",
+ "hopr-types 5.0.0",
  "serde",
  "serde_bytes",
  "strum",
@@ -4372,7 +4368,7 @@ dependencies = [
  "const-hex",
  "criterion",
  "elliptic-curve-tools",
- "hopr-types",
+ "hopr-types 5.0.0",
  "hopr-utilities",
  "moka",
  "parking_lot",
@@ -4408,7 +4404,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-protocol-app",
- "hopr-types",
+ "hopr-types 5.0.0",
  "hopr-utilities",
  "indexmap 2.14.2",
  "insta",
@@ -4443,7 +4439,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-protocol-pix",
- "hopr-types",
+ "hopr-types 5.0.0",
  "serde",
  "serde_cbor_2",
  "strum",
@@ -4453,8 +4449,7 @@ dependencies = [
 [[package]]
 name = "hopr-ticket-manager"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2219a766732e0970cc3f31fcf55ca86619a37733c8db40e2f18b20ef8dbc852"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=lukas%2Fextended-offchain-key#6bd4595f09eb0580ca1dac6a4e83dbe641a42841"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4546,7 +4541,7 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-types",
+ "hopr-types 5.0.0",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4562,9 +4557,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30deaabede896b2a6528fcb465e7058d944f5a4889b546741570d5d89a7f7e91"
+version = "0.12.3"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=lukas%2Fextended-offchain-key#6bd4595f09eb0580ca1dac6a4e83dbe641a42841"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -4677,6 +4671,57 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9edbc7eef689f0dde57fb481404f15b671f0877dd75ff1e88c125f19a09efaf7"
 dependencies = [
  "aes 0.9.2",
+ "aquamarine",
+ "ark-bn254 0.6.0",
+ "ark-ec 0.6.0",
+ "ark-ff 0.6.0",
+ "ark-serialize 0.6.0",
+ "arrayvec",
+ "async-trait",
+ "babyjubjub-ec",
+ "bigdecimal",
+ "blake3",
+ "chacha20 0.10.1",
+ "chrono",
+ "cipher 0.5.2",
+ "const-hex",
+ "ctr 0.10.1",
+ "curve25519-dalek 5.0.0",
+ "digest 0.11.3",
+ "ed25519-dalek 3.0.0",
+ "elliptic-curve 0.14.1",
+ "float-cmp",
+ "hash2curve",
+ "hex-literal",
+ "hybrid-array",
+ "k256 0.14.0",
+ "lazy_static",
+ "libp2p-identity",
+ "multiaddr",
+ "num_enum",
+ "poly1305 0.9.1",
+ "primitive-types 0.14.0",
+ "rand 0.10.3",
+ "rayon",
+ "regex",
+ "secp256k1 0.31.1",
+ "sha2 0.11.0",
+ "sha3 0.12.0",
+ "smart-default",
+ "strum",
+ "subtle",
+ "thiserror 2.0.20",
+ "tracing",
+ "typenum",
+ "zeroize",
+]
+
+[[package]]
+name = "hopr-types"
+version = "5.0.0"
+source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Fextended-offchain-key#2cd12d80883980abed80b3c5b6727903f319aa61"
+dependencies = [
+ "aes 0.9.2",
  "anyhow",
  "aquamarine",
  "ark-bn254 0.6.0",
@@ -4736,9 +4781,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.17.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72da17af86817eee527335feb09887ae1bd506f690bf8ffb787f54808f590203"
+version = "0.18.0"
+source = "git+https://github.com/hoprnet/hopr-utilities?branch=lukas%2Fextended-offchain-key#9c813b8c418e0516f6507f42bd668b136bfc91c3"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4755,7 +4799,7 @@ dependencies = [
  "futures-time",
  "hickory-resolver 0.26.3",
  "hopr-api",
- "hopr-types",
+ "hopr-types 5.0.0",
  "indexmap 2.14.2",
  "lazy_static",
  "libc",
