@@ -515,9 +515,21 @@ where
     ///
     /// `me` is this node's [`OffchainPublicKey`]; it is used as the source in path queries.
     pub fn new(me: OffchainPublicKey, surb_store: Surb, resolver: R, selector: S, config: PathPlannerConfig) -> Self {
+        // Bound the diversity tracker to the live cache: when a key's cached paths are evicted by
+        // capacity or expire by TTL, drop its collapsed-state record too, so the set cannot grow
+        // without bound as distinct `(source, destination, hops)` keys churn. A `Replaced` eviction
+        // (a recompute or refresh installing a newer value for the same key) leaves the key live, so
+        // its record must stay. Cleanup is silent -- it is not a diversity recovery, so no INFO.
+        let collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>> = Arc::new(Mutex::new(HashSet::new()));
+        let tracker_for_eviction = collapsed_diversity.clone();
         let cache = moka::future::Cache::builder()
             .max_capacity(config.max_cache_capacity)
             .time_to_live(config.cache_ttl)
+            .eviction_listener(move |key: Arc<PlannerCacheKey>, _value, cause| {
+                if cause != moka::notification::RemovalCause::Replaced {
+                    tracker_for_eviction.lock().remove(key.as_ref());
+                }
+            })
             .build();
 
         Self {
@@ -526,7 +538,7 @@ where
             resolver: Arc::new(resolver),
             selector: Arc::new(selector),
             cache,
-            collapsed_diversity: Arc::new(Mutex::new(HashSet::new())),
+            collapsed_diversity,
             refresh_period: config.refresh_period,
             weighting: WeightingParams {
                 latency_halflife: config.latency_halflife,
@@ -2102,6 +2114,26 @@ mod tests {
             diverse.collapsed_diversity_len(),
             0,
             "a diverse return path must not record a collapse"
+        );
+    }
+
+    /// The collapsed-key tracker is bounded by the cache: when a key's cache entry leaves, its
+    /// record is dropped too, so the set cannot grow without bound as keys churn (issue #8502). The
+    /// cleanup is silent (it is not a diversity recovery).
+    #[tokio::test]
+    async fn evicting_a_cache_entry_drops_its_diversity_record() {
+        let (me, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
+        let (planner, _g) = two_relayer_return_planner_with_floor(1);
+        fill_return_cache(&planner).await;
+        assert_eq!(planner.collapsed_diversity_len(), 1, "the collapsed key is recorded");
+
+        // Explicitly evict the entry, then drain moka's maintenance so the eviction listener runs.
+        planner.cache.invalidate(&(dest, me, 1)).await;
+        planner.cache.run_pending_tasks().await;
+        assert_eq!(
+            planner.collapsed_diversity_len(),
+            0,
+            "evicting the cache entry must drop its collapsed-state record"
         );
     }
 
