@@ -154,6 +154,18 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
     rb_capacity.saturating_mul(SURB_BUFFER_TARGET_NUMERATOR) / SURB_BUFFER_TARGET_DENOMINATOR
 }
 
+/// Share of the counter flush interval a conformance report waits for its packets' acknowledgments.
+///
+/// See [`PeerProtocolCounterRegistry::drain_settled`] for why it waits at all. A third of the
+/// interval is 5 s at the 15 s default: it outlasts the multi-second acknowledgment lag of a cold
+/// burst measured in hoprnet#8484, and leaves every report a full interval's worth of sends.
+const COUNTER_FLUSH_ACK_GRACE_DIVISOR: u32 = 3;
+
+/// How long each protocol-conformance report waits for acknowledgments of the packets it counts.
+fn counter_flush_ack_grace(flush_interval: Duration) -> Duration {
+    flush_interval / COUNTER_FLUSH_ACK_GRACE_DIVISOR
+}
+
 /// Reads the packet key out of an Ed25519 [`PeerId`]'s multihash.
 ///
 /// This used to be CPU-intensive - it decompressed the curve point - and was served from a
@@ -1005,22 +1017,22 @@ where
             hopr_utils::spawn_as_abortable!(async move {
                 use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
 
-                futures_time::stream::interval(futures_time::time::Duration::from(flush_interval))
-                    .for_each(|_| {
-                        for (peer, num_packets, num_acks) in flush_counters.drain() {
-                            tracing::trace!(
-                                %peer,
-                                num_packets,
-                                num_acks,
-                                "flushing protocol conformance counters"
-                            );
-                            flush_graph.upsert_edge(&flush_me, &peer, |obs| {
-                                obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
-                            });
-                        }
-                        futures::future::ready(())
-                    })
-                    .await;
+                // The grace sits inside the interval, so consecutive reports stay one interval apart.
+                let ack_grace = counter_flush_ack_grace(flush_interval);
+                let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(flush_interval));
+                while ticks.next().await.is_some() {
+                    for (peer, num_packets, num_acks) in flush_counters.drain_settled(ack_grace).await {
+                        tracing::trace!(
+                            %peer,
+                            num_packets,
+                            num_acks,
+                            "flushing protocol conformance counters"
+                        );
+                        flush_graph.upsert_edge(&flush_me, &peer, |obs| {
+                            obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
+                        });
+                    }
+                }
             }),
         );
 
@@ -1518,7 +1530,11 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
             if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+                    ssa_id,
+                    observed_total,
+                    peer,
+                })
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");

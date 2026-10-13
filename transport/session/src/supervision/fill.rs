@@ -140,6 +140,14 @@ impl FillPlanner {
         std::mem::take(&mut self.stall_onset)
     }
 
+    /// Whether the target has gone motionless and fill has fallen back to its heartbeat.
+    ///
+    /// The level behind [`take_stall_onset`](Self::take_stall_onset)'s edge, so the census can
+    /// report a stall for as long as it lasts without the caller tracking it.
+    pub(crate) fn is_stalled(&self) -> bool {
+        self.stall_warned
+    }
+
     /// Whether the stream this planner drives is currently emitting nothing.
     ///
     /// The supervisor uses it to decide whether a tick is worth waking for when there is no target:

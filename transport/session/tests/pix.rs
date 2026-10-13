@@ -33,7 +33,7 @@ use test_log::test;
 use tokio::time as tokio_time;
 
 /// What one SSA cycle at these dimensions costs, mirroring the Exit's own accounting:
-/// `polys × (threshold + surplus) × PAYLOAD_SIZE`.
+/// `polys × (threshold + surplus) × PIX_QUOTA_BYTES_PER_SHARE`.
 ///
 /// Derived per test rather than pinned to a round number, because `quota_range` has to satisfy two
 /// bounds at once and a literal only ever satisfies one on purpose: wide enough to accept what the
@@ -43,7 +43,7 @@ use tokio::time as tokio_time;
 fn cycle_quota(params: &PixParams) -> u64 {
     params.polys_per_ssa() as u64
         * params.emitted_shares_per_poly() as u64
-        * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64
+        * hopr_transport_session::PIX_QUOTA_BYTES_PER_SHARE
 }
 
 /// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
@@ -407,7 +407,7 @@ async fn a_dropped_ssa_commit_is_repaired_by_a_scoped_retransmission() -> Result
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let ssa_gen_config = SsaGeneratorConfig {
-        polynomials_per_ssa: 64,
+        polynomials_per_ssa: 128,
         threshold: 64,
         surplus_shares: 16,
     };
@@ -690,6 +690,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     let event = HoprSessionInPixEvent::UnverifiableShares {
         ssa_id,
         observed_total: 1,
+        peer: *hopr_api::OffchainKeypair::random().public(),
     };
 
     let result = mgr.dispatch_pix_event(event).await;
@@ -1121,8 +1122,8 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// An Exit batching above the Entry's cap must fail fast on a `SessionError`, not linger until its own
 /// deposit kill switch fires.
 ///
-/// The batch size is not negotiated — `StartSession.additional_data` has no room to advertise the
-/// Entry's cap — so this misconfiguration is reachable and, without the `SessionError`, silent: the
+/// The batch size is not negotiated — the Entry does not advertise its cap in
+/// `StartSession.additional_data` — so this misconfiguration is reachable and, without the `SessionError`, silent: the
 /// Exit has armed its kill switches, will never receive an `SsaCommit`, and has no event that could
 /// make it re-request. It would serve the Session unincentivized for
 /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)` — 240 s at the defaults used here —

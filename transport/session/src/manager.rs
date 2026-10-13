@@ -24,7 +24,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
+    prelude::{HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
@@ -61,8 +61,8 @@ use crate::{
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
         HoprPixDepositPayload, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-        LOCAL_PIX_SUITE, SESSION_APPLICATION_TAG, SessionAdmissionSink, SsaQuota, deposit_data_for_batch,
-        pix_params_to_quota,
+        LOCAL_PIX_SUITE, PIX_QUOTA_BYTES_PER_SHARE, SESSION_APPLICATION_TAG, SessionAdmissionSink, SsaQuota,
+        deposit_data_for_batch, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -287,9 +287,9 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 ///
 /// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
-/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × (threshold + surplus)`, an over-estimate by that whole second
-///   factor, since a cycle carries one constant term per polynomial and nothing else. The quota alone does not reveal
-///   how the product splits, so the over-estimate cannot be undone from it.
+/// * `quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE` is `polys × (threshold + surplus)`, an over-estimate by that whole
+///   second factor, since a cycle carries one constant term per polynomial and nothing else. The quota alone does not
+///   reveal how the product splits, so the over-estimate cannot be undone from it.
 /// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
 ///   quota says. It therefore bounds the commitments a cycle can ever deliver.
 ///
@@ -310,8 +310,7 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 /// allocation. Ordinary Start traffic is one message per session *in flight*, not one per session
 /// the node will ever manage, so [`MAX_CONCURRENT_START_EXCHANGES`] is the honest bound.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
-    let max_commitments =
-        (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
+    let max_commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
     let ssas_per_request = cfg.pix_config.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u64;
 
@@ -327,17 +326,14 @@ pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
 pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
-/// Per-Session return-path rate used to size the PIX recovery deadline, in packets per second.
+/// Fastest return-path rate a Session is assumed to sustain, in packets per second.
 ///
-/// This is 1.5 Mbps divided by the HOPR packet payload size. A slower Session needs a longer
-/// deadline, so this is the loosest useful bound for rejecting a deadline that no fully saturated
-/// Session could meet.
-pub const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / HoprPacket::PAYLOAD_SIZE as u64;
-
-const _: () = assert!(
-    ASSUMED_SESSION_PACKET_RATE > 0,
-    "HoprPacket::PAYLOAD_SIZE leaves the assumed PIX Session packet rate at zero"
-);
+/// Bounds the PIX `max_recovery_time` from below: a deadline this rate cannot meet is treated as one
+/// no Session can, so without fill it is the floor itself, and with fill it caps the `fill.max_rate`
+/// the floor may count on. Stated in packets, because per-packet work is what limits a Session, so it does not
+/// move with any packet or segment size; it carries ≈ 58 Mbps of Session data at full
+/// [`SESSION_MTU`] segments.
+pub const MAX_ASSUMED_SESSION_PACKET_RATE: u64 = 5000;
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
@@ -446,7 +442,7 @@ pub fn cycle_budget_for(params: &PixParams, ssas_per_request: usize) -> u64 {
 /// Used to reject a [`IncomingSessionPixConfig::max_live_cycle_bytes`] that could never admit even
 /// one Session at the dimensions its own `quota_range` advertises.
 pub fn max_cycle_budget_for_quota(quota_bytes: u64, ssas_per_request: usize) -> u64 {
-    let quota_shares = quota_bytes / HoprPacket::PAYLOAD_SIZE as u64;
+    let quota_shares = quota_bytes / PIX_QUOTA_BYTES_PER_SHARE;
 
     (hopr_protocol_pix::MIN_POLY_THRESHOLD..=hopr_protocol_pix::MAX_POLY_THRESHOLD)
         .filter_map(|threshold| {
@@ -765,6 +761,9 @@ struct PixFillState {
     /// This is what makes the distinction: one packet per notification period is the notification and
     /// is exempt from the SURB reserve, and everything above that rate is fill and is not.
     last_notify_at: Option<Instant>,
+    /// Whether the SURB reserve is currently withholding fill, so `hopr_pix_sessions_stalled` counts
+    /// this Session once per stall rather than once per refused packet.
+    withholding: bool,
     /// Whether this stream is draining the SURB buffer of a Session that has already been closed.
     ///
     /// Set once, by [`PixFillControl::enter_drain`], and never cleared: a drain ends with the
@@ -794,6 +793,7 @@ impl PixFillControl {
                 notify_started: false,
                 fill: FillRate::ZERO,
                 last_notify_at: None,
+                withholding: false,
                 draining: false,
             }),
         }
@@ -959,6 +959,7 @@ impl PixFillControl {
         }
 
         if self.estimator.saturating_diff() >= self.min_surb_reserve {
+            Self::set_withholding(&mut state, false);
             #[cfg(feature = "telemetry")]
             telemetry::record_pix_fill_packet();
             return true;
@@ -970,9 +971,35 @@ impl PixFillControl {
             estimate = self.estimator.saturating_diff(),
             "withholding a PIX fill keep-alive to stay above the SURB reserve"
         );
+        Self::set_withholding(&mut state, true);
         #[cfg(feature = "telemetry")]
-        telemetry::record_pix_fill_backoff(telemetry::PixFillBackoff::SurbReserve);
+        telemetry::pix::record_pix_fill_backoff(telemetry::pix::PixFillBackoff::SurbReserve);
         false
+    }
+
+    /// Moves the `surb_starved` gauge on the edges only, so it counts stalled Sessions rather than
+    /// refused packets — the same distinction `PixGateBlockEpisode` draws for the egress gate.
+    fn set_withholding(state: &mut PixFillState, withholding: bool) {
+        if state.withholding == withholding {
+            return;
+        }
+        state.withholding = withholding;
+        crate::supervision::telemetry::emit_sessions_stalled(
+            crate::supervision::telemetry::PixStallCause::SurbStarved,
+            if withholding { 1 } else { -1 },
+        );
+    }
+}
+
+/// Returns this Session's `surb_starved` count if it was withholding when it went away.
+///
+/// `Drop` rather than a call on the close paths, for the reason `PixGateBlockEpisode` gives: a
+/// Session can end by teardown, by drain, or by its last `Arc` going out of scope in a task nobody
+/// is waiting on, and this is the one mechanism that covers all three. Without it a Session that
+/// dies mid-stall leaves the gauge standing for the life of the process.
+impl Drop for PixFillControl {
+    fn drop(&mut self) {
+        Self::set_withholding(self.state.get_mut(), false);
     }
 }
 
@@ -982,8 +1009,8 @@ impl PixFillControl {
 /// *ceiling* rather than the value used, and it has to be, because the two sides of the comparison
 /// are chosen by different nodes. The reserve is measured against the Exit's estimate of its own SURB
 /// buffer for the Session, and how deep that buffer is is the *Entry's* decision — it announces its
-/// balancer target in the lower 32 bits of `StartInitiation::additional_data`. An operator sizing the
-/// reserve against a production buffer therefore also decides, unintentionally, that every Session
+/// balancer target in the lower 32 bits of the options word in `StartInitiation::additional_data`. An operator sizing
+/// the reserve against a production buffer therefore also decides, unintentionally, that every Session
 /// whose Entry asks for a shallower one can never be filled at all: the estimate never reaches the
 /// reserve, every fill packet is withheld, and the funded cycle strands on `max_recovery_time` while
 /// the logs report only a backoff.
@@ -1178,12 +1205,12 @@ pub struct IncomingSessionPixConfig {
     /// them must widen this range explicitly.
     ///
     /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
-    /// PAYLOAD_SIZE` — so this bounds the traffic actually served rather than the fraction of it the
-    /// threshold accounts for. It used to bound only the latter, which understated the exposure by
-    /// the surplus factor: 1.25× at the deployed dimensions.
+    /// PIX_QUOTA_BYTES_PER_SHARE` — so this bounds the traffic actually served rather than the
+    /// fraction of it the threshold accounts for. It used to bound only the latter, which understated
+    /// the exposure by the surplus factor: 1.25× at the deployed dimensions.
     ///
     /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
-    /// (≈ 162 MiB to ≈ 649 MiB, inclusive).
+    /// (≈ 227 MiB to ≈ 908 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Ceiling on the live Exit-side reconstructor state this node will commit to, in bytes.
@@ -1294,6 +1321,25 @@ impl EffectivePixAdmission {
     }
 }
 
+/// Bit position of the 64-bit options word within `StartInitiation::additional_data`.
+///
+/// The options word (PIX parameters and SURB balancer target) occupies the most significant 64 bits;
+/// the least significant 64 bits are currently unused and always sent as `0`.
+const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
+
+/// Places the 64-bit options word into the most significant half of `StartInitiation::additional_data`,
+/// leaving the (currently unused) least significant half zero.
+#[inline]
+const fn into_initiation_additional_data(options: u64) -> u128 {
+    (options as u128) << INITIATION_OPTIONS_SHIFT
+}
+
+/// Inverse of [`into_initiation_additional_data`], ignoring the least significant half.
+#[inline]
+const fn initiation_options(additional_data: u128) -> u64 {
+    (additional_data >> INITIATION_OPTIONS_SHIFT) as u64
+}
+
 /// Decodes the incentivization the Entry offered, before anyone is asked what to do about it.
 ///
 /// `Ok(None)` is a peer that offered none. `Err` is one whose offer this node cannot read or
@@ -1311,7 +1357,7 @@ fn decode_pix_offer(
 
     // Unpacking is what enforces the protocol ranges on the three dimensions, and what rejects a
     // suite identifier no curve claims — leaving only "a known curve, but not ours" below.
-    let params = PixParams::try_from_additional_data(req.additional_data).map_err(|error| {
+    let params = PixParams::try_from_additional_data(initiation_options(req.additional_data)).map_err(|error| {
         debug!(
             challenge = req.challenge,
             %error,
@@ -1342,45 +1388,47 @@ fn decode_pix_offer(
 
 /// Validates the incoming-PIX invariants that span quota, supervision and memory settings.
 ///
-/// `assumed_session_packet_rate` is explicit because the deadline is meaningful only relative to
-/// the rate a caller expects a Session to sustain.
+/// `max_session_packet_rate` is the fastest a Session is assumed to go. Without fill it bounds
+/// `max_recovery_time` directly; with fill it caps the `fill.max_rate` the deadline may count on.
 pub fn validate_incoming_session_pix_config(
     cfg: &IncomingSessionPixConfig,
-    assumed_session_packet_rate: u64,
+    max_session_packet_rate: u64,
 ) -> errors::Result<()> {
     if cfg.quota_range.is_empty() {
         return Err(TransportSessionError::InvalidConfig(
             "PIX quota_range must be non-empty (start must not exceed end)".into(),
         ));
     }
-    if assumed_session_packet_rate == 0 {
+    if max_session_packet_rate == 0 {
         return Err(TransportSessionError::InvalidConfig(
-            "assumed PIX Session packet rate must be non-zero".into(),
+            "maximum assumed PIX Session packet rate must be non-zero".into(),
+        ));
+    }
+    // Named here although `validate_pix_supervision` also refuses it, because that runs later on both
+    // paths: with fill enabled a zero deadline would otherwise surface as an infinite fill rate.
+    if cfg.supervision.max_recovery_time.is_zero() {
+        return Err(TransportSessionError::InvalidConfig(
+            "PIX max_recovery_time must be non-zero".into(),
         ));
     }
 
-    let worst_cycle_packets = *cfg.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
-    let needed = Duration::from_secs(worst_cycle_packets.div_ceil(assumed_session_packet_rate));
-    if cfg.supervision.max_recovery_time < needed {
-        return Err(TransportSessionError::InvalidConfig(format!(
-            "PIX max_recovery_time is {:?}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
-             packets and needs at least {needed:?} at {assumed_session_packet_rate} packets/s",
-            cfg.supervision.max_recovery_time,
-            cfg.quota_range.end(),
-        )));
-    }
+    let worst_cycle_packets = *cfg.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
 
-    // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs, or
-    // the mechanism that exists to complete idle cycles cannot complete the very ones it admits. The
-    // arithmetic is the planner's own, taken at the moment fill starts: the whole cycle remains, the
-    // aim point sits `finish_fraction` of the way through `max_recovery_time`, and the loss margin is
-    // paid on top. `max_recovery_time` is the *configured* per-cycle budget rather than a deadline
-    // observed at run time, so this is a property of the configuration and can be decided here.
-    //
-    // Checked only when fill is enabled: an Exit that has turned it off is choosing the pre-fill
-    // behaviour, where the cap is inert and refusing a Session over it would be refusing it over a
-    // value nothing reads.
+    // `max_recovery_time` has to leave a cycle of the widest accepted quota time to complete, and what
+    // completes it depends on fill. With fill enabled the Exit finishes an under-served cycle itself, so
+    // the bound is the fill ceiling's own arithmetic below. Without it only application traffic does,
+    // and the Exit has no rate of its own to reason from.
     if cfg.supervision.fill.enabled {
+        // The fill ceiling has to clear the rate a cycle of the widest accepted quota actually needs,
+        // or the mechanism that exists to complete idle cycles cannot complete the very ones it
+        // admits. The arithmetic is the planner's own, taken at the moment fill starts: the whole
+        // cycle remains, the aim point sits `finish_fraction` of the way through `max_recovery_time`,
+        // and the loss margin is paid on top. `max_recovery_time` is the *configured* per-cycle budget
+        // rather than a deadline observed at run time, so this is a property of the configuration and
+        // can be decided here.
+        //
+        // The ceiling counts only up to `max_session_packet_rate`: fill faster than any Session is
+        // assumed to carry cannot finish a cycle any sooner.
         let fill = &cfg.supervision.fill;
         // Before the arithmetic, not after it. `validate_pix_supervision` also range-checks these two,
         // but it runs later on both paths that reach here — `SessionManager::start` calls this first,
@@ -1390,21 +1438,39 @@ pub fn validate_incoming_session_pix_config(
         crate::supervision::validate_fill_fractions(fill)?;
 
         let horizon = cfg.supervision.max_recovery_time.mul_f64(fill.finish_fraction);
-        // Guarded rather than assumed non-zero: both factors are validated elsewhere, and a divide by
-        // zero here would report an infinite requirement for a configuration whose real fault is
-        // named by its own validator.
+        // Still guarded although both factors are non-zero: a nanosecond-scale deadline times a
+        // fraction rounds to zero, and dividing by it would report an infinite requirement.
         let floor = if horizon.is_zero() {
             u64::MAX
         } else {
             (worst_cycle_packets as f64 * (1.0 + fill.loss_margin) / horizon.as_secs_f64()).ceil() as u64
         };
-        if (fill.max_rate as u64) < floor {
+        if (fill.max_rate as u64).min(max_session_packet_rate) < floor {
+            let remedy = if floor > max_session_packet_rate {
+                "raise max_recovery_time"
+            } else {
+                "raise fill.max_rate or max_recovery_time"
+            };
             return Err(TransportSessionError::InvalidConfig(format!(
-                "PIX fill.max_rate is {}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} packets \
-                 and needs at least {floor} packets/s to finish inside {horizon:?} with a {} loss margin",
+                "PIX fill.max_rate is {} (counted up to {max_session_packet_rate} packets/s), but the largest \
+                 accepted quota ({} bytes) is {worst_cycle_packets} packets and needs at least {floor} packets/s to \
+                 finish inside {horizon:?} with a {} loss margin; {remedy}",
                 fill.max_rate,
                 cfg.quota_range.end(),
                 fill.loss_margin,
+            )));
+        }
+    } else {
+        // Refused only if even a Session at the fastest assumed rate could not finish a cycle in time,
+        // so this rejects a deadline that is impossible rather than one that is merely tight.
+        let needed = Duration::from_secs(worst_cycle_packets.div_ceil(max_session_packet_rate));
+        if cfg.supervision.max_recovery_time < needed {
+            return Err(TransportSessionError::InvalidConfig(format!(
+                "PIX max_recovery_time is {:?}, but with fill disabled the largest accepted quota ({} bytes) is \
+                 {worst_cycle_packets} packets and needs at least {needed:?} even at {max_session_packet_rate} \
+                 packets/s",
+                cfg.supervision.max_recovery_time,
+                cfg.quota_range.end(),
             )));
         }
     }
@@ -1427,8 +1493,10 @@ pub fn validate_incoming_session_pix_config(
 pub struct SessionManagerConfig {
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
-    /// Default is 1500.
-    #[default(1500)]
+    /// Clamped to the socket's supported frame size range, preserving boundaries within that range.
+    ///
+    /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
+    #[default(SESSION_MTU)]
     pub frame_mtu: usize,
 
     /// The maximum time for an incomplete frame to stay in the Session's output buffer.
@@ -1823,12 +1891,12 @@ impl PixToolbox {
 ///
 /// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
 /// Address) parameters — a [`PixParams`] quadruple of `polys_per_ssa`, `shares_per_poly`,
-/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the
-/// `StartSession.additional_data` field, via [`PixParams::into_additional_data`]. The first two
-/// describe how many polynomials and shares each SSA will use; the third is how many extra shares
-/// per polynomial the Entry emits to absorb losses. Those three define the data quota per SSA, which
-/// is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free,
-/// since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
+/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the 64-bit options word
+/// carried in the most significant 64 bits of the `StartSession.additional_data` field, via
+/// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares each
+/// SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb losses. Those three define
+/// the data quota per SSA, which is `polys × (threshold + surplus) × SESSION_MTU` — the surplus is priced in rather
+/// than free, since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
 ///
 /// The fourth is not a dimension and does not enter the quota: it names the elliptic curve the
 /// Entry's build instantiates PIX over, which fixes the width of every curve-sized field later in
@@ -1849,7 +1917,7 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈162 MiB–649 MiB). Dynamic admission checks
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈227 MiB–908 MiB). Dynamic admission checks
 ///   the smallest `batch_size × quota_per_ssa` up to the configured maximum; fixed admission checks the per-SSA quota
 ///   itself and retains the configured exact batch.
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
@@ -2105,9 +2173,8 @@ fn initialize_session_telemetry(
 
 /// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer.
 ///
-/// `max_out` is the client's `always_max_out_surbs` opt-in, which wins outright: a client that has
-/// asked for the maximum has said something about its own traffic that the balancer's estimate
-/// cannot contradict.
+/// The default cap of `1` follows the balancer's target. Explicit limits of `0` or more than `1`
+/// take precedence; `usize::MAX` leaves the packet's existing limit untouched.
 ///
 /// Otherwise the cap comes from [`BalancerStateValues::organic_surbs_per_packet`], which yields `0`
 /// once the counterparty is estimated to be at its target. That zero is the whole point of the
@@ -2119,10 +2186,31 @@ fn initialize_session_telemetry(
 /// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
 /// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
 /// queued for a packet that can actually deliver it.
-fn cap_organic_surbs(data: &mut ApplicationDataOut, max_out: bool, surb_mgmt: &BalancerStateValues) {
-    if !max_out {
-        data.packet_info.get_or_insert_default().max_surbs_in_packet = surb_mgmt.organic_surbs_per_packet();
+fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) {
+    if max_surbs != usize::MAX {
+        data.packet_info.get_or_insert_default().max_surbs_in_packet = if max_surbs == 1 {
+            surb_mgmt.organic_surbs_per_packet()
+        } else {
+            max_surbs
+        };
     }
+}
+
+/// Books an incoming packet's SURBs into the Exit's flow estimator.
+///
+/// `saved` SURBs entered the store and `evicted` older ones were dropped to make room for them. Both
+/// are recorded so that `produced - consumed - evicted` tracks what the store actually holds: without
+/// the eviction term the estimate stays inflated by every SURB the full store ever discarded, long
+/// after they are gone -- which leaves the keep-alive level report and the PIX fill reserve both
+/// reading a level that never falls. Split out from the receive closure so the accounting can be
+/// unit-tested on its own.
+fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evicted: u64) {
+    estimator
+        .produced
+        .fetch_add(saved, std::sync::atomic::Ordering::Relaxed);
+    estimator
+        .evicted
+        .fetch_add(evicted, std::sync::atomic::Ordering::Relaxed);
 }
 
 async fn send_via_msg_sender<S, D>(
@@ -2295,10 +2383,9 @@ where
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
-            // Idle rather than live TTL, and generous: the entry must outlive the gap between two
-            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~61 min at the
-            // deployed dimensions and the documented rate cap. Matches the generator's own
-            // per-pseudonym cache, which is what the guarded region reads.
+            // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
+            // race for it, and one evicted between two cycles is simply recreated by the next request.
+            // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
             ssa_request_locks: moka::future::Cache::builder()
                 .time_to_idle(Duration::from_secs(1800))
                 .build(),
@@ -2338,7 +2425,7 @@ where
         // `AlreadyStarted`: neither running nor recoverable, out of what is an ordinary configuration
         // error the caller could have corrected and retried on the same instance.
         if let Some(pix) = pix.as_ref() {
-            validate_incoming_session_pix_config(&self.cfg.pix_config, ASSUMED_SESSION_PACKET_RATE)?;
+            validate_incoming_session_pix_config(&self.cfg.pix_config, MAX_ASSUMED_SESSION_PACKET_RATE)?;
 
             // The authoritative cross-component check, and the first moment it can be made: the
             // supervisor's deadlines are meaningless without the reconstructor lifetimes they race
@@ -2593,7 +2680,7 @@ where
 
         let mut additional_data = 0_u64;
 
-        // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
+        // SURB balancer target announcement is encoded in the lower 32-bits of the options word
         if !cfg.capabilities.contains(Capability::NoRateControl) {
             additional_data |= cfg
                 .surb_management
@@ -2609,7 +2696,7 @@ where
                 .min(u32::MAX as u64);
         }
 
-        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // PIX quota parameter announcement is encoded in the upper 32-bits of the options word.
         // Run these validations BEFORE reserving the initiation challenge slot so that a
         // repeated invalid request cannot exhaust all challenge slots.
         if cfg.capabilities.contains(Capability::UsePIX) {
@@ -2669,7 +2756,7 @@ where
             challenge,
             target,
             capabilities: HoprSessionCapabilities(cfg.capabilities),
-            additional_data,
+            additional_data: into_initiation_additional_data(additional_data),
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -2740,6 +2827,7 @@ where
                 // with our maximum value.
                 if let Some(balancer_config) = cfg.surb_management {
                     let surb_estimator = AtomicSurbFlowEstimator::default();
+                    let surbs_per_keep_alive = KeepAliveMessage::from(session_id).max_surbs()? as u32;
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
@@ -2763,14 +2851,14 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
                         // NOTE: this is put in-front of the `full_surb_scoring_sender`,
                         // so that its estimate of SURBs gets automatically updated based on
                         // the `max_surbs_in_packets` set here.
                         move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            cap_organic_surbs(&mut data, max_out_organic_surbs, &surb_mgmt_for_tx);
+                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                             futures::future::ok::<_, S::Error>((routing, data))
                         },
                     );
@@ -2803,9 +2891,8 @@ where
                         // The setpoint and output limit is immediately reconfigured by the SurbBalancer
                         PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
                         surb_estimator.clone(),
-                        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-                        // so the correction by this factor is applied.
-                        SurbControllerWithCorrection(ka_controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+                        // Convert the requested SURB rate to packets using the keep-alive's capacity.
+                        SurbControllerWithCorrection(ka_controller, surbs_per_keep_alive),
                         surb_mgmt.clone(),
                     );
 
@@ -2974,11 +3061,11 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let surb_mgmt_for_tx = surb_mgmt.clone();
                     let reduced_surb_sender =
                         msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            cap_organic_surbs(&mut data, max_out_organic_surbs, &surb_mgmt_for_tx);
+                            cap_organic_surbs(&mut data, max_surbs_in_packet, &surb_mgmt_for_tx);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -3340,7 +3427,7 @@ where
             owned_ssas.clear();
 
             #[cfg(feature = "telemetry")]
-            crate::telemetry::record_pix_closure(reason);
+            crate::telemetry::pix::record_pix_closure(reason);
 
             // Return this Session's share of the node-level aggregates now, rather than leaving it
             // to `close_session` below. The notification between here and there is a network send
@@ -3978,8 +4065,9 @@ where
     /// outlive their Session by up to the reconstructor's ack window, so events for a just-closed
     /// Session are routine. Callers distinguish it for exactly that reason.
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
-        let session_id = event.pseudonym();
-        let Some(slot) = self.sessions.get(session_id) else {
+        // Copied rather than borrowed, so the match below can move the event's payload out.
+        let session_id = *event.pseudonym();
+        let Some(slot) = self.sessions.get(&session_id) else {
             debug!(%session_id, "pix event for a session that is no longer registered");
             return Err(SessionManagerError::NonExistingSession.into());
         };
@@ -3999,7 +4087,7 @@ where
         // one, and the next one supersedes it.
         if let HoprSessionInPixEvent::RecoveryProgress(progress) = event {
             #[cfg(feature = "telemetry")]
-            telemetry::set_pix_recovery_progress(session_id, progress.useful_shares, progress.target_useful_shares);
+            telemetry::set_pix_recovery_progress(&session_id, progress.useful_shares, progress.target_useful_shares);
 
             if !supervisor.try_send_progress(progress) {
                 trace!(%session_id, "dropped a pix progress snapshot on a full supervisor channel");
@@ -4014,9 +4102,17 @@ where
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
                 supervisor.send_event(SessionPixEvent::Recovered(ssa_id)).await
             }
-            HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total } => {
+            HoprSessionInPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total,
+                peer,
+            } => {
                 supervisor
-                    .send_event(SessionPixEvent::UnverifiableShares { ssa_id, observed_total })
+                    .send_event(SessionPixEvent::UnverifiableShares {
+                        ssa_id,
+                        observed_total,
+                        peer,
+                    })
                     .await
             }
             HoprSessionInPixEvent::RecoveryProgress(_) => unreachable!("handled above"),
@@ -4694,15 +4790,15 @@ where
         // The SURB buffer target the Entry asked for, resolved once for both branches below.
         //
         // The Session request carries a "hint" as additional data telling what the Session initiator
-        // has configured as its target buffer size in the Balancer. The lower 32 bits contain the
-        // SURB target; the upper 32 bits carry PIX parameters and must be masked out.
+        // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
+        // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
         // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
         // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
         // figure, and on that branch the fallback below — the same one the balancer would have used —
         // is the only estimate of the buffer there is.
         let announced_surb_target = {
-            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            let surb_target = initiation_options(session_req.additional_data) as u32;
             if surb_target > 0 {
                 (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
@@ -4728,7 +4824,8 @@ where
 
             let target_surb_buffer_size = announced_surb_target;
 
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
             // so the egress path never has to look inside the `OnceLock` again.
             let egress_gate = slot.pix_egress_gate.get().cloned();
@@ -4743,7 +4840,7 @@ where
                         .sink_map_err(std::io::Error::other)
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_clone
+                            surb_estimator_tx
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
@@ -4754,11 +4851,10 @@ where
                         .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        // Count the number of SURBs delivered with each incoming packet
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        account_incoming_surbs(&surb_estimator_rx, produced, evicted);
                         #[cfg(feature = "telemetry")]
                         telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -4816,7 +4912,8 @@ where
             // opts out of rate control is exactly the one that could drain the most service before
             // funding, so leaving this path ungated would make the predeposit budget optional.
             let egress_gate = slot.pix_egress_gate.get().cloned();
-            let surb_estimator_clone = slot.surb_estimator.clone();
+            let surb_estimator_tx = slot.surb_estimator.clone();
+            let surb_estimator_rx = slot.surb_estimator.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -4830,7 +4927,7 @@ where
                             // reserve that either never binds or never releases. `NoRateControl` is
                             // also the branch that can drain SURBs fastest, so it is the one where
                             // that matters most.
-                            surb_estimator_clone
+                            surb_estimator_tx
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
@@ -4839,10 +4936,10 @@ where
                         },
                     ),
                     session_rx.inspect(move |data| {
+                        // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        surb_estimator_clone
-                            .produced
-                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        account_incoming_surbs(&surb_estimator_rx, produced, evicted);
                         #[cfg(feature = "telemetry")]
                         telemetry::record_session_surb_produced(&session_id, produced);
                     }),
@@ -4998,16 +5095,16 @@ where
             match &session_slot.routing_opts {
                 // Session is outgoing - keep-alive was received from the Exit
                 DestinationRouting::Forward { .. } => {
-                    if msg.flags.contains(KeepAliveFlag::BalancerState)
-                        && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot.surb_mgmt.buffer_level() != msg.additional_data
-                    {
-                        // Update the buffer level as sent to us from the Exit
-                        session_slot
-                            .surb_mgmt
-                            .buffer_level
-                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                    if msg.flags.contains(KeepAliveFlag::BalancerState) && !session_slot.surb_mgmt.is_disabled() {
+                        // Record the reported level and let it infer the counterparty's real store
+                        // capacity from a plateau. Every report is fed in, including one that repeats
+                        // the last value -- a level that stops rising while we are still minting is
+                        // exactly the plateau signal, so this must not dedup equal reports.
+                        let changed = session_slot.surb_mgmt.buffer_level() != msg.additional_data;
+                        session_slot.surb_mgmt.observe_reported_level(msg.additional_data);
+                        if changed {
+                            debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                        }
                     }
 
                     // Increase the number of consumed SURBs in the estimator
@@ -5040,8 +5137,7 @@ where
                     }
 
                     // Increase the number of received SURBs in the estimator.
-                    // Typically, 2 SURBs per Keep-Alive message
-                    let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                    let produced = msg.max_surbs()? as u64;
                     session_slot
                         .surb_estimator
                         .produced
@@ -5852,10 +5948,12 @@ mod tests {
     /// Tests go through the same packing production does. They used to write the shifts out by
     /// hand, which meant a change to the layout altered what every one of them was asserting
     /// without altering a single line of them — plain `u64` literals type-check against anything.
-    fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u64 {
-        PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
-            .expect("test dimensions must be valid")
-            .into_additional_data(0)
+    fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u128 {
+        into_initiation_additional_data(
+            PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
+                .expect("test dimensions must be valid")
+                .into_additional_data(0),
+        )
     }
 
     /// The default test dimensions: the smallest legal split, with the surplus the test generators
@@ -5865,8 +5963,8 @@ mod tests {
     }
 
     /// [`small_pix_params`] as an Entry offering them would pack them into `additional_data`.
-    fn small_pix_additional_data() -> u64 {
-        small_pix_params().into_additional_data(0)
+    fn small_pix_additional_data() -> u128 {
+        into_initiation_additional_data(small_pix_params().into_additional_data(0))
     }
 
     /// Surplus used by the small test `SsaGeneratorConfig`s below. Non-zero and different from
@@ -6016,10 +6114,72 @@ mod tests {
         Ok(data)
     }
 
+    /// `account_incoming_surbs` must keep the estimator's held count (`saturating_diff`) equal to
+    /// what a bounded store of capacity `CAP` would actually hold across a fill-past-capacity-then-drain
+    /// sequence. The eviction term is what makes the held count fall back to zero once the overflow is
+    /// drained -- and so what stops the keep-alive report and the PIX fill reserve from reading a level
+    /// that never falls.
+    #[test]
+    fn account_incoming_surbs_tracks_a_bounded_store_through_overflow_and_drain() {
+        const CAP: u64 = 100;
+        let estimator = AtomicSurbFlowEstimator::default();
+        let mut occupancy: u64 = 0;
+
+        let mut receive = |batch: u64| {
+            let evicted = (occupancy + batch).saturating_sub(CAP);
+            occupancy = (occupancy + batch).min(CAP);
+            account_incoming_surbs(&estimator, batch, evicted);
+        };
+
+        for _ in 0..5 {
+            receive(40);
+        }
+        assert_eq!(occupancy, CAP, "the model store is full");
+        assert_eq!(
+            estimator.saturating_diff(),
+            CAP,
+            "held count tracks a full store, not the {}-SURB total received",
+            5 * 40
+        );
+
+        for _ in 0..CAP {
+            estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            occupancy -= 1;
+        }
+        assert_eq!(occupancy, 0, "the model store is empty");
+        assert_eq!(
+            estimator.saturating_diff(),
+            0,
+            "held count returns to zero after the drain; the evicted surplus is not counted as held"
+        );
+    }
+
+    /// The gate primitive itself mints whenever the level is below the effective target. A level
+    /// short of target with no capacity inferred yet still mints -- the stop for a smaller-than-target
+    /// store comes from inferring its capacity over successive reports (see
+    /// `a_plateau_below_target_infers_the_counterparty_capacity` in `balancer/controller.rs`), which
+    /// lowers the effective target rather than changing this primitive.
+    #[test]
+    fn organic_minting_continues_below_target_without_an_inferred_capacity() -> anyhow::Result<()> {
+        const EXIT_CAPACITY: u64 = 500;
+        const ENTRY_TARGET: u64 = 2_000;
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &gate_state(ENTRY_TARGET, EXIT_CAPACITY));
+
+        assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
+        assert_eq!(
+            1,
+            data.estimate_surbs_with_msg(),
+            "below the effective target with no inferred capacity, the Entry mints"
+        );
+        Ok(())
+    }
+
     #[test]
     fn cap_organic_surbs_should_zero_the_packet_once_the_counterparty_is_at_target() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, false, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
 
         assert_eq!(Some(0), data.packet_info.map(|i| i.max_surbs_in_packet));
         assert_eq!(
@@ -6033,7 +6193,7 @@ mod tests {
     #[test]
     fn cap_organic_surbs_should_allow_one_while_the_counterparty_is_below_target() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, false, &gate_state(100, 10));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 10));
 
         assert_eq!(Some(1), data.packet_info.map(|i| i.max_surbs_in_packet));
         assert_eq!(1, data.estimate_surbs_with_msg());
@@ -6051,7 +6211,7 @@ mod tests {
             surb_generation: Some(7),
         });
 
-        cap_organic_surbs(&mut data, false, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
 
         let info = data.packet_info.expect("packet info must survive");
         assert_eq!(0, info.max_surbs_in_packet);
@@ -6067,16 +6227,30 @@ mod tests {
         Ok(())
     }
 
-    /// `always_max_out_surbs` is an explicit statement by the client about its own traffic, so it
+    /// `usize::MAX` is an explicit statement by the client about its own traffic, so it
     /// wins over the balancer's estimate — and must leave the packet entirely untouched rather than
     /// writing some larger cap.
     #[test]
     fn maxing_out_surbs_should_bypass_the_balancer_gate() -> anyhow::Result<()> {
         let mut data = small_outgoing_packet()?;
-        cap_organic_surbs(&mut data, true, &gate_state(100, 200));
+        cap_organic_surbs(&mut data, usize::MAX, &gate_state(100, 200));
 
         assert_eq!(None, data.packet_info, "the opt-in must not touch the packet at all");
         assert!(data.estimate_surbs_with_msg() >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn cap_organic_surbs_should_honor_explicit_packet_limits() -> anyhow::Result<()> {
+        for limit in [0, 2] {
+            for buffer_level in [10, 200] {
+                let mut data = small_outgoing_packet()?;
+                cap_organic_surbs(&mut data, limit, &gate_state(100, buffer_level));
+
+                assert_eq!(Some(limit), data.packet_info.map(|info| info.max_surbs_in_packet));
+                assert_eq!(limit, data.estimate_surbs_with_msg());
+            }
+        }
         Ok(())
     }
 
@@ -6656,6 +6830,78 @@ mod tests {
         )
     }
 
+    /// The `surb_starved` gauge moves on the edges, and a control dropped mid-stall returns it.
+    ///
+    /// Per refused packet would measure how hard the stream retried rather than how long the
+    /// Session was starved, and a control that went away while withholding would leave the count
+    /// standing for the life of the process.
+    #[test]
+    fn the_surb_starved_gauge_counts_stalls_and_is_returned_on_drop() {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let control = fill_control(None, 10);
+        let now = Instant::now();
+
+        // The estimator starts empty, so every one of these is below the reserve of ten.
+        for _ in 0..3 {
+            assert!(!control.admit_at(now), "fill must be withheld below the reserve");
+        }
+        assert_eq!(
+            1,
+            probe::get("sessions_stalled/surb_starved"),
+            "three refusals are one stall, not three"
+        );
+
+        // Enough SURBs arrive to clear the reserve.
+        control
+            .estimator
+            .produced
+            .fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        assert!(control.admit_at(now));
+        assert_eq!(0, probe::get("sessions_stalled/surb_starved"));
+
+        // And a control dropped while withholding returns its own.
+        control
+            .estimator
+            .consumed
+            .fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        assert!(!control.admit_at(now));
+        assert_eq!(1, probe::get("sessions_stalled/surb_starved"));
+        drop(control);
+        assert_eq!(
+            0,
+            probe::get("sessions_stalled/surb_starved"),
+            "a session that dies mid-stall must not leave the gauge standing"
+        );
+    }
+
+    /// The fill reserve reads the estimator's held count, which must not stay inflated by evicted
+    /// SURBs. After an overflow drains, the real store is empty, yet a raw `produced - consumed` would
+    /// still read far above the reserve and admit fill into an empty buffer -- the exact failure the
+    /// reserve exists to prevent (a return packet that finds no SURB stalls every packet the node
+    /// originates). With evictions counted, the held count is what the store holds, so fill is withheld.
+    #[test]
+    fn the_fill_reserve_is_not_defeated_by_a_post_overflow_estimate() {
+        use std::sync::atomic::Ordering;
+
+        const RESERVE: u64 = 100;
+        let control = fill_control(None, RESERVE);
+        let now = Instant::now();
+
+        // Post-overflow-drain: 1000 SURBs arrived, the full store evicted 900 of them, and the 100 it
+        // actually held were all spent. The store is empty; `produced - consumed` alone reads 900.
+        control.estimator.produced.fetch_add(1000, Ordering::Relaxed);
+        control.estimator.evicted.fetch_add(900, Ordering::Relaxed);
+        control.estimator.consumed.fetch_add(100, Ordering::Relaxed);
+
+        assert_eq!(0, control.drainable_surbs(), "an empty store has nothing to drain");
+        assert!(
+            !control.admit_at(now),
+            "fill must be withheld: the real held count is below the reserve"
+        );
+    }
+
     /// One stream, two producers, and the faster of them wins.
     ///
     /// The SURB-level notification and PIX fill are the same packet sent for different reasons, so
@@ -6943,7 +7189,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(capabilities | Capability::UsePIX),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -8173,7 +8419,7 @@ mod tests {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
                     capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                    additional_data: params.into_additional_data(0),
+                    additional_data: into_initiation_additional_data(params.into_additional_data(0)),
                 },
             )
         };
@@ -8523,7 +8769,7 @@ mod tests {
 
         // Zero polynomials is outside the protocol range, so unpacking refuses it outright.
         let unreadable = StartInitiation {
-            additional_data: ((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40),
+            additional_data: into_initiation_additional_data(((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40)),
             ..pix_offer()
         };
         mgr.handle_incoming_session_initiation(HoprPseudonym::random(), unreadable)
@@ -10246,7 +10492,7 @@ mod tests {
                 finish_fraction,
                 ..Default::default()
             });
-            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
             assert!(
                 matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.finish_fraction")),
                 "a finish_fraction of {finish_fraction} must be refused rather than multiplied, got {outcome:?}"
@@ -10258,15 +10504,39 @@ mod tests {
                 loss_margin,
                 ..Default::default()
             });
-            let outcome = validate_incoming_session_pix_config(&cfg, ASSUMED_SESSION_PACKET_RATE);
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
             assert!(
                 matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("fill.loss_margin")),
                 "a loss_margin of {loss_margin} must be refused, got {outcome:?}"
             );
         }
 
-        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), ASSUMED_SESSION_PACKET_RATE)
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default(), MAX_ASSUMED_SESSION_PACKET_RATE)
             .expect("the shipped defaults must still validate");
+    }
+
+    /// A zero recovery deadline must be named as such on both fill paths, rather than reaching the
+    /// fill arithmetic and being reported as an infinite rate requirement.
+    #[test]
+    fn a_zero_recovery_deadline_is_refused_as_zero_with_and_without_fill() {
+        for enabled in [true, false] {
+            let cfg = IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    max_recovery_time: Duration::ZERO,
+                    fill: crate::supervision::PixFillConfig {
+                        enabled,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let outcome = validate_incoming_session_pix_config(&cfg, MAX_ASSUMED_SESSION_PACKET_RATE);
+            assert!(
+                matches!(&outcome, Err(TransportSessionError::InvalidConfig(msg)) if msg.contains("max_recovery_time must be non-zero")),
+                "with fill enabled = {enabled}, a zero deadline must be refused as zero, got {outcome:?}"
+            );
+        }
     }
 
     /// The fill heartbeat is clamped at *both* ends for a programmatically assembled config.
@@ -10654,7 +10924,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -10789,7 +11059,7 @@ mod tests {
             challenge: MIN_CHALLENGE,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-            additional_data: DEFAULT_PIX_PARAMS.into_additional_data(0),
+            additional_data: into_initiation_additional_data(DEFAULT_PIX_PARAMS.into_additional_data(0)),
         };
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
@@ -10975,6 +11245,7 @@ mod tests {
         mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
             ssa_id,
             observed_total: 1,
+            peer: crate::supervision::test_peer(),
         })
         .await?;
 
@@ -11531,7 +11802,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -13096,8 +13367,7 @@ mod tests {
 
         // Number of commitments implied by the largest quota this node accepts, clamped by the
         // number of polynomials it would actually admit.
-        let commitments =
-            (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
+        let commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
         let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
 
         assert!(
@@ -13584,7 +13854,7 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data,
+            additional_data: into_initiation_additional_data(additional_data),
         };
         // Packed by hand rather than through `pix_additional_data`, because that helper refuses to
         // build the very values under test. The layout it mirrors is pinned in `PixParams`' own
@@ -13657,9 +13927,11 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: PixParams::try_new(8192, 128, 37, suite)
-                .expect("test dimensions must be valid")
-                .into_additional_data(0),
+            additional_data: into_initiation_additional_data(
+                PixParams::try_new(8192, 128, 37, suite)
+                    .expect("test dimensions must be valid")
+                    .into_additional_data(0),
+            ),
         };
 
         let foreign = match LOCAL_PIX_SUITE {
@@ -13681,7 +13953,9 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+            additional_data: into_initiation_additional_data(
+                (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+            ),
         };
         assert!(
             decode_and_check(&mgr, &unknown).is_none(),
@@ -13745,7 +14019,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: params.into_additional_data(0),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
             },
         )
         .await?;
@@ -13761,6 +14035,7 @@ mod tests {
             .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
                 ssa_id,
                 observed_total: 1,
+                peer: crate::supervision::test_peer(),
             })
             .await;
         // Forwarding succeeds even for the event that closes: the supervisor decides, and it does so

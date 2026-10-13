@@ -21,7 +21,7 @@ use tracing::{Instrument, debug, error, instrument};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
-    balancer::{BalancerStateValues, RateController, RateLimitStreamExt, SurbFlowEstimator},
+    balancer::{BalancerStateValues, RateController, RateLimitStreamExt},
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
@@ -280,10 +280,16 @@ where
                 flags: KeepAliveFlag::BalancerTarget.into(),
                 additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
             }),
-            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            // Report the level this side acts on: the balancer's accumulator, fed by
+            // `produced - consumed - evicted` and clamped to the store capacity on every update. The
+            // raw estimator diff now tracks true occupancy too, but the accumulator additionally
+            // collapses to 0 while the return path is degraded, which is exactly the moment the Entry
+            // should mint at maximum rather than read the counterparty as full. The estimator stays in
+            // the enum for the callers.
+            SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
                 flags: KeepAliveFlag::BalancerState.into(),
-                additional_data: estimator.saturating_diff(),
+                additional_data: cfg.buffer_level(),
             }),
             SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
