@@ -1339,6 +1339,12 @@ where
         &self.graph
     }
 
+    /// Returns a handle to the path planner, so connectivity events can re-plan without waiting
+    /// for the background sweep.
+    pub fn path_planner(&self) -> PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>> {
+        self.path_planner.clone()
+    }
+
     /// Returns a reference to the SURB store.
     ///
     /// Exposed so that chain-level channel events can invalidate stored SURBs whose return path
