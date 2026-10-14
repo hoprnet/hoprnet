@@ -621,10 +621,18 @@ where
     {
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
+        let planner = transport_api.path_planner();
+        let surb_store = transport_api.surb_store().clone();
+        let key_ids = chain_api.clone();
+        let net = network.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
+                    let planner = planner.clone();
+                    let surb_store = surb_store.clone();
+                    let key_ids = key_ids.clone();
+                    let net = net.clone();
                     async move {
                         let (peer_id, connected) = match event {
                             hopr_api::network::NetworkEvent::PeerConnected(p) => (p, true),
@@ -638,6 +646,47 @@ where
                                 peer: opk,
                                 connected,
                             });
+
+                            use hopr_api::chain::KeyIdMapping as _;
+                            let relayer = key_ids.key_id_mapper_ref().map_key_to_id(&opk);
+                            if connected {
+                                if let Some(relayer) = relayer {
+                                    surb_store.mark_relayer_reachable(&relayer);
+                                }
+                            } else if !net.is_connected(&peer_id) {
+                                // Re-plan now rather than at the next sweep, so no new path draws the
+                                // lost peer; its SURBs are set aside and purged only if it stays away.
+                                planner.refresh_cached_paths().await;
+                                if let Some(relayer) = relayer {
+                                    surb_store.mark_relayer_unreachable(&relayer);
+                                    spawn(async move {
+                                        hopr_utils::runtime::prelude::sleep(
+                                            surb_store.unreachable_relayer_grace() + Duration::from_secs(1),
+                                        )
+                                        .await;
+                                        // A disconnect that raced a second connection gets no PeerConnected.
+                                        if net.is_connected(&peer_id) {
+                                            surb_store.mark_relayer_reachable(&relayer);
+                                            return;
+                                        }
+                                        match hopr_utils::parallelize::cpu::spawn_blocking(
+                                            move || surb_store.purge_unusable_surbs(),
+                                            "surb_purge",
+                                        )
+                                        .await
+                                        {
+                                            Ok(purged) if purged > 0 => {
+                                                tracing::info!(
+                                                    purged,
+                                                    "purged SURBs through a relayer that stayed unreachable"
+                                                )
+                                            }
+                                            Ok(_) => {}
+                                            Err(error) => tracing::warn!(%error, "could not purge unusable SURBs"),
+                                        }
+                                    });
+                                }
+                            }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                         }
