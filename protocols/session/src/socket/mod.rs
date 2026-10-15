@@ -1,6 +1,7 @@
 //! This module defines the socket-like interface for Session protocol.
 
 pub mod ack_state;
+mod loss_report;
 pub mod state;
 
 /// Contains socket statistics types.
@@ -16,6 +17,7 @@ use std::{
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
+use loss_report::{FRAME_LOSS_REPORT_INTERVAL, FrameLossReport};
 use state::{SocketComponents, SocketState, Stateless};
 use tracing::{Instrument, instrument};
 #[cfg(feature = "telemetry")]
@@ -206,6 +208,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
+        // Dropped frames are counted and reported once per window, not logged one by one
+        let loss_report = Arc::new(FrameLossReport::new(&id, FRAME_LOSS_REPORT_INTERVAL));
+        let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
+
         // Debug tracing spans for individual pipeline stages
         let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
         let stage2_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
@@ -229,7 +235,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                tracing::trace!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                lr1.duplicate_segment();
                                 false
                             } else {
                                 true
@@ -256,7 +263,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
-                        tracing::error!(%error, "failed to reassemble frame");
+                        tracing::debug!(%error, "failed to reassemble frame");
+                        lr2.frame_not_reassembled();
                         #[cfg(feature = "telemetry")]
                         s2.incomplete_frame();
                         None
@@ -277,16 +285,18 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
+                            tracing::debug!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
+                        lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::error!(frame_id, "frame discarded");
+                        tracing::debug!(frame_id, "frame discarded");
+                        lr3.frame_discarded();
                         #[cfg(feature = "telemetry")]
                         s3.frame_discarded();
                         None
@@ -408,6 +418,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
+        // Dropped frames are counted and reported once per window, not logged one by one
+        let loss_report = Arc::new(FrameLossReport::new(state.session_id(), FRAME_LOSS_REPORT_INTERVAL));
+        let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
+
         // Pipeline OUT: Packets incoming from Downstream
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
@@ -435,7 +449,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         packet.try_as_segment().filter(|s| {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                tracing::trace!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                lr1.duplicate_segment();
                                 false
                             } else {
                                 true
