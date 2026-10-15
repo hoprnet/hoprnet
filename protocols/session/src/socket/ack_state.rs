@@ -261,6 +261,14 @@ impl<const C: usize> AcknowledgementState<C> {
     }
 }
 
+/// Whether the state is still running.
+///
+/// Background tasks use this to tell a failure from the normal end that follows
+/// [`AcknowledgementState::stop`], which closes their channels on purpose.
+fn is_running(started: &AtomicBool) -> bool {
+    started.load(std::sync::atomic::Ordering::Acquire)
+}
+
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     fn session_id(&self) -> &str {
         &self.id
@@ -298,6 +306,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             let ctl_tx_clone = context.ctl_tx.clone();
             let frame_inspector_clone = context.inspector.clone();
             let cfg = self.cfg;
+            let (started_1, started_2) = (self.started.clone(), self.started.clone());
             hopr_utils::runtime::prelude::spawn(incoming_frame_retries_rx
                 .filter_map(move |rf| {
                     let frame_id = rf.frame_id;
@@ -308,7 +317,11 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                             // Register the next retry if still possible
                             let retry_at = next_deadline_with_backoff(next.retry_count, cfg.backoff_base, cfg.expected_packet_latency);
                             if let Err(error) = incoming_frame_retries_tx_clone.send_one((next, retry_at)) {
-                                tracing::error!(frame_id, %error, "failed to register next resend of incoming frame");
+                                if is_running(&started_1) {
+                                    tracing::error!(frame_id, %error, "failed to register next resend of incoming frame");
+                                } else {
+                                    tracing::debug!(frame_id, %error, "state stopped, next resend of incoming frame not registered");
+                                }
                             } else {
                                 tracing::debug!(frame_id, retry_in = ?retry_at.saturating_duration_since(Instant::now()), "next resend request of incoming frame segments");
                             }
@@ -328,7 +341,8 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
                     Ok(_) => tracing::debug!("incoming frame resends processing done"),
-                    Err(error) => tracing::error!(%error, "error while processing incoming frame resends")
+                    Err(error) if is_running(&started_2) => tracing::error!(%error, "error while processing incoming frame resends"),
+                    Err(error) => tracing::debug!(%error, "incoming frame resends ended after the state stopped")
                 })
                 .instrument(tracing::debug_span!("incoming_frame_retries_sender"))
             );
@@ -358,6 +372,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let rb_rx_clone = context.rb_rx.clone();
         let cfg = self.cfg;
         let delivery_tap = self.delivery_tap.clone();
+        let (started_1, started_2) = (self.started.clone(), self.started.clone());
         hopr_utils::runtime::prelude::spawn(
             outgoing_frame_retries_rx
                 .filter_map(move |rf: RetriedFrameId| {
@@ -380,7 +395,11 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                         let retry_at =
                             next_deadline_with_backoff(next.retry_count, cfg.backoff_base, cfg.expected_packet_latency);
                         if let Err(error) = outgoing_frame_retries_tx_clone.send_one((next, retry_at)) {
-                            tracing::error!(frame_id, %error, "failed to register next retry of frame");
+                            if is_running(&started_1) {
+                                tracing::error!(frame_id, %error, "failed to register next retry of frame");
+                            } else {
+                                tracing::debug!(frame_id, %error, "state stopped, next retry of frame not registered");
+                            }
                         } else {
                             tracing::debug!(frame_id, retry_in = ?retry_at.saturating_duration_since(Instant::now()), "next resend of outgoing frame");
                         }
@@ -409,7 +428,10 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 .forward(ctl_tx_clone) // Retransmit all the segments
                 .map(move |res| match res {
                     Ok(_) => tracing::debug!("outgoing frame retries processing done"),
-                    Err(error) => tracing::error!(%error, "error while processing outgoing frame retries"),
+                    Err(error) if is_running(&started_2) => {
+                        tracing::error!(%error, "error while processing outgoing frame retries")
+                    }
+                    Err(error) => tracing::debug!(%error, "outgoing frame retries ended after the state stopped"),
                 })
                 .instrument(tracing::debug_span!("outgoing_frame_retries_sender")),
         );
@@ -423,15 +445,19 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     #[tracing::instrument(name = "AcknowledgementState::stop", skip(self), fields(session_id = self.id))]
     fn stop(&mut self) -> Result<(), SessionError> {
         if let Some(mut ctx) = self.context.take() {
+            // Mark the state as stopped before closing the channels, so the background tasks
+            // that fail on the closed channels know this is a normal stop and not an error.
+            self.started.store(false, std::sync::atomic::Ordering::Release);
             ctx.outgoing_frame_retries_tx.force_close();
             ctx.incoming_frame_retries_tx.force_close();
             // ack_tx and ctl_tx close when their last clone is dropped;
             // dropping ctx here drops the originals, spawned-task clones drop when those tasks complete.
 
-            self.started.store(false, std::sync::atomic::Ordering::Relaxed);
             tracing::debug!("state has been stopped");
         } else {
-            tracing::warn!("cannot be stopped, because it is not running");
+            // A socket is stopped both when it is closed and when it is dropped,
+            // so a second stop is expected.
+            tracing::debug!("state already stopped");
         }
 
         Ok(())

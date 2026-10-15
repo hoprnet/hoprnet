@@ -111,6 +111,18 @@ pub struct SessionSocketConfig {
     pub max_frames_behind_gap: Option<usize>,
 }
 
+/// Logs a failed update of the socket state.
+///
+/// When the Session is closing, frames that are still in the pipeline can no longer update it.
+/// It's a normal situation and not an error.
+fn log_state_update_error(error: &SessionError, message: &'static str) {
+    if matches!(error, SessionError::StateNotRunning) {
+        tracing::debug!(%error, message);
+    } else {
+        tracing::error!(%error, message);
+    }
+}
+
 enum WriteState {
     WriteOnly,
     Writing,
@@ -450,14 +462,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
-                            tracing::error!(%error, "frame complete state update failed");
+                            log_state_update_error(&error, "frame complete state update failed");
                         }
                         #[cfg(feature = "telemetry")]
                         s2.frame_completed();
                         Some(OrderedFrame(frame))
                     }
                     Err(error) => {
-                        tracing::error!(%error, "failed to reassemble frame");
+                        tracing::debug!(%error, "failed to reassemble frame");
+                        lr2.frame_not_reassembled();
                         #[cfg(feature = "telemetry")]
                         s2.incomplete_frame();
                         None
@@ -483,20 +496,23 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         if let Err(error) = st_3.frame_emitted(frame.0.frame_id) {
-                            tracing::error!(%error, "frame received state update failed");
+                            log_state_update_error(&error, "frame received state update failed");
                         }
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
+                            tracing::debug!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
+                        lr3.frame_emitted();
                         #[cfg(feature = "telemetry")]
                         s3.frame_emitted();
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
+                        tracing::debug!(frame_id, "frame discarded");
+                        lr3.frame_discarded();
                         if let Err(error) = st_3.frame_discarded(frame_id) {
-                            tracing::error!(%error, "frame discarded state update failed");
+                            log_state_update_error(&error, "frame discarded state update failed");
                         }
                         #[cfg(feature = "telemetry")]
                         s3.frame_discarded();
