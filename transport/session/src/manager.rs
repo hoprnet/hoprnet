@@ -172,7 +172,9 @@ fn acquire_egress_permit(
 
 #[tracing::instrument(level = "debug", skip(session_data))]
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
-    debug!("closing session");
+    // The counterpart of "new session established": one line per Session at INFO, so its whole
+    // lifetime can be read from a production log without the per-frame detail of the socket.
+    info!(%session_id, %reason, "session closed");
 
     #[cfg(feature = "telemetry")]
     {
