@@ -82,7 +82,7 @@ pub struct StartErrorType<I> {
 /// - `C` are session capabilities
 ///
 /// The `additional_data` are set dependent on the `capabilities`
-/// or set to `0x0000000000000000` to be ignored.
+/// or set to `0` to be ignored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartInitiation<T, C> {
     /// Random challenge for this initiation.
@@ -93,14 +93,16 @@ pub struct StartInitiation<T, C> {
     ///
     /// This might also contain information required for the PIX protocol.
     pub capabilities: C,
-    /// Additional options (might be `capabilities` dependent), ignored if `0x0000000000000000`.
+    /// Additional options (might be `capabilities` dependent), ignored if `0`.
     ///
-    /// When PIX is offered, the upper 32 bits are the
-    /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
+    /// The most significant 64 bits carry the negotiated options: when PIX is offered, the upper
+    /// 32 bits of them are the [`PixParams`](hopr_protocol_pix::PixParams) word — see
     /// [`PixParams::into_additional_data`](hopr_protocol_pix::PixParams::into_additional_data) —
-    /// and the lower 32 bits are the SURB balancer target. The field is then fully allocated;
-    /// there is no room left in it to negotiate anything further.
-    pub additional_data: u64,
+    /// and the lower 32 bits of them are the SURB balancer target.
+    ///
+    /// The least significant 64 bits are currently unused: senders must set them to `0` and
+    /// receivers ignore them, so that they can be allocated later without breaking older decoders.
+    pub additional_data: u128,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -449,9 +451,13 @@ flagset::flags! {
     }
 }
 
-impl<I> KeepAliveMessage<I> {
-    /// The minimum number of SURBs a [`KeepAliveMessage`] must be able to carry.
-    pub const MIN_SURBS_PER_MESSAGE: usize = HoprPacket::MAX_SURBS_IN_PACKET;
+impl<I: serde::Serialize> KeepAliveMessage<I> {
+    /// Number of SURBs that fit alongside this message, including the application tag.
+    pub fn max_surbs(&self) -> errors::Result<usize> {
+        // Start header (version, discriminant, body length), flags, additional data and CBOR session ID.
+        let message_len = 4 + size_of::<u8>() + size_of::<u64>() + serde_cbor_2::to_vec(&self.session_id)?.len();
+        Ok(HoprPacket::max_surbs_with_message(Tag::SIZE + message_len))
+    }
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -497,7 +503,7 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
     /// Fixed [`Tag`] of every protocol message.
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
-    pub const START_PROTOCOL_VERSION: u8 = 0x03;
+    pub const START_PROTOCOL_VERSION: u8 = 0x04;
 
     /// How many commitment entries one [`SsaCommit`](StartProtocol::SsaCommit) message can carry,
     /// for each of the two delivery phases.
@@ -878,7 +884,7 @@ where
         Ok(
             match StartProtocolDiscriminants::from_repr(disc).ok_or(StartProtocolError::UnknownMessage)? {
                 StartProtocolDiscriminants::StartSession => {
-                    if body.len() < size_of::<StartChallenge>() + 1 + size_of::<u64>() {
+                    if body.len() < size_of::<StartChallenge>() + 1 + size_of::<u128>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -891,12 +897,12 @@ where
                         capabilities: body[size_of::<StartChallenge>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("init.capabilities".into()))?,
-                        additional_data: u64::from_be_bytes(
-                            body[size_of::<StartChallenge>() + 1..size_of::<StartChallenge>() + 1 + size_of::<u64>()]
+                        additional_data: u128::from_be_bytes(
+                            body[size_of::<StartChallenge>() + 1..size_of::<StartChallenge>() + 1 + size_of::<u128>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.additional_data".into()))?,
                         ),
-                        target: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>() + 1 + size_of::<u64>()..])?,
+                        target: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>() + 1 + size_of::<u128>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
@@ -1308,7 +1314,7 @@ mod tests {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
             capabilities: Default::default(),
-            additional_data: 0x12345678,
+            additional_data: 0x1234_5678_9abc_def0_0000_0000_0000_0000,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -1328,7 +1334,7 @@ mod tests {
                 challenge: 0,
                 target: "127.0.0.1:1234".to_string(),
                 capabilities: 0xff,
-                additional_data: 0xffffffff,
+                additional_data: (u64::MAX as u128) << u64::BITS,
             });
 
         // Two SURBs are needed because if the server wants to establish PIX, it needs to send an additional
@@ -1645,10 +1651,10 @@ mod tests {
     fn max_missing_runs_should_match_the_encode_layout() -> anyhow::Result<()> {
         type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], MinimalDeposit>;
 
-        // PAYLOAD_SIZE(1030) - header(4) - params(4) - empty CBOR map(1) - num_commitments(2)
+        // PAYLOAD_SIZE(3238) - header(4) - params(4) - empty CBOR map(1) - num_commitments(2)
         // - num_missing_runs(2) - CBOR null session_id(1), over 8 bytes per run.
         let max_runs = Spec::max_missing_runs(&())?;
-        assert_eq!(127, max_runs);
+        assert_eq!(403, max_runs);
 
         let scope = |runs: usize| {
             // One run per SSA index, which is the worst case for the flat table: every entry pays
@@ -1885,10 +1891,10 @@ mod tests {
     fn max_deposit_data_size_should_match_the_encode_layout() -> anyhow::Result<()> {
         type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], Vec<u8>>;
 
-        // PAYLOAD_SIZE(1030) - header(4) - params(4) - num_commitments(2) - one entry(4 + 33)
+        // PAYLOAD_SIZE(3238) - header(4) - params(4) - num_commitments(2) - one entry(4 + 33)
         // - num_missing_runs(2) - CBOR null session_id(1). Stated as a literal so a layout change
         // has to come through here.
-        assert_eq!(980, Spec::MAX_DEPOSIT_DATA_SIZE);
+        assert_eq!(3188, Spec::MAX_DEPOSIT_DATA_SIZE);
 
         let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
             session_id: (),
@@ -1929,8 +1935,8 @@ mod tests {
         );
         // Stated as literals too, so that a change reaching *both* the encoder and the derivation
         // above still has to be acknowledged here.
-        assert_eq!(28, chunking.max_commitments_per_message);
-        assert_eq!(27, chunking.max_constant_terms_per_message);
+        assert_eq!(92, chunking.max_commitments_per_message);
+        assert_eq!(90, chunking.max_constant_terms_per_message);
 
         // The proof is carried by constant-term messages only, so phase 1 must never fit more
         // entries than phase 2 — the invariant `new_multiple`'s two loops rely on.
@@ -2204,24 +2210,14 @@ mod tests {
     }
 
     #[test]
-    fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg =
-            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
-                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-                flags: None.into(),
-                additional_data: 0,
-            });
-        let len = msg.encode()?.1.len();
-        assert_eq!(
-            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
-            HoprPacket::MAX_SURBS_IN_PACKET
-        );
-        assert!(
-            HoprPacket::max_surbs_with_message(len) >= KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
-            "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
-            len,
-            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
-        );
+    fn start_protocol_message_keep_alive_surb_capacity_should_include_all_headers() -> anyhow::Result<()> {
+        for id_len in [0, 9, 20, 500] {
+            let keep_alive = KeepAliveMessage::from("x".repeat(id_len));
+            let capacity = keep_alive.max_surbs()?;
+            let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(keep_alive);
+            let data = ApplicationData::try_from(msg)?;
+            assert_eq!(capacity, HoprPacket::max_surbs_with_message(data.total_len()));
+        }
 
         Ok(())
     }

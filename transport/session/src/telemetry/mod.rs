@@ -208,11 +208,6 @@ lazy_static::lazy_static! {
         "PIX egress gate mode encoded as Predeposit=0, Funded=1",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
-        "hopr_session_pix_closures_total",
-        "Sessions closed by the PIX supervisor, by reason",
-        &["reason"]
-    ).unwrap();
     static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_pix_recovery_progress",
         "Recovery progress of a session's most recently advanced SSA, as a ratio of useful shares to target",
@@ -226,11 +221,6 @@ lazy_static::lazy_static! {
     static ref METRIC_SESSION_PIX_FILL_PACKETS_TOTAL: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_session_pix_fill_packets_total",
         "PIX fill keep-alives originated by this Exit, above its SURB-level notification rate"
-    ).unwrap();
-    static ref METRIC_SESSION_PIX_FILL_BACKOFF_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
-        "hopr_session_pix_fill_backoff_total",
-        "Times PIX fill held back, by reason",
-        &["reason"]
     ).unwrap();
     static ref SESSION_RUNTIME: parking_lot::Mutex<HashMap<SessionId, SessionRuntimeState>> = parking_lot::Mutex::new(HashMap::new());
 }
@@ -464,9 +454,9 @@ pub fn set_pix_recovery_progress(session_id: &SessionId, useful_shares: u64, tar
 ///
 /// Set from the supervisor's planned rate rather than measured at the stream, so it reports the
 /// decision. What actually goes out can be lower — the SURB reserve withholds packets, and that shows
-/// up in [`record_pix_fill_backoff`] — and the pair is more informative than either alone: a fill
-/// rate pinned at its ceiling with a climbing backoff counter is a Session whose SURB supply, not its
-/// deadline, is the thing failing.
+/// up in [`pix::record_pix_fill_backoff`] — and the pair is more informative than either alone: a
+/// fill rate pinned at its ceiling with a climbing backoff counter is a Session whose SURB supply,
+/// not its deadline, is the thing failing.
 ///
 /// Deliberately not [`touch_session_activity`]: fill is this node talking to itself about a Session
 /// the application has abandoned, and counting that as activity would make
@@ -483,43 +473,6 @@ pub fn set_pix_fill_rate(session_id: &SessionId, packets_per_sec: f64) {
 /// series per Session that is never retired, for a number that is only interesting in aggregate.
 pub fn record_pix_fill_packet() {
     METRIC_SESSION_PIX_FILL_PACKETS_TOTAL.increment();
-}
-
-/// Why PIX fill sent less than its planned rate.
-///
-/// A closed enum, so it can be a metric label without unbounded cardinality — the same argument as
-/// [`record_pix_closure`], and for the same reason it takes the enum rather than a string.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
-pub enum PixFillBackoff {
-    /// The Session's estimated SURB level was below `fill.min_surb_reserve`, so the packet was
-    /// withheld to leave the Session able to answer its own application.
-    SurbReserve,
-    /// The cycle being filled for stopped making progress for `max_recovery_idle`, so the planner
-    /// dropped back to its heartbeat rather than spend a whole deadline's worth of SURBs on a cycle
-    /// that may never recover.
-    Stalled,
-}
-
-/// Counts one occasion on which PIX fill held back, labelled by why.
-///
-/// The two reasons are counted at different granularities on purpose, because they are different
-/// events: `SurbReserve` is per withheld packet, and `Stalled` is per stall — the planner warns and
-/// counts once when a cycle goes motionless, not once per second for as long as it stays that way.
-pub fn record_pix_fill_backoff(reason: PixFillBackoff) {
-    METRIC_SESSION_PIX_FILL_BACKOFF_TOTAL.increment(&[reason.to_string().as_str()]);
-}
-
-/// Counts a Session closed by the PIX supervisor, labelled by why.
-///
-/// Labelled by reason rather than by Session: the reasons are a closed enum, so the cardinality is
-/// bounded, which is what makes this safe to keep after the Session is gone.
-///
-/// Takes the enum rather than a `&str` so that boundedness is a property of the signature instead of
-/// a promise the doc makes on behalf of every future caller. `&'static str` would not have done it
-/// either — it admits any string literal, and a literal is exactly what an unbounded label looks
-/// like at the call site. The label is derived here, so there is one spelling of each reason.
-pub fn record_pix_closure(reason: crate::supervision::SessionPixCloseReason) {
-    METRIC_SESSION_PIX_CLOSURES_TOTAL.increment(&[reason.to_string().as_str()]);
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {

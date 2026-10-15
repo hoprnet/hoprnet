@@ -565,7 +565,7 @@ where
     tracing::info!(
         peer_id = %transport_id.public().to_peerid_str(),
         address = %me_onchain,
-        version = constants::APP_VERSION,
+        hopr_lib_version = constants::APP_VERSION,
         "Node information"
     );
 
@@ -833,7 +833,7 @@ macro_rules! impl_build_methods {
             hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
             tracing::info!(
                 id = %hopr.transport_id.public().to_peerid_str(),
-                version = constants::APP_VERSION,
+                hopr_lib_version = constants::APP_VERSION,
                 "EDGE NODE STARTED AND RUNNING"
             );
 
@@ -892,7 +892,7 @@ macro_rules! impl_build_methods {
             hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
             tracing::info!(
                 id = %hopr.transport_id.public().to_peerid_str(),
-                version = constants::APP_VERSION,
+                hopr_lib_version = constants::APP_VERSION,
                 "ENTRY NODE STARTED AND RUNNING"
             );
 
@@ -953,7 +953,7 @@ macro_rules! impl_build_methods {
             hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
             tracing::info!(
                 id = %hopr.transport_id.public().to_peerid_str(),
-                version = constants::APP_VERSION,
+                hopr_lib_version = constants::APP_VERSION,
                 "EXIT NODE STARTED AND RUNNING"
             );
 
@@ -1104,7 +1104,7 @@ macro_rules! impl_build_methods {
 
             tracing::info!(
                 id = %hopr.transport_id.public().to_peerid_str(),
-                version = constants::APP_VERSION,
+                hopr_lib_version = constants::APP_VERSION,
                 "FULL NODE STARTED AND RUNNING"
             );
 

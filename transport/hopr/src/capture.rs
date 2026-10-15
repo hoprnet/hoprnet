@@ -676,7 +676,7 @@ mod tests {
                 challenge: 0x01234567_89abcdef,
                 target: SessionTarget::UdpStream(SealedHost::Plain("some-dns-name.com:1234".parse()?)),
                 capabilities: (Capability::Segmentation | Capability::NoRateControl).into(),
-                additional_data: 0x12345678,
+                additional_data: 0x12345678 << u64::BITS,
             }))?
             .to_bytes()
             .into_vec()

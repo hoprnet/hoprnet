@@ -13,8 +13,8 @@
 //! | per-Session rate      | 16 – 20 Mbps |
 //! | clients per Exit      | 10 – 30 |
 //!
-//! Quota follows from the first three — `polys × (threshold + surplus) × PAYLOAD_SIZE`, per
-//! `pix_params_to_quota` in `transport/session/src/types.rs` — and spans roughly 153 MB to 714 MB
+//! Quota follows from the first three — `polys × (threshold + surplus) × SESSION_MTU`, per
+//! `pix_params_to_quota` in `transport/session/src/types.rs` — and spans roughly 119 MB to 952 MB
 //! across the box. It is an *output*, which is why the sweeps below cover the box rather than an
 //! iso-quota diagonal: holding the product fixed models a trade no deployment actually makes.
 //!

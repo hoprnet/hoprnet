@@ -41,19 +41,28 @@ pub struct AuxiliaryPacketInfo {
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
     /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
-    /// already full.
+    /// already full: the SURBs that left the store, or never entered it, to make room. A share-less
+    /// newcomer the store turned away counts as well.
     ///
-    /// This is the only point at which an overflow is visible, and the cost is higher than a wasted
-    /// SURB: each one carries a partial SSA share that reaches the reconstructor only when the SURB
-    /// is *used*, so an eviction destroys the share. The redundancy budget that absorbs those losses
-    /// is a fixed surplus per polynomial, and emission is windowed, so on deployed dimensions a
-    /// burst of roughly `surplus × SHARE_EMISSION_WINDOW` evictions is enough to put polynomials
+    /// This is the only point at which an overflow is visible per packet. The store gives up
+    /// share-less SURBs first, and refuses a share-less newcomer before it evicts a share-bearing
+    /// SURB, so what an eviction costs depends on what the buffer holds. A share-less SURB is only a
+    /// lost return path. A share-bearing one carries a partial SSA share that reaches the
+    /// reconstructor only when the SURB is *used*, so evicting it destroys the share. That only
+    /// happens once the buffer holds nothing but shares, which makes this count an upper bound on the
+    /// shares lost. The exact figure is [`SurbInsertOutcome::evicted_shares`]. It is deliberately not
+    /// carried here: it is the store's own business, reported in its eviction summary (the
+    /// `ring_share` value of the `cache` label of `hopr_surb_store_evictions_count`, and a warning per
+    /// report interval). The redundancy budget that absorbs those losses is a fixed surplus per
+    /// polynomial, and emission is windowed, so on deployed dimensions a burst of roughly
+    /// `surplus × SHARE_EMISSION_WINDOW` evicted share-bearing SURBs is enough to put polynomials
     /// below their threshold — and a cycle short of recovery is worth nothing at all. See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
     /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
     ///
-    /// Carried for observability. Sessions deliberately do not subtract it from their SURB level
-    /// estimate, because the imprecise estimate is the one that fails safe — see
+    /// The Exit's Session books this count into its SURB flow estimate — an evicted SURB has left the
+    /// buffer just as a spent one has — so the meaning above must not change: it is the total of
+    /// SURBs that left or never entered the store, not the number of lost shares. See
     /// `counterparty_buffer_capacity` in `hopr-transport-session`.
     pub num_evicted_surbs: usize,
 }
@@ -187,17 +196,29 @@ pub struct FoundSurb {
 
 /// What storing SURBs via `SurbStore::insert_surbs` did to the ring buffer.
 ///
-/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops its
-/// oldest entry and the caller sees only that the insert "succeeded". That count is the only local
-/// evidence that the sender is producing faster than this side can hold, and under PIX it is also a
-/// tally of destroyed SSA shares — a share reaches the reconstructor only when its SURB is *used*,
-/// so an evicted SURB takes its share with it permanently.
+/// The `evicted` count exists because an overflow is otherwise entirely silent: the buffer drops a
+/// SURB to make room — a share-less one whenever there is one to drop — and the caller sees only that
+/// the insert "succeeded". That count is the only local evidence that the sender is producing faster
+/// than this side can hold. It does not say what the overflow cost, though. Under PIX a share reaches
+/// the reconstructor only when its SURB is *used*, so an evicted share-bearing SURB takes its share
+/// with it permanently, whereas a share-less one is only a lost return path. `evicted_shares` is the
+/// exact number of shares lost to overflow, which is what tells routine share-less churn from a loss
+/// that matters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SurbInsertOutcome {
     /// Number of SURBs held for the pseudonym after the insert.
     pub retained: usize,
-    /// Number of SURBs dropped to make room during this insert, oldest first.
+    /// Number of SURBs that left, or never entered, the buffer to make room during this insert:
+    /// share-less ones first, oldest first, and the oldest share-bearing one only once none remain. A
+    /// share-less SURB turned away because the buffer held nothing but shares counts as well.
     pub evicted: usize,
+    /// Of [`evicted`](Self::evicted), how many carried a PIX share: the exact number of shares this
+    /// insert lost to overflow, each of them for good. It is zero for as long as the buffer still has
+    /// share-less SURBs to give up, and for every refused share-less newcomer.
+    ///
+    /// `evicted - evicted_shares` is the number of share-less SURBs dropped or refused, which cost a
+    /// return path and nothing more.
+    pub evicted_shares: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

@@ -251,18 +251,36 @@ where
                 if !incoming.surbs.is_empty() {
                     let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
                     info.num_evicted_surbs = outcome.evicted;
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
 
-                    // Warn rather than trace: an overflow is silent everywhere else, and it is not a
-                    // wasted SURB but a destroyed PIX share. Without this line the only way to learn
-                    // that a buffer is overflowing is to infer it from a balancer estimate that
-                    // outgrew the store it describes, which is how it was found the first time.
+                    // The tier split costs a second lookup and a lock, so take it only if the line below is
+                    // going to be emitted.
+                    let tiers = tracing::enabled!(tracing::Level::TRACE)
+                        .then(|| self.surb_store.tier_lens(&incoming.sender))
+                        .flatten();
+                    tracing::trace!(
+                        pseudonym = %incoming.sender,
+                        num_surbs = info.num_surbs,
+                        retained = outcome.retained,
+                        retained_shares = tiers.map(|(shares, _)| shares),
+                        retained_plain = tiers.map(|(_, plain)| plain),
+                        packet_type = "final",
+                        "stored incoming surbs for pseudonym"
+                    );
+
+                    // Debug rather than warn: the store summarises overflows once per report interval and per
+                    // tier (`EvictionStats`), and that summary is what warns, on any lost PIX share and on
+                    // dropped share-less SURBs only above a threshold. A sender that bypasses the balancer gate
+                    // keeps the share-less tier full, so every one of its packets evicts SURBs although no
+                    // share is lost, and a warning here would fire for each of them. This line is for chasing
+                    // a single overflow, and `evicted_shares` is what it cost.
                     if outcome.evicted > 0 {
-                        tracing::warn!(
+                        tracing::debug!(
                             pseudonym = %incoming.sender,
                             evicted = outcome.evicted,
+                            evicted_shares = outcome.evicted_shares,
                             retained = outcome.retained,
-                            "SURB buffer full; dropped the oldest SURBs and the PIX shares they carried"
+                            "SURB buffer full; dropped SURBs to make room (share-less first; \
+                             `evicted_shares` of them carried a PIX share, which is lost)"
                         );
                     }
                 }

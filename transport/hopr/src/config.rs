@@ -12,8 +12,8 @@ use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    ASSUMED_SESSION_PACKET_RATE, DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA,
-    DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
+    MAX_ASSUMED_SESSION_PACKET_RATE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -140,6 +140,11 @@ pub struct StreamProtocolConfig {
     /// head-of-line-block delivery to other peers indefinitely: after this timeout the packet is
     /// dropped and the drain moves on. Healthy peers drain far faster than this, so the timeout is not
     /// hit in normal operation.
+    ///
+    /// It doubles as the per-peer write-pump stall timeout: if the pump makes no progress writing to
+    /// a peer's stream for this long (a remote that stopped reading parks quinn's `poll_write`
+    /// forever), the pump fails and its cache entry is evicted so the next send reopens the stream,
+    /// rather than the pump parking indefinitely and the drain serialising on it.
     ///
     /// Defaults to 2 seconds. Must be at least 1 ms — a zero value would defeat the feature.
     #[validate(custom(function = "validate_egress_backpressure_timeout"))]
@@ -302,11 +307,12 @@ fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), Vali
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
 /// `UnacceptablePixParams` errors at Session establishment time.
 ///
-/// `max_recovery_time` has to cover a whole cycle at the widest dimensions this Exit will
-/// *accept*, or it closes honest Sessions partway through one. That check is possible at all only
-/// because the quota now counts the surplus: `quota_range.end()` is the number of bytes a cycle
-/// actually puts on the wire, so the packet count follows by division with nothing left to guess.
-/// While the surplus was unpriced this needed the peer's `additional_shares`, which never travelled.
+/// `max_recovery_time` has to leave a whole cycle at the widest dimensions this Exit will *accept*
+/// time to complete, or it closes honest Sessions partway through one. With fill enabled that is
+/// judged at `fill.max_rate`, counted up to [`MAX_ASSUMED_SESSION_PACKET_RATE`]; without it, at that
+/// rate itself, so only a deadline no Session could meet is refused. The check is possible at all only because the
+/// quota counts the surplus: `quota_range.end()` prices every share a cycle emits, so the packet count follows by
+/// division with nothing left to guess.
 ///
 /// And `max_live_cycle_bytes` has to admit at least one Session at those same widest dimensions,
 /// or the Exit advertises a `quota_range` whose top it will always refuse for want of budget —
@@ -314,11 +320,13 @@ fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), Vali
 /// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
 /// number no node holds, so checking it here would only ever reject the shipping defaults.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
-    hopr_transport_session::validate_incoming_session_pix_config(cfg, ASSUMED_SESSION_PACKET_RATE).map_err(|error| {
-        let mut e = ValidationError::new("invalid incoming PIX configuration");
-        e.message = Some(error.to_string().into());
-        e
-    })
+    hopr_transport_session::validate_incoming_session_pix_config(cfg, MAX_ASSUMED_SESSION_PACKET_RATE).map_err(
+        |error| {
+            let mut e = ValidationError::new("invalid incoming PIX configuration");
+            e.message = Some(error.to_string().into());
+            e
+        },
+    )
 }
 
 /// Headroom over the profiled dimension product that [`PixGlobalConfig`] will accept.
@@ -1042,12 +1050,13 @@ pub struct SessionGlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use hopr_protocol_pix::SHARE_EMISSION_WINDOW;
-    use hopr_transport_session::{MAX_SSA_BATCH_SIZE, SupervisorConfig};
+    use hopr_transport_session::{MAX_SSA_BATCH_SIZE, PIX_QUOTA_BYTES_PER_SHARE, SupervisorConfig};
 
     use super::*;
 
-    /// The Exit computes the offered quota as `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`
+    /// The Exit computes the offered quota as `polys × (shares + surplus) × PIX_QUOTA_BYTES_PER_SHARE`
     /// and rejects the Session when neither that quota nor an allowed dynamic batch falls inside
     /// `quota_range`. The default batch ceiling is one, so an Entry running the default
     /// `PixGlobalConfig` must itself be acceptable to an Exit running the default
@@ -1062,9 +1071,8 @@ mod tests {
         let pix = PixGlobalConfig::default();
         let incoming = IncomingSessionPixConfig::default();
 
-        let quota = pix.num_ssa_parts as u64
-            * (pix.ssa_part_size + pix.surplus_shares()) as u64
-            * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+        let quota =
+            pix.num_ssa_parts as u64 * (pix.ssa_part_size + pix.surplus_shares()) as u64 * PIX_QUOTA_BYTES_PER_SHARE;
 
         assert!(
             incoming.quota_range.contains(&quota),
@@ -1075,7 +1083,7 @@ mod tests {
 
         // Both sides are derived from the same constants, so the range must be anchored exactly
         // at the nominal quota. Asserting the relationship rather than a literal keeps this test
-        // correct if `HoprPacket::PAYLOAD_SIZE` ever changes, while still failing loudly if the
+        // correct if `PIX_QUOTA_BYTES_PER_SHARE` ever changes, while still failing loudly if the
         // range or the dimensions stop being derived from a shared source.
         assert_eq!(
             quota,
@@ -1269,59 +1277,150 @@ mod tests {
         assert!(past_ceiling.validate().is_err(), "past the ceiling must be rejected");
     }
 
-    /// The hard recovery deadline must clear one whole cycle at the widest quota this Exit accepts.
-    ///
-    /// At the shipping defaults a cycle is 655 360 packets of full emission, about 61 minutes at the
-    /// documented 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped was 41
-    /// seconds short of the accepted quota and closed an honest, fully saturated Session just before
-    /// recovery, which is worth nothing since the SSA is the sum of every polynomial's constant term.
-    ///
-    /// Full emission is the right count *here* because it is what `quota_range` prices, which is
-    /// what the assertion below derives the requirement from. `SupervisorConfig::max_recovery_time`
-    /// documents the same deadline against 651 264 — where the last *useful* share lands — because
-    /// that argument is about when the cycle becomes payable rather than about what was sold.
+    /// The fill-off deadline floor is a figure in packets, so no packet or segment size can move it.
+    /// Changing it is a policy decision, and this is where that decision shows up.
     #[test]
-    fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() {
-        let cfg = IncomingSessionPixConfig::default();
-        let packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
-        let needed = Duration::from_secs(packets.div_ceil(ASSUMED_SESSION_PACKET_RATE));
-
-        assert!(
-            needed > Duration::from_secs(3600),
-            "the previous 1 h default must be demonstrably too short ({needed:?} needed), or this test proves nothing"
-        );
-        assert!(
-            cfg.supervision.max_recovery_time >= needed,
-            "default max_recovery_time ({:?}) must cover one cycle at the top of the accepted quota ({needed:?})",
-            cfg.supervision.max_recovery_time
-        );
-        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+    fn the_assumed_session_rate_is_stated_in_packets() {
+        assert_eq!(MAX_ASSUMED_SESSION_PACKET_RATE, 5000);
     }
 
-    /// And an operator who shortens it, or widens the quota past it, must be told at load time.
+    /// The default recovery deadline must leave a cycle at the widest accepted quota time to
+    /// complete, both with fill and without it.
+    ///
+    /// Full emission is the right count here because it is what `quota_range` prices.
     #[test]
-    fn a_recovery_deadline_below_one_cycle_is_rejected() {
-        let too_short = IncomingSessionPixConfig {
+    fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() -> anyhow::Result<()> {
+        let cfg = IncomingSessionPixConfig::default();
+        validate_incoming_session_pix_config(&cfg).context("the shipping default must validate")?;
+
+        let without_fill = IncomingSessionPixConfig {
             supervision: SupervisorConfig {
-                max_recovery_time: Duration::from_secs(3600),
+                fill: hopr_transport_session::PixFillConfig {
+                    enabled: false,
+                    ..cfg.supervision.fill.clone()
+                },
+                ..cfg.supervision.clone()
+            },
+            ..cfg
+        };
+        validate_incoming_session_pix_config(&without_fill)
+            .context("the shipping deadline must also clear the fill-off floor")?;
+        Ok(())
+    }
+
+    /// Without fill, a deadline is refused only when even a Session at the fastest assumed rate
+    /// could not finish a cycle of the widest accepted quota inside it.
+    #[test]
+    fn without_fill_a_deadline_below_one_cycle_at_the_assumed_rate_is_rejected() -> anyhow::Result<()> {
+        let with_deadline = |max_recovery_time: Duration| IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                max_recovery_time,
+                fill: hopr_transport_session::PixFillConfig {
+                    enabled: false,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
         };
+        let packets = *IncomingSessionPixConfig::default().quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
+        let needed = Duration::from_secs(packets.div_ceil(MAX_ASSUMED_SESSION_PACKET_RATE));
+
+        validate_incoming_session_pix_config(&with_deadline(needed))
+            .context("a deadline of exactly one cycle at the assumed rate must be accepted")?;
         assert!(
-            validate_incoming_session_pix_config(&too_short).is_err(),
-            "an hour cannot cover the 61-minute accepted quota and must be refused"
+            validate_incoming_session_pix_config(&with_deadline(needed - Duration::from_nanos(1))).is_err(),
+            "a deadline a nanosecond short of {needed:?} must be refused"
+        );
+        Ok(())
+    }
+
+    /// The fill rate a cycle of the widest default quota needs to finish inside `max_recovery_time`,
+    /// by the planner's own arithmetic at the default fractions.
+    fn default_fill_rate_needed_within(max_recovery_time: Duration) -> u64 {
+        let packets = *IncomingSessionPixConfig::default().quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
+        let fill = hopr_transport_session::PixFillConfig::default();
+        let horizon = max_recovery_time.mul_f64(fill.finish_fraction);
+        (packets as f64 * (1.0 + fill.loss_margin) / horizon.as_secs_f64()).ceil() as u64
+    }
+
+    /// The deadline below which no Session could finish a cycle of the widest default quota.
+    fn default_fill_off_floor() -> Duration {
+        let packets = *IncomingSessionPixConfig::default().quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
+        Duration::from_secs(packets.div_ceil(MAX_ASSUMED_SESSION_PACKET_RATE))
+    }
+
+    /// With fill enabled, the deadline is judged at `fill.max_rate`: it is the fill ceiling, not the
+    /// fill-off floor, that decides.
+    #[test]
+    fn with_fill_the_deadline_is_judged_at_the_fill_ceiling() -> anyhow::Result<()> {
+        let max_recovery_time = default_fill_off_floor() * 4;
+        let needed_rate = default_fill_rate_needed_within(max_recovery_time);
+        assert!(
+            needed_rate <= MAX_ASSUMED_SESSION_PACKET_RATE,
+            "test case must need no more than the assumed Session rate, needs {needed_rate}"
         );
 
-        // The other way round: the deadline is fine, the operator widened what they accept.
-        let widened = IncomingSessionPixConfig {
-            quota_range: 1..=(*IncomingSessionPixConfig::default().quota_range.end() * 4),
+        let with_ceiling = |max_rate: u64| -> anyhow::Result<IncomingSessionPixConfig> {
+            Ok(IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    max_recovery_time,
+                    fill: hopr_transport_session::PixFillConfig {
+                        max_rate: u32::try_from(max_rate)?,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+        };
+
+        validate_incoming_session_pix_config(&with_ceiling(needed_rate)?)
+            .context("a ceiling that finishes the cycle in time must be accepted")?;
+        assert!(
+            validate_incoming_session_pix_config(&with_ceiling(needed_rate - 1)?).is_err(),
+            "a ceiling one packet/s short of {needed_rate} must be refused"
+        );
+        Ok(())
+    }
+
+    /// But a fill ceiling above the fastest rate a Session is assumed to carry buys no shorter
+    /// deadline, because fill that fast could not finish a cycle any sooner.
+    #[test]
+    fn a_fill_ceiling_above_the_assumed_session_rate_buys_no_shorter_deadline() -> anyhow::Result<()> {
+        // `MAX_FILL_RATE`, the largest ceiling `validate_pix_supervision` accepts.
+        const LARGEST_LEGAL_FILL_RATE: u32 = 10_000;
+        let with_deadline = |max_recovery_time: Duration| IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                max_recovery_time,
+                fill: hopr_transport_session::PixFillConfig {
+                    max_rate: LARGEST_LEGAL_FILL_RATE,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             ..Default::default()
         };
+
+        let too_short = default_fill_off_floor();
+        let needed_rate = default_fill_rate_needed_within(too_short);
         assert!(
-            validate_incoming_session_pix_config(&widened).is_err(),
-            "accepting 4x the default quota needs a deadline raised to match"
+            needed_rate > MAX_ASSUMED_SESSION_PACKET_RATE && needed_rate <= u64::from(LARGEST_LEGAL_FILL_RATE),
+            "test case must need more than the assumed Session rate but no more than the ceiling, needs {needed_rate}"
         );
+        assert!(
+            validate_incoming_session_pix_config(&with_deadline(too_short)).is_err(),
+            "a deadline that needs {needed_rate} packets/s of fill must be refused despite the ceiling allowing it"
+        );
+
+        let long_enough = too_short * 2;
+        assert!(
+            default_fill_rate_needed_within(long_enough) <= MAX_ASSUMED_SESSION_PACKET_RATE,
+            "test case must need no more than the assumed Session rate"
+        );
+        validate_incoming_session_pix_config(&with_deadline(long_enough))
+            .context("a deadline within the assumed Session rate must be accepted")?;
+        Ok(())
     }
 
     /// The fill ceiling must clear the rate the widest accepted quota actually needs.
@@ -1329,7 +1428,7 @@ mod tests {
     /// Fill exists to complete funded cycles that the application will not, and a ceiling below the
     /// requirement is a filler that runs flat out and still strands the deposit. The failure is
     /// invisible without this check: every individual value validates, the rate gauge sits pinned at
-    /// the cap, and the only symptom is a cycle closing on `RecoveryDeadline` two hours later.
+    /// the cap, and the only symptom is a cycle closing on `RecoveryDeadline` four hours later.
     ///
     /// The floor is the planner's own arithmetic taken at the moment fill starts — the whole cycle
     /// remaining, spread over `finish_fraction` of `max_recovery_time`, plus the loss margin —
@@ -1338,7 +1437,7 @@ mod tests {
     #[test]
     fn a_fill_ceiling_below_the_widest_accepted_quota_is_rejected() {
         let cfg = IncomingSessionPixConfig::default();
-        let packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+        let packets = *cfg.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE;
         let horizon = cfg
             .supervision
             .max_recovery_time

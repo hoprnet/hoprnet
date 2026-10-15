@@ -174,7 +174,7 @@ impl EmissionProgress {
 /// At the deployed 8192 × 64 (+16) that is 27 whole windows — 552 960 shares — plus 63 full passes
 /// and 52 shares of the 64th in the 28th window, i.e. **86.8 % of the cycle**. Dividing the Exit's
 /// 0.85 by the 1.25× surplus factor gives 68 %, and admitting there would hand out the next deposit
-/// roughly 122 MiB of payload before it could possibly have been earned.
+/// roughly 171 MiB of quota before it could possibly have been earned.
 ///
 /// ## Which threshold to pass
 ///
