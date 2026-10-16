@@ -3,7 +3,7 @@
 //!
 //! Some frames arrive too late or have missing segments. Retried packets can also arrive twice.
 //! Simply logging every drop or duplicate can hide other problems. This module counts these
-//! events and logs an INFO summary.
+//! events and logs an INFO summary only when frames were dropped or could not be reassembled.
 //!
 //! A "window" is the time covered by one summary. Each counted event checks whether enough time
 //! has passed to finish the window. There is no background timer, so an idle socket waits until
@@ -39,9 +39,9 @@ pub(crate) struct FrameLossSummary {
 }
 
 impl FrameLossSummary {
-    /// Whether any frames were dropped or duplicate segments were ignored.
+    /// Whether any frames were dropped or could not be reassembled.
     pub fn has_loss(&self) -> bool {
-        self.discarded + self.not_reassembled + self.duplicates > 0
+        self.discarded > 0 || self.not_reassembled > 0
     }
 
     fn log(&self, session_id: &str) {
@@ -57,10 +57,11 @@ impl FrameLossSummary {
     }
 }
 
-/// Counts received frames and duplicate segments, and logs summaries when there are drops or duplicates.
+/// Counts received frames and duplicate segments, and logs summaries when there is frame loss.
 ///
 /// The receive stages share this report. When its last owner drops it, it logs any remaining
-/// counts if there were drops or duplicates.
+/// counts if frames were dropped or could not be reassembled. Duplicate segments alone do not
+/// indicate frame loss, but their counts are included as context in loss summaries.
 #[derive(Debug)]
 pub(crate) struct FrameLossReport {
     session_id: String,
@@ -208,6 +209,30 @@ mod tests {
             ..Default::default()
         };
         assert!(!summary.has_loss());
+    }
+
+    #[test]
+    fn duplicate_segments_do_not_indicate_frame_loss() {
+        let summary = FrameLossSummary {
+            emitted: 100,
+            duplicates: 4,
+            window: INTERVAL,
+            ..Default::default()
+        };
+        assert!(!summary.has_loss());
+    }
+
+    #[test]
+    fn discarded_or_unreassembled_frames_indicate_loss() {
+        for (discarded, not_reassembled) in [(1, 0), (0, 1)] {
+            let summary = FrameLossSummary {
+                discarded,
+                not_reassembled,
+                window: INTERVAL,
+                ..Default::default()
+            };
+            assert!(summary.has_loss());
+        }
     }
 
     #[test]
