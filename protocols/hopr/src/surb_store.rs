@@ -298,6 +298,9 @@ pub struct MemorySurbStore {
     /// First relayers we lost the connection to, with when. Their SURBs are kept but not used
     /// until they reconnect, and purged after [`SurbStoreConfig::unreachable_relayer_grace`].
     unreachable_relayers: Arc<parking_lot::RwLock<HashMap<HoprKeyIdent, Instant>>>,
+    /// Connected first relayers whose probes mostly time out. Their SURBs are used only once no
+    /// other SURB is left, so a relay that stalls without disconnecting stops carrying replies.
+    slow_relayers: Arc<parking_lot::RwLock<HashSet<HoprKeyIdent>>>,
     reporters: Arc<EvictionReporters>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -335,6 +338,7 @@ impl MemorySurbStore {
                 .build(),
             invalidated_relayers: Default::default(),
             unreachable_relayers: Default::default(),
+            slow_relayers: Default::default(),
             reporters,
             cfg: cfg.into(),
         }
@@ -365,6 +369,18 @@ impl MemorySurbStore {
         if self.unreachable_relayers.write().remove(relayer).is_some() {
             tracing::info!(%relayer, "relayer reconnected, its stored SURBs are usable again");
         }
+    }
+
+    /// Replaces the set of slow first relayers.
+    pub fn set_slow_relayers(&self, slow: HashSet<HoprKeyIdent>) {
+        let mut current = self.slow_relayers.write();
+        for relayer in slow.difference(&current) {
+            tracing::info!(%relayer, "relayer is slow, its SURBs are used only when no other is left");
+        }
+        for relayer in current.difference(&slow) {
+            tracing::info!(%relayer, "relayer is no longer slow");
+        }
+        *current = slow;
     }
 
     /// How long SURBs through a disconnected first relayer are kept before they are purged.
@@ -446,8 +462,20 @@ impl SurbStore for MemorySurbStore {
             // SURBs whose return path no longer has a usable first edge are dropped on the way,
             // rather than handed out only to have the reply fail to be paid for.
             SurbMatcher::Pseudonym(_) => {
-                surbs_for_pseudonym
-                    .pop_next_with(self.verdict_fn())
+                let slow = self.slow_relayers.read().clone();
+                let verdict = self.verdict_fn();
+                let avoiding_slow = (!slow.is_empty())
+                    .then(|| {
+                        surbs_for_pseudonym.pop_next_with(|surb| match verdict(surb) {
+                            SurbVerdict::Use if surb_is_relayed(surb) && slow.contains(&surb.first_relayer) => {
+                                SurbVerdict::Keep
+                            }
+                            other => other,
+                        })
+                    })
+                    .flatten();
+                avoiding_slow
+                    .or_else(|| surbs_for_pseudonym.pop_next_with(verdict))
                     .map(|popped_surb| FoundSurb {
                         sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
                         surb: popped_surb.surb,
@@ -908,6 +936,36 @@ mod tests {
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
             .ok_or(anyhow::anyhow!("expected the SURB back after reconnect"))?;
         assert_eq!([1u8; 8], found.sender_id.surb_id());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_use_surbs_through_a_slow_relayer_only_when_no_other_is_left() -> anyhow::Result<()> {
+        let (slow, fast) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(slow, TWO_HOP)?),
+                ([2u8; 8], surb_via(fast, TWO_HOP)?),
+                ([3u8; 8], surb_via(slow, TWO_HOP)?),
+            ],
+        );
+
+        store.set_slow_relayers(HashSet::from([slow]));
+        let popped = (0..3)
+            .filter_map(|_| store.find_surb(SurbMatcher::Pseudonym(pseudonym)))
+            .map(|found| found.sender_id.surb_id())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            3,
+            popped.len(),
+            "a slow relayer's SURBs are still used once nothing else is left"
+        );
+        assert_eq!([2u8; 8], popped[0], "the SURB via the fast relayer must go first");
 
         Ok(())
     }
