@@ -421,6 +421,42 @@ async fn put_if_unchanged(
     matches!(written, moka::ops::compute::CompResult::ReplacedWith(_))
 }
 
+/// Rebuilds every cached multi-hop entry from the current graph, one pass of the background sweep.
+async fn sweep_cache<R, S>(
+    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    resolver: &R,
+    selector: &S,
+    weighting: WeightingParams,
+    me: OffchainPublicKey,
+) where
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
+    S: PathSelector,
+{
+    for (key, swept) in cache.iter() {
+        let (src_key, dest_key, hops_u32) = *key.as_ref();
+        if hops_u32 == 0 {
+            continue;
+        }
+
+        if let Ok(Some(weighted)) = rebuild_candidates(
+            resolver,
+            selector,
+            weighting,
+            me,
+            src_key,
+            dest_key,
+            hops_u32 as usize,
+            "background-refresh",
+        )
+        .await
+        {
+            // Only if this is still the entry the sweep read: a `recompute_paths_from` that ran
+            // during the rebuild built from newer evidence, and its route must not be overwritten.
+            put_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
+        }
+    }
+}
+
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
@@ -594,6 +630,12 @@ where
             })
             .await
             .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Runs one background sweep now: called when a neighbour disconnects, so cached paths stop
+    /// drawing it immediately instead of up to [`PathPlannerConfig::refresh_period`] later.
+    pub async fn refresh_cached_paths(&self) {
+        sweep_cache(&self.cache, &*self.resolver, &*self.selector, self.weighting, self.me).await
     }
 
     /// Rebuilds every cached entry whose paths originate at `source`, replacing each in place.
@@ -875,38 +917,7 @@ where
             let selector = selector.clone();
             let weighting = weighting;
 
-            async move {
-                for (key, swept) in cache.iter() {
-                    let (src_key, dest_key, hops_u32) = {
-                        let k = key.as_ref();
-                        (k.0, k.1, k.2)
-                    };
-
-                    if hops_u32 == 0 {
-                        continue;
-                    }
-
-                    // The key already holds resolved offchain keys, which is what the selector
-                    // wants -- so nothing has to be resolved again here.
-                    if let Ok(Some(weighted)) = rebuild_candidates(
-                        &*resolver,
-                        &*selector,
-                        weighting,
-                        me,
-                        src_key,
-                        dest_key,
-                        hops_u32 as usize,
-                        "background-refresh",
-                    )
-                    .await
-                    {
-                        // Only if this is still the entry the sweep read: a `recompute_paths_from`
-                        // that ran during the rebuild built from newer evidence, and its route must
-                        // not be overwritten by this older selection.
-                        put_if_unchanged(&cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
-                    }
-                }
-            }
+            async move { sweep_cache(&cache, &*resolver, &*selector, weighting, me).await }
         })
     }
 }
@@ -1917,6 +1928,39 @@ mod tests {
         assert!(
             Arc::ptr_eq(&current, &recomputed),
             "the recomputed route is the one still served"
+        );
+        Ok(())
+    }
+
+    /// A neighbour that disconnects must stop being drawn as soon as the cache is refreshed, not
+    /// up to a refresh period later.
+    #[tokio::test]
+    async fn refreshing_after_a_disconnect_should_drop_the_lost_relayer() -> anyhow::Result<()> {
+        use hopr_api::graph::traits::EdgeWeightType;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+
+        let before = fill_return_cache(&planner).await;
+        assert!(
+            share_of(&before, &b) > 0.0,
+            "vacuity guard: B must be a candidate first"
+        );
+
+        for (src, dst) in [(me, b), (b, me)] {
+            graph.upsert_edge(&src, &dst, |obs| obs.record(EdgeWeightType::Connected(false)));
+        }
+        planner.refresh_cached_paths().await;
+
+        let after = planner
+            .cache
+            .get(&(dest, me, 1))
+            .await
+            .context("the entry is still cached")?;
+        assert_eq!(0.0, share_of(&after, &b), "the disconnected relayer must not be drawn");
+        assert!(
+            share_of(&after, &pubkey(&SECRET_A)) > 0.0,
+            "the connected relayer must remain"
         );
         Ok(())
     }
