@@ -151,6 +151,8 @@ impl Drop for FrameLossReport {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
+
     use super::*;
 
     const INTERVAL: Duration = Duration::from_secs(30);
@@ -166,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_a_window_returns_and_resets_its_counts() {
+    fn closing_a_window_returns_and_resets_its_counts() -> anyhow::Result<()> {
         let report = FrameLossReport::new("test", INTERVAL);
         report.emitted.fetch_add(10, Ordering::Relaxed);
         report.discarded.fetch_add(2, Ordering::Relaxed);
@@ -176,7 +178,7 @@ mod tests {
         let start = *report.window_start.lock();
         let summary = report
             .close_window_if_due(start + INTERVAL)
-            .expect("window must close at the interval");
+            .context("window must close at the interval")?;
 
         assert_eq!(
             summary,
@@ -194,11 +196,12 @@ mod tests {
         assert_eq!(*report.window_start.lock(), start + INTERVAL);
         let next = report
             .close_window_if_due(start + 2 * INTERVAL)
-            .expect("second window must close");
+            .context("second window must close")?;
         assert_eq!(
             next.emitted + next.discarded + next.not_reassembled + next.duplicates,
             0
         );
+        Ok(())
     }
 
     #[test]
