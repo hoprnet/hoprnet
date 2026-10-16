@@ -32,6 +32,8 @@ pub enum SurbVerdict {
     /// Skip it but keep it: its first relayer may come back.
     Keep,
     Drop,
+    /// Remove a set-aside SURB whose grace ran out; it was already reported when set aside.
+    Expire,
 }
 
 fn validate_pseudonyms_lifetime(lifetime: &Duration) -> Result<(), ValidationError> {
@@ -347,7 +349,14 @@ impl MemorySurbStore {
     pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) {
         if let std::collections::hash_map::Entry::Vacant(e) = self.unreachable_relayers.write().entry(*relayer) {
             e.insert(Instant::now());
-            tracing::info!(%relayer, "setting aside stored SURBs whose return path starts with this disconnected relayer");
+            // Reported now rather than at the purge, so the counterparty's estimate stops counting
+            // them while they are unusable; a reconnect leaves it low, which only means more SURBs.
+            let set_aside: usize = self
+                .surbs_per_pseudonym
+                .iter()
+                .map(|(_, rb)| rb.report_matching(|surb| surb.first_relayer == *relayer && surb_is_relayed(surb)))
+                .sum();
+            tracing::info!(%relayer, set_aside, "setting aside stored SURBs whose return path starts with this disconnected relayer");
         }
     }
 
@@ -382,6 +391,10 @@ impl MemorySurbStore {
     }
 }
 
+fn surb_is_relayed(surb: &HoprSurb) -> bool {
+    surb.additional_data_receiver.proof_of_relay_values().chain_length() > 1
+}
+
 /// Whether a stored SURB can be used to reply: its first relayer must be payable and connected.
 ///
 /// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
@@ -409,7 +422,7 @@ fn surb_verdict(
             SurbVerdict::Drop
         }
         _ => match unreachable.get(&surb.first_relayer) {
-            Some(since) if since.elapsed() >= grace => SurbVerdict::Drop,
+            Some(since) if since.elapsed() >= grace => SurbVerdict::Expire,
             Some(_) => SurbVerdict::Keep,
             None => SurbVerdict::Use,
         },
@@ -459,11 +472,24 @@ impl SurbStore for MemorySurbStore {
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
-        self.surbs_per_pseudonym
+        // Arrivals through a relayer we cannot reach are stored but unusable: report them at once.
+        let unusable = if self.unreachable_relayers.read().is_empty() {
+            0
+        } else {
+            let verdict = self.verdict_fn();
+            surbs
+                .iter()
+                .filter(|(_, surb)| verdict(surb) == SurbVerdict::Keep)
+                .count()
+        };
+        let mut outcome = self
+            .surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
             .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY), self.cfg.pop_order))
             .value()
-            .push(surbs)
+            .push(surbs);
+        outcome.evicted += unusable;
+        outcome
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
@@ -617,6 +643,9 @@ impl<S> SurbRingBuffer<S> {
                     rb.remove(idx);
                     self.dropped.fetch_add(1, Ordering::Relaxed);
                 }
+                SurbVerdict::Expire => {
+                    rb.remove(idx);
+                }
             }
         }
         None
@@ -659,10 +688,27 @@ impl<S> SurbRingBuffer<S> {
     {
         let mut rb = self.surbs.lock();
         let before = rb.len();
-        rb.retain(|(_, surb)| verdict(surb) != SurbVerdict::Drop);
-        let purged = before - rb.len();
-        self.dropped.fetch_add(purged, Ordering::Relaxed);
-        purged
+        let mut reported = 0;
+        rb.retain(|(_, surb)| match verdict(surb) {
+            SurbVerdict::Drop => {
+                reported += 1;
+                false
+            }
+            SurbVerdict::Expire => false,
+            SurbVerdict::Use | SurbVerdict::Keep => true,
+        });
+        self.dropped.fetch_add(reported, Ordering::Relaxed);
+        before - rb.len()
+    }
+
+    /// Reports every held SURB matching `pred` as dropped on the next push, without removing it.
+    pub fn report_matching<F>(&self, pred: F) -> usize
+    where
+        F: Fn(&S) -> bool,
+    {
+        let count = self.surbs.lock().iter().filter(|(_, surb)| pred(surb)).count();
+        self.dropped.fetch_add(count, Ordering::Relaxed);
+        count
     }
 
     /// Pops the next SURB (in the buffer's [`SurbPopOrder`]) only if it has the given ID.
@@ -881,18 +927,30 @@ mod tests {
             ],
         );
 
+        store.mark_relayer_unreachable(&gone);
+        let outcome = store.insert_surbs(pseudonym, vec![([4u8; 8], surb_via(alive, TWO_HOP)?)]);
+        assert_eq!(
+            2, outcome.evicted,
+            "set-aside SURBs must reach the level estimate at once"
+        );
+        assert_eq!(4, outcome.retained, "and stay stored until the grace runs out");
+
         let since = Instant::now()
             .checked_sub(store.unreachable_relayer_grace())
             .ok_or(anyhow::anyhow!("clock too young for the fixture"))?;
         store.unreachable_relayers.write().insert(gone, since);
 
         assert_eq!(2, store.purge_unusable_surbs());
-        let outcome = store.insert_surbs(pseudonym, vec![([4u8; 8], surb_via(alive, TWO_HOP)?)]);
+        let outcome = store.insert_surbs(pseudonym, vec![([5u8; 8], surb_via(alive, TWO_HOP)?)]);
+        assert_eq!(0, outcome.evicted, "a purge must not report the same SURBs twice");
+        assert_eq!(3, outcome.retained);
+
+        store.unreachable_relayers.write().insert(gone, Instant::now());
+        let outcome = store.insert_surbs(pseudonym, vec![([6u8; 8], surb_via(gone, TWO_HOP)?)]);
         assert_eq!(
-            2, outcome.evicted,
-            "purged SURBs must reach the level estimate as evicted"
+            1, outcome.evicted,
+            "an arrival through an unreachable relayer is reported at once"
         );
-        assert_eq!(2, outcome.retained);
 
         Ok(())
     }

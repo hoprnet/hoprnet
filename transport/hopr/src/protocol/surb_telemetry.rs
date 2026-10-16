@@ -255,8 +255,8 @@ impl SurbRoundTripRegistry {
             }
 
             if expected < MIN_EXPECTED_FOR_SILENCE {
-                // Too little went out to conclude anything. An idle pair is not a failing one.
-                state.runs = 0;
+                // Too little went out to conclude anything either way: hold the run. SURB minting is
+                // bursty, so resetting here meant five *consecutive* busy flushes were never seen.
                 continue;
             }
 
@@ -1402,6 +1402,31 @@ mod tests {
             deliver(&registry, heartbeat(), destination);
             assert!(flush(&registry).is_empty());
         }
+        let _ = (graph, me);
+    }
+
+    #[test]
+    fn quiet_flushes_between_silent_ones_should_not_reset_the_run() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = registry_at_slot_zero();
+        let paths = legs();
+
+        deliver(&registry, paths, destination);
+        assert!(flush(&registry).is_empty());
+
+        // Bursty minting: every silent busy flush is followed by one that minted too little to judge.
+        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            assert!(flush(&registry).is_empty());
+            registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE - 1, destination);
+            deliver(&registry, heartbeat(), destination);
+            assert!(flush(&registry).is_empty());
+        }
+        mint_only(&registry, paths, destination);
+        deliver(&registry, heartbeat(), destination);
+        assert_eq!(vec![destination], flush(&registry));
         let _ = (graph, me);
     }
 
