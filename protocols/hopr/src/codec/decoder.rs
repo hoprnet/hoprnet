@@ -245,6 +245,18 @@ where
                     packet_signals: incoming.signals,
                     num_surbs: incoming.surbs.len(),
                     num_evicted_surbs: 0,
+                    // Taken before the SURBs move into the store. A malformed chain length of 0
+                    // saturates to a direct return path, the reading that refuses rather than admits.
+                    min_return_path_hops: incoming
+                        .surbs
+                        .iter()
+                        .map(|(_, surb)| {
+                            surb.additional_data_receiver
+                                .proof_of_relay_values()
+                                .chain_length()
+                                .saturating_sub(1)
+                        })
+                        .min(),
                 };
 
                 // Store all incoming SURBs if any

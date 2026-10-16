@@ -442,9 +442,11 @@ pub(crate) fn into_completed_share<S: PixSpec>(
 ///
 /// What the per-coefficient commitments did buy was fault *isolation*: one bad share could be
 /// rejected on arrival and its slot refilled from the surplus. That is given up. A share that
-/// fails to reconstruct implies a dishonest or broken Entry — it travels inside a
-/// Sphinx-authenticated SURB, and its decryption key is fixed by the very acknowledgement
-/// challenge it is filed under, so there is no benign path to a corrupt one — and such an Entry
+/// fails to reconstruct implies a dishonest or broken Entry. The forward payload carrying its SURB
+/// has no MAC, but every hop applies a wide-block PRP to it, so tampering in transit randomises the
+/// whole SURB, acknowledgement challenge included. The share is decrypted only with an
+/// acknowledgement that opens the challenge it is filed under, so a garbled SURB is a *lost* share,
+/// never a decryptable corrupt one, and there is no benign path to the latter. Such an Entry
 /// has already funded the deposit it thereby forfeits. The price paid is detection latency:
 /// a dishonest Entry is caught on the `threshold`-th share of a polynomial rather than the first.
 ///

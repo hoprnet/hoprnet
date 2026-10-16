@@ -1714,7 +1714,10 @@ type SessionNotifiers = (
 // Sink for processing Start protocol messages.
 // Must be within Arc to be shared across SessionManager clones.
 // The inner OnceLock is set once in `start()` and read in `dispatch_message`.
-type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol)>>>>;
+// The packet info travels along because a Start message cannot always be judged by its content alone:
+// see `refuse_pix_over_direct_return_path`.
+type StartProtocolMsgSink =
+    Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol, IncomingPacketInfo)>>>>;
 
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
 #[derive(Clone)]
@@ -2562,12 +2565,24 @@ where
             "session_start_protocol_processor",
             start_protocol_rx.into_stream().for_each_concurrent(
                 Some(self.cfg.maximum_sessions + 10),
-                move |(pseudonym, protocol_msg)| {
+                move |(pseudonym, protocol_msg, packet_info)| {
                     let myself = myself.clone();
                     async move {
                         let result = match protocol_msg {
                             HoprStartProtocol::StartSession(session_req) => {
-                                myself.handle_incoming_session_initiation(pseudonym, session_req).await
+                                match myself
+                                    .refuse_pix_over_direct_return_path(
+                                        pseudonym,
+                                        &session_req,
+                                        packet_info.min_return_path_hops,
+                                    )
+                                    .await
+                                {
+                                    Ok(false) => {
+                                        myself.handle_incoming_session_initiation(pseudonym, session_req).await
+                                    }
+                                    refused => refused.map(|_| ()),
+                                }
                             }
                             HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
                             HoprStartProtocol::SessionError(error_type) => {
@@ -4218,7 +4233,11 @@ where
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 start_protocol_tx
-                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
+                    .try_send((
+                        pseudonym,
+                        HoprStartProtocol::try_from(in_data.data)?,
+                        in_data.packet_info,
+                    ))
                     .map_err(|error| {
                         error!(%error, "failed to send Start protocol message to processing task");
                         SessionManagerError::other(error)
@@ -4537,6 +4556,55 @@ where
             // which are not going to be used.
             Some((DEFAULT_PIX_PARAMS, 1))
         }
+    }
+
+    /// Refuses a PIX offer whose initiation packet carried a SURB with a direct (0-hop) return path.
+    ///
+    /// A PIX share is decrypted with the acknowledgement of the return path's first relayer, and a
+    /// direct return path has none, so the Entry mints such SURBs share-less and the Session could never
+    /// make PIX progress (RFC-0012, Appendix 2). A conforming Entry refuses to offer PIX over one in
+    /// `new_session`; without this check, a non-conforming one would be served until the commitment
+    /// deadline closed the Session as `CommitmentTimeout`, a reason that names the clock rather than
+    /// the fault.
+    ///
+    /// The hop count is the SURB creator's word (its declared Proof-of-Relay chain length), so this
+    /// turns a misconfigured Entry away early rather than bounding a malicious one — the egress gate
+    /// does that. Only the initiation packet is inspected: a conforming Entry keeps its return-path
+    /// hop count for the lifetime of the Session.
+    ///
+    /// Returns `true` if the offer was refused and a `SessionError` was sent.
+    async fn refuse_pix_over_direct_return_path(
+        &self,
+        pseudonym: HoprPseudonym,
+        session_req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        min_return_path_hops: Option<u8>,
+    ) -> errors::Result<bool> {
+        if !session_req.capabilities.0.contains(Capability::UsePIX) || min_return_path_hops != Some(0) {
+            return Ok(false);
+        }
+
+        error!(
+            challenge = session_req.challenge,
+            "client offered PIX over a direct return path"
+        );
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let reason = StartErrorReason::UnacceptablePixParams;
+        let data = HoprStartProtocol::SessionError(StartErrorType {
+            identifier: ErrorIdentifier::Challenge(session_req.challenge),
+            reason,
+        });
+        PixAdmissionRejection::DirectReturnPath.record_if_pix(session_req.capabilities.0);
+        send_via_msg_sender(
+            &mut msg_sender,
+            DestinationRouting::Return(pseudonym.into()),
+            data,
+            "session error due to a PIX offer over a direct return path",
+        )
+        .await?;
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+        Ok(true)
     }
 
     #[tracing::instrument(level = "debug", skip(self, session_req))]
@@ -5338,8 +5406,9 @@ where
     /// slot would survive until the idle timeout.
     ///
     /// No new capability is handed to an attacker by closing on a refusal: an `SsaRequest` only reaches
-    /// here Sphinx-authenticated and with `pseudonym == session_id`, so only the Exit can produce one —
-    /// and the Exit can already close the Session whenever it likes.
+    /// here with `pseudonym == session_id`, and relayers never see that pseudonym — a relayer can garble
+    /// a packet in transit but not forge one for this Session — so only the Exit can produce one, and
+    /// the Exit can already close the Session whenever it likes.
     async fn refuse_ssa_request(&self, session_id: SessionId, routing: DestinationRouting) {
         self.notify_session_error(
             session_id,
@@ -9071,6 +9140,66 @@ mod tests {
         sender.close_channel();
         transport.await??;
         handler.abort();
+        Ok(())
+    }
+
+    /// A PIX offer whose initiation packet carried a direct-return SURB is refused, through the same
+    /// path a real `StartSession` takes: the hop count only reaches the check by riding along with the
+    /// message, so this is what proves it does.
+    #[test_log::test(tokio::test)]
+    async fn a_pix_offer_over_a_direct_return_path_is_refused() -> anyhow::Result<()> {
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+
+        let result = mgr.dispatch_message(
+            HoprPseudonym::random(),
+            ApplicationDataIn {
+                data: ApplicationData::try_from(HoprStartProtocol::StartSession(pix_offer()))?,
+                packet_info: IncomingPacketInfo {
+                    num_saved_surbs: 2,
+                    min_return_path_hops: Some(0),
+                    ..Default::default()
+                },
+            },
+        )?;
+        assert!(matches!(result, DispatchResult::Processed));
+
+        let err = timeout(Duration::from_secs(5), err_rx)
+            .await
+            .context("the offer was never refused")??;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0, "no slot may be created for a refusal");
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// The check refuses PIX over a direct return path and nothing else: not a relayed return path,
+    /// not a packet that carried no SURBs to judge by, and not an ordinary Session, for which a direct
+    /// return path is perfectly fine.
+    #[test_log::test(tokio::test)]
+    async fn the_direct_return_path_check_leaves_every_other_offer_alone() -> anyhow::Result<()> {
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        for (offer, min_return_path_hops) in [(pix_offer(), Some(1)), (pix_offer(), None), (no_pix_offer(), Some(0))] {
+            assert!(
+                !mgr.refuse_pix_over_direct_return_path(pseudonym, &offer, min_return_path_hops)
+                    .await?,
+                "refused {:?} over {min_return_path_hops:?} return-path hops",
+                offer.capabilities
+            );
+        }
+
+        sender.close_channel();
+        transport.await??;
+        assert!(
+            err_rx.await.is_err(),
+            "no SessionError may be sent for an offer that was let through"
+        );
         Ok(())
     }
 
