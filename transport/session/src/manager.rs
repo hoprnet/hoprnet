@@ -170,8 +170,22 @@ fn acquire_egress_permit(
     }
 }
 
-#[tracing::instrument(level = "debug", skip(session_data))]
+/// Closes an established Session.
+///
+/// Logs the counterpart of "new session established" (see [`SessionSlotGuard::commit`]): one line
+/// per Session at INFO, so its whole lifetime can be read from a production log without the
+/// per-frame detail of the socket.
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+    tracing::info!(%session_id, %reason, "session closed");
+    release_session_slot(session_id, session_data, reason);
+}
+
+/// Tears down a Session slot: stops its tasks and returns what it holds.
+///
+/// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
+/// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
+#[tracing::instrument(level = "debug", skip(session_data))]
+fn release_session_slot(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!("closing session");
 
     #[cfg(feature = "telemetry")]
@@ -1122,8 +1136,12 @@ impl<'a> SessionSlotGuard<'a> {
 
     /// Marks the session as successfully established, preventing the slot from
     /// being rolled back when this guard is dropped.
+    ///
+    /// Logs "new session established" here, on both the Entry and the Exit side, so that every
+    /// "session closed" line from [`close_session`] has a matching start line.
     fn commit(&mut self) {
         self.committed = true;
+        tracing::info!(session_id = %self.session_id, "new session established");
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -1139,7 +1157,9 @@ impl Drop for SessionSlotGuard<'_> {
             warn!(%session_id, "rolling back partially established session slot after setup failure");
             if let Some(slot) = self.sessions.remove(&session_id) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                close_session(session_id, slot, ClosureReason::Eviction);
+                // Not `close_session`: the Session was never established, so there is no
+                // "session closed" line to pair with "new session established".
+                release_session_slot(session_id, slot, ClosureReason::Eviction);
             }
         }
     }
@@ -5020,8 +5040,6 @@ where
                 .lock()
                 .insert(SessionHandles::PixActionDriver, driver);
         }
-
-        info!(%session_id, "new session established");
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_NUM_ESTABLISHED_SESSIONS.increment();
