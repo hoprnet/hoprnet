@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FrameMapEntry"],"struct":["FrameBuilder","FrameDashMap","FrameHashMap","FrameInspector"],"trait":["FrameMap","FrameMapOccupiedEntry","FrameMapVacantEntry"]};
