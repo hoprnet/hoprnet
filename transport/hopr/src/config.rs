@@ -26,6 +26,7 @@ const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
 const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
 const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_DISCONNECT_ESCALATION_COOLDOWN: Duration = Duration::from_secs(5);
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
@@ -48,6 +49,11 @@ fn default_frame_writer_backpressure_bytes() -> usize {
 #[inline]
 fn default_egress_backpressure_timeout() -> Duration {
     DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT
+}
+
+#[inline]
+fn default_disconnect_escalation_cooldown() -> Duration {
+    DEFAULT_DISCONNECT_ESCALATION_COOLDOWN
 }
 
 fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -151,6 +157,21 @@ pub struct StreamProtocolConfig {
     #[default(default_egress_backpressure_timeout())]
     #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
     pub egress_backpressure_timeout: Duration,
+
+    /// Cooldown period between forced peer connection terminations (disconnects)
+    /// triggered by write-pump stalls or stream-open failures.
+    ///
+    /// When a stream write stalls or opening a stream times out, the underlying connection
+    /// is actively disconnected to clean up degraded or half-open QUIC connections.
+    /// This cooldown bounds the rate of active disconnects per peer to avoid thrashing.
+    ///
+    /// Defaults to 5 seconds.
+    #[default(default_disconnect_escalation_cooldown())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_disconnect_escalation_cooldown", with = "humantime_serde")
+    )]
+    pub disconnect_escalation_cooldown: Duration,
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -2165,6 +2186,10 @@ mod tests {
         assert_eq!(
             cfg.frame_writer_backpressure_bytes,
             DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+        );
+        assert_eq!(
+            cfg.disconnect_escalation_cooldown,
+            DEFAULT_DISCONNECT_ESCALATION_COOLDOWN
         );
         cfg.validate().expect("default StreamProtocolConfig must be valid");
     }

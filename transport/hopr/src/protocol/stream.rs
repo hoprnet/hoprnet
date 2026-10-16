@@ -8,10 +8,11 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossfire::mpsc;
+use dashmap::DashMap;
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
@@ -190,6 +191,45 @@ where
     }
 }
 
+/// Cooldown-governed connection-level disconnect escalation.
+///
+/// If a peer's write pump stalls or opening a stream to it times out/fails, the underlying
+/// QUIC connection may be wedged in an unrecoverable state (e.g. broken congestion window or
+/// connection-level flow control stall). This function actively disconnects from the peer at the
+/// transport layer so that subsequent attempts establish a clean connection, while enforcing a
+/// cooldown to avoid thrashing.
+async fn escalate_disconnect<V: NetworkStreamControl + Sync>(
+    control: &V,
+    cooldowns: &DashMap<PeerId, Instant>,
+    cooldown_duration: Duration,
+    peer: PeerId,
+) {
+    let now = Instant::now();
+    let should_disconnect = match cooldowns.entry(peer) {
+        dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+            if now.duration_since(*entry.get()) >= cooldown_duration {
+                entry.insert(now);
+                true
+            } else {
+                false
+            }
+        }
+        dashmap::mapref::entry::Entry::Vacant(entry) => {
+            entry.insert(now);
+            true
+        }
+    };
+
+    if should_disconnect {
+        tracing::info!(%peer, "write stall/open timeout detected; disconnecting peer connection to force clean re-establishment");
+        if let Err(e) = control.disconnect(peer).await {
+            tracing::debug!(%peer, %e, "disconnect peer failed");
+        }
+    } else {
+        tracing::debug!(%peer, "skipping disconnect escalation due to active cooldown");
+    }
+}
+
 /// Spawn the write and read pump tasks for an open peer stream.
 ///
 /// The write pump drains `rx` into the framed stream writer; the read pump
@@ -197,7 +237,7 @@ where
 /// `cache[peer]` when they complete, but only if the cache entry still holds
 /// the same `token` — this prevents a stale task from wiping a newer sink.
 #[allow(clippy::too_many_arguments)]
-fn spawn_stream_pumps<S, C>(
+fn spawn_stream_pumps<S, C, V>(
     peer: PeerId,
     stream: S,
     rx: crossfire::AsyncRx<mpsc::Array<<C as Decoder>::Item>>,
@@ -208,17 +248,23 @@ fn spawn_stream_pumps<S, C>(
     frame_writer_backpressure_bytes: usize,
     write_stall_timeout: Duration,
     ready: Arc<AtomicBool>,
+    control: V,
+    cooldowns: Arc<DashMap<PeerId, Instant>>,
+    disconnect_cooldown: Duration,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
+    V: NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
     let cache_for_write = cache.clone();
     let cache_for_read = cache.clone();
     let token_write = token.clone();
+    let control_write = control.clone();
+    let cooldowns_write = cooldowns.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
@@ -246,12 +292,20 @@ fn spawn_stream_pumps<S, C>(
         .inspect(move |res| {
             tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
         })
-        .then(move |_| async move {
+        .then(move |res| async move {
             if cache_for_write
                 .get(&peer)
                 .is_some_and(|s| Arc::ptr_eq(&s.token, &token_write))
             {
                 cache_for_write.invalidate(&peer);
+            }
+
+            if matches!(res, Err(EgressWriteError::Stalled { .. })) {
+                tracing::warn!(
+                    %peer, ?res, component = "stream",
+                    "write pump stalled; escalating to disconnect peer connection"
+                );
+                escalate_disconnect(&control_write, &cooldowns_write, disconnect_cooldown, peer).await;
             }
         }),
     );
@@ -328,11 +382,15 @@ where
     let frame_writer_backpressure_bytes = stream_cfg.frame_writer_backpressure_bytes;
     let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
     let egress_backpressure_timeout = stream_cfg.egress_backpressure_timeout;
+    let disconnect_escalation_cooldown = stream_cfg.disconnect_escalation_cooldown;
+
+    let disconnect_cooldowns: Arc<DashMap<PeerId, Instant>> = Arc::new(DashMap::new());
 
     let open_ctx = Arc::new((control, codec, tx_in));
 
     let cache_ingress = cache_out.clone();
     let open_ctx_ingress = open_ctx.clone();
+    let disconnect_cooldowns_ingress = disconnect_cooldowns.clone();
 
     // terminated when the incoming is dropped
     let _ingress_process = hopr_utils::runtime::prelude::spawn(
@@ -342,7 +400,7 @@ where
                 let open_ctx = open_ctx_ingress.clone();
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
-                let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
+                let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
 
                 let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
                 let sink = PeerSink::new(tx);
@@ -359,6 +417,9 @@ where
                     frame_writer_backpressure_bytes,
                     egress_backpressure_timeout,
                     ready,
+                    control.clone(),
+                    disconnect_cooldowns_ingress.clone(),
+                    disconnect_escalation_cooldown,
                 );
                 cache.insert(peer, sink);
 
@@ -395,6 +456,7 @@ where
                 let cache2 = cache_out.clone();
                 let open_ctx2 = open_ctx.clone();
                 let open_count2 = open_task_count.clone();
+                let cooldowns2 = disconnect_cooldowns.clone();
                 cache_out.get_with(peer, move || {
                     let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
                     let sink = PeerSink::new(tx);
@@ -433,6 +495,9 @@ where
                                         frame_writer_backpressure_bytes,
                                         egress_backpressure_timeout,
                                         ready,
+                                        control.clone(),
+                                        cooldowns2.clone(),
+                                        disconnect_escalation_cooldown,
                                     );
                                 }
                                 Err(error) => {
@@ -443,6 +508,13 @@ where
                                     if cache2.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
                                         cache2.invalidate(&peer);
                                     }
+                                    escalate_disconnect(
+                                        control,
+                                        &cooldowns2,
+                                        disconnect_escalation_cooldown,
+                                        peer,
+                                    )
+                                    .await;
                                 }
                             }
                         });
@@ -1650,6 +1722,171 @@ mod tests {
              regression to drop-newest on a full open channel would lose the overflow (wrote {} bytes, need >= \
              {min_delivered})",
             io.written()
+        );
+
+        Ok(())
+    }
+
+    #[derive(Clone, Default, Debug)]
+    struct DisconnectRecordingControl {
+        open_calls: Arc<AtomicUsize>,
+        disconnect_calls: Arc<AtomicUsize>,
+        disconnected_peers: Arc<Mutex<Vec<PeerId>>>,
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for DisconnectRecordingControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, StalledWriteIo)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(StalledWriteIo)
+        }
+
+        async fn disconnect(&self, peer: PeerId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            self.disconnect_calls.fetch_add(1, Ordering::Relaxed);
+            self.disconnected_peers.lock().push(peer);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn stalled_write_pump_should_escalate_to_disconnect() -> anyhow::Result<()> {
+        const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
+
+        let control = DisconnectRecordingControl::default();
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 4,
+                frame_writer_backpressure_bytes: 1,
+                egress_backpressure_timeout: STALL_TIMEOUT,
+                disconnect_escalation_cooldown: std::time::Duration::from_millis(50),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"data"[..]);
+
+        tx_out.send((peer, msg.clone())).await.context("first send")?;
+        assert!(
+            wait_for(2, || control.open_calls.load(Ordering::Relaxed) >= 1).await,
+            "stream was never opened"
+        );
+
+        // The stream is opened with StalledWriteIo, which never writes or flushes.
+        // Once STALL_TIMEOUT elapses, the write pump must stall and escalate to disconnect.
+        assert!(
+            wait_for(2, || control.disconnect_calls.load(Ordering::Relaxed) >= 1).await,
+            "stalled write pump did not escalate to disconnect"
+        );
+        assert_eq!(
+            *control.disconnected_peers.lock(),
+            vec![peer],
+            "disconnect must be called for the stalled peer"
+        );
+
+        Ok(())
+    }
+
+    #[derive(Clone, Default, Debug)]
+    struct FailingOpenControl {
+        disconnect_calls: Arc<AtomicUsize>,
+        disconnected_peers: Arc<Mutex<Vec<PeerId>>>,
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for FailingOpenControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, StalledWriteIo)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            Err::<StalledWriteIo, _>(std::io::Error::other("connection dead"))
+        }
+
+        async fn disconnect(&self, peer: PeerId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            self.disconnect_calls.fetch_add(1, Ordering::Relaxed);
+            self.disconnected_peers.lock().push(peer);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_stream_open_should_escalate_to_disconnect() -> anyhow::Result<()> {
+        let control = FailingOpenControl::default();
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 4,
+                stream_open_timeout: std::time::Duration::from_millis(100),
+                disconnect_escalation_cooldown: std::time::Duration::from_millis(50),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"data"[..]);
+
+        tx_out.send((peer, msg.clone())).await.context("send")?;
+
+        assert!(
+            wait_for(2, || control.disconnect_calls.load(Ordering::Relaxed) >= 1).await,
+            "failed stream open did not escalate to disconnect"
+        );
+        assert_eq!(*control.disconnected_peers.lock(), vec![peer]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn disconnect_escalation_respects_cooldown() -> anyhow::Result<()> {
+        let control = FailingOpenControl::default();
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 4,
+                stream_open_timeout: std::time::Duration::from_millis(50),
+                disconnect_escalation_cooldown: std::time::Duration::from_secs(10),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"data"[..]);
+
+        // Send first message
+        tx_out.send((peer, msg.clone())).await.context("first send")?;
+        assert!(
+            wait_for(2, || control.disconnect_calls.load(Ordering::Relaxed) == 1).await,
+            "first disconnect must occur"
+        );
+
+        // Sleep briefly and send again
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let _ = tx_out.send((peer, msg.clone())).await;
+
+        // Verify disconnect was not called a second time due to active 10s cooldown
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(
+            control.disconnect_calls.load(Ordering::Relaxed),
+            1,
+            "cooldown must prevent second disconnect"
         );
 
         Ok(())

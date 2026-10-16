@@ -231,3 +231,8 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+[patch.crates-io]
+hopr-api = { path = "../hopr-api" }
+hopr-transport-p2p = { path = "../hopr-impls/transport/p2p" }
+libp2p-quic = { path = "../hopr-impls/patches/libp2p-quic" }
