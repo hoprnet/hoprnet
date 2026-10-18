@@ -496,7 +496,7 @@ enum Deferral {
 
 /// Cap on deferred acknowledgements held for a single polynomial.
 ///
-/// A conforming Entry emits `threshold + surplus` shares per polynomial — 96 at the default
+/// A conforming Entry emits `threshold + surplus` shares per polynomial — 111 at the default
 /// dimensions — across all return paths combined, so at the defaults this cannot be reached without
 /// the peer exceeding its own share budget. Anything above the cap is dropped rather than buffered.
 ///
@@ -509,8 +509,9 @@ enum Deferral {
 /// arriving *before* the cycle's commitments install are deferred at all — a prefix, not the whole
 /// emission — so `shares_per_poly + surplus_shares <= MAX_DEFERRED_ACKS_PER_POLYNOMIAL` is a
 /// sufficient condition for "no acknowledgement is ever dropped for want of room", not a necessary
-/// one for the dimensions to work. Enforcing it would reject legitimate re-splits: `4096 x 128` holds
-/// the profiled product exactly and sums to 160. The shipping defaults sum to 96 and are asserted to
+/// one for the dimensions to work. Enforcing it would reject legitimate re-splits: `1024 x 128` holds
+/// the profiled product exactly and, with the surplus derived for it, sums to 333. The shipping
+/// defaults sum to 111 and are asserted to
 /// stay under the cap in `hopr-transport`'s config tests; wider dimensions lose the guarantee and
 /// fall back on the deferral window being short.
 ///
@@ -1083,7 +1084,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             //
             // Reported rather than swallowed, even though it advances nothing. Polynomials in an
             // emission window run in lockstep, so they reach `threshold` together and then take their
-            // surplus together — `surplus × window` consecutive shares, 4096 at the deployed
+            // surplus together — `surplus × window` consecutive shares, 20 224 at the deployed
             // dimensions, none of them useful. A consumer that only ever hears about useful shares
             // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
             // moves, `useful_shares` does not.
@@ -1728,8 +1729,8 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     /// `surplus_shares` is deliberate rather than an oversight — worth stating, because the surplus
     /// does reach `SsaPartBuilder::max_credited_surplus` and so does size how much post-reconstruction
     /// traffic one completed polynomial may credit as liveness. `try_new` accepts the whole `u8`
-    /// range for it on purpose: the surplus is a *wire* value, `surplus_must_not_exceed_threshold`
-    /// bounds only what this node will locally configure, and an extravagant surplus is caught where
+    /// range for it on purpose: the surplus is a *wire* value, local configuration no longer bounds it
+    /// any tighter either (see `SsaGeneratorConfig`), and an extravagant surplus is caught where
     /// it costs the peer something — the Exit's `quota_range`, which prices `polys × (threshold +
     /// surplus)` and so rises with it. A peer declaring a surplus of 255 against a threshold of 2 is
     /// asking to be charged 128× and is refused unless the operator configured a range that admits
@@ -3379,7 +3380,7 @@ mod tests {
     ///
     /// This is the distinction the Exit's egress gate and recovery-idle deadline turn on. A conforming
     /// Entry emits `threshold + surplus` shares per polynomial, and a whole emission window reaches its
-    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 4096 packets
+    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 20 224 packets
     /// at the deployed dimensions. A consumer told only about *useful* shares reads that run as the
     /// Entry having gone quiet, and if it answers by withholding service it removes the only thing that
     /// could have produced the next useful share.
@@ -3485,10 +3486,10 @@ mod tests {
     #[test]
     fn a_polynomial_credits_no_more_surplus_than_was_negotiated() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        // Threshold and emitted surplus are equal because that is the largest over-emission
-        // `SsaGeneratorConfig` will construct: `surplus_must_not_exceed_threshold` bounds the
-        // surplus by the threshold, so expressing "emits four where it negotiated one" needs a
-        // threshold of at least four.
+        // Threshold and emitted surplus are equal only because that was once the largest
+        // over-emission `SsaGeneratorConfig` would construct, under a `surplus <= threshold` bound
+        // that has since been removed. Nothing here depends on the equality: any emitted surplus
+        // above the declared one expresses "emits four where it negotiated one".
         const THRESHOLD: u8 = 4;
         const DECLARED_SURPLUS: u8 = 1;
         const EMITTED_SURPLUS: u8 = 4;

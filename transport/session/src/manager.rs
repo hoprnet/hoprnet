@@ -312,7 +312,7 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 /// operator-settable `quota_range` feeding an unclamped derivation is an allocation with no upper
 /// bound — at `quota_range.end() = 1e13` it asks for 77 GB. Over-provisioning is still the safe
 /// direction within the clamp, and the surviving margin is large: the default dimensions burst
-/// ≈ 320 messages against a capacity term of ≈ 648.
+/// ≈ 160 messages against a capacity term of ≈ 648.
 ///
 /// The batch factor is bounded by [`MAX_SSA_BATCH_SIZE`] for the same allocation reason, and is
 /// clamped here rather than being taken on trust from the config, so that callers which build a
@@ -1227,10 +1227,10 @@ pub struct IncomingSessionPixConfig {
     /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
     /// PIX_QUOTA_BYTES_PER_SHARE` — so this bounds the traffic actually served rather than the
     /// fraction of it the threshold accounts for. It used to bound only the latter, which understated
-    /// the exposure by the surplus factor: 1.25× at the deployed dimensions.
+    /// the exposure by the surplus factor: 3.47× at the deployed dimensions.
     ///
     /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
-    /// (≈ 227 MiB to ≈ 908 MiB, inclusive).
+    /// (≈ 157 MiB to ≈ 630 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Ceiling on the live Exit-side reconstructor state this node will commit to, in bytes.
@@ -1249,10 +1249,12 @@ pub struct IncomingSessionPixConfig {
     /// only ever reject the shipping defaults. Counting what has actually been committed to is
     /// indifferent to how the ceiling was configured.
     ///
-    /// Default is 3 GiB. Derived from the deployed operating point rather than picked: at the
-    /// default dimensions a Session reserves ≈82 MiB, so this admits ≈37 concurrent PIX Sessions,
-    /// comfortably covering the 10–30 clients per Exit the calibration profile models. The same
-    /// defaults with `maximum_sessions = 100` and no budget imply ≈8 GiB.
+    /// Default is 3 GiB. At the default dimensions a Session reserves ≈29.6 MiB, so this admits ≈103
+    /// concurrent PIX Sessions, comfortably covering the 10–30 clients per Exit the calibration
+    /// profile models. That is just past the 100 Sessions a node manages by default
+    /// (`maximum_managed_sessions`), which at these dimensions reserve ≈2.9 GiB — so with every
+    /// default in place the Session limit is reached first, and this budget is what binds once peers
+    /// offer a costlier split of the same quota or that limit is raised.
     ///
     /// A ceiling on *reservations*, not an allocation: nothing is claimed up front, and because the
     /// reservation is denominated at the adversarial peak, a node serving conforming peers holds an
@@ -1937,7 +1939,7 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈227 MiB–908 MiB). Dynamic admission checks
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default ≈157 MiB–630 MiB). Dynamic admission checks
 ///   the smallest `batch_size × quota_per_ssa` up to the configured maximum; fixed admission checks the per-SSA quota
 ///   itself and retains the configured exact batch.
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
@@ -1982,10 +1984,11 @@ impl PixToolbox {
 /// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signaling that
 /// funds can be deposited at the computed address.
 ///
-/// "One or more" is hundreds at the deployed dimensions — one commitment per polynomial, chunked to
-/// packet size — and the Exit can use *none* of it until every message has landed, since the SSA
-/// commitment is the sum of them all. A single lost packet therefore used to cost the whole Session
-/// on `max_ssa_delivery_time`, typically after the Entry had already been told to fund the address.
+/// "One or more" is well over a hundred at the deployed dimensions — one commitment per polynomial,
+/// chunked to packet size — and the Exit can use *none* of it until every message has landed, since
+/// the SSA commitment is the sum of them all. A single lost packet therefore used to cost the whole
+/// Session on `max_ssa_delivery_time`, typically after the Entry had already been told to fund the
+/// address.
 ///
 /// So a partially delivered commitment is repaired rather than waited out. Each arriving message
 /// reports `SessionPixEvent::CommitmentProgress`, which arms (and re-arms) the supervisor's
@@ -5620,14 +5623,14 @@ where
         // reached the last committed cycle — which, with the window clamped to one cycle, means every
         // earlier one is exhausted — *and* it must be far enough into that cycle. Checking only the
         // index admitted a successor batch on the last cycle's very first share, i.e. ~0 % of the way
-        // through the batch rather than the ~86 % at which a conforming Exit asks. That is nearly a
+        // through the batch rather than the ~83 % at which a conforming Exit asks. That is nearly a
         // whole cycle of unearned deposits, on a gate whose entire purpose is to prevent them.
         //
         // The boundary is derived rather than guessed — see `min_emission_for_early_recovery`, which
         // accounts for the Exit counting *polynomials* and for emission running in lockstep windows
         // that spend their whole surplus before the next window starts. A flat fraction of the cycle
-        // gets this badly wrong in the unsafe direction: 0.85/1.5 is 57 %, against a true boundary of
-        // 86.4 % at the deployed dimensions.
+        // gets this badly wrong in the unsafe direction: 0.85 over the 3.47× surplus factor is 24.5 %,
+        // against a true boundary of 83.0 % at the deployed dimensions.
         //
         // Being early is refused rather than fatal, and deliberately not via `refuse_ssa_request`,
         // which closes the Session: that message is dropped and the Session left running. A correct
@@ -11695,9 +11698,9 @@ mod tests {
     ///
     /// Recovery is counted in completed polynomials, while emission is windowed. Every fully drained
     /// window before the one containing the 85% boundary has already emitted both threshold and
-    /// surplus shares. Dividing 85% by the global 1.25x surplus factor therefore underestimates the
-    /// boundary: at the deployed dimensions the first possible early signal is about 87% through
-    /// emission, not 68%.
+    /// surplus shares. Dividing 85% by the global 3.47x surplus factor therefore underestimates the
+    /// boundary: at the deployed dimensions the first possible early signal is about 83% through
+    /// emission, not 24.5%.
     ///
     /// The gate compares against `min_emission_for_early_recovery` directly, so this test recomputes
     /// the boundary independently — from the same first principles, but without calling the function
@@ -12775,10 +12778,10 @@ mod tests {
     /// polynomials at threshold two — `new_ssa_commitment` returns in microseconds, so the window
     /// between reading the gate and advancing it is too narrow to hit: removing
     /// [`ssa_request_locks`](SessionManager::ssa_request_locks) leaves the outcome unchanged here.
-    /// The window is a function of that call's cost, which at the deployed 8192 x 64 is around a
-    /// second, and a fixture that large is not something to build into a unit test. So this test
-    /// guards the property and the serialisation is justified by the shape of the code rather than
-    /// by this failing without it.
+    /// The window is a function of that call's cost, which scales with `polys x threshold` — around a
+    /// second at the former 8192 x 64, so roughly a quarter of one at the deployed 4096 x 32 — and a
+    /// fixture that large is not something to build into a unit test. So this test guards the property and the
+    /// serialisation is justified by the shape of the code rather than by this failing without it.
     ///
     /// It does earn its place: it is what would catch the gate being made per-entry, the guard being
     /// taken after the gate instead of before it, or the handler gaining an await between the two.

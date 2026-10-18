@@ -188,8 +188,8 @@ pub const PIX_QUOTA_BYTES_PER_SHARE: SsaQuota = SESSION_MTU as SsaQuota;
 /// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
 /// shares (`SsaShareGenerator::next_share`), whether or not any were lost, and each share rides back
 /// on one Exit → Entry data packet — so this is exactly the traffic the Exit serves per cycle.
-/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.25× factor is a
-/// fifth of all Exit → Entry traffic.
+/// Charging the threshold alone left the surplus unpaid, which at the deployed 3.47× factor is 71 %
+/// of all Exit → Entry traffic.
 ///
 /// The surplus is insurance the Entry buys against share loss, and it is billed like insurance: on
 /// purchase, not on claim. One deposit per cycle at this rate is what makes paid-for equal served.
@@ -1003,11 +1003,8 @@ mod tests {
             "a surplus of half the threshold must cost half the threshold's quota again"
         );
 
-        // And the same, at the surplus this node actually defaults to. That is no longer
-        // `threshold / 4` — see `hopr_protocol_pix::DEFAULT_SURPLUS_SHARES` for why the deployed
-        // surplus is sized for the loss the protocol is deployed against rather than for the
-        // derived 20 % ratio, which a 4096-polynomial cycle compounds into a failure rate no return
-        // path survives.
+        // And the same, at the surplus this node actually defaults to — sized for a 50 % share loss
+        // rather than the `threshold / 4` it used to be; see `hopr_protocol_pix::default_surplus_for`.
         let deployed = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
         let deployed_factor = (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64) as f64
             / DEFAULT_PIX_SHARES_PER_POLY as f64;
@@ -1041,11 +1038,12 @@ mod tests {
                 * SESSION_MTU as u64,
             DEFAULT_PIX_SSA_QUOTA
         );
-        // `DEFAULT_PIX_SURPLUS_SHARES` is no longer `default_surplus_for(DEFAULT_PIX_SHARES_PER_POLY)`:
-        // the deployed surplus is sized for the loss the protocol is deployed against, not for the
-        // derived 20 % ratio. What has to hold is that it is the value the protocol crate exports,
-        // so the two cannot drift apart.
-        assert_eq!(DEFAULT_PIX_SURPLUS_SHARES, hopr_protocol_pix::DEFAULT_SURPLUS_SHARES);
+        // Anchored on the derivation rather than on a restatement of it: the surplus depends on both
+        // dimensions, so it is the derivation at *these* two that the quota must price.
+        assert_eq!(
+            DEFAULT_PIX_SURPLUS_SHARES,
+            hopr_protocol_pix::default_surplus_for(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY)
+        );
     }
 
     // --- ByteCapabilities tests ---

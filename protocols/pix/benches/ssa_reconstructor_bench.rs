@@ -6,7 +6,7 @@
 //! | --------------------- | ---------- |
 //! | polynomials per SSA   | 4 096 – 8 192 |
 //! | threshold             | 16 – 64 |
-//! | surplus shares        | `threshold/4`, covering 20 % share loss |
+//! | surplus shares        | sized for 50 % share loss at 99 % of cycles — 79 at 4 096 × 32 |
 //! | SSAs in flight        | 2 – 3 per Session |
 //! | per-Session rate      | 16 – 20 Mbps |
 //! | clients per Exit      | 10 – 30 |
@@ -67,10 +67,9 @@ const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 /// Surplus shares emitted per polynomial beyond the deployed threshold.
 ///
-/// The deployed value, which is *not* the derived ratio at [`PROD_THRESHOLD`] — see
-/// `hopr_protocol_pix::DEFAULT_SURPLUS_SHARES` for why. The swept groups still derive the ratio from
-/// their own threshold (see [`gen_cfg`]), since a flat count would model a different loss tolerance at
-/// every point of the sweep.
+/// The deployed value. The swept groups derive their own from each point's dimensions (see
+/// [`gen_cfg`]), since a flat count would model a different loss tolerance at every point of the
+/// sweep.
 const PROD_SURPLUS: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
 
 /// Coefficient commitments carried by one `SsaCommit` message.
@@ -192,15 +191,14 @@ fn bench_recon_cfg(use_batch_verification: bool) -> SsaReconstructorConfig {
     }
 }
 
-/// Derived from the `threshold` argument, not from [`PROD_THRESHOLD`]: this helper is called from the
-/// swept groups, where a flat [`PROD_SURPLUS`] would hold the surplus *count* fixed and so change
-/// the loss tolerance at every point of the sweep. See [`PROD_SURPLUS`] for why the ratio is the
-/// thing to keep constant.
+/// Derived from the `polys` and `threshold` arguments, not from the deployed split: this helper is
+/// called from the swept groups, where a flat [`PROD_SURPLUS`] would hold the surplus *count* fixed
+/// and so change the loss tolerance at every point of the sweep.
 fn gen_cfg(polys: u16, threshold: u8) -> SsaGeneratorConfig {
     SsaGeneratorConfig {
         threshold,
         polynomials_per_ssa: polys,
-        surplus_shares: hopr_protocol_pix::default_surplus_for(threshold),
+        surplus_shares: hopr_protocol_pix::default_surplus_for(polys, threshold),
     }
 }
 
@@ -383,13 +381,18 @@ fn whole_cycle_points() -> Vec<(u16, u8)> {
         // widths no node runs, which is how the ack fixture came to sit at 512 for so long.
         points.extend([
             (4096u16, 16u8),
-            (4096, PROD_THRESHOLD),
+            (4096, 64),
             (6144, 32),
-            (PROD_POLYS_PER_SSA, 16),
-            (PROD_POLYS_PER_SSA, 32),
-            (PROD_POLYS_PER_SSA, 48),
+            (8192, 16),
+            (8192, 32),
+            (8192, 48),
+            (8192, 64),
         ]);
     }
+    // The deployed point is one of the box's corners, and criterion panics on a repeated
+    // `BenchmarkId` within a group — before any filter applies, so `--list` included.
+    points.sort_unstable();
+    points.dedup();
     points
 }
 
@@ -419,15 +422,15 @@ fn bench_insert_coefficient_commitments(c: &mut Criterion) {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
                         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                         reconstructor
-                            // Surplus from the swept threshold, matching the generator that produced
-                            // the fixture: `PROD_SURPLUS` here would negotiate a different ratio at
+                            // Surplus from the swept point, matching the generator that produced the
+                            // fixture: `PROD_SURPLUS` here would negotiate a different tolerance at
                             // every point but the production one.
                             .new_exit_commitment(
                                 ssa_id,
                                 bench_params(
                                     polys as usize,
                                     threshold as usize,
-                                    hopr_protocol_pix::default_surplus_for(threshold),
+                                    hopr_protocol_pix::default_surplus_for(polys, threshold),
                                 ),
                             )
                             .unwrap();
@@ -595,13 +598,17 @@ fn bench_acknowledge_shares_sustained(c: &mut Criterion) {
     group.sample_size(10);
     group.throughput(Throughput::Bytes(SUSTAINED_BATCH as u64 * QUOTA_BYTES_PER_SHARE));
 
-    let widths: &[u16] = if cfg!(feature = "all-benchmarks") {
-        &[ACK_BENCH_POLYS, PROD_POLYS_PER_SSA]
-    } else {
-        &[ACK_BENCH_POLYS]
-    };
+    let mut widths = vec![ACK_BENCH_POLYS];
+    if cfg!(feature = "all-benchmarks") {
+        // 8192 keeps the top of the production range now that the deployed width is its bottom.
+        widths.extend([PROD_POLYS_PER_SSA, 8192]);
+    }
+    // `ACK_BENCH_POLYS` and the deployed width coincide at 4096, and a repeated `BenchmarkId`
+    // panics the whole binary.
+    widths.sort_unstable();
+    widths.dedup();
 
-    for &polys in widths {
+    for polys in widths {
         for (mode, use_batch_verification) in [("per_ack", false), ("batch", true)] {
             bench_acknowledge_batch(
                 &mut group,
@@ -929,7 +936,12 @@ fn bench_acknowledge_shares_interpolation(c: &mut Criterion) {
     let recon_cfg = bench_recon_cfg(false);
     let polys = INTERPOLATION_POLYS;
 
-    for threshold in [16u8, 32, 48, PROD_THRESHOLD] {
+    // 64 keeps the top of the production range now that the deployed threshold is 32; sorted and
+    // deduplicated because a repeated `BenchmarkId` panics the whole binary.
+    let mut thresholds = vec![16u8, 32, 48, 64, PROD_THRESHOLD];
+    thresholds.sort_unstable();
+    thresholds.dedup();
+    for threshold in thresholds {
         let num_shares = polys as usize * threshold as usize;
         let generator_cfg = SsaGeneratorConfig {
             threshold,

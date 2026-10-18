@@ -61,7 +61,7 @@ impl PixMode {
 
     /// Builds the generator and the pseudonym that packets must be sent under.
     ///
-    /// `polynomials_per_ssa` is the maximum rather than the deployed 8192 only to widen the
+    /// `polynomials_per_ssa` is the maximum rather than the deployed 4096 only to widen the
     /// share budget — one SURB consumes one share and a run sends hundreds of thousands of
     /// them. The polynomial count does not affect the per-share cost; [`PIX_THRESHOLD`] does.
     fn build(&self) -> (Arc<SsaShareGenerator<HoprPixSpec>>, HoprPseudonym) {

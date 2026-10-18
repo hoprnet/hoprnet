@@ -47,8 +47,8 @@ impl<S: PixSpec> IndexedPolynomial<S> {
 /// constant term — so an Entry that recomputed would fail exactly when the peer has been waiting
 /// longest.
 ///
-/// The cost is the compressed commitments, `polynomials_per_ssa × 33 B` — 270 kB at the deployed
-/// dimensions, against the ~33 MB of polynomial state a cycle holds while it is still being served.
+/// The cost is the compressed commitments, `polynomials_per_ssa × 33 B` — 135 kB at the deployed
+/// dimensions, against the ~8 MB of polynomial state a cycle holds while it is still being served.
 /// [`MAX_RETAINED_COMMITMENT_CYCLES`] bounds how many are held at once.
 struct RetainedCommitment<S: PixSpec> {
     ssa_index: SsaIndex,
@@ -173,7 +173,7 @@ impl EmissionProgress {
 ///
 /// At the deployed 4096 × (32 + 79) that is 13 whole windows — 3328 polynomials, `3328 × 111`
 /// shares — plus 31 full passes of the 14th and 154 shares of its 32nd, i.e. **83.0 % of the cycle**.
-/// Dividing the Exit's 0.85 by the 3.47× surplus factor gives 24 %, and admitting there would hand
+/// Dividing the Exit's 0.85 by the 3.47× surplus factor gives 24.5 %, and admitting there would hand
 /// out the next deposit a large fraction of a cycle's quota before it could possibly have been
 /// earned.
 ///
@@ -240,8 +240,8 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 ///
 /// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
 /// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
-/// a time keeps one part live; the full 8192 would keep every part live at once, `polys × threshold`
-/// shares of peak memory. 256 keeps that peak around a megabyte while covering a contiguous loss
+/// a time keeps one part live; the full 4096 would keep every part live at once, `polys × threshold`
+/// shares of peak memory. 256 keeps that peak around half a megabyte while covering a contiguous loss
 /// far larger than the ring buffer's entire overshoot allowance.
 ///
 /// ## The window never crosses a cycle boundary
@@ -255,7 +255,7 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// sum of *every* polynomial's constant term, a cycle short of recovery is worth nothing at all.
 ///
 /// The clamp costs no loss tolerance while `polynomials_per_ssa` is a multiple of the window, which
-/// the deployed 8192 is: polynomials in the window advance in lockstep, so a cycle drains as
+/// the deployed 4096 is: polynomials in the window advance in lockstep, so a cycle drains as
 /// `polys / window` full-width blocks and the last one is swept out inside a single `next_share`
 /// call. A cycle whose polynomial count is *not* a multiple runs its final partial block at that
 /// remainder's width, absorbing a proportionally shorter contiguous loss.
@@ -304,7 +304,7 @@ fn new_polynomial_with_commitment<S: PixSpec>(
 /// | 128 | 214 | 1.7× |
 ///
 /// Halving the polynomial count shaves a few shares off each row — at the deployed 4096 the
-/// threshold-32 row needs 79, which is [`DEFAULT_SURPLUS_SHARES`](crate::DEFAULT_SURPLUS_SHARES).
+/// threshold-32 row needs 79, which is [`DEFAULT_SURPLUS_SHARES`].
 ///
 /// At 8192 polynomials, `surplus = threshold` covers only ~30 % share loss, so a ratio
 /// bound of one made a 50 %-return-relayer-loss tolerance unreachable at any deployable threshold.
@@ -350,9 +350,9 @@ pub struct SsaGeneratorConfig {
     /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
     ///
     /// Default is [`DEFAULT_SURPLUS_SHARES`] — but prefer
-    /// [`default_surplus_for`](crate::default_surplus_for) wherever the threshold is known, because
-    /// this is a *ratio* of it and the constant can only be the ratio evaluated at the default
-    /// threshold.
+    /// [`default_surplus_for`](crate::default_surplus_for) wherever the dimensions are known, because
+    /// the surplus a loss tolerance needs depends on both of them and the constant is that function
+    /// evaluated at the deployed split only.
     ///
     /// Bounded only by the byte the wire gives it. It shares the lower half of the negotiated
     /// [`PixParams`] word with `threshold`, so `255` is the most that fits there. There is no
@@ -675,7 +675,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         let commitment_proof = SsaCommitmentProof::prove(&ssa_id, &our_commitment_secret, &ssa_commitment)?;
 
         // Cloned rather than moved: the caller gets these bytes to put on the wire, and the entry
-        // keeps them to answer a request for the pieces that never arrived. 270 kB at the deployed
+        // keeps them to answer a request for the pieces that never arrived. 135 kB at the deployed
         // dimensions — see `RetainedCommitment`.
         let retained = RetainedCommitment {
             ssa_index,
@@ -1286,68 +1286,74 @@ mod tests {
         Ok(())
     }
 
-    /// The surplus is a ratio of the threshold, and the ratio is a loss-rate tolerance.
+    /// The default surplus carries a cycle through the loss of half its shares at 99 %.
     ///
-    /// Pinned as the tolerance rather than as four literals, because the tolerance is the property
-    /// with a physical meaning — `surplus/(threshold + surplus)` is the fraction of a polynomial's
-    /// shares that may be lost before it cannot reconstruct. A change to
-    /// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to restate what it did to that number.
-    ///
-    /// Swept over the *whole* accepted threshold range rather than the deployed multiples of four.
-    /// Restricting it to those was what let the ratio round down unnoticed: every sampled point
-    /// divided exactly, so integer division and the intended ratio agreed on all of them and
-    /// disagreed on everything else.
+    /// Pinned against values computed independently at 60 significant digits rather than against the
+    /// implementation's own `f64` arithmetic, so a precision defect in the tail sum or the
+    /// exponentiation shows up as a wrong count. The rows are the ones the documentation quotes.
     #[test]
-    fn the_default_surplus_covers_a_fifth_of_a_polynomial_being_lost() {
+    fn the_default_surplus_carries_a_cycle_through_half_its_shares_being_lost() {
+        for (polys, threshold, surplus) in [
+            (1024u16, 32u8, 75u8),
+            (4096, 16, 52),
+            (4096, 32, 79),
+            (4096, 48, 103),
+            (4096, 64, 126),
+            (4096, 128, 211),
+            (8192, 16, 54),
+            (8192, 32, 81),
+            (8192, 64, 128),
+            (8192, 128, 214),
+            // Past ~160 the target needs more than the byte carries, and the result saturates.
+            (4096, 200, 255),
+        ] {
+            assert_eq!(
+                surplus,
+                crate::default_surplus_for(polys, threshold),
+                "{polys} x {threshold} must derive {surplus} surplus shares"
+            );
+        }
+
+        // The fewest that meet the target, over the whole accepted threshold range: one share fewer
+        // must miss it, or the search is over-insuring.
         for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
-            let surplus = crate::default_surplus_for(threshold);
-            let emitted = threshold as f64 + surplus as f64;
-            let tolerated = surplus as f64 / emitted;
-
-            // A floor, not an approximation: the surplus may over-cover, never under-cover.
-            assert!(
-                tolerated >= 0.20,
-                "threshold {threshold} + surplus {surplus} tolerates only {tolerated:.4} loss"
-            );
-            // And it over-covers by less than one share, which is what makes rounding up cheap.
-            assert!(
-                surplus as f64 - 1.0 < threshold as f64 / crate::SURPLUS_LOSS_TOLERANCE_DIVISOR as f64,
-                "threshold {threshold} buys {surplus} surplus shares, more than one above the ratio"
-            );
-            // Zero surplus is zero loss tolerance. Rounding down produced it at thresholds 2 and 3.
+            let surplus = crate::default_surplus_for(DEFAULT_POLYS_PER_SSA, threshold);
+            if surplus < u8::MAX {
+                assert!(
+                    crate::cycle_recovery_at_half_share_loss(DEFAULT_POLYS_PER_SSA, threshold, surplus)
+                        >= crate::SURPLUS_TARGET_CYCLE_RECOVERY,
+                    "threshold {threshold} with surplus {surplus} misses the target"
+                );
+            }
             assert!(surplus > 0, "threshold {threshold} derives no surplus at all");
-        }
-
-        // Where the threshold divides exactly the tolerance is the documented 20 % on the nose.
-        for threshold in [16u8, 32, 48, 64] {
-            let surplus = crate::default_surplus_for(threshold);
-            let tolerated = surplus as f64 / (threshold as f64 + surplus as f64);
             assert!(
-                (0.19..=0.21).contains(&tolerated),
-                "threshold {threshold} + surplus {surplus} tolerates {tolerated:.3} loss, expected ~0.20"
+                crate::cycle_recovery_at_half_share_loss(DEFAULT_POLYS_PER_SSA, threshold, surplus - 1)
+                    < crate::SURPLUS_TARGET_CYCLE_RECOVERY,
+                "threshold {threshold} with surplus {surplus} is not the fewest that meets the target"
             );
         }
 
-        // `DEFAULT_SURPLUS_SHARES` is deliberately *not* `default_surplus_for(DEFAULT_POLY_THRESHOLD)`
-        // any more — the derived ratio is a 20 % tolerance, which a 4096-polynomial cycle compounds
-        // into a failure rate no return path survives. The relation this test used to assert is
-        // therefore gone by design; what still has to hold is that the deployed default is itself
-        // admissible, which the tests below cover.
+        // A wire parameter: the Exit's default `quota_range` is derived from it, so this moving is a
+        // protocol change and must be a deliberate one.
+        assert_eq!(79, DEFAULT_SURPLUS_SHARES);
+        assert_eq!(
+            DEFAULT_SURPLUS_SHARES,
+            crate::default_surplus_for(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD)
+        );
     }
 
     /// A derived surplus must never fail the validator it is derived under.
     ///
     /// The surplus is now bounded only by the byte it is stored in, so this holds by construction:
-    /// `default_surplus_for` is `threshold / 4` rounded up, which cannot leave a `u8`. It is kept as
-    /// the guard that would catch a bound being reintroduced on `SsaGeneratorConfig` that the
-    /// derivation does not respect.
+    /// `default_surplus_for` saturates at 255. It is kept as the guard that would catch a bound being
+    /// reintroduced on `SsaGeneratorConfig` that the derivation does not respect.
     #[test]
     fn every_derived_surplus_passes_the_bound_it_is_derived_under() {
         for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
             let cfg = SsaGeneratorConfig {
                 polynomials_per_ssa: 16,
                 threshold,
-                surplus_shares: crate::default_surplus_for(threshold),
+                surplus_shares: crate::default_surplus_for(16, threshold),
             };
             assert!(
                 cfg.validate().is_ok(),

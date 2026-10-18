@@ -109,7 +109,7 @@ lazy_static::lazy_static! {
     /// Generator holding a committed SSA for [`PSEUDONYM`], so every SURB created during the
     /// benchmark carries a real PIX share.
     ///
-    /// `polynomials_per_ssa` is set to the maximum rather than the deployed 8192 purely to
+    /// `polynomials_per_ssa` is set to the maximum rather than the deployed 4096 purely to
     /// widen the share budget: a commitment yields `polys * (threshold + surplus)` shares,
     /// and the benchmark makes hundreds of thousands of SURBs. The polynomial count does not
     /// affect the per-share cost — only [`PIX_THRESHOLD`] does — so this does not change what

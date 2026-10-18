@@ -419,16 +419,15 @@ pub struct PixGlobalConfig {
     /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
     ///
     /// **Leave unset unless you have measured your return-path loss.** `None` derives the surplus
-    /// from [`ssa_part_size`](Self::ssa_part_size) via
-    /// [`default_surplus_for`](hopr_protocol_pix::default_surplus_for), which sizes it to absorb
-    /// 20 % of a polynomial's shares going missing. Read
-    /// [`surplus_shares`](Self::surplus_shares) for the resolved value.
+    /// from [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size) via
+    /// [`default_surplus_for`](hopr_protocol_pix::default_surplus_for), which sizes it so that a
+    /// cycle still recovers at 99 % when half of all shares go missing — 79 at the deployed
+    /// `4096 × 32`. Read [`surplus_shares`](Self::surplus_shares) for the resolved value.
     ///
-    /// It is a ratio because the physics is a ratio: a polynomial reconstructs from the first
-    /// `ssa_part_size` distinct shares to arrive out of `ssa_part_size + surplus` emitted, so
-    /// surviving loss rate `p` needs `surplus >= ssa_part_size · p/(1−p)`. Setting an absolute count
-    /// therefore means a different loss tolerance at every threshold — a flat 20 covers 24 % at
-    /// `ssa_part_size` 64 but 56 % at 16, where it exceeds the shares it insures and is rejected.
+    /// It depends on both dimensions because a cycle recovers only if *every* polynomial does: one
+    /// polynomial survives with probability `P(Binom(ssa_part_size + surplus, 1 − loss) >=
+    /// ssa_part_size)`, and the cycle with that raised to the power `num_ssa_parts`. Setting an
+    /// absolute count therefore means a different loss tolerance at every split.
     ///
     /// The factor is what matters, because it is what this costs. A polynomial leaves the
     /// generator's queue at `ssa_part_size + surplus` shares whether or not any were
@@ -441,8 +440,9 @@ pub struct PixGlobalConfig {
     /// should be. It used to be the other way: the surplus was excluded from the quota, so the
     /// rational Entry raised this dial to take traffic it was not billed for.
     ///
-    /// Capped at 255 because it is the other byte of that word, and at `ssa_part_size` because
-    /// insurance costing more than the payload is a misconfiguration rather than a preference.
+    /// Capped at 255 because it is the other byte of that word, and at nothing tighter: how much
+    /// insurance a path needs is a property of its loss rate, and the surplus that a 50 % loss needs
+    /// exceeds the threshold at every split in the deployed range.
     #[validate(range(min = 0, max = 255))]
     pub additional_shares: Option<usize>,
 
@@ -479,7 +479,7 @@ pub struct PixGlobalConfig {
 
 impl PixGlobalConfig {
     /// Surplus shares per polynomial: the operator's value if set, otherwise derived from
-    /// [`ssa_part_size`](Self::ssa_part_size).
+    /// [`num_ssa_parts`](Self::num_ssa_parts) and [`ssa_part_size`](Self::ssa_part_size).
     ///
     /// Every reader must go through this rather than the field. The field is `Option` precisely
     /// because serde cannot express "default to a function of a sibling", so the field alone is not
@@ -487,16 +487,10 @@ impl PixGlobalConfig {
     /// surplus, i.e. no loss tolerance at all.
     pub fn surplus_shares(&self) -> usize {
         self.additional_shares.unwrap_or_else(|| {
-            let threshold = self.ssa_part_size.min(u8::MAX as usize) as u8;
-            // The deployed threshold takes the deployed surplus, which is *not* the derived ratio —
-            // see `DEFAULT_SURPLUS_SHARES` for why the ratio is not enough for the loss this is
-            // deployed against. Any other threshold derives the ratio, which is the right shape for
-            // a path whose loss an operator has not measured.
-            if threshold == hopr_protocol_pix::DEFAULT_POLY_THRESHOLD {
-                hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize
-            } else {
-                hopr_protocol_pix::default_surplus_for(threshold) as usize
-            }
+            hopr_protocol_pix::default_surplus_for(
+                self.num_ssa_parts.min(u16::MAX as usize) as u16,
+                self.ssa_part_size.min(u8::MAX as usize) as u8,
+            ) as usize
         })
     }
 }
@@ -1158,7 +1152,7 @@ mod tests {
             20_224, surplus_run,
             "the shipped dimensions produce a 20 224-packet run of non-useful shares. This is a tripwire on the \
              product of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` \
-             (or `additional_shares`, which overrides the quarter-of-threshold derivation), \
+             (or the surplus: `additional_shares`, or the default an unset one resolves to), \
              `PixGlobalConfig::num_ssa_parts`, or `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive \
              the run, then re-check that nothing has started keying liveness on useful shares again"
         );
@@ -1689,15 +1683,19 @@ mod tests {
             SsaReconstructorConfig::from(cfg.pix.reconstructor).max_ack_await_time
         );
 
-        // An unset surplus must derive from the configured threshold, not fall to zero. This is the
+        // An unset surplus must derive from the configured dimensions, not fall to zero. This is the
         // one field whose `serde(default)` cannot express its own default, so "absent" and "zero"
         // are the two readings that must not be confused — zero surplus is legal and means no loss
-        // tolerance at all. 48 rather than the deployed 32, which resolves to
-        // `DEFAULT_SURPLUS_SHARES` instead of the derived ratio — see `PixGlobalConfig::surplus_shares`.
+        // tolerance at all. 48 rather than the deployed 32, so that a derivation that only ever
+        // returned the deployed default would be caught.
         let json = r#"{ "pix": { "ssa_part_size": 48 } }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX dimensions must deserialize");
         assert_eq!(None, cfg.pix.additional_shares, "the field itself stays unset");
-        assert_eq!(12, cfg.pix.surplus_shares(), "and resolves to ssa_part_size / 4");
+        assert_eq!(
+            103,
+            cfg.pix.surplus_shares(),
+            "and resolves to the derivation at 4096 x 48"
+        );
 
         let json = r#"{ "pix": { "ssa_part_size": 32, "additional_shares": 30 } }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("an explicit surplus must deserialize");
@@ -1758,22 +1756,18 @@ mod tests {
         );
     }
 
-    /// The derived surplus tracks the configured threshold, which is the whole point of deriving it.
+    /// The derived surplus tracks the configured split, which is the whole point of deriving it.
     ///
-    /// Stated as the loss rate it covers rather than as four literals: `surplus/(threshold+surplus)`
-    /// is the fraction of a polynomial's shares that may go missing before it cannot reconstruct,
-    /// and that — not the raw count — is what an operator would compare against measured loss.
+    /// It depends on both dimensions — the cycle recovers only if every one of `num_ssa_parts`
+    /// polynomials does — so both have to reach `default_surplus_for`, and the deployed split has to
+    /// land on the deployed constant rather than be special-cased onto it. A special case is what
+    /// this used to be, and it made the derived value a cliff: 50 % loss tolerance at
+    /// `ssa_part_size` 32 and ~3 % one share either side of it.
     ///
-    /// Swept over every accepted `ssa_part_size`, not just the deployed multiples of four. Sampling
-    /// only those is what let the underlying ratio round down unnoticed — they are exactly the
-    /// values on which integer division and the intended ratio agree.
-    ///
-    /// `num_ssa_parts` is pinned at its minimum for the sweep so that only the surplus rule is under
-    /// test: at the default 8192 the top of the `ssa_part_size` range lands within 0.4 % of
-    /// `validate_pix_dimension_product`'s ceiling, so a future re-tune of the split would fail this
-    /// test for a reason that has nothing to do with the surplus.
+    /// `num_ssa_parts` is pinned low for the full sweep so that only the surplus rule is under test,
+    /// not `validate_pix_dimension_product`'s ceiling.
     #[test]
-    fn the_derived_surplus_covers_a_fifth_of_a_polynomial_at_every_threshold() {
+    fn the_derived_surplus_follows_the_configured_split() {
         for ssa_part_size in 2usize..=255 {
             let cfg = PixGlobalConfig {
                 num_ssa_parts: 8,
@@ -1781,10 +1775,9 @@ mod tests {
                 ..Default::default()
             };
             let surplus = cfg.surplus_shares();
-            let tolerated = surplus as f64 / (ssa_part_size + surplus) as f64;
-            assert!(
-                tolerated >= 0.20,
-                "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating only {tolerated:.4} loss"
+            assert_eq!(
+                hopr_protocol_pix::default_surplus_for(8, ssa_part_size as u8) as usize,
+                surplus
             );
             assert!(
                 surplus > 0,
@@ -1796,37 +1789,34 @@ mod tests {
             );
         }
 
-        // On the multiples of four the tolerance is the documented 20 % exactly — except at the
-        // deployed threshold, which resolves to `DEFAULT_SURPLUS_SHARES` rather than the derived
-        // ratio. That is deliberate: see that constant for why a 20 % per-share tolerance is not
-        // enough once a 4096-polynomial cycle's exponent is accounted for.
-        for ssa_part_size in [16usize, 48, 64] {
-            let cfg = PixGlobalConfig {
+        // No cliff: at the deployed polynomial count the surplus never falls as the threshold rises,
+        // and in particular not either side of the deployed threshold.
+        let at = |num_ssa_parts: usize, ssa_part_size: usize| {
+            PixGlobalConfig {
+                num_ssa_parts,
                 ssa_part_size,
                 ..Default::default()
-            };
-            let surplus = cfg.surplus_shares();
-            let tolerated = surplus as f64 / (ssa_part_size + surplus) as f64;
+            }
+            .surplus_shares()
+        };
+        let polys = DEFAULT_PIX_POLYS_PER_SSA as usize;
+        for ssa_part_size in 3usize..=255 {
             assert!(
-                (0.19..=0.21).contains(&tolerated),
-                "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating {tolerated:.3} loss"
+                at(polys, ssa_part_size) >= at(polys, ssa_part_size - 1),
+                "the derived surplus falls from ssa_part_size {} to {ssa_part_size}",
+                ssa_part_size - 1
             );
         }
 
-        // The deployed threshold takes the deployed surplus instead, which is sized for the loss
-        // this is actually deployed against rather than for the derived ratio.
-        let deployed = PixGlobalConfig::default();
+        // The polynomial count reaches the derivation too: more polynomials, more for every one of
+        // them to survive.
+        assert!(at(8192, 32) > at(4096, 32), "the surplus must grow with num_ssa_parts");
+
+        // And the deployed split resolves to the deployed constant by derivation, not by fiat.
         assert_eq!(
             hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize,
-            deployed.surplus_shares(),
-            "the deployed threshold must resolve to the deployed surplus"
-        );
-        // `s/(t+s)` is the break-even ratio, not the tolerance: every polynomial of the cycle must
-        // recover, so 0.712 at 4096 polynomials buys a 50 % per-share loss at 99 % of cycles.
-        let ratio = deployed.surplus_shares() as f64 / (deployed.ssa_part_size + deployed.surplus_shares()) as f64;
-        assert!(
-            ratio >= 0.70,
-            "the deployed surplus must keep s/(t+s) at or above the 0.70 a 50 % share loss needs, got {ratio:.3}"
+            PixGlobalConfig::default().surplus_shares(),
+            "the deployed split must derive the deployed surplus"
         );
     }
 

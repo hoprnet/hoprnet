@@ -73,7 +73,8 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 4096;
 
 /// Minimum number of shares needed to recover one polynomial of an SSA.
 ///
-/// 64 rather than the 128 this was before the split was re-tuned. Dropping the non-constant
+/// 32, down from the 128 this was before the split was first re-tuned and the 64 it was after —
+/// see below for why it now sits under the measured optimum. Dropping the non-constant
 /// coefficient commitments (see [`SsaPartCommitment`]) put every commitment-side cost — wire
 /// volume, ingest, reconstructor memory, share verification — on `polys` alone. What still grows
 /// with the threshold is Exit interpolation (`O(threshold²)` per polynomial), fault-detection
@@ -82,7 +83,7 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 4096;
 /// every share it emits. The full cost model is documented on `DEFAULT_PIX_POLYS_PER_SSA` in
 /// `hopr-transport-session`.
 ///
-/// # What 64 optimises
+/// # What 64 optimised, and why 32 is deployed instead
 ///
 /// **Exit reconstruction capacity, deliberately, and not total network CPU.** The two sides do not
 /// deserve equal weight: an Exit is a shared resource serving 10–30 concurrent clients while each
@@ -101,7 +102,8 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 4096;
 /// `A ≈ 81 µs`, `B ≈ 7.61`, `C ≈ 0.028`, so per share it is `A/t + B + C·t` — the fixed
 /// per-polynomial commitment opening is amortised over `threshold` shares and punishes *low*
 /// thresholds harder than interpolation punishes high ones. The Exit-only optimum is
-/// `t = √(A/C) ≈ 54`, flat within 0.5 % from 48 to 64, and 64 sits within 0.4 % of it.
+/// `t = √(A/C) ≈ 54`, flat within 0.5 % from 48 to 64, and 64 — the value deployed before the
+/// current split — sits within 0.4 % of it.
 ///
 /// Under the total column 48 is about 3 % cheaper. That reading is recorded rather than acted on:
 /// it weights one Entry's share generation equally with the Exit work of the 10–30 clients that
@@ -111,56 +113,92 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 4096;
 /// trade.** This table prices one *share*, but the quota prices `polys × (threshold + surplus)`, and
 /// the surplus is a ratio of the threshold that grows as the threshold falls. A configuration that
 /// tolerates 50 % share loss therefore needs a *lower* threshold to be cheap: at `polys = 4096`,
-/// `t = 32, s = 79` is 629.6 MiB per cycle where `t = 64, s = 128` is 1078 MiB. The Exit pays ~5 %
+/// `t = 32, s = 79` is 629.6 MiB per cycle where `t = 64, s = 126` is 1078 MiB. The Exit pays ~5 %
 /// more per share at 32 than at 54, and the Entry pays ~40 % less quota per cycle — which is the
 /// side that pays in money rather than in CPU. See [`DEFAULT_SURPLUS_SHARES`] for the loss tolerance
 /// that fixes the surplus, and note that `s/(t+s)` is what the tolerance depends on, not `s` alone.
 pub const DEFAULT_POLY_THRESHOLD: u8 = 32;
 
-/// Share loss a polynomial's surplus is sized to absorb, as a reciprocal: `1/5` is 20 %.
+/// Fraction of cycles [`default_surplus_for`] sizes the surplus to carry through the loss of half of
+/// all shares.
 ///
-/// The surplus is insurance against *lost* shares, and this is the loss rate it covers. A
-/// polynomial reconstructs from the first `threshold` distinct shares to arrive out of
-/// `threshold + surplus` emitted, so surviving a per-packet loss rate of `p` needs
-/// `surplus >= threshold · p/(1−p)` — which makes the surplus inherently a **ratio** of the
-/// threshold, and `surplus/(threshold + surplus)` the loss rate it tolerates.
-///
-/// At `threshold/4` that is 20 %, and [`default_surplus_for`] rounds *up* so it is a floor rather
-/// than an approximation — see there for why the direction matters.
-const SURPLUS_LOSS_TOLERANCE_DIVISOR: u8 = 4;
+/// The surplus is insurance against *lost* shares — a share is lost when the first relayer of its
+/// return path never acknowledges it, so a dead return relayer takes its whole share of the path's
+/// traffic with it. Half is the design point because it is what losing one of two return relayers
+/// costs, and a cycle that survives it at this rate is one the operator does not have to tune.
+const SURPLUS_TARGET_CYCLE_RECOVERY: f64 = 0.99;
 
-/// Shares to emit per polynomial beyond `threshold`, to absorb losses.
+/// Shares to emit per polynomial beyond `threshold`, to absorb losses: the fewest with which a
+/// cycle of `polys` polynomials still recovers at 99 % when every share is lost independently with
+/// probability one half.
 ///
-/// **A ratio, evaluated at the threshold actually configured** — see
-// `SURPLUS_LOSS_TOLERANCE_DIVISOR` is deliberately unlinked here and below: it is crate-private, so
-// an intra-doc link from this public function trips `rustdoc::private_intra_doc_links`, which the
-// `nix build .#docs` job builds as an error.
-/// `SURPLUS_LOSS_TOLERANCE_DIVISOR` for why a ratio is the physically meaningful shape.
+/// A polynomial reconstructs from the first `threshold` of the `threshold + surplus` shares emitted
+/// for it, so it survives with probability `P(Binom(threshold + surplus, 1/2) >= threshold)`. A
+/// *cycle* recovers only if **every** one of its `polys` polynomials does — the SSA is the sum of
+/// their constant terms — so that probability is raised to the power `polys`, and the surplus
+/// depends on the polynomial count as well as on the threshold.
 ///
-/// This used to be a bare constant, `DEFAULT_POLY_THRESHOLD / 2`, evaluated once at the *default*
-/// threshold and then applied whatever the configured one was. Deployments run thresholds from 16
-/// to 64, so a single absolute surplus means wildly different insurance across that range: a flat
-/// 20 covers 24 % loss at threshold 64 but 56 % at threshold 16, where it exceeds the shares it
-/// insures. Since H5 the surplus is billed on purchase rather than on claim, so that over-insurance
-/// is quota an Entry pays for in every deposit.
+/// This replaced a fixed ratio, `threshold / 4`, documented as covering 20 % share loss. It covered
+/// 20 % per *polynomial*; with the exponent applied, a cycle of 4096 tolerated about 3 %, and the
+/// former `8192 × (64 + 16)` about 5 %. Deriving from the target also gives every split the same
+/// tolerance, where any fixed ratio gives each a different one.
 ///
-/// **Rounds up.** The result is a guarantee of *at least* the documented tolerance, not an
-/// approximation of it: shares are indivisible, so a threshold that is not a multiple of
-/// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to land on one side of 20 % or the other, and covering
-/// less than the documented rate is the failure this function exists to prevent. Rounding down
-/// undershot for every such threshold — 33 received 8 surplus shares and covered 19.51 % — and gave
-/// thresholds 2 and 3 a surplus of **zero**, i.e. no loss tolerance at all, at and just above
-/// [`MIN_POLY_THRESHOLD`]. Rounding up over-covers by less than one share, which is most visible at
-/// the smallest thresholds (2 → 1 surplus → 33 %) and vanishes as the threshold grows (63 → 16 →
-/// 20.3 %).
+/// The required ratio *falls* as the threshold rises — at 4096 polynomials it is 52 surplus shares
+/// at threshold 16 (3.3×), 79 at 32 (2.5×), 126 at 64 (2.0×) and 211 at 128 (1.6×) — because a
+/// larger sample concentrates around its mean.
 ///
-/// The deployed value is unaffected: [`DEFAULT_POLY_THRESHOLD`] is 64, a multiple of the divisor, so
-/// this returns 16 either way and no negotiated quota moves.
-pub const fn default_surplus_for(threshold: u8) -> u8 {
-    // Not `(threshold + DIVISOR - 1) / DIVISOR`: that addition overflows a `u8` for thresholds above
-    // 252, which `MAX_POLY_THRESHOLD` (255) admits, and would fail const evaluation rather than
-    // merely misbehave.
-    threshold.div_ceil(SURPLUS_LOSS_TOLERANCE_DIVISOR)
+/// **Saturates at 255**, the byte the surplus travels in. From a threshold of around 160 the target
+/// needs more than that, and the result is then the most the wire can carry rather than a surplus
+/// meeting the target.
+///
+/// `const` so that [`DEFAULT_SURPLUS_SHARES`] can be defined by it, and deterministic for the same
+/// reason: it is evaluated with IEEE `f64` addition, multiplication and division only, whose results
+/// are fixed.
+pub const fn default_surplus_for(polys: u16, threshold: u8) -> u8 {
+    let mut surplus = 0u8;
+    while surplus < u8::MAX
+        && cycle_recovery_at_half_share_loss(polys, threshold, surplus) < SURPLUS_TARGET_CYCLE_RECOVERY
+    {
+        surplus += 1;
+    }
+    surplus
+}
+
+/// Probability that a cycle of `polys` polynomials, each emitting `threshold + surplus` shares,
+/// recovers when every share is lost independently with probability one half.
+const fn cycle_recovery_at_half_share_loss(polys: u16, threshold: u8, surplus: u8) -> f64 {
+    let emitted = threshold as u32 + surplus as u32;
+
+    // The per-polynomial failure tail `P(Binom(emitted, 1/2) < threshold)`, summed term by term
+    // rather than taken as one minus the success: the tail is ~1e-6 at the deployed split, and the
+    // subtraction would cancel most of its digits. `C(emitted, 0) / 2^emitted` underflows nothing,
+    // since `emitted` is at most 510.
+    let mut term = 1.0f64;
+    let mut i = 0;
+    while i < emitted {
+        term *= 0.5;
+        i += 1;
+    }
+    let mut failure = 0.0f64;
+    let mut k = 0u32;
+    while k < threshold as u32 {
+        failure += term;
+        term = term * (emitted - k) as f64 / (k + 1) as f64;
+        k += 1;
+    }
+
+    // `(1 - failure)^polys` by squaring, since `powi` is not `const`.
+    let mut base = 1.0 - failure;
+    let mut exponent = polys;
+    let mut recovery = 1.0f64;
+    while exponent > 0 {
+        if exponent & 1 == 1 {
+            recovery *= base;
+        }
+        base *= base;
+        exponent >>= 1;
+    }
+    recovery
 }
 
 /// Shares emitted per polynomial beyond [`DEFAULT_POLY_THRESHOLD`], to absorb losses.
@@ -172,23 +210,17 @@ pub const fn default_surplus_for(threshold: u8) -> u8 {
 /// being harmless once the per-SSA quota started counting it, because the quota is a `const` and had
 /// to pick one of the two.
 ///
-/// No longer [`default_surplus_for`] at the default threshold.
+/// [`default_surplus_for`] at the deployed split, which is 79: `surplus/(threshold + surplus) =
+/// 0.712`, carrying a 50 % per-share loss at 99 % of cycles. That is the configuration the
+/// localcluster soak exercises with a relay killed mid-run.
 ///
-/// That derivation sizes the surplus to absorb 20 % of a polynomial's shares, which is a reasonable
-/// default for a healthy path and is what `additional_shares: None` still resolves to. It is not
-/// enough for the loss this protocol is deployed against: at [`DEFAULT_POLYS_PER_SSA`] polynomials a
-/// cycle recovers only if *every* one does, so a 20 % per-share tolerance compounds to a per-cycle
-/// failure rate that no realistic return path survives — `0.999...^4096` is unforgiving.
+/// **A negotiated wire parameter**, so a change to the derivation that moves it is a protocol
+/// change: the Exit's default `quota_range` is computed from it. A test pins the value for exactly
+/// that reason.
 ///
-/// 79 with a threshold of 32 is `surplus/(threshold + surplus) = 0.712`, which carries a 50 %
-/// per-share loss at 99 % of cycles. That is the configuration the localcluster soak exercises with
-/// a relay killed mid-run, and it is the point of the defaults being what they are: a deployment
-/// that does nothing gets the tolerance the protocol was sized for, rather than a ratio chosen
-/// before the exponent was accounted for.
-///
-/// It remains a *default*, not a bound. `additional_shares: None` derives the ratio instead, and
-/// any explicit value within the wire byte is accepted — see [`SsaGeneratorConfig`] for why.
-pub const DEFAULT_SURPLUS_SHARES: u8 = 79;
+/// It remains a *default*, not a bound. Any explicit value within the wire byte is accepted — see
+/// [`SsaGeneratorConfig`] for why.
+pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD);
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
@@ -228,7 +260,7 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// asking for far longer than [`MAX_COMMITMENT_RETRANSMISSIONS`] attempts on any sane re-request
 /// interval allow.
 ///
-/// Costs `polynomials_per_ssa × 33 B` per cycle — 270 kB at the deployed dimensions, 4.8 MB per
+/// Costs `polynomials_per_ssa × 33 B` per cycle — 135 kB at the deployed dimensions, 2.4 MB per
 /// pseudonym with the cap full. Entry-side state, which is why it is not charged against an Exit's
 /// incoming-Session memory budget: that reserves reconstructor state for Sessions this node *serves*,
 /// and nothing else the generator holds is charged there either.
@@ -238,12 +270,12 @@ pub const MAX_COMMITMENT_RETRANSMISSIONS: u8 = 8;
 /// committed a cycle for within that window, Sessions long closed included, and churn accumulates it
 /// rather than it tracking the live Session count.
 /// What bounds the consequence is that the same entry keeps its polynomial state under exactly the
-/// same rule, and that term is larger by two orders of magnitude: 270 kB here against ~33 MB there,
+/// same rule, and that term is larger by a factor of about sixty: 135 kB here against ~8 MB there,
 /// per cycle. A Session whose cycles are still queued when it closes — the ordinary case, since
-/// draining one takes `polynomials_per_ssa × (threshold + surplus)` shares, 655 k at the deployed
-/// dimensions — leaves both, and this is under 1% of it. Reaching the cap instead means having
-/// drained eighteen cycles, some twelve million shares, by which point the polynomials are gone and
-/// 4.8 MB is the entire residue.
+/// draining one takes `polynomials_per_ssa × (threshold + surplus)` shares, 455 k at the deployed
+/// dimensions — leaves both, and this is under 2% of it. Reaching the cap instead means having
+/// drained eighteen cycles, some eight million shares, by which point the polynomials are gone and
+/// 2.4 MB is the entire residue.
 ///
 /// Clearing the entry outright at Session teardown would release both sooner, and is worth doing for
 /// the polynomial term; [`SsaShareGenerator::forget`] exists for it, but no production path calls it
