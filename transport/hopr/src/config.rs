@@ -337,22 +337,21 @@ const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
 /// Rejects dimensions whose *product* is far outside anything that has been measured.
 ///
 /// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
-/// 16192 × 255 = 4 128 960 commitments, about 8× the profiled operating point of 8192 × 64 =
-/// 524 288 (worst case ≈41 MiB of peak reconstructor state per cycle, per
-/// `hopr_protocol_pix::peak_cycle_bytes`, and ≈1.25 s of commitment ingest). Nothing
-/// downstream catches that: the product *is* the per-cycle quota, and the only guard on it is the
-/// peer Exit's `quota_range` rejection — which protects the Exit, and arrives after this node has
-/// already generated the cycle.
+/// 16192 × 255 = 4 128 960 commitments, about 31× the profiled operating point of 4096 × 32 =
+/// 131 072 (worst case ≈13 MiB of peak reconstructor state per cycle, per
+/// `hopr_protocol_pix::peak_cycle_bytes`). Nothing downstream catches that: the product *is* the
+/// per-cycle quota, and the only guard on it is the peer Exit's `quota_range` rejection — which
+/// protects the Exit, and arrives after this node has already generated the cycle.
 ///
 /// The ceiling is deliberately on the product rather than on either field, and that is what makes it
-/// stable: re-tuning the split holds the product constant — 4096 × 128 and 8192 × 64 are both
-/// exactly 524 288, which is why the derived `quota_range` survived that change untouched. Only a
-/// deliberate decision to raise the per-cycle quota needs to revisit this, and such a decision has to
-/// widen the Exit's `quota_range` in concert regardless.
+/// stable: re-tuning the split holds the product constant — 4096 × 32 and 8192 × 16 are both
+/// exactly 131 072 — so the derived `quota_range` survives such a change untouched. Only a deliberate
+/// decision to raise the per-cycle quota needs to revisit this, and such a decision has to widen the
+/// Exit's `quota_range` in concert regardless.
 ///
 /// It binds less hard than it once did: `ssa_part_size` was capped at 4096 before the threshold was
 /// narrowed to a byte so it could share the negotiated `PixParams` word with the surplus, which took
-/// the field-range maximum product down from 126× the profiled point to under 8×. It still binds
+/// the field-range maximum product down from 126× the profiled point to a few tens. It still binds
 /// over most of the two ranges, which is the intended effect.
 fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), ValidationError> {
     const PROFILED: usize = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
@@ -488,7 +487,16 @@ impl PixGlobalConfig {
     /// surplus, i.e. no loss tolerance at all.
     pub fn surplus_shares(&self) -> usize {
         self.additional_shares.unwrap_or_else(|| {
-            hopr_protocol_pix::default_surplus_for(self.ssa_part_size.min(u8::MAX as usize) as u8) as usize
+            let threshold = self.ssa_part_size.min(u8::MAX as usize) as u8;
+            // The deployed threshold takes the deployed surplus, which is *not* the derived ratio —
+            // see `DEFAULT_SURPLUS_SHARES` for why the ratio is not enough for the loss this is
+            // deployed against. Any other threshold derives the ratio, which is the right shape for
+            // a path whose loss an operator has not measured.
+            if threshold == hopr_protocol_pix::DEFAULT_POLY_THRESHOLD {
+                hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize
+            } else {
+                hopr_protocol_pix::default_surplus_for(threshold) as usize
+            }
         })
     }
 }
@@ -1147,12 +1155,12 @@ mod tests {
         // produces, and the liveness counter is what absorbs it.
         let surplus_run = cfg.pix.surplus_shares() as u64 * cfg.pix.num_ssa_parts.min(SHARE_EMISSION_WINDOW) as u64;
         assert_eq!(
-            4096, surplus_run,
-            "the shipped dimensions produce a 4096-packet run of non-useful shares. This is a tripwire on the product \
-             of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` (which \
-             sets the surplus at a quarter of it), `PixGlobalConfig::num_ssa_parts`, or \
-             `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive the run, then re-check that nothing \
-             has started keying liveness on useful shares again"
+            20_224, surplus_run,
+            "the shipped dimensions produce a 20 224-packet run of non-useful shares. This is a tripwire on the \
+             product of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` \
+             (or `additional_shares`, which overrides the quarter-of-threshold derivation), \
+             `PixGlobalConfig::num_ssa_parts`, or `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive \
+             the run, then re-check that nothing has started keying liveness on useful shares again"
         );
     }
 
@@ -1227,10 +1235,10 @@ mod tests {
 
         // Re-splitting at a constant product is exactly what a re-tune does, and must stay valid —
         // this is why the ceiling is on the product rather than on either field. The splits are
-        // fewer than they were: `ssa_part_size` is now capped at 255, so the 2048 x 256 and
-        // 1024 x 512 re-splits this used to cover are no longer expressible at all.
+        // fewer than they were: `ssa_part_size` is now capped at 255, so re-splits above it are not
+        // expressible at all, and the deployed split has moved down to 4096 x 32.
         let profiled = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
-        for (polys, shares) in [(4096usize, 128usize), (8192, 64)] {
+        for (polys, shares) in [(4096usize, 32usize), (8192, 16)] {
             assert_eq!(polys * shares, profiled, "test case must hold the product constant");
             let cfg = PixGlobalConfig {
                 num_ssa_parts: polys,
@@ -1787,8 +1795,11 @@ mod tests {
             );
         }
 
-        // On the deployed multiples of four the tolerance is the documented 20 % exactly.
-        for ssa_part_size in [16usize, 32, 48, 64] {
+        // On the multiples of four the tolerance is the documented 20 % exactly — except at the
+        // deployed threshold, which resolves to `DEFAULT_SURPLUS_SHARES` rather than the derived
+        // ratio. That is deliberate: see that constant for why a 20 % per-share tolerance is not
+        // enough once a 4096-polynomial cycle's exponent is accounted for.
+        for ssa_part_size in [16usize, 48, 64] {
             let cfg = PixGlobalConfig {
                 ssa_part_size,
                 ..Default::default()
@@ -1800,6 +1811,20 @@ mod tests {
                 "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating {tolerated:.3} loss"
             );
         }
+
+        // The deployed threshold takes the deployed surplus instead, which is sized for the loss
+        // this is actually deployed against rather than for the derived ratio.
+        let deployed = PixGlobalConfig::default();
+        assert_eq!(
+            hopr_protocol_pix::DEFAULT_SURPLUS_SHARES as usize,
+            deployed.surplus_shares(),
+            "the deployed threshold must resolve to the deployed surplus"
+        );
+        let tolerated = deployed.surplus_shares() as f64 / (deployed.ssa_part_size + deployed.surplus_shares()) as f64;
+        assert!(
+            tolerated >= 0.70,
+            "the deployed surplus must tolerate at least 70 % per-share loss, tolerating {tolerated:.3}"
+        );
     }
 
     /// Both SSA batch knobs are bounded by [`MAX_SSA_BATCH_SIZE`], and the `range` attribute on

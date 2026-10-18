@@ -326,24 +326,32 @@ pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 /// measured per-polynomial figures side by side with the share buffers subtracted, which is exactly
 /// this number. Run it to re-derive every figure below.
 ///
+/// **Measured at the deployed dimensions, and it scales with them.** The residue below is a function
+/// of how many shares a polynomial holds — the part builder's received-index set and its residual
+/// bookkeeping grow with `threshold + surplus` — so a re-tune of the split moves it. It was 704 at
+/// `8192 × (64 + 16)`, where a polynomial emits 80 shares; at `4096 × (32 + 79)` a polynomial emits
+/// 111, the residue grew to ~783 B, and 704 left the model *understating* the peak — which the
+/// worst-case share-order test catches, because the model is a ceiling the Session layer's live-cycle
+/// budget is denominated in. Re-derive with that test whenever the deployed dimensions move.
+///
 /// The arithmetic, at the time of writing and at the deployed dimensions:
 ///
-/// * measured per polynomial, share buffers excluded: **~880–905 B**. A range because it is a range: the
-///   acknowledgement residue is a scheduling artefact, and two runs of the same test on the same machine gave 876 B and
-///   904 B. That variance is the reason this constant is set with headroom rather than at the measurement;
-/// * of which `size_of` accounts for **458 B**, leaving a **~420–450 B** residue the types cannot see;
-/// * this constant is **704 B**, ~1.6× that residue, so the model charges 458 + 704 = **1162 B** per polynomial — ~30 %
+/// * measured per polynomial, share buffers excluded: **~1241 B**. A range because it is a range: the
+///   acknowledgement residue is a scheduling artefact, and two runs of the same test on the same machine gave 1241 B and
+///   a lower figure. That variance is the reason this constant is set with headroom rather than at the measurement;
+/// * of which `size_of` accounts for **458 B**, leaving a **~783 B** residue the types cannot see;
+/// * this constant is **1280 B**, ~1.6× that residue, so the model charges 458 + 1280 = **1738 B** per polynomial — ~33 %
 ///   above the measurement;
-/// * across a whole cycle that dilutes to ~6 %, because the share buffers are modelled exactly and dominate: **41.1
-///   MiB** modelled against **38.8 MiB** measured, of which 32.0 MiB is share buffers.
+/// * across a whole cycle that dilutes to ~13 %, because the share buffers are modelled exactly and dominate: **14.8
+///   MiB** modelled against **13.1 MiB** measured, of which 8.0 MiB is share buffers.
 ///
-/// Both headroom figures are worth keeping straight, because they answer different questions: ~30 %
-/// is the margin on the term this constant actually sets, and ~6 % is the margin on the number the
+/// Both headroom figures are worth keeping straight, because they answer different questions: ~40 %
+/// is the margin on the term this constant actually sets, and ~5 % is the margin on the number the
 /// Session layer's live-cycle budget is denominated in.
 ///
 /// Headroom rather than the measured figure for the variance above, and because understating this
 /// would let that budget be exceeded.
-pub const PART_BUILDER_OVERHEAD_BYTES: usize = 704;
+pub const PART_BUILDER_OVERHEAD_BYTES: usize = 1280;
 
 /// The per-polynomial share buffer [`peak_cycle_bytes`] models, in bytes.
 ///
@@ -371,8 +379,8 @@ pub fn peak_share_buffer_bytes<S: PixSpec>(params: &PixParams) -> u64 {
 /// deliberately the **adversarial** peak rather than the conforming one. Nothing constrains the
 /// order in which an Entry emits shares within a cycle: the shipped generator walks polynomials in
 /// blocks of [`SHARE_EMISSION_WINDOW`](crate::SHARE_EMISSION_WINDOW), so only that window holds
-/// share buffers at once and a conforming cycle peaks five times below this — 7.8 MiB against
-/// 39.1 MiB measured at the deployed dimensions — but a peer running anything else can drive *every*
+/// share buffers at once and a conforming cycle peaks below this — a few MiB against
+/// 13.1 MiB measured at the deployed dimensions — but a peer running anything else can drive *every*
 /// polynomial to one share short of its threshold and hold the lot.
 /// `SsaPartBuilder::release_verification_state` frees a buffer when its polynomial reconstructs; a
 /// polynomial one share short never reconstructs.

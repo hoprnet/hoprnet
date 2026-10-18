@@ -69,7 +69,7 @@ pub const CONSTANT_TERM_COEFFICIENT: CoefficientIndex = 0;
 /// `DEFAULT_PIX_SHARES_PER_POLY`, and the Exit's accepted quota range is derived from their
 /// product. Changing either changes what nodes negotiate, and a product that no longer matches
 /// the Exit's range makes every PIX Session fail to establish — so move them together.
-pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
+pub const DEFAULT_POLYS_PER_SSA: u16 = 4096;
 
 /// Minimum number of shares needed to recover one polynomial of an SSA.
 ///
@@ -105,10 +105,17 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
 ///
 /// Under the total column 48 is about 3 % cheaper. That reading is recorded rather than acted on:
 /// it weights one Entry's share generation equally with the Exit work of the 10–30 clients that
-/// Exit serves, which is not where the capacity limit is. Moving the split also moves the
-/// negotiated per-SSA quota and everything derived from it, which is not worth 3 % of a model that
-/// does not describe the bottleneck.
-pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
+/// Exit serves, which is not where the capacity limit is.
+///
+/// **The deployed value is 32, below the Exit-only optimum of ~54, and that is a deliberate
+/// trade.** This table prices one *share*, but the quota prices `polys × (threshold + surplus)`, and
+/// the surplus is a ratio of the threshold that grows as the threshold falls. A configuration that
+/// tolerates 50 % share loss therefore needs a *lower* threshold to be cheap: at `polys = 4096`,
+/// `t = 32, s = 79` is 629.6 MiB per cycle where `t = 64, s = 128` is 1078 MiB. The Exit pays ~5 %
+/// more per share at 32 than at 54, and the Entry pays ~40 % less quota per cycle — which is the
+/// side that pays in money rather than in CPU. See [`DEFAULT_SURPLUS_SHARES`] for the loss tolerance
+/// that fixes the surplus, and note that `s/(t+s)` is what the tolerance depends on, not `s` alone.
+pub const DEFAULT_POLY_THRESHOLD: u8 = 32;
 
 /// Share loss a polynomial's surplus is sized to absorb, as a reciprocal: `1/5` is 20 %.
 ///
@@ -165,9 +172,23 @@ pub const fn default_surplus_for(threshold: u8) -> u8 {
 /// being harmless once the per-SSA quota started counting it, because the quota is a `const` and had
 /// to pick one of the two.
 ///
-/// Only the value of [`default_surplus_for`] at the default threshold. Anything that knows its own
-/// threshold should call that instead — this constant cannot, which is exactly the defect above.
-pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLY_THRESHOLD);
+/// No longer [`default_surplus_for`] at the default threshold.
+///
+/// That derivation sizes the surplus to absorb 20 % of a polynomial's shares, which is a reasonable
+/// default for a healthy path and is what `additional_shares: None` still resolves to. It is not
+/// enough for the loss this protocol is deployed against: at [`DEFAULT_POLYS_PER_SSA`] polynomials a
+/// cycle recovers only if *every* one does, so a 20 % per-share tolerance compounds to a per-cycle
+/// failure rate that no realistic return path survives — `0.999...^4096` is unforgiving.
+///
+/// 79 with a threshold of 32 is `surplus/(threshold + surplus) = 0.712`, which carries a 50 %
+/// per-share loss at 99 % of cycles. That is the configuration the localcluster soak exercises with
+/// a relay killed mid-run, and it is the point of the defaults being what they are: a deployment
+/// that does nothing gets the tolerance the protocol was sized for, rather than a ratio chosen
+/// before the exponent was accounted for.
+///
+/// It remains a *default*, not a bound. `additional_shares: None` derives the ratio instead, and
+/// any explicit value within the wire byte is accepted — see the note above `SsaGeneratorConfig`.
+pub const DEFAULT_SURPLUS_SHARES: u8 = 79;
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;

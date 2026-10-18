@@ -650,7 +650,7 @@ pub struct SupervisorConfig {
     ///
     /// Two things it costs, both linear in the value:
     ///
-    /// * Up to two batches can own live reconstructor state — worst case ≈41 MiB per cycle at the profiled dimensions,
+    /// * Up to two batches can own live reconstructor state — worst case ≈15 MiB per cycle at the profiled dimensions,
     ///   per `hopr_protocol_pix::peak_cycle_bytes`. That cost is reserved up front against
     ///   `IncomingSessionPixConfig::max_live_cycle_bytes`; the supervisor enforces the two-generation/full-cycle bound
     ///   before allocating, so this value directly divides the number of PIX Sessions the node will admit.

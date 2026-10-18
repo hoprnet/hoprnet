@@ -387,8 +387,8 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
 ///   burst of thousands of `SsaCommit` packets, and its own `ReadyToDeposit` — i.e. its own on-chain deposit.
-/// * Exit: every entry is a live reconstructor cycle, held until that cycle recovers — worst case ≈41 MiB at the
-///   deployed dimensions (`hopr_protocol_pix::peak_cycle_bytes`), so ≈820 MiB per Session at this ceiling, before the
+/// * Exit: every entry is a live reconstructor cycle, held until that cycle recovers — worst case ≈15 MiB at the
+///   deployed dimensions (`hopr_protocol_pix::peak_cycle_bytes`), so ≈270 MiB per Session at this ceiling, before the
 ///   pipelining factor. That is what a Session reserves against [`IncomingSessionPixConfig::max_live_cycle_bytes`], so
 ///   raising the batch size directly divides how many PIX Sessions the node will accept.
 ///
@@ -12296,16 +12296,16 @@ mod tests {
             LOCAL_PIX_SUITE,
         )?;
         let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
-        assert_eq!(655_360, cycle);
+        assert_eq!(454_656, cycle);
 
         let undiscounted = hopr_protocol_pix::min_emission_for_early_recovery(
             &params,
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
-        assert_eq!(569_140, undiscounted);
+        assert_eq!(377_498, undiscounted);
 
         let required = required_returned_packets(&params, 1);
-        assert_eq!(455_312, required);
+        assert_eq!(108_828, required);
         assert_eq!(
             undiscounted * DEFAULT_PIX_SHARES_PER_POLY as u64
                 / (DEFAULT_PIX_SHARES_PER_POLY + DEFAULT_PIX_SURPLUS_SHARES) as u64,
@@ -12315,8 +12315,8 @@ mod tests {
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.694..0.696).contains(&fraction),
-            "the deployed successor boundary must sit at ~69.5% of a cycle's returned packets, got {fraction}"
+            (0.239..0.240).contains(&fraction),
+            "the deployed successor boundary must sit at ~23.9% of a cycle's returned packets, got {fraction}"
         );
 
         // Each further cycle of a batch is demanded in full, at the same discount.

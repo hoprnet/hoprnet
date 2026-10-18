@@ -171,10 +171,11 @@ impl EmissionProgress {
 /// window emits its entire surplus before the next window starts. So every window before the one
 /// holding the boundary has already spent `threshold + surplus` per polynomial, not `threshold`.
 ///
-/// At the deployed 8192 × 64 (+16) that is 27 whole windows — 552 960 shares — plus 63 full passes
-/// and 52 shares of the 64th in the 28th window, i.e. **86.8 % of the cycle**. Dividing the Exit's
-/// 0.85 by the 1.25× surplus factor gives 68 %, and admitting there would hand out the next deposit
-/// roughly 171 MiB of quota before it could possibly have been earned.
+/// At the deployed 4096 × (32 + 79) that is 13 whole windows — 3328 polynomials, `3328 × 111`
+/// shares — plus 31 full passes of the 14th and 154 shares of its 32nd, i.e. **83.0 % of the cycle**.
+/// Dividing the Exit's 0.85 by the 3.47× surplus factor gives 24 %, and admitting there would hand
+/// out the next deposit a large fraction of a cycle's quota before it could possibly have been
+/// earned.
 ///
 /// ## Which threshold to pass
 ///
@@ -1132,28 +1133,31 @@ mod tests {
     ///
     /// Pins the deployed number, because that is what the Entry's successor gate compares against and
     /// it is not something a reader can check by inspection. The naive
-    /// `early_threshold / surplus_factor` gives 68 %; the truth is 86.8 %, and the gap is a whole
+    /// `early_threshold / surplus_factor` gives a materially lower fraction, and the gap is a whole
     /// batch's worth of deposit exposure.
     #[test]
     fn early_recovery_boundary_is_computed_from_the_emission_windows() -> anyhow::Result<()> {
         let params =
             PixParams::try_new_for::<TestSpec>(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD, DEFAULT_SURPLUS_SHARES)?;
         let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
-        assert_eq!(655_360, cycle);
+        assert_eq!(454_656, cycle);
 
-        // 27 whole windows (552 960 shares), then 63 full passes of the 28th plus 52 shares of its
-        // 64th — the instant the 6964th polynomial reaches its threshold.
+        // 13 whole windows (3328 polynomials, `3328 x 111` shares), then 31 full passes of the 14th
+        // plus 154 shares of its 32nd — the instant the 3482nd polynomial reaches its threshold.
         let boundary = min_emission_for_early_recovery(&params, 0.85);
-        assert_eq!(552_960 + 63 * 256 + 52, boundary);
+        assert_eq!(3328 * 111 + 31 * 256 + 154, boundary);
 
+        // The surplus factor is now much larger, so the naive estimate is further below the truth
+        // than it was — which is the point of computing the boundary rather than estimating it.
         let fraction = boundary as f64 / cycle as f64;
         assert!(
-            (0.868..0.869).contains(&fraction),
-            "the deployed boundary must be ~86.8% of emission, got {fraction}"
+            (0.830..0.831).contains(&fraction),
+            "the deployed boundary must be ~83.0% of emission, got {fraction}"
         );
+        let naive = 0.85 / (DEFAULT_SURPLUS_SHARES as f64 / DEFAULT_POLY_THRESHOLD as f64 + 1.0);
         assert!(
-            fraction > 0.85 / 1.25,
-            "the naive surplus-factor estimate must be demonstrably below the real boundary"
+            fraction > naive,
+            "the naive surplus-factor estimate ({naive}) must be demonstrably below the real boundary"
         );
 
         Ok(())
@@ -1319,11 +1323,11 @@ mod tests {
             );
         }
 
-        assert_eq!(
-            DEFAULT_SURPLUS_SHARES,
-            crate::default_surplus_for(DEFAULT_POLY_THRESHOLD),
-            "the constant must stay the ratio evaluated at the default threshold, not drift from it"
-        );
+        // `DEFAULT_SURPLUS_SHARES` is deliberately *not* `default_surplus_for(DEFAULT_POLY_THRESHOLD)`
+        // any more — the derived ratio is a 20 % tolerance, which a 4096-polynomial cycle compounds
+        // into a failure rate no return path survives. The relation this test used to assert is
+        // therefore gone by design; what still has to hold is that the deployed default is itself
+        // admissible, which the tests below cover.
     }
 
     /// A derived surplus must never fail the validator it is derived under.
