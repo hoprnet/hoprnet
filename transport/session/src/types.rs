@@ -1026,8 +1026,8 @@ mod tests {
         )?);
         assert!(
             deployed > deployed_threshold_only,
-            "the deployed quota {deployed} must exceed the surplus-free quota {deployed_threshold_only} at the \
-             same dimensions"
+            "the deployed quota {deployed} must exceed the surplus-free quota {deployed_threshold_only} at the same \
+             dimensions"
         );
         Ok(())
     }

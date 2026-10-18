@@ -338,7 +338,7 @@ const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
 ///
 /// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
 /// 16192 × 255 = 4 128 960 commitments, about 31× the profiled operating point of 4096 × 32 =
-/// 131 072 (worst case ≈13 MiB of peak reconstructor state per cycle, per
+/// 131 072 (worst case ≈15 MiB of peak reconstructor state per cycle, per
 /// `hopr_protocol_pix::peak_cycle_bytes`). Nothing downstream catches that: the product *is* the
 /// per-cycle quota, and the only guard on it is the peer Exit's `quota_range` rejection — which
 /// protects the Exit, and arrives after this node has already generated the cycle.
@@ -1692,11 +1692,12 @@ mod tests {
         // An unset surplus must derive from the configured threshold, not fall to zero. This is the
         // one field whose `serde(default)` cannot express its own default, so "absent" and "zero"
         // are the two readings that must not be confused — zero surplus is legal and means no loss
-        // tolerance at all.
-        let json = r#"{ "pix": { "ssa_part_size": 32 } }"#;
+        // tolerance at all. 48 rather than the deployed 32, which resolves to
+        // `DEFAULT_SURPLUS_SHARES` instead of the derived ratio — see `PixGlobalConfig::surplus_shares`.
+        let json = r#"{ "pix": { "ssa_part_size": 48 } }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX dimensions must deserialize");
         assert_eq!(None, cfg.pix.additional_shares, "the field itself stays unset");
-        assert_eq!(8, cfg.pix.surplus_shares(), "and resolves to ssa_part_size / 4");
+        assert_eq!(12, cfg.pix.surplus_shares(), "and resolves to ssa_part_size / 4");
 
         let json = r#"{ "pix": { "ssa_part_size": 32, "additional_shares": 30 } }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("an explicit surplus must deserialize");
@@ -1820,10 +1821,12 @@ mod tests {
             deployed.surplus_shares(),
             "the deployed threshold must resolve to the deployed surplus"
         );
-        let tolerated = deployed.surplus_shares() as f64 / (deployed.ssa_part_size + deployed.surplus_shares()) as f64;
+        // `s/(t+s)` is the break-even ratio, not the tolerance: every polynomial of the cycle must
+        // recover, so 0.712 at 4096 polynomials buys a 50 % per-share loss at 99 % of cycles.
+        let ratio = deployed.surplus_shares() as f64 / (deployed.ssa_part_size + deployed.surplus_shares()) as f64;
         assert!(
-            tolerated >= 0.70,
-            "the deployed surplus must tolerate at least 70 % per-share loss, tolerating {tolerated:.3}"
+            ratio >= 0.70,
+            "the deployed surplus must keep s/(t+s) at or above the 0.70 a 50 % share loss needs, got {ratio:.3}"
         );
     }
 

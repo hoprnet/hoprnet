@@ -281,6 +281,10 @@ fn new_polynomial_with_commitment<S: PixSpec>(
     Ok((polynomial, PixGroup::<S>::mul_by_generator(&secret)))
 }
 
+/// Configuration for the [`SsaShareGenerator`].
+///
+/// # The surplus bound
+///
 /// The surplus has no upper bound below the byte the negotiated [`PixParams`] word gives it.
 ///
 /// It used to be rejected above `threshold` — "insurance must not cost more than the payload it
@@ -290,7 +294,7 @@ fn new_polynomial_with_commitment<S: PixSpec>(
 /// it survives a per-share loss rate `p` with probability `P(Binom(t + s, 1 - p) >= t)`. A *cycle*
 /// recovers only if **every** one of `polys` polynomials does — the SSA is the sum of every
 /// polynomial's constant term — so the per-polynomial failure tail is exponentiated and the surplus
-/// needed for a given loss rate is super-linear in it:
+/// needed for a given loss rate is super-linear in it. At 8192 polynomials:
 ///
 /// | threshold | surplus for 50 % loss at 99 % of cycles | ratio |
 /// |---|---|---|
@@ -299,7 +303,10 @@ fn new_polynomial_with_commitment<S: PixSpec>(
 /// | 64 | 128 | 2.0× |
 /// | 128 | 214 | 1.7× |
 ///
-/// At the deployed 8192 polynomials, `surplus = threshold` covers only ~30 % share loss, so a ratio
+/// Halving the polynomial count shaves a few shares off each row — at the deployed 4096 the
+/// threshold-32 row needs 79, which is [`DEFAULT_SURPLUS_SHARES`](crate::DEFAULT_SURPLUS_SHARES).
+///
+/// At 8192 polynomials, `surplus = threshold` covers only ~30 % share loss, so a ratio
 /// bound of one made a 50 %-return-relayer-loss tolerance unreachable at any deployable threshold.
 /// A ratio bound of any size has the same shape of problem: it is tightest where the requirement is
 /// largest, because the required ratio *falls* with the threshold.
@@ -313,7 +320,6 @@ fn new_polynomial_with_commitment<S: PixSpec>(
 /// [`MAX_DEFERRED_ACKS_PER_POLYNOMIAL`](crate::MAX_DEFERRED_ACKS_PER_POLYNOMIAL) — the cap on
 /// deferred acknowledgements is a sufficient condition for never dropping one, not a bound on the
 /// dimensions, and only a prefix of a cycle's shares is ever deferred.
-/// Configuration for the [`SsaShareGenerator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SsaGeneratorConfig {
@@ -352,7 +358,7 @@ pub struct SsaGeneratorConfig {
     /// [`PixParams`] word with `threshold`, so `255` is the most that fits there. There is no
     /// tighter rule: how much insurance a path needs is a property of that path's loss rate, and
     /// the required ratio *falls* as the threshold rises, so any ratio bound would be tightest
-    /// exactly where the requirement is largest. See the note above this type for the derivation.
+    /// exactly where the requirement is largest. See the type-level documentation for the derivation.
     #[default(DEFAULT_SURPLUS_SHARES)]
     pub surplus_shares: u8,
 }
@@ -1312,8 +1318,7 @@ mod tests {
             assert!(surplus > 0, "threshold {threshold} derives no surplus at all");
         }
 
-        // Where the threshold divides exactly the tolerance is the documented 20 % on the nose, and
-        // the deployed threshold is one of those.
+        // Where the threshold divides exactly the tolerance is the documented 20 % on the nose.
         for threshold in [16u8, 32, 48, 64] {
             let surplus = crate::default_surplus_for(threshold);
             let tolerated = surplus as f64 / (threshold as f64 + surplus as f64);
@@ -1332,10 +1337,10 @@ mod tests {
 
     /// A derived surplus must never fail the validator it is derived under.
     ///
-    /// `default_surplus_for` rounds up, so the two meet at the smallest threshold there is: at
-    /// [`MIN_POLY_THRESHOLD`] the derived surplus is 1 against a threshold of 2. Since the surplus
-    /// is now bounded only by the byte, the property under test is that the derivation cannot
-    /// overflow it — which it cannot, since the derived value is at most `threshold / 4`.
+    /// The surplus is now bounded only by the byte it is stored in, so this holds by construction:
+    /// `default_surplus_for` is `threshold / 4` rounded up, which cannot leave a `u8`. It is kept as
+    /// the guard that would catch a bound being reintroduced on `SsaGeneratorConfig` that the
+    /// derivation does not respect.
     #[test]
     fn every_derived_surplus_passes_the_bound_it_is_derived_under() {
         for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
@@ -1351,14 +1356,6 @@ mod tests {
         }
     }
 
-    /// A surplus is bounded at [`MAX_SURPLUS_THRESHOLD_RATIO`] times the threshold it insures.
-    ///
-    /// The boundary rather than an arbitrary over-large value, because the rule is a multiple: the
-    /// interesting cases are on either side of `4 x threshold`.
-    ///
-    /// The cases below the boundary are the ones this bound was widened for. `surplus = threshold`
-    /// used to be the ceiling, and at threshold 16 it is a *useful* configuration — it covers a 50 %
-    /// share loss — so rejecting it forced the ratio below what the loss tolerance needs.
     /// A surplus above the threshold is admissible — the bound this used to enforce was wrong.
     ///
     /// A cycle recovers only if *every* polynomial does, so the surplus needed for a given loss rate
@@ -1368,8 +1365,8 @@ mod tests {
     #[test]
     fn a_surplus_above_the_threshold_is_admissible() {
         for (threshold, surplus) in [
-            // Covers 50 % share loss at 99 % of cycles, at 8192 polynomials. Derived from
-            // `P(Binom(t + s, 0.5) >= t) ^ polys >= 0.99`.
+            // Each covers 50 % share loss at 99 % of cycles at 8192 polynomials, and so with room
+            // to spare at the 4096 used below. Derived from `P(Binom(t + s, 0.5) >= t) ^ polys >= 0.99`.
             (16u8, 54u8),
             (32, 81),
             (64, 128),

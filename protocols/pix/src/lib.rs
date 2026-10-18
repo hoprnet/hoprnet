@@ -187,7 +187,7 @@ pub const fn default_surplus_for(threshold: u8) -> u8 {
 /// before the exponent was accounted for.
 ///
 /// It remains a *default*, not a bound. `additional_shares: None` derives the ratio instead, and
-/// any explicit value within the wire byte is accepted — see the note above `SsaGeneratorConfig`.
+/// any explicit value within the wire byte is accepted — see [`SsaGeneratorConfig`] for why.
 pub const DEFAULT_SURPLUS_SHARES: u8 = 79;
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].

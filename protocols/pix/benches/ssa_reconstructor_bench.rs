@@ -67,11 +67,11 @@ const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 /// Surplus shares emitted per polynomial beyond the deployed threshold.
 ///
-/// Derived, not flat: the surplus is a ratio of the threshold sized to absorb 20 % share loss, so a
-/// sweep that varies the threshold has to vary this with it. A flat value would model a different
-/// loss tolerance at every point — and above threshold 16 a flat 20 no longer even validates, since
-/// the insurance would exceed the payload it insures.
-const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
+/// The deployed value, which is *not* the derived ratio at [`PROD_THRESHOLD`] — see
+/// `hopr_protocol_pix::DEFAULT_SURPLUS_SHARES` for why. The swept groups still derive the ratio from
+/// their own threshold (see [`gen_cfg`]), since a flat count would model a different loss tolerance at
+/// every point of the sweep.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
 
 /// Coefficient commitments carried by one `SsaCommit` message.
 ///

@@ -53,11 +53,11 @@ const QUOTA_BYTES_PER_SHARE: u64 = 1452;
 
 /// Surplus shares emitted per polynomial beyond the threshold.
 ///
-/// Derived from the threshold — a ratio sized to absorb 20 % share loss — rather than a flat count.
-/// The cycle is `polys × (threshold + surplus)` shares long, so this decides how much of the
-/// profile's wall clock is spent walking one, and a flat value would mean a different cycle length
-/// relative to the threshold at every dimension.
-const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
+/// The deployed value, which is *not* the derived ratio at [`PROD_THRESHOLD`] — see
+/// `hopr_protocol_pix::DEFAULT_SURPLUS_SHARES` for why. The cycle is `polys × (threshold + surplus)`
+/// shares long, so this decides how much of the profile's wall clock is spent walking one; deriving
+/// it here profiled a cycle a third the length of the deployed one.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
 
 /// Operating point being modelled: per-Session return-path rate, in bytes per second.
 ///
