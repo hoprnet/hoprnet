@@ -363,17 +363,14 @@ fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), Validatio
         ));
     }
 
-    // An explicit surplus above the threshold buys more redundancy than payload, and — since H5 put
-    // the surplus in the negotiated `PixParams` and hence in the billed quota — pays for it on every
-    // deposit. `hopr-protocol-pix` enforces the same rule on `SsaGeneratorConfig`; checking it here
-    // too turns it into a config-load error naming the operator's own field, rather than one about a
-    // struct they never wrote.
-    if cfg.surplus_shares() > cfg.ssa_part_size {
-        return Err(ValidationError::new(
-            "additional_shares must not exceed ssa_part_size — the surplus is billed, so this pays for more \
-             redundancy than payload",
-        ));
-    }
+    // No bound on the surplus beyond the byte the field itself carries. It used to be capped at
+    // `ssa_part_size` — "insurance must not cost more than the payload it insures" — and that rule
+    // was wrong: the ratio a path needs *falls* as the threshold rises, so a ratio bound is tightest
+    // exactly where the requirement is largest, and at one it made a 50 %-return-relayer-loss
+    // tolerance unreachable. See the note above `SsaGeneratorConfig` in `hopr-protocol-pix` for the
+    // derivation. The surplus is billed, but that is an argument for choosing it deliberately rather
+    // than for refusing a value the wire can carry; an extravagant one inflates the quota and is
+    // refused by the peer Exit's `quota_range`, where the price is actually known.
 
     Ok(())
 }
@@ -1697,59 +1694,58 @@ mod tests {
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("an explicit surplus must deserialize");
         assert_eq!(30, cfg.pix.surplus_shares(), "an explicit surplus is passed through");
 
-        let json = r#"{ "pix": { "ssa_part_size": 16, "additional_shares": 20 } }"#;
+        // A surplus above the threshold is legal now: the ratio a path needs falls as the threshold
+        // rises, so the old `surplus <= threshold` rule was tightest where the requirement was
+        // largest. 65 against 16 is a real choice, not a typo, and only the wire byte bounds it.
+        let json = r#"{ "pix": { "ssa_part_size": 16, "additional_shares": 65 } }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("it parses; validation is what rejects it");
         assert!(
-            cfg.validate().is_err(),
-            "a surplus above the threshold must be rejected — 20 shares of insurance against 16 of payload"
+            cfg.validate().is_ok(),
+            "a surplus above the threshold must be accepted — only the wire byte bounds it"
         );
     }
 
-    /// The surplus has two upper bounds, and the tighter one is `ssa_part_size`.
+    /// The surplus has exactly one upper bound: the byte the wire gives it.
     ///
-    /// `range(max = 255)` is the byte the negotiated `PixParams` word gives the field; the schema
-    /// check is "insurance must not exceed the payload it insures". Since `ssa_part_size` is itself
-    /// capped at 255, the second subsumes the first — the range attribute survives because it fails
-    /// *keyed on the field*, naming the limit, where the schema check can only report against the
-    /// struct.
+    /// `range(max = 255)` is that byte. It used to be joined by a schema check capping the surplus
+    /// at the threshold — "insurance must not cost more than the payload it insures" — and that rule
+    /// was wrong, because the ratio a path needs *falls* as the threshold rises. See the note above
+    /// `SsaGeneratorConfig` in `hopr-protocol-pix` for the derivation.
     ///
-    /// Both are asserted because a `range` attribute on an `Option` is not obviously live: the
-    /// crate has no other instance of one, and an attribute that silently validated nothing would
-    /// look exactly like this one. It does fire — validator 0.21 unwraps the `Option` — and this is
-    /// what would notice if that changed.
+    /// The `range` attribute is asserted because one on an `Option` is not obviously live: the crate
+    /// has no other instance of one, and an attribute that silently validated nothing would look
+    /// exactly like this one. It does fire — validator 0.21 unwraps the `Option` — and this is what
+    /// would notice if that changed.
     #[test]
-    fn the_surplus_is_bounded_by_the_threshold_it_insures() {
-        let at_bound = PixGlobalConfig {
-            ssa_part_size: 64,
-            additional_shares: Some(64),
-            ..Default::default()
-        };
-        at_bound
-            .validate()
-            .expect("a surplus equal to the threshold is allowed — over-insuring a lossy path is a real choice");
+    fn the_surplus_is_bounded_only_by_the_wire_byte() {
+        // A surplus that covers a 50 % share loss at a low threshold, which the previous
+        // `surplus <= threshold` rule rejected outright. At threshold 32 a cycle needs 81 surplus
+        // shares to survive half its shares going missing, and the old bound refused anything above
+        // 32.
+        for (ssa_part_size, additional_shares) in [(32usize, 81usize), (16, 54), (64, 128), (64, 255)] {
+            let cfg = PixGlobalConfig {
+                ssa_part_size,
+                additional_shares: Some(additional_shares),
+                ..Default::default()
+            };
+            cfg.validate().unwrap_or_else(|e| {
+                panic!("threshold {ssa_part_size} with surplus {additional_shares} must be admissible: {e}")
+            });
+        }
 
-        let past_bound = PixGlobalConfig {
-            additional_shares: Some(65),
-            ..at_bound
-        };
-        let errors = past_bound
-            .validate()
-            .expect_err("one share past the threshold must be rejected");
-        assert!(
-            errors.field_errors().contains_key("__all__"),
-            "the schema check is what enforces the tighter bound"
-        );
-
+        // The field's own byte range: a value that cannot fit the `PixParams` byte must be refused
+        // by the field range, which fires through the `Option` rather than only via a schema check.
         let past_the_wire_byte = PixGlobalConfig {
-            additional_shares: Some(300),
-            ..at_bound
+            ssa_part_size: 64,
+            additional_shares: Some(256),
+            ..Default::default()
         };
         let errors = past_the_wire_byte
             .validate()
             .expect_err("a surplus that cannot fit the PixParams byte must be rejected");
         assert!(
             errors.field_errors().contains_key("additional_shares"),
-            "the field range must still fire through the Option, not only the schema check"
+            "the field range must fire through the Option, not only a schema check"
         );
     }
 
