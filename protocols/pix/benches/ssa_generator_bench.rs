@@ -8,13 +8,13 @@
 //! | --------------------- | ---------- |
 //! | polynomials per SSA   | 4 096 – 8 192 |
 //! | threshold             | 16 – 64 |
-//! | surplus shares        | `threshold/4`, covering 20 % share loss |
+//! | surplus shares        | sized for 50 % share loss at 99 % of cycles — 79 at 4 096 × 32 |
 //! | SSAs in flight        | 2 – 3 per Session |
 //! | per-Session rate      | 16 – 20 Mbps |
 //! | clients per Exit      | 10 – 30 |
 //!
 //! Quota follows from the first three — `polys × (threshold + surplus) × SESSION_MTU`, per
-//! `pix_params_to_quota` in `transport/session/src/types.rs` — and spans roughly 119 MB to 952 MB
+//! `pix_params_to_quota` in `transport/session/src/types.rs` — and spans roughly 404 MB to 2.3 GB
 //! across the box. It is an *output*, which is why the sweeps below cover the box rather than an
 //! iso-quota diagonal: holding the product fixed models a trade no deployment actually makes.
 //!
@@ -52,14 +52,14 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// removed.
 const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
-/// Surplus shares emitted per polynomial, derived from the threshold being swept.
+/// Surplus shares emitted per polynomial at the point being swept, resolved the way a node with
+/// `additional_shares` unset resolves it (`PixGlobalConfig::surplus_shares` in `hopr-transport`).
 ///
-/// A function rather than a constant, because the surplus *is* a ratio of the threshold — sized to
-/// absorb 20 % share loss — and a sweep that varies the threshold while holding the surplus fixed
-/// would silently vary the loss tolerance instead, from 20 % at one end to something else at the
-/// other. See `default_surplus_for` in `hopr-protocol-pix`.
-fn prod_surplus(threshold: u8) -> u8 {
-    hopr_protocol_pix::default_surplus_for(threshold)
+/// A function rather than a constant: the surplus a fixed loss tolerance needs depends on both
+/// dimensions, and a sweep that held it fixed would silently vary the tolerance instead. At the
+/// deployed point this is `DEFAULT_SURPLUS_SHARES`, so the always-measured point is the shipped one.
+fn prod_surplus(polys: u16, threshold: u8) -> u8 {
+    hopr_protocol_pix::default_surplus_for(polys, threshold)
 }
 
 // The production operating box, per the module documentation. The last entry of each is the
@@ -74,10 +74,13 @@ fn prod_surplus(threshold: u8) -> u8 {
 // compiled but modelled polynomial counts no deployment runs. Both mistakes have the same root:
 // choosing the sweep from an idea about the parameter space rather than from what nodes are
 // configured with.
+//
+// The literals are the rest of the box *excluding* the deployed value, which the last entry adds;
+// the check below keeps a re-tune from landing the deployed value on a literal.
 #[cfg(feature = "all-benchmarks")]
-const THRESHOLDS: [u8; 4] = [16, 32, 48, PROD_THRESHOLD];
+const THRESHOLDS: [u8; 4] = [16, 48, 64, PROD_THRESHOLD];
 #[cfg(feature = "all-benchmarks")]
-const POLYNOMIALS: [u16; 3] = [4096, 6144, PROD_POLYS_PER_SSA];
+const POLYNOMIALS: [u16; 3] = [6144, 8192, PROD_POLYS_PER_SSA];
 
 #[cfg(not(feature = "all-benchmarks"))]
 const THRESHOLDS: [u8; 1] = [PROD_THRESHOLD];
@@ -97,6 +100,33 @@ const _: () = {
             POLYNOMIALS[i] <= hopr_protocol_pix::MAX_POLYS_PER_SSA,
             "swept polynomial count exceeds MAX_POLYS_PER_SSA and would panic at run time"
         );
+        i += 1;
+    }
+};
+
+/// Compile-time check that no sweep repeats a point.
+///
+/// Criterion panics on a repeated `BenchmarkId` within a group — before any filter applies, so a
+/// duplicate takes down the whole binary, `--list` included. The sweeps mix literals with the
+/// deployed constants, and moving the deployed threshold to 32 made `[16, 32, 48, PROD_THRESHOLD]`
+/// exactly that.
+const _: () = {
+    let mut i = 0;
+    while i < THRESHOLDS.len() {
+        let mut j = i + 1;
+        while j < THRESHOLDS.len() {
+            assert!(THRESHOLDS[i] != THRESHOLDS[j], "THRESHOLDS repeats a point");
+            j += 1;
+        }
+        i += 1;
+    }
+    let mut i = 0;
+    while i < POLYNOMIALS.len() {
+        let mut j = i + 1;
+        while j < POLYNOMIALS.len() {
+            assert!(POLYNOMIALS[i] != POLYNOMIALS[j], "POLYNOMIALS repeats a point");
+            j += 1;
+        }
         i += 1;
     }
 };
@@ -140,7 +170,7 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                             let cfg = SsaGeneratorConfig {
                                 threshold,
                                 polynomials_per_ssa,
-                                surplus_shares: prod_surplus(threshold),
+                                surplus_shares: prod_surplus(polynomials_per_ssa, threshold),
                             };
                             (SsaShareGenerator::<TestSpec>::new(cfg), SimplePseudonym::random())
                         },
@@ -173,7 +203,8 @@ fn bench_verify_reconstructed(c: &mut Criterion) {
         let cfg = SsaGeneratorConfig {
             threshold,
             polynomials_per_ssa: 1,
-            surplus_shares: prod_surplus(threshold),
+            // The surplus a deployed-width cycle emits, not one a single-polynomial cycle would need.
+            surplus_shares: prod_surplus(PROD_POLYS_PER_SSA, threshold),
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
         let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
@@ -234,7 +265,9 @@ fn bench_next_share(c: &mut Criterion) {
                 let cfg = SsaGeneratorConfig {
                     threshold,
                     polynomials_per_ssa: NEXT_SHARE_BENCH_POLYS,
-                    surplus_shares: prod_surplus(threshold),
+                    // Per polynomial as a deployed-width cycle emits them; the narrowing is only of
+                    // the polynomial count.
+                    surplus_shares: prod_surplus(PROD_POLYS_PER_SSA, threshold),
                 };
                 // A commitment yields `polys * (threshold + surplus)` shares before the
                 // generator runs dry and starts returning `Ok(None)`.

@@ -522,7 +522,7 @@ async fn await_milestones(
 /// which at fill's rate is minutes. Two cycles' worth keeps the queue shallow enough that this cannot
 /// dominate, while still covering the Exit between refills.
 ///
-/// Production does not have the problem: the shipped 7 000 SURBs against a 655 360-packet cycle is
+/// Production does not have the problem: the shipped 7 000 SURBs against a 454 656-packet cycle is
 /// one per cent of a cycle, so the share-less run between cycles is a rounding error rather than the
 /// whole buffer.
 #[cfg(feature = "session-client")]

@@ -188,8 +188,8 @@ pub const PIX_QUOTA_BYTES_PER_SHARE: SsaQuota = SESSION_MTU as SsaQuota;
 /// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
 /// shares (`SsaShareGenerator::next_share`), whether or not any were lost, and each share rides back
 /// on one Exit → Entry data packet — so this is exactly the traffic the Exit serves per cycle.
-/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.25× factor is a
-/// fifth of all Exit → Entry traffic.
+/// Charging the threshold alone left the surplus unpaid, which at the deployed 3.47× factor is 71 %
+/// of all Exit → Entry traffic.
 ///
 /// The surplus is insurance the Entry buys against share loss, and it is billed like insurance: on
 /// purchase, not on claim. One deposit per cycle at this rate is what makes paid-for equal served.
@@ -235,13 +235,13 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// So raising `threshold` (and lowering `polys`) buys a proportionally smaller commitment phase at
 /// the cost of more interpolation, later fault detection and more Entry evaluation.
 ///
-/// Both sides have since been measured, and `8192 × 64` stands — see
-/// [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the tables. The objective is **Exit
-/// reconstruction capacity**, because the Exit serves 10–30 clients while an Entry serves only
-/// itself: on that measure the deployed threshold is within 0.4 % of the optimum, and the fixed
-/// per-polynomial cost the Exit amortises over `threshold` shares means a *lower* threshold is
-/// worse, not better. Summing Entry and Exit per-share cost instead would favour 48 by about 3 %;
-/// that reading is recorded there and deliberately not acted on.
+/// Both sides have since been measured — see [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the
+/// tables. The objective is **Exit reconstruction capacity**, because the Exit serves 10–30 clients
+/// while an Entry serves only itself, and on that measure the Exit-only optimum sits around 54 and
+/// is flat within 0.5 % from 48 to 64. The deployed split has since moved below that, to 32, for a
+/// reason the cost model does not weigh: the surplus is a *ratio* of the threshold, so a lower
+/// threshold makes the 50 %-loss configuration cheaper in absolute quota even though it costs the
+/// Exit more per share. The tables there carry that reading.
 ///
 /// The quota is fixed by `polys × (threshold + surplus)`, so the split can be re-tuned without
 /// touching session negotiation as long as that product holds.
@@ -1003,10 +1003,29 @@ mod tests {
             "a surplus of half the threshold must cost half the threshold's quota again"
         );
 
-        // And the same, at the surplus this node actually defaults to: `threshold / 4`, i.e. a
-        // deployed factor of 1.25x rather than the 1.5x this test used to describe as "deployed".
+        // And the same, at the surplus this node actually defaults to — sized for a 50 % share loss
+        // rather than the `threshold / 4` it used to be; see `hopr_protocol_pix::default_surplus_for`.
         let deployed = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
-        assert_eq!(threshold_only * 5 / 4, deployed, "the deployed surplus factor is 1.25x");
+        let deployed_factor = (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64) as f64
+            / DEFAULT_PIX_SHARES_PER_POLY as f64;
+        assert!(
+            (deployed_factor - 3.46875).abs() < 1e-9,
+            "the deployed surplus factor is {deployed_factor}x, expected 3.46875x"
+        );
+        // Compared against the same dimensions with no surplus, which is the property that matters:
+        // the deployed surplus is charged for. The absolute figure moves with the deployed split, so
+        // this cannot be stated against the 8192 x 64 literals above.
+        let deployed_threshold_only = pix_params_to_quota(&PixParams::try_new(
+            DEFAULT_PIX_POLYS_PER_SSA,
+            DEFAULT_PIX_SHARES_PER_POLY,
+            0,
+            LOCAL_PIX_SUITE,
+        )?);
+        assert!(
+            deployed > deployed_threshold_only,
+            "the deployed quota {deployed} must exceed the surplus-free quota {deployed_threshold_only} at the same \
+             dimensions"
+        );
         Ok(())
     }
 
@@ -1019,12 +1038,11 @@ mod tests {
                 * SESSION_MTU as u64,
             DEFAULT_PIX_SSA_QUOTA
         );
-        // Anchored on the ratio function rather than on a restatement of it. This line used to read
-        // `DEFAULT_PIX_SHARES_PER_POLY / 2`, which was the ratio before it became `threshold / 4`;
-        // restating it is precisely how it came to disagree with the constant it checks.
+        // Anchored on the derivation rather than on a restatement of it: the surplus depends on both
+        // dimensions, so it is the derivation at *these* two that the quota must price.
         assert_eq!(
             DEFAULT_PIX_SURPLUS_SHARES,
-            hopr_protocol_pix::default_surplus_for(DEFAULT_PIX_SHARES_PER_POLY)
+            hopr_protocol_pix::default_surplus_for(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY)
         );
     }
 
