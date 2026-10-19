@@ -1119,6 +1119,34 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     Ok(())
 }
 
+/// How long [`eventually`] waits for a condition the test is certain to reach, however slowly.
+///
+/// Generous on purpose. These waits end the moment their condition holds, so the figure costs nothing
+/// when things are fast, and it is what keeps a coverage-instrumented build, several times slower, green.
+const DEADLINE: Duration = Duration::from_secs(30);
+
+/// How often [`eventually`] looks at its condition.
+const POLL: Duration = Duration::from_millis(25);
+
+/// How often Bob re-sends an unanswered successor request in the re-send test.
+const RESEND_INTERVAL: Duration = Duration::from_millis(200);
+
+/// Waits until `condition` holds, or fails once [`DEADLINE`] has gone by.
+///
+/// For the conditions a test needs *to become true*. The ones it needs to stay false are asserted
+/// after the wait that makes them meaningful, because no length of waiting proves an absence.
+async fn eventually(what: &str, mut condition: impl FnMut() -> bool) -> Result<()> {
+    let deadline = std::time::Instant::now() + DEADLINE;
+    while !condition() {
+        anyhow::ensure!(
+            std::time::Instant::now() < deadline,
+            "timed out after {DEADLINE:?} waiting for {what}"
+        );
+        tokio_time::sleep(POLL).await;
+    }
+    Ok(())
+}
+
 /// A successor `SsaRequest` that the Entry's gate refuses is sent again by the Exit until the Entry
 /// admits it, and the Session survives the wait. The acceptance test of #8523.
 ///
@@ -1138,18 +1166,25 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// 2. Alice's generator emits up to the boundary, so the Entry's *emission* gate is open and only its *service* gate —
 ///    the packets that came back — can refuse.
 /// 3. Bob is told the first cycle is almost recovered and asks for the successor. Alice refuses it as under-served.
-/// 4. Three seconds pass, twice the delivery deadline. Bob re-sent the byte-identical request throughout, and was still
-///    doing so more than 1.5 s after the first one; Alice committed nothing, announced nothing and sent no `SsaCommit`
-///    for it; nobody sent a `SessionError`, with both Sessions alive; and Bob's reconstructor still holds the
-///    successor's registration, pending and incomplete. Before the re-send the successor's deadline expired at 1.5 s
-///    and it was retired, which dropped that registration. With the first cycle still live that is a tolerated lost
-///    cycle, so the Session stayed open, but without a next cycle: the registration is what tells the two apart.
+/// 4. The test waits until Bob has re-sent the request at least twice more than 1.5 s after the first one, which is the
+///    delivery deadline he gave the batch. That alone shows he outlived it. Every re-send is byte-identical; Alice
+///    committed nothing, announced nothing and sent no `SsaCommit` for it; nobody sent a `SessionError`, with both
+///    Sessions alive; and Bob's reconstructor still holds the successor's registration, pending and incomplete. Before
+///    the re-send the successor's deadline expired at 1.5 s and it was retired, which dropped that registration. With
+///    the first cycle still live that is a tolerated lost cycle, so the Session stayed open, but without a next cycle:
+///    the registration is what tells the two apart.
 /// 5. 1280 keep-alives are dispatched into Alice. They stand in for Bob's service, and the bar is below the boundary
 ///    they cover.
 /// 6. The next re-send is admitted: exactly one `ReadyToDeposit` for the successor on Alice and one `DepositNeeded` on
 ///    Bob, naming one deposit address, the pool asked about the successor once, and one `SsaCommit` burst for it.
-/// 7. Two repeats of the successor request and one stale request for the first cycle are replayed into Alice. Nothing
-///    is announced and nothing is sent, the Session lives, and Bob has stopped re-sending.
+/// 7. Two repeats of the successor request and one stale request for the first cycle are replayed into Alice. The test
+///    then waits until Bob's last re-send is a good many intervals old. Nothing is announced and nothing is sent, the
+///    Session lives, and Bob has stopped re-sending.
+///
+/// Every wait is on a condition with a generous deadline, never a fixed sleep followed by an assertion: this runs
+/// under a coverage-instrumented build that is several times slower, and a duration that is long enough on a laptop
+/// is not long enough there. The assertions that something did *not* happen cannot be made to wait on one, so they
+/// are made after the positive condition they depend on, and a slow machine can only make them pass vacuously.
 #[test(tokio::test)]
 async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Result<()> {
     use std::{
@@ -1194,10 +1229,10 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         pix_config: IncomingSessionPixConfig {
             quota_range: 0..=cycle_quota(&params),
             supervision: SupervisorConfig {
-                // Short enough to count a dozen re-sends inside the test, and long enough apart that
-                // the loop cannot spin. Both are below the delivery time, which is what the
-                // validator requires of them.
-                ssa_request_resend_interval: Duration::from_millis(200),
+                // Short enough that the test does not take long to see Bob keep asking, and long
+                // enough apart that the loop cannot spin. Both are below the delivery time, which is
+                // what the validator requires of them.
+                ssa_request_resend_interval: RESEND_INTERVAL,
                 max_ssa_delivery_time: Duration::from_millis(1500),
                 commitment_recommit_interval: Duration::from_millis(500),
                 ..Default::default()
@@ -1322,7 +1357,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     let target = SealedHost::Plain("127.0.0.1:80".parse()?);
     pin_mut!(new_session_rx_bob);
     let (alice_session, bob_session) = tokio_time::timeout(
-        Duration::from_secs(5),
+        DEADLINE,
         futures::future::join(
             alice_mgr.new_session(
                 bob_peer,
@@ -1349,16 +1384,15 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     // Step 1 — the first cycle, committed and funded. Every `DepositNeeded` observer is *held* until
     // the end: dropping one reports `DepositObserverClosed`, which the supervisor counts as a lost
     // cycle, and that is not what this test is about.
-    let HoprSessionOutPixEvent::ReadyToDeposit(alice_first) =
-        tokio_time::timeout(Duration::from_secs(5), pix_alice_rx.next())
-            .await
-            .map_err(|e| anyhow::anyhow!("timeout waiting for alice's first ReadyToDeposit: {e}"))?
-            .ok_or(anyhow::anyhow!("alice must get a pix event"))?
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_first) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for alice's first ReadyToDeposit: {e}"))?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?
     else {
         anyhow::bail!("expected ReadyToDeposit for the first cycle");
     };
     let HoprSessionOutPixEvent::DepositNeeded(bob_first, mut first_observer) =
-        tokio_time::timeout(Duration::from_secs(5), pix_bob_rx.next())
+        tokio_time::timeout(DEADLINE, pix_bob_rx.next())
             .await
             .map_err(|e| anyhow::anyhow!("timeout waiting for bob's first DepositNeeded: {e}"))?
             .ok_or(anyhow::anyhow!("bob must get a pix event"))?
@@ -1396,12 +1430,6 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         .await
         .context("bob must accept the early recovery signal")?;
 
-    // Step 4 — twice the delivery deadline, which is the whole point. Before the re-send the successor's
-    // deadline expired 1.5 s in and it was retired; with the first cycle still live that was a tolerated
-    // lost cycle, so the Session survived it, and nothing here but the successor's registration shows
-    // the difference.
-    tokio_time::sleep(Duration::from_secs(3)).await;
-
     let requests_for = |index: u32| -> Vec<(Instant, ApplicationData)> {
         bob_requests
             .lock()
@@ -1413,27 +1441,29 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     };
     let commits_for = |index: u32| commit_counts.lock().unwrap().get(&index).copied().unwrap_or_default();
 
-    let resent = requests_for(2);
-    assert!(
-        resent.len() >= 3,
-        "bob must keep asking for the successor while it is refused, got {} requests in 3 s",
-        resent.len()
-    );
-    // Counted by when they arrived rather than as a rate: what separates this from the one-shot request
-    // is that asking went on past the delivery time the batch is given, and under instrumentation the
-    // number that fit into 3 s is not a figure to lean on.
+    // Step 4 — wait for Bob to have asked again after the delivery deadline he gave the batch, which is
+    // the whole point. Before the re-send the successor's deadline expired 1.5 s in and it was retired;
+    // with the first cycle still live that was a tolerated lost cycle, so the Session survived it, and
+    // nothing here but the successor's registration shows the difference.
+    //
+    // Counted by when the requests arrived rather than as a rate, and polled for: the number that fit
+    // into a fixed window is not a figure to lean on under instrumentation, but whether asking went on
+    // past the delivery time is.
     let delivery_time = Duration::from_millis(1500);
-    let first_sent_at = resent[0].0;
-    let late_resends = resent
-        .iter()
-        .filter(|(sent_at, _)| *sent_at > first_sent_at + delivery_time)
-        .count();
-    assert!(
-        late_resends >= 2,
-        "bob must still be asking after the {delivery_time:?} delivery time has passed, got {late_resends} re-sends \
-         later than that out of {}",
-        resent.len()
-    );
+    let late_resends = |resent: &[(Instant, ApplicationData)]| {
+        resent.first().map_or(0, |(first_sent_at, _)| {
+            resent
+                .iter()
+                .filter(|(sent_at, _)| *sent_at > *first_sent_at + delivery_time)
+                .count()
+        })
+    };
+    eventually(
+        "bob to re-send the successor request twice after the delivery time has passed",
+        || late_resends(&requests_for(2)) >= 2,
+    )
+    .await?;
+    let resent = requests_for(2);
     for (_, request) in &resent {
         assert_eq!(
             (&resent[0].1.application_tag, &resent[0].1.plain_text),
@@ -1489,16 +1519,15 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     }
 
     // Step 6 — the next re-send is admitted.
-    let HoprSessionOutPixEvent::ReadyToDeposit(alice_second) =
-        tokio_time::timeout(Duration::from_secs(5), pix_alice_rx.next())
-            .await
-            .map_err(|e| anyhow::anyhow!("timeout waiting for alice's successor ReadyToDeposit: {e}"))?
-            .ok_or(anyhow::anyhow!("alice must get a pix event"))?
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_second) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())
+        .await
+        .map_err(|e| anyhow::anyhow!("timeout waiting for alice's successor ReadyToDeposit: {e}"))?
+        .ok_or(anyhow::anyhow!("alice must get a pix event"))?
     else {
         anyhow::bail!("expected ReadyToDeposit for the successor");
     };
     let HoprSessionOutPixEvent::DepositNeeded(bob_second, second_observer) =
-        tokio_time::timeout(Duration::from_secs(5), pix_bob_rx.next())
+        tokio_time::timeout(DEADLINE, pix_bob_rx.next())
             .await
             .map_err(|e| anyhow::anyhow!("timeout waiting for bob's successor DepositNeeded: {e}"))?
             .ok_or(anyhow::anyhow!("bob must get a pix event"))?
@@ -1518,15 +1547,16 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         "the pool is asked once per batch: the re-sends carried the stored deposit data"
     );
 
-    // Let anything still in flight land before the counts are taken as final.
-    tokio_time::sleep(Duration::from_millis(400)).await;
+    eventually("the whole burst for the successor to have gone out", || {
+        commits_for(2) >= commits_per_burst
+    })
+    .await?;
     assert_eq!(
         commits_per_burst,
         commits_for(2),
         "the admitted request is answered with exactly one burst of commitments"
     );
     assert_eq!(commits_per_burst, commits_for(1));
-    let resends_when_answered = requests_for(2).len();
 
     // Step 7 — the same request again, and a stale one. Alice gets them as a late copy would arrive.
     let recorded = bob_requests.lock().unwrap().clone();
@@ -1550,9 +1580,18 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         )?;
     }
 
-    // Long enough for Alice to have handled all three and for Bob to have re-sent three more times
-    // if he were going to.
-    tokio_time::sleep(Duration::from_millis(800)).await;
+    // Bob stops asking once the Entry has answered. A re-send that was already on its way when the
+    // answer landed may still turn up, so what is waited for is quiet: his last re-send, measured from
+    // when it arrived, is many intervals old. If he never stopped there would always be a recent one
+    // and this would run out its deadline instead. The wait is also what gives Alice time to handle
+    // the three replayed requests before the negative assertions below.
+    eventually("bob to stop re-sending the successor request", || {
+        requests_for(2)
+            .last()
+            .is_some_and(|(sent_at, _)| sent_at.elapsed() > RESEND_INTERVAL * 10)
+    })
+    .await?;
+    let resends_when_answered = requests_for(2).len();
     assert!(
         pix_alice_rx.next().now_or_never().is_none(),
         "neither a repeat nor a stale request may announce a deposit"

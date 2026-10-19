@@ -72,15 +72,17 @@ pub enum SessionManagerError {
     /// found wrong.
     ///
     /// The counterpart of [`Unacceptable`](Self::Unacceptable) for refusals that are *not* terminal. It
-    /// is returned for exactly four causes: the request lost a race for the per-Session request lock;
+    /// is returned for exactly five causes: the request lost a race for the per-Session request lock;
     /// it came too early, before emission reached the successor boundary; it is under-served, since
-    /// the returned packets have not yet earned it; or it is stale, naming indices at or below the
-    /// committed watermark that are not the batch last committed. The Session keeps running and the
-    /// peer is told nothing.
+    /// the returned packets have not yet earned it; it is stale, naming indices at or below the
+    /// committed watermark that are not the batch last committed; or it repeats a batch whose
+    /// publication was cut short, and finishing that publication failed again. The Session keeps
+    /// running and the peer is told nothing.
     ///
-    /// The first three can succeed on a later re-send of the same request, once the lock is free or the
-    /// Entry's state has caught up. A stale request is never admitted. A repeat of the batch last
-    /// committed is not among the causes: it returns `Ok(())` as a no-op. Callers that report errors
+    /// All but the stale request can succeed on a later re-send of the same request, once the lock is
+    /// free, the Entry's state has caught up or the transport has recovered. A stale request is never
+    /// admitted. A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was
+    /// published in full, and after finishing the publication if it was not. Callers that report errors
     /// should treat this as an ordinary outcome rather than a fault.
     #[error("the request was not admitted: {0}")]
     NotAdmitted(String),
