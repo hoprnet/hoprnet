@@ -1075,7 +1075,7 @@ mod tests {
     /// requirement — the bucket only holds shares that arrive before the cycle's commitments
     /// install, which is a prefix, so larger dimensions merely lose the guarantee rather than break.
     /// That is why it is asserted on the defaults here and not enforced in `validate`, where it
-    /// would reject legitimate re-splits such as `4096 x 128`.
+    /// would reject legitimate splits such as `4096 x 128`.
     ///
     /// The behavioural half of the original concern is pinned where it can actually be exercised:
     /// `a_surplus_only_snapshot_is_liveness_without_payment` in the supervisor, which drives a

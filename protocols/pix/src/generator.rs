@@ -1295,6 +1295,7 @@ mod tests {
     fn the_default_surplus_carries_a_cycle_through_half_its_shares_being_lost() {
         for (polys, threshold, surplus) in [
             (1024u16, 32u8, 75u8),
+            (2048, 64, 123),
             (4096, 16, 52),
             (4096, 32, 79),
             (4096, 48, 103),

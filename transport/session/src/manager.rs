@@ -1278,12 +1278,14 @@ pub struct IncomingSessionPixConfig {
     /// only ever reject the shipping defaults. Counting what has actually been committed to is
     /// indifferent to how the ceiling was configured.
     ///
-    /// Default is 3 GiB. At the default dimensions a Session reserves ≈29.6 MiB, so this admits ≈103
-    /// concurrent PIX Sessions, comfortably covering the 10–30 clients per Exit the calibration
-    /// profile models. That is just past the 100 Sessions a node manages by default
-    /// (`maximum_managed_sessions`), which at these dimensions reserve ≈2.9 GiB — so with every
-    /// default in place the Session limit is reached first, and this budget is what binds once peers
-    /// offer a costlier split of the same quota or that limit is raised.
+    /// Default is 3 GiB. At the default dimensions a Session reserves ≈30.7 MiB — two overlapping
+    /// batches of one cycle's peak each — so this admits 100 concurrent PIX Sessions with ≈1.7 MiB to
+    /// spare, comfortably covering the 10–30 clients per Exit the calibration profile models. That
+    /// is exactly the 100 Sessions a node manages by default (`maximum_managed_sessions`), which at
+    /// these dimensions reserve ≈2.998 GiB — so with every default in place the two limits meet and
+    /// this budget is what binds as soon as peers offer a costlier split of the same quota or that
+    /// limit is raised. The margin is pinned by
+    /// `default_live_cycle_budget_admits_the_default_managed_session_count`.
     ///
     /// A ceiling on *reservations*, not an allocation: nothing is claimed up front, and because the
     /// reservation is denominated at the adversarial peak, a node serving conforming peers holds an
@@ -5763,7 +5765,8 @@ where
             // the deployed `4096 × (32 + 79)` the ratio is 71.2 % against a tolerance of 50.3 % — a
             // cycle losing 71.2 % of its shares does not recover — and discounting by it put the bar
             // at 23.9 % of a cycle's packets, below even the 111 424 shares a lossless Exit must have
-            // unlocked to reach its early-recovery point. The tolerance puts it at 41.3 %.
+            // unlocked to reach its early-recovery point. The tolerance puts the mean at 41.3 %; the bound
+            // below sets the bar at 41.0 %.
             //
             // The discount is also what an Exit can withhold for as long as it likes and still have
             // every next deposit funded — one whose first return relayer is its own acknowledges each
@@ -11744,14 +11747,38 @@ mod tests {
         Ok(())
     }
 
+    /// The default live-cycle budget must admit at least as many PIX Sessions as a node manages by
+    /// default, or the Session limit stops being the first one reached and the documented default
+    /// no longer holds.
+    ///
+    /// The per-Session figure is what admission reserves at the default batch of one, not the bare
+    /// peak of one cycle: `cycle_budget_for` multiplies by `MAX_OVERLAPPING_BATCHES`.
+    #[test]
+    fn default_live_cycle_budget_admits_the_default_managed_session_count() {
+        // Default of `maximum_managed_sessions` in `hopr-transport`'s `HoprProtocolConfig`, which is
+        // not visible from this crate; keep in step with it.
+        const DEFAULT_MANAGED_SESSIONS: u64 = 100;
+
+        let per_session = cycle_budget_for(&DEFAULT_PIX_PARAMS, 1);
+        let budget = IncomingSessionPixConfig::default().max_live_cycle_bytes;
+
+        assert!(
+            budget / per_session >= DEFAULT_MANAGED_SESSIONS,
+            "a {budget}-byte budget at {per_session} bytes per Session admits {} Sessions, fewer than the \
+             {DEFAULT_MANAGED_SESSIONS} a node manages by default",
+            budget / per_session
+        );
+    }
+
     /// The Entry must not admit a successor before a default Exit could possibly have produced its
     /// early-recovery request.
     ///
     /// Recovery is counted in completed polynomials, while emission is windowed. Every fully drained
     /// window before the one containing the 85% boundary has already emitted both threshold and
-    /// surplus shares. Dividing 85% by the global 3.47x surplus factor therefore underestimates the
-    /// boundary: at the deployed dimensions the first possible early signal is about 83% through
-    /// emission, not 24.5%.
+    /// surplus shares. Dividing 85% by the global surplus factor therefore underestimates the
+    /// boundary. At the deployed split (`DEFAULT_PIX_PARAMS`, whose factor is 3.47x) the first
+    /// possible early signal is about 83% through emission, not 24.5%; those figures belong to that
+    /// split and move with it.
     ///
     /// The gate compares against `min_emission_for_early_recovery` directly, so this test recomputes
     /// the boundary independently — from the same first principles, but without calling the function
