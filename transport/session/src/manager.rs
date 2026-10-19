@@ -416,8 +416,8 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
 ///   burst of thousands of `SsaCommit` packets, and its own `ReadyToDeposit` — i.e. its own on-chain deposit.
-/// * Exit: every entry is a live reconstructor cycle, held until that cycle recovers — worst case ≈15 MiB at the
-///   deployed dimensions (`hopr_protocol_pix::peak_cycle_bytes`), so ≈135 MiB per Session at this ceiling, before the
+/// * Exit: every entry is a live reconstructor cycle, held until that cycle recovers — worst case ≈15.4 MiB at the
+///   deployed dimensions (`hopr_protocol_pix::peak_cycle_bytes`), so ≈138 MiB per Session at this ceiling, before the
 ///   pipelining factor. That is what a Session reserves against [`IncomingSessionPixConfig::max_live_cycle_bytes`], so
 ///   raising the batch size directly divides how many PIX Sessions the node will accept.
 ///
