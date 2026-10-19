@@ -81,12 +81,15 @@ pub enum SessionManagerError {
     ///
     /// Whether a later request succeeds depends on the cause. The first three can succeed on a later
     /// re-send of the same request, once the lock is free or the Entry's state has caught up, and the
-    /// Exit does re-send while it is unanswered. A stale request is never admitted. A cut-short
-    /// publication is finished only if the Exit asks again, by repeating the request (which it does
-    /// while some member of the batch has reported nothing) or by re-requesting parts of a commitment
-    /// that began to arrive; nothing asks when the batch already holds the front with no message out,
-    /// or when the whole burst went out and only the announcement failed, and then the Exit's own
-    /// deadline ends the cycle. Nothing is stranded in either case, because nothing was announced.
+    /// Exit does re-send a successor while it is unanswered and its batch is behind the front. A stale
+    /// request is never admitted. A cut-short publication is finished only if the Exit asks again: by
+    /// re-requesting parts of a commitment that began to arrive, which works wherever the batch stands,
+    /// or by repeating the request, which it does while some member of the batch has reported nothing
+    /// but only while the batch is behind the front. Nothing asks for a member with no message of it
+    /// out whose batch holds the front (the opening batch always does, so any member after a boundary
+    /// cut there), nor when the whole burst went out and only the announcement failed, and then the
+    /// Exit's own deadline ends the cycle. Nothing is stranded for that member, because nothing was
+    /// announced for it.
     ///
     /// A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was published
     /// in full, and after finishing the publication if it was not. Callers that report errors should

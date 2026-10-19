@@ -166,7 +166,9 @@
 //! never emitted. The Exit's re-request timer asks until just before the cycle's commitment deadline and does not move
 //! it, so a resumed burst — or a repeat that was delayed on the way — can arrive after the Exit has retired the cycle,
 //! and the Entry then announces a deposit for an address nobody can reconstruct. That timing is the re-request's and is
-//! unchanged here.
+//! unchanged here. A re-send is a second source of the same thing: re-sends go on up to the deadline of a member that
+//! has reported a part, which the tick does not push, so the last one — emitted up to one re-send interval before the
+//! Exit retires that member and ends the re-sends — can resume and announce it after the fact.
 //!
 //! Allocation independently enforces the reservation: at most
 //! `MAX_OVERLAPPING_BATCHES` generations and
@@ -892,7 +894,9 @@ pub struct SupervisorConfig {
     /// short has the same exposure with a longer window: the Exit's re-request timer asks until just
     /// before the cycle's commitment deadline and does not move it, so a resumed burst (or a delayed
     /// repeat) can arrive after the cycle was retired, and the Entry then announces a deposit for an
-    /// address nobody can reconstruct.
+    /// address nobody can reconstruct. A re-send is a second source: it goes on up to the deadline of a
+    /// member that has reported a part, which the tick does not push, so the last one can resume and
+    /// announce that member after the Exit has retired it.
     ///
     /// Zero disables re-sending in a config that was not validated; [`validate_pix_supervision`]
     /// rejects it, together with any value at or above `max_ssa_delivery_time` (the pushed deadline

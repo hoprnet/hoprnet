@@ -234,9 +234,27 @@ struct PaidRecoveryTail {
 
 /// A successor batch the Entry has not fully answered, which the supervisor keeps asking for.
 ///
-/// At most one exists, because a successor is requested only once the cycle that asks for it has a
-/// verified commitment, and a verified commitment is an answer: the batch before it is answered
-/// before this one exists. See [`SessionPixSupervisor::resend`].
+/// The supervisor holds this in a single slot, not a set: arming a newer batch replaces whatever the
+/// slot held. One slot is enough because a successor is requested only by the last cycle of the batch
+/// before it, once the reconstructor has verified that cycle's commitment and it has reached its
+/// early-recovery signal. That does not by itself prove every *earlier* member of that batch has
+/// answered — under the per-member rule the last member could be verified while an earlier one has
+/// seen nothing — but three mechanisms elsewhere keep it from happening:
+///
+/// * the Entry emits shares in index order. Its emission window is clamped to the cycle at the front of its queue, so
+///   the last member is not served a share until the earlier members' emission is exhausted;
+/// * the front is only ever advanced through the front. The paid tail is released by
+///   `consume_paid_tail_at_observed_boundary` on the *earliest live cycle's* progress, and an earlier member that has
+///   seen nothing is that cycle, so a later member's progress cannot move it;
+/// * the share-order verdict. `book_share_order_progress` counts every useful share of a later member as off-front
+///   while the unanswered one is the earliest live cycle, and closes the Session with `BatchServedOutOfOrder` once
+///   `min_share_order_sample` shares have been judged and more than `max_off_front_share_fraction` of them are
+///   off-front. By default that sample is 16 384 shares, against the 111 424 useful shares an early-recovery signal
+///   needs at the deployed dimensions, so the Session is closed long before the last member could ask.
+///
+/// Were it to happen anyway, replacing the slot is benign: the member that had heard nothing is left to
+/// its own commitment deadline and times out on it, as it did before any re-send existed. See
+/// [`SessionPixSupervisor::resend`].
 struct PendingResend {
     /// First index of the batch, which is [`PerSsaState::batch_id`] of every member.
     batch_id: u32,
@@ -359,7 +377,10 @@ pub struct SessionPixSupervisor {
     /// timer asks until just before the cycle's commitment deadline and does not move it, so a resumed
     /// burst — or a repeat that was delayed on the way — can arrive after the Exit has retired the
     /// cycle, and the Entry then announces a deposit for an address nobody can reconstruct. That timing
-    /// is the re-request's and is unchanged here.
+    /// is the re-request's and is unchanged here. A re-send is a second source of the same thing:
+    /// re-sends go on up to the deadline of a member that has reported a part, which the tick does not
+    /// push, so the last one — emitted up to one re-send interval before the Exit retires that member
+    /// and ends the re-sends — can resume and announce it after the fact.
     ///
     /// Cleared when every member has reported a commitment part, when any member is retired, when the
     /// carrier reports that it can no longer send this batch, when the batch is found at the front or
@@ -1242,9 +1263,11 @@ impl SessionPixSupervisor {
             return;
         };
 
-        // Replaces rather than refuses when one is already set. At most one batch is ever unanswered,
-        // so a leftover is one whose members have all moved on, and it would clear itself at its next
-        // tick — by which time this batch's confirmation would be too late to arm anything.
+        // Replaces rather than refuses when one is already set: the slot belongs to the newest batch.
+        // The older one is not expected to still be unanswered — see `PendingResend` for why, and for
+        // why replacing it would be benign if it were — and a leftover that has nothing left to ask
+        // would only clear itself at its next tick, by which time this batch's confirmation would be
+        // too late to arm anything.
         self.resend = Some(PendingResend {
             batch_id,
             ssa_ids: self

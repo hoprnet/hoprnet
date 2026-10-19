@@ -646,27 +646,33 @@ struct SessionSsaState {
     /// batch that fails after it was replaced finds its member not wanted back (see [`OwedPublications`]).
     ///
     /// **What this recovers, and what it does not.** Only the Exit can prompt a resumption: by a repeat
-    /// of the request, or by a scoped re-request that names an owed cycle. Both happen in the cases
-    /// that matter most. The Exit re-sends a successor batch, whole, for as long as any member of it has
-    /// reported nothing, so a batch cut at a member boundary is finished by the repeat; and it
-    /// re-requests the parts of a commitment that has started to arrive and gone quiet, so a burst cut
-    /// part-way is finished by the re-request. Nothing prompts a resumption in two cases, and a third
-    /// is given up on:
+    /// of the request, or by a scoped re-request that names an owed cycle. The Exit re-requests the
+    /// parts of a commitment that has started to arrive and gone quiet, so a member cut part-way
+    /// through its burst is finished by the re-request wherever its batch stands — and that resumption
+    /// publishes every member still owed, not only the one named. A member with *no message of it out*
+    /// has nothing to re-request, and only a repeat can reach it. The Exit repeats a successor batch,
+    /// whole, for as long as any member of it has reported nothing, **but only while the batch is behind
+    /// the front**: a batch at the front is never re-sent (the opening batch is at the front from the
+    /// start, and a successor admitted just before the front moved joins it). So, per member, nothing
+    /// prompts a resumption in two cases, and a third is given up on:
     ///
-    /// * a batch that already holds the front, with no message of it out. Nothing re-sends it (the opening batch is
-    ///   never re-sent, and a successor at the front no longer is) and, having received nothing, the Exit has no scope
-    ///   to re-request. It closes on its commitment deadline;
+    /// * a member with no message of it out whose batch holds the front: the opening batch always, or any member after
+    ///   a cut that lands exactly on a member boundary there, when no earlier member has a partial commitment whose
+    ///   re-request would resume it too. The member times out on its commitment deadline;
     /// * a burst that went out whole whose `ReadyToDeposit` could not be queued because the PIX event channel was
     ///   full. The Exit then holds a complete commitment and never asks again. The member is kept owed, in case
     ///   something does;
     /// * a cycle whose retransmissions are spent, which can never be published again. It is dropped from here with one
     ///   warning (see [`resume_publication`]).
     ///
-    /// None of these strands a deposit, because nothing was announced: the Exit's own deadline ends the
-    /// cycle. The opposite hazard exists, though. A resumed burst answers a re-request, and the Exit's
-    /// re-request timer asks until just before the cycle's commitment deadline without moving it, so the
-    /// resumption — or a repeat delayed on the way — can arrive after the Exit has retired the cycle.
-    /// The Entry then announces a deposit for an address nobody can reconstruct.
+    /// None of these strands a deposit, because nothing was announced for the member concerned: the
+    /// Exit's own deadline ends the cycle. The opposite hazard exists, though. A resumed burst answers a
+    /// re-request, and the Exit's re-request timer asks until just before the cycle's commitment
+    /// deadline without moving it, so the resumption — or a repeat delayed on the way — can arrive after
+    /// the Exit has retired the cycle. A re-send is a second source of the same thing: re-sends go on
+    /// up to the deadline of a member that has reported a part, which the tick does not push, so the
+    /// last one — sent up to one interval before the Exit retires that member — can resume and announce
+    /// it afterwards. The Entry then announces a deposit for an address nobody can reconstruct.
     unpublished: parking_lot::Mutex<OwedPublications>,
     /// The refusal this Session last logged, as `(lowest index asked for, SsaRefusal)`, `0` for none.
     ///
@@ -6693,11 +6699,13 @@ where
         // `EXTERNAL_SEND_TIMEOUT`. A failed send does not fail the Session. The member being published
         // goes back to the owed set and a non-fatal `NotAdmitted` is returned, logged once at `warn!`;
         // members after it were never claimed and stay owed too. What happens next is up to the Exit:
-        // its next re-send of this request, or its re-request for a cycle that got part of a burst out,
-        // resumes from there. Two cuts are not recovered, because nothing prompts the Exit to ask again:
-        // a batch that already holds the front with no message out (the opening batch always does), and
-        // a burst that went out whole whose `ReadyToDeposit` could not be queued. In both the Exit's
-        // own deadline ends the cycle, and nothing is stranded because nothing was announced. See
+        // its re-request for a cycle that got part of a burst out resumes from there, and so does its
+        // next re-send of this request — but the Exit re-sends only a batch that is still behind the
+        // front. Two cuts are therefore not recovered, because nothing prompts the Exit to ask again: a
+        // member with no message of it out whose batch holds the front (the opening batch always does,
+        // so any member after a boundary cut there), and a burst that went out whole whose
+        // `ReadyToDeposit` could not be queued. In both the Exit's own deadline ends the cycle, and
+        // nothing is stranded for that member because nothing was announced for it. See
         // `SessionSsaState::unpublished` and `resume_publication`.
         for (staged_quota, burst) in staged {
             // Claimed just before its burst, so that nobody else can publish this member while this
