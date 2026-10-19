@@ -390,17 +390,28 @@ const SUCCESSOR_GATE_ARRIVAL_SIGMAS: f64 = 4.0;
 ///
 /// `floor(max(0, μ − zσ))` for an Exit's arrivals at exactly that loss, `Binomial(target, 1 − L)`:
 /// `μ = target · (1 − L)`, `σ = √(target · L · (1 − L))` and `z` [`SUCCESSOR_GATE_ARRIVAL_SIGMAS`].
-/// A split with no surplus tolerates no loss, so σ is zero and the whole target is demanded exactly;
-/// a tolerance near one clamps at nothing.
+/// A split with no surplus tolerates no loss, so σ is zero and the whole target is demanded exactly.
+///
+/// A tolerance near one floors at one packet, not zero, for any non-zero target: the bound is at most
+/// `μ ≤ target`, so one is never more than the boundary itself. Without it a tiny boundary under a
+/// huge surplus (`128 × (2 + 255)`: μ 10.8, σ 3.2) demands nothing, the near-miss wait never starts
+/// on zero returned packets, and the successor is funded on the Entry's own emission alone. An Exit
+/// that has returned nothing since its first commitment has shown no service whatever split the Entry
+/// chose. The cost is an honest Exit at the tolerated loss returning nothing with probability
+/// `L^target` — 1.5 × 10⁻⁵ at `128 × (2 + 255)`, the order of the 4σ bound's own 3 × 10⁻⁵ — and
+/// it bites only at degenerate cycles of a few dozen packets (`8 × (2 + 255)`: 0.59), where no
+/// statistic means anything.
 ///
 /// An `f64` carries both terms to well under a packet below a watermark of 10⁹ cycles.
 fn successor_required_packets(target: u64, tolerated_loss: f64) -> u64 {
+    let bar_floor = target.min(1);
     let target = target as f64;
     let delivered = 1.0 - tolerated_loss;
     let mean = target * delivered;
     let deviation = (target * tolerated_loss * delivered).sqrt();
     // The cast floors, the clamped bound being non-negative.
-    (mean - SUCCESSOR_GATE_ARRIVAL_SIGMAS * deviation).max(0.0) as u64
+    let bound = (mean - SUCCESSOR_GATE_ARRIVAL_SIGMAS * deviation).max(0.0) as u64;
+    bound.max(bar_floor)
 }
 
 /// Minimum timeout until an unfinished frame is discarded.
@@ -12529,13 +12540,82 @@ mod tests {
         Ok(())
     }
 
+    /// A tiny boundary under a huge surplus must still demand one returned packet.
+    ///
+    /// At `128 × (2 + 255)` the early-recovery boundary is 237 packets against a tolerated loss of
+    /// ~95 %: μ − 4σ is below one, and an unfloored bar of zero funds the successor on the Entry's
+    /// own emission with nothing returned — the near-miss wait is skipped on zero observed packets, so
+    /// nothing else would stop it.
+    #[test_log::test(tokio::test)]
+    async fn the_successor_gate_demands_a_returned_packet_whatever_the_surplus() -> anyhow::Result<()> {
+        let params = PixParams::try_new(128, 2, 255, LOCAL_PIX_SUITE)?;
+        let target = hopr_protocol_pix::min_emission_for_early_recovery(
+            &params,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
+        );
+        assert_eq!(237, target);
+
+        let tolerated = params.tolerated_share_loss();
+        let mean = target as f64 * (1.0 - tolerated);
+        let deviation = (target as f64 * tolerated * (1.0 - tolerated)).sqrt();
+        let raw_bound = mean - SUCCESSOR_GATE_ARRIVAL_SIGMAS * deviation;
+        assert!(
+            raw_bound < 1.0,
+            "the unfloored bound must be below one packet, got {raw_bound}"
+        );
+        assert_eq!(1, required_returned_packets(&params, 1));
+
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        for sent in 1..=target as u32 {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+            )
+            .await
+            .expect_err("a successor with no returned packet must be refused");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+
+        credit_returned_packets(&mgr, &pseudonym, 1);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("a successor with one returned packet must be admitted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     /// The bar is a lower confidence bound on an honest Exit's arrivals, not their mean.
     ///
     /// Pinned against `floor(μ − 4σ)` computed outside this crate from independently computed
     /// tolerances: at the deployed split, at one an Entry distrusting its return relayers may buy, and
     /// at the derived `2048 × (64 + 123)`, where the mean refused an honest Exit. The ends are what tie
     /// the bound to the split — no surplus, no tolerance and so no slack; a tolerance near one asks
-    /// for nothing rather than for a negative count.
+    /// for one packet rather than for a negative count or nothing.
     #[test]
     fn the_successor_bar_is_a_lower_confidence_bound_on_honest_arrivals() -> anyhow::Result<()> {
         for target in [0, 1, 377_498, 1 << 40] {
@@ -12547,8 +12627,16 @@ mod tests {
         }
 
         // 100 × 0.01 − 4 × √(100 × 0.01 × 0.99) < 0: the margin outweighs the mean.
-        assert_eq!(0, successor_required_packets(100, 0.99));
-        assert_eq!(0, successor_required_packets(377_498, 1.0));
+        // ... but never below one packet of a non-zero boundary, and a zero boundary stays zero.
+        assert_eq!(1, successor_required_packets(100, 0.99));
+        assert_eq!(1, successor_required_packets(377_498, 1.0));
+        for loss in [0.0, 0.5, 0.99, 1.0] {
+            assert_eq!(
+                0,
+                successor_required_packets(0, loss),
+                "a zero boundary demands nothing at L = {loss}"
+            );
+        }
 
         for (polys, threshold, surplus, target, required) in [
             (4096, 32, 79, 377_498, 186_431),
