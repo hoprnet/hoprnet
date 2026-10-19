@@ -82,14 +82,19 @@ pub enum SessionManagerError {
     /// Whether a later request succeeds depends on the cause. The first three can succeed on a later
     /// re-send of the same request, once the lock is free or the Entry's state has caught up, and the
     /// Exit does re-send a successor while it is unanswered and its batch is behind the front. A stale
-    /// request is never admitted. A cut-short publication is finished only if the Exit asks again: by
-    /// re-requesting parts of a commitment that began to arrive, which works wherever the batch stands,
-    /// or by repeating the request, which it does while some member of the batch has reported nothing
-    /// but only while the batch is behind the front. Nothing asks for a member with no message of it
-    /// out whose batch holds the front (the opening batch always does, so any member after a boundary
-    /// cut there), nor when the whole burst went out and only the announcement failed, and then the
-    /// Exit's own deadline ends the cycle. Nothing is stranded for that member, because nothing was
-    /// announced for it.
+    /// request is never admitted.
+    ///
+    /// A cut-short publication is finished only if the Exit asks again, and it has two ways to. Its
+    /// automatic repeat of the request is sent only while some member of the batch has reported nothing
+    /// *and* the batch is behind the front. Its scoped re-request for a member whose commitment began to
+    /// arrive works wherever the batch stands, and resumes every owed member of the batch, not only the
+    /// one named. Two cases are therefore not recovered. A member of which no message went out, whose
+    /// batch holds the front (the opening batch always does), is resumed only as a side effect of a
+    /// scoped re-request for an earlier member of the same batch. And neither path is prompted by a
+    /// member whose whole burst went out and only its `ReadyToDeposit` could not be queued, since the
+    /// Exit already holds its complete commitment; it stays owed, and is finished only incidentally,
+    /// if a request for another member resumes everything owed. In those cases the Exit's own deadline
+    /// ends the cycle, and nothing is stranded for that member because nothing was announced for it.
     ///
     /// A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was published
     /// in full, and after finishing the publication if it was not. Callers that report errors should
