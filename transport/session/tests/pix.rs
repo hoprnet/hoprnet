@@ -1570,6 +1570,9 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         .find(|(first, ..)| *first == 1)
         .map(|(.., data)| data.clone())
         .context("bob must have sent the opening request")?;
+    // Read before the replays, so that what is compared below is a count taken before they could have
+    // had any effect on Bob rather than one taken a moment before the comparison.
+    let resends_before_replays = requests_for(2).len();
     for data in [request_for_two.clone(), request_for_two, request_for_one] {
         alice_mgr.dispatch_message(
             alice_pseudonym,
@@ -1591,7 +1594,6 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
             .is_some_and(|(sent_at, _)| sent_at.elapsed() > RESEND_INTERVAL * 10)
     })
     .await?;
-    let resends_when_answered = requests_for(2).len();
     assert!(
         pix_alice_rx.next().now_or_never().is_none(),
         "neither a repeat nor a stale request may announce a deposit"
@@ -1602,10 +1604,13 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         "nor burst the successor's commitment again"
     );
     assert_eq!(commits_per_burst, commits_for(1), "nor the first cycle's");
-    assert_eq!(
-        resends_when_answered,
-        requests_for(2).len(),
-        "once the Entry has answered, Bob stops asking"
+    // At most one: a re-send that was already in flight when the answer landed can still arrive, and
+    // nothing in the exchange can rule that out. Anything past it would mean Bob kept asking.
+    assert!(
+        requests_for(2).len() <= resends_before_replays + 1,
+        "once the Entry has answered, Bob stops asking: {} requests before the replays, {} after the quiet",
+        resends_before_replays,
+        requests_for(2).len()
     );
     assert_eq!(0, session_errors.load(Ordering::Relaxed));
     assert!(alice_mgr.active_sessions().contains(&alice_pseudonym));

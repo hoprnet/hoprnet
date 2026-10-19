@@ -75,15 +75,22 @@ pub enum SessionManagerError {
     /// is returned for exactly five causes: the request lost a race for the per-Session request lock;
     /// it came too early, before emission reached the successor boundary; it is under-served, since
     /// the returned packets have not yet earned it; it is stale, naming indices at or below the
-    /// committed watermark that are not the batch last committed; or it repeats a batch whose
-    /// publication was cut short, and finishing that publication failed again. The Session keeps
-    /// running and the peer is told nothing.
+    /// committed watermark that are not the batch last committed; or the transport cut short the
+    /// publication of a commitment — the Entry's own, or the resumption of one a repeat or a scoped
+    /// re-request prompted. The Session keeps running and the peer is told nothing.
     ///
-    /// All but the stale request can succeed on a later re-send of the same request, once the lock is
-    /// free, the Entry's state has caught up or the transport has recovered. A stale request is never
-    /// admitted. A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was
-    /// published in full, and after finishing the publication if it was not. Callers that report errors
-    /// should treat this as an ordinary outcome rather than a fault.
+    /// Whether a later request succeeds depends on the cause. The first three can succeed on a later
+    /// re-send of the same request, once the lock is free or the Entry's state has caught up, and the
+    /// Exit does re-send while it is unanswered. A stale request is never admitted. A cut-short
+    /// publication is finished only if the Exit asks again, by repeating the request (which it does
+    /// while some member of the batch has reported nothing) or by re-requesting parts of a commitment
+    /// that began to arrive; nothing asks when the batch already holds the front with no message out,
+    /// or when the whole burst went out and only the announcement failed, and then the Exit's own
+    /// deadline ends the cycle. Nothing is stranded in either case, because nothing was announced.
+    ///
+    /// A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was published
+    /// in full, and after finishing the publication if it was not. Callers that report errors should
+    /// treat this as an ordinary outcome rather than a fault.
     #[error("the request was not admitted: {0}")]
     NotAdmitted(String),
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
