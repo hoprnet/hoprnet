@@ -374,6 +374,35 @@ const SSA_SUCCESSOR_SERVICE_WAIT: Duration = Duration::from_secs(2);
 /// which would put a branch on every inbound packet to serve a case that arises once per SSA cycle.
 const SSA_SUCCESSOR_SERVICE_POLL: Duration = Duration::from_millis(250);
 
+/// Standard deviations below an honest Exit's expected returned packets at which the successor gate
+/// sets its bar — see [`successor_required_packets`].
+///
+/// Four put the chance that an Exit losing exactly the tolerated share fraction falls short of the
+/// bar at 3 × 10⁻⁵, and that it falls short by more than the near-miss window — refused without
+/// waiting — at about one in 1.5 million at the deployed split (normal approximation). A shortfall
+/// inside the window still gets [`SSA_SUCCESSOR_SERVICE_WAIT`] for the Session's ongoing traffic to
+/// make it up. The price is ~0.33 % of the boundary added to what an Exit can withhold and still be
+/// funded: the deployed bar moves from 41.3 % of a cycle's packets to 41.0 %.
+const SUCCESSOR_GATE_ARRIVAL_SIGMAS: f64 = 4.0;
+
+/// Returned packets the successor gate demands of an Exit whose boundary is `target` packets, at the
+/// share loss `tolerated_loss` the negotiated split survives.
+///
+/// `floor(max(0, μ − zσ))` for an Exit's arrivals at exactly that loss, `Binomial(target, 1 − L)`:
+/// `μ = target · (1 − L)`, `σ = √(target · L · (1 − L))` and `z` [`SUCCESSOR_GATE_ARRIVAL_SIGMAS`].
+/// A split with no surplus tolerates no loss, so σ is zero and the whole target is demanded exactly;
+/// a tolerance near one clamps at nothing.
+///
+/// An `f64` carries both terms to well under a packet below a watermark of 10⁹ cycles.
+fn successor_required_packets(target: u64, tolerated_loss: f64) -> u64 {
+    let target = target as f64;
+    let delivered = 1.0 - tolerated_loss;
+    let mean = target * delivered;
+    let deviation = (target * tolerated_loss * delivered).sqrt();
+    // The cast floors, the clamped bound being non-negative.
+    (mean - SUCCESSOR_GATE_ARRIVAL_SIGMAS * deviation).max(0.0) as u64
+}
+
 /// Minimum timeout until an unfinished frame is discarded.
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
@@ -5736,18 +5765,25 @@ where
             // at 23.9 % of a cycle's packets, below even the 111 424 shares a lossless Exit must have
             // unlocked to reach its early-recovery point. The tolerance puts it at 41.3 %.
             //
-            // The discount is also exactly what an Exit can withhold for as long as it likes and still
-            // have every next deposit funded — one whose first return relayer is its own acknowledges
-            // each packet, unlocking the share, and drops it. So it is the design tolerance and no
-            // more: the loss the negotiated surplus carries at the 99 % target `default_surplus_for`
-            // sizes it to. That is the tolerance the *Entry* bought, as insurance against the return
+            // The discount is also what an Exit can withhold for as long as it likes and still have
+            // every next deposit funded — one whose first return relayer is its own acknowledges each
+            // packet, unlocking the share, and drops it. So it is the design tolerance and no more:
+            // the loss the negotiated surplus carries at the 99 % target `default_surplus_for` sizes
+            // it to. That is the tolerance the *Entry* bought, as insurance against the return
             // relayers it picked — one expecting unreliable relayers buys more surplus and thereby
             // loosens its own gate. How strict the gate is follows from that choice; it is not a knob
             // of its own, and the Exit, which judges an offer by its quota alone, does not set it.
             //
-            // An `f64` carries the product to well under a packet below a watermark of 10⁹ cycles, and
-            // the cast floors it, the product being positive.
-            let required = (target as f64 * (1.0 - our_params.tolerated_share_loss())) as u64;
+            // Not at the mean of what an Exit losing that much returns, though, but well below it. One
+            // losing exactly the tolerance downstream of its first return relayer still unlocks every
+            // share and asks at the lossless boundary, and the packets of it that reach us are
+            // `Binomial(target, 1 − L)`: short of their mean half the time, and at the deployed split
+            // one time in five by more than the near-miss window below — refused at once and, with
+            // `RequestSsa` never retried, the Session with it. `SUCCESSOR_GATE_ARRIVAL_SIGMAS`
+            // standard deviations under the mean make that negligible for a fraction of a percent
+            // more that an Exit can withhold. The deviation is the same binomial's, so the bound still
+            // follows the split the Entry chose; a split without surplus is demanded its whole target.
+            let required = successor_required_packets(target, our_params.tolerated_share_loss());
 
             let served = |slot: &SessionSlot| {
                 state.served_since_first_commit(slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed))
@@ -11896,15 +11932,18 @@ mod tests {
 
     /// Packets the successor gate requires before it will admit a batch beyond `watermark`.
     ///
-    /// Mirrors `handle_ssa_request`'s arithmetic rather than calling it, so that a change to the
+    /// Mirrors `handle_ssa_request`'s boundary rather than calling it, so that a change to the
     /// boundary has to be restated here — a helper shared with the code under test would agree with
-    /// itself whatever either of them did.
+    /// itself whatever either of them did. The bar set below that boundary is
+    /// [`successor_required_packets`] itself, which
+    /// `the_successor_bar_is_a_lower_confidence_bound_on_honest_arrivals` pins against values computed
+    /// independently.
     fn required_returned_packets(params: &PixParams, watermark: u32) -> u64 {
         let min_emitted =
             hopr_protocol_pix::min_emission_for_early_recovery(params, hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD);
         let shares_per_cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
         let target = (watermark as u64 - 1) * shares_per_cycle + min_emitted;
-        (target as f64 * (1.0 - params.tolerated_share_loss())) as u64
+        successor_required_packets(target, params.tolerated_share_loss())
     }
 
     /// The successor gate must open at the protocol floor, not at the local reconstructor's threshold.
@@ -12305,6 +12344,10 @@ mod tests {
     /// 71.2 % where a cycle tolerates 50.3 %, and put the bar at 23.9 % of a cycle — below the shares a
     /// lossless Exit has necessarily unlocked by the earliest point it may ask at all.
     ///
+    /// The bar is then set [`SUCCESSOR_GATE_ARRIVAL_SIGMAS`] standard deviations below the mean an
+    /// Exit at that loss returns, so that one losing exactly the tolerance is not refused for the
+    /// variance of its own arrivals.
+    ///
     /// Pinned at the deployed dimensions because the resulting fraction is not something a reader can
     /// check by inspection, and it is what decides when real money moves.
     #[test]
@@ -12326,21 +12369,25 @@ mod tests {
         );
         assert_eq!(377_498, undiscounted);
 
-        // floor(377 498 × (1 − 0.502 883 257 4…)), against a tolerance computed independently at 60
-        // significant digits.
+        // floor(μ − 4σ) for μ = 377 498 × (1 − L) = 187 660.58 and σ = √(377 498 · L · (1 − L)) =
+        // 307.20, at L = 0.502 883 257 4… computed independently at 60 significant digits.
         let required = required_returned_packets(&params, 1);
-        assert_eq!(187_660, required);
+        assert_eq!(186_431, required);
 
         let tolerated = params.tolerated_share_loss();
+        let mean = undiscounted as f64 * (1.0 - tolerated);
+        let deviation = (undiscounted as f64 * tolerated * (1.0 - tolerated)).sqrt();
+        let bound = mean - SUCCESSOR_GATE_ARRIVAL_SIGMAS * deviation;
         assert!(
-            (required as f64 / undiscounted as f64 - (1.0 - tolerated)).abs() < 1.0 / undiscounted as f64,
-            "the discount must be the tolerated loss and nothing else"
+            required as f64 <= bound && bound < required as f64 + 1.0,
+            "the bar must be the mean arrivals at the tolerated loss less {SUCCESSOR_GATE_ARRIVAL_SIGMAS} of their \
+             standard deviations, floored, and nothing else: {bound} against {required}"
         );
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.412..0.413).contains(&fraction),
-            "the deployed successor boundary must sit at ~41.3% of a cycle's returned packets, got {fraction}"
+            (0.409..0.411).contains(&fraction),
+            "the deployed successor boundary must sit at ~41.0% of a cycle's returned packets, got {fraction}"
         );
 
         // A lossless conforming Exit asks no earlier than `ceil(0.85 × 4096)` recovered polynomials,
@@ -12357,13 +12404,17 @@ mod tests {
              first ask ({unlocked_by_a_lossless_exit})"
         );
 
-        // Each further cycle of a batch is demanded in full, at the same discount — to within the one
-        // packet the floor can move between the two.
+        // Each further cycle of a batch is demanded in full at the same discount, less only what the
+        // margin grows by — and that grows with the square root of the target, so by less than the
+        // margin a cycle would get on its own. The floor can move either end by one packet.
         let whole_first_cycle = required_returned_packets(&params, 2) - required;
+        let discounted_cycle = cycle as f64 * (1.0 - tolerated);
+        let lone_cycle_margin = SUCCESSOR_GATE_ARRIVAL_SIGMAS * (cycle as f64 * tolerated * (1.0 - tolerated)).sqrt();
         assert!(
-            (whole_first_cycle as f64 - cycle as f64 * (1.0 - tolerated)).abs() <= 1.0,
-            "a batch of two must demand the first cycle's whole discounted worth plus the second's boundary, got \
-             {whole_first_cycle} for the first cycle"
+            (discounted_cycle - lone_cycle_margin - 1.0..=discounted_cycle + 1.0).contains(&(whole_first_cycle as f64)),
+            "a batch of two must demand the first cycle's whole discounted worth, less under {lone_cycle_margin} of \
+             margin, plus the second's boundary; got {whole_first_cycle} for the first cycle against \
+             {discounted_cycle}"
         );
 
         Ok(())
@@ -12374,8 +12425,8 @@ mod tests {
     /// The discount is the tolerance of the *negotiated* split, so an Entry that expects unreliable
     /// return relayers and buys more surplus loosens its own gate by exactly that much: how strict the
     /// gate is follows from the Entry's insurance choice rather than being a knob of its own. At
-    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~11.5 % of a cycle's
-    /// packets against the deployed split's ~41.3 %.
+    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~11.3 % of a cycle's
+    /// packets against the deployed split's ~41.0 %.
     ///
     /// Driven through `handle_ssa_request` at the real dimensions rather than only through
     /// [`required_returned_packets`], because the property is that the gate reads the Session's own
@@ -12389,18 +12440,16 @@ mod tests {
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
 
-        let tolerated = params.tolerated_share_loss();
         let required = required_returned_packets(&params, 1);
-        assert_eq!((undiscounted as f64 * (1.0 - tolerated)) as u64, required);
-        // floor(346 522 × (1 − 0.858 950 169 2…)), against a tolerance computed independently at 80
-        // significant digits.
+        // floor(μ − 4σ) for μ = 346 522 × (1 − L) = 48 876.87 and σ = 204.90, at L = 0.858 950 169 2…
+        // computed independently at 80 significant digits.
         assert_eq!(346_522, undiscounted);
-        assert_eq!(48_876, required);
+        assert_eq!(48_057, required);
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.11..0.12).contains(&fraction),
-            "the successor boundary of 4096 x (2 + 102) must sit at ~11.5% of a cycle's returned packets, got \
+            (0.112..0.114).contains(&fraction),
+            "the successor boundary of 4096 x (2 + 102) must sit at ~11.3% of a cycle's returned packets, got \
              {fraction}"
         );
 
@@ -12450,6 +12499,119 @@ mod tests {
 
         bob_sender.close_channel();
         bob_handle.await??;
+        Ok(())
+    }
+
+    /// The bar is a lower confidence bound on an honest Exit's arrivals, not their mean.
+    ///
+    /// Pinned against `floor(μ − 4σ)` computed outside this crate from independently computed
+    /// tolerances: at the deployed split, at one an Entry distrusting its return relayers may buy, and
+    /// at the derived `2048 × (64 + 123)`, where the mean refused an honest Exit. The ends are what tie
+    /// the bound to the split — no surplus, no tolerance and so no slack; a tolerance near one asks
+    /// for nothing rather than for a negative count.
+    #[test]
+    fn the_successor_bar_is_a_lower_confidence_bound_on_honest_arrivals() -> anyhow::Result<()> {
+        for target in [0, 1, 377_498, 1 << 40] {
+            assert_eq!(
+                target,
+                successor_required_packets(target, 0.0),
+                "a split tolerating no loss must be demanded its whole target"
+            );
+        }
+
+        // 100 × 0.01 − 4 × √(100 × 0.01 × 0.99) < 0: the margin outweighs the mean.
+        assert_eq!(0, successor_required_packets(100, 0.99));
+        assert_eq!(0, successor_required_packets(377_498, 1.0));
+
+        for (polys, threshold, surplus, target, required) in [
+            (4096, 32, 79, 377_498, 186_431),
+            (4096, 2, 102, 346_522, 48_057),
+            (2048, 64, 123, 303_565, 150_641),
+        ] {
+            let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
+            assert_eq!(
+                required,
+                successor_required_packets(target, params.tolerated_share_loss()),
+                "{polys} x ({threshold} + {surplus}) must demand {required} of a {target}-packet boundary"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// An honest Exit losing the tolerated share fraction must not lose its Session to the variance
+    /// of its own arrivals.
+    ///
+    /// Losses past the first return relayer cost the Exit nothing — the relayer has acknowledged, so
+    /// the share is unlocked — and it asks at the lossless boundary with `Binomial(target, 1 − L)` of
+    /// its packets having reached the Entry. A bar at their mean refused it about half the time, and
+    /// at this split ~18 % of the time by more than the near-miss window, at once; `RequestSsa` is
+    /// never retried, so the Session then died on `max_ssa_delivery_time`.
+    ///
+    /// The draw is the one an independent review reproduced that with, at the surplus derived for
+    /// `2048 × 64`: 151 352 of 303 565 packets arrived, 391 short of the mean.
+    #[test_log::test(tokio::test)]
+    async fn an_honest_exit_at_the_tolerated_loss_is_not_refused_for_its_variance() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{MIN_EARLY_RECOVERY_THRESHOLD, SHARE_EMISSION_WINDOW, default_surplus_for};
+
+        // 303 565 independent fair bits (Python `random.Random(3)`).
+        const ARRIVED: u64 = 151_352;
+
+        let params = PixParams::try_new(2048, 64, default_surplus_for(2048, 64), LOCAL_PIX_SUITE)?;
+        assert_eq!(123, params.surplus_shares());
+        assert!(
+            IncomingSessionPixConfig::default()
+                .quota_range
+                .contains(&pix_params_to_quota(&params)),
+            "the split must be one a default Exit accepts"
+        );
+
+        let boundary = hopr_protocol_pix::min_emission_for_early_recovery(&params, MIN_EARLY_RECOVERY_THRESHOLD);
+        assert_eq!(303_565, boundary);
+
+        // floor(μ − 4σ) for μ = 303 565 × (1 − L) = 151 743.28 and σ = 275.48, at
+        // L = 0.500 129 201 488 385 6.
+        let required = required_returned_packets(&params, 1);
+        assert_eq!(150_641, required);
+
+        // What this pins: a bar at the mean would have refused the draw outright, never reaching the
+        // near-miss wait, where the confidence bound admits it.
+        let at_the_mean = (boundary as f64 * (1.0 - params.tolerated_share_loss())) as u64;
+        assert_eq!(151_743, at_the_mean);
+        assert!(
+            ARRIVED + (SHARE_EMISSION_WINDOW as u64) < at_the_mean,
+            "the draw must fall more than one emission window short of the mean, or a mean bar would have waited"
+        );
+        assert!(ARRIVED >= required, "the draw must clear the confidence bound");
+
+        let (mgr, generator, pseudonym, mut events, sender, handle) =
+            entry_with_pix_session(params, MIN_EARLY_RECOVERY_THRESHOLD).await?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await?;
+        assert_eq!(1, drain_pix_events(&mut events).await);
+
+        for n in 1..=boundary as u32 {
+            generator.next_share(&pseudonym, &n.to_be_bytes())?;
+        }
+
+        // Every packet was acknowledged by the first relayer; the losses are downstream, so the Exit
+        // asks at the boundary.
+        credit_returned_packets(&mgr, &pseudonym, ARRIVED);
+        let result = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+            )
+            .await;
+
+        sender.close_channel();
+        handle.await??;
+        result.context("honest Exit on a 50 % downstream-loss path lost its only successor request")?;
+        assert_eq!(1, drain_pix_events(&mut events).await);
+
         Ok(())
     }
 
