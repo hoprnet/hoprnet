@@ -328,52 +328,6 @@ fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Resul
     )
 }
 
-/// Headroom over the profiled dimension product that [`PixGlobalConfig`] will accept.
-///
-/// See [`validate_pix_dimension_product`] for why the ceiling is on the product and why this
-/// multiple does not have to move when the polynomial/threshold split is re-tuned.
-const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
-
-/// Rejects dimensions whose *product* is far outside anything that has been measured.
-///
-/// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
-/// 16192 × 255 = 4 128 960 commitments, about 31× the profiled operating point of 4096 × 32 =
-/// 131 072 (worst case ≈15 MiB of peak reconstructor state per cycle, per
-/// `hopr_protocol_pix::peak_cycle_bytes`). Nothing downstream catches that: the product *is* the
-/// per-cycle quota, and the only guard on it is the peer Exit's `quota_range` rejection — which
-/// protects the Exit, and arrives after this node has already generated the cycle.
-///
-/// The ceiling is deliberately on the product rather than on either field, and that is what makes it
-/// stable: re-tuning the split holds the product constant — 4096 × 32 and 8192 × 16 are both
-/// exactly 131 072 — so the derived `quota_range` survives such a change untouched. Only a deliberate
-/// decision to raise the per-cycle quota needs to revisit this, and such a decision has to widen the
-/// Exit's `quota_range` in concert regardless.
-///
-/// It binds less hard than it once did: `ssa_part_size` was capped at 4096 before the threshold was
-/// narrowed to a byte so it could share the negotiated `PixParams` word with the surplus, which took
-/// the field-range maximum product down from 126× the profiled point to a few tens. It still binds
-/// over most of the two ranges, which is the intended effect.
-fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), ValidationError> {
-    const PROFILED: usize = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
-
-    if cfg.num_ssa_parts.saturating_mul(cfg.ssa_part_size) > MAX_PIX_DIMENSION_PRODUCT_FACTOR * PROFILED {
-        return Err(ValidationError::new(
-            "num_ssa_parts * ssa_part_size exceeds the supported per-cycle dimension product",
-        ));
-    }
-
-    // No bound on the surplus beyond the byte the field itself carries. It used to be capped at
-    // `ssa_part_size` — "insurance must not cost more than the payload it insures" — and that rule
-    // was wrong: the ratio a path needs *falls* as the threshold rises, so a ratio bound is tightest
-    // exactly where the requirement is largest, and at one it made a 50 %-return-relayer-loss
-    // tolerance unreachable. See the note above `SsaGeneratorConfig` in `hopr-protocol-pix` for the
-    // derivation. The surplus is billed, but that is an argument for choosing it deliberately rather
-    // than for refusing a value the wire can carry; an extravagant one inflates the quota and is
-    // refused by the peer Exit's `quota_range`, where the price is actually known.
-
-    Ok(())
-}
-
 /// Global configuration for the Protocol for Incentivization of eXits (PIX).
 #[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
@@ -381,7 +335,6 @@ fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), Validatio
     derive(serde::Serialize, serde::Deserialize),
     serde(default, deny_unknown_fields)
 )]
-#[validate(schema(function = "validate_pix_dimension_product", skip_on_field_errors = false))]
 pub struct PixGlobalConfig {
     /// Number of parts an SSA is split into.
     ///
@@ -391,9 +344,13 @@ pub struct PixGlobalConfig {
     /// [`IncomingSessionPixConfig::quota_range`] is derived from — changing this without
     /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
     ///
-    /// The range below bounds this field alone. What actually costs is the *product* with
-    /// [`ssa_part_size`](Self::ssa_part_size), which validation bounds separately at 4× the profiled
-    /// operating point — see `validate_pix_dimension_product`.
+    /// The range below bounds this field alone, and nothing bounds its product with
+    /// [`ssa_part_size`](Self::ssa_part_size) beyond the two ranges. The product is this node's own
+    /// generation cost and the quota it pays for, and the peer Exit bounds the quota it will serve with
+    /// its `quota_range` when the Session is initiated — before this node has generated anything,
+    /// since polynomials are built only once the Exit asks for a cycle with an `SsaRequest`. An
+    /// oversized offer therefore costs one refused initiation. A local ceiling on the product used to
+    /// sit here on the premise that the refusal arrived after generation, which it does not.
     #[validate(range(min = 8, max = 16192))]
     #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
     pub num_ssa_parts: usize,
@@ -403,9 +360,8 @@ pub struct PixGlobalConfig {
     /// This does not scale well with CPU parallelism.
     ///
     /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
-    /// for the interaction with the Exit's accepted quota range, and
-    /// `validate_pix_dimension_product` for the bound on the two together.
-    /// Capped at 255 because the threshold is one byte of the negotiated
+    /// for the interaction with the Exit's accepted quota range, and for why the two are not bounded
+    /// together. Capped at 255 because the threshold is one byte of the negotiated
     /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
     /// [`MAX_POLY_THRESHOLD`](hopr_protocol_pix::MAX_POLY_THRESHOLD).
     #[validate(range(min = 2, max = 255))]
@@ -460,8 +416,6 @@ pub struct PixGlobalConfig {
     /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
     /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
     /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
-    ///
-    /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
     ///
     /// Defaults to 2, minimum 1, maximum 9 (`MAX_SSA_BATCH_SIZE`).
     #[validate(range(min = 1, max = 9))]
@@ -1205,74 +1159,32 @@ mod tests {
         );
     }
 
-    /// Each dimension range is satisfiable on its own well past anything measured, so the product
-    /// needs its own bound.
+    /// The dimensions are bounded field by field and by nothing else, so every corner of the box the
+    /// ranges describe must validate.
     ///
-    /// Both fields are operator-settable, and the product *is* the per-cycle quota: it decides how
-    /// many polynomials the Entry builds and how many commitments and part builders the Exit holds.
-    /// The peer's `quota_range` refusal is no defence — it fires after this node has generated.
+    /// The product used to be capped as well, at 4× the profiled operating point, on the premise
+    /// that the peer Exit's `quota_range` refusal arrives after this node has generated the cycle. It
+    /// arrives at Session initiation, and this node generates a cycle only when the Exit asks for one,
+    /// so the product is this node's own cost and price and the Exit is where it is bounded.
     #[test]
-    fn pix_dimensions_are_bounded_by_their_product_not_only_field_by_field() {
-        const MAX_NUM_SSA_PARTS: usize = 16192;
-        const MAX_SSA_PART_SIZE: usize = hopr_protocol_pix::MAX_POLY_THRESHOLD as usize;
-
-        // The extremes of the two field ranges, each individually valid.
-        let extreme = PixGlobalConfig {
-            num_ssa_parts: MAX_NUM_SSA_PARTS,
-            ssa_part_size: MAX_SSA_PART_SIZE,
-            ..Default::default()
-        };
-        assert!(
-            extreme.validate().is_err(),
-            "16192 x 255 is ~8x the profiled product and must be rejected"
-        );
-
-        // Re-splitting at a constant product is exactly what a re-tune does, and must stay valid —
-        // this is why the ceiling is on the product rather than on either field. The splits are
-        // fewer than they were: `ssa_part_size` is now capped at 255, so re-splits above it are not
-        // expressible at all, and the deployed split has moved down to 4096 x 32.
-        let profiled = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
-        for (polys, shares) in [(4096usize, 32usize), (8192, 16)] {
-            assert_eq!(polys * shares, profiled, "test case must hold the product constant");
-            let cfg = PixGlobalConfig {
-                num_ssa_parts: polys,
-                ssa_part_size: shares,
-                ..Default::default()
-            };
-            assert!(
-                cfg.validate().is_ok(),
-                "{polys} x {shares} is the profiled product re-split and must stay valid"
-            );
+    fn every_corner_of_the_pix_dimension_ranges_validates() -> anyhow::Result<()> {
+        for num_ssa_parts in [8usize, 16192] {
+            for ssa_part_size in [2usize, 255] {
+                for additional_shares in [None, Some(0usize), Some(255)] {
+                    PixGlobalConfig {
+                        num_ssa_parts,
+                        ssa_part_size,
+                        additional_shares,
+                        ..Default::default()
+                    }
+                    .validate()
+                    .with_context(|| {
+                        format!("{num_ssa_parts} x ({ssa_part_size} + {additional_shares:?}) must be accepted")
+                    })?;
+                }
+            }
         }
-
-        // The headroom is real: the ceiling is straddled rather than hit, because hitting it exactly
-        // is no longer possible. `4 x profiled` is 2^21, and every factorisation of it with
-        // `ssa_part_size <= 255` needs `num_ssa_parts >= 16384`, past that field's own maximum. So
-        // the pair below is the largest accepted product and the next one up, one share apart.
-        let ceiling = MAX_PIX_DIMENSION_PRODUCT_FACTOR * profiled;
-        let just_under = PixGlobalConfig {
-            num_ssa_parts: MAX_NUM_SSA_PARTS,
-            ssa_part_size: ceiling / MAX_NUM_SSA_PARTS,
-            ..Default::default()
-        };
-        assert!(
-            just_under.num_ssa_parts * just_under.ssa_part_size <= ceiling,
-            "test case must sit under the ceiling"
-        );
-        assert!(
-            just_under.validate().is_ok(),
-            "the largest reachable product under the ceiling must be accepted"
-        );
-
-        let past_ceiling = PixGlobalConfig {
-            ssa_part_size: just_under.ssa_part_size + 1,
-            ..just_under
-        };
-        assert!(
-            past_ceiling.num_ssa_parts * past_ceiling.ssa_part_size > ceiling,
-            "test case must sit over the ceiling"
-        );
-        assert!(past_ceiling.validate().is_err(), "past the ceiling must be rejected");
+        Ok(())
     }
 
     /// The fill-off deadline floor is a figure in packets, so no packet or segment size can move it.
@@ -1763,9 +1675,6 @@ mod tests {
     /// land on the deployed constant rather than be special-cased onto it. A special case is what
     /// this used to be, and it made the derived value a cliff: 50 % loss tolerance at
     /// `ssa_part_size` 32 and ~3 % one share either side of it.
-    ///
-    /// `num_ssa_parts` is pinned low for the full sweep so that only the surplus rule is under test,
-    /// not `validate_pix_dimension_product`'s ceiling.
     #[test]
     fn the_derived_surplus_follows_the_configured_split() {
         for ssa_part_size in 2usize..=255 {
