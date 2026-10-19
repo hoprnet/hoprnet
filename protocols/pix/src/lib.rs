@@ -126,6 +126,10 @@ pub const DEFAULT_POLY_THRESHOLD: u8 = 32;
 /// return path never acknowledges it, so a dead return relayer takes its whole share of the path's
 /// traffic with it. Half is the design point because it is what losing one of two return relayers
 /// costs, and a cycle that survives it at this rate is one the operator does not have to tune.
+///
+/// [`tolerated_share_loss`] reads the same target in the other direction — the loss a given surplus
+/// carries rather than the surplus a given loss needs — so that the two agree on what "tolerates"
+/// means.
 const SURPLUS_TARGET_CYCLE_RECOVERY: f64 = 0.99;
 
 /// Shares to emit per polynomial beyond `threshold`, to absorb losses: the fewest with which a
@@ -199,6 +203,93 @@ const fn cycle_recovery_at_half_share_loss(polys: u16, threshold: u8, surplus: u
         exponent >>= 1;
     }
     recovery
+}
+
+/// The largest per-share loss rate at which a cycle of `polys` polynomials, each emitting
+/// `threshold + surplus` shares, still recovers at 99 % — the target [`default_surplus_for`] sizes
+/// the surplus to, so the deployed split tolerates just over the 50 % it was derived for.
+///
+/// Shares are taken to be lost independently. A polynomial survives with probability
+/// `P(Binom(threshold + surplus, 1 − loss) >= threshold)`, the cycle with that raised to the power
+/// `polys`, and the result falls monotonically as the loss rises; the rate where it crosses the target
+/// is found by bisection, to within 2⁻⁶⁰.
+///
+/// **Not `surplus/(threshold + surplus)`.** That is the break-even ratio: the loss at which a
+/// polynomial receives exactly `threshold` shares *on average*. Around half of all polynomials fall
+/// short of their average, and a cycle needs every one of them, so a cycle at break-even fails. At
+/// the deployed `4096 × (32 + 79)` the ratio is 71.2 % and this is 50.3 %; a cycle losing 71.2 % of its
+/// shares recovers with probability indistinguishable from zero.
+///
+/// Evaluated in log space, which is what lets one implementation serve the whole accepted range. The
+/// recurrence [`default_surplus_for`] uses starts from the all-lost term `loss^(threshold + surplus)`
+/// and multiplies its way up from there; at 510 shares that term underflows to zero for any loss
+/// below about a quarter and takes every later term with it, while the tolerances the bisection has
+/// to reach in that corner run down to 10⁻⁹. Here each term is a logarithm, the tail is a
+/// log-sum-exp, and the cycle probability is `exp(polys · ln(1 − tail))` rather than a power of
+/// `1 − tail`, whose subtraction keeps only ten or so of the tail's digits at the deployed split.
+///
+/// Not `const`, because `ln` and `exp` are not, and nothing needs it to be: this prices service
+/// at runtime rather than defining a constant.
+///
+/// A cycle with no polynomials, or polynomials with a zero threshold, recovers whatever is lost, and
+/// tolerates a loss of one.
+pub fn tolerated_share_loss(polys: u16, threshold: u8, surplus: u8) -> f64 {
+    // Each step halves the bracket, so 60 of them leave it at 2⁻⁶⁰ — absolute, and still under a
+    // relative 10⁻⁹ at the smallest tolerance in the accepted range, ~2.4 × 10⁻⁹.
+    const BISECTION_STEPS: u32 = 60;
+
+    if cycle_recovery_at_share_loss(polys, threshold, surplus, 1.0) >= SURPLUS_TARGET_CYCLE_RECOVERY {
+        return 1.0;
+    }
+
+    // Recovery is one at no loss and below the target at total loss, so the crossing lies between.
+    let (mut tolerated, mut fatal) = (0.0f64, 1.0f64);
+    for _ in 0..BISECTION_STEPS {
+        let loss = 0.5 * (tolerated + fatal);
+        if cycle_recovery_at_share_loss(polys, threshold, surplus, loss) >= SURPLUS_TARGET_CYCLE_RECOVERY {
+            tolerated = loss;
+        } else {
+            fatal = loss;
+        }
+    }
+    tolerated
+}
+
+/// Probability that a cycle of `polys` polynomials, each emitting `threshold + surplus` shares,
+/// recovers when every share is lost independently with probability `loss`.
+///
+/// The general form of [`cycle_recovery_at_half_share_loss`], in log space — see
+/// [`tolerated_share_loss`] for why.
+fn cycle_recovery_at_share_loss(polys: u16, threshold: u8, surplus: u8, loss: f64) -> f64 {
+    if polys == 0 || threshold == 0 || loss <= 0.0 {
+        return 1.0;
+    }
+    if loss >= 1.0 {
+        return 0.0;
+    }
+
+    let emitted = threshold as u32 + surplus as u32;
+    let ln_delivered = (-loss).ln_1p();
+    let ln_lost = loss.ln();
+
+    // `ln` of the terms of the per-polynomial failure tail, `C(emitted, k) (1 − loss)^k
+    // loss^(emitted − k)` for `k < threshold`, with the binomial coefficient built up alongside.
+    // Recomputed rather than collected, so that the two passes of the log-sum-exp allocate nothing.
+    let ln_terms = move || {
+        let mut ln_choose = 0.0f64;
+        (0..threshold as u32).map(move |k| {
+            let ln_term = ln_choose + k as f64 * ln_delivered + (emitted - k) as f64 * ln_lost;
+            ln_choose += ((emitted - k) as f64).ln() - ((k + 1) as f64).ln();
+            ln_term
+        })
+    };
+    let peak = ln_terms().fold(f64::NEG_INFINITY, f64::max);
+    let ln_failure = peak + ln_terms().map(|ln_term| (ln_term - peak).exp()).sum::<f64>().ln();
+
+    // Clamped because rounding can carry a tail of one a hair past it, and `ln_1p` of anything below
+    // minus one is NaN rather than the zero recovery it means.
+    let failure = ln_failure.exp().min(1.0);
+    (polys as f64 * (-failure).ln_1p()).exp()
 }
 
 /// Shares emitted per polynomial beyond [`DEFAULT_POLY_THRESHOLD`], to absorb losses.
@@ -560,6 +651,7 @@ impl<S: PixSpec> SsaPartCommitment<S, S::Pseudonym> {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use anyhow::Context;
     use hopr_types::{
         crypto::{
             crypto_traits,
@@ -700,6 +792,166 @@ pub(crate) mod tests {
         );
 
         Ok(())
+    }
+
+    /// The tolerated loss must match values computed independently at 80 significant digits, by
+    /// bisection to 2⁻⁶⁰, rather than the implementation's own `f64` arithmetic.
+    ///
+    /// The rows cover the deployed split, the one it replaced, the corners of the accepted range and
+    /// the surplus-free splits, whose tolerances run down to 10⁻⁹ and are where a recurrence in linear
+    /// space underflows. The relative bound is therefore also an absolute one of 10⁻¹² wherever the
+    /// tolerance is below 10⁻⁶.
+    #[test]
+    fn tolerated_share_loss_matches_an_independent_high_precision_computation() -> anyhow::Result<()> {
+        for (polys, threshold, surplus, expected) in [
+            (4096u16, 32u8, 79u8, 0.5028832574f64),
+            (8192, 64, 16, 0.05450787123),
+            (8192, 64, 128, 0.5008618695),
+            (4096, 64, 126, 0.5015851451),
+            (8, 2, 2, 0.06917757351),
+            (1, 2, 255, 0.9744513612),
+            (8, 2, 0, 0.0006279487485),
+            (128, 2, 0, 3.92583538e-05),
+            (4096, 32, 0, 7.667797446e-08),
+            (128, 255, 255, 0.4179011439),
+            (16192, 255, 255, 0.3948700769),
+            (16192, 255, 0, 2.434108308e-09),
+            (16192, 2, 255, 0.9351652844),
+            (16192, 2, 0, 3.103487615e-07),
+            (16192, 255, 1, 4.362398113e-06),
+            (8, 255, 255, 0.4343906026),
+            // Splits an Entry distrusting its return relayers may choose to buy instead of the
+            // deployed one, at quotas the default `quota_range` admits.
+            (4096, 2, 102, 0.8589501692),
+            (1024, 2, 255, 0.9459344036),
+            (16192, 2, 26, 0.5347733964),
+        ] {
+            let tolerated = tolerated_share_loss(polys, threshold, surplus);
+            assert!(
+                (tolerated - expected).abs() <= 1e-6 * expected,
+                "{polys} x ({threshold} + {surplus}) must tolerate {expected}, got {tolerated}"
+            );
+        }
+
+        // The deployed split clears the 50 % it was derived for, and falls well short of its
+        // break-even ratio — the distinction the Entry's successor gate depends on.
+        let deployed =
+            PixParams::try_new_for::<TestSpec>(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD, DEFAULT_SURPLUS_SHARES)
+                .context("the deployed split must be valid")?;
+        let tolerated = deployed.tolerated_share_loss();
+        let break_even = DEFAULT_SURPLUS_SHARES as f64 / deployed.emitted_shares_per_poly() as f64;
+        assert!(
+            (0.5..0.51).contains(&tolerated),
+            "the deployed split must tolerate just over half its shares being lost, got {tolerated}"
+        );
+        assert!(
+            break_even - tolerated > 0.2,
+            "the deployed split tolerates {tolerated}, which must sit well below its break-even {break_even}"
+        );
+
+        Ok(())
+    }
+
+    /// The log-space recovery must agree with the direct sum [`default_surplus_for`] is built on,
+    /// wherever the two overlap — at half share loss.
+    ///
+    /// The two are independent implementations of the same probability, so agreement checks the
+    /// log-sum-exp and the exponent rather than the bisection. The absolute floor is for the
+    /// single-polynomial corners where a cycle is all but certain to fail: there both take one minus a
+    /// failure tail within 10⁻¹⁰ of one, and keep few or none of the digits of a recovery that is
+    /// itself far below the 99 % either is ever compared against.
+    #[test]
+    fn the_general_recovery_agrees_with_the_const_one_at_half_share_loss() {
+        for polys in [1u16, 128, 4096, MAX_POLYS_PER_SSA] {
+            for threshold in [MIN_POLY_THRESHOLD, 32, 128, MAX_POLY_THRESHOLD] {
+                for surplus in [0u8, 1, 79, u8::MAX] {
+                    let general = cycle_recovery_at_share_loss(polys, threshold, surplus, 0.5);
+                    let half = cycle_recovery_at_half_share_loss(polys, threshold, surplus);
+                    assert!(
+                        (general - half).abs() <= 1e-9 * general.max(half) + 1e-12,
+                        "{polys} x ({threshold} + {surplus}) recovers {general} in log space and {half} directly"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Every surplus [`default_surplus_for`] derives must tolerate the half share loss it was derived
+    /// for, read back through the other function.
+    ///
+    /// The two share the 99 % target, so this is what pins them to the same definition of
+    /// "tolerates". Saturated surpluses are skipped: past a threshold of ~160 the byte cannot carry
+    /// what the target needs, and the derivation says so by returning its maximum.
+    #[test]
+    fn every_derived_surplus_tolerates_half_its_shares_being_lost() {
+        for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
+            let surplus = default_surplus_for(DEFAULT_POLYS_PER_SSA, threshold);
+            if surplus == u8::MAX {
+                continue;
+            }
+            let tolerated = tolerated_share_loss(DEFAULT_POLYS_PER_SSA, threshold, surplus);
+            assert!(
+                tolerated >= 0.5,
+                "{DEFAULT_POLYS_PER_SSA} x ({threshold} + {surplus}) tolerates only {tolerated}"
+            );
+        }
+    }
+
+    /// More surplus never tolerates less, and more polynomials never tolerate more — each further
+    /// polynomial is one more that has to survive.
+    #[test]
+    fn tolerated_share_loss_is_monotone_in_both_surplus_and_polynomials() {
+        const POLYS: [u16; 6] = [1, 8, 128, 4096, 8192, MAX_POLYS_PER_SSA];
+
+        for threshold in [MIN_POLY_THRESHOLD, 32, MAX_POLY_THRESHOLD] {
+            // 0 to 255 inclusive: 255 is a multiple of 15.
+            let surpluses = (0..=u8::MAX).step_by(15).collect::<Vec<_>>();
+
+            for polys in POLYS {
+                for pair in surpluses.windows(2) {
+                    let (fewer, more) = (pair[0], pair[1]);
+                    assert!(
+                        tolerated_share_loss(polys, threshold, more) >= tolerated_share_loss(polys, threshold, fewer),
+                        "{polys} x {threshold}: surplus {more} tolerates less than {fewer}"
+                    );
+                }
+            }
+
+            for surplus in [0u8, 79, u8::MAX] {
+                for pair in POLYS.windows(2) {
+                    let (fewer, more) = (pair[0], pair[1]);
+                    assert!(
+                        tolerated_share_loss(more, threshold, surplus)
+                            <= tolerated_share_loss(fewer, threshold, surplus),
+                        "({threshold} + {surplus}): {more} polynomials tolerate more than {fewer}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Every corner of the accepted range yields a probability, and the degenerate inputs outside it
+    /// yield the one they mean rather than a panic or a NaN.
+    #[test]
+    fn tolerated_share_loss_is_a_probability_across_the_whole_range() {
+        for polys in [1u16, MAX_POLYS_PER_SSA] {
+            for threshold in [MIN_POLY_THRESHOLD, MAX_POLY_THRESHOLD] {
+                for surplus in [0u8, u8::MAX] {
+                    let tolerated = tolerated_share_loss(polys, threshold, surplus);
+                    assert!(
+                        tolerated.is_finite() && (0.0..=1.0).contains(&tolerated),
+                        "{polys} x ({threshold} + {surplus}) tolerates {tolerated}"
+                    );
+                }
+            }
+        }
+
+        // Nothing to recover, or nothing needed to recover it: any loss is survived.
+        assert_eq!(
+            1.0,
+            tolerated_share_loss(0, DEFAULT_POLY_THRESHOLD, DEFAULT_SURPLUS_SHARES)
+        );
+        assert_eq!(1.0, tolerated_share_loss(DEFAULT_POLYS_PER_SSA, 0, 0));
     }
 
     /// A commitment equal to the generator represents constant term 1 and must survive decoding —

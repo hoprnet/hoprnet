@@ -5723,16 +5723,31 @@ where
             let shares_per_cycle = our_params.polys_per_ssa() as u64 * our_params.emitted_shares_per_poly() as u64;
             let target = (watermark.get() as u64 - 1) * shares_per_cycle + min_emitted;
 
-            // Discounted by exactly the loss the surplus insures against. The Exit unlocks a share
-            // when the *first relayer* acknowledges, which is upstream of us, so every packet lost
-            // after that point is progress it legitimately has and we cannot see. Demanding the
-            // undiscounted figure would refuse conforming Exits on any lossy path; an Exit losing
-            // more than the surplus covers could not have reconstructed the cycle anyway.
+            // Discounted, because the Exit unlocks a share when the *first relayer* acknowledges,
+            // which is upstream of us: every packet lost after that point is progress it legitimately
+            // has and we cannot see. Demanding the undiscounted figure would refuse conforming Exits
+            // on any lossy path.
             //
-            // `u128` for the multiplication only — at the extremes of the accepted ranges the
-            // numerator overflows `u64`. The quotient cannot, since the ratio is at most one.
-            let required = (target as u128 * our_params.shares_per_poly() as u128
-                / our_params.emitted_shares_per_poly() as u128) as u64;
+            // By the loss a cycle actually survives, not by the surplus ratio `s/(t+s)` this used to
+            // take. The ratio is break-even — the loss at which a polynomial receives `t` shares on
+            // average — and a cycle needs every polynomial to clear it, so at break-even it fails. At
+            // the deployed `4096 × (32 + 79)` the ratio is 71.2 % against a tolerance of 50.3 % — a
+            // cycle losing 71.2 % of its shares does not recover — and discounting by it put the bar
+            // at 23.9 % of a cycle's packets, below even the 111 424 shares a lossless Exit must have
+            // unlocked to reach its early-recovery point. The tolerance puts it at 41.3 %.
+            //
+            // The discount is also exactly what an Exit can withhold for as long as it likes and still
+            // have every next deposit funded — one whose first return relayer is its own acknowledges
+            // each packet, unlocking the share, and drops it. So it is the design tolerance and no
+            // more: the loss the negotiated surplus carries at the 99 % target `default_surplus_for`
+            // sizes it to. That is the tolerance the *Entry* bought, as insurance against the return
+            // relayers it picked — one expecting unreliable relayers buys more surplus and thereby
+            // loosens its own gate. How strict the gate is follows from that choice; it is not a knob
+            // of its own, and the Exit, which judges an offer by its quota alone, does not set it.
+            //
+            // An `f64` carries the product to well under a packet below a watermark of 10⁹ cycles, and
+            // the cast floors it, the product being positive.
+            let required = (target as f64 * (1.0 - our_params.tolerated_share_loss())) as u64;
 
             let served = |slot: &SessionSlot| {
                 state.served_since_first_commit(slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed))
@@ -11889,7 +11904,7 @@ mod tests {
             hopr_protocol_pix::min_emission_for_early_recovery(params, hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD);
         let shares_per_cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
         let target = (watermark as u64 - 1) * shares_per_cycle + min_emitted;
-        (target as u128 * params.shares_per_poly() as u128 / params.emitted_shares_per_poly() as u128) as u64
+        (target as f64 * (1.0 - params.tolerated_share_loss())) as u64
     }
 
     /// The successor gate must open at the protocol floor, not at the local reconstructor's threshold.
@@ -12278,18 +12293,22 @@ mod tests {
         Ok(())
     }
 
-    /// The boundary is discounted by exactly the loss the surplus insures against.
+    /// The boundary is discounted by the loss a cycle tolerates, not by the surplus ratio.
     ///
     /// The Exit unlocks a share when the *first relayer* acknowledges its returned packet, which is
     /// upstream of the Entry — so everything lost after that point is progress the Exit legitimately
-    /// has and this node cannot observe. Demanding the undiscounted emission boundary would refuse
-    /// conforming Exits on any lossy path; an Exit losing more than the surplus covers could not have
-    /// reconstructed the cycle at all, so the surplus ratio is the honest allowance.
+    /// has and this node cannot observe, and demanding the undiscounted emission boundary would refuse
+    /// conforming Exits on any lossy path. But the discount is also what an Exit can withhold for good
+    /// and still be funded, so it may be no larger than the loss a cycle survives.
+    ///
+    /// The surplus ratio `s/(t+s)` is break-even, not survival. At the deployed split it discounted
+    /// 71.2 % where a cycle tolerates 50.3 %, and put the bar at 23.9 % of a cycle — below the shares a
+    /// lossless Exit has necessarily unlocked by the earliest point it may ask at all.
     ///
     /// Pinned at the deployed dimensions because the resulting fraction is not something a reader can
     /// check by inspection, and it is what decides when real money moves.
     #[test]
-    fn the_successor_boundary_is_discounted_by_the_surplus_it_insures() -> anyhow::Result<()> {
+    fn the_successor_boundary_is_discounted_by_the_loss_a_cycle_tolerates() -> anyhow::Result<()> {
         use crate::{DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SURPLUS_SHARES};
 
         let params = PixParams::try_new(
@@ -12307,30 +12326,130 @@ mod tests {
         );
         assert_eq!(377_498, undiscounted);
 
+        // floor(377 498 × (1 − 0.502 883 257 4…)), against a tolerance computed independently at 60
+        // significant digits.
         let required = required_returned_packets(&params, 1);
-        assert_eq!(108_828, required);
-        assert_eq!(
-            undiscounted * DEFAULT_PIX_SHARES_PER_POLY as u64
-                / (DEFAULT_PIX_SHARES_PER_POLY + DEFAULT_PIX_SURPLUS_SHARES) as u64,
-            required,
-            "the discount must be the surplus ratio and nothing else"
+        assert_eq!(187_660, required);
+
+        let tolerated = params.tolerated_share_loss();
+        assert!(
+            (required as f64 / undiscounted as f64 - (1.0 - tolerated)).abs() < 1.0 / undiscounted as f64,
+            "the discount must be the tolerated loss and nothing else"
         );
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.239..0.240).contains(&fraction),
-            "the deployed successor boundary must sit at ~23.9% of a cycle's returned packets, got {fraction}"
+            (0.412..0.413).contains(&fraction),
+            "the deployed successor boundary must sit at ~41.3% of a cycle's returned packets, got {fraction}"
         );
 
-        // Each further cycle of a batch is demanded in full, at the same discount.
-        assert_eq!(
-            required
-                + cycle * DEFAULT_PIX_SHARES_PER_POLY as u64
-                    / (DEFAULT_PIX_SHARES_PER_POLY + DEFAULT_PIX_SURPLUS_SHARES) as u64,
-            required_returned_packets(&params, 2),
-            "a batch of two must demand the first cycle's whole discounted worth plus the second's boundary"
+        // A lossless conforming Exit asks no earlier than `ceil(0.85 × 4096)` recovered polynomials,
+        // each of which took `t` unlocked shares before any of its surplus. A bar below that funds the
+        // next deposit on less delivered service than the useful shares the Exit is claiming to have
+        // recovered from.
+        let unlocked_by_a_lossless_exit =
+            (hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD * DEFAULT_PIX_POLYS_PER_SSA as f64).ceil() as u64
+                * DEFAULT_PIX_SHARES_PER_POLY as u64;
+        assert_eq!(111_424, unlocked_by_a_lossless_exit);
+        assert!(
+            required >= unlocked_by_a_lossless_exit,
+            "the successor boundary ({required}) must not sit below what a lossless Exit has unlocked when it may \
+             first ask ({unlocked_by_a_lossless_exit})"
         );
 
+        // Each further cycle of a batch is demanded in full, at the same discount — to within the one
+        // packet the floor can move between the two.
+        let whole_first_cycle = required_returned_packets(&params, 2) - required;
+        assert!(
+            (whole_first_cycle as f64 - cycle as f64 * (1.0 - tolerated)).abs() <= 1.0,
+            "a batch of two must demand the first cycle's whole discounted worth plus the second's boundary, got \
+             {whole_first_cycle} for the first cycle"
+        );
+
+        Ok(())
+    }
+
+    /// The successor gate follows the surplus the Entry bought.
+    ///
+    /// The discount is the tolerance of the *negotiated* split, so an Entry that expects unreliable
+    /// return relayers and buys more surplus loosens its own gate by exactly that much: how strict the
+    /// gate is follows from the Entry's insurance choice rather than being a knob of its own. At
+    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~11.5 % of a cycle's
+    /// packets against the deployed split's ~41.3 %.
+    ///
+    /// Driven through `handle_ssa_request` at the real dimensions rather than only through
+    /// [`required_returned_packets`], because the property is that the gate reads the Session's own
+    /// parameters — a mirror of its arithmetic cannot show that.
+    #[test_log::test(tokio::test)]
+    async fn the_successor_gate_follows_the_surplus_the_entry_bought() -> anyhow::Result<()> {
+        let params = PixParams::try_new(4096, 2, 102, LOCAL_PIX_SUITE)?;
+        let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
+        let undiscounted = hopr_protocol_pix::min_emission_for_early_recovery(
+            &params,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
+        );
+
+        let tolerated = params.tolerated_share_loss();
+        let required = required_returned_packets(&params, 1);
+        assert_eq!((undiscounted as f64 * (1.0 - tolerated)) as u64, required);
+        // floor(346 522 × (1 − 0.858 950 169 2…)), against a tolerance computed independently at 80
+        // significant digits.
+        assert_eq!(346_522, undiscounted);
+        assert_eq!(48_876, required);
+
+        let fraction = required as f64 / cycle as f64;
+        assert!(
+            (0.11..0.12).contains(&fraction),
+            "the successor boundary of 4096 x (2 + 102) must sit at ~11.5% of a cycle's returned packets, got \
+             {fraction}"
+        );
+
+        // And the gate itself, not only its mirror: with emission past the boundary, one emission
+        // window short of `required` is refused outright — past the near-miss wait, so at once —
+        // and the rest of it admits the successor.
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        for sent in 1..=undiscounted as u32 {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        let short = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u64 + 1;
+        credit_returned_packets(&mgr, &pseudonym, required - short);
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+            )
+            .await
+            .expect_err("a successor short of the bought tolerance's boundary must be refused");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+
+        credit_returned_packets(&mgr, &pseudonym, short);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("a successor at the bought tolerance's boundary must be admitted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
         Ok(())
     }
 
@@ -13981,6 +14100,58 @@ mod tests {
         assert!(
             decode_and_check(&mgr, &unknown).is_none(),
             "an unknown suite identifier must be refused"
+        );
+
+        Ok(())
+    }
+
+    /// The Exit judges an offer by its quota alone; the split is the Entry's choice.
+    ///
+    /// The surplus is insurance against the return relayers the *Entry* picks for its SURBs, and only
+    /// the Entry knows how far it trusts them: one expecting most of them to fail may buy
+    /// `4096 × (2 + 102)`, which carries ~86 % share loss where the deployed split carries ~50 %. What
+    /// the Exit has a stake in is how much it serves for one deposit, which is the quota —
+    /// `polys × (threshold + surplus)` shares — so every split whose quota fits `quota_range` is
+    /// accepted, whatever its ratio of surplus to threshold, and the Entry's successor gate then
+    /// follows the tolerance it bought.
+    ///
+    /// Reconstructor memory is also reserved from the offered dimensions, at admission against
+    /// `max_live_cycle_bytes`. That is a capacity check, and one the configuration validator holds to
+    /// admitting a Session at any split of the advertised quota — not a policy on the split.
+    #[test_log::test(tokio::test)]
+    async fn the_exit_judges_an_offer_by_its_quota_alone() -> anyhow::Result<()> {
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let offer = |params: PixParams| StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+        };
+
+        // The default range, in shares, is a quarter of the deployed cycle up to the whole of it:
+        // 113 664 ..= 454 656.
+        for (polys, threshold, surplus, quota_shares) in [
+            (4096u16, 2u8, 102u8, 425_984u64),
+            (1024, 2, 255, 263_168),
+            (16192, 2, 26, 453_376),
+            (4096, 32, 79, 454_656),
+        ] {
+            let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
+            assert_eq!(quota_shares * PIX_QUOTA_BYTES_PER_SHARE, pix_params_to_quota(&params));
+
+            let (accepted, _) = decode_and_check(&mgr, &offer(params)).with_context(|| {
+                format!("{polys} x ({threshold} + {surplus}) fits the default quota range and must be accepted")
+            })?;
+            assert_eq!(params, accepted, "the split must arrive as offered");
+        }
+
+        // The same threshold and the most surplus the byte carries, at a polynomial count whose quota
+        // — 1 052 672 shares — is past the top of the range. Refused, and by the quota alone.
+        let over = PixParams::try_new(4096, 2, u8::MAX, LOCAL_PIX_SUITE)?;
+        assert!(pix_params_to_quota(&over) > *IncomingSessionPixConfig::default().quota_range.end());
+        assert!(
+            decode_and_check(&mgr, &offer(over)).is_none(),
+            "an offer whose quota exceeds the range must be refused"
         );
 
         Ok(())
