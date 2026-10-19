@@ -189,7 +189,7 @@
 //!
 //! A PIX Exit is paid per **return** packet. Each Exit → Entry packet spends one SURB carrying one
 //! share, and a funded cycle recovers — unlocks the deposit key it has already been paid for — only
-//! once `polys × (threshold + surplus)` of them have gone back. That is 327 680 packets at the shipped
+//! once `polys × (threshold + surplus)` of them have gone back. That is 454 656 packets at the shipped
 //! dimensions. Nothing in the protocol makes the *application* send them:
 //!
 //! * an idle VPN client sends nothing at all;
@@ -199,7 +199,7 @@
 //! Each of those leaves the Exit holding a cycle it was paid for and cannot complete.
 //! [`max_recovery_time`](SupervisorConfig::max_recovery_time) then closes the Session, and because
 //! the deposit address derives from the client's and the server's commitments *together*, the money
-//! is stranded rather than refunded. At production geometry the boundary is about 46 return packets
+//! is stranded rather than refunded. At production geometry the boundary is about 32 return packets
 //! per second averaged over a whole cycle — which is not a light client, it is a saturated one.
 //!
 //! So the Exit sends its own. The rate is planned once per `SAMPLING_INTERVAL`:
@@ -327,7 +327,7 @@
 //! Session forces the teardown for a different reason: it is the operator's way to overrule the
 //! drain. And a funded successor that has not yet reached the front, or a recovered predecessor's
 //! paid tail, is never drained for: a production SURB buffer is at most ten thousand deep and a cycle
-//! is 160 000–330 000 packets, so it could not cover a second one.
+//! is 160 000–455 000 packets, so it could not cover a second one.
 //!
 //! ## The Worker — bridging pure logic to async
 //!
@@ -455,7 +455,7 @@
 //! | `commitment_recommit_interval` | 3 s | A *single lost packet* costing the whole Session. A commitment set ships as hundreds of messages and is unusable until every one lands, so without this a drop stranded the cycle on the deadline above — after the Entry had already been told to fund it. The one parameter here that buys liveness rather than bounding an attack; it bounds nothing itself. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
-//! | `max_recovery_time` | 4 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must leave a whole cycle at the widest dimensions the node accepts — 655 360 packets of *full emission* at the defaults, the quantity `quota_range` prices — time to complete, or it closes honest Sessions instead. `validate_incoming_session_pix_config` judges that at `fill.max_rate` when fill is enabled (~61 min at the defaults) and at `MAX_ASSUMED_SESSION_PACKET_RATE` when it is not (~2 min). With fill it also sets the idle tariff; see "why four hours" on [`SupervisorConfig::max_recovery_time`]. |
+//! | `max_recovery_time` | 4 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must leave a whole cycle at the widest dimensions the node accepts — 454 656 packets of *full emission* at the defaults, the quantity `quota_range` prices — time to complete, or it closes honest Sessions instead. `validate_incoming_session_pix_config` judges that at `fill.max_rate` when fill is enabled (~42 min at the defaults) and at `MAX_ASSUMED_SESSION_PACKET_RATE` when it is not (~1.5 min). With fill it also sets the idle tariff; see "why four hours" on [`SupervisorConfig::max_recovery_time`]. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
@@ -515,14 +515,14 @@
 //! `1..=MAX_FILL_RATE`, and a non-zero `min_surb_reserve`. One further constraint cannot be decided
 //! here because it spans the quota: `validate_incoming_session_pix_config` requires `max_rate` to
 //! clear the rate a cycle of the *widest accepted quota* needs to finish inside
-//! `finish_fraction × max_recovery_time`, which is 64 packets/s at the shipped defaults.
+//! `finish_fraction × max_recovery_time`, which is 45 packets/s at the shipped defaults.
 //!
 //! ### The surplus run, and why it no longer constrains anything
 //!
 //! Emission is round-robin over a window of up to `hopr_protocol_pix::SHARE_EMISSION_WINDOW` (256)
 //! polynomials advancing in lockstep. They reach `threshold` on the same pass and then take their
 //! surplus shares together, so every block ends with `surplus_shares × window` consecutive packets
-//! carrying no *useful* share — **4096 at the shipped dimensions**, against a
+//! carrying no *useful* share — **20 224 at the shipped dimensions**, against a
 //! `max_served_without_progress` of 2048.
 //!
 //! That used to be a live constraint on two parameters, and an unmeetable one: the ceiling and the
@@ -544,7 +544,7 @@
 //! The one dimension-dependent property that remains is not a supervisor parameter at all: a
 //! polynomial's whole emission, `threshold + surplus`, should fit one peer deferral bucket
 //! (`hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL`, 128), or acknowledgements arriving before
-//! the cycle's commitments install can be dropped. The shipped 96 fits; both halves are a byte wide
+//! the cycle's commitments install can be dropped. The shipped 111 fits; both halves are a byte wide
 //! on the wire, so the sum can reach 510. It is a sufficient condition rather than a required one —
 //! only the pre-install prefix is deferred — which is why it is asserted on the defaults rather than
 //! enforced.
@@ -555,20 +555,21 @@
 //! SSA deposit. At full `SESSION_MTU` segments that is ≈ 7 Mbps of Session
 //! data each way, and every return packet carries one SURB and one share.
 //!
-//! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` with the
-//! derived surplus of 16 gives 131 072 useful shares out of 163 840 emitted, and a cycle of 163 840
+//! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` with an
+//! explicit surplus of 16 gives 131 072 useful shares out of 163 840 emitted, and a cycle of 163 840
 //! packets — about **4.5 min** at this rate. The quota is priced on all of them, surplus included, so
-//! it is `2048 × 80 × 1452 B` = **226.9 MiB**, which is exactly the bottom of the default
-//! `quota_range` (a quarter of the 907.5 MiB the default dimensions imply), so no range change is
-//! needed. The default `8192 × 64` would make that 18.1 min per cycle, which at 6 s settlement is a
-//! long time to leave one cycle's traffic unsettled for no benefit. Keep it a multiple of 256 so the
-//! emission window never narrows.
+//! it is `2048 × 80 × 1452 B` = **226.9 MiB**, which sits inside the default `quota_range` —
+//! 157.4 MiB to 629.6 MiB, a quarter of what the default dimensions imply up to all of it — so no
+//! range change is needed. The default `4096 × (32 + 79)` would make that 12.6 min per cycle, 71 % of it
+//! surplus bought against 50 % share loss, which at 6 s settlement is a long time to leave one
+//! cycle's traffic unsettled on a path that loses little. Keep it a multiple of 256 so the emission
+//! window never narrows.
 //!
 //! | Parameter | Value | Why, at this profile |
 //! |---|---|---|
 //! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 226.9 MiB quota, 4.5 min cycle; multiple of the emission window |
-//! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | Shipped threshold; with the surplus below, it is what fixes the quota |
-//! | `PixGlobalConfig::additional_shares` (Entry) | unset | Derives to 16 — a quarter of the threshold, i.e. a 1.25× surplus factor and a fifth of the quota. Setting it explicitly buys loss tolerance and charges the Entry for it. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
+//! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | The threshold shipped before the current 32, near the Exit-only optimum; with the surplus below, it is what fixes the quota |
+//! | `PixGlobalConfig::additional_shares` (Entry) | 16 | Set explicitly, because this profile assumes a path that loses little: a 1.25× surplus factor and a fifth of the quota, carrying ~6 % share loss at 99 % of cycles. Left unset it derives 123 for 50 % loss, and the quota grows to 530.3 MiB. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
 //! | `ssas_per_request` | **1** | The 85 % early signal leaves a 24 627-packet runway — **41 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 226.9 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
@@ -583,7 +584,7 @@
 //! | `fill.enabled` | true | The cycle is 163 840 return packets and the hard deadline is 2 h, so without fill any Session averaging under **23 packets/s of return traffic** over a cycle strands its deposit. Against the 602 packets/s this profile is sized for that sounds like a wide margin; it is not, because it is a *return* rate and any client that reads more than it writes falls under it |
 //! | `fill.finish_fraction` | 0.75 | Aims 30 min before the 2 h deadline, which is the margin for loss beyond `loss_margin`, for a mixnet delay spike, and for the successor's commitment and deposit round trip. A cycle that misses is worth nothing at all rather than nearly everything, so the last quarter of the budget is not spent |
 //! | `fill.loss_margin` | 0.05 | Fill counts packets sent; the cycle advances on shares that arrive. The Exit cannot observe the difference, so it sends this much extra and lets the per-second re-plan absorb whatever the real figure turns out to be |
-//! | `fill.max_rate` | 250 | An idle cycle here needs 163 840 x 1.05 / 5400 s = **32 packets/s**, so this is ~8x the requirement — headroom for a Session that fell behind, at a ceiling of ~2.9 Mbps. `validate_incoming_session_pix_config` enforces the floor against the *widest accepted quota*, which at the default `quota_range` is 128 packets/s |
+//! | `fill.max_rate` | 250 | An idle cycle of this profile's `2048 × (64 + 16)` needs 163 840 x 1.05 / 5400 s = **32 packets/s**, so 250 is ~8x that — headroom for a Session that fell behind, at a ceiling of ~2.9 Mbps. It is not the floor that binds, though: `validate_incoming_session_pix_config` enforces it against the *widest accepted quota*, the 454 656-packet cycle at the top of the default `quota_range`, which at the same 5400 s needs **89 packets/s**, so 250 is ~2.8x the validator's floor |
 //! | `fill.heartbeat` | 60 s | The floor while organic egress covers the need. Not zero: the Entry's own idle eviction is refreshed by this traffic, and its balancer has no SURB-level report without it |
 //! | `fill.min_surb_reserve` | 500 | `SurbStoreConfig::distress_threshold`. A *ceiling*: the effective reserve is `min(500, announced_target / 4)`, floored at one, because the buffer it is measured against is sized by the Entry rather than here. At the 7 000-SURB balancer target below a quarter is 1 750, so 500 is what binds — leaving fill 93 % of the buffer and keeping the last 7 % for the application, which is the side that has something waiting on it. The derivation engages only on a Session whose Entry asked for under 2 000 SURBs, which without it could never be filled at all |
 //! | `fill.drain_after_close` | true | Shipped value, and inert at this profile's buffer depth: 7 000 SURBs less the 500 reserve is 4 % of a 163 840-packet cycle, so a Session closed at any point before the last 6 500 shares simply closes. What it does buy is the endgame — a client that hangs up in the final seconds of a cycle it has all but paid off no longer strands the whole deposit, and the drain then finishes in about 26 s at `max_rate` |
@@ -602,7 +603,7 @@
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
 //! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the pipelining runway derived for `ssas_per_request` above — 24 627 packets, 41 s. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
 //! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
-//! | `IncomingSessionPixConfig::max_live_cycle_bytes` | 3 GiB | Shipped value. At `2048 × 64 + 16` a Session reserves ≈20.5 MiB, so this profile admits ≈150 concurrent PIX Sessions rather than the ≈37 the default dimensions imply. It is the ceiling on live reconstructor state, and it — not `maximum_managed_sessions` — is what decides how many PIX Sessions this Exit accepts |
+//! | `IncomingSessionPixConfig::max_live_cycle_bytes` | 3 GiB | Shipped value. At `2048 × 64 + 16` a Session reserves ≈23.4 MiB, so this profile admits ≈131 concurrent PIX Sessions, where the default dimensions admit exactly 100. It is the ceiling on live reconstructor state; this profile's ≈131 sits above the default `maximum_managed_sessions` of 100, which is reached first unless raised, and past that it — not `maximum_managed_sessions` — is what decides how many PIX Sessions this Exit accepts |
 
 use std::time::Duration;
 
@@ -650,7 +651,7 @@ pub struct SupervisorConfig {
     ///
     /// Two things it costs, both linear in the value:
     ///
-    /// * Up to two batches can own live reconstructor state — worst case ≈41 MiB per cycle at the profiled dimensions,
+    /// * Up to two batches can own live reconstructor state — worst case ≈15 MiB per cycle at the profiled dimensions,
     ///   per `hopr_protocol_pix::peak_cycle_bytes`. That cost is reserved up front against
     ///   `IncomingSessionPixConfig::max_live_cycle_bytes`; the supervisor enforces the two-generation/full-cycle bound
     ///   before allocating, so this value directly divides the number of PIX Sessions the node will admit.
@@ -780,22 +781,22 @@ pub struct SupervisorConfig {
     /// ## Why four hours
     ///
     /// It has to leave a whole cycle at the dimensions the node accepts time to complete, but that
-    /// floor is far below four hours: ~61 min with fill at its default ceiling, ~2 min without fill
+    /// floor is far below four hours: ~42 min with fill at its default ceiling, ~1.5 min without fill
     /// at `MAX_ASSUMED_SESSION_PACKET_RATE`. A cycle cut
     /// short is worth nothing, since the SSA is the sum of every polynomial's constant term, so the
     /// margin is cheap.
     ///
     /// What sets the value is the rest of what it does. With fill enabled it is the idle tariff: an
-    /// idle Session's cycle is finished at `finish_fraction` of it, three hours, which needs 64
+    /// idle Session's cycle is finished at `finish_fraction` of it, three hours, which needs 45
     /// packets/s for the widest accepted quota. And it keeps this instrument far enough out that
     /// [`max_recovery_idle`](Self::max_recovery_idle) is what actually binds.
     ///
     /// The clock starts when the cycle reaches the paid transport front. That is deliberately later
     /// than merely becoming the earliest unrecovered record: the predecessor's buffered surplus tail
-    /// can still occupy ~4096 packets, over a minute for a slow Session, and remains bounded by the
-    /// predecessor's original hard clock. Starting the successor at the FIFO boundary prevents that
-    /// pipeline delay from being charged twice. A funded cycle that reaches the front and is never
-    /// served is still caught.
+    /// can still occupy ~20 224 packets, over a minute even at fill's default ceiling, and remains
+    /// bounded by the predecessor's original hard clock. Starting the successor at the FIFO boundary
+    /// prevents that pipeline delay from being charged twice. A funded cycle that reaches the front
+    /// and is never served is still caught.
     ///
     /// `HoprProtocolConfig::validate` checks this against the dimensions the node will actually
     /// accept, so a raised `quota_range` that outgrows it is refused at load rather than discovered
@@ -921,8 +922,8 @@ pub struct SupervisorConfig {
     ///
     /// Those events now follow `shares_seen` rather than `useful_shares`, which is what makes a flat
     /// 2048 safe at any dimensions. Keyed on useful shares, this had to exceed
-    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 4096 at the shipped dimensions, twice
-    /// this value — because a conforming Entry emits a whole window's surplus in one contiguous run
+    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 20 224 at the shipped dimensions, nearly ten
+    /// times this value — because a conforming Entry emits a whole window's surplus in one contiguous run
     /// during which no share is useful. The gate parked the writer partway through, and a parked
     /// writer spends no SURBs, so nothing could arrive to release it. See
     /// [`SsaRecoveryProgress::shares_seen`](hopr_protocol_pix::SsaRecoveryProgress::shares_seen).
@@ -951,7 +952,7 @@ pub struct SupervisorConfig {
     /// Every other field above is a rule for *stopping*. This one is the single rule for *going*, and
     /// it exists because the deadlines cannot be met by an idle Session: a funded cycle only recovers
     /// once its whole emission has ridden back to the Entry, so at production dimensions a Session
-    /// averaging under ~46 return packets/s over a cycle loses its deposit to
+    /// averaging under ~32 return packets/s over a cycle loses its deposit to
     /// [`max_recovery_time`](Self::max_recovery_time) — which is every idle or light client.
     ///
     /// See [`PixFillConfig`] for what it costs and what it is bounded by.
@@ -965,7 +966,7 @@ pub struct SupervisorConfig {
 ///
 /// A PIX Exit is paid per *return* packet. Each Exit → Entry packet spends one SURB carrying one
 /// share, and a funded cycle only recovers — only unlocks the deposit it has already been paid — once
-/// `polys × (threshold + surplus)` of them have gone out. That figure is 327 680 at the shipped
+/// `polys × (threshold + surplus)` of them have gone out. That figure is 454 656 at the shipped
 /// dimensions. Nothing in the protocol makes the *application* send them: an idle VPN client, a
 /// tunnel between keystrokes, or a client that simply reads more than it writes all leave the Exit
 /// holding a funded cycle that will never complete. `max_recovery_time` then closes it, and because
@@ -1063,7 +1064,7 @@ pub struct PixFillConfig {
     /// than a Session is assumed to carry finishes nothing sooner.
     ///
     /// Default: 250 packets/s, which is ~2.9 Mbps of Session data at full `SESSION_MTU` segments and
-    /// about four times the 64 packets/s the shipped defaults require.
+    /// over five times the 45 packets/s the shipped defaults require.
     #[default(250)]
     pub max_rate: u32,
 

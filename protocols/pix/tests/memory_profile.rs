@@ -53,11 +53,9 @@ const QUOTA_BYTES_PER_SHARE: u64 = 1452;
 
 /// Surplus shares emitted per polynomial beyond the threshold.
 ///
-/// Derived from the threshold — a ratio sized to absorb 20 % share loss — rather than a flat count.
-/// The cycle is `polys × (threshold + surplus)` shares long, so this decides how much of the
-/// profile's wall clock is spent walking one, and a flat value would mean a different cycle length
-/// relative to the threshold at every dimension.
-const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
+/// The deployed value. The cycle is `polys × (threshold + surplus)` shares long, so this decides how
+/// much of the profile's wall clock is spent walking one.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
 
 /// Operating point being modelled: per-Session return-path rate, in bytes per second.
 ///
@@ -81,7 +79,7 @@ const SSAS_IN_FLIGHT: usize = 3;
 /// Polynomial count for the full-tenancy profile.
 ///
 /// Deliberately narrower than [`PROD_POLYS_PER_SSA`]: the dimension under test there is *fan-out*,
-/// not per-cycle width, and width is already measured at 8 192 by the two single-cycle profiles.
+/// not per-cycle width, and width is already measured at 4 096 by the two single-cycle profiles.
 /// Installing 90 production-width cycles would be minutes of setup for a number the sibling already
 /// reports — and the quantity that matters, whether per-cycle cost stays flat as cycles accumulate,
 /// is a property of the caches rather than of the polynomial count.
@@ -345,7 +343,7 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     // A cycle emits `threshold + surplus` shares per polynomial, and the quota counts every one of
     // them — `pix_params_to_quota` in `transport/session/src/types.rs` includes the surplus because
     // H5 established that it is billed on purchase rather than on claim. This used to be
-    // `commitments * QUOTA_BYTES_PER_SHARE`, i.e. threshold only, understating the cycle by 31 % at
+    // `commitments * QUOTA_BYTES_PER_SHARE`, i.e. threshold only, understating the cycle by 71 % at
     // the deployed surplus and mis-stating the duration by the same factor.
     let emitted_shares = polys * (threshold + PROD_SURPLUS as usize);
     let quota_bytes = emitted_shares as u64 * QUOTA_BYTES_PER_SHARE;
@@ -450,7 +448,7 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     // The whole wire order: one constant term per polynomial. The closing message publishes the
     // SSA commitment, the part accumulator and every part builder at once, so this is the
     // expected peak. At the modelled line rate it lands inside the first fraction of a percent
-    // of the cycle: ~0.3 MiB of commitments against ~908 MiB of quota.
+    // of the cycle: ~0.13 MiB of commitments against ~630 MiB of quota.
     for chunk in constant_terms.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
         reconstructor
             .insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), chunk.iter().copied())
@@ -611,9 +609,10 @@ fn exit_reconstructor_worst_case_share_order() {
     //
     // Staged up front rather than pulled inside the measured region because the generator frees each
     // polynomial as it exhausts it, in this same process. That release runs concurrently with the
-    // Exit's accumulation and cancels most of it out: measured the other way round this cycle reads
-    // as +7.5 MiB rather than the ~37 MiB it actually holds. It is the same confound the sibling
-    // profile documents for its intermediate readings, and here it would swallow the whole result.
+    // Exit's accumulation and cancels most of it out: measured the other way round at the former
+    // 8192 x 64 dimensions this cycle read as +7.5 MiB rather than the ~37 MiB it actually held. It is
+    // the same confound the sibling profile documents for its intermediate readings, and here it
+    // would swallow the whole result.
     let mut held = vec![0usize; polys];
     let mut staged = Vec::with_capacity(polys * (threshold - 1));
     for counter in 0..(polys * threshold) as u64 {
