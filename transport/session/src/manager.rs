@@ -6702,13 +6702,15 @@ where
         // which has two ways to ask again: its automatic repeat of this request, sent only while some
         // member of the batch has reported nothing and the batch is behind the front, and its scoped
         // re-request for a member whose commitment began to arrive, which works wherever the batch
-        // stands and resumes every owed member, not only the one named. Two cases are therefore not
-        // recovered. A member of which no message went out, whose batch holds the front (the opening
-        // batch always does), is resumed only as a side effect of a re-request for an earlier member of
-        // the same batch. And a member whose whole burst went out but whose `ReadyToDeposit` could not
-        // be queued prompts no request at all, since the Exit already holds its complete commitment. In
-        // both the Exit's own deadline ends the cycle, and nothing is stranded for that member because
-        // nothing was announced for it. See `SessionSsaState::unpublished` and `resume_publication`.
+        // stands and resumes every owed member, not only the one named, but only when the member it
+        // names is itself still owed, because its own burst was cut part-way. Two cases are therefore
+        // not recovered. A member of which no message went out, whose batch holds the front (the
+        // opening batch always does), is resumed only as a side effect of a re-request for an earlier
+        // member of the same batch that is itself still owed. And a member whose whole burst went out
+        // but whose `ReadyToDeposit` could not be queued prompts no request at all, since the Exit
+        // already holds its complete commitment. In both the Exit's own deadline ends the cycle, and
+        // nothing is stranded for that member because nothing was announced for it. See
+        // `SessionSsaState::unpublished` and `resume_publication`.
         for (staged_quota, burst) in staged {
             // Claimed just before its burst, so that nobody else can publish this member while this
             // call is doing so, and so that only the claimant announces it.

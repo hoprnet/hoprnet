@@ -88,13 +88,15 @@ pub enum SessionManagerError {
     /// automatic repeat of the request is sent only while some member of the batch has reported nothing
     /// *and* the batch is behind the front. Its scoped re-request for a member whose commitment began to
     /// arrive works wherever the batch stands, and resumes every owed member of the batch, not only the
-    /// one named. Two cases are therefore not recovered. A member of which no message went out, whose
+    /// one named, but only when the member it names is itself still owed, because its own burst was cut
+    /// part-way. Two cases are therefore not recovered. A member of which no message went out, whose
     /// batch holds the front (the opening batch always does), is resumed only as a side effect of a
-    /// scoped re-request for an earlier member of the same batch. And neither path is prompted by a
-    /// member whose whole burst went out and only its `ReadyToDeposit` could not be queued, since the
-    /// Exit already holds its complete commitment; it stays owed, and is finished only incidentally,
-    /// if a request for another member resumes everything owed. In those cases the Exit's own deadline
-    /// ends the cycle, and nothing is stranded for that member because nothing was announced for it.
+    /// scoped re-request for an earlier member of the same batch that is itself still owed. And neither
+    /// path is prompted by a member whose whole burst went out and only its `ReadyToDeposit` could not
+    /// be queued, since the Exit already holds its complete commitment; it stays owed, and is finished
+    /// only incidentally, if a request for another member resumes everything owed. In those cases the
+    /// Exit's own deadline ends the cycle, and nothing is stranded for that member because nothing was
+    /// announced for it.
     ///
     /// A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was published
     /// in full, and after finishing the publication if it was not. Callers that report errors should
