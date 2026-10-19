@@ -68,6 +68,16 @@ pub enum SessionManagerError {
     UnsupportedMessage,
     #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
     Unacceptable(String),
+    /// A Start protocol request was dropped without being served, and nothing about the Session was
+    /// found wrong.
+    ///
+    /// The counterpart of [`Unacceptable`](Self::Unacceptable) for refusals that are *not* terminal:
+    /// the request came too early, was already served, or lost a race for the per-Session request lock.
+    /// The Session keeps running and the peer is told nothing — it re-asks, and the same request is
+    /// admitted once the Entry's state has caught up. Callers that report errors should treat it as an
+    /// ordinary outcome rather than a fault.
+    #[error("the request was not admitted: {0}")]
+    NotAdmitted(String),
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
     MissingDepositData(String),
     #[error(transparent)]

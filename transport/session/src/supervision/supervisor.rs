@@ -67,7 +67,9 @@ struct PerSsaState {
     /// Set only once *some* of the commitment has arrived, and pushed out by every further part, so
     /// it measures silence in the delivery rather than elapsed time. A cycle for which nothing was
     /// ever delivered leaves it unset and dies on `commitment_deadline`, which is all the Exit can
-    /// do about one: it has no scope to name.
+    /// do about one: it has no scope to name. For a successor batch that is still behind the front
+    /// that deadline is not fixed — each re-send of the request moves it, see
+    /// [`SessionPixSupervisor::resend`].
     recommit_deadline: Option<Instant>,
     /// Re-requests already made for this cycle, capped at
     /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS).
@@ -78,6 +80,14 @@ struct PerSsaState {
     /// twenty thousand of them. Matching the figure the Entry will answer means none of the asks is
     /// wasted either.
     recommit_attempts: u8,
+    /// Whether any part of this cycle's commitment has been reported, whole or partial.
+    ///
+    /// Set by `CommitmentProgress` and `CommitmentVerified` and never cleared. It is the evidence that
+    /// the Entry *answered* the request that created this cycle — it only sends a commitment for a
+    /// request it admitted — so it is what ends the re-sending of the request, and what stops a late
+    /// `SsaRequestSent` from arming one for a batch that was already answered. Kept apart from
+    /// `recommit_attempts`, which stops counting at its cap while the answer is still an answer.
+    commitment_seen: bool,
     deposit_deadline: Option<Instant>,
     recovery_idle_deadline: Option<Instant>,
     recovery_hard_deadline: Option<Instant>,
@@ -145,6 +155,7 @@ impl PerSsaState {
             commitment_deadline: None,
             recommit_deadline: None,
             recommit_attempts: 0,
+            commitment_seen: false,
             deposit_uhopr: 0,
             deposit_deadline: None,
             recovery_idle_deadline: None,
@@ -220,6 +231,26 @@ struct PaidRecoveryTail {
     hard_deadline: Option<Instant>,
 }
 
+/// A successor batch the Entry has not answered, which the supervisor keeps asking for.
+///
+/// At most one exists, because a successor is requested only once the cycle that asks for it has a
+/// verified commitment, and a verified commitment is an answer: the batch before it is answered
+/// before this one exists. See [`SessionPixSupervisor::resend`].
+struct PendingResend {
+    /// First index of the batch, which is [`PerSsaState::batch_id`] of every member.
+    batch_id: u32,
+    /// Every member, in index order, as the original `RequestSsa` named them.
+    ///
+    /// Kept rather than re-derived from `ssas` so that a member that has gone missing is *noticed*
+    /// instead of silently shrinking the batch, and so the action and its failure report name
+    /// exactly what the carrier last sent.
+    ssa_ids: Vec<SsaId<HoprPseudonym>>,
+    /// When the next re-send is due.
+    resend_at: Instant,
+    /// Re-sends emitted so far, for the log level of the next one.
+    resends: u32,
+}
+
 // ---------------------------------------------------------------------------
 // SessionPixSupervisor
 // ---------------------------------------------------------------------------
@@ -269,6 +300,42 @@ pub struct SessionPixSupervisor {
     paid_recovery_tail: Option<PaidRecoveryTail>,
     /// A successor batch was earned but could not yet fit the two-generation reservation.
     successor_request_deferred: bool,
+    /// The successor batch that has been requested, has not been answered, and is being asked for
+    /// again.
+    ///
+    /// The Entry admits a successor only once its predecessor's returned packets have earned the
+    /// request, and drops it otherwise without a word — so a request sent at the Exit's early signal
+    /// is routinely refused, as is one lost on the return path. Without this the Exit waited out the
+    /// batch's commitment deadline and closed the Session on it, although the very same request would
+    /// have been admitted a few seconds later.
+    ///
+    /// **Unanswered** is the interval from a batch's first `SsaRequestSent` to the first
+    /// `CommitmentProgress` or `CommitmentVerified` of any member. The Entry commits a batch
+    /// all-or-nothing and answers an admitted request with its commitment, so one reported part
+    /// settles the question for every member.
+    ///
+    /// **Behind the front** means [`paid_recovery_tail`](Self::paid_recovery_tail) is set, or the
+    /// earliest live cycle belongs to another batch — an earlier generation is still being served. It
+    /// is absorbing: the front only ever advances.
+    ///
+    /// While both hold, [`handle_deadline`](Self::handle_deadline) emits
+    /// [`SessionPixAction::ResendSsaRequest`] every
+    /// [`ssa_request_resend_interval`](SupervisorConfig::ssa_request_resend_interval), and each
+    /// emission pushes every member's `commitment_deadline` to at least `now` plus the batch-scaled
+    /// delivery budget. So a re-send the Entry admits always has a whole window to deliver in, and a
+    /// batch that is not yet needed cannot time out. At the front, and for the opening batch, nothing
+    /// is re-sent and the deadline stops moving: the Session closes on `CommitmentTimeout` at most one
+    /// window after the last re-send. Never asking at the front also means a request admitted late
+    /// cannot leave the Entry with a `ReadyToDeposit` for a cycle the Exit has already given up on.
+    ///
+    /// Cleared when any member reports a commitment part, when any member is retired, when the
+    /// carrier reports that it can no longer send this batch, when the batch is found at the front or
+    /// when a drain begins. Armed only from a first-index `SsaRequestSent` that arms the commitment
+    /// deadline, so a late or repeated confirmation cannot arm it again once it has been cleared.
+    ///
+    /// Unarmed when the interval is zero, which a config that skipped validation can carry; that
+    /// reads as "off" rather than as a timer that spins.
+    resend: Option<PendingResend>,
     /// Ordered SSAs (oldest first, newest last), including short-lived recovered tombstones.
     ssas: Vec<PerSsaState>,
     /// Tracks the first failure reason when multiple SSAs fail, so the
@@ -332,6 +399,7 @@ impl SessionPixSupervisor {
             paid_front_handoff: false,
             paid_recovery_tail: None,
             successor_request_deferred: false,
+            resend: None,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
             failed_cycles: 0,
@@ -669,11 +737,16 @@ impl SessionPixSupervisor {
                 if reason == SessionPixCloseReason::RecoveryIdle && served_total <= tail.served_total_at_last_progress {
                     tail.idle_deadline = now.checked_add(max_recovery_idle);
                 } else {
+                    // The batch behind the tail that the Entry never admitted, if there is one. With
+                    // successor re-sends its commitment deadline keeps moving for as long as the tail
+                    // holds the front, so this — not `CommitmentTimeout` — is how a Session whose
+                    // successor request is refused for good ends, and the log has to say why.
                     tracing::warn!(
                         ssa_id = %tail.ssa_id,
                         ?reason,
                         largest_shares_seen = tail.largest_shares_seen,
                         served_total_at_last_progress = tail.served_total_at_last_progress,
+                        unanswered_successor_batch = ?self.resend.as_ref().map(|resend| resend.batch_id),
                         "closing PIX Session while its paid recovery tail is stalled"
                     );
                     // The tail is ending here, not merely being abandoned with the Session, so it
@@ -771,6 +844,12 @@ impl SessionPixSupervisor {
             self.note_retired_index(id.ssa_index());
             actions.push(SessionPixAction::RetireSsa(id));
         }
+
+        // Last of the per-cycle timers, after the expiry loop above: a re-send pushes deadlines, so
+        // running it first would let a stalled worker revive a batch whose deadline had already
+        // passed. Here the deadline is authoritative and the re-send only ever extends one that is
+        // still live.
+        actions.extend(self.tick_ssa_request_resend(now));
 
         // A terminal cycle may have released the older of two live batches. Keep retirement before
         // the replacement request in the action stream so the reconstructor drops the old guard
@@ -949,8 +1028,15 @@ impl SessionPixSupervisor {
             .paid_recovery_tail
             .as_ref()
             .and_then(|tail| tail.idle_deadline.into_iter().chain(tail.hard_deadline).min());
+        // A re-send is a timer like the re-request one: leaving it out would mean the worker slept
+        // past it and only re-sent when something else woke it up.
+        let resend_deadline = self.resend.as_ref().map(|resend| resend.resend_at);
 
-        ssa_deadline.into_iter().chain(tail_deadline).min()
+        ssa_deadline
+            .into_iter()
+            .chain(tail_deadline)
+            .chain(resend_deadline)
+            .min()
     }
 
     /// Feed back the result of executing an action.
@@ -965,6 +1051,21 @@ impl SessionPixSupervisor {
                 self.with_fill_stopped(vec![SessionPixAction::Close(
                     SessionPixCloseReason::SupervisorUnavailable,
                 )])
+            }
+            // The carrier can no longer send this batch: it is not what was last requested, or its
+            // registration is gone or complete. Another tick would be refused for the same reason, so
+            // stop. Matched on the ids rather than on the variant alone, so a stale report about an
+            // earlier batch cannot switch off the re-sends of the current one. The commitment deadline
+            // is not touched — it simply stops moving, and remains the bound.
+            SessionPixAction::ResendSsaRequest { ssa_ids } if !ok => {
+                if self.resend.as_ref().is_some_and(|resend| &resend.ssa_ids == ssa_ids) {
+                    tracing::debug!(
+                        batch_size = ssa_ids.len(),
+                        "the carrier can no longer re-send the SSA request — stopping the re-sends"
+                    );
+                    self.resend = None;
+                }
+                Vec::new()
             }
             SessionPixAction::Close(_) => {
                 self.closed = true;
@@ -1014,9 +1115,151 @@ impl SessionPixSupervisor {
                 self.cfg.max_ssa_delivery_time,
                 self.cfg.ssas_per_request,
             ));
+            // On the same confirmation that starts the clock, so the guard above is also what keeps a
+            // late or repeated one from arming the re-sends a second time.
+            self.arm_ssa_request_resend(idx, now);
         }
 
         Vec::new()
+    }
+
+    /// Whether the batch `batch_id` is still waiting for an earlier generation to be served.
+    ///
+    /// True while the recovered predecessor's paid FIFO tail holds the transport front, or while the
+    /// earliest live cycle belongs to another batch. Together those are exactly "an earlier generation
+    /// is still live", and the Entry's successor gate is measuring that generation's service. Absorbing
+    /// once false: the front only advances, so a batch that has reached it never goes back behind it.
+    fn batch_is_behind_front(&self, batch_id: u32) -> bool {
+        self.paid_recovery_tail.is_some()
+            || self
+                .earliest_live_idx()
+                .is_some_and(|idx| self.ssas[idx].batch_id != batch_id)
+    }
+
+    /// Starts re-sending the batch whose first index has just been confirmed, if it should be.
+    ///
+    /// Only the first index of a batch arms it: a batch is confirmed one index at a time, and one timer
+    /// per batch is the point. The conditions are the whole of the policy. A zero interval is "off"; a
+    /// drain has no Session left to serve a successor; a member that has already reported a commitment
+    /// part means the request was answered before its own confirmation was processed, which the
+    /// ordering of the two does not rule out; and a batch at the front is not asked for again, so the
+    /// opening batch never is.
+    fn arm_ssa_request_resend(&mut self, idx: usize, now: Instant) {
+        let batch_id = self.ssas[idx].batch_id;
+        if self.ssas[idx].ssa_id.ssa_index().get() != batch_id
+            || self.cfg.ssa_request_resend_interval.is_zero()
+            || self.draining
+            || self
+                .ssas
+                .iter()
+                .any(|ssa| ssa.batch_id == batch_id && ssa.commitment_seen)
+            || !self.batch_is_behind_front(batch_id)
+        {
+            return;
+        }
+        let Some(resend_at) = now.checked_add(self.cfg.ssa_request_resend_interval) else {
+            return;
+        };
+
+        // Replaces rather than refuses when one is already set. At most one batch is ever unanswered,
+        // so a leftover is one whose members have all moved on, and it would clear itself at its next
+        // tick — by which time this batch's confirmation would be too late to arm anything.
+        self.resend = Some(PendingResend {
+            batch_id,
+            ssa_ids: self
+                .ssas
+                .iter()
+                .filter(|ssa| ssa.batch_id == batch_id)
+                .map(|ssa| ssa.ssa_id)
+                .collect(),
+            resend_at,
+            resends: 0,
+        });
+    }
+
+    /// Stops re-sending `batch_id`, if that is the batch being re-sent.
+    fn clear_resend_for(&mut self, batch_id: u32) {
+        if self.resend.as_ref().is_some_and(|resend| resend.batch_id == batch_id) {
+            self.resend = None;
+        }
+    }
+
+    /// Records that part of the cycle at `idx`'s commitment arrived, which answers its batch.
+    fn note_commitment_seen(&mut self, idx: usize) {
+        self.ssas[idx].commitment_seen = true;
+        let batch_id = self.ssas[idx].batch_id;
+        self.clear_resend_for(batch_id);
+    }
+
+    /// Re-sends the unanswered successor batch if its turn has come, pushing its deadlines with it.
+    ///
+    /// Stops instead — clearing the state, so nothing re-arms it — when the batch has reached the
+    /// front, when a drain has begun, or when a member is missing or has left `AwaitingCommitment`.
+    /// Those are the same facts the clears at the event handlers act on, checked again here because
+    /// this is the only place that acts on the *absence* of an event: the front moving is not one.
+    ///
+    /// Every member's `commitment_deadline` becomes the later of what it was and `now` plus the
+    /// batch-scaled delivery budget, so the budget is never shortened and a re-send the Entry admits
+    /// always finds a whole window ahead of it. The deadline is moved here, when the action is
+    /// emitted, rather than when it is carried out: the carrier may drop the action or fail to send
+    /// it, and the batch is then no worse off than if the Entry had refused it.
+    fn tick_ssa_request_resend(&mut self, now: Instant) -> Option<SessionPixAction> {
+        let pending = self.resend.as_ref().filter(|resend| now >= resend.resend_at)?;
+        let batch_id = pending.batch_id;
+        let ssa_ids = pending.ssa_ids.clone();
+        let resends = pending.resends;
+
+        let still_unanswered = ssa_ids.iter().all(|ssa_id| {
+            self.find_ssa_idx(ssa_id)
+                .is_some_and(|idx| self.ssas[idx].phase == SsaPhase::AwaitingCommitment)
+        });
+        if self.draining || !still_unanswered || !self.batch_is_behind_front(batch_id) {
+            tracing::debug!(
+                batch_id,
+                resends,
+                draining = self.draining,
+                still_unanswered,
+                "no longer re-sending the SSA request"
+            );
+            self.resend = None;
+            return None;
+        }
+
+        let budget = crate::supervision::scaled_deadline(self.cfg.max_ssa_delivery_time, self.cfg.ssas_per_request);
+        if let Some(pushed) = now.checked_add(budget) {
+            for ssa_id in &ssa_ids {
+                if let Some(idx) = self.find_ssa_idx(ssa_id) {
+                    let deadline = &mut self.ssas[idx].commitment_deadline;
+                    *deadline = Some(deadline.map_or(pushed, |current| current.max(pushed)));
+                }
+            }
+        }
+
+        // A first re-send of a batch is news — it means the Entry has not admitted the request yet —
+        // and the ones after it are the same news again.
+        if resends == 0 {
+            tracing::info!(
+                batch_id,
+                batch_size = ssa_ids.len(),
+                "the SSA request was not answered while the previous generation is served — re-sending it"
+            );
+        } else {
+            tracing::debug!(batch_id, resends = resends + 1, "re-sending the unanswered SSA request");
+        }
+        self.telemetry.ssa_requests_resent = self.telemetry.ssa_requests_resent.saturating_add(1);
+
+        match now.checked_add(self.cfg.ssa_request_resend_interval) {
+            Some(resend_at) => {
+                if let Some(resend) = self.resend.as_mut() {
+                    resend.resend_at = resend_at;
+                    resend.resends = resends.saturating_add(1);
+                }
+            }
+            // An interval the clock cannot represent is an interval that never elapses.
+            None => self.resend = None,
+        }
+
+        Some(SessionPixAction::ResendSsaRequest { ssa_ids })
     }
 
     /// Arms — or re-arms — the re-request timer on a commitment that is under way but not complete.
@@ -1026,14 +1269,28 @@ impl SessionPixSupervisor {
     /// arriving part pushes the timer out, the first ask cannot land in the middle of the burst —
     /// what the timer measures is a stall in delivery.
     ///
+    /// A cycle that received nothing is not necessarily left to its deadline, though: a successor
+    /// batch that is still behind the front is asking the *Entry* for the whole commitment again, see
+    /// [`resend`](Self::resend). The first part reported here is what stops that — the request was
+    /// admitted, and the missing parts are this timer's to chase from then on.
+    ///
     /// Unscaled by the batch size, unlike the two absolute deadlines: this is a per-cycle stall
     /// detector, and a batch's commitment sets do not queue behind one another in a way that would
     /// make one cycle's silence expected.
     fn on_commitment_progress(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
-        if let Some(idx) = self.find_ssa_idx(ssa_id)
-            && self.ssas[idx].phase == SsaPhase::AwaitingCommitment
-            && self.ssas[idx].recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS
-        {
+        let Some(idx) = self.find_ssa_idx(ssa_id) else {
+            return Vec::new();
+        };
+        if self.ssas[idx].phase != SsaPhase::AwaitingCommitment {
+            return Vec::new();
+        }
+
+        // Before the attempts guard below, which says whether the Exit may *ask* again and nothing
+        // about whether the Entry *answered*: a cycle that has used all its re-requests has still
+        // been answered, and the request that created it must stop being re-sent.
+        self.note_commitment_seen(idx);
+
+        if self.ssas[idx].recommit_attempts < hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
             self.ssas[idx].recommit_deadline = now.checked_add(self.cfg.commitment_recommit_interval);
         }
 
@@ -1045,11 +1302,13 @@ impl SessionPixSupervisor {
             Some(i) => i,
             None => return Vec::new(),
         };
-        let ssa = &mut self.ssas[idx];
-        if ssa.phase != SsaPhase::AwaitingCommitment {
+        if self.ssas[idx].phase != SsaPhase::AwaitingCommitment {
             return Vec::new();
         }
+        // A commitment can arrive whole, in one message, without a `CommitmentProgress` before it.
+        self.note_commitment_seen(idx);
 
+        let ssa = &mut self.ssas[idx];
         let deposit_deadline = now.checked_add(crate::supervision::scaled_deadline(
             self.cfg.max_deposit_wait,
             self.cfg.ssas_per_request,
@@ -1707,6 +1966,11 @@ impl SessionPixSupervisor {
     /// the target's existing clocks rather than starting any of its own, which is the point — the
     /// resource bound on the cycle must not be extended by the Session ending.
     fn on_session_closed(&mut self, available: u64, _now: Instant) -> Vec<SessionPixAction> {
+        // Whether the Session drains or closes at once, no successor is wanted any more. An unanswered
+        // batch is never the drain's target — it is not funded — so the retirement below takes it too,
+        // but the re-sends stop here regardless of what that decides.
+        self.resend = None;
+
         let target = self
             .paid_recovery_tail
             .is_none()
@@ -1780,6 +2044,11 @@ impl SessionPixSupervisor {
         if matches!(self.ssas[idx].phase, SsaPhase::Closing) {
             return Vec::new();
         }
+
+        // A batch with a member gone is not a batch the Entry can still be asked to commit to as a
+        // whole, and the survivors are on their own deadlines from here.
+        let batch_id = self.ssas[idx].batch_id;
+        self.clear_resend_for(batch_id);
 
         // Track the first close reason so it isn't lost when multiple SSAs close.
         self.first_failure_reason.get_or_insert(reason);
@@ -2062,6 +2331,7 @@ mod tests {
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             commitment_recommit_interval: Duration::from_secs(3),
+            ssa_request_resend_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
@@ -5307,6 +5577,566 @@ mod tests {
             actions.is_empty(),
             "late tombstone unverifiable shares should be absorbed"
         );
+    }
+
+    // ---------------------------------------------------------------
+    // Re-sending an unanswered successor request
+    // ---------------------------------------------------------------
+
+    /// The re-send interval the tests below read their expectations against.
+    const RESEND: Duration = Duration::from_secs(3);
+
+    /// A Session whose first batch is funded and recovering, and whose successor batch has been
+    /// requested and confirmed on the wire at `sent_at`.
+    ///
+    /// This is the state the Entry's successor gate leaves a refused request in: the predecessor is
+    /// the front, the successor is `AwaitingCommitment`, and nothing has come back for it. Returns the
+    /// successor's ids in index order.
+    fn with_unanswered_successor(
+        cfg: SupervisorConfig,
+        sent_at: Instant,
+    ) -> (SessionPixSupervisor, HoprPseudonym, Vec<SsaId<HoprPseudonym>>) {
+        let p = pseudonym();
+        let batch = cfg.ssas_per_request as u32;
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, sent_at);
+        fund_batch(&mut sup, p, batch, sent_at);
+
+        // The last cycle of a batch is the one that asks for the next.
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, batch)), sent_at, 0);
+        let successor = actions
+            .iter()
+            .find_map(|action| match action {
+                SessionPixAction::RequestSsa { ssa_ids, .. } => Some(ssa_ids.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("the early signal must request the successor, got {actions:?}"));
+
+        for id in &successor {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(*id), sent_at, 0);
+        }
+        (sup, p, successor)
+    }
+
+    /// The commitment deadline of the cycle `id`, which the re-sends move.
+    fn commitment_deadline_of(sup: &SessionPixSupervisor, id: SsaId<HoprPseudonym>) -> Option<Instant> {
+        sup.find_ssa_idx(&id).and_then(|idx| sup.ssas[idx].commitment_deadline)
+    }
+
+    /// The re-sends among `actions`, as the ids each one names.
+    fn resends_in(actions: &[SessionPixAction]) -> Vec<Vec<SsaId<HoprPseudonym>>> {
+        actions
+            .iter()
+            .filter_map(|action| match action {
+                SessionPixAction::ResendSsaRequest { ssa_ids } => Some(ssa_ids.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// An unanswered successor behind a live predecessor is asked for on every interval, long past
+    /// the delivery deadline that used to end the Session, and each ask carries the deadline with it.
+    ///
+    /// This is the issue: the Entry's gate drops an early or under-served successor request without
+    /// a word, so the Exit sent it once, waited out `max_ssa_delivery_time` and closed the Session on
+    /// it, although the same request would have been admitted a few seconds later.
+    #[test]
+    fn an_unanswered_successor_behind_a_live_predecessor_is_resent_past_its_delivery_deadline() {
+        let t0 = Instant::now();
+        let cfg = default_cfg();
+        let delivery = crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let (mut sup, _, successor) = with_unanswered_successor(cfg, t0);
+
+        assert_eq!(
+            Some(t0 + delivery),
+            commitment_deadline_of(&sup, successor[0]),
+            "the deadline is as armed until the first re-send moves it"
+        );
+
+        // Four times the delivery deadline, so nothing but the re-sends can be what keeps it alive.
+        let mut resends = 0u32;
+        let mut now = t0;
+        while now < t0 + delivery * 4 {
+            now += RESEND;
+            let actions = sup.handle_deadline(now, 0);
+            assert_eq!(
+                vec![successor.clone()],
+                resends_in(&actions),
+                "exactly one re-send of the whole batch per interval, at {now:?}"
+            );
+            assert!(
+                !actions
+                    .iter()
+                    .any(|action| matches!(action, SessionPixAction::Close(_))),
+                "an unanswered successor behind a live predecessor must not close the Session, got {actions:?}"
+            );
+            resends += 1;
+
+            // The window an admitted re-send gets is always whole, however long this has been going on.
+            assert_eq!(
+                Some(now + delivery),
+                commitment_deadline_of(&sup, successor[0]),
+                "each re-send pushes the deadline to a full delivery window from now"
+            );
+        }
+        assert!(
+            resends * RESEND > delivery * 4,
+            "the loop must have run well past the original deadline"
+        );
+        assert_eq!(
+            resends,
+            sup.take_telemetry_events().ssa_requests_resent,
+            "every re-send is counted, on its own series"
+        );
+
+        // Between two intervals nothing is emitted.
+        assert!(
+            resends_in(&sup.handle_deadline(now + RESEND / 2, 0)).is_empty(),
+            "a re-send is due on its interval, not on every sweep"
+        );
+    }
+
+    /// A batch is re-sent whole, and every member's deadline moves with it.
+    #[test]
+    fn a_resent_batch_names_and_pushes_every_member() {
+        let t0 = Instant::now();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            ..default_cfg()
+        };
+        let delivery = crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let (mut sup, p, successor) = with_unanswered_successor(cfg, t0);
+        assert_eq!(vec![ssa_id(p, 3), ssa_id(p, 4)], successor);
+
+        let now = t0 + RESEND;
+        let actions = sup.handle_deadline(now, 0);
+        assert_eq!(vec![successor.clone()], resends_in(&actions));
+        for id in &successor {
+            assert_eq!(
+                Some(now + delivery),
+                commitment_deadline_of(&sup, *id),
+                "{id} must be pushed with the rest of its batch"
+            );
+        }
+        assert_eq!(
+            1,
+            sup.take_telemetry_events().ssa_requests_resent,
+            "one re-send of a batch is one count, not one per index"
+        );
+    }
+
+    /// The re-send is a timer the worker has to wake for.
+    #[test]
+    fn the_resend_timer_is_part_of_the_next_deadline() {
+        let t0 = Instant::now();
+        let (mut sup, ..) = with_unanswered_successor(default_cfg(), t0);
+
+        // Sooner than the commitment deadline (20 s), the predecessor's idle deadline (60 s) and
+        // everything else the Session has armed.
+        assert_eq!(Some(t0 + RESEND), sup.next_deadline());
+
+        sup.handle_deadline(t0 + RESEND, 0);
+        assert_eq!(
+            Some(t0 + RESEND * 2),
+            sup.next_deadline(),
+            "a sent re-send re-arms the timer for the next interval"
+        );
+    }
+
+    /// While only a paid FIFO tail stands between a successor and the front, it is still behind it.
+    ///
+    /// The predecessor has recovered and left a tombstone, so the successor is the earliest *live*
+    /// cycle — but the Entry is still emitting the predecessor's surplus, and its successor gate is
+    /// measuring that. Reading "earliest live cycle" alone would stop the re-sends here, one
+    /// generation too early.
+    #[test]
+    fn a_paid_tail_keeps_the_successor_behind_the_front() {
+        let t0 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, t0);
+        let id1 = ssa_id(p, 1);
+        let id2 = ssa_id(p, 2);
+        fund_batch(&mut sup, p, 1, t0);
+
+        // Recovery without a prior early signal: the full-recovery fallback asks for the successor,
+        // and the cycle leaves a tail because the Entry has not emitted all of its surplus yet.
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), t0, 0);
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::RequestSsa { .. })),
+            "the fallback must request the successor, got {actions:?}"
+        );
+        assert!(sup.paid_recovery_tail.is_some(), "the fixture needs a live paid tail");
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), t0, 0);
+
+        assert!(
+            sup.earliest_live_idx().is_some_and(|idx| sup.ssas[idx].ssa_id == id2),
+            "the successor is the earliest live cycle, so only the tail holds it back"
+        );
+        let mut now = t0;
+        for _ in 0..4 {
+            now += RESEND;
+            assert_eq!(
+                vec![vec![id2]],
+                resends_in(&sup.handle_deadline(now, 0)),
+                "a successor held back by the tail alone is still re-sent"
+            );
+        }
+    }
+
+    /// At the front the re-sends stop, the deadline stops moving, and the Session closes on it.
+    ///
+    /// Never asking at the front is also what keeps a request admitted late from stranding the
+    /// Entry: it would commit, announce a deposit and burst its commitments for a cycle the Exit had
+    /// already given up on.
+    #[test]
+    fn at_the_front_nothing_is_resent_and_the_deadline_closes_the_session() {
+        let t0 = Instant::now();
+        let cfg = default_cfg();
+        let delivery = crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, t0);
+        let id1 = ssa_id(p, 1);
+        let id2 = ssa_id(p, 2);
+        fund_batch(&mut sup, p, 1, t0);
+        sup.handle_event(&SessionPixEvent::Recovered(id1), t0, 0);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), t0, 0);
+
+        // Two re-sends while the tail holds the front.
+        let mut last_resend = t0;
+        for _ in 0..2 {
+            last_resend += RESEND;
+            assert_eq!(vec![vec![id2]], resends_in(&sup.handle_deadline(last_resend, 0)));
+        }
+        let pushed_to = commitment_deadline_of(&sup, id2).expect("the successor has a deadline");
+
+        // The tail is spent: the Entry has finished the predecessor's emission, so the successor is
+        // the front and the Entry's gate has been satisfied for as long as it was going to be.
+        let spent = make_recovered_tail_progress(&sup, id1, max_cycle_shares(&sup));
+        sup.handle_event(&SessionPixEvent::RecoveryProgress(spent), last_resend, 0);
+        assert!(sup.paid_recovery_tail.is_none(), "the fixture must have spent the tail");
+
+        let at_the_tick = last_resend + RESEND;
+        let actions = sup.handle_deadline(at_the_tick, 0);
+        assert!(
+            resends_in(&actions).is_empty() && !actions.iter().any(|a| matches!(a, SessionPixAction::Close(_))),
+            "a batch found at the front is not re-sent, and is not closed before its deadline, got {actions:?}"
+        );
+        assert!(sup.resend.is_none(), "reaching the front ends the re-sends for good");
+        assert_eq!(
+            Some(pushed_to),
+            commitment_deadline_of(&sup, id2),
+            "and the deadline stops moving where the last re-send left it"
+        );
+        assert!(
+            pushed_to <= last_resend + delivery,
+            "so the Session closes at most one delivery window after the last re-send"
+        );
+
+        for later in 1..=5 {
+            assert!(
+                resends_in(&sup.handle_deadline(at_the_tick + RESEND * later, 0)).is_empty(),
+                "once at the front nothing is ever re-sent again"
+            );
+            if at_the_tick + RESEND * later >= pushed_to {
+                break;
+            }
+        }
+        let actions = sup.handle_deadline(pushed_to, 0);
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)]
+            ),
+            "the Session closes on the commitment deadline, got {actions:?}"
+        );
+    }
+
+    /// The opening request is never re-sent: nothing has been paid for before it.
+    #[test]
+    fn the_opening_batch_is_never_resent() {
+        let t0 = Instant::now();
+        let cfg = default_cfg();
+        let delivery = crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, t0);
+        let id1 = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), t0, 0);
+        assert!(sup.resend.is_none(), "the opening batch is the front from the start");
+        assert_eq!(
+            Some(t0 + delivery),
+            sup.next_deadline(),
+            "so the only timer is the commitment deadline"
+        );
+
+        let mut now = t0;
+        while now + RESEND < t0 + delivery {
+            now += RESEND;
+            assert!(
+                sup.handle_deadline(now, 0).is_empty(),
+                "the opening request is sent once, at {now:?}"
+            );
+        }
+        assert_eq!(
+            Some(t0 + delivery),
+            commitment_deadline_of(&sup, id1),
+            "and its deadline is never moved"
+        );
+        assert!(matches!(
+            sup.handle_deadline(t0 + delivery, 0).as_slice(),
+            [SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)]
+        ));
+    }
+
+    /// The first part of the Entry's commitment answers the request, for every member of the batch.
+    #[test]
+    fn any_commitment_part_ends_the_resends() {
+        for verified_whole in [false, true] {
+            let t0 = Instant::now();
+            let cfg = SupervisorConfig {
+                ssas_per_request: 2,
+                ..default_cfg()
+            };
+            let (mut sup, _, successor) = with_unanswered_successor(cfg, t0);
+
+            let now = t0 + RESEND;
+            assert_eq!(vec![successor.clone()], resends_in(&sup.handle_deadline(now, 0)));
+
+            // The *second* member answers: the Entry commits a batch all-or-nothing, so one part from
+            // any member settles the question for all of them.
+            let answered = now + Duration::from_secs(1);
+            let event = if verified_whole {
+                SessionPixEvent::CommitmentVerified(successor[1])
+            } else {
+                SessionPixEvent::CommitmentProgress(successor[1])
+            };
+            sup.handle_event(&event, answered, 0);
+            assert!(sup.resend.is_none(), "{event:?} must end the re-sends");
+
+            let pushed = commitment_deadline_of(&sup, successor[0]);
+            let mut later = answered;
+            for _ in 0..4 {
+                later += RESEND;
+                assert!(
+                    resends_in(&sup.handle_deadline(later, 0)).is_empty(),
+                    "nothing is re-sent once the batch is answered ({event:?})"
+                );
+            }
+            assert_eq!(
+                pushed,
+                commitment_deadline_of(&sup, successor[0]),
+                "and the deadline stops moving: from here it is the commitment's to meet ({event:?})"
+            );
+        }
+    }
+
+    /// A late or repeated confirmation cannot arm what has already been cleared, or what was never due.
+    #[test]
+    fn a_late_or_repeated_confirmation_does_not_arm_the_resends() {
+        let t0 = Instant::now();
+        let (mut sup, _, successor) = with_unanswered_successor(default_cfg(), t0);
+
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(successor[0]), t0, 0);
+        assert!(sup.resend.is_none());
+
+        // The confirmation again, after the answer: the guard that arms the deadline is also the one
+        // that keeps this from arming a second timer.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(successor[0]), t0 + RESEND, 0);
+        assert!(
+            sup.resend.is_none(),
+            "a repeated confirmation must not re-arm the re-sends"
+        );
+
+        // And the reverse order: the Entry's answer overtakes the confirmation of its own request.
+        let t1 = Instant::now();
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, t1);
+        fund_batch(&mut sup, p, 1, t1);
+        sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 1)), t1, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentProgress(ssa_id(p, 2)), t1, 0);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 2)), t1, 0);
+        assert!(
+            sup.resend.is_none(),
+            "a batch already answered when its confirmation is processed is not asked for again"
+        );
+    }
+
+    /// A member of the batch retired on its own ends the re-sends.
+    ///
+    /// A batch with a member gone is not one the Entry can still be asked to commit to as a whole,
+    /// and the survivors are left on their own deadlines.
+    #[test]
+    fn a_member_retired_alone_ends_the_resends() {
+        let t0 = Instant::now();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            ..default_cfg()
+        };
+        let (mut sup, _, successor) = with_unanswered_successor(cfg, t0);
+        assert_eq!(
+            vec![successor.clone()],
+            resends_in(&sup.handle_deadline(t0 + RESEND, 0))
+        );
+
+        let idx = sup.find_ssa_idx(&successor[0]).expect("the member is live");
+        let actions = sup.close_ssa_and_collect(idx, SessionPixCloseReason::CommitmentTimeout, 0, t0 + RESEND);
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::RetireSsa(retired)] if *retired == successor[0]),
+            "the first lost cycle is tolerated and retired, got {actions:?}"
+        );
+        assert!(sup.resend.is_none(), "a retired member ends the re-sends");
+
+        let mut now = t0 + RESEND;
+        for _ in 0..3 {
+            now += RESEND;
+            assert!(
+                resends_in(&sup.handle_deadline(now, 0)).is_empty(),
+                "the survivor is not re-sent on its own"
+            );
+        }
+    }
+
+    /// The carrier saying it cannot send the batch ends the re-sends — but only for that batch.
+    #[test]
+    fn a_failed_resend_report_ends_the_resends_for_its_batch_only() {
+        let t0 = Instant::now();
+        let (mut sup, p, successor) = with_unanswered_successor(default_cfg(), t0);
+        assert_eq!(
+            vec![successor.clone()],
+            resends_in(&sup.handle_deadline(t0 + RESEND, 0))
+        );
+
+        // A stale report, about a batch that is not the one being re-sent.
+        sup.action_result(
+            &SessionPixAction::ResendSsaRequest {
+                ssa_ids: vec![ssa_id(p, 1)],
+            },
+            false,
+            t0 + RESEND,
+        );
+        assert!(sup.resend.is_some(), "a report about another batch must be ignored");
+
+        // A success report is not a report of anything: the carrier says nothing when it sends.
+        sup.action_result(
+            &SessionPixAction::ResendSsaRequest {
+                ssa_ids: successor.clone(),
+            },
+            true,
+            t0 + RESEND,
+        );
+        assert!(sup.resend.is_some(), "a success must not stop the re-sends either");
+
+        sup.action_result(
+            &SessionPixAction::ResendSsaRequest {
+                ssa_ids: successor.clone(),
+            },
+            false,
+            t0 + RESEND,
+        );
+        assert!(sup.resend.is_none(), "a failure for this batch ends them");
+        assert!(
+            resends_in(&sup.handle_deadline(t0 + RESEND * 2, 0)).is_empty(),
+            "and nothing more is emitted"
+        );
+        assert!(
+            commitment_deadline_of(&sup, successor[0]).is_some(),
+            "the deadline stays armed — it just stops moving"
+        );
+    }
+
+    /// A drain has no Session left to serve a successor, so nothing is re-sent for one.
+    #[test]
+    fn nothing_is_resent_while_draining() {
+        let t0 = Instant::now();
+
+        // Armed before the close: closing the Session retires the batch and ends the re-sends.
+        let (mut sup, _, successor) = with_unanswered_successor(default_cfg(), t0);
+        assert!(sup.resend.is_some());
+        let actions = sup.handle_event(
+            &SessionPixEvent::SessionClosed {
+                drainable_surbs: u64::MAX,
+            },
+            t0,
+            0,
+        );
+        assert!(sup.draining, "the funded front has enough SURBs to drain");
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::RetireSsa(id) if *id == successor[0])),
+            "the unfunded successor is retired by the drain, got {actions:?}"
+        );
+        assert!(sup.resend.is_none(), "a drain ends the re-sends");
+        assert!(resends_in(&sup.handle_deadline(t0 + RESEND, 0)).is_empty());
+
+        // And not armed in the first place when the confirmation arrives mid-drain.
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, t0);
+        fund_batch(&mut sup, p, 1, t0);
+        sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 1)), t0, 0);
+        sup.draining = true;
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 2)), t0, 0);
+        assert!(sup.resend.is_none(), "a draining Session arms nothing");
+        assert!(resends_in(&sup.handle_deadline(t0 + RESEND, 0)).is_empty());
+    }
+
+    /// A zero interval means "off" for a config that never went through validation, not a timer that
+    /// fires on the instant it is armed.
+    #[test]
+    fn a_zero_resend_interval_disables_the_resends() {
+        let t0 = Instant::now();
+        let cfg = SupervisorConfig {
+            ssa_request_resend_interval: Duration::ZERO,
+            ..default_cfg()
+        };
+        let (mut sup, _, successor) = with_unanswered_successor(cfg, t0);
+
+        assert!(sup.resend.is_none());
+        let before = commitment_deadline_of(&sup, successor[0]);
+        let mut now = t0;
+        for _ in 0..5 {
+            now += RESEND;
+            assert!(
+                sup.handle_deadline(now, 0).is_empty(),
+                "nothing at all is emitted at {now:?}"
+            );
+        }
+        assert_eq!(before, commitment_deadline_of(&sup, successor[0]));
+    }
+
+    /// The deadline stays authoritative: a worker that was stalled past it does not get a re-send.
+    ///
+    /// The tick runs after the expiry loop on purpose. Pushing the deadline before it would let a
+    /// late wake-up revive a batch whose time was already up, and a Session that should have closed
+    /// would be kept alive by the very sweep that discovered it.
+    #[test]
+    fn a_stalled_worker_cannot_revive_an_expired_successor() {
+        let t0 = Instant::now();
+        let cfg = default_cfg();
+        let delivery = crate::supervision::scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+        let (mut sup, _, successor) = with_unanswered_successor(cfg, t0);
+
+        // The sweep that finally runs is past both the re-send and the deadline. With the
+        // predecessor still live the lost cycle is tolerated, so it is retired rather than the Session
+        // closed — what matters here is that the deadline was honoured and nothing was re-sent.
+        let actions = sup.handle_deadline(t0 + delivery + Duration::from_secs(1), 0);
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::RetireSsa(retired)] if *retired == successor[0]
+            ),
+            "the expired deadline wins and nothing is re-sent, got {actions:?}"
+        );
+        assert!(sup.resend.is_none(), "and the retired batch is not asked for again");
+    }
+
+    /// The shipped interval and every other default still fit together.
+    #[test]
+    fn the_resend_interval_is_unscaled_and_matches_the_recommit_cadence() {
+        let cfg = SupervisorConfig::default();
+        assert_eq!(cfg.commitment_recommit_interval, cfg.ssa_request_resend_interval);
+        assert!(cfg.ssa_request_resend_interval < cfg.max_ssa_delivery_time);
     }
 
     // ---------------------------------------------------------------

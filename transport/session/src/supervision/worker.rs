@@ -407,8 +407,10 @@ fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, ga
 /// can fail-close.
 ///
 /// On `Full`:
-/// - **Coalescible** actions (`ProgressNotification`) are logged + skipped. They are idempotent and safe to drop — the
-///   next notification will replace them, and dropping here prevents transient load from killing a healthy session.
+/// - **Coalescible** actions (`ProgressNotification`, `ResendSsaRequest`) are logged + skipped. They are idempotent and
+///   safe to drop — the next notification will replace them, and dropping here prevents transient load from killing a
+///   healthy session. A dropped re-send costs the batch nothing: the supervisor pushed its commitment deadline when it
+///   emitted the action, and its next tick emits another.
 /// - **Non-coalescible** actions (every other variant) are treated as fatal. If these cannot be delivered the channel
 ///   is genuinely wedged.
 fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
@@ -435,7 +437,10 @@ fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
 /// Returns `true` for actions that are safe to drop when the action channel
 /// is transiently full.
 fn is_coalescible(action: &SessionPixAction) -> bool {
-    matches!(action, SessionPixAction::ProgressNotification)
+    matches!(
+        action,
+        SessionPixAction::ProgressNotification | SessionPixAction::ResendSsaRequest { .. }
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -510,6 +515,7 @@ mod tests {
             max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             commitment_recommit_interval: Duration::from_secs(3),
+            ssa_request_resend_interval: Duration::from_secs(3),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(10),
             max_recovery_time: Duration::from_secs(3600),
@@ -1031,6 +1037,30 @@ mod tests {
         // returns true (session survives).
         let progress: Vec<_> = (0..100).map(|_| SessionPixAction::ProgressNotification).collect();
         assert!(send_actions(&progress, &action_tx));
+
+        // A re-send of an unanswered successor request is just as droppable: its deadline was
+        // pushed when it was emitted and the next tick emits another, so a full channel costs the
+        // batch nothing and must not fail the Session.
+        let resends: Vec<_> = (0..100)
+            .map(|_| SessionPixAction::ResendSsaRequest {
+                ssa_ids: vec![SsaId::new(
+                    HoprPseudonym::random(),
+                    SsaIndex::new(2).expect("index two is non-zero"),
+                )],
+            })
+            .collect();
+        assert!(send_actions(&resends, &action_tx));
+        // While the request itself, whose loss the supervisor cannot repair, is not.
+        assert!(!send_actions(
+            &[SessionPixAction::RequestSsa {
+                ssa_ids: vec![SsaId::new(
+                    HoprPseudonym::random(),
+                    SsaIndex::new(1).expect("index one is non-zero")
+                )],
+                params: dims(),
+            }],
+            &action_tx
+        ));
 
         assert!(!send_actions(&[SessionPixAction::WithholdService], &action_tx));
 
