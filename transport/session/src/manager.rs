@@ -2106,7 +2106,7 @@ impl PixToolbox {
 /// `max_ssa_delivery_time` deadline with it. The Entry answers a repeat of a request it already
 /// committed to with a no-op, and a request that arrives while it is still processing another one
 /// is dropped rather than queued. The re-sends end on the first commitment part, and once the
-/// predecessor is exhausted nothing is sent and the deadline runs out as it always did.
+/// batch reaches the front nothing is sent and the deadline runs out as it always did.
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -2398,6 +2398,75 @@ where
             SessionManagerError::other(error)
         })?;
     Ok(())
+}
+
+/// The batch most recently put on the wire by the PIX action driver, with the message that carried it.
+///
+/// The one thing [`SessionPixAction::ResendSsaRequest`] can send again. See
+/// [`SessionManager::spawn_pix_action_driver`].
+type LastSsaRequest = (Vec<SsaId<HoprPseudonym>>, HoprStartProtocol);
+
+/// What the action driver does with a [`SessionPixAction::ResendSsaRequest`].
+///
+/// The decision is separate from the driver so that each refusal is observable on its own: all of them
+/// look the same from outside — nothing goes on the wire and the supervisor is told the batch can no
+/// longer be sent — and the driver's I/O loop is the wrong place to pin which of the three it was.
+#[derive(Debug)]
+enum ResendDecision<'a> {
+    /// Send this message, which is the stored request itself and so goes out byte for byte as before.
+    Send(&'a HoprStartProtocol),
+    /// The ids are not the batch last sent: a report about an earlier batch, or the batch has been
+    /// retired since. Another tick would meet the same answer.
+    NotLastRequest,
+    /// A member's Exit registration no longer exists — retired, or idled out past
+    /// `incomplete_commitment_lifetime` — so the Entry's answer would find nothing to match
+    /// (`MissingSsaCommitment`).
+    RegistrationGone,
+    /// A member's commitment is already complete. The Entry has answered; what is left is not a request
+    /// to send again.
+    CommitmentComplete,
+}
+
+/// Decides whether `ssa_ids` can be re-sent, and with what.
+///
+/// Sent only if `ssa_ids` is exactly the batch of `last_request` *and* every member's registration is
+/// still waiting for its commitment (a non-empty `missing_commitment_runs`). Members are checked in
+/// order and the first that is not pending decides the refusal. Checking a registration refreshes its
+/// idle timer — see [`SsaReconstructor::missing_commitment_runs`] — which is what keeps a pending
+/// registration alive across the Entry's silence; a mismatch is decided before any registration is
+/// read, since the batch is not one this driver can send anyway.
+fn resend_payload<'a>(
+    last_request: Option<&'a LastSsaRequest>,
+    ssa_ids: &[SsaId<HoprPseudonym>],
+    processor: &SsaReconstructor<HoprPixSpec>,
+) -> ResendDecision<'a> {
+    let Some((_, message)) = last_request.filter(|(sent_ids, _)| sent_ids.as_slice() == ssa_ids) else {
+        return ResendDecision::NotLastRequest;
+    };
+
+    for ssa_id in ssa_ids {
+        match processor.missing_commitment_runs(ssa_id, 1) {
+            None => return ResendDecision::RegistrationGone,
+            Some(runs) if runs.is_empty() => return ResendDecision::CommitmentComplete,
+            Some(_) => {}
+        }
+    }
+    ResendDecision::Send(message)
+}
+
+/// Forgets `last_request` when `retired` is one of its members.
+///
+/// A batch with a retired member is not one the Entry can still be asked to commit to as a whole, and
+/// the supervisor ends its re-sends. The stored message goes with it, so a `ResendSsaRequest` that was
+/// already queued finds nothing to send. Left to the registration check in [`resend_payload`] alone,
+/// that refusal would depend on the reconstructor having dropped the retired member's registration.
+fn forget_request_of(last_request: &mut Option<LastSsaRequest>, retired: &SsaId<HoprPseudonym>) {
+    if last_request
+        .as_ref()
+        .is_some_and(|(sent_ids, _)| sent_ids.contains(retired))
+    {
+        *last_request = None;
+    }
 }
 
 impl<S> SessionManager<S>
@@ -2723,9 +2792,11 @@ where
 
                         match result {
                             Ok(()) => {}
-                            // Dropped on purpose and not a fault: the successor gate and the request
-                            // lock both refuse this way, the handler has already logged the first
-                            // occurrence of a refusal at the level it deserves, and the peer re-asks.
+                            // Dropped on purpose and not a fault: the request lock, the successor
+                            // gate (early or under-served) and the stale-index check all refuse this
+                            // way. The handler has already logged the first occurrence of a gate or
+                            // stale refusal at the level it deserves, and the peer re-asks — which
+                            // can succeed for all of them but a stale request.
                             Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
                                 debug!(%reason, "Start protocol message not admitted");
                             }
@@ -3424,7 +3495,7 @@ where
             // latest batch is kept — the supervisor re-sends only an unanswered one, and a batch is
             // requested only after the one before it has been answered. Dropped when a member is
             // retired, since a request for a registration that no longer exists can only be refused.
-            let mut last_request: Option<(Vec<SsaId<HoprPseudonym>>, HoprStartProtocol)> = None;
+            let mut last_request: Option<LastSsaRequest> = None;
 
             let close_reason = loop {
                 let Ok(action) = action_rx.recv().await else {
@@ -3552,37 +3623,29 @@ where
                         // reconstructor refuses as a duplicate of the pending one, and its failure
                         // path closes the Session as `SupervisorUnavailable`. A re-send is allowed to
                         // fail without costing the Session anything.
-                        let message = last_request
-                            .as_ref()
-                            .filter(|(sent_ids, _)| *sent_ids == ssa_ids)
-                            .map(|(_, message)| message);
-
-                        // Every member must still be waiting for its commitment. Reading the
-                        // reconstructor's registration is also what keeps it from idling out, which
-                        // it would after `incomplete_commitment_lifetime` otherwise: a pending
-                        // registration is not refreshed by anything else while the Entry is silent.
-                        // `None` is a registration that is gone and `Some([])` one that completed; a
-                        // request for either can only be refused, so it is not sent.
-                        let pending = ssa_ids.iter().all(|ssa_id| {
-                            share_processor
-                                .missing_commitment_runs(ssa_id, 1)
-                                .is_some_and(|runs| !runs.is_empty())
-                        });
-
-                        let Some(message) = message.filter(|_| pending) else {
-                            debug!(
-                                %session_id, batch_size = ssa_ids.len(), matches_last_request = message.is_some(),
-                                "cannot re-send the SSA request — it is not the last one sent, or its registration is gone or complete"
-                            );
-                            if let Some(supervisor) = supervisor.as_ref()
-                                && supervisor
-                                    .send_action_result(SessionPixAction::ResendSsaRequest { ssa_ids }, false)
-                                    .await
-                                    .is_err()
-                            {
-                                error!(%session_id, "pix supervisor stopped accepting results");
+                        //
+                        // Deciding also reads each member's registration, which is what keeps it from
+                        // idling out after `incomplete_commitment_lifetime`: a pending registration
+                        // is not refreshed by anything else while the Entry is silent. A batch that
+                        // is not the last one sent, or whose registration is gone or complete, can
+                        // only be refused, so it is not sent.
+                        let message = match resend_payload(last_request.as_ref(), &ssa_ids, &share_processor) {
+                            ResendDecision::Send(message) => message,
+                            refusal => {
+                                debug!(
+                                    %session_id, batch_size = ssa_ids.len(), ?refusal,
+                                    "cannot re-send the SSA request"
+                                );
+                                if let Some(supervisor) = supervisor.as_ref()
+                                    && supervisor
+                                        .send_action_result(SessionPixAction::ResendSsaRequest { ssa_ids }, false)
+                                        .await
+                                        .is_err()
+                                {
+                                    error!(%session_id, "pix supervisor stopped accepting results");
+                                }
+                                continue;
                             }
-                            continue;
                         };
 
                         // Failure is logged and dropped, as for the re-request above, and nothing is
@@ -3637,12 +3700,7 @@ where
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
-                        if last_request
-                            .as_ref()
-                            .is_some_and(|(sent_ids, _)| sent_ids.contains(&ssa_id))
-                        {
-                            last_request = None;
-                        }
+                        forget_request_of(&mut last_request, &ssa_id);
                         if let Some(slot) = myself.sessions.get(&session_id) {
                             slot.abort_handles
                                 .lock()
@@ -5855,7 +5913,8 @@ where
         // Taken without waiting. A request that finds the lock held is one the Exit is going to send
         // again — a repeat of the batch being committed right now, or a request racing it — and
         // queueing behind the holder would park a `for_each_concurrent` slot for as long as that
-        // holder runs: the near-miss wait below, or the minutes a commitment takes to generate. The
+        // holder runs: the near-miss wait below, or generating a commitment (a fraction of a second per
+        // cycle at the deployed dimensions, longer for wide dimensions or a full batch). The
         // Exit re-sends an unanswered request every few seconds, so a queue of them would be a lever
         // on exactly those slots. Dropping it costs nothing: either the holder admits the batch and the
         // repeat is moot, or it does not and the repeat is the next attempt.
@@ -13502,11 +13561,12 @@ mod tests {
     /// The Exit re-sends an unanswered successor request, so the Entry has to answer the re-sends of
     /// one it has already admitted with nothing at all.
     ///
-    /// Once the first copy is admitted the Entry spends minutes generating and publishing its
-    /// commitment, and every re-send already in flight lands on a watermark that is at or above the
-    /// index it names. Answering one of them with a second commitment would announce a second deposit
-    /// address for the same quota and burst the same polynomials again; answering it with a refusal
-    /// would log a fault, per re-send, for a request that was served. A repeat names the batch
+    /// Once the first copy is admitted the Entry spends a fraction of a second per cycle at the
+    /// deployed dimensions (longer for wide dimensions or a full batch) generating its commitment, and
+    /// then publishing it, and every re-send already in flight lands on a watermark that is at or above
+    /// the index it names. Answering one of them with a second commitment would announce a second
+    /// deposit address for the same quota and burst the same polynomials again; answering it with a
+    /// refusal would log a fault, per re-send, for a request that was served. A repeat names the batch
     /// committed last, which is what tells it apart from a stale one.
     #[test_log::test(tokio::test)]
     async fn a_repeat_of_the_committed_successor_is_a_no_op() -> anyhow::Result<()> {
@@ -13713,10 +13773,11 @@ mod tests {
 
     /// A request that finds another one in progress for the same Session is dropped on the spot.
     ///
-    /// The holder can be anywhere in a long handler — waiting out the near-miss window, or minutes
-    /// into generating a commitment — and a queue of the Exit's re-sends behind it would park one
-    /// `for_each_concurrent` slot each for all of that. Dropping costs nothing: either the holder
-    /// admits the batch and the repeat is moot, or it does not and the repeat is the next attempt.
+    /// The holder can be anywhere in a long handler — waiting out the near-miss window, or part-way
+    /// through generating a commitment, which at wide dimensions or a full batch takes seconds — and a
+    /// queue of the Exit's re-sends behind it would park one `for_each_concurrent` slot each for all of
+    /// that. Dropping costs nothing: either the holder admits the batch and the repeat is moot, or it
+    /// does not and the repeat is the next attempt.
     #[test_log::test(tokio::test)]
     async fn a_request_that_finds_the_lock_held_is_dropped_not_queued() -> anyhow::Result<()> {
         let params = wide_pix_params();
@@ -15652,6 +15713,221 @@ mod tests {
             probe::non_zero(),
             "a Session that negotiated no PIX must contribute to no PIX aggregate"
         );
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------
+    // The action driver's decision to re-send an SSA request
+    // ---------------------------------------------------------------
+
+    /// A request as the driver would have stored it after sending.
+    ///
+    /// Any Start message will do: the decision only ever hands back a reference to what was stored,
+    /// and the tests tell it apart from a copy by address.
+    fn stored_request(session_id: HoprPseudonym) -> HoprStartProtocol {
+        HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            session_id,
+            flags: KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+    }
+
+    /// A reconstructor with a pending Exit registration for each of `indices`, as a sent request leaves it.
+    fn reconstructor_awaiting(
+        pseudonym: HoprPseudonym,
+        indices: &[u32],
+    ) -> anyhow::Result<(SsaReconstructor<HoprPixSpec>, Vec<SsaId<HoprPseudonym>>)> {
+        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig::default());
+        let ssa_ids = indices
+            .iter()
+            .map(|&index| {
+                let ssa_id = SsaId::new(pseudonym, SsaIndex::new(index).context("SSA indices are non-zero")?);
+                reconstructor.new_exit_commitment(ssa_id, small_pix_params())?;
+                Ok(ssa_id)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok((reconstructor, ssa_ids))
+    }
+
+    /// Delivers the whole constant-term set of `ssa_id`, which is what an Entry's answer is.
+    ///
+    /// The dummy constant terms sum to the identity, whose discrete logarithm is zero, so an honest
+    /// proof of knowledge over it is constructible — the same filler the commitment tests use.
+    fn complete_commitment(
+        reconstructor: &SsaReconstructor<HoprPixSpec>,
+        ssa_id: SsaId<HoprPseudonym>,
+    ) -> anyhow::Result<()> {
+        use hopr_protocol_pix::{Field, PixGroup, PixScalar, PolynomialIndex, SsaCommitmentProof};
+
+        let zero = <PixScalar<HoprPixSpec> as Field>::ZERO;
+        let proof = SsaCommitmentProof::<HoprPixSpec>::prove(&ssa_id, &zero, &PixGroup::<HoprPixSpec>::default())
+            .context("the identity proof must be constructible")?;
+        let polys = small_pix_params().polys_per_ssa() as PolynomialIndex;
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            Some(proof),
+            (0..polys).map(|poly| (poly, PixGroup::<HoprPixSpec>::default().to_bytes())),
+        )?;
+        anyhow::ensure!(state.is_verifiable, "the fixture must have completed the commitment");
+        Ok(())
+    }
+
+    /// A pending batch is re-sent as the stored message itself, not as a rebuilt one.
+    ///
+    /// Identity matters here: a rebuilt request would carry new Exit secrets, which the reconstructor
+    /// refuses as a duplicate of the pending commitment, and the deposit pool answers a batch once.
+    #[test]
+    fn a_pending_batch_is_resent_as_the_stored_message() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+        let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+        match resend_payload(Some(&last_request), &ssa_ids, &reconstructor) {
+            ResendDecision::Send(message) => assert!(
+                std::ptr::eq(message, &last_request.1),
+                "the stored message must go out, not a copy of it"
+            ),
+            refusal => anyhow::bail!("a pending batch must be re-sent, got {refusal:?}"),
+        }
+        Ok(())
+    }
+
+    /// Ids that are not exactly the stored batch are refused, and before any registration is consulted.
+    ///
+    /// The reconstructor here holds no registrations at all, so a mismatch that was decided *after*
+    /// reading them would come out as `RegistrationGone`.
+    #[test]
+    fn a_resend_of_anything_but_the_last_batch_sent_is_refused() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let ids = |indices: &[u32]| -> anyhow::Result<Vec<SsaId<HoprPseudonym>>> {
+            indices
+                .iter()
+                .map(|&index| Ok(SsaId::new(pseudonym, SsaIndex::new(index).context("non-zero")?)))
+                .collect()
+        };
+        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig::default());
+        let last_request = (ids(&[3, 4])?, stored_request(pseudonym));
+
+        for (label, asked) in [
+            ("an earlier batch", ids(&[1, 2])?),
+            ("a prefix of the batch", ids(&[3])?),
+            ("a superset of the batch", ids(&[3, 4, 5])?),
+            ("the batch in another order", ids(&[4, 3])?),
+            ("another Session's batch", {
+                let other = HoprPseudonym::random();
+                vec![
+                    SsaId::new(other, SsaIndex::new(3).context("non-zero")?),
+                    SsaId::new(other, SsaIndex::new(4).context("non-zero")?),
+                ]
+            }),
+        ] {
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &asked, &reconstructor),
+                    ResendDecision::NotLastRequest
+                ),
+                "{label} is not the last request sent"
+            );
+        }
+
+        assert!(
+            matches!(
+                resend_payload(None, &last_request.0, &reconstructor),
+                ResendDecision::NotLastRequest
+            ),
+            "with nothing stored there is nothing to send"
+        );
+        Ok(())
+    }
+
+    /// A member whose registration is gone refuses the whole batch, wherever it stands in it.
+    ///
+    /// Gone is retired or idled out. Either way the Entry's answer would reach an Exit with nothing to
+    /// match it against, so asking for it again can only waste a SURB.
+    #[test]
+    fn a_resend_with_a_missing_registration_is_refused() -> anyhow::Result<()> {
+        for retired_position in [0, 1] {
+            let pseudonym = HoprPseudonym::random();
+            let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+            let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::Send(_)
+                ),
+                "the control: before the retirement the batch is sent"
+            );
+
+            reconstructor.retire_ssa(ssa_ids[retired_position]);
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::RegistrationGone
+                ),
+                "a batch whose member {retired_position} was retired must not be re-sent"
+            );
+        }
+        Ok(())
+    }
+
+    /// A member whose commitment is complete refuses the whole batch.
+    ///
+    /// The Entry has answered, which is exactly what ends the re-sends; what the supervisor may still
+    /// have queued is a tick that raced the answer, and it must find nothing to send.
+    #[test]
+    fn a_resend_for_a_completed_commitment_is_refused() -> anyhow::Result<()> {
+        for completed_position in [0, 1] {
+            let pseudonym = HoprPseudonym::random();
+            let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+            let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+            complete_commitment(&reconstructor, ssa_ids[completed_position])?;
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::CommitmentComplete
+                ),
+                "a batch whose member {completed_position} completed must not be re-sent"
+            );
+        }
+        Ok(())
+    }
+
+    /// Retiring any member of the stored batch forgets the request, and retiring anything else does not.
+    #[test]
+    fn retiring_a_member_forgets_the_stored_request() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let id = |index: u32| -> anyhow::Result<SsaId<HoprPseudonym>> {
+            Ok(SsaId::new(pseudonym, SsaIndex::new(index).context("non-zero")?))
+        };
+        let batch = vec![id(3)?, id(4)?];
+
+        for member in &batch {
+            let mut last_request = Some((batch.clone(), stored_request(pseudonym)));
+            forget_request_of(&mut last_request, member);
+            assert!(
+                last_request.is_none(),
+                "{member} is a member, so the request goes with it"
+            );
+        }
+
+        let mut last_request = Some((batch.clone(), stored_request(pseudonym)));
+        forget_request_of(&mut last_request, &id(2)?);
+        forget_request_of(&mut last_request, &id(5)?);
+        forget_request_of(
+            &mut last_request,
+            &SsaId::new(HoprPseudonym::random(), SsaIndex::new(3).context("non-zero")?),
+        );
+        assert_eq!(
+            Some(&batch),
+            last_request.as_ref().map(|(ids, _)| ids),
+            "the retirement of an earlier batch, a later one or another Session's must not drop it"
+        );
+
+        let mut nothing = None;
+        forget_request_of(&mut nothing, &batch[0]);
+        assert!(nothing.is_none(), "forgetting nothing leaves nothing");
         Ok(())
     }
 }

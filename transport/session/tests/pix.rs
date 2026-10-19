@@ -1138,9 +1138,12 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 /// 2. Alice's generator emits up to the boundary, so the Entry's *emission* gate is open and only its *service* gate —
 ///    the packets that came back — can refuse.
 /// 3. Bob is told the first cycle is almost recovered and asks for the successor. Alice refuses it as under-served.
-/// 4. Three seconds pass, twice the delivery deadline. Bob re-sent the byte-identical request throughout; Alice
-///    committed nothing, announced nothing and sent no `SsaCommit` for it; and nobody sent a `SessionError`, with both
-///    Sessions alive. Before the re-send Bob closed the Session at 1.5 s.
+/// 4. Three seconds pass, twice the delivery deadline. Bob re-sent the byte-identical request throughout, and was still
+///    doing so more than 1.5 s after the first one; Alice committed nothing, announced nothing and sent no `SsaCommit`
+///    for it; nobody sent a `SessionError`, with both Sessions alive; and Bob's reconstructor still holds the
+///    successor's registration, pending and incomplete. Before the re-send the successor's deadline expired at 1.5 s
+///    and it was retired, which dropped that registration. With the first cycle still live that is a tolerated lost
+///    cycle, so the Session stayed open, but without a next cycle: the registration is what tells the two apart.
 /// 5. 1280 keep-alives are dispatched into Alice. They stand in for Bob's service, and the bar is below the boundary
 ///    they cover.
 /// 6. The next re-send is admitted: exactly one `ReadyToDeposit` for the successor on Alice and one `DepositNeeded` on
@@ -1155,6 +1158,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
             Mutex,
             atomic::{AtomicUsize, Ordering},
         },
+        time::Instant,
     };
 
     use anyhow::Context;
@@ -1206,7 +1210,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     // What each side's transport saw. Alice: the `SsaCommit` messages per SSA index. Bob: every
     // request for new SSAs, with the bytes it went out as. Both: the `SessionError`s.
     let commit_counts: Arc<Mutex<HashMap<u32, usize>>> = Arc::new(Mutex::new(HashMap::new()));
-    let bob_requests: Arc<Mutex<Vec<(u32, ApplicationData)>>> = Arc::new(Mutex::new(Vec::new()));
+    let bob_requests: Arc<Mutex<Vec<(u32, Instant, ApplicationData)>>> = Arc::new(Mutex::new(Vec::new()));
     let session_errors = Arc::new(AtomicUsize::new(0));
 
     let mut alice_transport = MockMsgSender::new();
@@ -1261,7 +1265,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
                         bob_requests_relay
                             .lock()
                             .unwrap()
-                            .push((first.get(), data.data.clone()));
+                            .push((first.get(), Instant::now(), data.data.clone()));
                     }
                 }
                 Ok(HoprStartProtocol::SessionError(_)) => {
@@ -1287,10 +1291,11 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     let ssa_rec_config = SsaReconstructorConfig::default();
     let (pix_toolbox_alice, pix_alice_rx) =
         PixToolbox::new(alice_generator.clone(), SsaReconstructor::new(ssa_rec_config).into());
-    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
-        SsaShareGenerator::new(ssa_gen_config).into(),
-        SsaReconstructor::new(ssa_rec_config).into(),
-    );
+    // Bob's reconstructor is kept: whether it still holds the successor's registration after the
+    // delivery deadline is what tells a batch that was kept alive from one that was retired.
+    let bob_reconstructor = Arc::new(SsaReconstructor::new(ssa_rec_config));
+    let (pix_toolbox_bob, pix_bob_rx) =
+        PixToolbox::new(SsaShareGenerator::new(ssa_gen_config).into(), bob_reconstructor.clone());
     // Bob's pool, recording which SSAs it was asked about. Each batch is asked once — a re-send
     // carries the stored message and must not ask again.
     let asked_of_the_pool: Arc<Mutex<Vec<u32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -1391,34 +1396,59 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
         .await
         .context("bob must accept the early recovery signal")?;
 
-    // Step 4 — twice the delivery deadline, which is the whole point: the Session used to be gone
-    // after 1.5 s of this.
+    // Step 4 — twice the delivery deadline, which is the whole point. Before the re-send the successor's
+    // deadline expired 1.5 s in and it was retired; with the first cycle still live that was a tolerated
+    // lost cycle, so the Session survived it, and nothing here but the successor's registration shows
+    // the difference.
     tokio_time::sleep(Duration::from_secs(3)).await;
 
-    let requests_for = |index: u32| -> Vec<ApplicationData> {
+    let requests_for = |index: u32| -> Vec<(Instant, ApplicationData)> {
         bob_requests
             .lock()
             .unwrap()
             .iter()
-            .filter(|(first, _)| *first == index)
-            .map(|(_, data)| data.clone())
+            .filter(|(first, ..)| *first == index)
+            .map(|(_, sent_at, data)| (*sent_at, data.clone()))
             .collect()
     };
     let commits_for = |index: u32| commit_counts.lock().unwrap().get(&index).copied().unwrap_or_default();
 
     let resent = requests_for(2);
     assert!(
-        resent.len() >= 10,
-        "bob must keep asking for the successor every 200 ms while it is refused, got {} requests in 3 s",
+        resent.len() >= 3,
+        "bob must keep asking for the successor while it is refused, got {} requests in 3 s",
         resent.len()
     );
-    for request in &resent {
+    // Counted by when they arrived rather than as a rate: what separates this from the one-shot request
+    // is that asking went on past the delivery time the batch is given, and under instrumentation the
+    // number that fit into 3 s is not a figure to lean on.
+    let delivery_time = Duration::from_millis(1500);
+    let first_sent_at = resent[0].0;
+    let late_resends = resent
+        .iter()
+        .filter(|(sent_at, _)| *sent_at > first_sent_at + delivery_time)
+        .count();
+    assert!(
+        late_resends >= 2,
+        "bob must still be asking after the {delivery_time:?} delivery time has passed, got {late_resends} re-sends \
+         later than that out of {}",
+        resent.len()
+    );
+    for (_, request) in &resent {
         assert_eq!(
-            (&resent[0].application_tag, &resent[0].plain_text),
+            (&resent[0].1.application_tag, &resent[0].1.plain_text),
             (&request.application_tag, &request.plain_text),
             "a re-send is the first request again, byte for byte"
         );
     }
+    let second_cycle = SsaId::new(alice_pseudonym, SsaIndex::new(2).context("non-zero")?);
+    assert!(
+        bob_reconstructor
+            .missing_commitment_runs(&second_cycle, 1)
+            .is_some_and(|runs| !runs.is_empty()),
+        "bob's registration for the successor must be alive and still waiting for its commitment: retired at the \
+         delivery deadline it would be gone"
+    );
     assert_eq!(
         0,
         commits_for(2),
@@ -1436,7 +1466,7 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     assert!(alice_mgr.active_sessions().contains(&alice_pseudonym));
     assert!(
         bob_mgr.active_sessions().contains(&alice_pseudonym),
-        "bob outlived the delivery deadline that used to close the Session"
+        "bob's Session is still active"
     );
 
     // Step 5 — the service the gate was waiting for. Keep-alives stand in for Bob's returned data:
@@ -1502,13 +1532,13 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     let recorded = bob_requests.lock().unwrap().clone();
     let request_for_two = recorded
         .iter()
-        .find(|(first, _)| *first == 2)
-        .map(|(_, data)| data.clone())
+        .find(|(first, ..)| *first == 2)
+        .map(|(.., data)| data.clone())
         .context("bob must have sent the successor request")?;
     let request_for_one = recorded
         .iter()
-        .find(|(first, _)| *first == 1)
-        .map(|(_, data)| data.clone())
+        .find(|(first, ..)| *first == 1)
+        .map(|(.., data)| data.clone())
         .context("bob must have sent the opening request")?;
     for data in [request_for_two.clone(), request_for_two, request_for_one] {
         alice_mgr.dispatch_message(

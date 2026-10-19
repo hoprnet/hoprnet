@@ -71,11 +71,17 @@ pub enum SessionManagerError {
     /// A Start protocol request was dropped without being served, and nothing about the Session was
     /// found wrong.
     ///
-    /// The counterpart of [`Unacceptable`](Self::Unacceptable) for refusals that are *not* terminal:
-    /// the request came too early, was already served, or lost a race for the per-Session request lock.
-    /// The Session keeps running and the peer is told nothing — it re-asks, and the same request is
-    /// admitted once the Entry's state has caught up. Callers that report errors should treat it as an
-    /// ordinary outcome rather than a fault.
+    /// The counterpart of [`Unacceptable`](Self::Unacceptable) for refusals that are *not* terminal. It
+    /// is returned for exactly four causes: the request lost a race for the per-Session request lock;
+    /// it came too early, before emission reached the successor boundary; it is under-served, since
+    /// the returned packets have not yet earned it; or it is stale, naming indices at or below the
+    /// committed watermark that are not the batch last committed. The Session keeps running and the
+    /// peer is told nothing.
+    ///
+    /// The first three can succeed on a later re-send of the same request, once the lock is free or the
+    /// Entry's state has caught up. A stale request is never admitted. A repeat of the batch last
+    /// committed is not among the causes: it returns `Ok(())` as a no-op. Callers that report errors
+    /// should treat this as an ordinary outcome rather than a fault.
     #[error("the request was not admitted: {0}")]
     NotAdmitted(String),
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]

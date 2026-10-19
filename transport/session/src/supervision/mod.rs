@@ -47,7 +47,8 @@
 //!                                          ├── (a successor behind the front, unanswered: every
 //!                                          │    ssa_request_resend_interval → ResendSsaRequest, which also
 //!                                          │    pushes the commitment deadline; ends on any commitment part,
-//!                                          │    on reaching the front, or on a retired member)
+//!                                          │    on reaching the front or coming within a delivery window of
+//!                                          │    the paid tail's hard deadline, or on a retired member)
 //!                                          ├── (CommitmentProgress arms/re-arms the re-request timer)
 //!                                          ├── (its expiry → RequestCommitmentRetransmission, bounded)
 //!                                          │
@@ -120,22 +121,36 @@
 //! members have reported no `CommitmentProgress` or `CommitmentVerified` since their `SsaRequestSent` — that is still
 //! **behind the front** is re-sent every
 //! [`ssa_request_resend_interval`](SupervisorConfig::ssa_request_resend_interval), identically, and each re-send pushes
-//! the batch's commitment deadlines to at least `now + max_ssa_delivery_time`. Behind the front means a paid FIFO tail
-//! is still draining, or the earliest live cycle belongs to another batch; it is absorbing, so a batch that has reached
-//! the front is never re-sent, and its deadline stops moving. Only the successor is covered: the opening request is
-//! sent once, since nothing has been paid for before it. This is a different mechanism from the **deferred** request
-//! below, which holds a request *back* until the two-generation reservation has room; the re-send repeats one that has
-//! already gone out.
+//! the batch's commitment deadlines to at least `now + max_ssa_delivery_time` (batch-scaled). Behind the front means a
+//! paid FIFO tail is still draining, or the earliest live cycle belongs to another batch; it is absorbing, so a batch
+//! that has reached the front is never re-sent, and its deadline stops moving. Only the successor is covered: the
+//! opening request is sent once, since nothing has been paid for before it. This is a different mechanism from the
+//! **deferred** request below, which holds a request *back* until the two-generation reservation has room; the re-send
+//! repeats one that has already gone out.
 //!
 //! What bounds it is the predecessor, not the interval: the batch is behind the front only while an earlier generation
-//! is live, so the re-sends end with that generation's recovery hard deadline, its service-gated idle deadline, the
-//! paid tail's idle and hard deadlines, or `max_served_without_progress` — and with a successor the Entry never admits,
-//! the Session now ends on one of those (`RecoveryIdle`, `RecoveryDeadline`) rather than on `CommitmentTimeout`. The
-//! worst case is a predecessor that stays alive and idle for its whole `max_recovery_time` of four hours: about 4800
-//! re-sends at the 3 s default, one SURB each. Two assumptions are the operator's. The re-sent request carries the
-//! deposit data the pool supplied the first time, which this node cannot read, so the pool is assumed to keep it valid
-//! for as long as the request is outstanding; and each re-send refreshes the Exit's pending reconstructor registration
-//! so that it outlives `incomplete_commitment_lifetime` for as long as the re-sends continue.
+//! is live, so the re-sends end with that generation's recovery hard deadline, its service-gated idle deadline, or the
+//! paid tail's idle and hard deadlines. `max_served_without_progress` is not one of these: it only halts service, and
+//! both idle deadlines are service-gated, so halting service re-arms them rather than closing; the hard deadline, the
+//! tail's own for a tail, is the bound that always holds. With a successor the Entry never admits, the Session then
+//! ends on those recovery deadlines (`RecoveryIdle`, `RecoveryDeadline`) rather than on `CommitmentTimeout` — but only
+//! while the paid tail never runs out, which is what a lossy return path does, since the Exit never sees every share.
+//! When the Exit does see every share, `on_recovered_tail_progress` releases the tail, the batch reaches the front, the
+//! re-sends stop, and the Session closes on `CommitmentTimeout` within one (batch-scaled) delivery window of the last
+//! re-send. The worst case is a predecessor that stays alive and idle for its whole `max_recovery_time` of four hours:
+//! about 4800 re-sends at the 3 s default, one SURB each. Two assumptions are the operator's. The re-sent request
+//! carries the deposit data the pool supplied the first time, which this node cannot read, so the pool is assumed to
+//! keep it valid for as long as the request is outstanding; and each re-send refreshes the Exit's pending reconstructor
+//! registration so that it outlives `incomplete_commitment_lifetime` for as long as the re-sends continue.
+//!
+//! One end of the whole Session is foreseeable, and the re-sends yield to it: the paid tail's hard deadline closes the
+//! Session on `RecoveryDeadline` directly, so while it falls within one (batch-scaled) delivery window the batch is
+//! treated as being at the front — no re-send, no deadline push — and is left to its own deadline, with the Session
+//! ending no later than the tail's hard deadline either way. The rest are not foreseeable. A re-send already in flight
+//! when the Exit gives up on the batch for a reason it cannot schedule — an operator close or drain, a protocol fault,
+//! a paid-tail idle stall, a second lost cycle — can still be admitted by the Entry after the Exit has torn down, and
+//! the Entry then announces a deposit for a cycle the Exit can no longer reconstruct. The window is one re-send
+//! interval plus transit; it is the price of not letting a refused request time out.
 //!
 //! Allocation independently enforces the reservation: at most
 //! `MAX_OVERLAPPING_BATCHES` generations and
@@ -546,7 +561,10 @@
 //! max_ssa_delivery_time` and `< incomplete_commitment_lifetime`; `ssas_per_request` in
 //! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
 //! `0.0..=1.0`; and non-zero `max_served_without_progress`, `min_share_order_sample` and
-//! `max_failed_cycles`.
+//! `max_failed_cycles`. The 3 s default of `ssa_request_resend_interval` fails its two upper bounds for a configuration
+//! whose `max_ssa_delivery_time` or `incomplete_commitment_lifetime` is 3 s or less, which was valid before the
+//! interval existed: such a configuration must also set the interval below both, and is rejected otherwise rather than
+//! clamped.
 //!
 //! For [`fill`](SupervisorConfig::fill) it enforces a non-zero `heartbeat` under the same 24 h cap, a
 //! finite `finish_fraction` in `(0, 1]`, a finite `loss_margin` in `[0, 1)`, a `max_rate` inside
@@ -816,7 +834,10 @@ pub struct SupervisorConfig {
     /// front ends the re-sends and the deadline stops moving, so the Session then closes on
     /// `CommitmentTimeout` at most one delivery window after the last re-send. Never asking at the
     /// front also means a late-admitted request cannot strand the Entry's `ReadyToDeposit` behind a
-    /// cycle the Exit has already given up on.
+    /// cycle the Exit has already given up on. For the same reason the paid tail's hard deadline, the
+    /// one whole-Session close the Exit can foresee, is treated as the front once it falls within a
+    /// delivery window: no re-send, no push, and the batch is left to its own deadline, with the
+    /// Session ending no later than the tail's hard deadline either way.
     ///
     /// The opening batch is never re-sent: it is the one request nothing has been paid for yet.
     ///
@@ -827,13 +848,27 @@ pub struct SupervisorConfig {
     /// did, and stops the moment *any* part of the answer arrives.
     ///
     /// Bounded by the predecessor's own clocks — its recovery hard deadline, its service-gated idle
-    /// deadline, the paid tail's idle and hard deadlines and `max_served_without_progress` — and by one
-    /// re-send per interval. The worst case is a predecessor that stays alive and idle until its
-    /// `max_recovery_time` of four hours: about 4800 re-sends at the default, each costing the Exit one
-    /// SURB. Two assumptions are made explicit. The re-sent deposit data is opaque to this node, so it
-    /// is assumed the deposit pool keeps what it handed out valid for as long as the request is
-    /// outstanding. And a successor the Entry never admits now ends the Session on the predecessor's
-    /// recovery deadlines (`RecoveryIdle`, `RecoveryDeadline`) rather than on `CommitmentTimeout`.
+    /// deadline and the paid tail's idle and hard deadlines — and by one re-send per interval.
+    /// `max_served_without_progress` is not among them: it only halts service, and the idle deadlines
+    /// are service-gated, so halting service re-arms them; the hard deadline always holds. The worst
+    /// case is a predecessor that stays alive and idle until its `max_recovery_time` of four hours:
+    /// about 4800 re-sends at the default, each costing the Exit one SURB. Two assumptions are made
+    /// explicit. The re-sent deposit data is opaque to this node, so it is assumed the deposit pool
+    /// keeps what it handed out valid for as long as the request is outstanding. And a successor the
+    /// Entry never admits ends the Session on the predecessor's recovery deadlines (`RecoveryIdle`,
+    /// `RecoveryDeadline`) rather than on `CommitmentTimeout`, but only while the paid tail never runs
+    /// out — on a lossy return path, where the Exit never sees every share. When it does see every
+    /// share, `on_recovered_tail_progress` releases the tail, the batch reaches the front, the re-sends
+    /// stop, and the Session closes on `CommitmentTimeout` within one (batch-scaled) delivery window of
+    /// the last re-send.
+    ///
+    /// One end of the Session is foreseeable and the re-sends yield to it: while the paid tail's hard
+    /// deadline falls within one (batch-scaled) delivery window the batch is treated as being at the
+    /// front. Nothing else is. A re-send already in flight when the Exit gives up on the batch for a
+    /// reason it cannot schedule — an operator close or drain, a protocol fault, a paid-tail idle
+    /// stall, a second lost cycle — can still be admitted by the Entry after the Exit has torn down,
+    /// and the Entry then announces a deposit for a cycle the Exit can no longer reconstruct. The
+    /// window is one interval plus transit.
     ///
     /// Zero disables re-sending in a config that was not validated; [`validate_pix_supervision`]
     /// rejects it, together with any value at or above `max_ssa_delivery_time` (the pushed deadline
@@ -843,8 +878,11 @@ pub struct SupervisorConfig {
     ///
     /// Not scaled by the batch size: it is a cadence, like the re-request interval, not a budget.
     ///
-    /// Default: 3 s — the cadence of `commitment_recommit_interval`, so every configuration valid
-    /// before this existed remains valid.
+    /// Default: 3 s — the cadence of `commitment_recommit_interval`. The default is not valid beside
+    /// every other value: a configuration whose `max_ssa_delivery_time` or whose reconstructor's
+    /// `incomplete_commitment_lifetime` is 3 s or less was valid before this existed and is rejected
+    /// with it, and must also set this interval below both. Rejecting is deliberate — a re-send
+    /// interval at or above either value is dead configuration, and silently clamping it would hide that.
     #[default(Duration::from_secs(3))]
     #[serde(with = "humantime_serde")]
     pub ssa_request_resend_interval: Duration,
@@ -1395,8 +1433,10 @@ pub enum SessionPixAction {
     ///
     /// Emitted every [`SupervisorConfig::ssa_request_resend_interval`] while the batch has had no
     /// reply from the Entry and an earlier generation is still being served — the Entry drops a
-    /// successor request it is not yet willing to commit to, and tells nobody. The supervisor has
-    /// already pushed the batch's commitment deadlines by the time this is emitted.
+    /// successor request it is not yet willing to commit to, and tells nobody. Not emitted within a
+    /// delivery window of the paid tail's hard deadline, which would end the Session before an
+    /// admitted request could be answered. The supervisor has already pushed the batch's commitment
+    /// deadlines by the time this is emitted.
     ///
     /// `ssa_ids` names the batch rather than carrying a message: what goes on the wire is the exact
     /// message the matching [`RequestSsa`](Self::RequestSsa) sent, which the carrier kept. A fresh one
@@ -1621,11 +1661,18 @@ pub fn validate_pix_supervision(
     // who wrote it has asked for something this cannot do.
     //
     // Each re-send pushes the commitment deadline to `now + max_ssa_delivery_time` (batch-scaled), so
-    // an interval at or above even the *unscaled* delivery time would let the next tick find the
-    // deadline already gone, and the re-send could never be admitted in time. And each one refreshes
-    // the idle timer of the Exit's pending registration, which the reconstructor reclaims after
-    // `incomplete_commitment_lifetime` — an interval at or above that lets the registration expire
-    // between two re-sends, and the action driver stops re-sending for a registration that is gone.
+    // an interval at or above the delivery time at a batch of one would let the next tick find the
+    // deadline already gone, and the re-send could never be admitted in time. That is exact for the
+    // smallest batch there is; above it the scaled window is longer and the check, made on the
+    // unscaled value, is merely conservative. And each one refreshes the idle timer of the Exit's
+    // pending registration, which the reconstructor reclaims after `incomplete_commitment_lifetime` —
+    // an interval at or above that lets the registration expire between two re-sends, and the action
+    // driver stops re-sending for a registration that is gone.
+    //
+    // Both are rejected rather than clamped, even though the 3 s default fails them for a config that
+    // was valid before this field existed (a `max_ssa_delivery_time` or an
+    // `incomplete_commitment_lifetime` of 3 s or less): such a config must set the interval below both,
+    // and a silently shortened default would hide that it was asked to run something it cannot.
     if cfg.ssa_request_resend_interval.is_zero() {
         return Err(TransportSessionError::InvalidConfig(
             "ssa_request_resend_interval must be non-zero".into(),
