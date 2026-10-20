@@ -21,6 +21,7 @@ use super::{
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
+use crate::protocol::surb_telemetry::RelayerLatency;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -481,6 +482,9 @@ pub struct PathPlanner<Surb, R, S> {
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
+    /// Per-relayer SURB reply timing. A stall keeps the graph's delivery ratio at ~1, so it is
+    /// applied here, where return paths are drawn.
+    relayer_latency: Option<Arc<RelayerLatency>>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -511,7 +515,15 @@ where
             },
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
+            relayer_latency: None,
         }
+    }
+
+    /// Steers return-path draws off relayers whose SURB replies come back slower than their siblings'.
+    #[must_use]
+    pub fn with_relayer_latency(mut self, latency: Arc<RelayerLatency>) -> Self {
+        self.relayer_latency = Some(latency);
+        self
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -702,6 +714,32 @@ where
         moved
     }
 
+    /// Per-candidate weight from how much later its first reply relayer answers than a typical
+    /// sibling: `median / own` over low quantiles, capped at `1.0`, and `1.0` where no timing is
+    /// known. A ratio, because store residency at the replier scales every sibling alike.
+    fn relayer_latency_factors(&self, items: &[&(ValidatedPath, f64)]) -> Vec<f64> {
+        let Some(latency) = &self.relayer_latency else {
+            return vec![1.0; items.len()];
+        };
+        let rtts: Vec<Option<f64>> = items
+            .iter()
+            .map(|item| {
+                item.0
+                    .first()
+                    .and_then(|relayer| latency.low_quantile(relayer))
+                    .map(|rtt| rtt.as_secs_f64())
+            })
+            .collect();
+        let mut known: Vec<f64> = rtts.iter().flatten().copied().collect();
+        known.sort_unstable_by(f64::total_cmp);
+        let Some(typical) = known.get(known.len().saturating_sub(1) / 2).copied() else {
+            return vec![1.0; items.len()];
+        };
+        rtts.into_iter()
+            .map(|rtt| rtt.filter(|rtt| *rtt > 0.0).map_or(1.0, |rtt| (typical / rtt).min(1.0)))
+            .collect()
+    }
+
     /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
     /// over [`PathPlannerConfig::return_path_weight_temper`]-flattened path values.
     ///
@@ -750,6 +788,14 @@ where
             &items.iter().map(|(_, w)| *w).collect::<Vec<_>>(),
             self.return_path_weight_temper,
         );
+        // Fold in the reply timing the graph cannot see: a relay that answers every reply late
+        // keeps its delivery ratio at ~1, so only here does a stall move a candidate's weight.
+        let latency_factors = self.relayer_latency_factors(&items);
+        let weights = weights
+            .iter()
+            .zip(&latency_factors)
+            .map(|(weight, factor)| weight * factor)
+            .collect::<Vec<f64>>();
 
         if weights.iter().all(|w| *w <= 0.0) {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -779,6 +825,7 @@ where
             distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
             temper = self.return_path_weight_temper,
             exploration = self.return_path_exploration,
+            ?latency_factors,
             "drawing return paths from tempered weights"
         );
 
@@ -1961,6 +2008,64 @@ mod tests {
         assert!(
             share_of(&after, &pubkey(&SECRET_A)) > 0.0,
             "the connected relayer must remain"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_relayer_replying_late_should_drop_out_of_the_return_draw() -> anyhow::Result<()> {
+        let latency = Arc::new(RelayerLatency::default());
+        let (planner, _graph) = two_relayer_return_planner();
+        let planner = planner.with_relayer_latency(latency.clone());
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+        for _ in 0..20 {
+            latency.record(a, Duration::from_millis(1000));
+            latency.record(b, Duration::from_millis(15000));
+        }
+
+        let paths = planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(pubkey(&SECRET_DEST)),
+                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                400,
+            )
+            .await?;
+        let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
+        assert_eq!(400, paths.len());
+        // Half of 400 without timing; what is left is exploration, which keeps re-measuring it.
+        assert!(
+            via_b < 60,
+            "the stalled relayer must lose its share, got {via_b} of 400"
+        );
+        assert!(
+            paths.iter().any(|vp| vp.first() == Some(&a)),
+            "the fast relayer must keep carrying the return stream"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn siblings_slowed_alike_by_the_replier_should_keep_their_shares() -> anyhow::Result<()> {
+        let latency = Arc::new(RelayerLatency::default());
+        let (planner, _graph) = two_relayer_return_planner();
+        let planner = planner.with_relayer_latency(latency.clone());
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+        for _ in 0..20 {
+            latency.record(a, Duration::from_millis(4000));
+            latency.record(b, Duration::from_millis(4400));
+        }
+
+        let paths = planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(pubkey(&SECRET_DEST)),
+                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                400,
+            )
+            .await?;
+        let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
+        assert!(
+            via_b > 140,
+            "seconds of store residency common to both must not starve one, got {via_b} of 400"
         );
         Ok(())
     }

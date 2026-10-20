@@ -60,7 +60,7 @@ use hopr_api::{
     types::primitive::prelude::*,
 };
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
+pub use hopr_protocol_hopr::{MemorySurbStore, RelayerState, SurbStore};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -262,6 +262,8 @@ pub struct HoprTransport<Chain, Graph, Net> {
     network: Arc<OnceLock<Net>>,
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
+    /// SURB round-trip counters and per-relayer reply timing, shared with the planner.
+    surb_round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -351,14 +353,17 @@ where
         };
 
         // Built before the session manager so the latter can be handed the seam that lets a
-        // session re-plan its return path on sustained loss.
+        // session re-plan its return path on sustained loss. Created here, not in `run_*`, so the
+        // planner can share the per-relayer reply timing the graph's delivery ratio cannot see.
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
             resolver.clone(),
             selector,
             planner_config,
-        );
+        )
+        .with_relayer_latency(surb_round_trips.relayer_latency());
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -367,6 +372,7 @@ where
             network: Arc::new(OnceLock::new()),
             graph,
             path_planner,
+            surb_round_trips,
             my_multiaddresses,
             smgr: Arc::new(SessionManager::new(SessionManagerConfig {
                 frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
@@ -756,7 +762,7 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        let surb_round_trips = self.surb_round_trips.clone();
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))

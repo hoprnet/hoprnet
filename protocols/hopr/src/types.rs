@@ -37,7 +37,8 @@ pub struct AuxiliaryPacketInfo {
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
     /// How many already-held SURBs the store evicted while inserting this packet's, because the
-    /// per-pseudonym buffer was already full.
+    /// per-pseudonym buffer was already full, plus those dropped because their first relayer became
+    /// unusable.
     ///
     /// The arriving SURBs are retained; what is lost is the oldest of what was already queued. This
     /// is the only point at which an overflow is visible — every layer above sees an insert that
@@ -188,6 +189,9 @@ pub struct SurbInsertOutcome {
     pub retained: usize,
     /// Number of SURBs dropped to make room during this insert, oldest first.
     pub evicted: usize,
+    /// Number of SURBs dropped since the previous insert because their first relayer became
+    /// unusable (disconnected or channel closed), including arrivals refused by this insert.
+    pub unusable: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

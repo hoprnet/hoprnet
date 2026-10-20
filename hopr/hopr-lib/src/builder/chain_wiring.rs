@@ -14,7 +14,7 @@ use hopr_api::{
         },
     },
 };
-use hopr_transport::{NeighborTelemetry, PathTelemetry, SurbStore};
+use hopr_transport::{NeighborTelemetry, PathTelemetry, RelayerState, SurbStore};
 use parking_lot::RwLock;
 use tracing::Instrument;
 
@@ -172,9 +172,9 @@ pub(super) async fn process_chain_events<C, G, S>(
                                 // cannot be paid for, with no compiler warning.
                                 Some(relayer) => match channel.status {
                                     ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => {
-                                        surb_store.invalidate_relayer(&relayer)
+                                        surb_store.on_relayer_state(&relayer, RelayerState::ChannelClosed)
                                     }
-                                    ChannelStatus::Open => surb_store.revalidate_relayer(&relayer),
+                                    ChannelStatus::Open => surb_store.on_relayer_state(&relayer, RelayerState::ChannelOpen),
                                 },
                                 None => tracing::warn!(
                                     %channel,

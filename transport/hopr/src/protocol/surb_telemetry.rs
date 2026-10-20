@@ -14,11 +14,12 @@
 //! a path identity it has no other use for.
 
 use std::{
+    collections::VecDeque,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use bytes::Bytes;
@@ -99,6 +100,8 @@ pub struct SurbRoundTripRegistry {
     /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
     /// reply leg terminates here. [`ME_SLOT_UNKNOWN`] means not yet known.
     me_slot: Arc<AtomicU64>,
+    /// Per-relayer round-trip timing, shared with the path planner so it can discount a slow relay.
+    relayer_latency: Arc<RelayerLatency>,
 }
 
 /// `me_slot` value meaning "this node's slot has not been learned yet".
@@ -116,6 +119,7 @@ impl Default for SurbRoundTripRegistry {
             silence: Default::default(),
             replanned: Default::default(),
             me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
+            relayer_latency: Default::default(),
         }
     }
 }
@@ -179,6 +183,18 @@ impl SurbRoundTripRegistry {
     pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
         self.counters(paths).record_expected(count);
+    }
+
+    /// Folds one round-trip's duration into its first relayer's average; a direct reply has none.
+    pub fn record_rtt(&self, first_relayer: Option<OffchainPublicKey>, rtt: Duration) {
+        if let Some(relayer) = first_relayer {
+            self.relayer_latency.record(relayer, rtt);
+        }
+    }
+
+    /// The per-relayer round-trip averages, for callers that weight return paths by timing.
+    pub fn relayer_latency(&self) -> Arc<RelayerLatency> {
+        self.relayer_latency.clone()
     }
 
     /// Destinations whose return path has been silent for long enough to act on.
@@ -372,12 +388,24 @@ pub fn no_path_slots() -> PathSlotResolver {
     Arc::new(|_| None)
 }
 
-/// Legs each outstanding SURB was minted over, shared between the two codec halves.
+/// What a minted SURB is remembered by until its reply comes home. The mint time makes the
+/// round-trip a duration, the only signal that tells a slow relay from a healthy one.
+#[derive(Debug, Clone, Copy)]
+pub struct PendingSurb {
+    /// Legs the round-trip traverses, for the counts and graph attribution.
+    pub paths: ForwardAndReturnPath,
+    /// First relayer on the reply leg, if any: the node a slow reply implicates.
+    pub first_relayer: Option<OffchainPublicKey>,
+    /// When the SURB was minted; a reply's arrival minus this is the measured round-trip.
+    pub minted_at: Instant,
+}
+
+/// What each outstanding SURB is remembered by, shared between the two codec halves.
 ///
 /// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
 /// shared by both. Giving each half its own leaves every lookup missing and silently discards the
 /// entire observation side of the metric.
-pub type PendingLegs = moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>;
+pub type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
 
 /// Builds the shared pending map, bounded by capacity and TTL.
 pub fn pending_legs(max_pending: u64) -> PendingLegs {
@@ -385,6 +413,51 @@ pub fn pending_legs(max_pending: u64) -> PendingLegs {
         .max_capacity(max_pending)
         .time_to_live(PENDING_SURB_TTL)
         .build()
+}
+
+/// Per-relayer SURB round-trip timing. The graph's delivery ratio stays ~1 for a relay that
+/// replies late, so this is what makes a stall visible.
+#[derive(Debug, Default)]
+pub struct RelayerLatency {
+    inner: DashMap<OffchainPublicKey, VecDeque<(Instant, Duration)>>,
+}
+
+/// Round-trips a relayer must have carried within [`RTT_WINDOW`] before its timing is trusted, so
+/// only a relayer under load is judged.
+const MIN_RTT_SAMPLES: usize = 20;
+
+/// How far back round-trips count once there are enough newer ones to judge by.
+const RTT_WINDOW: Duration = Duration::from_secs(10);
+
+/// Upper bound on the samples kept per relayer.
+const MAX_RTT_SAMPLES: usize = 256;
+
+impl RelayerLatency {
+    pub fn record(&self, relayer: OffchainPublicKey, rtt: Duration) {
+        let mut samples = self.inner.entry(relayer).or_default();
+        if samples.len() == MAX_RTT_SAMPLES {
+            samples.pop_front();
+        }
+        samples.push_back((Instant::now(), rtt));
+    }
+
+    /// The relayer's lower-quartile round-trip over the window, or `None` without enough samples.
+    ///
+    /// A low quantile because store residency at the replier only ever adds to a round-trip.
+    pub fn low_quantile(&self, relayer: &OffchainPublicKey) -> Option<Duration> {
+        let mut samples = self.inner.get_mut(relayer)?;
+        // Old samples age out only as fresh ones replace them: a relayer drawn less because it is
+        // slow must not read as unknown, and so as fine, the moment its samples thin out.
+        while samples.len() > MIN_RTT_SAMPLES && samples.front().is_some_and(|(at, _)| at.elapsed() > RTT_WINDOW) {
+            samples.pop_front();
+        }
+        if samples.len() < MIN_RTT_SAMPLES {
+            return None;
+        }
+        let mut sorted: Vec<Duration> = samples.iter().map(|(_, rtt)| *rtt).collect();
+        sorted.sort_unstable();
+        Some(sorted[sorted.len() / 4])
+    }
 }
 
 /// Reads path slots out of a network graph.
@@ -598,7 +671,17 @@ impl<C> SurbTelemetryCodec<C> {
             };
 
             self.registry.record_expected(paths, 1, destination);
-            self.pending.insert(*surb_id, paths);
+            // A reply leg is `[R, ..., me]`; `R` is the first relay and the one a slow reply
+            // implicates. A direct reply (no relay) has nothing to blame.
+            let first_relayer = (reply.len() >= 2).then(|| reply[0]);
+            self.pending.insert(
+                *surb_id,
+                PendingSurb {
+                    paths,
+                    first_relayer,
+                    minted_at: Instant::now(),
+                },
+            );
         }
     }
 
@@ -606,7 +689,11 @@ impl<C> SurbTelemetryCodec<C> {
     fn on_replied(&self, surb_id: &HoprSurbId) {
         // A SURB is single-use, so the association is consumed with it.
         match self.pending.remove(surb_id) {
-            Some(paths) => self.registry.record_observed(paths, 1),
+            Some(pending) => {
+                self.registry.record_observed(pending.paths, 1);
+                self.registry
+                    .record_rtt(pending.first_relayer, pending.minted_at.elapsed());
+            }
             None => tracing::debug!("reply on a surb with no pending legs"),
         }
     }
@@ -738,6 +825,49 @@ mod tests {
         assert_eq!(vec![(paths, 3, 2)], registry.drain());
         // Counts belong to the interval that produced them, so a second flush must not re-report.
         assert!(registry.drain().is_empty());
+    }
+
+    /// A relay that answers seconds late must read as slower than one that answers at once, but a
+    /// relay with too few round-trips to judge must report nothing rather than a guess.
+    #[test]
+    fn relayer_latency_should_separate_a_slow_relayer_from_a_measured_too_young_one() {
+        let latency = RelayerLatency::default();
+        let fast = *OffchainKeypair::random().public();
+        let slow = *OffchainKeypair::random().public();
+
+        for _ in 0..MIN_RTT_SAMPLES {
+            latency.record(fast, Duration::from_millis(20));
+            latency.record(slow, Duration::from_millis(3000));
+        }
+
+        assert_eq!(latency.low_quantile(&fast), Some(Duration::from_millis(20)));
+        assert!(
+            latency
+                .low_quantile(&slow)
+                .is_some_and(|rtt| rtt > Duration::from_secs(2)),
+            "a stalled relayer's replies must read seconds late"
+        );
+
+        let too_young = *OffchainKeypair::random().public();
+        latency.record(too_young, Duration::from_millis(10));
+        assert_eq!(
+            latency.low_quantile(&too_young),
+            None,
+            "one reply is not enough to judge a relayer"
+        );
+    }
+
+    #[test]
+    fn a_few_surbs_that_sat_in_the_store_should_not_make_a_relayer_read_slow() {
+        let latency = RelayerLatency::default();
+        let relayer = *OffchainKeypair::random().public();
+
+        for i in 0..32 {
+            let stale = i % 3 == 0;
+            latency.record(relayer, Duration::from_millis(if stale { 60_000 } else { 20 }));
+        }
+
+        assert_eq!(latency.low_quantile(&relayer), Some(Duration::from_millis(20)));
     }
 
     #[test]

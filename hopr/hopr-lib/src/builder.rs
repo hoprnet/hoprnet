@@ -36,7 +36,7 @@ pub use hopr_api::types::crypto::{
     prelude::{ChainKeypair, OffchainKeypair},
 };
 use hopr_api::{
-    chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
+    chain::{AnnouncementError, HoprChainApi, KeyIdMapping as _, SafeRegistrationError, StateSyncOptions},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
@@ -44,7 +44,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
-use hopr_transport::{HoprTransport, IncomingSession};
+use hopr_transport::{HoprTransport, IncomingSession, RelayerState, SurbStore as _};
 use hopr_utils::{
     network_types::{
         addr::is_public_address,
@@ -77,11 +77,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-const SLOW_RELAYER_CHECK_INTERVAL: Duration = Duration::from_secs(1);
-/// Below this probe success rate a connected first relayer counts as stalled.
-const SLOW_RELAYER_PROBE_RATE: f64 = 0.5;
-/// A stalled relayer still answers some probes; it counts as recovered only above this rate.
-const SLOW_RELAYER_RECOVERED_PROBE_RATE: f64 = 0.9;
 const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 
 type PeerDiscoveryRx =
@@ -652,44 +647,16 @@ where
                                 connected,
                             });
 
-                            use hopr_api::chain::KeyIdMapping as _;
                             let relayer = key_ids.key_id_mapper_ref().map_key_to_id(&opk);
                             if connected {
                                 if let Some(relayer) = relayer {
-                                    surb_store.mark_relayer_reachable(&relayer);
+                                    surb_store.on_relayer_state(&relayer, RelayerState::Connected);
                                 }
                             } else if !net.is_connected(&peer_id) {
-                                // Re-plan now rather than at the next sweep, so no new path draws the
-                                // lost peer; its SURBs are set aside and purged only if it stays away.
+                                // Re-plan now rather than at the next sweep, so no new path draws the lost peer.
                                 planner.refresh_cached_paths().await;
                                 if let Some(relayer) = relayer {
-                                    surb_store.mark_relayer_unreachable(&relayer);
-                                    spawn(async move {
-                                        hopr_utils::runtime::prelude::sleep(
-                                            surb_store.unreachable_relayer_grace() + Duration::from_secs(1),
-                                        )
-                                        .await;
-                                        // A disconnect that raced a second connection gets no PeerConnected.
-                                        if net.is_connected(&peer_id) {
-                                            surb_store.mark_relayer_reachable(&relayer);
-                                            return;
-                                        }
-                                        match hopr_utils::parallelize::cpu::spawn_blocking(
-                                            move || surb_store.purge_unusable_surbs(),
-                                            "surb_purge",
-                                        )
-                                        .await
-                                        {
-                                            Ok(purged) if purged > 0 => {
-                                                tracing::info!(
-                                                    purged,
-                                                    "purged SURBs through a relayer that stayed unreachable"
-                                                )
-                                            }
-                                            Ok(_) => {}
-                                            Err(error) => tracing::warn!(%error, "could not purge unusable SURBs"),
-                                        }
-                                    });
+                                    surb_store.on_relayer_state(&relayer, RelayerState::Disconnected);
                                 }
                             }
                         } else {
@@ -698,55 +665,6 @@ where
                     }
                 })
                 .await;
-        });
-    }
-
-    // A first relayer can stall without disconnecting. The neighbour probes still see it: mark the
-    // connected peers whose probes mostly fail, so the replies stop going through them.
-    {
-        let graph = graph.clone();
-        let surb_store = transport_api.surb_store().clone();
-        let key_ids = chain_api.clone();
-        let net = network.clone();
-        spawn(async move {
-            use hopr_api::{
-                chain::KeyIdMapping as _,
-                graph::{EdgeLinkObservable as _, traits::EdgeObservableRead as _},
-            };
-            let mut slow = std::collections::HashSet::new();
-            // Only a relayer seen healthy can turn slow: one still climbing back after an outage or
-            // at startup is not a stall.
-            let mut healthy = std::collections::HashSet::new();
-            loop {
-                hopr_utils::runtime::prelude::sleep(SLOW_RELAYER_CHECK_INTERVAL).await;
-                let me = *graph.identity();
-                let rated: Vec<_> = net
-                    .connected_peers()
-                    .iter()
-                    .filter_map(|peer| {
-                        let peer = hopr_api::OffchainPublicKey::from_peerid(peer).ok()?;
-                        let relayer = key_ids.key_id_mapper_ref().map_key_to_id(&peer)?;
-                        let edge = graph.edge(&me, &peer)?;
-                        Some((relayer, edge.immediate_qos()?.average_probe_rate()?))
-                    })
-                    .collect();
-                slow.retain(|relayer| rated.iter().any(|(rated, _)| rated == relayer));
-                for (relayer, rate) in &rated {
-                    if *rate >= SLOW_RELAYER_RECOVERED_PROBE_RATE {
-                        healthy.insert(*relayer);
-                        slow.remove(relayer);
-                    } else if *rate < SLOW_RELAYER_PROBE_RATE && healthy.contains(relayer) {
-                        slow.insert(*relayer);
-                    }
-                }
-                // Slow is relative: when most neighbours are slow it is our own outage, and there is
-                // nothing better to prefer.
-                if slow.len() * 2 > rated.len() {
-                    slow.clear();
-                    healthy.clear();
-                }
-                surb_store.set_slow_relayers(slow.clone());
-            }
         });
     }
 
