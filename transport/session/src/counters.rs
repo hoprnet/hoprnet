@@ -109,8 +109,9 @@ pub fn dispatch_message_call_count() -> usize {
 /// and no pending initiation on this node.
 ///
 /// These are messages nothing here could ever have handled — the cheapest possible way for a peer
-/// to occupy the shared Start-protocol worker pool. Counted rather than logged so the volume is
-/// observable without the volume becoming the log.
+/// to occupy the shared Start-protocol worker pool. Each drop emits only a `trace!`, which is
+/// invisible at default log levels, so the counter is what makes the volume observable without the
+/// volume becoming the log.
 pub static SESSION_STALE_START_MESSAGES: AtomicUsize = AtomicUsize::new(0);
 
 /// Returns the cumulative count of Start-protocol messages rejected as naming no local state.

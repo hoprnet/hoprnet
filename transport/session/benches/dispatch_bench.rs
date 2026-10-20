@@ -31,14 +31,18 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPixGroupElement};
 use hopr_protocol_app::{
-    prelude::{ApplicationDataOut, Tag::Reserved},
-    v1::{ApplicationData, ApplicationDataIn, ReservedTag, Tag},
+    prelude::ApplicationDataOut,
+    v1::{ApplicationData, ApplicationDataIn, ReservedTag},
 };
-use hopr_protocol_start::{StartChallenge, StartInitiation, StartProtocol};
+use hopr_protocol_pix::{GroupEncoding, PixParams, SsaIndex};
+use hopr_protocol_start::{
+    KeepAliveFlag, KeepAliveMessage, SsaServerCommitmentMessage, StartChallenge, StartInitiation,
+};
 use hopr_transport_session::{
-    HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig,
-    SessionTarget,
+    DispatchResult, DropReason, HoprSessionCapabilities, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE,
+    SessionId, SessionManager, SessionManagerConfig, SessionTarget,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 
@@ -68,8 +72,6 @@ const BENCHMARK_CHANNEL_CAPACITY: usize = 2_000_000;
 /// benchmarks without excessive runtime.
 const BENCHMARK_SAMPLE_COUNT: usize = 10_000;
 
-const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(3);
-
 /// Builds valid `ApplicationDataIn` with the Start protocol tag and a dummy encoded payload.
 fn make_start_protocol_data() -> ApplicationDataIn {
     let challenge = StartChallenge::MAX;
@@ -80,12 +82,80 @@ fn make_start_protocol_data() -> ApplicationDataIn {
         capabilities: HoprSessionCapabilities::try_from(0u8).unwrap(),
         additional_data: 0,
     });
+    make_start_message_data(msg)
+}
+
+/// Encodes any [`HoprStartProtocol`] message into the packet form `dispatch_message` takes.
+///
+/// The Start tag is what `dispatch_message` routes on, exactly as the crate's own `start_packet`
+/// test helper builds its packets — but via [`HoprStartProtocol::encode`] rather than
+/// `ApplicationData::try_from`, because the bench asserts on the tag it is about to assert against
+/// `dispatch_message`'s own routing comparison. The tag comes back from `encode` itself, so the two
+/// cannot drift: a future change of [`HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG`] re-tags every
+/// packet this bench sends automatically, instead of silently sending one no longer routed.
+///
+/// A plain `assert_eq!` rather than `debug_assert_eq!`: `[profile.bench]` does not enable
+/// `debug-assertions`, so a `debug_assert!` here would compile out of `cargo bench` and the tag
+/// guard would never run.
+fn make_start_message_data(msg: HoprStartProtocol) -> ApplicationDataIn {
     let (tag, bytes) = msg.encode().unwrap();
-    debug_assert_eq!(tag, START_PROTOCOL_MESSAGE_TAG);
+    assert_eq!(
+        tag,
+        HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG,
+        "the encoded Start protocol message must carry the Start protocol tag, or dispatch_message would not route it"
+    );
     ApplicationDataIn {
         data: ApplicationData::new(tag, bytes.into_vec()).unwrap(),
         packet_info: Default::default(),
     }
+}
+
+/// The PIX dimensions this bench builds `SsaRequest`s under.
+///
+/// Not the deployed ones — the message is only ever decoded and its `params` echoed back, so any
+/// legal quadruple exercises the same path — but taken from the crate's constants so they cannot
+/// drift into an illegal combination that fails `PixParams::try_new`.
+fn bench_pix_params() -> PixParams {
+    PixParams::try_new(
+        hopr_transport_session::DEFAULT_PIX_POLYS_PER_SSA,
+        hopr_transport_session::DEFAULT_PIX_SHARES_PER_POLY,
+        hopr_transport_session::DEFAULT_PIX_SURPLUS_SHARES,
+        LOCAL_PIX_SUITE,
+    )
+    .expect("the crate's own PIX dimensions must be valid")
+}
+
+/// One SSA commitment at `index`, carrying the identity element.
+///
+/// As in the crate's `ssa_request_for` test helper: the Exit-side point is not checked in dispatch,
+/// so the identity element is enough for the message to be decodable and well-formed.
+fn ssa_request_commitments(index: u32) -> std::collections::BTreeMap<SsaIndex, HoprPixGroupElement> {
+    let identity = HoprPixGroupElement::try_from(
+        hopr_protocol_pix::PixGroup::<HoprPixSpec>::default()
+            .to_bytes()
+            .as_ref(),
+    )
+    .expect("identity element must be valid");
+    std::collections::BTreeMap::from([(SsaIndex::new(index).expect("non-zero"), identity)])
+}
+
+/// An `SsaRequest` for `session_id` with a single identity-element commitment.
+fn make_ssa_request_data(session_id: SessionId) -> ApplicationDataIn {
+    make_start_message_data(HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+        session_id,
+        bench_pix_params(),
+        ssa_request_commitments(1),
+        [],
+    )))
+}
+
+/// A `KeepAlive` for `session_id` carrying only the balancer-state flag.
+fn make_keep_alive_data(session_id: SessionId) -> ApplicationDataIn {
+    make_start_message_data(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+        session_id,
+        flags: KeepAliveFlag::BalancerState.into(),
+        additional_data: 0,
+    }))
 }
 
 /// Builds valid `ApplicationDataIn` with the Session protocol tag and fixed payload.
@@ -306,6 +376,135 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark: the Start-protocol admission filter's per-variant lookups.
+///
+/// `dispatch_message` runs every Start message through
+/// `start_message_is_for_local_state` before enqueueing it, dropping with
+/// `DropReason::StaleStartMessage` anything naming no local Session state. The filter exists
+/// because Start messages share one bounded worker pool, and several of its handlers park a
+/// worker on state a bogus message will never have — `handle_ssa_request` waits up to a second
+/// for a Session slot a random pseudonym never gets. Before the filter, ~110 concurrent bogus
+/// requests occupied every handler and the bounded Start queue then dropped all traffic behind
+/// them, including the KeepAlives of live Sessions (#8514).
+///
+/// # Why this group and not `dispatch_start_protocol`
+///
+/// [`dispatch_start_protocol`] sends only `StartSession`, which is the one arm the filter answers
+/// with a constant `true` — no lookup of any kind. A regression that turned the *lookup* arms into
+/// something expensive is therefore invisible to it. Each case below pins one arm whose cost is a
+/// real cache probe:
+///
+/// * `ssa_request_forward_slot` — the legitimate, hot case: the Exit asking its own Entry for SSA commitments of a
+///   Session this node holds as an outgoing (`Forward`) slot. The filter pays `pending_outgoing.contains_key` (a miss)
+///   and then `sessions.get` plus a `Forward` variant match. Enqueued (`Processed`), and so is also the only case here
+///   that reaches the credit.
+/// * `ssa_request_stranger` — the attack case: an `SsaRequest` for a pseudonym this node never issued. The filter pays
+///   the same two probes and both miss, then drops without enqueueing. This is the path the DoS floods with, and its
+///   cost must stay a cache-miss lookup: anything that grows it — a log line per drop, a lock, a decode of the payload
+///   — is itself a lever a peer can ride, which is exactly what the filter was written to remove. Read it against
+///   `ssa_request_forward_slot`: the gap between them is what a *hit* adds, and the absolute is what every packet on
+///   the wire costs when under flood.
+/// * `keep_alive_registered` — the steady-state control-traffic case: a `KeepAlive` for a live Session. One
+///   `sessions.contains_key` probe, then the enqueue, the `Forward` check and the credit that
+///   `dispatch_start_protocol`'s `session_hit_forward` also measures — so the interesting read is against that case,
+///   which carries the identical tail but no `contains_key`.
+///
+/// Like the neighbouring groups, none of these fixtures is new: `make_manager_with_session` and
+/// `make_manager_without_session` are exactly what `dispatch_start_protocol` uses, so a change in
+/// the filter's cost cannot be masked by a change in the fixture. The intended branch is checked
+/// once per benchmark *run* — before `b.iter` is ever called — by a plain `assert!(matches!(...))`
+/// over the same `dispatch_message` call the closure then measures, outside the timed section:
+/// asserting inside `b.iter` would put the assert in the measurement, and it is only ever needed
+/// once, since the fixture is fixed for the life of the group. It is a plain `assert!` rather than
+/// `debug_assert!` because `[profile.bench]` does not enable `debug-assertions`, so a
+/// `debug_assert!` would compile out of `cargo bench` and the check would silently never run. The
+/// timed closures themselves discard the result exactly as the existing ones do.
+pub fn dispatch_start_protocol_filter(c: &mut Criterion) {
+    let mut group = c.benchmark_group("dispatch_start_protocol_filter");
+    group.sample_size(BENCHMARK_SAMPLE_COUNT);
+
+    // `SsaRequest` for a Session held as an outgoing (Forward) slot: the Exit's own Entry. Passes
+    // the filter on the `sessions.get` + `Forward` match, and is enqueued.
+    {
+        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session(forward_routing);
+        let in_data = make_ssa_request_data(session_id);
+
+        assert!(
+            matches!(
+                manager.dispatch_message(session_id, in_data.clone()),
+                Ok(DispatchResult::Processed)
+            ),
+            "fixture must take the filter's Forward-slot arm: the SsaRequest names a session held as an outgoing \
+             (Forward) slot, so dispatch_message must enqueue it, not drop it"
+        );
+
+        group.bench_function("ssa_request_forward_slot", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    // `SsaRequest` for a pseudonym this node never issued: the DoS flood. Fails the filter after
+    // two cache-miss probes and is dropped before reaching the queue.
+    {
+        let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
+        let stranger = HoprPseudonym::random();
+        let in_data = make_ssa_request_data(stranger);
+
+        assert!(
+            matches!(
+                manager.dispatch_message(stranger, in_data.clone()),
+                Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))
+            ),
+            "fixture must take the filter's drop arm: the SsaRequest names a pseudonym this node never issued, so \
+             dispatch_message must drop it before enqueueing"
+        );
+
+        group.bench_function("ssa_request_stranger", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(stranger, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    // `KeepAlive` for a live Session: the steady-state control traffic the flood above must not be
+    // able to starve. Passes the filter on a single `contains_key`, and is enqueued.
+    {
+        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session(forward_routing);
+        let in_data = make_keep_alive_data(session_id);
+
+        assert!(
+            matches!(
+                manager.dispatch_message(session_id, in_data.clone()),
+                Ok(DispatchResult::Processed)
+            ),
+            "fixture must take the filter's KeepAlive arm: the KeepAlive names a registered session, so \
+             dispatch_message must enqueue it, not drop it"
+        );
+
+        group.bench_function("keep_alive_registered", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    group.finish();
+}
+
 /// Benchmark: dispatching a Session data message where the session exists in the cache.
 ///
 /// Exercises the moka cache lookup + `session_slot.session_tx.try_send()` path.
@@ -393,6 +592,7 @@ pub fn dispatch_unrelated(c: &mut Criterion) {
 criterion_group!(
     benches,
     dispatch_start_protocol,
+    dispatch_start_protocol_filter,
     dispatch_session_hit,
     dispatch_session_miss,
     dispatch_unrelated

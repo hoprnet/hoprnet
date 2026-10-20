@@ -2135,7 +2135,8 @@ pub struct SessionManager<S> {
     /// names the Session by its pseudonym. This is the pseudonym-keyed half, so `dispatch_message`
     /// can tell in one lookup whether an inbound `SsaRequest` belongs to an initiation this node is
     /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
-    /// on every failure path and once the slot exists; the TTL is a backstop matching
+    /// on every failure path (the closure that maps `allocate_session_slot`'s failure to
+    /// `Loopback` removes it too) and once the slot exists; the TTL is a backstop matching
     /// `session_initiations`'.
     pending_outgoing: moka::sync::Cache<HoprPseudonym, ()>,
     /// Serialises `handle_ssa_request` per pseudonym.
@@ -3018,6 +3019,11 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives.
+                            self.pending_outgoing.remove(&session_id);
                             SessionManagerError::Loopback
                         })?;
 
@@ -3147,6 +3153,11 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives.
+                            self.pending_outgoing.remove(&session_id);
                             SessionManagerError::Loopback
                         })?;
 
@@ -4267,6 +4278,24 @@ where
             .collect()
     }
 
+    /// Whether an `SsaRequest` for `session_id` names SSA state this node holds or is making.
+    ///
+    /// Only the Exit asks for SSA commitments, and only of its own Entry: a Session this node holds
+    /// as an outgoing (`Forward`) slot, or one this node is still initiating (`pending_outgoing`).
+    /// An Exit-side (`Return`) slot never legitimately receives one, so a request naming one is
+    /// refused.
+    ///
+    /// Lives on [`Self::start_message_is_for_local_state`] only. [`Self::handle_ssa_request`]
+    /// re-checks the two cheap halves of it (slot present, or initiation pending) as a backstop, but
+    /// deliberately not the variant — see there.
+    fn ssa_request_names_local_state(&self, session_id: &SessionId) -> bool {
+        self.pending_outgoing.contains_key(session_id)
+            || self
+                .sessions
+                .get(session_id)
+                .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+    }
+
     /// Whether a Start-protocol message names Session state this node actually holds.
     ///
     /// Start messages share one bounded worker pool, and several handlers park a worker on state a
@@ -4287,12 +4316,7 @@ where
             // (Forward) Session, or one this node is still initiating. An Exit-side (Return) slot
             // never legitimately receives one.
             HoprStartProtocol::SsaRequest(m) => {
-                m.session_id == *pseudonym
-                    && (self.pending_outgoing.contains_key(&m.session_id)
-                        || self
-                            .sessions
-                            .get(&m.session_id)
-                            .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. })))
+                m.session_id == *pseudonym && self.ssa_request_names_local_state(&m.session_id)
             }
 
             // Both are replies to an initiation this node made, and name it by challenge.
@@ -5611,11 +5635,15 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
-        // Waiting is only ever legitimate for a Session this node is still initiating: the Exit
-        // sends `SessionEstablished` and its first `SsaRequest` back-to-back, so the request can
-        // outrun the slot allocation. A request naming anything else is refused here rather than
-        // after a second of waiting, which is what kept a flood of bogus requests from parking the
-        // shared handler pool.
+        // Deliberately narrower than the dispatch filter's `SsaRequest` arm
+        // (`ssa_request_names_local_state`), which additionally requires the slot to be an outgoing
+        // (`Forward`) one: a compliant peer never sends an `SsaRequest` to an Exit-side (Return)
+        // slot, so dispatch drops that case outright, and re-checking the variant here would only
+        // re-decide what dispatch already decided on the same in-memory state. This guard is the
+        // backstop for the state changing between the two — a message that sat queued long enough
+        // for the session it names to close, or for a `pending_outgoing` initiation to be removed —
+        // and for callers that bypass dispatch entirely. Refusing here rather than after the wait
+        // below is what kept a flood of bogus requests from parking the shared handler pool.
         if self.sessions.get(&msg.session_id).is_none() && !self.pending_outgoing.contains_key(&msg.session_id) {
             trace!(session_id = %msg.session_id, "refusing an SSA request for a session this node does not hold");
             return Err(SessionManagerError::NonExistingSession.into());
