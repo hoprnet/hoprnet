@@ -112,6 +112,12 @@ pub trait SurbStore {
     /// it and owns the headroom math. It may be `0` when no target was announced, which the store
     /// treats as "unknown", not as "one SURB".
     ///
+    /// An implementation that admits must never return `0`: that value is reserved for "no admission"
+    /// — the session side's `AdmissionToken::NONE` — and a [`retire`](SurbStore::retire) presenting it
+    /// must match nothing, so a store that minted it would let every teardown of a never-committed
+    /// Session release a live admission. Returning `0` from a store that does not admit is how the
+    /// default below honours the rule.
+    ///
     /// Calling this twice for the same `pseudonym` must not discard what it already holds, and
     /// invalidates the number the earlier admission returned.
     ///

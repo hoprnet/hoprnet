@@ -797,6 +797,15 @@ impl SessionSsaState {
     }
 }
 
+/// The admission-token cell a [`SessionSlot`] shares with the [`SessionSlotGuard`] that allocated it.
+///
+/// Behind an `Arc` for two reasons. The slot is cloned into the sessions cache and into the guard, so
+/// the token `commit` writes through the guard has to land in the *cached* copy every teardown reads
+/// from — the `Arc` is that one shared cell. And it lets [`commit_slot_guard`] recognise its own slot
+/// when it re-reads the cache by key: the key is a reusable pseudonym, so the entry found there may be
+/// a successor Session's, and comparing this cell by identity is what rejects a foreign slot.
+type AdmissionCell = Arc<OnceLock<AdmissionToken>>;
+
 #[derive(Clone)]
 pub(crate) struct SessionSlot {
     // Sender does not need to be in Arc, because the receiver part is always
@@ -886,14 +895,25 @@ pub(crate) struct SessionSlot {
     /// from the slot it removes, so it travels with the Session however long the teardown is delayed;
     /// empty stays [`AdmissionToken::NONE`], which matches no admission, so a rolled-back Session's
     /// retire is the no-op the seam's idempotency is there for.
-    admission_token: Arc<OnceLock<AdmissionToken>>,
+    ///
+    /// The same cell is what identifies this slot to the commit that allocated it — see
+    /// [`AdmissionCell`].
+    admission_token: AdmissionCell,
 }
 
 impl SessionSlot {
-    /// The token naming this Session's SURB-store admission, or [`AdmissionToken::NONE`] if the
-    /// Session was never committed — hence never admitted.
-    fn admission_token(&self) -> AdmissionToken {
-        self.admission_token.get().copied().unwrap_or(AdmissionToken::NONE)
+    /// Claims the slot's admission-token cell on behalf of a teardown and returns what it holds.
+    ///
+    /// Empty means no `commit` has run yet, and the teardown claims the cell by storing
+    /// [`AdmissionToken::NONE`] into it. That write is what lets a `commit` racing this teardown tell
+    /// it lost: its own `set` then fails, and it retires the admission it just made instead of leaving
+    /// a ring no teardown will ever remove. Without the claim, a teardown that read the empty cell
+    /// would schedule a no-op retire, and a `commit` landing afterwards would admit a Session that is
+    /// already gone — the leak the exit-side `SessionEstablished`-before-commit ordering makes
+    /// reachable. Returns the token a later `commit` would have stored, or `NONE` when this teardown
+    /// got there first (or the Session was never admitted at all).
+    fn claim_admission_token(&self) -> AdmissionToken {
+        *self.admission_token.get_or_init(|| AdmissionToken::NONE)
     }
 }
 
@@ -1280,9 +1300,25 @@ impl Drop for CycleBudgetReservation {
 ///
 /// The slot is re-read from the cache rather than kept from allocation: the token `admit` returns has
 /// to land in the *cached* copy of the slot, and that copy and the one the guard rolled in are two
-/// clones of one value — see [`SessionSlot::admission_token`] for why the cell they share is behind an
-/// `Arc`. Re-reading is what keeps this honest when the cache has since handed the entry to another
-/// reader: they all share the one cell.
+/// clones of one value — see [`SessionSlot::claim_admission_token`] for why the cell they share is
+/// behind an `Arc`. Re-reading is what keeps this honest when the cache has since handed the entry to
+/// another reader: they all share the one cell.
+///
+/// An absent slot is not an error: the Session *was* established on this path, and `commit` runs with
+/// `None` so the guard is still marked committed and the Session still counted. The teardown that
+/// removed the slot already decremented `METRIC_ACTIVE_SESSIONS` and logged "session closed", so
+/// skipping the commit here would drift the gauge down by one and leave that close unpaired (see
+/// [`SessionSlotGuard::commit`]).
+///
+/// A slot found by key that is *not* the one this establishment allocated is treated exactly like an
+/// absent one, and for the same reason: the re-read is by a reusable pseudonym, so between this
+/// Session's `SessionEstablished` send and its parked commit a teardown can remove its slot and a
+/// successor Session can be allocated under the same key. Admitting into the successor's slot would
+/// stamp the successor's ring with this Session's token, and the successor's own commit would then
+/// find the cell occupied and retire the successor's live admission — dropping a running Session to
+/// the quarantine, the failure this whole seam exists to prevent. The guard holds its own slot's
+/// [`AdmissionCell`], so the re-read can reject a foreign slot by identity; the commit itself still
+/// runs, since this Session *was* established.
 fn commit_slot_guard(
     guard: &mut SessionSlotGuard<'_>,
     sessions: &moka::sync::Cache<SessionId, SessionSlot>,
@@ -1290,15 +1326,16 @@ fn commit_slot_guard(
     surb_admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
     capacity: usize,
 ) {
-    // Unwrap-free: an absent slot means the guard's rollback already removed it (its `Drop` fires on
-    // the early returns between allocation and here), and a rolled-back Session must not be admitted.
-    let Some(slot) = sessions.get(&session_id) else {
-        error!(%session_id, "session slot vanished before it could be committed");
-        return;
-    };
+    // Re-read so the token lands in the cached copy; `None` means a teardown already removed it, and
+    // the commit below still runs — only the admission is skipped. A slot that has since been
+    // reallocated to another Session on this same pseudonym is discarded the same way: its cell is not
+    // the guard's, so it is not this commit's to admit into.
+    let slot = sessions
+        .get(&session_id)
+        .filter(|slot| Arc::ptr_eq(&slot.admission_token, guard.admission_token()));
 
     guard.commit(
-        &slot,
+        slot.as_ref(),
         surb_admission.get().map(|a| a.as_ref() as &dyn SurbAdmissionControl),
         capacity,
     );
@@ -1330,6 +1367,10 @@ struct SessionSlotGuard<'a> {
     /// reason: the rollback's deferred retire has to wait it out, and the guard outlives the
     /// establishing call that could otherwise read the manager's config.
     surb_resolution_wait: Duration,
+    /// The admission-token cell of the slot this guard allocated, so a commit that re-reads the cache
+    /// by key can tell its own slot from a successor's — see [`AdmissionCell`] and
+    /// [`commit_slot_guard`].
+    admission_cell: AdmissionCell,
     committed: bool,
 }
 
@@ -1340,6 +1381,7 @@ impl<'a> SessionSlotGuard<'a> {
         active_sessions: Arc<std::sync::atomic::AtomicUsize>,
         admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
         surb_resolution_wait: Duration,
+        admission_cell: AdmissionCell,
     ) -> Self {
         Self {
             sessions,
@@ -1347,8 +1389,16 @@ impl<'a> SessionSlotGuard<'a> {
             session_id,
             admission,
             surb_resolution_wait,
+            admission_cell,
             committed: false,
         }
+    }
+
+    /// The admission-token cell of the slot this guard allocated. [`commit_slot_guard`] compares it
+    /// against the cell of the slot the cache hands back for the same key, so a slot reallocated to a
+    /// successor Session is recognised as foreign.
+    fn admission_token(&self) -> &AdmissionCell {
+        &self.admission_cell
     }
 
     /// Marks the session as successfully established, preventing the slot from
@@ -1373,13 +1423,45 @@ impl<'a> SessionSlotGuard<'a> {
     /// gone by the time the Session is torn down, and the teardown reads the token from the slot it
     /// removes. Writing it here, after the `admit`, is what lets a later `release_session_slot`
     /// retire exactly this admission.
-    fn commit(&mut self, slot: &SessionSlot, admission: Option<&dyn SurbAdmissionControl>, capacity: usize) {
+    ///
+    /// `slot` is the cached copy when the caller could still find it *and* it is this establishment's
+    /// own, and `None` when the slot was already torn down or has been reallocated to a successor
+    /// Session on the same pseudonym — [`commit_slot_guard`] discards the latter before calling here.
+    /// Committing without a slot is still a commit: the Session *was* established (the Exit sends
+    /// `SessionEstablished` before it commits, so an Entry can close or answer with a
+    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed and
+    /// the Session counted, or the teardown's decrement would leave `METRIC_ACTIVE_SESSIONS` drifting
+    /// down and `close_session` would log a "session closed" with no matching "new session
+    /// established". Only the `admit` is skipped — there is no cell left to carry its token.
+    ///
+    /// When a slot *is* present, it is this Session's own (the caller checked), so its cell arbitrates
+    /// against a teardown racing this commit and nothing else can be writing to it. The teardown claims
+    /// the cell (see [`SessionSlot::claim_admission_token`]), so if this commit's own `set` fails, a
+    /// teardown has already passed the point where it read the cell: it saw nothing to retire, and this
+    /// admission would otherwise leak a ring no teardown ever removes. The commit therefore retires it
+    /// — immediately, not deferred: the deferral exists so a closing Session's own return-routed
+    /// notification still finds its ring, but here the Session is already gone and no packet of its is
+    /// in flight for this admission, which was never visible to the pipeline.
+    fn commit(&mut self, slot: Option<&SessionSlot>, admission: Option<&dyn SurbAdmissionControl>, capacity: usize) {
         self.committed = true;
         tracing::info!(session_id = %self.session_id, "new session established");
 
-        if let Some(admission) = admission {
+        // Only a slot that is this Session's own can carry the admission's token to a teardown, so
+        // `None` means nothing to admit for: either the Session was torn down — its teardown already
+        // ran its (no-op) retire, and any batch a peer sends meanwhile lands in the quarantine like any
+        // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
+        // this admission's to stamp. The commit itself — logging and the metric below — still happens.
+        if let (Some(admission), Some(slot)) = (admission, slot) {
             let token = admission.admit(&self.session_id, capacity);
-            let _ = slot.admission_token.set(token);
+            if slot.admission_token.set(token).is_err() {
+                // A teardown claimed the cell first, so nothing will retire this admission. Retire
+                // it here — see the doc comment for why this is immediate rather than deferred.
+                tracing::debug!(
+                    session_id = %self.session_id,
+                    "session was torn down while it committed; retiring the admission it could not record"
+                );
+                admission.retire(&self.session_id, token);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
@@ -1401,8 +1483,9 @@ impl Drop for SessionSlotGuard<'_> {
                 //
                 // The token is `NONE` by construction — admission happens at `commit`, and this
                 // guard never committed — so the retire is the no-op that keeps every teardown wired
-                // through the same seam without asking the store's accounting to trust that.
-                let token = slot.admission_token();
+                // through the same seam without asking the store's accounting to trust that. Claiming
+                // the cell rather than reading it keeps every teardown using one protocol.
+                let token = slot.claim_admission_token();
                 release_session_slot(
                     session_id,
                     slot,
@@ -2685,7 +2768,7 @@ where
                             // cycles actually in flight, where enumerating every index this Session
                             // had ever used was unbounded in its lifetime.
                             active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
-                            let token = entry.admission_token();
+                            let token = entry.claim_admission_token();
                             close_session(
                                 *session_id.as_ref(),
                                 entry,
@@ -2958,6 +3041,11 @@ where
             return None;
         }
 
+        // Lift the slot's admission cell out before the slot is moved into the cache: the guard keeps
+        // it so `commit_slot_guard` can recognise the cached slot as this establishment's own by cell
+        // identity, even though the key it re-reads by is a reusable pseudonym.
+        let admission_cell = slot.admission_token.clone();
+
         let result =
             self.sessions
                 .entry(session_id)
@@ -2993,6 +3081,7 @@ where
                     counter.clone(),
                     self.surb_admission.clone(),
                     self.cfg.surb_resolution_wait,
+                    admission_cell,
                 ))
             }
             _ => None,
@@ -3825,7 +3914,7 @@ where
 
             if let Some(slot) = myself.sessions.remove(&session_id) {
                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                let token = slot.admission_token();
+                let token = slot.claim_admission_token();
                 close_session(
                     session_id,
                     slot,
@@ -4371,7 +4460,7 @@ where
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             // Reconstructor state is released by `close_session` aborting the PIX action driver,
             // whose commitment guards retire on drop.
-            let token = slot.admission_token();
+            let token = slot.claim_admission_token();
             close_session(
                 *id,
                 slot,
@@ -6745,14 +6834,15 @@ mod tests {
     /// maintenance thread — so a test that counts immediately after triggering a teardown would race
     /// it twice over. Polling keeps the test honest about the ordering it actually asserts (retire
     /// happens, and after the admit) without sleeping a fixed delay in every test that touches the
-    /// seam.
+    /// seam. `surb_retire_grace`'s one-second margin is what bounds the wait below the ten-second
+    /// ceiling even when a test keeps the default `surb_resolution_wait`.
     async fn wait_for_retire(admission: &RecordingAdmission, pseudonym: &SessionId, count: usize) -> usize {
-        for _ in 0..120 {
+        for _ in 0..200 {
             let retired = admission.retired(pseudonym);
             if retired >= count {
                 return retired;
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
         admission.retired(pseudonym)
     }
@@ -7219,9 +7309,15 @@ mod tests {
     #[derive(Clone, Default)]
     struct RecordingAdmission {
         events: Arc<Mutex<Vec<(String, SessionId)>>>,
-        /// The token each `admit` minted and each `retire` presented, in call order — the property
-        /// the token-guard tests pin: a teardown can only present the token its own `admit` minted.
-        tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// The tokens `admit` minted, in call order.
+        ///
+        /// Kept separate from the retires so each list answers one question: what admissions were
+        /// distinguished, and what a teardown actually presented. One combined list cannot — a
+        /// retire's token would read as a mint, so a regression that presented the wrong token would
+        /// hide behind the admit that also wrote the list.
+        admit_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// The tokens `retire` presented, in call order.
+        retire_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
         /// Mints the tokens `admit` returns, so each admission of a pseudonym is distinguishable —
         /// the property the token guard below pins.
         token_counter: Arc<std::sync::atomic::AtomicU64>,
@@ -7278,23 +7374,12 @@ mod tests {
         /// Admissions of the same pseudonym must be distinguishable — that is what lets a deferred
         /// retire name the admission it belongs to rather than "whatever is admitted now".
         fn minted_tokens(&self) -> Vec<AdmissionToken> {
-            self.tokens
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .iter()
-                .filter(|token| token.into_raw() != 0)
-                .copied()
-                .collect()
+            self.admit_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
         }
 
         /// The tokens presented by retires, in call order.
         fn retire_tokens(&self) -> Vec<AdmissionToken> {
-            self.tokens
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .iter()
-                .copied()
-                .collect()
+            self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
         }
     }
 
@@ -7315,7 +7400,7 @@ mod tests {
             // stale retire never matching a successor's admission.
             let token =
                 AdmissionToken::from_raw(self.token_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1);
-            self.tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+            self.admit_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
             token
         }
 
@@ -7324,7 +7409,7 @@ mod tests {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .push(("retire".into(), *pseudonym));
-            self.tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+            self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
         }
     }
 
@@ -7732,6 +7817,9 @@ mod tests {
         let params = fill_pix_params();
         let mgr = RecordingManager::new(SessionManagerConfig {
             surb_balance_notify_period: notify_period,
+            // The admission tests over this fixture wait out the deferred retire; a short window
+            // keeps them fast without changing the seam they exercise.
+            surb_resolution_wait: Duration::from_millis(100),
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=pix_params_to_quota(&params),
                 supervision: SupervisorConfig {
@@ -8240,7 +8328,12 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_rolled_back_session_is_never_admitted() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
-        let mgr = RecordingManager::new(Default::default());
+        // Short grace: the rollback's retire is deferred, and the default window would make this
+        // test wait out the library default in real time for no added coverage.
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_resolution_wait: Duration::from_millis(100),
+            ..Default::default()
+        });
         mgr.set_surb_admission(Arc::new(admission.clone()));
 
         // Drop the receiver so that notifying about the new incoming session fails *after* the slot
@@ -8289,27 +8382,37 @@ mod tests {
         Ok(())
     }
 
-    /// A teardown on a reused pseudonym must not invalidate the successor Session's admission.
+    /// A teardown on a reused pseudonym must present *its own* admission's token, not the successor's.
     ///
     /// The pseudonym is client-chosen (`SessionClientConfig::pseudonym`) and freely reusable, so
     /// "close Session A, open Session B on the same pseudonym" is a real sequence, not an exotic
     /// one. A's retire is deliberately deferred past the packet pipeline's SURB-resolution window —
     /// A's own return-routed notification needs its ring while the resolution stage looks it up — so
-    /// it can land *after* B's commit, and an unconditional retire would invalidate B's
-    /// already-admitted ring: B would go on inserting its SURBs into the 16-cap un-admitted
-    /// quarantine and never recover, with nothing logged anywhere.
+    /// it lands *after* B's commit, and an unconditional retire would invalidate B's already-admitted
+    /// ring: B would go on inserting its SURBs into the 16-cap un-admitted quarantine and never
+    /// recover, with nothing logged anywhere.
     ///
-    /// The deferral is therefore guarded: `admit` returns a token naming its admission, the teardown
+    /// The deferral is guarded by the token: `admit` returns one naming its admission, the teardown
     /// threads that token to its retire, and the store honours a retire only while its token still
-    /// names the pseudonym's current admission. What this test pins is that the token reaches the
-    /// retire at all — two distinct tokens, and a teardown that carries A's rather than B's. The
-    /// store's own matching is pinned by `a_stale_retire_must_not_clobber_a_successor_admissions_ring`
-    /// over in `hopr-protocol-hopr`, which is where the matching lives.
+    /// names the pseudonym's current admission. This test pins the manager half of that — the
+    /// successor's admit is real and distinguished, and A's retire presents A's token rather than B's
+    /// (the failure a teardown re-looking-up the slot under the pseudonym would produce). The store's
+    /// own matching is pinned by `a_stale_retire_must_not_clobber_a_successor_admissions_ring` over in
+    /// `hopr-protocol-hopr`, which is where the matching lives.
+    ///
+    /// The grace is shortened through `surb_resolution_wait` so the deferral is exercised without
+    /// waiting out the library default in real time.
     #[test_log::test(tokio::test)]
-    async fn a_reused_pseudonym_is_retired_before_the_successor_session_admits_it() -> anyhow::Result<()> {
+    async fn a_reused_pseudonym_keeps_the_successor_ring_when_the_stale_retire_fires() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
-        let (mgr, mut msg_rx, _new_session_rx, pseudonym) =
-            exit_session_originating_keep_alives(Default::default(), Some(Arc::new(admission.clone()))).await?;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_originating_keep_alives(
+            SessionManagerConfig {
+                surb_resolution_wait: Duration::from_millis(100),
+                ..Default::default()
+            },
+            Some(Arc::new(admission.clone())),
+        )
+        .await?;
 
         assert_eq!(
             admission.admitted(&pseudonym),
@@ -8333,20 +8436,40 @@ mod tests {
         )
         .await?;
 
-        // The close's retire is deferred past the SURB-resolution window, so it may land on either
-        // side of the successor's admit — landing after it is exactly the case the token exists to
-        // make safe. What must hold is that two admissions were distinguished and both teardowns
-        // carry a token: one retire, and none of it suppressed.
-        assert_eq!(
-            admission.sequence(&pseudonym),
-            vec!["admit", "admit"].into_iter().map(String::from).collect::<Vec<_>>(),
-            "the successor Session must have been admitted on the reused pseudonym"
-        );
+        // The successor's admit is in the log, and A's retire is deferred: the interleaving below is
+        // the one the grace produces — B's admit first, A's retire after — which is exactly the case
+        // the token makes safe. Waiting the retire out before asserting keeps the order pinned rather
+        // than assumed.
         assert_eq!(
             wait_for_retire(&admission, &pseudonym, 1).await,
             1,
             "the first teardown's retire must still be paid — deferred past the SURB-resolution window, never \
              suppressed"
+        );
+        assert_eq!(
+            admission.sequence(&pseudonym),
+            vec!["admit", "admit", "retire"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>(),
+            "the successor must be admitted before A's deferred retire fires — the case the token exists for"
+        );
+
+        let minted = admission.minted_tokens();
+        assert_eq!(
+            minted.len(),
+            2,
+            "two Sessions on one pseudonym must mint two admissions"
+        );
+        assert_ne!(
+            minted[0], minted[1],
+            "the two admissions must carry distinct tokens, or no retire could tell them apart"
+        );
+        assert_eq!(
+            admission.retire_tokens(),
+            vec![minted[0]],
+            "A's retire must present A's token and not B's — a teardown that re-looked-up the slot under the \
+             pseudonym would present B's and invalidate the live ring"
         );
 
         let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
@@ -8365,8 +8488,16 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_teardown_presents_the_token_of_the_session_it_is_tearing_down() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
-        let (mgr, mut msg_rx, _new_session_rx, pseudonym) =
-            exit_session_originating_keep_alives(Default::default(), Some(Arc::new(admission.clone()))).await?;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_originating_keep_alives(
+            SessionManagerConfig {
+                // Shortened so the deferred retire is exercised without waiting out the library
+                // default in real time.
+                surb_resolution_wait: Duration::from_millis(100),
+                ..Default::default()
+            },
+            Some(Arc::new(admission.clone())),
+        )
+        .await?;
 
         assert_eq!(
             admission.admitted(&pseudonym),
@@ -15340,8 +15471,188 @@ mod tests {
             "waiter must be signaled with Ok(()), not canceled"
         );
 
-        guard.unwrap().commit(&slot, None, 0);
+        guard.unwrap().commit(Some(&slot), None, 0);
 
+        Ok(())
+    }
+
+    /// Builds a slot for `session_id` that is not yet in any cache, for the guard tests below.
+    fn unregistered_slot(session_id: SessionId) -> SessionSlot {
+        let (session_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        SessionSlot {
+            session_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(session_id)),
+            abort_handles: Default::default(),
+            surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+            pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
+            returned_packets: Default::default(),
+            cycle_budget: None,
+            admission_token: Default::default(),
+        }
+    }
+
+    /// A commit that finds its slot already gone must still commit the Session.
+    ///
+    /// The Session *was* established on this path — the Exit sends `SessionEstablished` before it
+    /// commits, so an Entry can close or answer with a `SessionId`-scoped `SessionError` in that
+    /// window — so the guard must be marked committed rather than rolled back, and the Session still
+    /// counted. Only the admission is skipped: there is no slot left to carry its token. Skipping the
+    /// commit instead would drift `METRIC_ACTIVE_SESSIONS` down (the teardown already decremented it)
+    /// and leave the teardown's "session closed" unpaired.
+    #[test_log::test(tokio::test)]
+    async fn a_commit_without_a_slot_still_commits_the_session() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let slot = unregistered_slot(session_id);
+        let mut guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("slot allocation must succeed")?;
+
+        // The teardown wins the race and removes the slot before the commit runs.
+        assert!(
+            mgr.sessions.remove(&session_id).is_some(),
+            "the slot must have been registered"
+        );
+
+        guard.commit(None, Some(&admission), 0);
+
+        assert!(
+            guard.committed,
+            "a Session that was established must be committed, not rolled back, even with no slot left"
+        );
+        assert_eq!(
+            admission.admitted(&session_id),
+            0,
+            "with no slot to carry the token, nothing may be admitted"
+        );
+        assert_eq!(
+            admission.retired(&session_id),
+            0,
+            "a commit that admitted nothing must retire nothing"
+        );
+        Ok(())
+    }
+
+    /// A teardown that claims the token cell before `commit` runs forces the commit to retire its own
+    /// admission.
+    ///
+    /// The order is the Exit-side one: `SessionEstablished` goes out before the commit, so a peer can
+    /// close in that window. The teardown claims the cell and reads `NONE` (a no-op retire), and the
+    /// commit then finds its `set` rejected — so it retires the admission it just made, or the ring
+    /// would leak with no teardown ever removing it.
+    #[test_log::test(tokio::test)]
+    async fn a_teardown_claiming_the_cell_first_forces_the_commit_to_retire_its_admission() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let slot = unregistered_slot(session_id);
+        let mut guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("slot allocation must succeed")?;
+
+        // The teardown gets there first: it claims the cell and reads `NONE`, so its scheduled retire
+        // is a no-op.
+        assert_eq!(
+            slot.claim_admission_token(),
+            AdmissionToken::NONE,
+            "an uncommitted slot's claimed token must be NONE"
+        );
+
+        // The commit still runs and admits, but cannot record the token — so it must retire it.
+        guard.commit(Some(&slot), Some(&admission), 100);
+
+        let minted = admission.minted_tokens();
+        assert_eq!(
+            minted.len(),
+            1,
+            "the commit must still admit the Session it was told to commit"
+        );
+        assert_eq!(
+            admission.retire_tokens(),
+            vec![minted[0]],
+            "the admission the commit could not record must be retired by the commit itself"
+        );
+        Ok(())
+    }
+
+    /// A commit whose re-read finds a *successor's* slot on the same pseudonym must not admit into it.
+    ///
+    /// The pseudonym is client-chosen and reusable, so a slot can be torn down and reallocated under
+    /// the same key between a Session's `SessionEstablished` send and its parked commit. That commit
+    /// re-reads the cache by key to land its token in the cached copy, and the copy it finds is then
+    /// the successor's — admitting into it would stamp the successor's ring with this Session's token,
+    /// and the successor's own commit would find the cell occupied and retire the successor's live
+    /// admission, dropping a running Session to the quarantine. This is the commit-vs-commit arm the
+    /// teardown-vs-commit test above does not reach: the slot is *present*, just not this one's, so the
+    /// ownership marker — not absence — has to reject it.
+    ///
+    /// A true concurrent commit is not drivable from a test without instrumenting the manager, so the
+    /// interleaving is built explicitly: A allocates and is torn down (freeing the key), B is allocated
+    /// under the same key, and only then does A's parked commit run through `commit_slot_guard`.
+    #[test_log::test(tokio::test)]
+    async fn a_commit_must_not_admit_into_a_successors_slot_on_the_same_pseudonym() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let pseudonym = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        mgr.set_surb_admission(Arc::new(admission.clone()));
+
+        // A allocates and then loses its slot to a teardown, which also claims the cell.
+        let mut guard_a = mgr
+            .allocate_session_slot(pseudonym, unregistered_slot(pseudonym))
+            .context("A's slot allocation must succeed")?;
+        let slot_a = mgr
+            .sessions
+            .remove(&pseudonym)
+            .context("the teardown must have found A's slot")?;
+        assert_eq!(
+            slot_a.claim_admission_token(),
+            AdmissionToken::NONE,
+            "A's teardown must claim the cell and read nothing, so its scheduled retire is a no-op"
+        );
+
+        // B is allocated under the same key before A's commit resumes. B's slot is the one the cache
+        // now hands back for that pseudonym.
+        let guard_b = mgr
+            .allocate_session_slot(pseudonym, unregistered_slot(pseudonym))
+            .context("B's slot allocation must succeed under the freed pseudonym")?;
+
+        // A's commit re-reads the key and finds B's slot, which it must refuse as not its own.
+        commit_slot_guard(&mut guard_a, &mgr.sessions, pseudonym, mgr.surb_admission.clone(), 100);
+
+        assert!(
+            guard_a.committed,
+            "A was established, so its commit must still mark it committed"
+        );
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            0,
+            "A must not admit into B's slot — a foreign slot is no more A's to admit into than an absent one"
+        );
+        assert_eq!(
+            admission.retired(&pseudonym),
+            0,
+            "A must not retire anything either: it admitted nothing"
+        );
+
+        // B's own commit is the one that admits, and it must land on B's untouched cell.
+        let mut guard_b = guard_b;
+        commit_slot_guard(&mut guard_b, &mgr.sessions, pseudonym, mgr.surb_admission.clone(), 100);
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            1,
+            "B's commit is the only admission on this pseudonym and must still happen"
+        );
+        assert!(
+            admission.retire_tokens().is_empty(),
+            "B's live admission must not be retired by A's commit — the successor ring is not A's to release"
+        );
         Ok(())
     }
 

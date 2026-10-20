@@ -453,9 +453,9 @@ pub struct MemorySurbStore {
     /// This cache is also the single source of truth for admission: there is no separate
     /// admission-marker cache for `insert_surbs` to route on, because a marker in one cache pointing
     /// at a ring in another can desync (an eviction on one side, an insert on the other) and admits
-    /// can race inserts. [`SurbStore::insert_surbs`] routes on `contains_key` here, so a pseudonym is
-    /// admitted exactly as long as it holds an entry — even an empty one, which is what `admit`
-    /// inserts so that standing is known before the first SURB arrives.
+    /// can race inserts. [`SurbStore::insert_surbs`] takes the entry here, so a pseudonym is
+    /// admitted exactly as long as it holds one — even an empty one, which is what `admit` inserts
+    /// so that standing is known before the first SURB arrives.
     ///
     /// The value carries the admission's number next to the ring, so a deferred
     /// [`SurbStore::retire`] can prove it is retiring the admission it was created for and not a
@@ -823,19 +823,28 @@ impl MemorySurbStore {
             // stands behind the pseudonym. Sized by `admitted_max_pseudonyms`, which the operator sets
             // at or above `maximum_managed_sessions` — an established Session per pseudonym is the only
             // way to fill this cache, so its ceiling is the operator's own session census, not anything
-            // an unauthenticated peer can inflate. Its listener logs at ERROR on anything but an
-            // explicit removal: a Size eviction here means the config is below the session census and
-            // live Sessions are shedding rings — an `admitted_overflow` event, worth alerting on.
+            // an unauthenticated peer can inflate. Its listener logs at ERROR on a Size removal: that is
+            // the one cause that says the config is wrong, since the cache cannot then hold one ring per
+            // live Session — an `admitted_overflow` event, worth alerting on.
+            //
+            // Deliberately no `time_to_idle`. The entry count is already bounded by
+            // `admitted_max_pseudonyms`, and every Session teardown retires its entry through
+            // `SurbStore::retire`, so a ring's lifetime is exactly its admission's lifetime — the
+            // invariant the whole design rests on, which a TTI can only violate. A Session's idle
+            // timeout is unbounded above and separate from `pseudonyms_lifetime`, and even at the
+            // defaults a Session can sit alive without receiving inbound SURBs for longer than the
+            // 600 s TTI. A ring reclaimed by time then silently falls back to the quarantine, whose
+            // 16-SURB cap drops the Session's later SURBs and PIX shares — the exact loss admission
+            // exists to prevent — and `SessionManager::ping_session` refreshes the session cache but
+            // does not re-admit, so nothing would restore it.
             admitted_surbs_per_pseudonym: moka::sync::Cache::builder()
-                .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener({
                     let stats = stats.clone();
                     move |_pseudonym, _surbs, cause| {
-                        // A Size eviction here is the one cause that says the config is wrong: the
-                        // cache cannot hold one ring per live Session. An `Expired` is the ring's own
-                        // idle lifetime lapsing while its Session stays alive on outgoing traffic —
-                        // routine, so it falls through to the stats record like every other cache.
+                        // Size is the only cache-driven removal left — the entry otherwise leaves by
+                        // `retire`'s explicit removal — so it is the one cause that says the config is
+                        // wrong: the cache cannot hold one ring per live Session.
                         if cause == RemovalCause::Size {
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_SURB_STORE_ADMISSIONS
@@ -966,6 +975,10 @@ impl MemorySurbStore {
     /// `admit`'s own promotion — and because `admit` itself must not be called again: it would mint a
     /// fresh admission number the manager's token no longer names, leaving the Session's deferred
     /// retire matching nothing while the entry it stamped holds a number no retire will ever present.
+    ///
+    /// The fold-in is what keeps the two routes from diverging, and it is why only `admit` creates an
+    /// admitted entry: an insert that minted one itself would have no admission number to stamp, and a
+    /// ring stamped with the sentinel is one no retire ever removes.
     /// `remove` is an explicit removal the listener skips, so the budget is decremented here at this
     /// one mutation site.
     fn push_into_admitted(
@@ -989,17 +1002,17 @@ impl MemorySurbStore {
         outcome
     }
 
-    /// The admit-window arm of [`SurbStore::insert_surbs`], split out so a test can drive it
-    /// directly: the race it answers — an `admit` landing between `insert_surbs`' two admission
-    /// lookups — cannot be forced deterministically from outside.
+    /// The admitted arm of [`SurbStore::insert_surbs`], split out so a test can drive it directly:
+    /// it is reached when `insert_surbs`' admission lookup finds an entry, which is only ever the one
+    /// `admit` installed — no insert may create one — and cannot be forced from outside.
     ///
     /// `admitted` is the entry the real `admit` installed, carrying the admission number the
     /// SessionManager threads back to `retire`. It is used as it stands rather than `admit` being
     /// called again: a second `admit` would mint a fresh number the manager's token no longer names,
-    /// the deferred retire would then match nothing, and the Session's ring would leak until the
-    /// admitted cache's own TTL. What is re-done here is only the fold-in of a quarantine ring, which
-    /// a concurrent insert for the same pseudonym can have created after `admit`'s own promotion.
-    fn insert_surbs_through_admit_window(
+    /// and the deferred retire would then match nothing, leaking the Session's ring until its teardown
+    /// never comes. What is re-done here is only the fold-in of a quarantine ring, which a concurrent
+    /// insert for the same pseudonym can have created after `admit`'s own promotion.
+    fn insert_surbs_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
         admitted: AdmittedRing,
@@ -1150,32 +1163,19 @@ impl SurbStore for MemorySurbStore {
         // test and the source of truth. A separate marker cache would have to be kept in step with
         // the ring across evictions and admits, and a desync there either loses a live ring to the
         // quarantine's tiny cap or lets a superseded marker resurrect it.
-        if self.admitted_surbs_per_pseudonym.contains_key(&pseudonym) {
-            // An admitted insert is never refused and never budgeted: the counterparty is behind an
-            // established Session, and dropping its SURBs to save the quarantine would defeat the
-            // point of admission.
-            let admitted = self
-                .admitted_surbs_per_pseudonym
-                .entry_by_ref(&pseudonym)
-                .or_insert_with(|| {
-                    // A ring only this racing insert could have created, so it has no Session behind it
-                    // that announced a target: the floor, the same "unknown target" capacity `admit`
-                    // itself would compute. Epoch zero, which no admission mints, so no `retire` can
-                    // match it — this entry exists only until the racing `admit` stamps its own.
-                    AdmittedRing::new(SurbRingBuffer::new(self.admitted_ring_capacity(0)), 0)
-                })
-                .into_value();
-
-            return self.push_into_admitted(&pseudonym, &admitted, surbs, generation);
-        }
-
-        // The admit window: the Session was established (and `admit` fired) between the routing check
-        // above and here, so the entry that check missed now exists. See
-        // [`insert_surbs_through_admit_window`] for why the entry is used as it stands rather than
-        // `admit` being called again.
+        //
+        // The lookup *takes* the entry rather than inserting one: only `admit` may create an admitted
+        // entry. `entry_by_ref(...).or_insert_with(...)` would recreate an epoch-0 ring whenever a
+        // deferred `retire` removed the key between the admission test and the entry lookup, and that
+        // ring would then never leave by its teardown — `retire` ignores token 0 — so it would leak
+        // until size eviction, while a successor `admit` finding it would only re-stamp the epoch and
+        // leave it at the floor capacity, so later inserts overflow it and lose SURBs and PIX shares.
+        // An absent entry therefore means the pseudonym is not admitted (or was just retired), and the
+        // batch belongs to the quarantine like any other unadmitted one.
         if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
-            return self.insert_surbs_through_admit_window(&pseudonym, admitted, surbs, generation);
+            return self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation);
         }
+
         // The quarantine is the only class an unauthenticated peer can write into, so the budget
         // applies here and only here. Refusing an admitted batch to protect it would trade live
         // PIX shares for untrusted ones.
@@ -1284,9 +1284,9 @@ impl SurbStore for MemorySurbStore {
     ///
     /// Any quarantine ring for the pseudonym is promoted rather than left behind to expire: the SURBs
     /// arrived for this very Session. A ring arrives here only while the pseudonym is unadmitted
-    /// (`insert_surbs` routes on admission), so the admitted entry cannot already hold anything of its
-    /// own except in the admit-window race — and there it holds an empty ring a concurrent
-    /// `insert_surbs` created, which the promotion fills rather than discards.
+    /// (`insert_surbs` routes on admission), so an admitted entry this finds already in place is one a
+    /// previous admission left behind — `insert_surbs` never creates one — and the promotion fills it
+    /// rather than discarding what it holds.
     ///
     /// The budget is accounted here, not by the listener: the promotion removes the quarantine entry
     /// explicitly, which the listener skips, so the SURBs it carried are decremented at this one
@@ -4102,20 +4102,18 @@ mod tests {
         Ok(())
     }
 
-    /// The admit-window race: a batch routed to the quarantine while the pseudonym was unadmitted can
-    /// reach `insert_surbs`' second admission lookup only after `admit` has installed the entry. That
-    /// arm must use the entry as it stands — the real `admit` already promoted the quarantine ring
-    /// and stamped it with the number the SessionManager threads back to `retire` — because calling
-    /// `admit` again would mint a fresh number the manager's token no longer names, and the Session's
-    /// deferred retire would then match nothing: the ring would leak until the admitted cache's own
-    /// TTL, and the retire would be booked as stale.
+    /// The admitted arm: a batch for an admitted pseudonym must land in the entry `admit` installed,
+    /// used as it stands — the real `admit` already promoted the quarantine ring and stamped it with
+    /// the number the SessionManager threads back to `retire`. Calling `admit` again would mint a
+    /// fresh number the manager's token no longer names, and the Session's deferred retire would then
+    /// match nothing: the ring would leak until a teardown that never comes, and the retire would be
+    /// booked as stale.
     ///
-    /// The race itself cannot be forced deterministically, so the test drives the arm directly with
-    /// the entry `admit` produced, exactly as the racing insert would find it — and then checks the
+    /// The test drives the arm directly with the entry `admit` produced, and then checks the
     /// properties that matter: the epoch the manager holds is unchanged, the SURB landed in the
     /// admitted ring, and a retire with the manager's token still releases it.
     #[test]
-    fn the_admit_window_must_reuse_the_admission_the_session_manager_holds() -> anyhow::Result<()> {
+    fn the_admitted_arm_must_reuse_the_admission_the_session_manager_holds() -> anyhow::Result<()> {
         let store = MemorySurbStore::default();
         let pseudonym = HoprPseudonym::random();
         let relayer = HoprKeyIdent::from(1u32);
@@ -4124,20 +4122,16 @@ mod tests {
         // admission token and promotes anything the quarantine already held.
         let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
 
-        // The racing insert finds the entry `admit` installed and hands the batch to the admit-window
-        // arm with it — the path the old code took through a second `admit`.
+        // The insert finds the entry `admit` installed and hands the batch to the admitted arm with
+        // it — the path the old code took through a second `admit`.
         let admitted = store
             .admitted_surbs_per_pseudonym
             .get(&pseudonym)
             .context("the Session's admitted entry must exist")?;
         // `AdmittedRing::clone`, not the deref'd ring's: the arm takes the whole entry, epoch and all.
         let admitted = AdmittedRing::clone(&admitted);
-        let outcome = store.insert_surbs_through_admit_window(
-            &pseudonym,
-            admitted,
-            vec![([1u8; 8], surb_via(relayer, DIRECT)?)],
-            0,
-        );
+        let outcome =
+            store.insert_surbs_into_admitted(&pseudonym, admitted, vec![([1u8; 8], surb_via(relayer, DIRECT)?)], 0);
         assert_eq!(
             SurbInsertOutcome {
                 retained: 1,
@@ -4308,6 +4302,51 @@ mod tests {
                 .context("the admitted ring must still exist")?
                 .len(),
             "and its SURB must still be held"
+        );
+
+        Ok(())
+    }
+
+    /// Only `admit` may create an admitted entry; an insert that finds none must route to the
+    /// quarantine.
+    ///
+    /// The failure this rules out: a deferred `retire` removes the key between `insert_surbs`'
+    /// admission test and its entry lookup, and an `or_insert_with` there would recreate the ring at
+    /// epoch `0` — which no retire matches, so the entry leaks until size eviction, and a successor
+    /// `admit` finding it would only re-stamp the epoch, leaving it at the floor capacity so later
+    /// inserts overflow it and lose SURBs and PIX shares.
+    #[test]
+    fn an_insert_must_not_create_an_admitted_entry() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        // A Session was admitted and retired before this batch arrived: the admitted entry is gone.
+        let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+        store.retire(&pseudonym, token);
+        assert!(
+            store.admitted_surbs_per_pseudonym.get(&pseudonym).is_none(),
+            "the retire must have removed the admitted entry"
+        );
+
+        let outcome = store.insert_surbs(pseudonym, vec![([1u8; 8], surb_via(relayer, DIRECT)?)]);
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 1,
+                evicted: 0,
+                evicted_shares: 0
+            },
+            outcome,
+            "the batch must be retained, in the quarantine"
+        );
+        assert!(
+            store.admitted_surbs_per_pseudonym.get(&pseudonym).is_none(),
+            "an insert must never resurrect an admitted entry — only `admit` may create one"
+        );
+        assert!(
+            store.quarantine_surbs.get(&pseudonym).is_some(),
+            "the unadmitted batch belongs to the quarantine"
         );
 
         Ok(())
