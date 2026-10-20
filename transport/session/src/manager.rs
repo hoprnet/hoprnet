@@ -1224,9 +1224,11 @@ pub enum DropReason {
     /// No slot for this session id is registered (formerly the `UnknownData` error): the session
     /// was fully deregistered before this packet arrived.
     Unregistered,
-    /// A Start-protocol message that names no Session and no pending initiation on this node, so
-    /// nothing here could ever have handled it. Rejected at dispatch, before it can occupy a shared
-    /// handler; benign, and quiet for the same reason the others are.
+    /// A Start-protocol message that names no state on this node it could ever be handled by:
+    /// neither a Session slot nor a pending initiation under the pseudonym it arrives under. That
+    /// includes one naming a *registered* Session under a mismatched sender pseudonym, which speaks
+    /// about someone else's Session. Rejected at dispatch, before it can occupy a shared handler;
+    /// benign, and quiet for the same reason the others are.
     StaleStartMessage,
 }
 
@@ -2135,9 +2137,8 @@ pub struct SessionManager<S> {
     /// names the Session by its pseudonym. This is the pseudonym-keyed half, so `dispatch_message`
     /// can tell in one lookup whether an inbound `SsaRequest` belongs to an initiation this node is
     /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
-    /// on every failure path (the closure that maps `allocate_session_slot`'s failure to
-    /// `Loopback` removes it too) and once the slot exists; the TTL is a backstop matching
-    /// `session_initiations`'.
+    /// by [`PendingOutgoingGuard`] on every failure path and once the slot exists; the TTL is a
+    /// backstop matching `session_initiations`'.
     pending_outgoing: moka::sync::Cache<HoprPseudonym, ()>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
@@ -2291,6 +2292,24 @@ fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evict
     estimator
         .evicted
         .fetch_add(evicted, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Removes an outgoing Session's pseudonym from the manager's pending index when dropped.
+///
+/// The index is keyed by the pseudonym the initiation is made under, but the paths that would
+/// otherwise clear it key on the peer-supplied `session_id`, which arrives in the establishment
+/// reply and is never checked against the pseudonym — a mismatched one would clear someone else's
+/// marker, and every early return and a dropped future would clear no one's. The guard ties the
+/// cleanup to the pseudonym actually inserted, so no path has to remember it.
+struct PendingOutgoingGuard<'a> {
+    pending: &'a moka::sync::Cache<HoprPseudonym, ()>,
+    pseudonym: HoprPseudonym,
+}
+
+impl Drop for PendingOutgoingGuard<'_> {
+    fn drop(&mut self) {
+        self.pending.remove(&self.pseudonym);
+    }
 }
 
 async fn send_via_msg_sender<S, D>(
@@ -2845,9 +2864,15 @@ where
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
         // Published before the initiation is sent so that a fast Exit's `SsaRequest` — which names
-        // the Session by this pseudonym, not by the challenge — finds it at dispatch. Removed on
-        // every terminal path below.
+        // the Session by this pseudonym, not by the challenge — finds it at dispatch. The guard
+        // removes it on every path below that does not reach `drop(_pending_guard)`: each early
+        // return, a dropped future, and the two `allocate_session_slot` failures, which are keyed
+        // by the peer-supplied `session_id` and so cannot clear it themselves.
         self.pending_outgoing.insert(pseudonym, ());
+        let _pending_guard = PendingOutgoingGuard {
+            pending: &self.pending_outgoing,
+            pseudonym,
+        };
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
@@ -2866,7 +2891,6 @@ where
         .await
         .map_err(|error| {
             self.session_initiations.remove(&challenge);
-            self.pending_outgoing.remove(&pseudonym);
             TransportSessionError::packet_sending(error)
         })?;
 
@@ -3022,16 +3046,16 @@ where
                             // The slot will never exist for this pseudonym, so the pending-initiation
                             // marker must not outlive this attempt: leaving it would let later
                             // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
-                            // on a slot that never arrives.
-                            self.pending_outgoing.remove(&session_id);
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
 
                     // The slot now exists, so inbound traffic for this Session passes the dispatch
                     // filter on the session registry alone; the pending-initiation marker has served
-                    // its purpose. Cleared before the SURB readiness wait below, which can take
+                    // its purpose. Cleared here, before the SURB readiness wait below, which can take
                     // seconds, rather than after it.
-                    self.pending_outgoing.remove(&session_id);
+                    drop(_pending_guard);
 
                     // Prevent the slot from being evicted by time_to_idle while SURBs are
                     // pre-loading. Each `get()` call resets the idle timer; the task is
@@ -3156,15 +3180,15 @@ where
                             // The slot will never exist for this pseudonym, so the pending-initiation
                             // marker must not outlive this attempt: leaving it would let later
                             // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
-                            // on a slot that never arrives.
-                            self.pending_outgoing.remove(&session_id);
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
 
                     // The slot now exists, so inbound traffic for this Session passes the dispatch
                     // filter on the session registry alone; the pending-initiation marker has served
                     // its purpose.
-                    self.pending_outgoing.remove(&session_id);
+                    drop(_pending_guard);
 
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_NUM_INITIATED_SESSIONS.increment();
@@ -3201,7 +3225,6 @@ where
             }
             Ok(Ok(None)) => {
                 self.session_initiations.remove(&challenge);
-                self.pending_outgoing.remove(&pseudonym);
                 Err(SessionManagerError::other(anyhow!(
                     "internal error: sender has been closed without completing the session establishment"
                 ))
@@ -3223,8 +3246,8 @@ where
                 );
                 // A rejected initiation can never become a Session, so nothing legitimate can name
                 // its pseudonym any more. `handle_session_error` removes the *challenge*, but only
-                // this call knows the pseudonym the rejection was made under.
-                self.pending_outgoing.remove(&pseudonym);
+                // this call knows the pseudonym the rejection was made under — which the guard
+                // removes here.
                 Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
@@ -3235,7 +3258,6 @@ where
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
                 self.session_initiations.remove(&challenge);
-                self.pending_outgoing.remove(&pseudonym);
                 Err(TransportSessionError::Timeout)
             }
         }
@@ -4319,7 +4341,9 @@ where
                 m.session_id == *pseudonym && self.ssa_request_names_local_state(&m.session_id)
             }
 
-            // Both are replies to an initiation this node made, and name it by challenge.
+            // Both are replies to something this node sent: an initiation named by challenge, or —
+            // for `SessionError` only — a post-establishment error naming a registered Session by
+            // its id.
             HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
             HoprStartProtocol::SessionError(err) => match err.identifier {
                 ErrorIdentifier::Challenge(challenge) => self.session_initiations.contains_key(&challenge),
@@ -4340,6 +4364,28 @@ where
         in_data: ApplicationDataIn,
     ) -> errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
+            // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
+            // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
+            // before anything else: the decode and the admission filter below can both drop the
+            // message, and a packet that is dropped here has already spent its return SURB, so the
+            // credit must not depend on it being decodable or admitted. Incoming Sessions receive
+            // this traffic from the Entry over the forward path and must not be credited.
+            if let Some(session_slot) = self.sessions.get(&pseudonym)
+                && matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. })
+            {
+                session_slot
+                    .returned_packets
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                // The only place the Exit's SURB supply can be heard from a quiet Session. The
+                // conversion below takes `in_data.data` and drops the packet info with it, so by the
+                // time `handle_keep_alive` runs the signals are gone -- and keep-alives are all a
+                // Session that has stopped exchanging data still sends.
+                session_slot
+                    .surb_mgmt
+                    .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
+            }
+
             // Decode once, then decide locally whether anything on this node could handle it.
             // Without this check a peer spraying Start messages for pseudonyms it invented occupies
             // the shared Start-protocol worker pool — several handlers park a worker on state such
@@ -4355,26 +4401,6 @@ where
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_DISPATCHED_MSGS.increment_by(&["dropped_stale_start"], 1);
                 return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
-            }
-
-            // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
-            // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
-            // before handing it to the protocol worker; incoming Sessions receive this traffic from
-            // the Entry over the forward path and must not be credited.
-            if let Some(session_slot) = self.sessions.get(&pseudonym)
-                && matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. })
-            {
-                session_slot
-                    .returned_packets
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-                // The only place the Exit's SURB supply can be heard from a quiet Session. The
-                // conversion below takes `in_data.data` and drops the packet info with it, so by the
-                // time `handle_keep_alive` runs the signals are gone -- and keep-alives are all a
-                // Session that has stopped exchanging data still sends.
-                session_slot
-                    .surb_mgmt
-                    .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
             }
 
             // This is a Start protocol message, so we send it to the handler
@@ -6720,6 +6746,73 @@ mod tests {
         // Cleanup: close sender and await handle
         alice_sender.close_channel();
         alice_handle.await??;
+
+        Ok(())
+    }
+
+    /// A failed initiation must leave no `pending_outgoing` marker behind: the marker is what lets
+    /// an `SsaRequest` for the pseudonym wait for a slot at dispatch, and a marker outliving its
+    /// attempt would park a handler on a Session that never arrives — one per leaked attempt, for
+    /// as long as the entry's TTL. The marker was once cleared by hand on each failure path and
+    /// keyed by the peer-supplied `session_id`; the guard that replaces it removes it keyed by the
+    /// pseudonym it was inserted under, on every path.
+    ///
+    /// ## Steps
+    /// 1. The transport swallows the `StartSession` message, so the initiation is never answered and times out (the
+    ///    deterministic failure path; a loopback needs a live manager for it to bounce off).
+    /// 2. `new_session` under a fixed pseudonym fails with `Timeout`.
+    /// 3. An `SsaRequest` naming that pseudonym must be dropped as stale at dispatch — no marker left to admit it.
+    #[test_log::test(tokio::test)]
+    async fn a_failed_session_initiation_must_leave_no_pending_outgoing_marker() -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the StartSession: the initiation times out.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let result = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+        assert!(
+            matches!(result, Err(TransportSessionError::Timeout)),
+            "the fixture must actually fail the initiation, got {result:?}"
+        );
+
+        // With no marker left, the same request a fast Exit could have raced ahead of is refused at
+        // dispatch instead of parking a handler on a slot that will never exist.
+        let refused = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(refused, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "an SsaRequest for a failed initiation's pseudonym must be stale, got {refused:?}"
+        );
 
         Ok(())
     }
@@ -9970,6 +10063,16 @@ mod tests {
             .map(|slot| slot.surb_mgmt.organic_surbs_per_packet())
     }
 
+    /// The Exit → Entry return-SURB credit the slot has accumulated, which the successor gate is
+    /// denominated in.
+    fn returned_packets_of(mgr: &TestManager, pseudonym: HoprPseudonym) -> u64 {
+        mgr.sessions
+            .get(&pseudonym)
+            .expect("slot must exist")
+            .returned_packets
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     fn session_packet_signalling(signals: PacketSignals) -> anyhow::Result<ApplicationDataIn> {
         let mut data = session_data_packet(b"reply")?;
         data.packet_info.signals_from_sender = signals;
@@ -10042,6 +10145,70 @@ mod tests {
         );
 
         assert_eq!(Some(1), organic_surbs(&mgr, pseudonym));
+
+        Ok(())
+    }
+
+    /// An Exit → Entry Start packet consumes a return SURB whatever it decodes to and wherever it
+    /// is admitted, so the credit that denominates the successor gate must be paid before the
+    /// decode and the admission filter, not after them. A packet the filter rejects has already
+    /// spent the SURB — under-crediting it can make the gate refuse the next `RequestSsa` and the
+    /// Session close with `CommitmentTimeout`.
+    ///
+    /// ## Steps
+    /// 1. An Entry-side (`Forward`) slot is pre-populated with its gate closed.
+    /// 2. A `KeepAlive` naming another Session — the filter's mismatched-pseudonym drop — must still credit
+    ///    `returned_packets` by one.
+    /// 3. A Start-tagged packet that fails to decode must credit it by one too.
+    #[test_log::test(tokio::test)]
+    async fn a_start_packet_the_filter_drops_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // The manager is not started, but that only matters past the filter; this one is dropped at
+        // the filter itself, for naming a Session the pseudonym it arrives under does not own.
+        let dropped = mgr.dispatch_message(
+            pseudonym,
+            keep_alive_packet_signalling(HoprPseudonym::random(), PacketSignals::default())?,
+        )?;
+        assert!(
+            matches!(dropped, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "the fixture must actually drop this packet at the filter, got {dropped:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet the filter drops has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
+    /// The undecodable half of the same regression: the decode runs after the credit, so a
+    /// Start-tagged packet that fails to parse must still have credited the return SURB it spent.
+    #[test_log::test(tokio::test)]
+    async fn an_undecodable_start_packet_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // Start-protocol tag, but a payload that parses to no Start-protocol message.
+        let mut undecodable = session_data_packet(b"not a start message")?;
+        undecodable.data.application_tag = HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG;
+
+        let result = mgr.dispatch_message(pseudonym, undecodable);
+        assert!(
+            result.is_err(),
+            "the fixture must actually fail to decode this packet, got {result:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet that cannot be decoded has already consumed its return SURB"
+        );
 
         Ok(())
     }

@@ -105,8 +105,10 @@ pub fn dispatch_message_call_count() -> usize {
     DISPATCH_MESSAGE_CALLS.load(Ordering::Relaxed)
 }
 
-/// Cumulative count of Start-protocol messages dropped at dispatch because they named no Session
-/// and no pending initiation on this node.
+/// Cumulative count of Start-protocol messages dropped at dispatch because they name no state on
+/// this node they could be handled by: neither a Session slot nor a pending initiation under the
+/// pseudonym they arrive under — including one naming a registered Session under a mismatched
+/// sender pseudonym.
 ///
 /// These are messages nothing here could ever have handled — the cheapest possible way for a peer
 /// to occupy the shared Start-protocol worker pool. Each drop emits only a `trace!`, which is

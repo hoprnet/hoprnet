@@ -396,8 +396,8 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
 ///
 /// * `ssa_request_forward_slot` — the legitimate, hot case: the Exit asking its own Entry for SSA commitments of a
 ///   Session this node holds as an outgoing (`Forward`) slot. The filter pays `pending_outgoing.contains_key` (a miss)
-///   and then `sessions.get` plus a `Forward` variant match. Enqueued (`Processed`), and so is also the only case here
-///   that reaches the credit.
+///   and then `sessions.get` plus a `Forward` variant match. Enqueued (`Processed`), and so also reaches the credit —
+///   as does `keep_alive_registered` below, the only other case here that passes the filter.
 /// * `ssa_request_stranger` — the attack case: an `SsaRequest` for a pseudonym this node never issued. The filter pays
 ///   the same two probes and both miss, then drops without enqueueing. This is the path the DoS floods with, and its
 ///   cost must stay a cache-miss lookup: anything that grows it — a log line per drop, a lock, a decode of the payload
