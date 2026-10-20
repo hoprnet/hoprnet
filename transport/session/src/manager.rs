@@ -1224,6 +1224,10 @@ pub enum DropReason {
     /// No slot for this session id is registered (formerly the `UnknownData` error): the session
     /// was fully deregistered before this packet arrived.
     Unregistered,
+    /// A Start-protocol message that names no Session and no pending initiation on this node, so
+    /// nothing here could ever have handled it. Rejected at dispatch, before it can occupy a shared
+    /// handler; benign, and quiet for the same reason the others are.
+    StaleStartMessage,
 }
 
 /// Indicates the result of processing a message.
@@ -2125,6 +2129,15 @@ pub struct SessionManager<S> {
     /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
     /// Keyed by SessionId so that only waiters for the relevant session are woken.
     slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
+    /// Pseudonyms of outgoing Session initiations currently in flight.
+    ///
+    /// `session_initiations` is keyed by challenge, but a Start message arriving from the peer
+    /// names the Session by its pseudonym. This is the pseudonym-keyed half, so `dispatch_message`
+    /// can tell in one lookup whether an inbound `SsaRequest` belongs to an initiation this node is
+    /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
+    /// on every failure path and once the slot exists; the TTL is a backstop matching
+    /// `session_initiations`'.
+    pending_outgoing: moka::sync::Cache<HoprPseudonym, ()>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -2174,6 +2187,7 @@ impl<S> Clone for SessionManager<S> {
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
+            pending_outgoing: self.pending_outgoing.clone(),
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
         }
@@ -2448,6 +2462,10 @@ where
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
+            pending_outgoing: moka::sync::Cache::builder()
+                .max_capacity(maximum_sessions as u64)
+                .time_to_live(initiation_timeout)
+                .build(),
             // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
             // race for it, and one evicted between two cycles is simply recreated by the next request.
             // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
@@ -2616,9 +2634,9 @@ where
                             }
                             HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
                             HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(error_type).await
+                                myself.handle_session_error(pseudonym, error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
                                 myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
@@ -2825,6 +2843,10 @@ where
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
+        // Published before the initiation is sent so that a fast Exit's `SsaRequest` — which names
+        // the Session by this pseudonym, not by the challenge — finds it at dispatch. Removed on
+        // every terminal path below.
+        self.pending_outgoing.insert(pseudonym, ());
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
@@ -2843,6 +2865,7 @@ where
         .await
         .map_err(|error| {
             self.session_initiations.remove(&challenge);
+            self.pending_outgoing.remove(&pseudonym);
             TransportSessionError::packet_sending(error)
         })?;
 
@@ -2998,6 +3021,12 @@ where
                             SessionManagerError::Loopback
                         })?;
 
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose. Cleared before the SURB readiness wait below, which can take
+                    // seconds, rather than after it.
+                    self.pending_outgoing.remove(&session_id);
+
                     // Prevent the slot from being evicted by time_to_idle while SURBs are
                     // pre-loading. Each `get()` call resets the idle timer; the task is
                     // aborted as soon as the readiness wait resolves.
@@ -3121,6 +3150,11 @@ where
                             SessionManagerError::Loopback
                         })?;
 
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose.
+                    self.pending_outgoing.remove(&session_id);
+
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_NUM_INITIATED_SESSIONS.increment();
 
@@ -3156,6 +3190,7 @@ where
             }
             Ok(Ok(None)) => {
                 self.session_initiations.remove(&challenge);
+                self.pending_outgoing.remove(&pseudonym);
                 Err(SessionManagerError::other(anyhow!(
                     "internal error: sender has been closed without completing the session establishment"
                 ))
@@ -3175,6 +3210,10 @@ where
                     %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
+                // A rejected initiation can never become a Session, so nothing legitimate can name
+                // its pseudonym any more. `handle_session_error` removes the *challenge*, but only
+                // this call knows the pseudonym the rejection was made under.
+                self.pending_outgoing.remove(&pseudonym);
                 Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
@@ -3185,6 +3224,7 @@ where
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
                 self.session_initiations.remove(&challenge);
+                self.pending_outgoing.remove(&pseudonym);
                 Err(TransportSessionError::Timeout)
             }
         }
@@ -4227,6 +4267,43 @@ where
             .collect()
     }
 
+    /// Whether a Start-protocol message names Session state this node actually holds.
+    ///
+    /// Start messages share one bounded worker pool, and several handlers park a worker on state a
+    /// bogus message will never have — `handle_ssa_request` waits up to a second for a Session slot
+    /// a random pseudonym never gets. Deciding admission here, where the session lookup is already
+    /// being done, keeps those messages off the pool entirely.
+    fn start_message_is_for_local_state(&self, pseudonym: &HoprPseudonym, msg: &HoprStartProtocol) -> bool {
+        match msg {
+            // Creates the state the other arms are checked against.
+            HoprStartProtocol::StartSession(_) => true,
+
+            // Per-Session control traffic. The pseudonym a Start message arrives under is the
+            // Session's own pseudonym on both sides, so a mismatch names someone else's Session.
+            HoprStartProtocol::KeepAlive(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+            HoprStartProtocol::SsaCommit(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+
+            // Only the Exit asks for SSA commitments, and only of its own Entry: an outgoing
+            // (Forward) Session, or one this node is still initiating. An Exit-side (Return) slot
+            // never legitimately receives one.
+            HoprStartProtocol::SsaRequest(m) => {
+                m.session_id == *pseudonym
+                    && (self.pending_outgoing.contains_key(&m.session_id)
+                        || self
+                            .sessions
+                            .get(&m.session_id)
+                            .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. })))
+            }
+
+            // Both are replies to an initiation this node made, and name it by challenge.
+            HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
+            HoprStartProtocol::SessionError(err) => match err.identifier {
+                ErrorIdentifier::Challenge(challenge) => self.session_initiations.contains_key(&challenge),
+                ErrorIdentifier::SessionId(id) => id == *pseudonym && self.sessions.contains_key(&id),
+            },
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -4239,6 +4316,23 @@ where
         in_data: ApplicationDataIn,
     ) -> errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
+            // Decode once, then decide locally whether anything on this node could handle it.
+            // Without this check a peer spraying Start messages for pseudonyms it invented occupies
+            // the shared Start-protocol worker pool — several handlers park a worker on state such
+            // a message never has — and the bounded queue then fills, dropping every message behind
+            // it.
+            let msg = HoprStartProtocol::try_from(in_data.data)?;
+
+            if !self.start_message_is_for_local_state(&pseudonym, &msg) {
+                // Quiet on purpose: a peer spraying Start messages for pseudonyms we never issued
+                // must not be able to fill the log any more than it can fill the handler pool.
+                trace!(%pseudonym, "dropping Start protocol message that names no local session");
+                crate::counters::SESSION_STALE_START_MESSAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_DISPATCHED_MSGS.increment_by(&["dropped_stale_start"], 1);
+                return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
+            }
+
             // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
             // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
             // before handing it to the protocol worker; incoming Sessions receive this traffic from
@@ -4262,12 +4356,11 @@ where
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
-                start_protocol_tx
-                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
-                    .map_err(|error| {
-                        error!(%error, "failed to send Start protocol message to processing task");
-                        SessionManagerError::other(error)
-                    })?;
+                start_protocol_tx.try_send((pseudonym, msg)).map_err(|error| {
+                    crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    error!(%error, "failed to send Start protocol message to processing task");
+                    SessionManagerError::other(error)
+                })?;
             } else {
                 return Err(SessionManagerError::NotStarted.into());
             }
@@ -5116,7 +5209,11 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+    async fn handle_session_error(
+        &self,
+        pseudonym: HoprPseudonym,
+        error_type: StartErrorType<SessionId>,
+    ) -> errors::Result<()> {
         let reason = error_type.reason;
         match error_type.identifier {
             ErrorIdentifier::Challenge(challenge) => {
@@ -5135,6 +5232,10 @@ where
                 }
             }
             ErrorIdentifier::SessionId(session_id) => {
+                if session_id != pseudonym {
+                    debug!(%pseudonym, %session_id, "dropping session error naming a different session");
+                    return Ok(());
+                }
                 error!(
                     %session_id, %reason,
                     "received post-establishment session error — closing session"
@@ -5151,7 +5252,19 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self, msg))]
-    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> errors::Result<()> {
+    async fn handle_keep_alive(
+        &self,
+        pseudonym: HoprPseudonym,
+        msg: KeepAliveMessage<SessionId>,
+    ) -> errors::Result<()> {
+        // The pseudonym a Start message arrives under is the Session's own pseudonym on both sides,
+        // so a mismatch means the sender is naming someone else's Session. Pseudonyms are 80 random
+        // bits, so this only matters on a leak — which is exactly when it matters.
+        if msg.session_id != pseudonym {
+            debug!(%pseudonym, session_id = %msg.session_id, "dropping keep-alive naming a different session");
+            return Ok(());
+        }
+
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -5498,6 +5611,16 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
+        // Waiting is only ever legitimate for a Session this node is still initiating: the Exit
+        // sends `SessionEstablished` and its first `SsaRequest` back-to-back, so the request can
+        // outrun the slot allocation. A request naming anything else is refused here rather than
+        // after a second of waiting, which is what kept a flood of bogus requests from parking the
+        // shared handler pool.
+        if self.sessions.get(&msg.session_id).is_none() && !self.pending_outgoing.contains_key(&msg.session_id) {
+            trace!(session_id = %msg.session_id, "refusing an SSA request for a session this node does not hold");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
         // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
         // has finished allocating the session slot, since both SessionEstablished and SsaRequest
         // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
@@ -5508,7 +5631,7 @@ where
             let waiter_deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 if Instant::now() >= waiter_deadline {
-                    error!(%session_id, "session slot waiter deadline exceeded");
+                    debug!(%session_id, "session slot waiter deadline exceeded");
                     return Err(SessionManagerError::NonExistingSession.into());
                 }
                 // Optimistic cache check
@@ -5554,7 +5677,7 @@ where
                             break slot;
                         }
 
-                        error!(%session_id, "session slot not found after awaiting allocation");
+                        debug!(%session_id, "session slot not found after awaiting allocation");
                         return Err(SessionManagerError::NonExistingSession.into());
                     }
                 }
@@ -8343,7 +8466,9 @@ mod tests {
             identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
-        mgr.handle_session_error(error_type).await?;
+        // The error is challenge-identified, so the handler ignores the sender's pseudonym on this
+        // arm; `new_session` picks a random one, and none is captured here.
+        mgr.handle_session_error(HoprPseudonym::random(), error_type).await?;
 
         // new_session must propagate the error as Rejected.
         let result = handle.await?;
@@ -9939,6 +10064,310 @@ mod tests {
             "an incoming Session must not take the signal as licence to mint"
         );
 
+        Ok(())
+    }
+
+    /// Encodes a [`HoprStartProtocol`] message into the packet form `dispatch_message` takes.
+    ///
+    /// The Start tag is what `dispatch_message` routes on, exactly as
+    /// [`keep_alive_packet_signalling`] builds its packet.
+    fn start_packet(msg: HoprStartProtocol) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::try_from(msg)?,
+            packet_info: Default::default(),
+        })
+    }
+
+    /// An `SsaRequest` for `session_id` with a single identity-element commitment.
+    ///
+    /// The Exit-side point is not checked in dispatch, so the identity element
+    /// ([`ssa_request_for`]) is enough for the message to be decodable and well-formed.
+    fn ssa_request_packet(session_id: SessionId) -> anyhow::Result<ApplicationDataIn> {
+        start_packet(HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            small_pix_params(),
+            ssa_request_for(1),
+            [],
+        )))
+    }
+
+    /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
+    ///
+    /// Before the admission filter, every one of these reached the shared Start-protocol worker
+    /// pool, where `handle_ssa_request` parked its handler for up to a second on a Session slot a
+    /// random pseudonym never gets; ~110 concurrent requests occupied every handler and the bounded
+    /// Start queue then dropped all traffic behind them — including the KeepAlives of live Sessions.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one live (pre-populated Forward) Session.
+    /// 2. ~300 `SsaRequest`s are dispatched, each for a fresh random pseudonym.
+    /// 3. Every one must come back `Dropped(StaleStartMessage)`, counted, and nothing may reach the bounded queue — the
+    ///    send-drop counter must not move.
+    /// 4. A `KeepAlive` for the live Session's own pseudonym must still be dispatched, proving the flood cannot have
+    ///    starved real control traffic.
+    #[test_log::test(tokio::test)]
+    async fn a_flood_of_ssa_requests_for_unknown_pseudonyms_must_not_starve_a_live_session() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let live_pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(
+            live_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(live_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+
+        let stale_before = crate::counters::session_stale_start_message_count();
+        let send_drops_before = crate::counters::start_protocol_send_drop_count();
+
+        const FLOOD: usize = 300;
+        for _ in 0..FLOOD {
+            let stranger = HoprPseudonym::random();
+            let result = mgr.dispatch_message(stranger, ssa_request_packet(stranger)?);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+                "an SSA request for a pseudonym this node never issued must be dropped as stale, got {result:?}"
+            );
+        }
+
+        assert!(
+            crate::counters::session_stale_start_message_count() >= stale_before + FLOOD,
+            "every flooded request must be counted as a stale Start message"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "nothing may reach the bounded queue: the filter must run before try_send"
+        );
+
+        // The live Session's control traffic must still be dispatched — the property the flood used
+        // to destroy by filling the queue.
+        let kept_alive = mgr.dispatch_message(
+            live_pseudonym,
+            keep_alive_packet_signalling(live_pseudonym, PacketSignals::default())?,
+        );
+        assert!(
+            matches!(kept_alive, Ok(DispatchResult::Processed)),
+            "the live Session's keep-alive must still get through, got {kept_alive:?}"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "the keep-alive must not have been dropped at try_send either"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The filter must not be broader than the attack: an `SsaRequest` an Exit legitimately sends to
+    /// its Entry is admitted, while the same request arriving on an Exit-side (Return) slot — which
+    /// no compliant peer ever sends — is dropped as stale.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one Forward (outgoing/Entry-side) slot.
+    /// 2. An `SsaRequest` naming it is admitted to the queue.
+    /// 3. A second Return (incoming/Exit-side) slot; the same request naming it is dropped.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_request_for_an_outgoing_session_is_admitted_and_one_for_an_exit_slot_is_not() -> anyhow::Result<()>
+    {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        // Outgoing (Entry-side) slot: the Entry receives SSA commitments for it, so the request is
+        // legitimate and must be admitted.
+        let entry_pseudonym = HoprPseudonym::random();
+        let _entry_rx = mgr.pre_populate_session_with_receiver(
+            entry_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(entry_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let admitted = mgr.dispatch_message(entry_pseudonym, ssa_request_packet(entry_pseudonym)?);
+        assert!(
+            matches!(admitted, Ok(DispatchResult::Processed)),
+            "an SSA request for an outgoing Session must be admitted, got {admitted:?}"
+        );
+
+        // Incoming (Exit-side) slot: nothing here ever receives an SSA commitment for one.
+        let exit_pseudonym = HoprPseudonym::random();
+        let _exit_rx =
+            mgr.pre_populate_session_with_receiver(exit_pseudonym, DestinationRouting::Return(exit_pseudonym.into()));
+        let refused = mgr.dispatch_message(exit_pseudonym, ssa_request_packet(exit_pseudonym)?);
+        assert!(
+            matches!(refused, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "an SSA request for an incoming Session must be dropped as stale, got {refused:?}"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// Keep-alives and post-establishment session errors naming another Session must be ignored.
+    ///
+    /// A sender names a Session both by the pseudonym it sends under and by the Session id inside
+    /// the message; the two are the same on both sides of a real Session, so a mismatch means the
+    /// sender is speaking about someone else's Session — only reachable if that id leaked. The
+    /// dispatch filter rejects such a message outright, and the handlers refuse it again (point 4 of
+    /// the fix) so the property does not rest on dispatch alone.
+    ///
+    /// ## Steps
+    /// 1. Two Return slots A and B are pre-populated with known balancer targets.
+    /// 2. A `KeepAlive { session_id: B }` arriving under A is refused — at dispatch, and again by the handler when
+    ///    reached directly — and B's balancer target is untouched.
+    /// 3. A `SessionError { identifier: SessionId(B) }` arriving under A is refused the same way, and B stays active.
+    /// 4. Control: the same messages under B's own pseudonym do take effect.
+    #[test_log::test(tokio::test)]
+    async fn keep_alives_and_session_errors_naming_another_session_are_ignored() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let a = HoprPseudonym::random();
+        let b = HoprPseudonym::random();
+        for pseudonym in [a, b] {
+            let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+            let slot = mgr
+                .sessions
+                .get(&pseudonym)
+                .ok_or_else(|| anyhow::anyhow!("slot for {pseudonym} must exist"))?;
+            // Non-disabled balancer with a known target, so the KeepAlive branch is reachable.
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+        }
+
+        let b_target_before = mgr
+            .sessions
+            .get(&b)
+            .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+            .surb_mgmt
+            .controller_bounds()
+            .target();
+
+        let cross_keep_alive = KeepAliveMessage {
+            session_id: b,
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: b_target_before + 1,
+        };
+
+        // Through dispatch, the admission filter refuses it before any handler runs.
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::KeepAlive(cross_keep_alive.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a keep-alive naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+
+        // Point 4: the handler refuses it again even when reached directly, so the property does not
+        // rest on the dispatch filter alone.
+        mgr.handle_keep_alive(a, cross_keep_alive.clone())
+            .await
+            .context("the keep-alive handler must refuse quietly, not error")?;
+        assert_eq!(
+            b_target_before,
+            mgr.sessions
+                .get(&b)
+                .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                .surb_mgmt
+                .controller_bounds()
+                .target(),
+            "a keep-alive naming another session must not move its balancer target"
+        );
+
+        // The same for a post-establishment session error naming B.
+        let cross_error = StartErrorType {
+            identifier: ErrorIdentifier::SessionId(b),
+            reason: StartErrorReason::Unknown,
+        };
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::SessionError(cross_error.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a session error naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+        mgr.handle_session_error(a, cross_error)
+            .await
+            .context("the session-error handler must refuse quietly, not error")?;
+        assert!(
+            mgr.active_sessions().contains(&b),
+            "a session error naming another session must not close it"
+        );
+
+        // Control: the same messages under B's own pseudonym do take effect. Dispatch hands the
+        // message to the Start-protocol worker, so the effect is asynchronous and polled for.
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: b,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: b_target_before + 2,
+            }))?,
+        )?;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let target = mgr
+                    .sessions
+                    .get(&b)
+                    .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                    .surb_mgmt
+                    .controller_bounds()
+                    .target();
+                if target == b_target_before + 2 {
+                    return Ok::<(), anyhow::Error>(());
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed keep-alive must still update the target")??;
+
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::SessionId(b),
+                reason: StartErrorReason::Unknown,
+            }))?,
+        )?;
+        let closed = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if !mgr.active_sessions().contains(&b) {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed session error must close the session");
+        closed?;
+
+        sender.close_channel();
         Ok(())
     }
 

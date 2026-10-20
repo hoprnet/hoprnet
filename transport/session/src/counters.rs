@@ -105,6 +105,34 @@ pub fn dispatch_message_call_count() -> usize {
     DISPATCH_MESSAGE_CALLS.load(Ordering::Relaxed)
 }
 
+/// Cumulative count of Start-protocol messages dropped at dispatch because they named no Session
+/// and no pending initiation on this node.
+///
+/// These are messages nothing here could ever have handled — the cheapest possible way for a peer
+/// to occupy the shared Start-protocol worker pool. Counted rather than logged so the volume is
+/// observable without the volume becoming the log.
+pub static SESSION_STALE_START_MESSAGES: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative count of Start-protocol messages rejected as naming no local state.
+#[inline]
+pub fn session_stale_start_message_count() -> usize {
+    SESSION_STALE_START_MESSAGES.load(Ordering::Relaxed)
+}
+
+/// Cumulative count of Start-protocol messages dropped because the bounded processing queue was
+/// full (`try_send` failed).
+///
+/// Distinct from [`SESSION_STALE_START_MESSAGES`]: these named real local state and were lost to
+/// backpressure rather than to the admission filter. Before the filter existed this was the counter
+/// the DoS drove.
+pub static START_PROTOCOL_SEND_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative Start-protocol queue-drop count.
+#[inline]
+pub fn start_protocol_send_drop_count() -> usize {
+    START_PROTOCOL_SEND_DROPS.load(Ordering::Relaxed)
+}
+
 /// Cumulative count of packets dropped by `forward_to_timeout(app_incoming)` at the ingress
 /// pipeline because `tx_from_protocol` was full for longer than `QUEUE_SEND_TIMEOUT` (50 ms).
 pub static APP_INCOMING_TIMEOUT_DROPS: AtomicUsize = AtomicUsize::new(0);
