@@ -1168,8 +1168,8 @@ impl SurbStore for MemorySurbStore {
         // entry. `entry_by_ref(...).or_insert_with(...)` would recreate an epoch-0 ring whenever a
         // deferred `retire` removed the key between the admission test and the entry lookup, and that
         // ring would then never leave by its teardown — `retire` ignores token 0 — so it would leak
-        // until size eviction, while a successor `admit` finding it would only re-stamp the epoch and
-        // leave it at the floor capacity, so later inserts overflow it and lose SURBs and PIX shares.
+        // until size eviction. (A successor `admit` re-stamps the epoch and raises the capacity, but
+        // the entry the retire never names is reason enough to keep an insert out of this cache.)
         // An absent entry therefore means the pseudonym is not admitted (or was just retired), and the
         // batch belongs to the quarantine like any other unadmitted one.
         if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
@@ -1320,9 +1320,12 @@ impl SurbStore for MemorySurbStore {
                 // Re-admitting a pseudonym (a Session reopened on the same one) must not discard what
                 // the resident ring already holds, and must not replace the entry wholesale either:
                 // `Replaced` trips the admitted cache's listener, which books it as an eviction the
-                // ring never actually suffered. Stamping in place changes the number and nothing else.
+                // ring never actually suffered. Stamping in place changes the number and nothing else,
+                // and raising the ceiling in place widens the ring to whatever the successor announced
+                // — a no-op when the successor's target is no larger, since the raise is monotone.
                 Some(entry) => {
                     entry.value().stamp_epoch(epoch);
+                    entry.value().raise_capacity(capacity);
                     moka::ops::compute::Op::Nop
                 }
                 // No ring to keep: admit an empty one, so standing is knowable before the first SURB
@@ -1611,12 +1614,23 @@ impl SurbShareInfo for HoprSurb {
 /// there, however long the steady-state overflow runs. It just has to earn it. Each tier keeps its own
 /// mark, so a pseudonym that has been filled with share-less SURBs and then with shares holds both:
 /// at most twice that footprint, and only after the buffer has been filled twice over.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SurbRingBuffer<S> {
     inner: Arc<parking_lot::Mutex<GenerationalBuffer<S>>>,
     /// Ceiling on the number of retained SURBs across both tiers; one is dropped (a share-less SURB if
     /// there is one) for every SURB that arrives once it is reached.
-    capacity: usize,
+    ///
+    /// An `Arc<AtomicUsize>`, not a plain field, because a re-admission of the same pseudonym must be
+    /// able to *raise* the ceiling of the ring already in place — `admit` keeps the resident ring
+    /// rather than replacing it, and `push` reaches the ring only through `&self`. The `Arc` is what
+    /// makes the raise visible: `admit`'s `and_compute_with` sees a *clone* of the cache value (moka's
+    /// `Entry::value` hands back the value it copied), so a raise through that clone would land on a
+    /// buffer the cache does not hold — the same reason the admission `epoch` is behind an `Arc`. It
+    /// only ever grows ([`raise_capacity`](Self::raise_capacity) is a `fetch_max`), so a later admission
+    /// can never narrow a ceiling a live Session is already filling: capacity is monotone, and the ring
+    /// a successor inherits is at least as wide as the widest target any admission of the pseudonym has
+    /// asked for.
+    capacity: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 /// An admitted ring together with the number naming the admission that installed it.
@@ -1773,18 +1787,18 @@ impl<S> SurbRingBuffer<S> {
             })),
             // A zero capacity would make the eviction below pop from an empty buffer and then push
             // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
-            capacity: capacity.max(1),
+            capacity: Arc::new(std::sync::atomic::AtomicUsize::new(capacity.max(1))),
         }
     }
 
     /// A copy of this buffer holding at most `capacity` SURBs, everything else carried over.
     ///
     /// This is a deep copy of both tiers and the generation into a fresh buffer, not an `Arc` clone:
-    /// `capacity` is a plain field read by [`push`](Self::push), so a shared inner would leave the
-    /// copy bound by the *old* ceiling no matter what the caller passes. It is how the store raises a
-    /// quarantine ring to its admitted capacity on promotion — rebuilding via `push` would re-run the
-    /// eviction order on SURBs that already earned their slots, and would lose the generation the
-    /// batches were minted at.
+    /// the copy is meant to carry its *own* ceiling, so a shared inner — and with it a shared
+    /// capacity — would leave the copy bound by the source's. It is how the store raises a quarantine
+    /// ring to its admitted capacity on promotion — rebuilding via `push` would re-run the eviction
+    /// order on SURBs that already earned their slots, and would lose the generation the batches were
+    /// minted at.
     ///
     /// Insertion order is preserved within each tier, so what pops first afterwards is what would
     /// have popped first before.
@@ -1799,10 +1813,45 @@ impl<S> SurbRingBuffer<S> {
                 plain: inner.plain.iter().cloned().collect(),
                 generation: inner.generation,
             })),
-            capacity: capacity.max(1),
+            capacity: Arc::new(std::sync::atomic::AtomicUsize::new(capacity.max(1))),
         }
     }
 
+    /// Raises this buffer's ceiling to at least `to` retained SURBs, never lowering it.
+    ///
+    /// Called when a pseudonym is re-admitted: [`SurbStore::admit`] keeps the resident ring rather than
+    /// replacing it (a `Put` of a fresh ring would trip the admitted cache's `Replaced` listener and be
+    /// booked as an eviction the ring never suffered), but the successor Session may have announced a
+    /// larger SURB target than its predecessor. Without this the resident ring would keep the
+    /// predecessor's smaller ceiling for the successor's whole lifetime, and once its balancer filled
+    /// past it, `push` would evict — losing PIX shares permanently, with nothing but an `evicted` count
+    /// to show for it.
+    ///
+    /// The raise is monotone on purpose. Narrowing on a re-admission would strand SURBs a live Session
+    /// may already have inserted and would make the ceiling depend on admission order; `fetch_max`
+    /// makes the effective ceiling the largest target any admission of the pseudonym has requested.
+    /// A concurrent `push` racing the raise simply reads whichever ceiling it sees: growing it can only
+    /// turn a would-be eviction into a clean insert.
+    fn raise_capacity(&self, to: usize) {
+        self.capacity.fetch_max(to.max(1), std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// A second handle on the same buffer, for the moka caches that require `Clone` on their values.
+///
+/// Deliberately not a derived `Clone` and not a deep copy: it shares the inner lock and the capacity
+/// `Arc`, so a cloned handle and its original see the same SURBs and the same bound. A caller that
+/// wants an independent buffer at a chosen ceiling asks for [`SurbRingBuffer::with_capacity`].
+impl<S> Clone for SurbRingBuffer<S> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            capacity: Arc::clone(&self.capacity),
+        }
+    }
+}
+
+impl<S> SurbRingBuffer<S> {
     /// Removes every SURB held and returns them with the generation they were pushed at.
     ///
     /// Used to move a ring between the store's two classes: the caller pushes the returned batch into
@@ -1870,6 +1919,10 @@ impl<S> SurbRingBuffer<S> {
             None => inner.generation = Some(generation),
         }
 
+        // Read the ceiling once per push: a concurrent re-admission can only raise it, and taking one
+        // snapshot keeps every element of this batch judged against the same bound.
+        let capacity = self.capacity.load(std::sync::atomic::Ordering::Relaxed);
+
         let mut evicted = 0;
         let mut evicted_shares = 0;
         for (id, surb) in surbs {
@@ -1878,7 +1931,7 @@ impl<S> SurbRingBuffer<S> {
             // Make room before inserting, so the length never exceeds the ceiling and the backing
             // allocations stop growing once their high-water marks are reached. Either a resident makes
             // way or the newcomer is turned away; both are one SURB dropped for want of room.
-            if inner.len() >= self.capacity {
+            if inner.len() >= capacity {
                 evicted += 1;
                 match inner.make_room_for(carries_share) {
                     MadeRoom::EvictedPlain => {}
@@ -4102,6 +4155,82 @@ mod tests {
         Ok(())
     }
 
+    /// A re-admission must widen the resident ring to the successor's target, not leave it at the
+    /// predecessor's smaller ceiling.
+    ///
+    /// The failure this rules out: a teardown defers `retire` by a grace period, a successor Session on
+    /// the same client-chosen pseudonym commits inside that window, and its `admit` finds the
+    /// predecessor's entry — re-stamping the epoch but, before this fix, leaving the ring at the
+    /// predecessor's capacity. A successor that announced a larger `announced_surb_target` then runs
+    /// for its whole lifetime at the smaller ceiling, and once its balancer fills past it, `push` evicts
+    /// — losing PIX shares permanently, with nothing but an `evicted` count to show for it.
+    #[test]
+    fn a_re_admission_must_raise_the_ring_ceiling_to_the_successors_target() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        // Targets chosen so the two admitted ceilings are 1.5× the target and well inside
+        // [`SurbStoreConfig::rb_capacity`]: 200 → 300, 600 → 900.
+        let small = 200;
+        let large = 600;
+        store.admit(&pseudonym, small);
+        store.admit(&pseudonym, large);
+
+        // More than `small × 1.5` (the predecessor's ceiling): under the old behaviour the ring would
+        // still be capped at 300 and evict the excess.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..500u64)
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: fill.len(),
+                evicted: 0,
+                evicted_shares: 0
+            },
+            store.insert_surbs(pseudonym, fill),
+            "the successor's larger target must have raised the ring's ceiling, not been left at the predecessor's"
+        );
+
+        Ok(())
+    }
+
+    /// A re-admission must not *narrow* a ceiling a live Session may already be filling: capacity is
+    /// monotone, so the effective ceiling is the largest target any admission of the pseudonym asked
+    /// for.
+    ///
+    /// The mirror of the test above: `admit` raises with a `fetch_max`, so a successor announcing a
+    /// *smaller* target than its predecessor leaves the wider ceiling in place. Lowering it would strand
+    /// SURBs the live Session had already inserted — and make the ceiling depend on admission order.
+    #[test]
+    fn a_re_admission_must_not_lower_an_existing_ring_ceiling() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let large = 600;
+        let small = 200;
+        store.admit(&pseudonym, large);
+        store.admit(&pseudonym, small);
+
+        // The narrower successor target would put the ceiling at 300; the fill below is past it, so any
+        // eviction would prove the re-admission had narrowed the ring.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..500u64)
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: fill.len(),
+                evicted: 0,
+                evicted_shares: 0
+            },
+            store.insert_surbs(pseudonym, fill),
+            "a smaller successor target must not narrow the ceiling the predecessor already established"
+        );
+
+        Ok(())
+    }
+
     /// The admitted arm: a batch for an admitted pseudonym must land in the entry `admit` installed,
     /// used as it stands — the real `admit` already promoted the quarantine ring and stamped it with
     /// the number the SessionManager threads back to `retire`. Calling `admit` again would mint a
@@ -4312,9 +4441,9 @@ mod tests {
     ///
     /// The failure this rules out: a deferred `retire` removes the key between `insert_surbs`'
     /// admission test and its entry lookup, and an `or_insert_with` there would recreate the ring at
-    /// epoch `0` — which no retire matches, so the entry leaks until size eviction, and a successor
-    /// `admit` finding it would only re-stamp the epoch, leaving it at the floor capacity so later
-    /// inserts overflow it and lose SURBs and PIX shares.
+    /// epoch `0` — which no retire matches, so the entry leaks until size eviction. (The successor
+    /// `admit` that later re-stamps it does raise its capacity, but the leak until size eviction is
+    /// reason enough to route such a batch to the quarantine, where it belongs.)
     #[test]
     fn an_insert_must_not_create_an_admitted_entry() -> anyhow::Result<()> {
         let store = MemorySurbStore::default();
