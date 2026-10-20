@@ -48,8 +48,9 @@
 //!                                          │    ssa_request_resend_interval → ResendSsaRequest, which also
 //!                                          │    pushes the commitment deadline; ends once every member has
 //!                                          │    reported a commitment part, on reaching the front or coming
-//!                                          │    within a delivery window of a foreseeable end of the Session,
-//!                                          │    or on a retired member)
+//!                                          │    within a delivery window of the paid tail's hard deadline, or
+//!                                          │    on a retired member; paused while a lost cycle that would end
+//!                                          │    the Session is due within a delivery window)
 //!                                          ├── (CommitmentProgress arms/re-arms the re-request timer)
 //!                                          ├── (its expiry → RequestCommitmentRetransmission, bounded)
 //!                                          │
@@ -154,15 +155,25 @@
 //!
 //! Two ends of the whole Session can be read off the Exit's own clocks, and the re-sends yield to both: a re-send
 //! admitted with less than a delivery window left before one would be answered by an Entry that has been told to fund
-//! a cycle the Exit will not be there to reconstruct. The paid tail's hard deadline closes the Session on
-//! `RecoveryDeadline` directly. And once the failure allowance (`max_failed_cycles`) is spent, so that the next lost
-//! cycle ends the Session, the expiry of any live cycle's non-service-gated deadline — its commitment, deposit or
-//! recovery hard deadline — does, whichever batch it belongs to; the one exception is the members of the re-sent batch
-//! that have reported nothing, whose deadlines the re-send itself pushes. Before the allowance is spent a lost cycle is
-//! merely retired, so those deadlines foresee nothing. While either end falls within one (batch-scaled) delivery window
-//! the batch is treated as being at the front — no re-send, no deadline push — and is left to its own deadline, with
-//! the Session ending when it was going to anyway. The rest are not foreseeable. A re-send already in flight when the
-//! Exit gives up on the batch for a reason it cannot schedule — an operator close or drain, a protocol fault, a stall
+//! a cycle the Exit will not be there to reconstruct. They differ in whether they can be taken back. The paid tail's
+//! hard deadline closes the Session on `RecoveryDeadline` directly and is immutable: while it falls within one
+//! (batch-scaled) delivery window the batch is treated as being at the front for good — no re-send, no deadline push —
+//! and is left to its own deadline, with the Session ending when it was going to anyway.
+//!
+//! The other is a lost cycle. Once the failure allowance (`max_failed_cycles`) is spent, so that the next lost cycle
+//! ends the Session, the expiry of any live cycle's non-service-gated deadline — its commitment, deposit or recovery
+//! hard deadline — does, whichever batch it belongs to; the one exception is the members of the re-sent batch that
+//! have reported nothing, whose deadlines the re-send itself pushes. Before the allowance is spent a lost cycle is
+//! merely retired, so those deadlines foresee nothing. This end only *pauses* the re-sends, because the deadlines are
+//! not final: a reported member's commitment deadline clears when its commitment verifies and its deposit deadline when
+//! it is funded, and neither ends the Session. While one falls within the window nothing is re-sent and nothing is
+//! pushed, but the state is kept and a later tick looks again, so re-sending resumes once it is gone. Ending the
+//! re-sends for good would leave a member the Entry still owes unasked, to time out in a Session they could have
+//! saved. If the pause outlasts the deadlines of the members that have reported nothing they expire, and with the
+//! allowance spent that ends the Session as it would have without any re-send.
+//!
+//! The rest are not foreseeable. A re-send already in flight when the Exit gives up on the batch for a reason it
+//! cannot schedule — an operator close or drain, a protocol fault, a stall
 //! of a service-gated idle clock (the paid tail's, or a live cycle's `RecoveryIdle`, which re-arms instead of closing
 //! while no service is consumed and so is no certain end), or a cycle lost for a reason that is not a deadline (its
 //! deposit observer closing) — can still be admitted by the Entry after the Exit has torn down, and the Entry then
@@ -177,7 +188,7 @@
 //! unchanged here. A re-send is a second source of the same thing: re-sends go on up to the deadline of a member that
 //! has reported a part, which the tick does not push, so the last one — emitted up to one re-send interval before the
 //! Exit retires that member and ends the re-sends — can resume and announce it after the fact. Once the failure
-//! allowance is spent that member's deadline is a foreseeable end of the Session and the re-sends stop a window before
+//! allowance is spent that member's deadline is a foreseeable end of the Session and the re-sends pause a window before
 //! it; until then losing it only retires it, and the exposure stands.
 //!
 //! Allocation independently enforces the reservation: at most
@@ -866,11 +877,14 @@ pub struct SupervisorConfig {
     /// front ends the re-sends and the deadline stops moving, so the Session then closes on
     /// `CommitmentTimeout` at most one delivery window after the last re-send. Never asking at the
     /// front also means a late-admitted request cannot strand the Entry's `ReadyToDeposit` behind a
-    /// cycle the Exit has already given up on. For the same reason a foreseeable end of the whole
-    /// Session — the paid tail's hard deadline, or, once the failure allowance is spent, the
-    /// non-service-gated deadline of any live cycle the re-send does not itself push — is treated as
-    /// the front once it falls within a delivery window: no re-send, no push, and the batch is left to
-    /// its own deadline, with the Session ending when it was going to anyway.
+    /// cycle the Exit has already given up on. For the same reason the paid tail's hard deadline is
+    /// treated as the front once it falls within a delivery window: no re-send, no push, for good, and
+    /// the batch is left to its own deadline, with the Session ending when it was going to anyway. A
+    /// lost cycle that would end the Session — once the failure allowance is spent, the
+    /// non-service-gated deadline of any live cycle the re-send does not itself push — only *pauses*
+    /// the re-sends while it is due within a delivery window, since that deadline can clear without
+    /// the Session ending (a reported member's commitment verifies, its deposit is funded); nothing is
+    /// sent or pushed meanwhile, and re-sending resumes once it is gone.
     ///
     /// The opening batch is never re-sent: it is the one request nothing has been paid for yet.
     ///
@@ -897,10 +911,13 @@ pub struct SupervisorConfig {
     ///
     /// Two ends of the Session are foreseeable and the re-sends yield to them: while the paid tail's
     /// hard deadline falls within one (batch-scaled) delivery window the batch is treated as being at
-    /// the front, and so it is while, with the failure allowance spent, the non-service-gated deadline
+    /// the front, for good, and while, with the failure allowance spent, the non-service-gated deadline
     /// (commitment, deposit or recovery hard) of any live cycle that the re-send does not itself push
-    /// does. Nothing else is. A re-send already in flight when the Exit gives up on the batch for a
-    /// reason it cannot schedule — an operator close or drain, a protocol fault, a stall of a
+    /// falls within it the re-sends are paused — nothing sent or pushed, the state kept, and re-sending
+    /// resumes once the deadline is gone. If the pause outlasts the deadlines of the members that have
+    /// reported nothing they expire, which with the allowance spent ends the Session as it would have
+    /// without any re-send. Nothing else is foreseeable. A re-send already in flight when the Exit gives up on the
+    /// batch for a reason it cannot schedule — an operator close or drain, a protocol fault, a stall of a
     /// service-gated idle clock (the paid tail's, or a live cycle's `RecoveryIdle`, which re-arms
     /// instead of closing while no service is consumed), or a cycle lost for a reason that is not a
     /// deadline — can still be admitted by the Entry after the Exit has torn down, and the Entry then
@@ -912,7 +929,7 @@ pub struct SupervisorConfig {
     /// reconstruct. A re-send is a second source: it goes on up to the deadline of a member that has
     /// reported a part, which the tick does not push, so the last one can resume and announce that
     /// member after the Exit has retired it — unless the failure allowance is spent, when that deadline
-    /// is itself a foreseeable end of the Session and the re-sends stop a window before it.
+    /// is itself a foreseeable end of the Session and the re-sends pause a window before it.
     ///
     /// Zero disables re-sending in a config that was not validated; [`validate_pix_supervision`]
     /// rejects it, together with any value at or above `max_ssa_delivery_time` (the pushed deadline
@@ -1488,11 +1505,11 @@ pub enum SessionPixAction {
     /// has had no reply from the Entry and an earlier generation is still being served — the Entry
     /// drops a successor request it is not yet willing to commit to, and tells nobody. Always names
     /// the whole batch, including the members that have replied. Not emitted within a delivery
-    /// window of a foreseeable end of the Session (the paid tail's hard deadline, or, with the failure
-    /// allowance spent, the non-service-gated deadline of a live cycle the re-send does not push),
-    /// which would end the Session before an admitted request could be answered. The supervisor has
-    /// already pushed the commitment deadlines of the members that have replied nothing by the time
-    /// this is emitted.
+    /// window of the paid tail's hard deadline, which would end the Session before an admitted request
+    /// could be answered, and not while — with the failure allowance spent — the non-service-gated
+    /// deadline of a live cycle the re-send does not push is due within a window (a pause, which
+    /// ends when that deadline is gone). The supervisor has already pushed the commitment deadlines
+    /// of the members that have replied nothing by the time this is emitted.
     ///
     /// `ssa_ids` names the batch rather than carrying a message: what goes on the wire is the exact
     /// message the matching [`RequestSsa`](Self::RequestSsa) sent, which the carrier kept. A fresh one
