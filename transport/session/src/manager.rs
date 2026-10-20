@@ -2139,7 +2139,13 @@ pub struct SessionManager<S> {
     /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
     /// by [`PendingOutgoingGuard`] on every failure path and once the slot exists; the TTL is a
     /// backstop matching `session_initiations`'.
-    pending_outgoing: moka::sync::Cache<HoprPseudonym, ()>,
+    ///
+    /// An initiation claims its entry atomically (see `new_session`), so a marker is owned by at
+    /// most one attempt at a time: a second initiation for a pseudonym that is still pending is
+    /// refused rather than allowed to overwrite the first one's reservation. The value is a
+    /// per-claim token, which lets [`PendingOutgoingGuard`] tell its own claim from a newer one
+    /// that reused the name after the TTL backstop expired the older marker.
+    pending_outgoing: moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -2301,14 +2307,57 @@ fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evict
 /// reply and is never checked against the pseudonym — a mismatched one would clear someone else's
 /// marker, and every early return and a dropped future would clear no one's. The guard ties the
 /// cleanup to the pseudonym actually inserted, so no path has to remember it.
+///
+/// The removal is ownership-checked rather than a plain `remove`, because the marker's TTL is only
+/// a backstop and the guard can outlive it: an initiation that times out runs almost to the TTL,
+/// so a few ticks of clock skew — or a task descheduled between the await resolving and the future
+/// being polled to completion — put the drop past expiry. Once expired, moka reports the key as
+/// absent, so a newer initiation for the same pseudonym can claim the name again; when this guard
+/// then drops, an unconditional `remove` would tear down the newer attempt's marker and leave its
+/// in-flight initiation invisible to the dispatch filter, which would drop that Session's
+/// `SsaRequest`s as `StaleStartMessage`. Comparing the entry's generation token restricts the
+/// removal to the marker this guard's own claim created.
 struct PendingOutgoingGuard<'a> {
-    pending: &'a moka::sync::Cache<HoprPseudonym, ()>,
+    pending: &'a moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
     pseudonym: HoprPseudonym,
+    token: PendingOutgoingToken,
 }
 
 impl Drop for PendingOutgoingGuard<'_> {
     fn drop(&mut self) {
-        self.pending.remove(&self.pseudonym);
+        // `and_compute_with` reads under moka's per-key compute lock and reports an expired entry
+        // as absent, so an expired marker of ours falls through to `Op::Nop` and nothing is left
+        // to clean up; a marker another attempt claimed after our expiry is likewise left to that
+        // attempt's own guard.
+        self.pending.entry(self.pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                match entry {
+                    // Still ours.
+                    Some(entry) if entry.value() == &self.token => moka::ops::compute::Op::Remove,
+                    // Absent (expired, or already removed by the success path), or a newer
+                    // attempt's claim: nothing to do.
+                    _ => moka::ops::compute::Op::Nop,
+                }
+            },
+        );
+    }
+}
+
+/// Per-claim token distinguishing one initiation's marker from another attempt's under the same
+/// pseudonym.
+///
+/// Uniqueness only has to hold for the lifetime of one claim, which the atomic claim in
+/// `new_session` serialises: two guards for the same pseudonym never overlap on a live marker.
+/// A per-process counter is enough for that, and `Copy` keeps the token cheap to move into and
+/// compare inside the compute closure.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct PendingOutgoingToken(u64);
+
+impl PendingOutgoingToken {
+    fn next() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -2863,15 +2912,45 @@ where
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
-        // Published before the initiation is sent so that a fast Exit's `SsaRequest` — which names
-        // the Session by this pseudonym, not by the challenge — finds it at dispatch. The guard
-        // removes it on every path below that does not reach `drop(_pending_guard)`: each early
-        // return, a dropped future, and the two `allocate_session_slot` failures, which are keyed
-        // by the peer-supplied `session_id` and so cannot clear it themselves.
-        self.pending_outgoing.insert(pseudonym, ());
+        // Atomically claim the pseudonym in `pending_outgoing` before the initiation is sent so
+        // that a fast Exit's `SsaRequest` — which names the Session by this pseudonym, not by the
+        // challenge — finds it at dispatch. The guard removes it on every path below that does not
+        // reach `drop(_pending_guard)`: each early return, a dropped future, and the two
+        // `allocate_session_slot` failures, which are keyed by the peer-supplied `session_id` and
+        // so cannot clear it themselves.
+        //
+        // The claim, not a plain `insert`, because `moka`'s `insert` would silently overwrite an
+        // existing reservation: two concurrent `new_session` calls under the same explicit
+        // pseudonym would both hold a guard over one shared marker, and the first one to finish
+        // would clear it while the other is still in flight — an `SsaRequest` for that initiation
+        // would then fail the dispatch filter and be dropped as `StaleStartMessage`. Refusing the
+        // overlapping initiation instead keeps each marker owned by exactly one attempt.
+        //
+        // The claim happens AFTER the challenge reservation above, so a failed claim must also
+        // release that reservation: it was taken for an initiation that never starts, and leaving
+        // it would shrink the initiation window for every later attempt.
+        let token = PendingOutgoingToken::next();
+        let claim_result = self.pending_outgoing.entry(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                if entry.is_none() {
+                    moka::ops::compute::Op::Put(token)
+                } else {
+                    // Another initiation already holds this pseudonym.
+                    moka::ops::compute::Op::Nop
+                }
+            },
+        );
+        if !matches!(claim_result, moka::ops::compute::CompResult::Inserted(_)) {
+            self.session_initiations.remove(&challenge);
+            return Err(SessionManagerError::Unacceptable(format!(
+                "an outgoing Session initiation under pseudonym {pseudonym} is already in flight"
+            ))
+            .into());
+        }
         let _pending_guard = PendingOutgoingGuard {
             pending: &self.pending_outgoing,
             pseudonym,
+            token,
         };
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
@@ -6812,6 +6891,165 @@ mod tests {
         assert!(
             matches!(refused, DispatchResult::Dropped(DropReason::StaleStartMessage)),
             "an SsaRequest for a failed initiation's pseudonym must be stale, got {refused:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A second initiation for a pseudonym already claimed by one in flight must be refused, not
+    /// silently overwrite the first one's `pending_outgoing` reservation.
+    ///
+    /// `moka`'s `insert` overwrites an existing entry, so the claim the first initiation holds used
+    /// to be a single shared marker: whichever attempt finished first removed it while the other
+    /// was still awaiting establishment, and an `SsaRequest` for that Session then failed the
+    /// dispatch filter and was dropped as `StaleStartMessage` — a false negative, the exact class
+    /// of miss the filter must not have. `new_session` therefore claims the name atomically and
+    /// refuses the overlap.
+    ///
+    /// ## Steps
+    /// 1. Alice's transport swallows the first `StartSession` (expectation `.once()`), so that initiation stays in
+    ///    flight; its `pending_outgoing` marker is held by its guard.
+    /// 2. A second `new_session` under the SAME pseudonym must fail with `Unacceptable` — and must not have sent
+    ///    anything (the refusal happens before the send).
+    /// 3. The refusal must not have consumed a challenge slot: `session_initiations.entry_count()` stays at 1, the
+    ///    first attempt's reservation.
+    /// 4. The first initiation still owns the marker (its `SsaRequest` dispatches as in flight), and then times out
+    ///    cleanly, leaving no marker and no challenge reservation behind.
+    ///
+    /// Sequential rather than `tokio::join!`-concurrent: the property pinned is that the *second*
+    /// call sees the first one's live claim, which is what the atomic compute serialises — running
+    /// them concurrently would only randomise which call is "first" without strengthening the
+    /// assertion, while the in-flight fixture (swallowed send) requires the first call to be
+    /// parked in its await for the second to observe the claim.
+    #[test_log::test(tokio::test)]
+    async fn a_second_initiation_for_a_pending_pseudonym_must_be_refused_without_consuming_a_challenge_slot()
+    -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the FIRST StartSession only: that initiation stays in flight holding its claim.
+        // The refused attempt must never reach the transport, so `.once()` also pins that.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let client_cfg = SessionClientConfig {
+            capabilities: None.into(),
+            pseudonym: alice_pseudonym.into(),
+            surb_management: None,
+            ..Default::default()
+        };
+
+        // Park the first initiation in flight: the transport swallowed its StartSession, so it
+        // holds both its challenge reservation and its pending-outgoing claim for the whole of
+        // this call's initiation timeout.
+        let in_flight = alice_mgr.new_session(
+            bob_peer,
+            SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            client_cfg.clone(),
+        );
+        futures::pin_mut!(in_flight);
+
+        // Poll the in-flight attempt exactly once, which runs it up to its first await: the claim
+        // (and the challenge reservation) are taken before the send, so a single pending poll is
+        // enough to make the overlap observable — no sleeps, and no runtime-dependent ordering.
+        assert!(
+            futures::poll!(in_flight.as_mut()).is_pending(),
+            "fixture: the swallowed StartSession must leave the initiation pending"
+        );
+
+        // The first attempt's claim is live: an SsaRequest naming the pseudonym is admitted at
+        // dispatch as belonging to an initiation this node is still making (it goes to the handler
+        // pool rather than being dropped as stale).
+        let admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(admitted, DispatchResult::Processed),
+            "an SsaRequest for the in-flight initiation must be admitted, got {admitted:?}"
+        );
+
+        let before = {
+            // moka defers the write op: without this the count is read before the insertion lands.
+            alice_mgr.session_initiations.run_pending_tasks();
+            alice_mgr.session_initiations.entry_count()
+        };
+        assert_eq!(
+            before, 1,
+            "fixture: the in-flight initiation must hold exactly one challenge reservation"
+        );
+
+        // The overlap: the same pseudonym, still pending. Must be refused, not allowed to
+        // overwrite the first attempt's reservation.
+        let refused = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                client_cfg,
+            )
+            .await;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "a second initiation under a pending pseudonym must be refused as Unacceptable, got {refused:?}"
+        );
+
+        // The refusal happened after the challenge reservation but before the send, and released
+        // its own reservation: exactly the in-flight one remains, none consumed by the refusal.
+        alice_mgr.session_initiations.run_pending_tasks();
+        let after = alice_mgr.session_initiations.entry_count();
+        assert_eq!(
+            after, before,
+            "the refused attempt must not consume a challenge slot (before: {before}, after: {after})"
+        );
+        assert_eq!(
+            alice_mgr.num_active_sessions(),
+            0,
+            "neither attempt may have allocated a session slot"
+        );
+
+        // The first initiation is unaffected by the refusal and still owns the claim.
+        let still_admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(still_admitted, DispatchResult::Processed),
+            "the refusal must not have cleared the in-flight initiation's claim, got {still_admitted:?}"
+        );
+
+        // The in-flight initiation then times out cleanly: no marker, no challenge reservation.
+        let timed_out = in_flight.await;
+        assert!(
+            matches!(timed_out, Err(TransportSessionError::Timeout)),
+            "the first initiation must still fail on its own timeout, got {timed_out:?}"
+        );
+        assert_eq!(
+            {
+                alice_mgr.session_initiations.run_pending_tasks();
+                alice_mgr.session_initiations.entry_count()
+            },
+            0,
+            "the timed-out initiation must release its challenge reservation"
+        );
+        let stale = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(stale, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "after the timeout, the pseudonym's marker must be gone, got {stale:?}"
         );
 
         Ok(())
