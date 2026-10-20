@@ -99,6 +99,49 @@ pub trait SurbStore {
     fn bump_generation(&self, _pseudonym: &HoprPseudonym) -> u8 {
         0
     }
+
+    /// Admits `pseudonym` into the store's trusted class, behind an established Session, and returns
+    /// the raw number naming this admission.
+    ///
+    /// Until this is called, SURBs arriving for `pseudonym` are held in the store's untrusted class
+    /// (if it has one): tightly capped and short-lived, because the pseudonym a packet names is chosen
+    /// by its sender and no ticket on the receiving path binds it to a Session. Admission is what lifts
+    /// that cap, so it belongs to the Session lifecycle — never to a mere packet's arrival.
+    ///
+    /// `expected_surbs` is the Session's announced SURB target; the store sizes the admitted ring from
+    /// it and owns the headroom math. It may be `0` when no target was announced, which the store
+    /// treats as "unknown", not as "one SURB".
+    ///
+    /// Calling this twice for the same `pseudonym` must not discard what it already holds, and
+    /// invalidates the number the earlier admission returned.
+    ///
+    /// Defaults to a no-op, for stores that do not separate a trusted class.
+    fn admit(&self, _pseudonym: &HoprPseudonym, _expected_surbs: usize) -> u64 {
+        0
+    }
+
+    /// Retires `pseudonym` from the store's trusted class, on behalf of the admission `token` names.
+    ///
+    /// The counterpart of [`SurbStore::admit`], called on every teardown path. It must be idempotent —
+    /// retiring a pseudonym that was never admitted is a no-op — and must not touch any SURBs the
+    /// pseudonym still holds in the untrusted class, which expire there on their own short lifetime.
+    ///
+    /// `token` names the admission the teardown is retiring. A teardown may run its retire some time
+    /// after it closes the Session — the closing Session's own return-routed notification still needs
+    /// its ring while the packet pipeline resolves the route — so the store must treat a `token` that
+    /// no longer matches `pseudonym`'s current admission as a no-op: a successor Session was admitted
+    /// on the same pseudonym in the meantime, and its ring is not this retire's to release.
+    ///
+    /// Defaults to a no-op, for stores that do not separate a trusted class.
+    fn retire(&self, _pseudonym: &HoprPseudonym, _token: u64) {}
+
+    /// Total SURBs the store currently holds, across all classes.
+    ///
+    /// For tests and observability only; not a hot path and not required to be cheap. Defaults to `0`,
+    /// for stores that do not account for it.
+    fn surbs_held(&self) -> usize {
+        0
+    }
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).

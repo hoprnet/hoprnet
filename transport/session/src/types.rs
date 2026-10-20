@@ -475,6 +475,81 @@ pub type SessionAdmissionReply =
 pub type SessionAdmissionSink =
     futures::channel::mpsc::Sender<(hopr_api::node::SessionAdmissionRequest, SessionAdmissionReply)>;
 
+/// Names one admission of a pseudonym into the SURB store's admitted class.
+///
+/// A pseudonym is client-chosen and freely reusable, so successive Sessions can be established on
+/// the same one, and the store's admitted class holds at most one ring per pseudonym. The token is
+/// what lets a [`retire`](SurbAdmissionControl::retire) be matched to the admission it belongs to:
+/// [`admit`](SurbAdmissionControl::admit) returns a fresh token each time it is called, and a
+/// retire whose token no longer names the pseudonym's current admission is a no-op. Without that
+/// match, a teardown that deferred its retire past the packet pipeline's SURB-resolution window
+/// could invalidate a *successor* Session's already-admitted ring, silently degrading its return
+/// path (hoprnet#8515).
+///
+/// The value is opaque on purpose: callers thread it from `admit` to `retire` without reading it,
+/// so the store is free to change how admissions are numbered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct AdmissionToken(u64);
+
+impl AdmissionToken {
+    /// The token of an admission that never happened.
+    ///
+    /// Stores must never issue this value, so a retire carrying it matches nothing: it is what a
+    /// teardown of a Session that was never committed — hence never admitted — passes through the
+    /// seam, keeping every teardown wired to the same path without inventing a retire that could
+    /// match a live admission.
+    pub const NONE: Self = Self(0);
+
+    /// Wraps the store's raw admission number back into a token.
+    ///
+    /// For the composition root bridging the two trait families: the store side deals in raw
+    /// numbers, this crate in opaque tokens.
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// The store's raw admission number this token wraps.
+    pub const fn into_raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// Hands a [`SessionId`] in and out of the SURB store's admission classes.
+///
+/// Without it every SURB that arrives for a `Final` packet — including the ones an established
+/// Session legitimately depends on — lands in the un-admitted quarantine class, which caps
+/// pseudonyms at a few SURBs each and expires them quickly (hoprnet#8515). The manager calls
+/// [`admit`](SurbAdmissionControl::admit) at the point a Session becomes established — the slot
+/// guard's `commit`, not slot allocation, so that no peer is admitted before the Start handshake has
+/// authenticated it — and [`retire`](SurbAdmissionControl::retire) at every teardown point.
+///
+/// Declared here rather than in the SURB store's own crate because the two crates depend on each
+/// other the wrong way round: the store cannot name the session crate, and this crate cannot name
+/// `hopr-protocol-hopr`. `hopr-transport` is the only crate that sees both, so it supplies the
+/// implementation bridging the two. Both methods are expected to be cheap and non-blocking; the
+/// store side is idempotent, so a retire for a pseudonym that was never admitted is a no-op.
+///
+/// [`retire`](SurbAdmissionControl::retire) may run some time after the teardown that asked for it
+/// — the closing Session's own return-routed notification still needs its ring while the packet
+/// pipeline resolves the route — and is therefore matched against the token `admit` returned: it
+/// must be a no-op once `token` no longer names the pseudonym's current admission, because a
+/// successor Session can have been admitted on the same pseudonym in the meantime.
+pub trait SurbAdmissionControl: Send + Sync + 'static {
+    /// Admits `pseudonym` into the store's admitted class, sized for `expected_surbs`, and returns
+    /// the token naming this admission.
+    ///
+    /// `expected_surbs` is the Session's announced SURB buffer target; the store owns the headroom
+    /// arithmetic and the floor, so a value of `0` (target unknown) still yields a usable ring.
+    /// Calling this twice for the same pseudonym must not discard what the admitted ring already
+    /// holds, and invalidates the token the earlier admission returned.
+    fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken;
+    /// Returns `pseudonym` to the un-admitted class, on behalf of the admission `token` names.
+    ///
+    /// A no-op when `token` no longer names `pseudonym`'s current admission — a successor Session
+    /// was admitted in the meantime, and its ring is not this retire's to release. Idempotent.
+    fn retire(&self, pseudonym: &SessionId, token: AdmissionToken);
+}
+
 /// Configures the Session protocol socket over HOPR.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {

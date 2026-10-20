@@ -77,8 +77,8 @@ use hopr_transport_probe::{
 };
 pub use hopr_transport_session as session;
 use hopr_transport_session::{
-    AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
-    SessionManagerConfig,
+    AdmissionToken, AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox,
+    SessionManager, SessionManagerConfig, SurbAdmissionControl,
 };
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
@@ -156,6 +156,28 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
     // Saturating rather than wrapping: an operator-supplied capacity is only range-validated at the
     // low end, and the multiplication would otherwise overflow on an absurd value.
     rb_capacity.saturating_mul(SURB_BUFFER_TARGET_NUMERATOR) / SURB_BUFFER_TARGET_DENOMINATOR
+}
+
+/// Bridges the [`SessionManager`]'s admission seam onto the packet pipeline's SURB store.
+///
+/// This is the only crate that sees both sides — the session crate cannot name
+/// `hopr-protocol-hopr`, and the store cannot name the session crate — so the adapter has to live
+/// here, which is also why it is constructed in [`HoprTransport::new`] rather than inside either
+/// component. It is pure delegation: the manager already knows when a Session becomes established
+/// and when it is torn down, and the store already owns the sizing and the idempotency, so the
+/// adapter adds no policy of its own.
+struct StoreSurbAdmission {
+    store: MemorySurbStore,
+}
+
+impl SurbAdmissionControl for StoreSurbAdmission {
+    fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken {
+        AdmissionToken::from_raw(self.store.admit(pseudonym, expected_surbs))
+    }
+
+    fn retire(&self, pseudonym: &SessionId, token: AdmissionToken) {
+        self.store.retire(pseudonym, token.into_raw());
+    }
 }
 
 /// Share of the counter flush interval a conformance report waits for its packets' acknowledgments.
@@ -410,6 +432,71 @@ where
             planner_config,
         );
 
+        // Bound before the struct literal rather than inside it so `set_surb_admission` below can
+        // reach the manager: the seam depends on `path_planner`, which does not exist inside the
+        // literal, and `HoprTransport` has no way to reach its own `smgr` mid-construction.
+        let smgr = Arc::new(SessionManager::new(SessionManagerConfig {
+            frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                .ok()
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                .max(SESSION_MTU),
+            max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                .max(Duration::from_millis(100)),
+            max_frames_behind_gap: cfg.session.max_frames_behind_gap,
+            max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
+                .ok()
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
+            initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+            idle_timeout: cfg.session.idle_timeout,
+            balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+            initial_return_session_egress_rate: 10,
+            minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
+            maximum_surb_buffer_size: surb_buffer_target_ceiling(cfg.packet.surb_store.rb_capacity),
+            // The lower bound is enforced once in `SessionManager::new` via
+            // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
+            surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(|ms| Some(Duration::from_millis(ms)))
+                .unwrap_or(cfg.session.surb_balance_notify_period),
+            surb_target_notify: true,
+            maximum_sessions: cfg.session.maximum_managed_sessions,
+            pix_config: cfg.incoming_session_pix_config.clone(),
+            max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,
+            // Threaded rather than re-derived in the session crate: the deferred retire of a closing
+            // Session's SURB admission has to wait out this window, and it is the operator's own
+            // pipeline setting here that decides how long that is.
+            surb_resolution_wait: crate::path::resolve::surb_resolution_wait(cfg.packet.pipeline.surb_resolution_wait),
+            ..Default::default()
+        }));
+
+        // Wire the SURB-store admission seam: without it, every Session's SURBs — established or
+        // not — land in the store's quarantine class and are capped and expired like any
+        // unauthenticated peer's (hoprnet#8515). The `let _ =` matches the seam's contract: the
+        // manager is freshly constructed here, so nothing can have set it yet.
+        let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
+            store: path_planner.surb_store.clone(),
+        }));
+
+        // The store's admitted class cannot see the session config, so the invariant that it must
+        // hold every Session that can be managed at once is checked here, where both figures are in
+        // scope. Violating it does not break the node — quarantine still resolves the SURBs — but
+        // the excess Sessions would silently fall back to the 16-SURB cap, so it is surfaced loudly
+        // rather than left to be diagnosed from eviction metrics later.
+        if cfg.packet.surb_store.admitted_max_pseudonyms < cfg.session.maximum_managed_sessions {
+            tracing::error!(
+                admitted_max_pseudonyms = cfg.packet.surb_store.admitted_max_pseudonyms,
+                maximum_managed_sessions = cfg.session.maximum_managed_sessions,
+                "SURB store admitted capacity is smaller than the maximum number of managed sessions — sessions \
+                 beyond the store's admitted capacity will lose their SURB return path"
+            );
+        }
+
         Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -418,41 +505,7 @@ where
             graph,
             path_planner,
             my_multiaddresses,
-            smgr: Arc::new(SessionManager::new(SessionManagerConfig {
-                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                    .ok()
-                    .and_then(|s| s.parse::<usize>().ok())
-                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                    .max(SESSION_MTU),
-                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                    .ok()
-                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                    .max(Duration::from_millis(100)),
-                max_frames_behind_gap: cfg.session.max_frames_behind_gap,
-                max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
-                    .ok()
-                    .and_then(|s| s.parse::<usize>().ok())
-                    .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
-                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                idle_timeout: cfg.session.idle_timeout,
-                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                initial_return_session_egress_rate: 10,
-                minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
-                maximum_surb_buffer_size: surb_buffer_target_ceiling(cfg.packet.surb_store.rb_capacity),
-                // The lower bound is enforced once in `SessionManager::new` via
-                // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
-                surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")
-                    .ok()
-                    .and_then(|s| s.parse::<u64>().ok())
-                    .map(|ms| Some(Duration::from_millis(ms)))
-                    .unwrap_or(cfg.session.surb_balance_notify_period),
-                surb_target_notify: true,
-                maximum_sessions: cfg.session.maximum_managed_sessions,
-                pix_config: cfg.incoming_session_pix_config.clone(),
-                max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,
-                ..Default::default()
-            })),
+            smgr,
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -1073,6 +1126,13 @@ where
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
+                    // Refresh the SURB-store gauge alongside the flush tick. The store updates its
+                    // accounting synchronously, but nothing on the hot path samples it, so without a
+                    // poller the series would be declared and never emitted. Once per flush interval
+                    // is ample for a ceiling reading, and the walk is read-only.
+                    #[cfg(feature = "telemetry")]
+                    surb_flush_store.surbs_held();
+
                     for step in protocol::return_path_recovery::run_flush_tick(
                         &surb_round_trips,
                         &surb_flush_graph,
