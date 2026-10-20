@@ -37,8 +37,7 @@ pub struct AuxiliaryPacketInfo {
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
     /// How many already-held SURBs the store evicted while inserting this packet's, because the
-    /// per-pseudonym buffer was already full, plus those dropped because their first relayer became
-    /// unusable.
+    /// per-pseudonym buffer was already full.
     ///
     /// The arriving SURBs are retained; what is lost is the oldest of what was already queued. This
     /// is the only point at which an overflow is visible — every layer above sees an insert that
@@ -49,6 +48,9 @@ pub struct AuxiliaryPacketInfo {
     /// estimate, because the imprecise estimate is the one that fails safe — see
     /// `counterparty_buffer_capacity` in `hopr-transport-session`.
     pub num_evicted_surbs: usize,
+    /// How many SURBs the store dropped as invalid (first relayer disconnected or its channel closed)
+    /// since the previous insert, including arrivals refused by this one.
+    pub num_invalid_surbs: usize,
 }
 
 /// An incoming packet with a payload intended for us.
@@ -190,8 +192,8 @@ pub struct SurbInsertOutcome {
     /// Number of SURBs dropped to make room during this insert, oldest first.
     pub evicted: usize,
     /// Number of SURBs dropped since the previous insert because their first relayer became
-    /// unusable (disconnected or channel closed), including arrivals refused by this insert.
-    pub unusable: usize,
+    /// invalid (disconnected or channel closed), including arrivals refused by this insert.
+    pub invalid: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

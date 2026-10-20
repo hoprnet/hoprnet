@@ -151,6 +151,9 @@ pub struct IncomingPacketInfo {
     /// counts these toward its SURB flow estimate (an evicted SURB has left the buffer just as a spent
     /// one has), so the level it reports tracks what the store actually holds.
     pub num_evicted_surbs: usize,
+    /// How many held SURBs were dropped as invalid (first relayer disconnected or its channel closed)
+    /// since the previous packet from this sender. They left the buffer as an evicted one does.
+    pub num_invalid_surbs: usize,
 }
 
 /// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the

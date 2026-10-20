@@ -433,7 +433,8 @@ type StartProtocolMsgSink =
 struct IncomingSurbCounts {
     /// SURBs the arriving packet stored (`num_saved_surbs`).
     saved: u64,
-    /// Older SURBs the full store evicted to make room (`num_evicted_surbs`).
+    /// SURBs that left the store without being spent: evicted to make room (`num_evicted_surbs`) or
+    /// dropped as invalid (`num_invalid_surbs`).
     evicted: u64,
 }
 
@@ -1487,7 +1488,7 @@ where
             // runs `handle_keep_alive` never sees the packet info otherwise.
             let surb_counts = IncomingSurbCounts {
                 saved: in_data.packet_info.num_saved_surbs as u64,
-                evicted: in_data.packet_info.num_evicted_surbs as u64,
+                evicted: (in_data.packet_info.num_evicted_surbs + in_data.packet_info.num_invalid_surbs) as u64,
             };
 
             // This is a Start protocol message, so we send it to the handler
@@ -1739,7 +1740,7 @@ where
                     session_rx.inspect(move |data| {
                         // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        let evicted = data.packet_info.num_evicted_surbs as u64;
+                        let evicted = (data.packet_info.num_evicted_surbs + data.packet_info.num_invalid_surbs) as u64;
                         surb_estimator_rx.record_incoming(produced, evicted);
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::record_session_surb_produced(&session_id, produced);

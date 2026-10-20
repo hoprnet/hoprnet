@@ -14,7 +14,7 @@
 //! a path identity it has no other use for.
 
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -185,14 +185,7 @@ impl SurbRoundTripRegistry {
         self.counters(paths).record_expected(count);
     }
 
-    /// Folds one round-trip's duration into its first relayer's average; a direct reply has none.
-    pub fn record_rtt(&self, first_relayer: Option<OffchainPublicKey>, rtt: Duration) {
-        if let Some(relayer) = first_relayer {
-            self.relayer_latency.record(relayer, rtt);
-        }
-    }
-
-    /// The per-relayer round-trip averages, for callers that weight return paths by timing.
+    /// The per-relayer reply races, for callers that weight return paths by timing.
     pub fn relayer_latency(&self) -> Arc<RelayerLatency> {
         self.relayer_latency.clone()
     }
@@ -270,6 +263,11 @@ impl SurbRoundTripRegistry {
                 continue;
             }
 
+            if expected == 0 {
+                // Not in use: a run held across idleness would fire on the first flush after reuse.
+                state.runs = 0;
+                continue;
+            }
             if expected < MIN_EXPECTED_FOR_SILENCE {
                 // Too little went out to conclude anything either way: hold the run. SURB minting is
                 // bursty, so resetting here meant five *consecutive* busy flushes were never seen.
@@ -388,16 +386,19 @@ pub fn no_path_slots() -> PathSlotResolver {
     Arc::new(|_| None)
 }
 
-/// What a minted SURB is remembered by until its reply comes home. The mint time makes the
-/// round-trip a duration, the only signal that tells a slow relay from a healthy one.
+/// What a minted SURB is remembered by until its reply comes home.
 #[derive(Debug, Clone, Copy)]
 pub struct PendingSurb {
     /// Legs the round-trip traverses, for the counts and graph attribution.
     pub paths: ForwardAndReturnPath,
-    /// First relayer on the reply leg, if any: the node a slow reply implicates.
+    /// First relayer on the reply leg, if any: the node a late reply implicates.
     pub first_relayer: Option<OffchainPublicKey>,
-    /// When the SURB was minted; a reply's arrival minus this is the measured round-trip.
+    /// When this SURB and its partner were minted; both round-trips run from here.
     pub minted_at: Instant,
+    /// The SURB minted in the same packet through another first relayer, which this one races.
+    pub partner: Option<HoprSurbId>,
+    /// The partner's first relayer and when its reply came home, once it has.
+    pub partner_replied: Option<(OffchainPublicKey, Instant)>,
 }
 
 /// What each outstanding SURB is remembered by, shared between the two codec halves.
@@ -415,49 +416,195 @@ pub fn pending_legs(max_pending: u64) -> PendingLegs {
         .build()
 }
 
-/// Per-relayer SURB round-trip timing. The graph's delivery ratio stays ~1 for a relay that
-/// replies late, so this is what makes a stall visible.
+/// Per-relayer reply races. The graph's delivery ratio stays ~1 for a relay that replies late, so
+/// this is what makes a stall visible.
+///
+/// Two SURBs minted in one packet share the mint instant, the forward path and their slot in the
+/// replier's store, so how much later one reply arrives than the other is down to the return paths
+/// alone. A lone round-trip is mostly the time the SURB sat in that store, which swings by seconds
+/// with the refill cycle and differs per relayer with when each was drawn.
 #[derive(Debug, Default)]
 pub struct RelayerLatency {
-    inner: DashMap<OffchainPublicKey, VecDeque<(Instant, Duration)>>,
+    relayers: DashMap<OffchainPublicKey, RaceHistory>,
+    /// Factors per candidate set, recomputed at most once per telemetry flush (`epoch`), so a
+    /// per-packet draw only reads.
+    cache: std::sync::Mutex<FactorCache>,
+    epoch: AtomicU64,
 }
 
-/// Round-trips a relayer must have carried within [`RTT_WINDOW`] before its timing is trusted, so
-/// only a relayer under load is judged.
-const MIN_RTT_SAMPLES: usize = 20;
+/// Factors per candidate set, with the epoch they were computed in.
+type FactorCache = std::collections::HashMap<Vec<Option<OffchainPublicKey>>, (u64, Vec<f64>)>;
 
-/// How far back round-trips count once there are enough newer ones to judge by.
-const RTT_WINDOW: Duration = Duration::from_secs(10);
+/// One race as one of its relayers saw it.
+#[derive(Debug, Clone, Copy)]
+struct Race {
+    at: Instant,
+    /// Seconds this relayer finished after its partner, negative when before.
+    margin: f64,
+    /// Seconds the faster of the two replies took to come home.
+    winning_round_trip: f64,
+}
 
-/// Upper bound on the samples kept per relayer.
-const MAX_RTT_SAMPLES: usize = 256;
+#[derive(Debug, Default)]
+struct RaceHistory {
+    races: VecDeque<Race>,
+    /// Races whose partner is home while this relayer's reply is not, by the SURB still out. Each
+    /// counts as lost by at least the time since the partner came home.
+    open: HashMap<HoprSurbId, Race>,
+    /// How far back its races count, set when it is judged; zero until then.
+    memory: Duration,
+}
+
+/// The fewest races whose median no single race decides.
+const MIN_RACES: usize = 3;
+
+impl RaceHistory {
+    fn forget_older_than(&mut self, memory: Duration) {
+        while self.races.len() > MIN_RACES && self.races.front().is_some_and(|race| race.at.elapsed() > memory) {
+            self.races.pop_front();
+        }
+    }
+}
 
 impl RelayerLatency {
-    pub fn record(&self, relayer: OffchainPublicKey, rtt: Duration) {
-        let mut samples = self.inner.entry(relayer).or_default();
-        if samples.len() == MAX_RTT_SAMPLES {
-            samples.pop_front();
+    /// Records that `later`'s reply came home `by` after `earlier`'s, which took `winning_round_trip`,
+    /// both on SURBs of one packet.
+    pub fn record_race(
+        &self,
+        later: OffchainPublicKey,
+        later_surb: HoprSurbId,
+        earlier: OffchainPublicKey,
+        winning_round_trip: Duration,
+        by: Duration,
+    ) {
+        if let Some(mut history) = self.relayers.get_mut(&later) {
+            history.open.remove(&later_surb);
         }
-        samples.push_back((Instant::now(), rtt));
+        let (at, winning_round_trip) = (Instant::now(), winning_round_trip.as_secs_f64());
+        let race = |margin| Race {
+            at,
+            margin,
+            winning_round_trip,
+        };
+        self.record(later, race(by.as_secs_f64()));
+        self.record(earlier, race(-by.as_secs_f64()));
     }
 
-    /// The relayer's lower-quartile round-trip over the window, or `None` without enough samples.
-    ///
-    /// A low quantile because store residency at the replier only ever adds to a round-trip.
-    pub fn low_quantile(&self, relayer: &OffchainPublicKey) -> Option<Duration> {
-        let mut samples = self.inner.get_mut(relayer)?;
-        // Old samples age out only as fresh ones replace them: a relayer drawn less because it is
-        // slow must not read as unknown, and so as fine, the moment its samples thin out.
-        while samples.len() > MIN_RTT_SAMPLES && samples.front().is_some_and(|(at, _)| at.elapsed() > RTT_WINDOW) {
-            samples.pop_front();
+    /// Records that `surb`'s partner came home in `winning_round_trip` while `surb`, through
+    /// `relayer`, is still out.
+    pub fn open_race(&self, relayer: OffchainPublicKey, surb: HoprSurbId, winning_round_trip: Duration) {
+        let race = Race {
+            at: Instant::now(),
+            margin: 0.0,
+            winning_round_trip: winning_round_trip.as_secs_f64(),
+        };
+        self.relayers.entry(relayer).or_default().open.insert(surb, race);
+    }
+
+    fn record(&self, relayer: OffchainPublicKey, race: Race) {
+        let mut history = self.relayers.entry(relayer).or_default();
+        history.races.push_back(race);
+        let memory = history.memory;
+        if !memory.is_zero() {
+            history.forget_older_than(memory);
         }
-        if samples.len() < MIN_RTT_SAMPLES {
+    }
+
+    /// Invalidates the cached factors; called once per telemetry flush.
+    fn next_epoch(&self) {
+        self.epoch.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Per-relayer weight from its reply races, relative to the best candidate; `1.0` for a relayer
+    /// that does not finish a round-trip behind its partners or has too few races to judge. `memory`
+    /// is how many of its own margins a relayer's races are remembered for (`PathPlannerConfig`).
+    pub fn factors(&self, relayers: &[Option<OffchainPublicKey>], memory: u32) -> Vec<f64> {
+        let epoch = self.epoch.load(Ordering::Relaxed);
+        if let Some((at, factors)) = self.cache.lock().ok().and_then(|c| c.get(relayers).cloned())
+            && at == epoch
+        {
+            return factors;
+        }
+        let factors = self.compute_factors(relayers, memory);
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.insert(relayers.to_vec(), (epoch, factors.clone()));
+        }
+        factors
+    }
+
+    /// A relayer is weighted down by how many round-trips it finishes behind its partners, the
+    /// fastest round-trip any candidate made being the unit: lagging by less costs nothing, as
+    /// healthy relayers differ by that much anyway.
+    fn compute_factors(&self, relayers: &[Option<OffchainPublicKey>], memory: u32) -> Vec<f64> {
+        let judged: Vec<Option<(f64, f64)>> = relayers
+            .iter()
+            .map(|relayer| relayer.and_then(|relayer| self.judge(&relayer, memory)))
+            .collect();
+        let Some(unit) = judged
+            .iter()
+            .flatten()
+            .map(|(_, fastest)| *fastest)
+            .min_by(f64::total_cmp)
+        else {
+            return vec![1.0; relayers.len()];
+        };
+        let factors: Vec<f64> = judged
+            .iter()
+            .map(|judged| judged.map_or(1.0, |(lateness, _)| if lateness > unit { unit / lateness } else { 1.0 }))
+            .collect();
+        // Never all zero, which would leave nothing to draw: the best candidate sets the scale.
+        let best = factors.iter().copied().fold(0.0, f64::max);
+        if best > 0.0 {
+            factors.iter().map(|factor| factor / best).collect()
+        } else {
+            vec![1.0; relayers.len()]
+        }
+    }
+
+    /// The relayer's lateness, the median margin by which it finishes behind its partners less the
+    /// median's own uncertainty, and the fastest round-trip among its remembered races. Its races are
+    /// then remembered for `memory` times its margin plus spread, so a relayer seconds late is judged
+    /// over several such spans and a healthy one over a fraction of a second.
+    fn judge(&self, relayer: &OffchainPublicKey, memory: u32) -> Option<(f64, f64)> {
+        let mut history = self.relayers.get_mut(relayer)?;
+        let remembered = history.memory;
+        let recent = |race: &Race| remembered.is_zero() || race.at.elapsed() <= remembered;
+        history.open.retain(|_, race| recent(race));
+        let still_out = history.open.values().map(|race| Race {
+            margin: race.at.elapsed().as_secs_f64(),
+            ..*race
+        });
+        let races: Vec<Race> = history
+            .races
+            .iter()
+            .rev()
+            .enumerate()
+            .take_while(|(i, race)| *i < MIN_RACES || recent(race))
+            .map(|(_, race)| *race)
+            .chain(still_out)
+            .collect();
+        if races.len() < MIN_RACES {
             return None;
         }
-        let mut sorted: Vec<Duration> = samples.iter().map(|(_, rtt)| *rtt).collect();
-        sorted.sort_unstable();
-        Some(sorted[sorted.len() / 4])
+        let mut margins: Vec<f64> = races.iter().map(|race| race.margin).collect();
+        let margin = median(&mut margins);
+        let spread = median(&mut margins.iter().map(|m| (m - margin).abs()).collect::<Vec<_>>());
+        history.memory = Duration::from_secs_f64(f64::from(memory) * (margin.abs() + spread));
+        let memory = history.memory;
+        history.forget_older_than(memory);
+
+        let fastest = races
+            .iter()
+            .map(|race| race.winning_round_trip)
+            .fold(f64::INFINITY, f64::min);
+        Some((margin - spread / (races.len() as f64).sqrt(), fastest))
     }
+}
+
+/// Lower median; `values` must not be empty.
+fn median(values: &mut [f64]) -> f64 {
+    values.sort_unstable_by(f64::total_cmp);
+    values[(values.len() - 1) / 2]
 }
 
 /// Reads path slots out of a network graph.
@@ -550,6 +697,7 @@ where
     G: hopr_api::graph::NetworkGraphUpdate,
 {
     let (mut legs, mut total_expected, mut total_observed) = (0usize, 0u64, 0u64);
+    registry.relayer_latency.next_epoch();
 
     for (paths, expected, observed) in registry.drain() {
         legs += 1;
@@ -663,40 +811,91 @@ impl<C> SurbTelemetryCodec<C> {
             "surb mint seen by telemetry"
         );
 
-        for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
-            let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
-            let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
-                tracing::debug!(reply_hops = reply.len(), "surb round-trip legs did not resolve");
+        let replies: Vec<Vec<OffchainPublicKey>> = return_paths
+            .iter()
+            .map(|return_path| return_path.transport_path().iter().copied().collect())
+            .collect();
+        // A reply leg is `[R, ..., me]`; `R` is the first relay and the one a late reply implicates.
+        // A direct reply (no relay) has nothing to blame.
+        let first_relayers: Vec<_> = replies
+            .iter()
+            .map(|reply| (reply.len() >= 2).then(|| reply[0]))
+            .collect();
+        let partners = race_partners(minted, &first_relayers);
+        let minted_at = Instant::now();
+
+        for (i, surb_id) in minted.iter().enumerate().take(replies.len()) {
+            let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &replies[i]) else {
+                tracing::debug!(reply_hops = replies[i].len(), "surb round-trip legs did not resolve");
                 continue;
             };
 
             self.registry.record_expected(paths, 1, destination);
-            // A reply leg is `[R, ..., me]`; `R` is the first relay and the one a slow reply
-            // implicates. A direct reply (no relay) has nothing to blame.
-            let first_relayer = (reply.len() >= 2).then(|| reply[0]);
             self.pending.insert(
                 *surb_id,
                 PendingSurb {
                     paths,
-                    first_relayer,
-                    minted_at: Instant::now(),
+                    first_relayer: first_relayers[i],
+                    minted_at,
+                    partner: partners[i],
+                    partner_replied: None,
                 },
             );
         }
     }
 
-    /// Credits the legs a reply came back on.
+    /// Credits the legs a reply came back on, and settles its race once the partner's is home too.
     fn on_replied(&self, surb_id: &HoprSurbId) {
         // A SURB is single-use, so the association is consumed with it.
-        match self.pending.remove(surb_id) {
-            Some(pending) => {
-                self.registry.record_observed(pending.paths, 1);
-                self.registry
-                    .record_rtt(pending.first_relayer, pending.minted_at.elapsed());
+        let Some(pending) = self.pending.remove(surb_id) else {
+            tracing::debug!("reply on a surb with no pending legs");
+            return;
+        };
+        self.registry.record_observed(pending.paths, 1);
+
+        let Some(relayer) = pending.first_relayer else {
+            return;
+        };
+        if let Some((partner_relayer, partner_home)) = pending.partner_replied {
+            self.registry.relayer_latency.record_race(
+                relayer,
+                *surb_id,
+                partner_relayer,
+                partner_home.duration_since(pending.minted_at),
+                partner_home.elapsed(),
+            );
+        } else if let Some(partner) = pending.partner
+            && let Some(mut waiting) = self.pending.get(&partner)
+        {
+            let home = Instant::now();
+            waiting.partner_replied = Some((relayer, home));
+            self.pending.insert(partner, waiting);
+            if let Some(waiting_relayer) = waiting.first_relayer {
+                self.registry.relayer_latency.open_race(
+                    waiting_relayer,
+                    partner,
+                    home.duration_since(pending.minted_at),
+                );
             }
-            None => tracing::debug!("reply on a surb with no pending legs"),
         }
     }
+}
+
+/// The SURB each one races: its neighbour in mint order (first with second, third with fourth),
+/// when both have a first relayer and the two differ.
+fn race_partners(minted: &[HoprSurbId], first_relayers: &[Option<OffchainPublicKey>]) -> Vec<Option<HoprSurbId>> {
+    (0..minted.len())
+        .map(|i| {
+            let neighbour = i ^ 1;
+            match (
+                first_relayers.get(i).copied().flatten(),
+                first_relayers.get(neighbour).copied().flatten(),
+            ) {
+                (Some(own), Some(other)) if own != other => minted.get(neighbour).copied(),
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 impl<C> PacketEncoder for SurbTelemetryCodec<C>
@@ -827,47 +1026,260 @@ mod tests {
         assert!(registry.drain().is_empty());
     }
 
-    /// A relay that answers seconds late must read as slower than one that answers at once, but a
-    /// relay with too few round-trips to judge must report nothing rather than a guess.
-    #[test]
-    fn relayer_latency_should_separate_a_slow_relayer_from_a_measured_too_young_one() {
-        let latency = RelayerLatency::default();
-        let fast = *OffchainKeypair::random().public();
-        let slow = *OffchainKeypair::random().public();
+    /// A few to a few dozen milliseconds: what healthy relayers win or lose a race by.
+    fn jitter(i: u64) -> Duration {
+        Duration::from_millis(5 + i * 7 % 40)
+    }
 
-        for _ in 0..MIN_RTT_SAMPLES {
-            latency.record(fast, Duration::from_millis(20));
-            latency.record(slow, Duration::from_millis(3000));
-        }
+    /// The round-trip of the faster reply in the races below.
+    const ROUND_TRIP: Duration = Duration::from_millis(200);
 
-        assert_eq!(latency.low_quantile(&fast), Some(Duration::from_millis(20)));
-        assert!(
-            latency
-                .low_quantile(&slow)
-                .is_some_and(|rtt| rtt > Duration::from_secs(2)),
-            "a stalled relayer's replies must read seconds late"
-        );
-
-        let too_young = *OffchainKeypair::random().public();
-        latency.record(too_young, Duration::from_millis(10));
-        assert_eq!(
-            latency.low_quantile(&too_young),
-            None,
-            "one reply is not enough to judge a relayer"
-        );
+    fn margins_of(latency: &RelayerLatency, relayer: &OffchainPublicKey) -> Vec<f64> {
+        latency
+            .relayers
+            .get(relayer)
+            .map(|history| history.races.iter().map(|race| race.margin).collect())
+            .unwrap_or_default()
     }
 
     #[test]
-    fn a_few_surbs_that_sat_in_the_store_should_not_make_a_relayer_read_slow() {
+    fn a_relayer_losing_its_races_by_seconds_should_lose_its_weight() {
         let latency = RelayerLatency::default();
-        let relayer = *OffchainKeypair::random().public();
-
-        for i in 0..32 {
-            let stale = i % 3 == 0;
-            latency.record(relayer, Duration::from_millis(if stale { 60_000 } else { 20 }));
+        let [fast, also_fast, stalled] = [(); 3].map(|_| *OffchainKeypair::random().public());
+        for i in 0..40 {
+            let (winner, loser) = if i % 2 == 0 {
+                (fast, also_fast)
+            } else {
+                (also_fast, fast)
+            };
+            latency.record_race(loser, surb_id(0), winner, ROUND_TRIP, jitter(i));
+            latency.record_race(
+                stalled,
+                surb_id(0),
+                winner,
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            );
         }
 
-        assert_eq!(latency.low_quantile(&relayer), Some(Duration::from_millis(20)));
+        let factors = latency.factors(&[Some(fast), Some(also_fast), Some(stalled), None], 4);
+        assert_eq!(
+            &[1.0, 1.0],
+            &factors[..2],
+            "trading wins by milliseconds is not a stall"
+        );
+        assert!(
+            factors[2] < 0.1,
+            "a relayer fifteen round-trips late must lose its weight, got {}",
+            factors[2]
+        );
+        assert_eq!(1.0, factors[3]);
+    }
+
+    /// Healthy relayers differ by tens to hundreds of milliseconds; lagging by less than a
+    /// round-trip must not cost a relayer its share, however consistently it lags.
+    #[test]
+    fn a_relayer_lagging_by_less_than_a_round_trip_should_keep_its_weight() {
+        let latency = RelayerLatency::default();
+        let [near, far] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        for i in 0..40 {
+            latency.record_race(
+                far,
+                surb_id(0),
+                near,
+                ROUND_TRIP,
+                Duration::from_millis(150) + jitter(i) / 10,
+            );
+        }
+
+        assert_eq!(vec![1.0, 1.0], latency.factors(&[Some(near), Some(far)], 4));
+    }
+
+    #[test]
+    fn a_relayer_with_too_few_races_should_stay_neutral() {
+        let latency = RelayerLatency::default();
+        let [fast, young] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        for _ in 1..MIN_RACES {
+            latency.record_race(young, surb_id(0), fast, ROUND_TRIP, Duration::from_secs(3));
+        }
+
+        assert_eq!(vec![1.0, 1.0], latency.factors(&[Some(fast), Some(young)], 4));
+    }
+
+    #[test]
+    fn a_recovered_relayer_should_regain_its_weight_once_its_late_races_are_forgotten() -> anyhow::Result<()> {
+        let latency = RelayerLatency::default();
+        let [fast, recovered] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        let long_ago = Instant::now()
+            .checked_sub(Duration::from_secs(60))
+            .context("monotonic clock younger than a minute")?;
+        for i in 0..20 {
+            latency.record(
+                recovered,
+                Race {
+                    at: long_ago,
+                    margin: 3.0 + jitter(i).as_secs_f64(),
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+        }
+        assert!(
+            latency.factors(&[Some(fast), Some(recovered)], 4)[1] < 0.1,
+            "precondition: judged stalled"
+        );
+
+        latency.next_epoch();
+        for i in 0..20 {
+            let (later, earlier) = if i % 2 == 0 {
+                (fast, recovered)
+            } else {
+                (recovered, fast)
+            };
+            latency.record_race(later, surb_id(0), earlier, ROUND_TRIP, jitter(i));
+        }
+        assert_eq!(vec![1.0, 1.0], latency.factors(&[Some(fast), Some(recovered)], 4));
+        Ok(())
+    }
+
+    /// A reply still out while its partner's is home has lost by at least that long already, so a
+    /// stall shows before the held replies finally arrive.
+    #[test]
+    fn a_reply_still_out_should_count_as_lost_by_at_least_its_wait() -> anyhow::Result<()> {
+        let latency = RelayerLatency::default();
+        let [fast, also_fast, stalled] = [(); 3].map(|_| *OffchainKeypair::random().public());
+        for i in 0..20 {
+            latency.record_race(also_fast, surb_id(0), fast, ROUND_TRIP, jitter(i));
+        }
+        let partners_home = Instant::now()
+            .checked_sub(Duration::from_secs(2))
+            .context("monotonic clock younger than two seconds")?;
+        for seed in 1..=5 {
+            latency.relayers.entry(stalled).or_default().open.insert(
+                surb_id(seed),
+                Race {
+                    at: partners_home,
+                    margin: 0.0,
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+        }
+
+        let factors = latency.factors(&[Some(fast), Some(also_fast), Some(stalled)], 4);
+        assert_eq!(&[1.0, 1.0], &factors[..2]);
+        assert!(
+            factors[2] < 0.2,
+            "replies two seconds overdue must cost the relayer its weight, got {}",
+            factors[2]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn settling_a_race_should_close_it() {
+        let latency = RelayerLatency::default();
+        let [early, late] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        latency.open_race(late, surb_id(1), ROUND_TRIP);
+        latency.record_race(late, surb_id(1), early, ROUND_TRIP, jitter(0));
+
+        let history = latency.relayers.get(&late).expect("the late relayer has a history");
+        assert!(history.open.is_empty());
+        assert_eq!(1, history.races.len());
+    }
+
+    /// All zero would leave nothing to draw, so the best candidate keeps full weight even when every
+    /// candidate finishes late against some other relayer.
+    #[test]
+    fn the_best_candidate_should_keep_full_weight_when_all_finish_late() {
+        let latency = RelayerLatency::default();
+        let [outsider, late, later] = [(); 3].map(|_| *OffchainKeypair::random().public());
+        for i in 0..20 {
+            latency.record_race(
+                late,
+                surb_id(0),
+                outsider,
+                ROUND_TRIP,
+                Duration::from_secs(1) + jitter(i),
+            );
+            latency.record_race(
+                later,
+                surb_id(0),
+                outsider,
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            );
+        }
+
+        let factors = latency.factors(&[Some(late), Some(later)], 4);
+        assert_eq!(1.0, factors[0]);
+        assert!(factors[1] < 1.0, "the later one still weighs less, got {}", factors[1]);
+    }
+
+    /// Whatever two SURBs of one packet spent in the replier's store, they spent together, so only
+    /// the gap between their replies counts against the later one.
+    #[test]
+    fn a_race_should_be_settled_by_the_gap_between_the_two_replies() {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let [early, late] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        let minted_at = Instant::now();
+        let pending_via = |relayer, partner| PendingSurb {
+            paths: ForwardAndReturnPath {
+                forward: [0; PATH_ID_SLOTS],
+                reply: [0; PATH_ID_SLOTS],
+            },
+            first_relayer: Some(relayer),
+            minted_at,
+            partner: Some(partner),
+            partner_replied: None,
+        };
+        recorder.pending.insert(surb_id(1), pending_via(early, surb_id(2)));
+        recorder.pending.insert(surb_id(2), pending_via(late, surb_id(1)));
+        let latency = &recorder.registry.relayer_latency;
+
+        recorder.on_replied(&surb_id(1));
+        assert!(
+            margins_of(latency, &early).is_empty(),
+            "no race settled until both are home"
+        );
+        assert_eq!(
+            1,
+            latency.relayers.get(&late).map_or(0, |history| history.open.len()),
+            "the reply still out is a race already being lost"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+        recorder.on_replied(&surb_id(2));
+        assert_eq!(0, latency.relayers.get(&late).map_or(0, |history| history.open.len()));
+
+        let lost_by = margins_of(latency, &late);
+        assert_eq!(1, lost_by.len());
+        assert!(
+            lost_by[0] >= 0.02,
+            "the later reply loses by the gap, got {}",
+            lost_by[0]
+        );
+        assert_eq!(vec![-lost_by[0]], margins_of(latency, &early));
+    }
+
+    #[test]
+    fn surbs_should_race_their_neighbour_only_through_another_first_relayer() {
+        let [a, b] = [(); 2].map(|_| *OffchainKeypair::random().public());
+        let ids = [surb_id(1), surb_id(2), surb_id(3)];
+
+        assert_eq!(
+            vec![Some(ids[1]), Some(ids[0]), None],
+            race_partners(&ids, &[Some(a), Some(b), Some(a)]),
+            "the odd one out has no partner"
+        );
+        assert_eq!(
+            vec![None, None],
+            race_partners(&ids[..2], &[Some(a), Some(a)]),
+            "a relayer cannot race itself"
+        );
+        assert_eq!(
+            vec![None, None],
+            race_partners(&ids[..2], &[None, Some(b)]),
+            "a direct reply has no relayer to blame"
+        );
     }
 
     #[test]
@@ -1557,6 +1969,32 @@ mod tests {
         mint_only(&registry, paths, destination);
         deliver(&registry, heartbeat(), destination);
         assert_eq!(vec![destination], flush(&registry));
+        let _ = (graph, me);
+    }
+
+    #[test]
+    fn a_run_should_not_survive_flushes_in_which_the_pair_was_not_used() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = registry_at_slot_zero();
+        let paths = legs();
+
+        deliver(&registry, paths, destination);
+        assert!(flush(&registry).is_empty());
+        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            assert!(flush(&registry).is_empty());
+        }
+
+        // The pair goes unused for a while, then is drawn again: its first busy flush is in flight.
+        for _ in 0..3 {
+            deliver(&registry, heartbeat(), destination);
+            assert!(flush(&registry).is_empty());
+        }
+        mint_only(&registry, paths, destination);
+        deliver(&registry, heartbeat(), destination);
+        assert!(flush(&registry).is_empty(), "a reused pair must start a fresh run");
         let _ = (graph, me);
     }
 

@@ -165,6 +165,8 @@ pub(super) async fn process_chain_events<C, G, S>(
 
                         // Only our own outgoing channels matter for SURBs: `to` is then the peer
                         // we would have to pay as the first relayer of a stored SURB's return path.
+                        // A channel deeper in a return path is paid by another relayer and is not
+                        // observable here; the entry sees such a path fail end to end instead.
                         if src_addr == own_chain_addr {
                             match chain_reader.key_id_mapper_ref().map_key_to_id(&to) {
                                 // Matched exhaustively on purpose: a wildcard would silently
@@ -172,9 +174,9 @@ pub(super) async fn process_chain_events<C, G, S>(
                                 // cannot be paid for, with no compiler warning.
                                 Some(relayer) => match channel.status {
                                     ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => {
-                                        surb_store.on_relayer_state(&relayer, RelayerState::ChannelClosed)
+                                        surb_store.on_relayer_state(&relayer, RelayerState::OwnChannelClosed)
                                     }
-                                    ChannelStatus::Open => surb_store.on_relayer_state(&relayer, RelayerState::ChannelOpen),
+                                    ChannelStatus::Open => surb_store.on_relayer_state(&relayer, RelayerState::OwnChannelOpen),
                                 },
                                 None => tracing::warn!(
                                     %channel,

@@ -140,6 +140,13 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
+    /// How long a relayer's reply races are remembered, in multiples of how far it typically
+    /// finishes from its partners, when return paths are weighted by how late each first relayer
+    /// answers: one replying seconds late is judged over several such spans, a healthy one over a
+    /// fraction of a second. Longer is steadier but slower to notice a stall and to forgive a
+    /// recovered relayer. `0` disables the weighting. Defaults to 4.
+    #[default = 4]
+    pub latency_race_memory: u32,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -482,6 +489,7 @@ pub struct PathPlanner<Surb, R, S> {
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
+    latency_race_memory: u32,
     /// Per-relayer SURB reply timing. A stall keeps the graph's delivery ratio at ~1, so it is
     /// applied here, where return paths are drawn.
     relayer_latency: Option<Arc<RelayerLatency>>,
@@ -515,6 +523,7 @@ where
             },
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
+            latency_race_memory: config.latency_race_memory,
             relayer_latency: None,
         }
     }
@@ -714,30 +723,14 @@ where
         moved
     }
 
-    /// Per-candidate weight from how much later its first reply relayer answers than a typical
-    /// sibling: `median / own` over low quantiles, capped at `1.0`, and `1.0` where no timing is
-    /// known. A ratio, because store residency at the replier scales every sibling alike.
+    /// Per-candidate weight from how its first reply relayer fares in reply races against the
+    /// relayers it shared packets with; see [`RelayerLatency::factors`].
     fn relayer_latency_factors(&self, items: &[&(ValidatedPath, f64)]) -> Vec<f64> {
-        let Some(latency) = &self.relayer_latency else {
+        let Some(latency) = self.relayer_latency.as_ref().filter(|_| self.latency_race_memory > 0) else {
             return vec![1.0; items.len()];
         };
-        let rtts: Vec<Option<f64>> = items
-            .iter()
-            .map(|item| {
-                item.0
-                    .first()
-                    .and_then(|relayer| latency.low_quantile(relayer))
-                    .map(|rtt| rtt.as_secs_f64())
-            })
-            .collect();
-        let mut known: Vec<f64> = rtts.iter().flatten().copied().collect();
-        known.sort_unstable_by(f64::total_cmp);
-        let Some(typical) = known.get(known.len().saturating_sub(1) / 2).copied() else {
-            return vec![1.0; items.len()];
-        };
-        rtts.into_iter()
-            .map(|rtt| rtt.filter(|rtt| *rtt > 0.0).map_or(1.0, |rtt| (typical / rtt).min(1.0)))
-            .collect()
+        let relayers: Vec<_> = items.iter().map(|item| item.0.first().copied()).collect();
+        latency.factors(&relayers, self.latency_race_memory)
     }
 
     /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
@@ -2018,9 +2011,14 @@ mod tests {
         let (planner, _graph) = two_relayer_return_planner();
         let planner = planner.with_relayer_latency(latency.clone());
         let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
-        for _ in 0..20 {
-            latency.record(a, Duration::from_millis(1000));
-            latency.record(b, Duration::from_millis(15000));
+        for i in 0..20u64 {
+            latency.record_race(
+                b,
+                Default::default(),
+                a,
+                Duration::from_millis(200),
+                Duration::from_millis(3000 + i * 7 % 40),
+            );
         }
 
         let paths = planner
@@ -2044,15 +2042,22 @@ mod tests {
         Ok(())
     }
 
+    /// Who wins a race by a few milliseconds is noise, not a stall.
     #[tokio::test]
-    async fn siblings_slowed_alike_by_the_replier_should_keep_their_shares() -> anyhow::Result<()> {
+    async fn relayers_trading_wins_by_milliseconds_should_keep_their_shares() -> anyhow::Result<()> {
         let latency = Arc::new(RelayerLatency::default());
         let (planner, _graph) = two_relayer_return_planner();
         let planner = planner.with_relayer_latency(latency.clone());
         let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
-        for _ in 0..20 {
-            latency.record(a, Duration::from_millis(4000));
-            latency.record(b, Duration::from_millis(4400));
+        for i in 0..20u64 {
+            let (later, earlier) = if i % 2 == 0 { (a, b) } else { (b, a) };
+            latency.record_race(
+                later,
+                Default::default(),
+                earlier,
+                Duration::from_millis(200),
+                Duration::from_millis(5 + i * 7 % 40),
+            );
         }
 
         let paths = planner
@@ -2065,7 +2070,7 @@ mod tests {
         let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
         assert!(
             via_b > 140,
-            "seconds of store residency common to both must not starve one, got {via_b} of 400"
+            "millisecond wins either way must not starve one, got {via_b} of 400"
         );
         Ok(())
     }

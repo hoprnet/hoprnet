@@ -52,13 +52,16 @@ pub trait SurbStore {
     fn on_relayer_state(&self, _relayer: &HoprKeyIdent, _state: RelayerState) {}
 }
 
-/// A change in whether a relayer can start a SURB return path.
+/// A change in whether a relayer can start a SURB return path. Only the first hop is observable
+/// here: our connection to the relayer, and our own outgoing channel to it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RelayerState {
     Connected,
     Disconnected,
-    ChannelOpen,
-    ChannelClosed,
+    /// Our outgoing channel to the relayer, the one a reply pays the first hop with, opened.
+    OwnChannelOpen,
+    /// Our outgoing channel to the relayer closed or is closing.
+    OwnChannelClosed,
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).

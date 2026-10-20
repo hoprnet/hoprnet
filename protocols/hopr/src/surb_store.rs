@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     sync::{
         Arc,
         atomic::{AtomicU64, AtomicUsize, Ordering},
@@ -264,12 +264,9 @@ impl Default for EvictionReporters {
 pub struct MemorySurbStore {
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
     surbs_per_pseudonym: moka::sync::Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
-    /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
-    /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
-    invalidated_relayers: Arc<parking_lot::RwLock<HashSet<HoprKeyIdent>>>,
-    /// Relayers this node has no connection to. Same handling as invalidated ones: their SURBs are
-    /// dropped, and the relayer, not its SURBs, becomes usable again once it reconnects.
-    disconnected_relayers: Arc<parking_lot::RwLock<HashSet<HoprKeyIdent>>>,
+    /// First relayers a return path cannot start through, and why. Replaced whole on a state change,
+    /// so the per-packet checks read it with an `Arc` clone instead of copying a set.
+    invalid_relayers: Arc<parking_lot::RwLock<Arc<HashMap<HoprKeyIdent, Invalid>>>>,
     reporters: Arc<EvictionReporters>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -305,29 +302,30 @@ impl MemorySurbStore {
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
-            invalidated_relayers: Default::default(),
-            disconnected_relayers: Default::default(),
+            invalid_relayers: Default::default(),
             reporters,
             cfg: cfg.into(),
         }
     }
 
-    /// Whether `relayer` is currently unusable as a return path's first hop.
+    /// Whether our own channel to `relayer` is closed, so a return path cannot start through it.
     pub fn is_relayer_invalidated(&self, relayer: &HoprKeyIdent) -> bool {
-        self.invalidated_relayers.read().contains(relayer)
+        self.invalid_relayers
+            .read()
+            .get(relayer)
+            .is_some_and(|i| i.channel_closed)
     }
 
-    /// Snapshot of the unusable first relayers, so the check runs without locks under a buffer's lock.
+    /// Snapshot of the invalid first relayers, so the check runs without locks under a buffer's lock.
     fn usable_fn(&self) -> impl Fn(&HoprSurb) -> bool + use<> {
-        let mut unusable = self.invalidated_relayers.read().clone();
-        unusable.extend(self.disconnected_relayers.read().iter().copied());
-        move |surb| surb_is_usable(surb, &unusable)
+        let invalid = self.invalid_relayers.read().clone();
+        move |surb| surb_is_usable(surb, |relayer| invalid.contains_key(relayer))
     }
 
     /// As [`Self::usable_fn`], but only a closed channel counts: what a common-mode outage keeps.
     fn payable_fn(&self) -> impl Fn(&HoprSurb) -> bool + use<> {
-        let invalidated = self.invalidated_relayers.read().clone();
-        move |surb| surb_is_usable(surb, &invalidated)
+        let invalid = self.invalid_relayers.read().clone();
+        move |surb| surb_is_usable(surb, |relayer| invalid.get(relayer).is_some_and(|i| i.channel_closed))
     }
 }
 
@@ -336,7 +334,14 @@ impl MemorySurbStore {
 /// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
 /// channel (RFC-0003 §3.2, RFC-0006 §6.1). Without that exemption, closing an unrelated channel
 /// to a session's originator would discard perfectly good SURBs.
-fn surb_is_usable(surb: &HoprSurb, unusable: &HashSet<HoprKeyIdent>) -> bool {
+/// Why a first relayer is invalid; it is valid again once neither holds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Invalid {
+    channel_closed: bool,
+    disconnected: bool,
+}
+
+fn surb_is_usable(surb: &HoprSurb, is_invalid: impl Fn(&HoprKeyIdent) -> bool) -> bool {
     match surb.additional_data_receiver.proof_of_relay_values().chain_length() {
         1 => true,
         // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. The length is an
@@ -348,7 +353,7 @@ fn surb_is_usable(surb: &HoprSurb, unusable: &HashSet<HoprKeyIdent>) -> bool {
             );
             false
         }
-        _ => !unusable.contains(&surb.first_relayer),
+        _ => !is_invalid(&surb.first_relayer),
     }
 }
 
@@ -399,7 +404,7 @@ impl SurbStore for MemorySurbStore {
         let surbs: Vec<_> = surbs.into_iter().filter(|(_, surb)| usable(surb)).collect();
         let refused = arrived - surbs.len();
         if refused > 0 {
-            tracing::debug!(%pseudonym, refused, "dropping arriving SURBs whose first relayer is unusable");
+            tracing::debug!(%pseudonym, refused, "dropping arriving SURBs whose first relayer is invalid");
         }
         let mut outcome = self
             .surbs_per_pseudonym
@@ -407,7 +412,7 @@ impl SurbStore for MemorySurbStore {
             .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY), self.cfg.pop_order))
             .value()
             .push(surbs);
-        outcome.unusable += refused;
+        outcome.invalid += refused;
         outcome
     }
 
@@ -448,16 +453,28 @@ impl SurbStore for MemorySurbStore {
 
     #[tracing::instrument(skip_all, level = "trace")]
     fn on_relayer_state(&self, relayer: &HoprKeyIdent, state: RelayerState) {
-        let changed = match state {
-            RelayerState::Connected => self.disconnected_relayers.write().remove(relayer),
-            RelayerState::Disconnected => self.disconnected_relayers.write().insert(*relayer),
-            RelayerState::ChannelOpen => self.invalidated_relayers.write().remove(relayer),
-            RelayerState::ChannelClosed => self.invalidated_relayers.write().insert(*relayer),
-        };
-        if !changed {
-            return;
+        {
+            let mut snapshot = self.invalid_relayers.write();
+            let before = snapshot.get(relayer).copied().unwrap_or_default();
+            let mut after = before;
+            match state {
+                RelayerState::Connected => after.disconnected = false,
+                RelayerState::Disconnected => after.disconnected = true,
+                RelayerState::OwnChannelOpen => after.channel_closed = false,
+                RelayerState::OwnChannelClosed => after.channel_closed = true,
+            }
+            if after == before {
+                return;
+            }
+            let mut invalid = (**snapshot).clone();
+            if after == Invalid::default() {
+                invalid.remove(relayer);
+            } else {
+                invalid.insert(*relayer, after);
+            }
+            *snapshot = Arc::new(invalid);
         }
-        if matches!(state, RelayerState::Connected | RelayerState::ChannelOpen) {
+        if matches!(state, RelayerState::Connected | RelayerState::OwnChannelOpen) {
             tracing::info!(%relayer, ?state, "relayer is usable again for new SURB return paths");
             return;
         }
@@ -548,7 +565,7 @@ impl<S> SurbRingBuffer<S> {
         SurbInsertOutcome {
             retained: rb.len(),
             evicted,
-            unusable: self.dropped.swap(0, Ordering::Relaxed),
+            invalid: self.dropped.swap(0, Ordering::Relaxed),
         }
     }
 
@@ -724,7 +741,7 @@ mod tests {
             ],
         );
 
-        store.on_relayer_state(&dead, RelayerState::ChannelClosed);
+        store.on_relayer_state(&dead, RelayerState::OwnChannelClosed);
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
@@ -753,7 +770,7 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
 
         store.insert_surbs(pseudonym, vec![([7u8; 8], surb_via(recipient, DIRECT)?)]);
-        store.on_relayer_state(&recipient, RelayerState::ChannelClosed);
+        store.on_relayer_state(&recipient, RelayerState::OwnChannelClosed);
         store.on_relayer_state(&recipient, RelayerState::Disconnected);
 
         let found = store
@@ -799,7 +816,7 @@ mod tests {
         store.on_relayer_state(&gone, RelayerState::Disconnected);
         let outcome = store.insert_surbs(pseudonym, vec![([4u8; 8], surb_via(gone, TWO_HOP)?)]);
         assert_eq!(
-            3, outcome.unusable,
+            3, outcome.invalid,
             "the two dropped SURBs and the refused arrival must reach the level estimate"
         );
         assert_eq!(0, outcome.evicted, "an unusable relayer is not a full buffer");
@@ -807,7 +824,7 @@ mod tests {
 
         store.on_relayer_state(&gone, RelayerState::Connected);
         let outcome = store.insert_surbs(pseudonym, vec![([5u8; 8], surb_via(gone, TWO_HOP)?)]);
-        assert_eq!(0, outcome.unusable);
+        assert_eq!(0, outcome.invalid);
         assert_eq!(2, outcome.retained, "the relayer, not its old SURBs, is usable again");
 
         Ok(())
@@ -835,7 +852,7 @@ mod tests {
         assert_eq!([2u8; 8], found.sender_id.surb_id());
 
         store.on_relayer_state(&b, RelayerState::Disconnected);
-        store.on_relayer_state(&a, RelayerState::ChannelClosed);
+        store.on_relayer_state(&a, RelayerState::OwnChannelClosed);
         store.on_relayer_state(&a, RelayerState::Connected);
         store.on_relayer_state(&b, RelayerState::Connected);
         assert!(
@@ -853,15 +870,15 @@ mod tests {
         let store = MemorySurbStore::default();
         let pseudonym = HoprPseudonym::random();
 
-        store.on_relayer_state(&relayer, RelayerState::ChannelClosed);
+        store.on_relayer_state(&relayer, RelayerState::OwnChannelClosed);
         store.on_relayer_state(&relayer, RelayerState::Disconnected);
         store.on_relayer_state(&relayer, RelayerState::Connected);
         let outcome = store.insert_surbs(pseudonym, vec![([1u8; 8], surb_via(relayer, TWO_HOP)?)]);
-        assert_eq!(1, outcome.unusable, "the channel is still closed");
+        assert_eq!(1, outcome.invalid, "the channel is still closed");
 
-        store.on_relayer_state(&relayer, RelayerState::ChannelOpen);
+        store.on_relayer_state(&relayer, RelayerState::OwnChannelOpen);
         let outcome = store.insert_surbs(pseudonym, vec![([2u8; 8], surb_via(relayer, TWO_HOP)?)]);
-        assert_eq!(0, outcome.unusable);
+        assert_eq!(0, outcome.invalid);
         assert_eq!(1, outcome.retained);
 
         Ok(())
@@ -883,7 +900,7 @@ mod tests {
         assert_eq!(2, popped.surb);
         assert_eq!(1, popped.remaining);
         let outcome = rb.push([]);
-        assert_eq!(1, outcome.unusable, "the entry dropped on the way is reported");
+        assert_eq!(1, outcome.invalid, "the entry dropped on the way is reported");
         assert_eq!(0, outcome.evicted);
         assert_eq!(Some(left_behind), rb.pop_next_usable(|_| true).map(|p| p.surb));
 
@@ -932,7 +949,7 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 0,
-                unusable: 0
+                invalid: 0
             },
             rb.push([([1u8; 8], 0), ([2u8; 8], 0)])
         );
@@ -940,7 +957,7 @@ mod tests {
             SurbInsertOutcome {
                 retained: 4,
                 evicted: 0,
-                unusable: 0
+                invalid: 0
             },
             rb.push([([3u8; 8], 0), ([4u8; 8], 0)])
         );
@@ -960,7 +977,7 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                unusable: 0
+                invalid: 0
             },
             outcome,
             "a 3-element push into a 2-slot buffer drops exactly one"
@@ -989,7 +1006,7 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                unusable: 0
+                invalid: 0
             },
             rb.push([([3u8; 8], 0)])
         );
@@ -997,7 +1014,7 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 2,
-                unusable: 0
+                invalid: 0
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)])
         );
