@@ -564,10 +564,23 @@ where
         )));
     }
 
+    // The network the node joined, with the minimums it enforces: what a log reader needs to judge
+    // ticket problems. Best effort, because the checks above have already passed.
+    let (network_name, network_chain_id) = match chain_api.chain_info().await {
+        Ok(info) => (info.hopr_network_name, Some(info.chain_id)),
+        Err(error) => {
+            tracing::warn!(%error, "could not read the network information");
+            (String::new(), None)
+        }
+    };
     tracing::info!(
         peer_id = %transport_id.public().to_peerid_str(),
         address = %me_onchain,
         hopr_lib_version = constants::APP_VERSION,
+        network = network_name,
+        chain_id = network_chain_id,
+        %network_min_ticket_price,
+        %network_min_win_prob,
         "Node information"
     );
 
