@@ -888,6 +888,67 @@ mod tests {
         Ok(())
     }
 
+    /// Documents and pins the tracker's remaining, *accepted* residual: replay protection expires
+    /// with `unack_ticket_timeout`, independently of on-chain redemption.
+    ///
+    /// An index that was accepted but never redeemed becomes replayable once its record expires,
+    /// so a counterparty that withholds acknowledgements (leaving the on-chain channel index
+    /// unchanged) can recycle a batch of indices once per window. This is materially weaker than
+    /// the reported attack — each replay needs a fresh window rather than a fresh index, and the
+    /// amplification is not unbounded — but it is not nothing, and it is why this timeout is a
+    /// replay-protection knob and not merely a cache knob.
+    ///
+    /// Closing it properly requires retiring indices on redemption rather than on a timer, which
+    /// needs state outside this in-memory tracker. If that lands, this test should be inverted
+    /// rather than deleted, so the guarantee is asserted in whichever direction is intended.
+    #[tokio::test]
+    async fn ticket_processor_replay_is_possible_only_after_the_tracker_ttl_expires() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                // Below the production minimum of 10s, but `new` does not run the validator and the
+                // test only needs to observe the expiry, not the production default.
+                unack_ticket_timeout: std::time::Duration::from_millis(300),
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
+            let ack_share = HalfKey::random();
+            let ticket = build_unack_ticket(index, 1, &ack_share)?;
+            Ok(ticket_processor.insert_unacknowledged_ticket(
+                &TEST_CHANNEL_ID,
+                1,
+                PEERS[2].1.public(),
+                ack_share.to_challenge()?,
+                ticket,
+            ))
+        };
+
+        insert(42)
+            .context("first insert must be attempted")?
+            .context("a fresh index must be accepted")?;
+        assert!(
+            insert(42).context("immediate replay must be attempted")?.is_err(),
+            "an index must not be replayable while its record is live"
+        );
+
+        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+        ticket_processor.seen_ticket_indices.run_pending_tasks();
+
+        assert!(
+            insert(42).context("post-expiry replay must be attempted")?.is_ok(),
+            "if this now fails the tracker retains indices beyond its TTL, which is strictly stronger than documented \
+             and should update the docs on unack_ticket_timeout"
+        );
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn ticket_processor_should_accept_same_ticket_index_on_different_channel() -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
