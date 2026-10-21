@@ -597,6 +597,11 @@ mod tests {
                 data: Box::new([0x08]),
                 ack_challenge: HalfKeyChallenge::default(),
                 received_ticket: ticket.into_unacknowledged(HalfKey::random()),
+                channel_id: hopr_api::types::internal::prelude::generate_channel_id(
+                    &Address::new(&[1u8; Address::SIZE]),
+                    &Address::new(&[2u8; Address::SIZE]),
+                ),
+                channel_epoch: 1,
                 ack_key_prev_hop: HalfKey::random(),
             }
             .into(),

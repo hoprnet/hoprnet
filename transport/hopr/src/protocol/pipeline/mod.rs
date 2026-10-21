@@ -75,7 +75,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
-        "Number of incoming packets rejected due various reasons",
+        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts forwarded packets whose ticket index was already accepted on the same channel and epoch (replayed index attack)",
         &["reason"]
     ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
@@ -444,10 +444,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             ack_key_prev_hop,
                             ack_challenge,
                             received_ticket,
+                            channel_id,
+                            channel_epoch,
                             ..
                         } = *fwd_packet;
                         // Per requirements, this call is not blocking
-                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket) {
+                        if let Err(error) =
+                            ticket_proc.insert_unacknowledged_ticket(&channel_id, channel_epoch, &next_hop, ack_challenge, received_ticket)
+                        {
                             tracing::error!(
                                 previous_hop = previous_hop.to_peerid_str(),
                                 next_hop = next_hop.to_peerid_str(),
@@ -456,7 +460,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             );
 
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            METRIC_PACKET_REJECTED_COUNT.increment(&["unack_processing_error"]);
+                            if T::is_duplicate_ticket_index_error(&error) {
+                                METRIC_PACKET_REJECTED_COUNT.increment(&["duplicate_ticket_index"]);
+                            } else {
+                                METRIC_PACKET_REJECTED_COUNT.increment(&["unack_processing_error"]);
+                            }
 
                             return None;
                         }
@@ -892,6 +900,8 @@ impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
     #[inline]
     fn insert_unacknowledged_ticket(
         &self,
+        _: &ChannelId,
+        _: u32,
         _: &OffchainPublicKey,
         _: HalfKeyChallenge,
         _: UnacknowledgedTicket,
@@ -1425,6 +1435,8 @@ mod tests {
 
         fn insert_unacknowledged_ticket(
             &self,
+            _: &ChannelId,
+            _: u32,
             _: &OffchainPublicKey,
             _: HalfKeyChallenge,
             _: UnacknowledgedTicket,

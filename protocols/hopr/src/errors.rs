@@ -57,6 +57,9 @@ pub enum HoprProtocolError {
     #[error("could not find unacknowledged ticket for challenge {0}")]
     UnacknowledgedTicketNotFound(HalfKeyChallenge),
 
+    #[error("ticket index {2} in channel {0} epoch {1} was already accepted")]
+    DuplicateTicketIndex(ChannelId, u32, u64),
+
     #[error("chain resolver error: {0}")]
     ResolverError(#[source] anyhow::Error),
 

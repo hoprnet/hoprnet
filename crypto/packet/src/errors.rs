@@ -71,6 +71,9 @@ pub enum ValidationErrorKind {
     /// Ticket index is lower than the given channel ticket index.
     #[error("ticket index is lower than channel index {0}")]
     IndexTooLow(u64),
+    /// Ticket counterparty does not match the channel destination.
+    #[error("ticket counterparty does not match the channel destination {0}")]
+    WrongCounterparty(Address),
     /// Not enough funds in the given channel to pay for the ticket.
     #[error("ticket value is greater than remaining unrealized balance {1} in channel {0}")]
     InsufficientFunds(ChannelId, HoprBalance),

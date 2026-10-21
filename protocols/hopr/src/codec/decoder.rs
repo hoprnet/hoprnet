@@ -61,7 +61,7 @@ where
     fn validate_and_replace_ticket(
         &self,
         mut fwd: HoprForwardedPacket,
-    ) -> Result<(HoprForwardedPacket, UnacknowledgedTicket), HoprProtocolError> {
+    ) -> Result<(HoprForwardedPacket, UnacknowledgedTicket, (ChannelId, u32)), HoprProtocolError> {
         let previous_hop_addr = trace_timed!("previous_hop_addr lookup", {
             self.chain_api
                 .packet_key_to_chain_key(&fwd.previous_hop)
@@ -166,7 +166,11 @@ where
         });
 
         let unack_ticket = verified_incoming_ticket.into_unacknowledged(fwd.own_key);
-        Ok((fwd, unack_ticket))
+        Ok((
+            fwd,
+            unack_ticket,
+            (*incoming_channel.get_id(), incoming_channel.channel_epoch),
+        ))
     }
 }
 
@@ -346,15 +350,16 @@ where
             HoprPacket::Forwarded(fwd) => {
                 // Phase 3: Ticket validation and replacement for forwarded packets
                 // Transform the ticket so it can be sent to the next hop
-                let (fwd, verified_unack_ticket) = trace_timed!("ticket_validation complete", {
-                    self.validate_and_replace_ticket(*fwd).map_err(|error| match error {
-                        // Distinguish ticket validation errors so that they can get extra treatment later
-                        HoprProtocolError::TicketValidationError(e) => {
-                            IncomingPacketError::InvalidTicket(previous_hop.into(), e)
-                        }
-                        e => IncomingPacketError::ProcessingError(previous_hop.into(), e),
-                    })?
-                });
+                let (fwd, verified_unack_ticket, (channel_id, channel_epoch)) =
+                    trace_timed!("ticket_validation complete", {
+                        self.validate_and_replace_ticket(*fwd).map_err(|error| match error {
+                            // Distinguish ticket validation errors so that they can get extra treatment later
+                            HoprProtocolError::TicketValidationError(e) => {
+                                IncomingPacketError::InvalidTicket(previous_hop.into(), e)
+                            }
+                            e => IncomingPacketError::ProcessingError(previous_hop.into(), e),
+                        })?
+                    });
 
                 let mut payload = BytesMut::with_capacity(HoprPacket::SIZE);
                 payload.put_slice(fwd.outgoing.packet.as_ref());
@@ -374,6 +379,8 @@ where
                         data: payload.freeze(),
                         ack_challenge: fwd.outgoing.ack_challenge,
                         received_ticket: verified_unack_ticket,
+                        channel_id,
+                        channel_epoch,
                         ack_key_prev_hop: fwd.ack_key,
                     }
                     .into(),

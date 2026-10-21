@@ -178,13 +178,35 @@ pub trait UnacknowledgedTicketProcessor {
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
     ///
+    /// `channel_id` and `channel_epoch` identify the channel the ticket was issued on, as resolved
+    /// by the decoder. They MUST be supplied by the caller and not derived from
+    /// [`ticket`](UnacknowledgedTicket) itself, because the ticket's channel id is
+    /// attacker-controllable.
+    ///
+    /// Returns `Err` if this ticket index was already accepted on that channel and epoch and has
+    /// not yet been retired (duplicate detection: an attacker must not be able to have many
+    /// tickets accepted on the same index, since only one of them would ever be redeemable).
+    ///
     /// This operation should be reasonably fast and should not block the main processing pipeline.
     fn insert_unacknowledged_ticket(
         &self,
+        channel_id: &ChannelId,
+        channel_epoch: u32,
         next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error>;
+
+    /// Returns `true` if the given [`Self::Error`] was produced by a duplicate ticket index
+    /// rejection ([`insert_unacknowledged_ticket`](Self::insert_unacknowledged_ticket) refusing a
+    /// ticket whose index was already accepted on the same channel and epoch).
+    ///
+    /// Used by the processing pipeline to give such rejections their own rejection metric label.
+    /// Defaults to `false` for processors that cannot produce this error.
+    fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool {
+        let _ = error;
+        false
+    }
 
     /// Finds and acknowledges previously inserted tickets, using incoming [`Acknowledgements`](Acknowledgement) from
     /// the upstream [`peer`](OffchainPublicKey).
