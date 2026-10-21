@@ -918,7 +918,7 @@ mod tests {
     /// validated (i.e. the fields are actually populated and the epoch is not taken from a
     /// different source than the one validation compared against).
     #[tokio::test]
-    async fn forwarded_packet_carries_the_decoder_resolved_channel() -> anyhow::Result<()> {
+    async fn forwarded_packet_channel_agrees_with_the_validated_ticket() -> anyhow::Result<()> {
         let f = PixTestFixture::new().await?;
 
         let out_packet = f.sender_encoder.encode_packet(

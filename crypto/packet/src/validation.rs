@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_validation_should_pass_when_index_equals_channel_index() -> anyhow::Result<()> {
+    async fn ticket_validation_should_pass_when_index_equals_channel_index() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
         channel.ticket_index = ticket.index;
@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_validation_should_fail_if_counterparty_is_not_channel_destination() -> anyhow::Result<()> {
+    async fn ticket_validation_should_fail_if_counterparty_is_not_channel_destination() -> anyhow::Result<()> {
         let bogus_counterparty = ChainKeypair::random();
         let ticket = TicketBuilder::default()
             .counterparty(&bogus_counterparty)

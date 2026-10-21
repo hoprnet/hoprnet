@@ -967,10 +967,12 @@ mod tests {
         Ok(())
     }
 
-    /// Only a genuine duplicate-index rejection may be reported under the dedicated
-    /// `hopr_packet_rejected_count{reason="duplicate_ticket_index"}` label; every other failure
-    /// from the same call site must keep falling into the generic `unack_processing_error`
-    /// bucket, so a regression here cannot silently mislabel unrelated rejections.
+    /// The predicate that the packet pipeline consults to pick the rejection metric label must be
+    /// true for a duplicate-index rejection and false for every other error.
+    ///
+    /// NOTE: this pins the *predicate* only. The label it selects is applied in
+    /// `transport/hopr`'s `unack_rejection_metric_label`, which is where the mapping itself is
+    /// pinned — the counter there is behind `not(test)` and cannot be asserted from here.
     #[tokio::test]
     async fn ticket_processor_only_duplicate_index_error_maps_to_its_own_metric_label() -> anyhow::Result<()> {
         use hopr_api::types::primitive::prelude::{Address, HoprBalance};

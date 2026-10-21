@@ -66,6 +66,25 @@ fn default_pipeline_concurrency(available_parallelism: usize) -> usize {
     available_parallelism.max(1) * PIPELINE_CONCURRENCY_PER_CPU
 }
 
+/// The `reason` label to record on `hopr_packet_rejected_count` when the ticket processor rejects an
+/// incoming forwarded packet.
+///
+/// A duplicate ticket index gets its own label so that a replayed-index attack is directly
+/// observable in dashboards and can be alerted on separately from unrelated ticket-processing
+/// failures. Every other failure keeps the generic `unack_processing_error` bucket.
+///
+/// This is a free function rather than an inline `if` at the call site so that the mapping is
+/// reachable from tests: the counter itself is behind
+/// `#[cfg(all(feature = "telemetry", not(test)))]`, which would otherwise compile the branch out of
+/// every test build and leave the mapping unverifiable.
+fn unack_rejection_metric_label<T: UnacknowledgedTicketProcessor>(error: &T::Error) -> &'static str {
+    if T::is_duplicate_ticket_index_error(error) {
+        "duplicate_ticket_index"
+    } else {
+        "unack_processing_error"
+    }
+}
+
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
@@ -460,11 +479,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             );
 
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            if T::is_duplicate_ticket_index_error(&error) {
-                                METRIC_PACKET_REJECTED_COUNT.increment(&["duplicate_ticket_index"]);
-                            } else {
-                                METRIC_PACKET_REJECTED_COUNT.increment(&["unack_processing_error"]);
-                            }
+                            METRIC_PACKET_REJECTED_COUNT.increment(&[unack_rejection_metric_label::<T>(&error)]);
 
                             return None;
                         }
@@ -1175,6 +1190,67 @@ mod tests {
     use hopr_api::types::crypto_random::Randomizable;
 
     use super::*;
+
+    /// A ticket processor whose error type is the real [`HoprProtocolError`], so the metric-label
+    /// mapping can be exercised on both branches. `NoopTicketProcessor` cannot serve here: its
+    /// error type is `Infallible`, so it can never produce the duplicate-index variant.
+    struct LabelTestTicketProc;
+
+    impl UnacknowledgedTicketProcessor for LabelTestTicketProc {
+        type Error = HoprProtocolError;
+
+        fn insert_unacknowledged_ticket(
+            &self,
+            _: &ChannelId,
+            _: u32,
+            _: &OffchainPublicKey,
+            _: HalfKeyChallenge,
+            _: UnacknowledgedTicket,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool {
+            matches!(error, HoprProtocolError::DuplicateTicketIndex(..))
+        }
+
+        fn acknowledge_tickets(
+            &self,
+            _: OffchainPublicKey,
+            _: Vec<Acknowledgement>,
+        ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
+            Ok(Vec::with_capacity(0))
+        }
+    }
+
+    /// The rejection metric label must separate a replayed ticket index from every other
+    /// ticket-processing failure, so the replay attack is alertable on its own.
+    ///
+    /// This is the discriminating pin for the label mapping: the counter increment itself is behind
+    /// `#[cfg(all(feature = "telemetry", not(test)))]` and is therefore absent from test builds, so
+    /// asserting on the extracted label function is the only way to keep the mapping honest. If the
+    /// two branches were collapsed back into one generic label, this test fails.
+    #[test]
+    fn duplicate_ticket_index_gets_its_own_rejection_metric_label() {
+        let duplicate = HoprProtocolError::DuplicateTicketIndex(Default::default(), 1, 5);
+        assert_eq!(
+            unack_rejection_metric_label::<LabelTestTicketProc>(&duplicate),
+            "duplicate_ticket_index",
+            "a replayed index must be reported under its own label"
+        );
+
+        for other in [
+            HoprProtocolError::Replay,
+            HoprProtocolError::InvalidSender,
+            HoprProtocolError::KeyNotFound,
+        ] {
+            assert_eq!(
+                unack_rejection_metric_label::<LabelTestTicketProc>(&other),
+                "unack_processing_error",
+                "{other} must keep the generic label"
+            );
+        }
+    }
 
     /// Regression guard for the 4.1.x relay throughput collapse (#8246 fallout).
     ///

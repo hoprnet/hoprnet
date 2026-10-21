@@ -120,7 +120,7 @@ mod tests {
     /// `hopr_packet_ticket_validation_errors` metric, so the wire-visible names are pinned here
     /// to catch an accidental rename or an added variant that would silently change dashboards.
     #[test]
-    fn test_validation_error_kind_metric_labels_are_stable() {
+    fn validation_error_kind_metric_labels_are_stable() {
         let destination = Address::new(&[0x11; Address::SIZE]);
 
         let labels = [
@@ -151,7 +151,7 @@ mod tests {
     /// The counterparty check is a rejection path reachable from an attacker-controlled ticket,
     /// so its message must name the expected destination.
     #[test]
-    fn test_validation_error_kind_wrong_counterparty_display() {
+    fn validation_error_kind_wrong_counterparty_display() {
         let destination = Address::new(&[0xAB; Address::SIZE]);
         let kind = ValidationErrorKind::WrongCounterparty(destination);
 
