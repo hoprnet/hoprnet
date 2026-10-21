@@ -75,7 +75,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
-        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts forwarded packets whose ticket index was already accepted on the same channel and epoch (replayed index attack)",
+        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts packets dropped before forwarding because their ticket index was already accepted on the same channel and epoch (replayed index attack)",
         &["reason"]
     ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
