@@ -985,6 +985,82 @@ mod tests {
         Ok(())
     }
 
+    /// Pins the two ends of the tracker's documented capacity behaviour, which was measured rather
+    /// than assumed, so the limitation cannot silently worsen.
+    ///
+    /// A freshly accepted index stays un-replayable even at capacity (the newly inserted entry is
+    /// not immediately admitted-and-evicted), but once enough *new* indices displace it, the oldest
+    /// records are evicted and those indices become replayable again. That is the accepted residual
+    /// disclosed on `max_unack_tickets`: it is bounded by the eviction pressure an attacker must
+    /// generate with fresh indices, each of which costs a real, individually redeemable ticket.
+    ///
+    /// If a future change makes the *fresh* case replayable, this test fails — that would be a
+    /// genuine fail-open regression rather than the disclosed residual.
+    #[tokio::test]
+    async fn ticket_processor_tracker_evicts_oldest_but_protects_fresh_indices_at_capacity() -> anyhow::Result<()> {
+        const CAPACITY: usize = 100;
+
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                max_unack_tickets: CAPACITY,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
+            let ack_share = HalfKey::random();
+            let ticket = build_unack_ticket(index, 1, &ack_share)?;
+            Ok(ticket_processor.insert_unacknowledged_ticket(
+                &TEST_CHANNEL_ID,
+                1,
+                PEERS[2].1.public(),
+                ack_share.to_challenge()?,
+                ticket,
+            ))
+        };
+
+        // Fill to capacity.
+        for index in 0..CAPACITY as u64 {
+            insert(index)
+                .context("filling to capacity must succeed")?
+                .with_context(|| format!("distinct index {index} must be accepted"))?;
+        }
+
+        // A brand-new index inserted at capacity, then replayed immediately: still rejected.
+        let fresh_index = CAPACITY as u64 + 5;
+        insert(fresh_index)
+            .context("insert of a fresh index must succeed")?
+            .context("a fresh index must be accepted even at capacity")?;
+        assert!(
+            insert(fresh_index)
+                .context("replay of the fresh index must be attempted")?
+                .is_err(),
+            "an index accepted at capacity must not be immediately replayable"
+        );
+
+        // The oldest index, after enough new indices have displaced it, becomes replayable again.
+        // This is the disclosed residual, not a regression.
+        for index in 0..(CAPACITY as u64 * 2) {
+            insert(1_000_000 + index)
+                .context("pressure inserts must succeed")?
+                .with_context(|| format!("distinct pressure index {index} must be accepted"))?;
+        }
+        assert!(
+            insert(0)
+                .context("replay of the oldest index must be attempted")?
+                .is_ok(),
+            "the oldest index is expected to be evicted under pressure; if this now fails the tracker became strictly \
+             stronger, which is fine but should update the docs"
+        );
+
+        Ok(())
+    }
+
     /// The predicate that the packet pipeline consults to pick the rejection metric label must be
     /// true for a duplicate-index rejection and false for every other error.
     ///
