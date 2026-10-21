@@ -168,7 +168,14 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
         }
 
         if channel.buffer.len() >= channel.capacity {
-            channel.sender_wakers.push(cx.waker().clone());
+            // Guard against unbounded growth: under sustained congestion the same sender
+            // can re-poll (woken by another event) while the buffer stays full, pushing its
+            // waker each time. The list is cleared on every pop (wake_sender_wakers), so this
+            // only caps a transient spike, not a normal steady state.
+            const MAX_SENDER_WAKERS: usize = 256;
+            if channel.sender_wakers.len() < MAX_SENDER_WAKERS {
+                channel.sender_wakers.push(cx.waker().clone());
+            }
             return Poll::Pending;
         }
 
