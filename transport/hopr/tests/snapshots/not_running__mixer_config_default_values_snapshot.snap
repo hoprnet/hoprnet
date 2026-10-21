@@ -1,7 +1,10 @@
 ---
-source: transport/api/tests/not_running.rs
+source: transport/hopr/tests/not_running.rs
 expression: cfg
 ---
-min_delay: 0s
-delay_range: 20ms
 capacity: 20000
+mixer_type:
+  Poisson:
+    max_delay: 20ms
+    miss_probability: 0.01
+    target_occupancy: 0
