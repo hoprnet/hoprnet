@@ -60,7 +60,7 @@ use hopr_api::{
     types::primitive::prelude::*,
 };
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-pub use hopr_protocol_hopr::{MemorySurbStore, RelayerState, SurbStore};
+pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -262,7 +262,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     network: Arc<OnceLock<Net>>,
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
-    /// SURB round-trip counters and per-relayer reply timing, shared with the planner.
+    /// SURB round-trip counters and per-relayer health, shared with the planner.
     surb_round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: Arc<HoprSessionManager>,
@@ -363,7 +363,7 @@ where
             selector,
             planner_config,
         )
-        .with_relayer_latency(surb_round_trips.relayer_latency());
+        .with_relayer_health(surb_round_trips.relayer_health());
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -817,10 +817,6 @@ where
 
         // -- periodic SURB round-trip flush
         tracing::info!(?role, "starting surb round-trip flush task");
-        // Long enough to outlast the silence gate that produced the evidence, so a path that stays
-        // dead is re-marked before the previous mark lapses, and short enough that a path which
-        // recovers unnoticed returns to closed-loop control promptly.
-        const RETURN_PATH_DEGRADED_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_smgr = self.smgr.clone();
@@ -829,64 +825,56 @@ where
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
-                let mut episodes = protocol::return_path_recovery::ReturnPathEpisodes::new(RETURN_PATH_DEGRADED_GRACE);
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
-
+                let health = surb_round_trips.relayer_health();
+                let mut unusable: std::collections::HashMap<OffchainPublicKey, (u64, f64)> = Default::default();
                 while ticks.next().await.is_some() {
-                    // Re-plan first, refill only if re-planning moved traffic. Run the other way
-                    // round the refill mints SURBs onto the very route the planner is abandoning --
-                    // see `protocol::return_path_recovery`. Detection/flush/tick ordering lives in
-                    // `run_flush_tick`.
-                    //
-                    // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
-                    // they capture has to survive being invoked once per silent destination.
-                    let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
-                    for step in protocol::return_path_recovery::run_flush_tick(
-                        &surb_round_trips,
-                        &surb_flush_graph,
-                        now_ms,
-                        &mut episodes,
-                        |destination| async move { planner.recompute_paths_from(&destination).await },
-                        |destination| async move {
-                            // Sessions name their destination by its chain address, this
-                            // telemetry by its packet key, and a `NodeId` holding one is never
-                            // equal to a `NodeId` holding the other -- so the match has to be
-                            // made on a resolved form, not on the enum.
-                            //
-                            // The counterparty has to still be receiving SURBs to reply with,
-                            // and its silence has by now convinced our balancer that it is well
-                            // stocked -- so tell the Sessions routed there to stop believing
-                            // that estimate while the evidence says otherwise.
-                            match chain.packet_key_to_chain_key(&destination) {
-                                Ok(Some(address)) => smgr.mark_return_path_degraded(
-                                    &hopr_api::types::internal::prelude::NodeId::Chain(address),
-                                    RETURN_PATH_DEGRADED_GRACE,
-                                ),
-                                // A resolver error is exactly the failure this recovery path exists
-                                // to surface, so it must not be collapsed into "no chain key" — log
-                                // it rather than silently marking zero sessions.
-                                Err(error) => {
-                                    tracing::warn!(%destination, %error, "could not resolve a silent destination's chain key to mark it degraded");
-                                    0
-                                }
-                                Ok(None) => 0,
+                    protocol::surb_telemetry::flush_into(&surb_round_trips, &surb_flush_graph, now_ms);
+
+                    let (newly_dead, recovered) = health.refresh_verdicts();
+                    if !newly_dead.is_empty() || !recovered.is_empty() {
+                        tracing::info!(?newly_dead, ?recovered, "relayer verdicts changed, re-planning");
+                        surb_flush_planner.refresh_cached_paths().await;
+                    }
+
+                    // The counterparty still counts SURBs returning through a dead relayer, so its
+                    // sessions are told how many of those it holds to replace.
+                    let through = surb_round_trips.unusable_through(&health.dead_relayers());
+                    let cleared = unusable
+                        .keys()
+                        .filter(|destination| !through.contains_key(destination))
+                        .map(|destination| (*destination, (0, 0.0)));
+                    let changed: Vec<(OffchainPublicKey, (u64, f64))> = through
+                        .iter()
+                        .map(|(destination, unusable)| (*destination, *unusable))
+                        .chain(cleared)
+                        .filter(|(destination, now)| unusable.get(destination) != Some(now))
+                        .collect();
+                    for (destination, (count, share)) in changed {
+                        // Sessions name their destination by its chain address, this telemetry by its packet key.
+                        let sessions = match surb_flush_chain.packet_key_to_chain_key(&destination) {
+                            Ok(Some(address)) => surb_flush_smgr.set_unusable_surbs(
+                                &hopr_api::types::internal::prelude::NodeId::Chain(address),
+                                count,
+                                share,
+                            ),
+                            Ok(None) => 0,
+                            Err(error) => {
+                                tracing::warn!(%destination, %error, "could not resolve a destination's chain key to mark its unusable SURBs");
+                                0
                             }
-                        },
-                    )
-                    .await
-                    {
-                        match step {
-                            protocol::return_path_recovery::RecoveryStep::Replanned { destination, moved } => {
-                                tracing::info!(%destination, entries = moved, "return path silent, re-planned")
-                            }
-                            protocol::return_path_recovery::RecoveryStep::Refilled { destination, sessions } => {
-                                tracing::info!(%destination, sessions, "refilling behind the re-plan")
-                            }
+                        };
+                        match (sessions, share > 0.0, unusable.contains_key(&destination)) {
+                            (0, ..) => {}
+                            (_, true, false) => tracing::info!(%destination, count, share, sessions, "marking SURBs returning through a dead relayer unusable"),
+                            (_, true, true) => tracing::debug!(%destination, count, share, sessions, "updating the unusable SURBs"),
+                            (_, false, _) => tracing::info!(%destination, sessions, "clearing unusable SURBs, no relayer they return through is dead"),
                         }
                     }
+                    unusable = through;
                 }
             }),
         );
@@ -1125,10 +1113,9 @@ where
         &self.graph
     }
 
-    /// Returns a handle to the path planner, so connectivity events can re-plan without waiting
-    /// for the background sweep.
-    pub fn path_planner(&self) -> PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>> {
-        self.path_planner.clone()
+    /// Returns the per-relayer health, so connectivity events can mark a relayer dead.
+    pub fn relayer_health(&self) -> std::sync::Arc<protocol::surb_telemetry::RelayerHealth> {
+        self.surb_round_trips.relayer_health()
     }
 
     /// Returns a reference to the SURB store.

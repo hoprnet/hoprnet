@@ -82,6 +82,7 @@ lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 multiaddr = { workspace = true }
+parking_lot = { workspace = true }
 proc-macro-regex = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
@@ -132,7 +133,6 @@ tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-parking_lot = { workspace = true }
 async-trait = { workspace = true }
 bimap = { workspace = true }
 bytesize = { workspace = true }

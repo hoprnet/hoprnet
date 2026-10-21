@@ -36,7 +36,7 @@ pub use hopr_api::types::crypto::{
     prelude::{ChainKeypair, OffchainKeypair},
 };
 use hopr_api::{
-    chain::{AnnouncementError, HoprChainApi, KeyIdMapping as _, SafeRegistrationError, StateSyncOptions},
+    chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
@@ -44,7 +44,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
-use hopr_transport::{HoprTransport, IncomingSession, RelayerState, SurbStore as _};
+use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{
         addr::is_public_address,
@@ -621,17 +621,13 @@ where
     {
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
-        let planner = transport_api.path_planner();
-        let surb_store = transport_api.surb_store().clone();
-        let key_ids = chain_api.clone();
+        let health = transport_api.relayer_health();
         let net = network.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
-                    let planner = planner.clone();
-                    let surb_store = surb_store.clone();
-                    let key_ids = key_ids.clone();
+                    let health = health.clone();
                     let net = net.clone();
                     async move {
                         let (peer_id, connected) = match event {
@@ -647,17 +643,12 @@ where
                                 connected,
                             });
 
-                            let relayer = key_ids.key_id_mapper_ref().map_key_to_id(&opk);
                             if connected {
-                                if let Some(relayer) = relayer {
-                                    surb_store.on_relayer_state(&relayer, RelayerState::Connected);
-                                }
+                                health.set_reachable(opk, true);
                             } else if !net.is_connected(&peer_id) {
-                                // Re-plan now rather than at the next sweep, so no new path draws the lost peer.
-                                planner.refresh_cached_paths().await;
-                                if let Some(relayer) = relayer {
-                                    surb_store.on_relayer_state(&relayer, RelayerState::Disconnected);
-                                }
+                                // Dead in every position until it is back; the next telemetry flush
+                                // re-plans around it.
+                                health.set_reachable(opk, false);
                             }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");

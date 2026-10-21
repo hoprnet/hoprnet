@@ -13,6 +13,9 @@ use tracing::instrument;
 
 use crate::{errors::SessionError, protocol::FrameId};
 
+/// Floor on a gap timer, so a gap already past its wait still yields to the runtime once.
+const MIN_GAP_WAIT: Duration = Duration::from_millis(1);
+
 /// Buffer entry pairing an item with when it entered the buffer.
 ///
 /// Ordering delegates entirely to `item`, so the heap behaves exactly as before; `buffered_at`
@@ -66,7 +69,8 @@ impl<T: PartialOrd<FrameId>> PartialOrd<FrameId> for Buffered<T> {
 /// The Sequencer takes to arguments: `max_wait` and `capacity`:
 ///
 /// The `max_wait` indicates the maximum amount of time to wait for a certain `FrameId` to
-/// be yielded from the underlying stream.
+/// be yielded from the underlying stream. Each gap is timed from when the frame behind it was
+/// buffered, so gaps queued behind one another drain together rather than one `max_wait` each.
 /// If this does not happen, the Segmenter yields an error,
 /// indicating that the given frame was discarded.
 ///
@@ -117,7 +121,7 @@ where
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
-            timer: futures_time::task::sleep(max_wait.max(Duration::from_millis(1)).into()),
+            timer: futures_time::task::sleep(max_wait.max(MIN_GAP_WAIT).into()),
             next_id: 1,
             max_wait,
             max_item_age: max_item_age.filter(|age| !age.is_zero()),
@@ -265,9 +269,8 @@ where
                             return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
                         }
                         let remaining = this.max_wait.saturating_sub(next.buffered_at.elapsed());
-                        this.timer.set(futures_time::task::sleep(
-                            remaining.max(Duration::from_millis(1)).into(),
-                        ));
+                        this.timer
+                            .set(futures_time::task::sleep(remaining.max(MIN_GAP_WAIT).into()));
                     } else {
                         tracing::trace!("buffer is empty");
                     }
@@ -882,6 +885,8 @@ mod tests {
         tx.send(1u32).await?;
         tx.send(3u32).await?;
         assert_eq!(Some(1), rx.try_next().await?);
+        // Frame 3 is only buffered, and its wait started, once the sequencer is polled again.
+        assert!(futures::poll!(rx.next()).is_pending());
 
         tokio::time::sleep(timeout / 2).await;
         tx.send(2u32).await?;

@@ -263,14 +263,12 @@ where
                     packet_signals: incoming.signals,
                     num_surbs: incoming.surbs.len(),
                     num_evicted_surbs: 0,
-                    num_invalid_surbs: 0,
                 };
 
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
                     info.num_evicted_surbs = outcome.evicted;
-                    info.num_invalid_surbs = outcome.invalid;
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, retained = outcome.retained, packet_type = "final", "stored incoming surbs for pseudonym");
 
                     // Warn rather than trace: an overflow is silent everywhere else. Without this

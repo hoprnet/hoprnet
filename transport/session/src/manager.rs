@@ -433,8 +433,7 @@ type StartProtocolMsgSink =
 struct IncomingSurbCounts {
     /// SURBs the arriving packet stored (`num_saved_surbs`).
     saved: u64,
-    /// SURBs that left the store without being spent: evicted to make room (`num_evicted_surbs`) or
-    /// dropped as invalid (`num_invalid_surbs`).
+    /// Older SURBs the full store evicted to make room (`num_evicted_surbs`).
     evicted: u64,
 }
 
@@ -1433,25 +1432,16 @@ where
         }
     }
 
-    /// Marks the return path to `destination` as degraded on every Session routed there.
-    ///
-    /// The Session layer cannot tell a dead return path from a peer with nothing to say -- both
-    /// simply stop consuming SURBs -- so the judgement is made where sibling paths can be compared
-    /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
-    /// their counterparty buffer estimate for `grace`.
-    ///
-    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
-    pub fn mark_return_path_degraded(
-        &self,
-        destination: &hopr_api::types::internal::NodeId,
-        grace: std::time::Duration,
-    ) -> usize {
+    /// Sets how many SURBs held by the counterparty of every Session routed to `destination`, and which
+    /// share of those outstanding, return through a relayer judged dead, so the balancer replaces them.
+    /// Returns the Sessions hit.
+    pub fn set_unusable_surbs(&self, destination: &hopr_api::types::internal::NodeId, count: u64, share: f64) -> usize {
         self.sessions
             .iter()
             .filter(|(_, slot)| {
                 matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
             })
-            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
+            .map(|(_, slot)| slot.surb_mgmt.set_counterparty_unusable(count, share))
             .count()
     }
 
@@ -1488,7 +1478,7 @@ where
             // runs `handle_keep_alive` never sees the packet info otherwise.
             let surb_counts = IncomingSurbCounts {
                 saved: in_data.packet_info.num_saved_surbs as u64,
-                evicted: (in_data.packet_info.num_evicted_surbs + in_data.packet_info.num_invalid_surbs) as u64,
+                evicted: in_data.packet_info.num_evicted_surbs as u64,
             };
 
             // This is a Start protocol message, so we send it to the handler
@@ -1740,7 +1730,7 @@ where
                     session_rx.inspect(move |data| {
                         // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
-                        let evicted = (data.packet_info.num_evicted_surbs + data.packet_info.num_invalid_surbs) as u64;
+                        let evicted = data.packet_info.num_evicted_surbs as u64;
                         surb_estimator_rx.record_incoming(produced, evicted);
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::record_session_surb_produced(&session_id, produced);
@@ -1759,7 +1749,6 @@ where
                 // No SURB decay at the Exit, since we know almost exactly how many SURBs
                 // were received
                 surb_decay: None,
-                sustain_on_return_path_loss: false,
             };
 
             slot.surb_mgmt.update(&balancer_config);
@@ -4358,6 +4347,52 @@ mod tests {
         );
         assert!(crate::counters::session_inbox_drop_count() > before);
 
+        Ok(())
+    }
+
+    #[test]
+    fn an_unusable_surb_share_should_reopen_the_gate_only_for_sessions_to_that_destination() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let [hit, other] = [(); 2].map(|_| Address::from(&ChainKeypair::random()));
+        let [hit_session, other_session] = [(); 2].map(|_| HoprPseudonym::random());
+        for (session, destination) in [(hit_session, hit), (other_session, other)] {
+            mgr.pre_populate_session(
+                session,
+                DestinationRouting::Forward {
+                    destination: Box::new(destination.into()),
+                    pseudonym: Some(session),
+                    forward_options: RoutingOptions::Hops(1.try_into()?),
+                    return_options: None,
+                },
+            );
+            let slot = mgr.sessions.get(&session).context("slot must exist")?;
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+            slot.surb_mgmt
+                .buffer_level
+                .store(200, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        assert_eq!(1, mgr.set_unusable_surbs(&hit.into(), 120, 0.6));
+
+        let organic = |session| -> anyhow::Result<usize> {
+            Ok(mgr
+                .sessions
+                .get(&session)
+                .context("slot must exist")?
+                .surb_mgmt
+                .organic_surbs_per_packet())
+        };
+        assert_eq!(
+            1,
+            organic(hit_session)?,
+            "80 usable of 200 held is below the target of 100"
+        );
+        assert_eq!(0, organic(other_session)?, "other destinations are untouched");
         Ok(())
     }
 

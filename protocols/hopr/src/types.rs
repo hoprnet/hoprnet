@@ -48,9 +48,6 @@ pub struct AuxiliaryPacketInfo {
     /// estimate, because the imprecise estimate is the one that fails safe — see
     /// `counterparty_buffer_capacity` in `hopr-transport-session`.
     pub num_evicted_surbs: usize,
-    /// How many SURBs the store dropped as invalid (first relayer disconnected or its channel closed)
-    /// since the previous insert, including arrivals refused by this one.
-    pub num_invalid_surbs: usize,
 }
 
 /// An incoming packet with a payload intended for us.
@@ -191,9 +188,6 @@ pub struct SurbInsertOutcome {
     pub retained: usize,
     /// Number of SURBs dropped to make room during this insert, oldest first.
     pub evicted: usize,
-    /// Number of SURBs dropped since the previous insert because their first relayer became
-    /// invalid (disconnected or channel closed), including arrivals refused by this insert.
-    pub invalid: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.

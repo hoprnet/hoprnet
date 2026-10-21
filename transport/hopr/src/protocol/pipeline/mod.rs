@@ -461,7 +461,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             signals_from_sender: aux_info.packet_signals,
                             num_saved_surbs: aux_info.num_surbs,
                             num_evicted_surbs: aux_info.num_evicted_surbs,
-                            num_invalid_surbs: aux_info.num_invalid_surbs,
                         }
                     })))
         ))
