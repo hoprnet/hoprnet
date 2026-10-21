@@ -6,8 +6,9 @@ use std::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
-    task::Poll,
+    task::{Poll, Waker},
     time::Duration,
+    vec::Vec,
 };
 
 use futures::{FutureExt, Stream, StreamExt};
@@ -40,8 +41,9 @@ lazy_static::lazy_static! {
 /// 2. Data is stored in the heap with its release timestamp
 /// 3. The heap maintains ordering so items with earliest release time are at the top
 ///
-/// This channel is **unbounded** by nature using the `capacity` in the configuration
-/// to solely pre-allocate the buffer.
+/// This channel is bounded by `capacity` in the configuration. When the heap holds
+/// `capacity` items, `poll_ready` returns `Pending` and registers a sender waker so the
+/// sender is notified once the receiver pops an item and frees a slot.
 ///
 /// The timer used by the receiver to wait for the next release deadline is **not** stored
 /// behind this mutex — it lives on the [`Receiver`] itself. Keeping it out of the shared
@@ -49,8 +51,22 @@ lazy_static::lazy_static! {
 struct Channel<T> {
     /// Buffer holding the data with a timestamp ordering to ensure the min heap behavior.
     buffer: BinaryHeap<Reverse<DelayedData<T>>>,
+    /// Waker for the receiver — signalled by `push_item` when a new item is added.
     waker: Option<std::task::Waker>,
+    /// Wakers for senders blocked by capacity — signalled by the receiver after a pop.
+    sender_wakers: Vec<Waker>,
     cfg: MixerConfig,
+}
+
+impl<T> Channel<T> {
+    /// Wake all senders blocked on capacity and clear the waker list.
+    /// Safe to call with an empty list — it is a no-op.
+    fn wake_sender_wakers(&mut self) {
+        for waker in &self.sender_wakers {
+            waker.wake_by_ref();
+        }
+        self.sender_wakers.clear();
+    }
 }
 
 /// Channel with sender and receiver counters allowing closure tracking.
@@ -76,6 +92,9 @@ pub enum SenderError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]
     Closed,
+    /// The channel buffer is full (`capacity` reached).
+    #[error("Channel buffer is full")]
+    Full,
 }
 
 /// Sender object interacting with the mixing channel.
@@ -119,6 +138,11 @@ impl<T> Sender<T> {
 
         let random_delay = channel.cfg.random_delay();
 
+        if channel.buffer.len() >= channel.cfg.capacity {
+            trace!("buffer at capacity — cannot push");
+            return Err(SenderError::Full);
+        }
+
         trace!(delay_in_ms = random_delay.as_millis(), "generated mixer delay",);
 
         let delayed_data: DelayedData<T> = (std::time::Instant::now() + random_delay, item).into();
@@ -145,13 +169,25 @@ impl<T> Sender<T> {
 impl<T> futures::sink::Sink<T> for Sender<T> {
     type Error = SenderError;
 
-    fn poll_ready(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let is_active = self.channel.receiver_active.load(Ordering::Relaxed);
-        if is_active {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(SenderError::Closed))
+    fn poll_ready(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if !self.channel.receiver_active.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(SenderError::Closed));
         }
+
+        let mut channel = self.channel.channel.lock();
+
+        // Re-check under lock: receiver may have been dropped between the
+        // fast-path read above and the lock acquisition.
+        if !self.channel.receiver_active.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(SenderError::Closed));
+        }
+
+        if channel.buffer.len() >= channel.cfg.capacity {
+            channel.sender_wakers.push(cx.waker().clone());
+            return Poll::Pending;
+        }
+
+        Poll::Ready(Ok(()))
     }
 
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
@@ -189,6 +225,15 @@ pub struct Receiver<T> {
     timer: Delay,
 }
 
+impl<T> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        self.channel.receiver_active.store(false, Ordering::Relaxed);
+        // Wake blocked senders so they observe the closed channel on their next poll.
+        let mut channel = self.channel.channel.lock();
+        channel.wake_sender_wakers();
+    }
+}
+
 impl<T> Stream for Receiver<T> {
     type Item = T;
 
@@ -219,6 +264,9 @@ impl<T> Stream for Receiver<T> {
 
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                // Wake any blocked senders now that a slot is free.
+                channel.wake_sender_wakers();
 
                 return Poll::Ready(Some(data));
             }
@@ -266,6 +314,8 @@ impl<T> Stream for Receiver<T> {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
 
+                channel.wake_sender_wakers();
+
                 Poll::Ready(Some(entry.0.item))
             }
             None => {
@@ -299,6 +349,7 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
         channel: Arc::new(Mutex::new(Channel::<T> {
             buffer,
             waker: None,
+            sender_wakers: Vec::new(),
             cfg,
         })),
         sender_count: Arc::new(AtomicUsize::new(1)),
@@ -644,6 +695,137 @@ mod tests {
         got.sort();
         assert_eq!(got, vec![1, 2]);
         assert!(rx.next().await.is_none(), "expected channel closed with no more items");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn poll_ready_returns_pending_when_buffer_full() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            capacity: 5,
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        };
+        let (mut tx, _rx) = channel::<u32>(cfg);
+
+        for i in 0..5 {
+            tx.send(i)?;
+        }
+
+        // SinkExt::send should block because buffer is full. Verify with timeout.
+        let result = timeout(Duration::from_millis(30), SinkExt::send(&mut tx, 99)).await;
+        assert!(
+            result.is_err(),
+            "SinkExt::send should not complete when buffer is at capacity"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_returns_full_when_buffer_at_capacity() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            capacity: 3,
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        };
+        let (tx, _rx) = channel::<u32>(cfg);
+
+        tx.send(1)?;
+        tx.send(2)?;
+        tx.send(3)?;
+
+        let result = tx.send(4);
+        assert!(
+            matches!(result, Err(SenderError::Full)),
+            "send should return Full when buffer is at capacity, got {result:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_succeeds_after_drain_frees_slot() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            capacity: 3,
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = channel::<u32>(cfg);
+
+        tx.send(1)?;
+        tx.send(2)?;
+        tx.send(3)?;
+
+        assert!(
+            matches!(tx.send(4), Err(SenderError::Full)),
+            "send should fail at capacity"
+        );
+
+        // Drain one item — frees a slot.
+        let drained = timeout(Duration::from_millis(100), rx.next()).await?;
+        assert!(drained.is_some(), "should drain an item");
+
+        // Now send must succeed.
+        tx.send(5)?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sink_backpressure_clears_after_receiver_drains_item() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            capacity: 5,
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        };
+        let (mut tx, mut rx) = channel::<u32>(cfg);
+
+        for i in 0..5 {
+            tx.send(i)?;
+        }
+
+        // Spawn a SinkExt::send — it will block at poll_ready.
+        let send_task = tokio::task::spawn(async move {
+            let _ = SinkExt::send(&mut tx, 42).await;
+        });
+
+        tokio::time::sleep(Duration::from_millis(30)).await;
+
+        // Drain one item — frees a slot and wakes the blocked sender.
+        let drained = rx.recv().await;
+        assert!(drained.is_some(), "should drain one item");
+
+        // The send task should now complete.
+        let send_result = timeout(Duration::from_millis(100), send_task).await;
+        assert!(send_result.is_ok(), "send task should complete after drain");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn capacity_does_not_affect_normal_operation_under_capacity() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            capacity: 100,
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = channel::<u32>(cfg);
+
+        const ITERATIONS: usize = 50;
+        for i in 0..ITERATIONS as u32 {
+            tx.send(i)?;
+        }
+
+        // Drop the sender so the receiver terminates when the buffer is drained.
+        drop(tx);
+
+        let mut received = 0usize;
+        while let Some(_item) = timeout(Duration::from_millis(100), rx.next()).await? {
+            received += 1;
+        }
+        assert_eq!(received, ITERATIONS, "all items must be delivered when under capacity");
         Ok(())
     }
 }

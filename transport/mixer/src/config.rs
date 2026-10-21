@@ -22,10 +22,11 @@ pub struct MixerConfig {
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub delay_range: Duration,
-    /// The capacity of the preallocated mixer buffer.
+    /// Hard upper bound on the mixer heap size.
     ///
-    /// It is possible to insert more items past the capacity, triggering
-    /// a possible buffer reallocation.
+    /// Items beyond this capacity are rejected via `SenderError::Full` or
+    /// cause `poll_ready` to return `Pending` (backpressure). Also used as a
+    /// pre-allocation hint via `BinaryHeap::reserve`.
     #[default(HOPR_MIXER_CAPACITY)]
     pub capacity: usize,
     #[default(HOPR_MIXER_DELAY_METRIC_WINDOW)]

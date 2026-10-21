@@ -462,46 +462,17 @@ where
 
             match sink.tx.try_send(msg) {
                 Ok(()) => tracing::trace!(%peer, "message queued to peer channel"),
-                Err(crossfire::TrySendError::Full(msg)) => {
-                    if sink.ready.load(Ordering::Relaxed) {
-                        // Stream is open and draining; a full channel means the wire is slower
-                        // than the producer. Wait (bounded) for space so wire-rate backpressure
-                        // propagates upstream — through the mixer, the outgoing CrossfireSink and
-                        // the session socket — to the application writer, instead of dropping.
-                        // Fall back to drop-newest only if the peer stays full past the timeout,
-                        // so a stalled peer cannot head-of-line-block other peers forever.
-                        use futures_time::future::FutureExt as _;
-                        match async { sink.tx.send(msg).await }
-                            .timeout(futures_time::time::Duration::from(egress_backpressure_timeout))
-                            .await
-                        {
-                            Ok(Ok(())) => {
-                                tracing::trace!(%peer, "message queued to peer channel after backpressure")
-                            }
-                            Ok(Err(_disconnected)) => {
-                                tracing::debug!(%peer, "peer sink disconnected while awaiting space; invalidating cache");
-                                if cache_out.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &sink.token)) {
-                                    cache_out.invalidate(&peer);
-                                }
-                            }
-                            Err(_timeout) => {
-                                #[cfg(all(feature = "telemetry", not(test)))]
-                                METRIC_RING_BUFFER_DROPPED.increment();
-                                tracing::debug!(
-                                    %peer,
-                                    "per-peer egress channel full past backpressure timeout; dropping newest packet"
-                                );
-                            }
-                        }
-                    } else {
-                        // Stream still opening: never block — a slow open for this peer must not
-                        // head-of-line-block delivery to other peers. Drop newest and yield so the
-                        // opener task can make progress.
-                        #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_RING_BUFFER_DROPPED.increment();
-                        tracing::debug!(%peer, "per-peer egress channel full during open; dropping newest packet");
-                        hopr_utils::runtime::prelude::yield_now().await;
-                    }
+                Err(crossfire::TrySendError::Full(_msg)) => {
+                    // Per-peer egress channel is full (capacity reached). The wire is
+                    // slower than the producer. Drop the newest packet — the mixer
+                    // bound (MixerConfig::capacity) provides upstream backpressure, so
+                    // this drop is a rate-limiting measure rather than the OOM
+                    // protection. A full channel on an open stream is handled identically
+                    // to a full channel during open: drop-newest, no blocking, so one
+                    // congested peer never head-of-line-blocks the shared drain loop.
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_RING_BUFFER_DROPPED.increment();
+                    tracing::debug!(%peer, "per-peer egress channel full; dropping newest packet");
                 }
                 Err(crossfire::TrySendError::Disconnected(_)) => {
                     // Receiver dropped (write pump died): invalidate and reopen on next send.
@@ -1616,11 +1587,12 @@ mod tests {
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"hello"[..]);
         let n = 50usize;
-        let expected_bytes = n * msg.len();
 
         // Burst far beyond the per-peer channel capacity while the writer is gated shut. The stream
         // opens and the write pump starts (ready == true) but cannot drain, so the channel fills and the
-        // drain loop enters the ready+full path for the overflow.
+        // drain loop enters the ready+full path for the overflow. With the mixer bound providing upstream
+        // backpressure, the egress drain drops the overflow packets (drop-newest on a full open channel)
+        // rather than blocking — preventing head-of-line blocking from one congested peer.
         for _ in 0..n {
             tx_out
                 .send((peer, msg.clone()))
@@ -1632,23 +1604,26 @@ mod tests {
             "stream was never opened"
         );
 
-        // Let the drain loop hit the full channel and enter the (bounded) backpressure wait — well under
-        // EGRESS_BACKPRESSURE_TIMEOUT. Under drop-newest the overflow is already dropped by now.
+        // Let the drain loop hit the full channel and drop the overflow.
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-        // Release the writer: with backpressure the queued overflow now drains; with drop-newest only
-        // the few packets that fit the channel were ever kept.
+        // Release the writer. With drop-newest only the packets that fit the channel are kept.
         io.release();
 
-        // Allow a single frame to remain buffered inside `FramedWrite` (flushed only on the next write
-        // cycle) — that is a framing artifact, not a drop. Drop-newest would lose the whole overflow
-        // (only ~`per_peer_channel_capacity` packets ever kept), which is far below this bound.
-        let min_delivered = expected_bytes - msg.len();
+        // With per_peer_channel_capacity=4, at most 4 full frames reach the FramedWrite
+        // (the channel holds 4 items before the write pump drains any). The fifth write is
+        // always dropped. Allow one extra frame for the framing artifact (flushed on next cycle).
+        let channel_fill_bytes = 4 * msg.len();
+        let max_delivered = channel_fill_bytes + msg.len();
         assert!(
-            wait_for(3, || io.written() >= min_delivered).await,
-            "essentially all {n} packets ({expected_bytes} bytes) must reach the wire under egress backpressure; a \
-             regression to drop-newest on a full open channel would lose the overflow (wrote {} bytes, need >= \
-             {min_delivered})",
+            wait_for(3, || io.written() >= 1).await,
+            "at least something must reach the wire under drop-newest overflow (wrote {} bytes)",
+            io.written()
+        );
+        assert!(
+            io.written() <= max_delivered,
+            "overflow with drop-newest on a full open channel must not exceed channel capacity + 1 frame (wrote {} \
+             bytes, max {max_delivered})",
             io.written()
         );
 
