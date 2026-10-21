@@ -446,6 +446,8 @@ where
 {
     let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
+    // First, so it is in the log even when the configuration or the chain fails below.
+    crate::startup::StartupSummary::new(&ctx.cfg, &ctx.chain_key, &ctx.packet_key).log(&ctx.cfg);
     ctx.cfg.validate()?;
 
     let chain_api = (configured

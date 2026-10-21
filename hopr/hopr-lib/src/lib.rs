@@ -14,6 +14,7 @@
 //! choice.
 /// Helper functions.
 mod helpers;
+mod startup;
 
 /// Builder module for the [`Hopr`] object.
 pub mod builder;
