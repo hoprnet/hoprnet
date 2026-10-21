@@ -92,6 +92,11 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     ///
     /// If the counterparty does not send an acknowledgement within this period, the ticket is lost forever.
     ///
+    /// This also bounds replay protection: the record that a given ticket index was already accepted
+    /// expires on the same timeout, so an index whose ticket was accepted but never redeemed can be
+    /// replayed once the window has passed. Raising this strengthens that protection at the cost of
+    /// memory; lowering it weakens it.
+    ///
     /// Default is 30 seconds.
     #[default(default_unack_ticket_timeout())]
     #[validate(custom(function = "validate_unack_ticket_timeout"))]
@@ -103,6 +108,10 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     /// Maximum number of unacknowledged tickets that can be stored in the cache at any given time.
     ///
     /// When more tickets are received, the oldest ones are discarded and lost forever.
+    ///
+    /// This also bounds replay protection: the accepted-index records share this capacity, so under
+    /// pressure the oldest are evicted and those indices become replayable again. Keep it at least as
+    /// large as the number of unredeemed tickets you expect to track per window.
     ///
     /// Default is 10 000 000.
     #[default(default_max_unack_tickets())]
@@ -130,6 +139,15 @@ pub struct HoprUnacknowledgedTicketProcessor<Chain> {
     /// An entry is never removed upon acknowledgement: a ticket whose acknowledgement is withheld,
     /// or that turns out to be losing, must not allow its index to be replayed either. Entries
     /// simply expire via TTL.
+    ///
+    /// Keyed by the *decoder-resolved* channel (the `previous_hop -> me` channel), never by
+    /// [`Ticket::channel_id`](hopr_api::types::internal::prelude::Ticket), which is derived from the
+    /// ticket's counterparty and is therefore attacker-controllable.
+    ///
+    /// Bounded by [`unack_ticket_timeout`](HoprUnacknowledgedTicketProcessorConfig::unack_ticket_timeout)
+    /// and [`max_unack_tickets`](HoprUnacknowledgedTicketProcessorConfig::max_unack_tickets), so
+    /// replay protection shares the lifetime and capacity of the unacknowledged-ticket cache: it is
+    /// in-memory only and does not survive a restart.
     seen_ticket_indices: moka::sync::Cache<(ChannelId, u32, u64), ()>,
     chain_api: Chain,
     chain_key: ChainKeypair,
