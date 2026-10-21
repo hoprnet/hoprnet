@@ -247,14 +247,42 @@ where
         // was losing or whose acknowledgement was withheld cannot be replayed either.
         // This is atomic: moka coalesces concurrent calls on the same absent key, so only
         // one of them observes `is_fresh() == true`.
+        //
+        // `is_fresh()` alone is NOT sufficient. moka admits entries through an admission
+        // policy (TinyLFU by default) and applies evictions lazily, so under capacity
+        // pressure `is_fresh()` can report `true` for an entry that maintenance then drops
+        // without ever storing it. Trusting it made the check fail OPEN: a replayed index
+        // was accepted again and again. So after claiming the key we force maintenance and
+        // verify the entry actually survived. If it did not, the tracker cannot vouch for
+        // this index and we refuse the ticket rather than relay it unaccounted (fail
+        // closed). `run_pending_tasks` + `contains_key` cost ~0.5us together, which is
+        // negligible next to the ticket signature verification on the same path.
         let index = ticket.verified_ticket().index;
+        let key = (*channel_id, channel_epoch, index);
+
         if !self
             .seen_ticket_indices
-            .entry_by_ref(&(*channel_id, channel_epoch, index))
+            .entry_by_ref(&key)
             .or_insert_with(|| ())
             .is_fresh()
         {
             tracing::warn!(%channel_id, channel_epoch, index, "duplicate ticket index rejected");
+            return Err(HoprProtocolError::DuplicateTicketIndex(
+                *channel_id,
+                channel_epoch,
+                index,
+            ));
+        }
+
+        self.seen_ticket_indices.run_pending_tasks();
+        if !self.seen_ticket_indices.contains_key(&key) {
+            tracing::error!(
+                %channel_id,
+                channel_epoch,
+                index,
+                "replay tracker could not retain this ticket index; rejecting the ticket rather \
+                 than accepting it without replay protection (see max_unack_tickets)"
+            );
             return Err(HoprProtocolError::DuplicateTicketIndex(
                 *channel_id,
                 channel_epoch,
@@ -985,19 +1013,21 @@ mod tests {
         Ok(())
     }
 
-    /// Pins the two ends of the tracker's documented capacity behaviour, which was measured rather
-    /// than assumed, so the limitation cannot silently worsen.
+    /// No accepted index may ever become replayable, including at capacity and under heavy
+    /// eviction pressure.
     ///
-    /// A freshly accepted index stays un-replayable even at capacity (the newly inserted entry is
-    /// not immediately admitted-and-evicted), but once enough *new* indices displace it, the oldest
-    /// records are evicted and those indices become replayable again. That is the accepted residual
-    /// disclosed on `max_unack_tickets`: it is bounded by the eviction pressure an attacker must
-    /// generate with fresh indices, each of which costs a real, individually redeemable ticket.
+    /// This pins the fail-closed guarantee, which is subtler than it looks. moka admits entries
+    /// through an admission policy (TinyLFU by default) and evicts lazily, so `is_fresh()` can
+    /// report `true` for an entry that maintenance then drops without ever storing it. A check
+    /// that trusted `is_fresh()` alone therefore failed OPEN: with a frequently-accessed resident
+    /// set, the same index was accepted 8 times out of 8. The tracker now forces maintenance and
+    /// verifies retention before accepting, so an index it cannot remember is refused instead.
     ///
-    /// If a future change makes the *fresh* case replayable, this test fails — that would be a
-    /// genuine fail-open regression rather than the disclosed residual.
+    /// The pressure loop is what makes this discriminating: replaying immediately after the first
+    /// insert passes even with the bug, because the drop is deferred. If the retention check is
+    /// ever removed, the repeated replays below succeed and this test fails.
     #[tokio::test]
-    async fn ticket_processor_tracker_evicts_oldest_but_protects_fresh_indices_at_capacity() -> anyhow::Result<()> {
+    async fn ticket_processor_never_replays_an_accepted_index_even_at_capacity() -> anyhow::Result<()> {
         const CAPACITY: usize = 100;
 
         let blokli_client = create_blokli_client()?;
@@ -1024,38 +1054,35 @@ mod tests {
             ))
         };
 
-        // Fill to capacity.
+        // A resident set that is re-accessed repeatedly, which is what drives TinyLFU to reject
+        // every new admission (and is exactly the shape a busy channel produces).
         for index in 0..CAPACITY as u64 {
             insert(index)
                 .context("filling to capacity must succeed")?
                 .with_context(|| format!("distinct index {index} must be accepted"))?;
         }
 
-        // A brand-new index inserted at capacity, then replayed immediately: still rejected.
-        let fresh_index = CAPACITY as u64 + 5;
-        insert(fresh_index)
-            .context("insert of a fresh index must succeed")?
-            .context("a fresh index must be accepted even at capacity")?;
-        assert!(
-            insert(fresh_index)
-                .context("replay of the fresh index must be attempted")?
-                .is_err(),
-            "an index accepted at capacity must not be immediately replayable"
-        );
-
-        // The oldest index, after enough new indices have displaced it, becomes replayable again.
-        // This is the disclosed residual, not a regression.
-        for index in 0..(CAPACITY as u64 * 2) {
-            insert(1_000_000 + index)
-                .context("pressure inserts must succeed")?
-                .with_context(|| format!("distinct pressure index {index} must be accepted"))?;
+        let target = 123_456u64;
+        let mut accepted = 0usize;
+        for _ in 0..8 {
+            if insert(target)
+                .context("insert of the target index must be attempted")?
+                .is_ok()
+            {
+                accepted += 1;
+            }
+            for _ in 0..20 {
+                for index in 0..CAPACITY as u64 {
+                    insert(index).context("resident re-access must not error")?;
+                }
+            }
+            ticket_processor.seen_ticket_indices.run_pending_tasks();
         }
-        assert!(
-            insert(0)
-                .context("replay of the oldest index must be attempted")?
-                .is_ok(),
-            "the oldest index is expected to be evicted under pressure; if this now fails the tracker became strictly \
-             stronger, which is fine but should update the docs"
+
+        assert_eq!(
+            accepted, 1,
+            "the same index must be accepted exactly once across 8 attempts under eviction pressure; more than one \
+             means the replay tracker failed open"
         );
 
         Ok(())
