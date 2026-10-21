@@ -93,6 +93,12 @@ pub struct StreamProtocolConfig {
     /// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
     /// target 7 000 / max 5 000/s).
     ///
+    /// When the per-peer channel is full, the egress drain drops the newest
+    /// packet (drop-newest) for both open and still-opening streams. The mixer's
+    /// hard capacity bound (`MixerConfig::capacity`) provides the upstream
+    /// backpressure layer, so this drop is a rate-limiting measure that prevents
+    /// one congested peer from head-of-line-blocking the shared drain loop.
+    ///
     /// Defaults to 5 000.
     #[validate(range(min = 1))]
     #[default(default_per_peer_channel_capacity())]
