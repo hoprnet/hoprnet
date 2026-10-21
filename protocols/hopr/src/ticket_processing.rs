@@ -966,4 +966,43 @@ mod tests {
 
         Ok(())
     }
+
+    /// Only a genuine duplicate-index rejection may be reported under the dedicated
+    /// `hopr_packet_rejected_count{reason="duplicate_ticket_index"}` label; every other failure
+    /// from the same call site must keep falling into the generic `unack_processing_error`
+    /// bucket, so a regression here cannot silently mislabel unrelated rejections.
+    #[tokio::test]
+    async fn ticket_processor_only_duplicate_index_error_maps_to_its_own_metric_label() -> anyhow::Result<()> {
+        use hopr_api::types::primitive::prelude::{Address, HoprBalance};
+
+        type TestProcessor = HoprUnacknowledgedTicketProcessor<
+            std::sync::Arc<
+                hopr_chain_connector::HoprBlockchainSafeConnector<
+                    hopr_chain_connector::testing::BlokliTestClient<hopr_chain_connector::testing::StaticState>,
+                >,
+            >,
+        >;
+
+        let duplicate = HoprProtocolError::DuplicateTicketIndex(Hash::default(), 1, 5);
+        assert!(
+            TestProcessor::is_duplicate_ticket_index_error(&duplicate),
+            "DuplicateTicketIndex must be reported under its own metric label"
+        );
+
+        let other_errors = [
+            HoprProtocolError::Replay,
+            HoprProtocolError::InvalidSender,
+            HoprProtocolError::KeyNotFound,
+            HoprProtocolError::ChannelNotFound(Address::default(), Address::default()),
+            HoprProtocolError::OutOfFunds(Default::default(), HoprBalance::zero()),
+        ];
+        for error in other_errors {
+            assert!(
+                !TestProcessor::is_duplicate_ticket_index_error(&error),
+                "{error} must not be reported as a duplicate ticket index"
+            );
+        }
+
+        Ok(())
+    }
 }
