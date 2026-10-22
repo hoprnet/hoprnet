@@ -128,7 +128,8 @@ pub struct AcknowledgementStateConfig {
     ///
     /// `0` (default) derives
     /// `max_incoming_frame_retries.max(1) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME`,
-    /// i.e. as many services as the receiver itself could ever have asked for the frame.
+    /// i.e. an 8x margin over the at most `max_incoming_frame_retries` requests the receiver
+    /// itself could ever have issued for the same frame.
     /// Internal defaults only; not operator-visible.
     #[default(0)]
     pub max_frame_retransmission_services: usize,
@@ -176,7 +177,9 @@ impl AcknowledgementStateConfig {
                     .unwrap_or_else(|| expected_packet_latency / 2),
             ),
             // A service cap of zero would refuse every request; derive it from how many times
-            // the receiver itself could ever have asked for the frame.
+            // the receiver itself could ever have asked for the frame. An honest receiver issues
+            // at most `max_incoming_frame_retries` requests per frame, so the product of that and
+            // the per-frame segment count is an 8x margin over what an honest peer can generate.
             max_frame_retransmission_services: if self.max_frame_retransmission_services == 0 {
                 self.max_incoming_frame_retries.max(1) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME
             } else {
@@ -264,13 +267,39 @@ impl RetransmissionBudget {
     }
 
     /// Refills the token bucket proportionally to the time elapsed since the last refill.
+    ///
+    /// The bucket earns [`Self::max_tokens`] over one [`Self::refill_interval`], so a full
+    /// allowance is available again after that interval — matching what the config documents
+    /// (`max_frame_retransmission_burst` frames served *across* a refill interval). Earning a
+    /// single token per interval instead would make a full refill take `max_tokens` intervals,
+    /// starving honest retry requests for tens of seconds after any burst.
+    ///
+    /// Elapsed time that is not yet worth a whole token is kept, so a steady stream of calls
+    /// refills at the same average rate as one call would.
     fn refill(&mut self, now: Instant) {
-        let elapsed = now.saturating_duration_since(self.last_refill);
-        if elapsed >= self.refill_interval {
+        // Nothing to earn while full; keep the clock current so a later drain starts accruing
+        // from now rather than from a stale instant.
+        if self.tokens >= self.max_tokens {
             self.last_refill = now;
-            let earned = (elapsed.as_nanos() / self.refill_interval.as_nanos()) as usize;
-            self.tokens = self.max_tokens.min(self.tokens.saturating_add(earned));
+            return;
         }
+
+        let interval_nanos = self.refill_interval.as_nanos();
+        if interval_nanos == 0 || self.max_tokens == 0 {
+            return;
+        }
+
+        let elapsed_nanos = now.saturating_duration_since(self.last_refill).as_nanos();
+        let earned = (elapsed_nanos.saturating_mul(self.max_tokens as u128) / interval_nanos) as usize;
+        if earned == 0 {
+            return;
+        }
+
+        // Advance the clock only by the time those whole tokens were worth, so the sub-token
+        // remainder is not discarded on every call.
+        let consumed_nanos = interval_nanos.saturating_mul(earned as u128) / (self.max_tokens as u128);
+        self.last_refill += Duration::from_nanos(consumed_nanos.min(u64::MAX as u128) as u64);
+        self.tokens = self.max_tokens.min(self.tokens.saturating_add(earned));
     }
 
     /// Pure admission check for `frame_id`; charges one session-wide token on success.
@@ -1957,7 +1986,7 @@ mod tests {
         let budget = state
             .context
             .as_ref()
-            .expect("state must be running")
+            .context("state must be running")?
             .retransmission_budget
             .clone();
 
@@ -1973,6 +2002,74 @@ mod tests {
         assert_eq!(budget.throttled, 0);
 
         Ok(())
+    }
+
+    #[test]
+    fn retransmission_budget_must_refill_a_full_allowance_within_one_refill_interval() {
+        // The config documents the burst as "frames served ACROSS a refill interval", so one whole
+        // interval must restore the entire allowance. Earning a single token per interval instead
+        // would take `max_tokens` intervals to refill, starving honest requests for a long time.
+        const TOKENS: usize = 10;
+        let interval = Duration::from_millis(100);
+        let t0 = Instant::now();
+
+        // A fresh bucket, drained at `t0`. Each scenario gets its own so that the refill clock
+        // advancing during one scenario cannot shift the baseline of the next.
+        let drained = || {
+            let mut budget = RetransmissionBudget::new(
+                Duration::from_millis(1), // per-frame interval, irrelevant here
+                usize::MAX,               // per-frame cap, irrelevant here
+                interval,
+                TOKENS,
+            );
+            for _ in 0..TOKENS {
+                assert!(budget.admit(1, t0), "the initial allowance must be spendable");
+            }
+            assert!(!budget.admit(1, t0), "an exhausted bucket must refuse");
+            budget
+        };
+
+        // Drains the bucket at `at`, returning how many frames were admitted.
+        fn drain_to(budget: &mut RetransmissionBudget, at: Instant) -> usize {
+            let mut admitted = 0;
+            while budget.admit(1, at) {
+                admitted += 1;
+                assert!(admitted <= TOKENS, "must never exceed the allowance");
+            }
+            admitted
+        }
+
+        // Half an interval restores about half the allowance.
+        let mut budget = drained();
+        assert_eq!(TOKENS / 2, drain_to(&mut budget, t0 + interval / 2));
+
+        // A full interval restores the entire allowance.
+        let mut budget = drained();
+        assert_eq!(
+            TOKENS,
+            drain_to(&mut budget, t0 + interval),
+            "a full refill interval must restore the whole allowance"
+        );
+
+        // Idling far longer than the interval must not overfill the bucket.
+        let mut budget = drained();
+        assert_eq!(
+            TOKENS,
+            drain_to(&mut budget, t0 + Duration::from_secs(3600)),
+            "the bucket must cap at max_tokens"
+        );
+
+        // A steady stream of sub-token calls must still refill at the full rate: the leftover
+        // time is carried, so `TOKENS` calls a tenth of the interval apart restore the allowance.
+        let mut budget = drained();
+        let mut admitted = 0;
+        for step in 1..=TOKENS as u32 {
+            admitted += drain_to(&mut budget, t0 + interval * step / TOKENS as u32);
+        }
+        assert_eq!(
+            TOKENS, admitted,
+            "sub-token calls must not discard the elapsed remainder"
+        );
     }
 
     #[test]
