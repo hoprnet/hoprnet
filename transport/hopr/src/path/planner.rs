@@ -21,7 +21,6 @@ use super::{
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
-use crate::protocol::surb_telemetry::RelayerHealth;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -140,11 +139,6 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
-    /// How long a relayer's reply races are remembered, in multiples of its own typical margin plus
-    /// spread. Longer is steadier but slower to notice a stall and to forgive a recovery. `0`
-    /// disables latency weighting.
-    #[default = 4]
-    pub latency_race_memory: u32,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -165,6 +159,7 @@ fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError
 struct WeightingParams {
     latency_halflife: Duration,
     capacity_reference: u128,
+    return_path_weight_temper: f64,
 }
 
 /// Continuous, monotonically decreasing latency factor, bounded in (0, 1].
@@ -206,6 +201,17 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
             .unwrap_or(1.0)
     };
     pwc.cost * lat * cap
+}
+
+/// The weight a candidate is drawn by. A return path's quality is tempered, to spread SURBs over
+/// relayers (see [`PathPlannerConfig::return_path_weight_temper`]), but the health of its relayers
+/// is not: `pwc.cost` already carries it, so it is divided out, tempered and multiplied back.
+fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams, returning: bool) -> f64 {
+    let weight = composite_weight(pwc, hops, params);
+    if !returning || pwc.health <= 0.0 {
+        return weight;
+    }
+    temper_weights(&[weight / pwc.health], params.return_path_weight_temper)[0] * pwc.health
 }
 
 /// Picks an index into `weights` with probability proportional to the weight; `None` if all are
@@ -258,118 +264,99 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
     weights.iter().map(|w| w.max(0.0).powf(temper)).collect()
 }
 
-/// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
-/// whatever the graph currently says.
-///
-/// Shared by the lazy cache fill, the background sweep and the on-demand recompute, so all three
-/// necessarily agree: a divergence here would make a session's weights depend on which of the three
-/// happened to run last.
-///
-/// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
-/// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
-/// alone. `Err` is reserved for a selector that actually failed.
-#[allow(clippy::too_many_arguments)]
-async fn rebuild_candidates<R, S>(
-    resolver: &R,
-    selector: &S,
+/// What a cache entry is rebuilt from, shared by the planner and its background sweep.
+struct PathBuilder<R, S> {
+    resolver: R,
+    selector: S,
     weighting: WeightingParams,
     me: OffchainPublicKey,
-    src_key: OffchainPublicKey,
-    dest_key: OffchainPublicKey,
-    hops: usize,
-    kind: &'static str,
-    health: Option<&RelayerHealth>,
-) -> Result<Option<hopr_utils::statistics::WeightedCollection<ValidatedPath>>>
+}
+
+impl<R, S> PathBuilder<R, S>
 where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
     S: PathSelector,
 {
-    let mut candidates = selector.select_path(src_key, dest_key, hops)?;
-    if let Some(health) = health {
-        let wanted = candidates.len();
-        let through_dead = |candidate: &PathWithMetrics| {
-            let relayers = &candidate.path[..candidate.path.len().saturating_sub(1)];
-            relayers.iter().any(|relayer| health.is_dead(relayer))
-        };
-        candidates.retain(|candidate| !through_dead(candidate));
-        // The selector returns the first paths its randomised search meets, not the best ones, so a
-        // dead relayer near the start of the search can crowd out every healthy path. Search again
-        // until healthy paths fill the set, or a search finds none it did not already have.
-        while candidates.len() < wanted {
-            let found = candidates.len();
-            let more = selector.select_path(src_key, dest_key, hops).unwrap_or_else(|error| {
-                tracing::debug!(kind, %error, "re-search for healthy paths failed");
-                Vec::new()
-            });
-            for candidate in more {
-                if candidates.len() < wanted
-                    && !through_dead(&candidate)
-                    && candidates.iter().all(|kept| kept.path != candidate.path)
-                {
-                    candidates.push(candidate);
+    /// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
+    /// whatever the graph currently says.
+    ///
+    /// Shared by the lazy cache fill, the background sweep and the on-demand recompute, so all three
+    /// necessarily agree: a divergence here would make a session's weights depend on which of the three
+    /// happened to run last.
+    ///
+    /// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
+    /// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
+    /// alone. `Err` is reserved for a selector that actually failed.
+    async fn rebuild(
+        &self,
+        src_key: OffchainPublicKey,
+        dest_key: OffchainPublicKey,
+        hops: usize,
+        kind: &'static str,
+    ) -> Result<Option<hopr_utils::statistics::WeightedCollection<ValidatedPath>>> {
+        let (resolver, weighting, me) = (&self.resolver, self.weighting, self.me);
+        // Dead relayers are pruned by the traversal itself, and stalled ones cost less there: the SURB
+        // telemetry records their health in the graph.
+        let candidates = self.selector.select_path(src_key, dest_key, hops)?;
+
+        let chain_resolver = ChainPathResolver::from(resolver);
+        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+        for mut pwc in candidates {
+            let path_nodes = std::mem::take(&mut pwc.path);
+            let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+            match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
+                Ok(vp) => {
+                    // Return paths are planned from the destination back to us.
+                    let returning = dest_key == me;
+                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting, returning)));
+                    path_metrics.push(pwc);
                 }
-            }
-            if candidates.len() == found {
-                break;
+                Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
             }
         }
-    }
 
-    let chain_resolver = ChainPathResolver::from(resolver);
-    let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-    let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-    for mut pwc in candidates {
-        let path_nodes = std::mem::take(&mut pwc.path);
-        let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-        match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
-            Ok(vp) => {
-                valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
-                path_metrics.push(pwc);
+        // A return path that resolves to a single first relayer puts every SURB of the destination
+        // behind it. Checked here, after validation, rather than in the selector: validation can reject
+        // every candidate through one of several relayers the selector saw, so only the survivors here
+        // reflect what a session can actually draw from.
+        if src_key != me && hops > 0 && !path_metrics.is_empty() {
+            let relayers = super::selector::distinct_first_relayers(&path_metrics);
+            if relayers <= 1 {
+                tracing::warn!(
+                    src = %src_key,
+                    kind,
+                    distinct_relayers = relayers,
+                    candidates = path_metrics.len(),
+                    "return-path relayer diversity collapsed to a single relayer",
+                );
             }
-            Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
         }
-    }
 
-    // A return path that resolves to a single first relayer puts every SURB of the destination
-    // behind it. Checked here, after validation, rather than in the selector: validation can reject
-    // every candidate through one of several relayers the selector saw, so only the survivors here
-    // reflect what a session can actually draw from.
-    if src_key != me && hops > 0 && !path_metrics.is_empty() {
-        let relayers = super::selector::distinct_first_relayers(&path_metrics);
-        if relayers <= 1 {
-            tracing::warn!(
-                src = %src_key,
+        if valid_paths.is_empty() {
+            return Ok(None);
+        }
+
+        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+        let total_wt = weighted.total_weight();
+        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+            tracing::debug!(
                 kind,
-                distinct_relayers = relayers,
-                candidates = path_metrics.len(),
-                "return-path relayer diversity collapsed to a single relayer",
+                destination = %dest_key,
+                hops,
+                path = %vp,
+                cost = pwm.cost,
+                selection_weight = w,
+                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                total_latency_ms = ?pwm.total_latency_ms,
+                min_probe_success_rate = ?pwm.min_probe_success_rate,
+                min_ack_rate = ?pwm.min_ack_rate,
+                fundable_tickets_floor = ?pwm.fundable_tickets_floor,
+                "weighted candidate path",
             );
         }
+        Ok(Some(weighted))
     }
-
-    if valid_paths.is_empty() {
-        return Ok(None);
-    }
-
-    let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-    let total_wt = weighted.total_weight();
-    for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-        tracing::debug!(
-            kind,
-            destination = %dest_key,
-            hops,
-            path = %vp,
-            cost = pwm.cost,
-            composite_weight = w,
-            sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-            total_latency_ms = ?pwm.total_latency_ms,
-            min_probe_success_rate = ?pwm.min_probe_success_rate,
-            min_ack_rate = ?pwm.min_ack_rate,
-            fundable_tickets_floor = ?pwm.fundable_tickets_floor,
-            "weighted candidate path",
-        );
-    }
-    Ok(Some(weighted))
 }
 
 /// Smallest change in a candidate's share of the draws that counts as traffic having moved.
@@ -470,48 +457,35 @@ async fn drop_if_unchanged(
         .await;
 }
 
-/// Rebuilds every cached multi-hop entry from the current graph, one pass of the background sweep.
-async fn sweep_cache<R, S>(
-    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
-    resolver: &R,
-    selector: &S,
-    weighting: WeightingParams,
-    me: OffchainPublicKey,
-    health: Option<&RelayerHealth>,
-) where
+impl<R, S> PathBuilder<R, S>
+where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
     S: PathSelector,
 {
-    for (key, swept) in cache.iter() {
-        let (src_key, dest_key, hops_u32) = *key.as_ref();
-        if hops_u32 == 0 {
-            continue;
-        }
+    /// Rebuilds every cached multi-hop entry from the current graph, one pass of the background sweep.
+    async fn sweep(&self, cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>) {
+        for (key, swept) in cache.iter() {
+            let (src_key, dest_key, hops_u32) = *key.as_ref();
+            if hops_u32 == 0 {
+                continue;
+            }
 
-        let rebuilt = rebuild_candidates(
-            resolver,
-            selector,
-            weighting,
-            me,
-            src_key,
-            dest_key,
-            hops_u32 as usize,
-            "background-refresh",
-            health,
-        )
-        .await;
-        // Only if this is still the entry the sweep read: a `recompute_paths_from` that ran
-        // during the rebuild built from newer evidence, and its route must not be overwritten.
-        match rebuilt {
-            Ok(Some(weighted)) => {
-                put_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
+            let rebuilt = self
+                .rebuild(src_key, dest_key, hops_u32 as usize, "background-refresh")
+                .await;
+            // Only if this is still the entry the sweep read: a `recompute_paths_from` that ran
+            // during the rebuild built from newer evidence, and its route must not be overwritten.
+            match rebuilt {
+                Ok(Some(weighted)) => {
+                    put_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
+                }
+                // No route left, e.g. every candidate runs through a dead relayer: serving the old one
+                // would keep drawing it.
+                Ok(None) | Err(PathPlannerError::Path(PathError::PathNotFound(..))) => {
+                    drop_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept).await
+                }
+                Err(error) => tracing::debug!(%error, "background refresh failed, keeping the cached paths"),
             }
-            // No route left, e.g. every candidate runs through a dead relayer: serving the old one
-            // would keep drawing it for forward paths, which carry no latency weights.
-            Ok(None) | Err(PathPlannerError::Path(PathError::PathNotFound(..))) => {
-                drop_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept).await
-            }
-            Err(error) => tracing::debug!(%error, "background refresh failed, keeping the cached paths"),
         }
     }
 }
@@ -533,18 +507,10 @@ async fn sweep_cache<R, S>(
 pub struct PathPlanner<Surb, R, S> {
     me: OffchainPublicKey,
     pub surb_store: Surb,
-    resolver: Arc<R>,
-    selector: Arc<S>,
+    paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
-    weighting: WeightingParams,
-    return_path_weight_temper: f64,
     return_path_exploration: f64,
-    latency_race_memory: u32,
-    /// Per-relayer health from SURB reply races and connectivity. The graph keeps a stalled relay's
-    /// delivery ratio at ~1 and never excludes a dead one in the middle of a path, so both are
-    /// applied here.
-    relayer_health: Option<Arc<RelayerHealth>>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -565,27 +531,20 @@ where
         Self {
             me,
             surb_store,
-            resolver: Arc::new(resolver),
-            selector: Arc::new(selector),
+            paths: Arc::new(PathBuilder {
+                resolver,
+                selector,
+                weighting: WeightingParams {
+                    latency_halflife: config.latency_halflife,
+                    capacity_reference: config.capacity_reference,
+                    return_path_weight_temper: config.return_path_weight_temper,
+                },
+                me,
+            }),
             cache,
             refresh_period: config.refresh_period,
-            weighting: WeightingParams {
-                latency_halflife: config.latency_halflife,
-                capacity_reference: config.capacity_reference,
-            },
-            return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
-            latency_race_memory: config.latency_race_memory,
-            relayer_health: None,
         }
-    }
-
-    /// Keeps dead relayers off every path and steers return-path draws off relayers whose SURB
-    /// replies come back later than their partners'.
-    #[must_use]
-    pub fn with_relayer_health(mut self, health: Arc<RelayerHealth>) -> Self {
-        self.relayer_health = Some(health);
-        self
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -593,7 +552,7 @@ where
         match node_id {
             NodeId::Offchain(key) => Ok(*key),
             NodeId::Chain(addr) => {
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 resolver
                     .resolve_transport_address(addr)
                     .await
@@ -621,7 +580,7 @@ where
                     ?explicit_path,
                     "resolving intermediate path"
                 );
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 ValidatedPath::new(
                     source,
                     explicit_path
@@ -635,7 +594,7 @@ where
 
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop direct path");
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 ValidatedPath::new(source, vec![destination], &resolver).await?
             }
 
@@ -685,48 +644,27 @@ where
 
         let cache_key: PlannerCacheKey = (src_key, dest_key, u32::from(hops));
 
-        let resolver = self.resolver.clone();
-        let selector = self.selector.clone();
-        let weighting = self.weighting;
-        let me = self.me;
-        let health = self.relayer_health.clone();
+        let paths = self.paths.clone();
 
         self.cache
             .try_get_with(cache_key, async move {
                 trace!(hops = hops_usize, "path cache miss, querying selector");
-                rebuild_candidates(
-                    &*resolver,
-                    &*selector,
-                    weighting,
-                    me,
-                    src_key,
-                    dest_key,
-                    hops_usize,
-                    "fill",
-                    health.as_deref(),
-                )
-                .await?
-                .map(Arc::new)
-                .ok_or_else(|| {
-                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
-                })
+                paths
+                    .rebuild(src_key, dest_key, hops_usize, "fill")
+                    .await?
+                    .map(Arc::new)
+                    .ok_or_else(|| {
+                        PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                    })
             })
             .await
             .map_err(PathPlannerError::CacheError)
     }
 
-    /// Runs one background sweep now: called when a relayer is lost or judged dead, so cached paths
-    /// stop drawing it immediately instead of up to [`PathPlannerConfig::refresh_period`] later.
+    /// Runs one background sweep now: called when relayer health in the graph changes, so cached
+    /// paths follow it at once instead of up to [`PathPlannerConfig::refresh_period`] later.
     pub(crate) async fn refresh_cached_paths(&self) {
-        sweep_cache(
-            &self.cache,
-            &*self.resolver,
-            &*self.selector,
-            self.weighting,
-            self.me,
-            self.relayer_health.as_deref(),
-        )
-        .await
+        self.paths.sweep(&self.cache).await
     }
 
     /// Rebuilds every cached entry whose paths originate at `source`, replacing each in place.
@@ -755,19 +693,7 @@ where
 
         let mut moved = 0usize;
         for (src_key, dest_key, hops) in keys {
-            if let Ok(Some(weighted)) = rebuild_candidates(
-                &*self.resolver,
-                &*self.selector,
-                self.weighting,
-                self.me,
-                src_key,
-                dest_key,
-                hops as usize,
-                "recompute",
-                self.relayer_health.as_deref(),
-            )
-            .await
-            {
+            if let Ok(Some(weighted)) = self.paths.rebuild(src_key, dest_key, hops as usize, "recompute").await {
                 let key = (src_key, dest_key, hops);
                 // A fresh entry counts as moved -- there was no previous distribution to compare
                 // against, so nothing here can say the traffic stayed put.
@@ -792,22 +718,6 @@ where
 
         tracing::debug!(%source, moved, "recomputed cached paths originating at peer");
         moved
-    }
-
-    /// Per-candidate weight from how every relayer on it fares in reply races; see
-    /// [`RelayerHealth::factors`].
-    fn relayer_latency_factors(&self, items: &[&(ValidatedPath, f64)]) -> Vec<f64> {
-        let Some(health) = self.relayer_health.as_ref().filter(|_| self.latency_race_memory > 0) else {
-            return vec![1.0; items.len()];
-        };
-        let candidates: Vec<Vec<OffchainPublicKey>> = items
-            .iter()
-            .map(|item| {
-                let path = item.0.transport_path();
-                path[..path.len().saturating_sub(1)].to_vec()
-            })
-            .collect();
-        health.factors(&candidates, self.latency_race_memory)
     }
 
     /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
@@ -854,18 +764,7 @@ where
 
         let candidates = self.cached_paths(destination, me, hops).await?;
         let items: Vec<&(ValidatedPath, f64)> = candidates.iter().collect();
-        let weights = temper_weights(
-            &items.iter().map(|(_, w)| *w).collect::<Vec<_>>(),
-            self.return_path_weight_temper,
-        );
-        // Fold in the reply timing the graph cannot see: a relay that answers every reply late
-        // keeps its delivery ratio at ~1, so only here does a stall move a candidate's weight.
-        let latency_factors = self.relayer_latency_factors(&items);
-        let weights = weights
-            .iter()
-            .zip(&latency_factors)
-            .map(|(weight, factor)| weight * factor)
-            .collect::<Vec<f64>>();
+        let weights = items.iter().map(|(_, w)| *w).collect::<Vec<_>>();
 
         if weights.iter().all(|w| *w <= 0.0) {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -893,9 +792,8 @@ where
             count,
             candidates = items.len(),
             distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
-            temper = self.return_path_weight_temper,
+            temper = self.paths.weighting.return_path_weight_temper,
             exploration = self.return_path_exploration,
-            ?latency_factors,
             "drawing return paths from tempered weights"
         );
 
@@ -1018,12 +916,8 @@ where
     fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
         // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
         let cache = self.cache.clone();
-        let resolver = self.resolver.clone();
-        let selector = self.selector.clone();
+        let paths = self.paths.clone();
         let refresh_period = self.refresh_period;
-        let weighting = self.weighting;
-        let me = self.me;
-        let health = self.relayer_health.clone();
 
         // run at a non-zero interval
         futures_time::stream::interval(futures_time::time::Duration::from_millis(
@@ -1031,12 +925,8 @@ where
         ))
         .for_each(move |_| {
             let cache = cache.clone();
-            let resolver = resolver.clone();
-            let selector = selector.clone();
-            let weighting = weighting;
-            let health = health.clone();
-
-            async move { sweep_cache(&cache, &*resolver, &*selector, weighting, me, health.as_deref()).await }
+            let paths = paths.clone();
+            async move { paths.sweep(&cache).await }
         })
     }
 }
@@ -2084,20 +1974,13 @@ mod tests {
         Ok(())
     }
 
-    /// A one-relayer return leg, as the reply races record it.
-    fn via(relayer: OffchainPublicKey) -> crate::protocol::surb_telemetry::ReturnRelayers {
-        let mut leg = [None; crate::protocol::surb_telemetry::PATH_ID_SLOTS];
-        leg[0] = Some(relayer);
-        leg
-    }
-
-    /// Our own connection dropping is one way a relayer is judged dead; whichever way it was, it
-    /// leaves the cached paths in any position, instead of lingering at a floored but drawable weight.
+    /// A relayer judged dead is pruned by the traversal itself, in any position, instead of
+    /// lingering at a floored but drawable weight.
     #[tokio::test]
     async fn a_relayer_judged_dead_should_leave_the_cached_paths() -> anyhow::Result<()> {
-        let health = Arc::new(RelayerHealth::default());
-        let (planner, _graph) = two_relayer_return_planner();
-        let planner = planner.with_relayer_health(health.clone());
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
         let (me, a, b, dest) = (
             pubkey(&SECRET_ME),
             pubkey(&SECRET_A),
@@ -2111,7 +1994,7 @@ mod tests {
             "vacuity guard: B must be a candidate first"
         );
 
-        health.set_reachable(b, false);
+        graph.record_node_health(&b, 0.0);
         planner.refresh_cached_paths().await;
 
         let after = planner
@@ -2126,14 +2009,14 @@ mod tests {
 
     #[tokio::test]
     async fn an_entry_left_without_a_route_should_leave_the_cache() -> anyhow::Result<()> {
-        let health = Arc::new(RelayerHealth::default());
-        let (planner, _graph) = two_relayer_return_planner();
-        let planner = planner.with_relayer_health(health.clone());
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
         let (me, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
 
         fill_return_cache(&planner).await;
-        health.set_reachable(pubkey(&SECRET_A), false);
-        health.set_reachable(pubkey(&SECRET_B), false);
+        graph.record_node_health(&pubkey(&SECRET_A), 0.0);
+        graph.record_node_health(&pubkey(&SECRET_B), 0.0);
         planner.refresh_cached_paths().await;
 
         assert!(
@@ -2143,73 +2026,73 @@ mod tests {
         Ok(())
     }
 
+    /// The return temper spreads SURBs over relayers of similar quality; it must not soften a
+    /// stall, or a relayer replying seconds late would keep a quarter of the stream instead of a
+    /// sixteenth.
     #[tokio::test]
-    async fn a_relayer_replying_late_should_drop_out_of_the_return_draw() -> anyhow::Result<()> {
-        let health = Arc::new(RelayerHealth::default());
-        let (planner, _graph) = two_relayer_return_planner();
-        let planner = planner.with_relayer_health(health.clone());
+    async fn a_stalled_relayer_should_lose_its_share_at_full_strength() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
         let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
-        for i in 0..20u64 {
-            health.record_race(
-                &via(b),
-                Default::default(),
-                &via(a),
-                Duration::from_millis(200),
-                Duration::from_millis(3000 + i * 7 % 40),
-            );
-        }
+        graph.record_node_health(&b, 1.0 / 16.0);
+        planner.refresh_cached_paths().await;
 
         let paths = planner
             .resolve_diverse_return_paths(
                 NodeId::Offchain(pubkey(&SECRET_DEST)),
-                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                RoutingOptions::Hops(1.try_into()?),
                 4000,
             )
             .await?;
         let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
         assert_eq!(4000, paths.len());
-        // Half without timing; ~10% is left, mostly exploration re-measuring it. 600 is ~9 sigma out.
+        // ~6% weighted plus half the 10% exploration is ~430; a tempered health would give ~900.
         assert!(
             via_b < 600,
             "the stalled relayer must lose its share, got {via_b} of 4000"
         );
         assert!(
             paths.iter().any(|vp| vp.first() == Some(&a)),
-            "the fast relayer must keep carrying the return stream"
+            "the healthy relayer must keep carrying the return stream"
         );
         Ok(())
     }
 
-    /// Who wins a race by a few milliseconds is noise, not a stall.
+    /// From races to the draw: a relayer losing its races by seconds is judged, recorded in the graph,
+    /// and the re-plan that follows cuts its share of the cached return paths.
     #[tokio::test]
-    async fn relayers_trading_wins_by_milliseconds_should_keep_their_shares() -> anyhow::Result<()> {
-        let health = Arc::new(RelayerHealth::default());
-        let (planner, _graph) = two_relayer_return_planner();
-        let planner = planner.with_relayer_health(health.clone());
+    async fn a_relayer_losing_its_races_should_lose_its_share_of_the_cached_paths() -> anyhow::Result<()> {
+        use crate::protocol::surb_telemetry::{SurbRoundTripRegistry, refresh_relayer_health};
+
+        let (planner, graph) = two_relayer_return_planner();
         let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
-        for i in 0..20u64 {
-            let (later, earlier) = if i % 2 == 0 { (a, b) } else { (b, a) };
+        let before = share_of(&fill_return_cache(&planner).await, &b);
+
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let leg = |relayer| {
+            let mut leg = [None; crate::protocol::surb_telemetry::PATH_ID_SLOTS];
+            leg[0] = Some(relayer);
+            leg
+        };
+        for seed in 0..10u8 {
             health.record_race(
-                &via(later),
-                Default::default(),
-                &via(earlier),
+                &leg(b),
+                [seed; 8],
+                &leg(a),
                 Duration::from_millis(200),
-                Duration::from_millis(5 + i * 7 % 40),
+                Duration::from_secs(3),
             );
         }
+        refresh_relayer_health(&registry, &graph, 4, || planner.refresh_cached_paths()).await;
 
-        let paths = planner
-            .resolve_diverse_return_paths(
-                NodeId::Offchain(pubkey(&SECRET_DEST)),
-                RoutingOptions::Hops(1.try_into().expect("valid 1")),
-                400,
-            )
-            .await?;
-        let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
+        let after = share_of(&fill_return_cache(&planner).await, &b);
         assert!(
-            via_b > 140,
-            "millisecond wins either way must not starve one, got {via_b} of 400"
+            after < before / 4.0,
+            "the late relayer's share must fall, from {before} to {after}"
         );
+        assert!(share_of(&fill_return_cache(&planner).await, &a) > 0.5);
         Ok(())
     }
 
@@ -2462,6 +2345,7 @@ mod tests {
         WeightingParams {
             latency_halflife: Duration::from_millis(100),
             capacity_reference: 10_000_000,
+            return_path_weight_temper: 1.0,
         }
     }
 
@@ -2473,6 +2357,7 @@ mod tests {
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor,
+            health: 1.0,
         }
     }
 

@@ -28,6 +28,7 @@ struct PathCostWithMetrics {
     min_probe_success_rate: Option<f64>,
     min_ack_rate: Option<f64>,
     fundable_tickets_floor: Option<u128>,
+    health: f64,
 }
 
 impl PartialOrd for PathCostWithMetrics {
@@ -51,6 +52,7 @@ impl From<(PathCostWithMetrics, Vec<OffchainPublicKey>)> for PathWithMetrics {
             min_probe_success_rate: metrics.min_probe_success_rate,
             min_ack_rate: metrics.min_ack_rate,
             fundable_tickets_floor: metrics.fundable_tickets_floor,
+            health: metrics.health,
         }
     }
 }
@@ -93,6 +95,7 @@ where
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor: None,
+            health: 1.0,
         }
     }
 
@@ -103,6 +106,7 @@ where
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor: None,
+            health: 1.0,
         })
     }
 
@@ -168,6 +172,7 @@ where
                 min_probe_success_rate,
                 min_ack_rate,
                 fundable_tickets_floor,
+                health: prev.health * observed.health().clamp(0.0, 1.0),
             }
         })
     }
@@ -1065,6 +1070,7 @@ mod tests {
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor: None,
+            health: 1.0,
         }
     }
 
@@ -1076,6 +1082,7 @@ mod tests {
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor,
+            health: 1.0,
         }
     }
 
@@ -1091,6 +1098,7 @@ mod tests {
             min_probe_success_rate: None,
             min_ack_rate: None,
             fundable_tickets_floor: Some(1000),
+            health: 1.0,
         }
     }
 

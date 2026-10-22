@@ -352,9 +352,6 @@ where
             ..cfg.packet.surb_store
         };
 
-        // Built before the session manager so the latter can be handed the seam that lets a
-        // session re-plan its return path on sustained loss. Created here, not in `run_*`, so the
-        // planner can share the per-relayer reply timing the graph's delivery ratio cannot see.
         let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
         let path_planner = PathPlanner::new(
             me_offchain,
@@ -362,8 +359,7 @@ where
             resolver.clone(),
             selector,
             planner_config,
-        )
-        .with_relayer_health(surb_round_trips.relayer_health());
+        );
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -820,61 +816,41 @@ where
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_smgr = self.smgr.clone();
-        let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
+        let latency_race_memory = self.cfg.latency_race_memory;
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
-                let health = surb_round_trips.relayer_health();
-                let mut unusable: std::collections::HashMap<OffchainPublicKey, (u64, f64)> = Default::default();
+                let mut unusable = std::collections::HashMap::new();
                 while ticks.next().await.is_some() {
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
                     protocol::surb_telemetry::flush_into(&surb_round_trips, &surb_flush_graph, now_ms);
+                    // Relayer health lives in the graph, so path selection prunes the dead and weights
+                    // the stalled natively.
+                    protocol::surb_telemetry::refresh_relayer_health(
+                        &surb_round_trips,
+                        &surb_flush_graph,
+                        latency_race_memory,
+                        || surb_flush_planner.refresh_cached_paths(),
+                    )
+                    .await;
 
-                    let (newly_dead, recovered) = health.refresh_verdicts();
-                    if !newly_dead.is_empty() || !recovered.is_empty() {
-                        tracing::info!(?newly_dead, ?recovered, "relayer verdicts changed, re-planning");
-                        surb_flush_planner.refresh_cached_paths().await;
-                    }
-
-                    // The counterparty still counts SURBs returning through a dead relayer, so its
-                    // sessions are told how many of those it holds to replace.
-                    let through = surb_round_trips.unusable_through(&health.dead_relayers());
-                    let cleared = unusable
-                        .keys()
-                        .filter(|destination| !through.contains_key(destination))
-                        .map(|destination| (*destination, (0, 0.0)));
-                    let changed: Vec<(OffchainPublicKey, (u64, f64))> = through
-                        .iter()
-                        .map(|(destination, unusable)| (*destination, *unusable))
-                        .chain(cleared)
-                        .filter(|(destination, now)| unusable.get(destination) != Some(now))
-                        .collect();
-                    for (destination, (count, share)) in changed {
-                        // Sessions name their destination by its chain address, this telemetry by its packet key.
-                        let sessions = match surb_flush_chain.packet_key_to_chain_key(&destination) {
-                            Ok(Some(address)) => surb_flush_smgr.set_unusable_surbs(
-                                &hopr_api::types::internal::prelude::NodeId::Chain(address),
-                                count,
-                                share,
-                            ),
-                            Ok(None) => 0,
-                            Err(error) => {
-                                tracing::warn!(%destination, %error, "could not resolve a destination's chain key to mark its unusable SURBs");
-                                0
-                            }
-                        };
-                        match (sessions, share > 0.0, unusable.contains_key(&destination)) {
-                            (0, ..) => {}
-                            (_, true, false) => tracing::info!(%destination, count, share, sessions, "marking SURBs returning through a dead relayer unusable"),
-                            (_, true, true) => tracing::debug!(%destination, count, share, sessions, "updating the unusable SURBs"),
-                            (_, false, _) => tracing::info!(%destination, sessions, "clearing unusable SURBs, no relayer they return through is dead"),
+                    // The counterparty still counts SURBs through a dead relayer, so each session is
+                    // told how many of those it holds, to replace them.
+                    let current = surb_round_trips.unusable();
+                    for (session, (count, share)) in protocol::surb_telemetry::unusable_updates(&unusable, &current) {
+                        if !surb_flush_smgr.set_unusable_surbs(&session, count, share) {
+                            surb_round_trips.forget_session(&session);
+                        } else if !unusable.contains_key(&session) {
+                            tracing::info!(%session, count, share, "marking SURBs that cannot bring a reply home unusable");
+                        } else if share == 0.0 {
+                            tracing::info!(%session, "clearing unusable SURBs");
                         }
                     }
-                    unusable = through;
+                    unusable = current;
                 }
             }),
         );
@@ -1113,7 +1089,7 @@ where
         &self.graph
     }
 
-    /// Returns the per-relayer health, so connectivity events can mark a relayer dead.
+    /// Returns the per-relayer health, so connectivity events can report neighbours we lost or regained.
     pub fn relayer_health(&self) -> std::sync::Arc<protocol::surb_telemetry::RelayerHealth> {
         self.surb_round_trips.relayer_health()
     }

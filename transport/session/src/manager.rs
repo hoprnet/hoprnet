@@ -1432,17 +1432,14 @@ where
         }
     }
 
-    /// Sets how many SURBs held by the counterparty of every Session routed to `destination`, and which
-    /// share of those outstanding, return through a relayer judged dead, so the balancer replaces them.
-    /// Returns the Sessions hit.
-    pub fn set_unusable_surbs(&self, destination: &hopr_api::types::internal::NodeId, count: u64, share: f64) -> usize {
+    /// Sets how many SURBs held by the counterparty of `session` return through a relayer judged dead,
+    /// and their share of what it was handed, so the balancer replaces them. `false` if there is no such
+    /// Session.
+    pub fn set_unusable_surbs(&self, session: &SessionId, count: u64, share: f64) -> bool {
         self.sessions
-            .iter()
-            .filter(|(_, slot)| {
-                matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
-            })
-            .map(|(_, slot)| slot.surb_mgmt.set_counterparty_unusable(count, share))
-            .count()
+            .get(session)
+            .map(|slot| slot.surb_mgmt.set_counterparty_unusable(count, share))
+            .is_some()
     }
 
     /// The main method to be called whenever data are received.
@@ -4351,13 +4348,13 @@ mod tests {
     }
 
     #[test]
-    fn an_unusable_surb_share_should_reopen_the_gate_only_for_sessions_to_that_destination() -> anyhow::Result<()> {
+    fn an_unusable_surb_share_should_reopen_the_gate_only_for_that_session() -> anyhow::Result<()> {
         use anyhow::Context as _;
 
         let mgr: TestManager = SessionManager::new(Default::default());
-        let [hit, other] = [(); 2].map(|_| Address::from(&ChainKeypair::random()));
+        let destination = Address::from(&ChainKeypair::random());
         let [hit_session, other_session] = [(); 2].map(|_| HoprPseudonym::random());
-        for (session, destination) in [(hit_session, hit), (other_session, other)] {
+        for session in [hit_session, other_session] {
             mgr.pre_populate_session(
                 session,
                 DestinationRouting::Forward {
@@ -4377,7 +4374,8 @@ mod tests {
                 .store(200, std::sync::atomic::Ordering::Relaxed);
         }
 
-        assert_eq!(1, mgr.set_unusable_surbs(&hit.into(), 120, 0.6));
+        assert!(mgr.set_unusable_surbs(&hit_session, 120, 0.6));
+        assert!(!mgr.set_unusable_surbs(&HoprPseudonym::random(), 120, 0.6));
 
         let organic = |session| -> anyhow::Result<usize> {
             Ok(mgr
@@ -4392,7 +4390,11 @@ mod tests {
             organic(hit_session)?,
             "80 usable of 200 held is below the target of 100"
         );
-        assert_eq!(0, organic(other_session)?, "other destinations are untouched");
+        assert_eq!(
+            0,
+            organic(other_session)?,
+            "other sessions to the same destination are untouched"
+        );
         Ok(())
     }
 

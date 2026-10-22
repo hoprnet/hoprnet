@@ -17,7 +17,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -80,10 +80,14 @@ impl SurbRoundTripCounters {
 #[derive(Debug, Clone)]
 pub struct SurbRoundTripRegistry {
     inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
-    /// Per-relayer health from reply races and connectivity, shared with the path planner.
+    /// Per-relayer health from reply races, published into the graph.
     relayer_health: Arc<RelayerHealth>,
-    /// Every outstanding SURB, shared by both codec halves and by the write-off of a dead relayer.
+    /// Every outstanding SURB, shared by both codec halves.
     pending: PendingLegs,
+    /// Per session, SURBs written off because their return path runs through a relayer judged dead,
+    /// by that relayer. Kept past the pending TTL: the counterparty holds them until it spends or
+    /// evicts them, or the relayer recovers.
+    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, u64>>>,
 }
 
 /// Memory bound only: at the 60 s TTL it is reached above ~1.7k SURBs minted per second.
@@ -95,6 +99,7 @@ impl Default for SurbRoundTripRegistry {
             inner: Default::default(),
             relayer_health: Default::default(),
             pending: pending_legs(MAX_PENDING_SURBS),
+            written_off: Default::default(),
         }
     }
 }
@@ -109,31 +114,60 @@ impl SurbRoundTripRegistry {
         self.counters(paths).record_expected(count);
     }
 
-    /// The per-relayer health, for callers that weight or exclude paths by it.
+    /// The per-relayer health, judged from reply races and published into the graph.
     pub fn relayer_health(&self) -> Arc<RelayerHealth> {
         self.relayer_health.clone()
     }
 
-    /// Per destination, how many outstanding SURBs return through any of `relayers`, and their share
-    /// of all outstanding. SURBs already spent into a dead relayer stay outstanding too, so the count
-    /// alone can outgrow what the counterparty still holds.
-    pub fn unusable_through(&self, relayers: &[OffchainPublicKey]) -> HashMap<OffchainPublicKey, (u64, f64)> {
-        if relayers.is_empty() {
+    /// Moves outstanding SURBs whose return path runs through a relayer judged dead into the
+    /// per-session write-off, and drops the write-off of relayers that recovered.
+    pub fn write_off_dead(&self) {
+        let health = &self.relayer_health;
+        for mut session in self.written_off.iter_mut() {
+            session.retain(|relayer, _| health.dead.contains(relayer));
+        }
+        self.written_off.retain(|_, session| !session.is_empty());
+        if health.dead.is_empty() {
+            return;
+        }
+        let through_dead: Vec<(HoprSurbId, HoprPseudonym, OffchainPublicKey)> = self
+            .pending
+            .iter()
+            .filter_map(|(id, pending)| {
+                relayers_of(&pending.return_relayers)
+                    .find(|relayer| health.dead.contains(relayer))
+                    .map(|dead| (*id, pending.pseudonym, dead))
+            })
+            .collect();
+        for (id, pseudonym, dead) in through_dead {
+            self.pending.invalidate(&id);
+            *self.written_off.entry(pseudonym).or_default().entry(dead).or_default() += 1;
+        }
+    }
+
+    /// Per session, how many SURBs held by the counterparty cannot bring a reply home, and their share
+    /// of all it was handed that are still accounted for.
+    pub fn unusable(&self) -> HashMap<HoprPseudonym, (u64, f64)> {
+        if self.written_off.is_empty() {
             return HashMap::new();
         }
-        let mut counts: HashMap<OffchainPublicKey, (u64, u64)> = HashMap::new();
+        let mut outstanding: HashMap<HoprPseudonym, u64> = HashMap::new();
         for (_, pending) in self.pending.iter() {
-            let (through, total) = counts.entry(pending.destination).or_default();
-            *total += 1;
-            if pending.return_relayers.iter().flatten().any(|r| relayers.contains(r)) {
-                *through += 1;
-            }
+            *outstanding.entry(pending.pseudonym).or_default() += 1;
         }
-        counts
-            .into_iter()
-            .filter(|(_, (through, _))| *through > 0)
-            .map(|(destination, (through, total))| (destination, (through, through as f64 / total as f64)))
+        self.written_off
+            .iter()
+            .map(|session| {
+                let count: u64 = session.values().sum();
+                let total = count + outstanding.get(session.key()).copied().unwrap_or_default();
+                (*session.key(), (count, count as f64 / total.max(1) as f64))
+            })
             .collect()
+    }
+
+    /// Drops the write-off of a session that no longer exists.
+    pub fn forget_session(&self, pseudonym: &HoprPseudonym) {
+        self.written_off.remove(pseudonym);
     }
 
     /// Records that `count` replies arrived over these legs.
@@ -176,17 +210,16 @@ pub(crate) type ReturnRelayers = [Option<OffchainPublicKey>; PATH_ID_SLOTS];
 pub(crate) struct PendingSurb {
     /// Legs the round-trip traverses, for the counts and graph attribution.
     paths: ForwardAndReturnPath,
-    /// Who the SURB was handed to.
-    destination: OffchainPublicKey,
+    /// The session it was minted for.
+    pseudonym: HoprPseudonym,
     /// Relayers the reply passes, any of which a late or missing reply implicates.
     return_relayers: ReturnRelayers,
     /// When this SURB and its partner were minted; both round-trips run from here.
     minted_at: Instant,
     /// The SURB minted in the same packet over another return path, which this one races.
     partner: Option<HoprSurbId>,
-    /// Whether this is the second SURB of its pair, the only one never buried behind newer SURBs in
-    /// the replier's store, so the only one whose lateness is down to its return path.
-    second: bool,
+    /// Its position in the pair, `0` or `1`; see [`FRESH_INDEX`].
+    pair_index: usize,
     /// The partner's relayers and when its reply came home, once it has.
     partner_replied: Option<(ReturnRelayers, Instant)>,
 }
@@ -211,13 +244,18 @@ fn pending_legs(max_pending: u64) -> PendingLegs {
 #[derive(Debug, Default)]
 pub struct RelayerHealth {
     relayers: DashMap<OffchainPublicKey, RaceHistory>,
-    /// Relayers we lost our own connection to, until it comes back.
-    unreachable: DashSet<OffchainPublicKey>,
-    /// Relayers judged dead at the last flush.
+    /// Neighbours we lost our own connection to, to re-plan when one comes or goes.
+    lost_neighbours: DashSet<OffchainPublicKey>,
+    neighbours_changed: AtomicBool,
     dead: DashSet<OffchainPublicKey>,
-    /// Factors per candidate set, cleared every telemetry flush, so a per-packet draw only reads.
-    cache: parking_lot::Mutex<HashMap<Vec<Vec<OffchainPublicKey>>, Vec<f64>>>,
+    /// Health last handed to the graph, below `1.0` only.
+    published: DashMap<OffchainPublicKey, f64>,
 }
+
+/// The SURB of a pair the replier spends first: the second, as it spends the newest first (LIFO,
+/// hoprd's and the store's default). Only its lateness is down to its return path; the first may wait
+/// in the replier's store behind newer SURBs.
+const FRESH_INDEX: usize = 1;
 
 /// One race as one of its relayers saw it.
 #[derive(Debug, Clone, Copy)]
@@ -227,6 +265,13 @@ struct Race {
     margin: f64,
     /// Seconds the faster of the two replies took to come home.
     winning_round_trip: f64,
+}
+
+impl Race {
+    /// Its reply never came home within the time a SURB is remembered.
+    fn lost(&self) -> bool {
+        self.margin >= PENDING_SURB_TTL.as_secs_f64()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -249,13 +294,16 @@ impl RaceHistory {
         }
     }
 
-    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than any settled
-    /// race ever took, and none has come home since the oldest of them was due.
+    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than any race it
+    /// finished took, and none has come home since the oldest was due.
     fn is_black_hole(&self) -> bool {
-        if self.races.len() < MIN_RACES {
+        let finished: Vec<&Race> = self.races.iter().filter(|race| !race.lost()).collect();
+        if finished.len() < MIN_RACES {
             return false;
         }
-        let usual = self.races.iter().map(|race| race.margin.abs()).fold(0.0, f64::max);
+        // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
+        // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
+        let usual = finished.iter().map(|race| race.margin.abs()).fold(0.0, f64::max);
         let overdue: Vec<Instant> = self
             .open
             .values()
@@ -266,6 +314,30 @@ impl RaceHistory {
             return false;
         };
         overdue.len() >= MIN_RACES && self.races.back().is_none_or(|settled| settled.at < oldest_overdue)
+    }
+}
+
+/// A relayer's standing in its races: median margin behind its partners, that median's
+/// uncertainty, and the fastest round-trip among them.
+#[derive(Debug, Clone, Copy)]
+struct Judgement {
+    margin: f64,
+    uncertainty: f64,
+    fastest: f64,
+}
+
+impl Judgement {
+    /// Health from the relayer's lateness, `unit` being the fastest round-trip any relayer made:
+    /// lagging by less than that costs nothing.
+    fn health(&self, unit: f64) -> f64 {
+        unit / unit.max(self.margin - self.uncertainty)
+    }
+
+    /// The healths its races cannot tell apart: lateness within its uncertainty, or within a
+    /// round-trip, which healthy relayers differ by anyway.
+    fn indistinct(&self, unit: f64) -> std::ops::RangeInclusive<f64> {
+        let slack = self.uncertainty.max(unit);
+        unit / unit.max(self.margin + slack)..=unit / unit.max(self.margin - slack)
     }
 }
 
@@ -331,36 +403,67 @@ impl RelayerHealth {
         }
     }
 
-    /// Our own connection to `relayer` came or went.
-    pub fn set_reachable(&self, relayer: OffchainPublicKey, reachable: bool) {
-        if reachable {
-            self.unreachable.remove(&relayer);
+    /// Our own connection to a neighbour came or went.
+    pub fn set_neighbour_connected(&self, neighbour: OffchainPublicKey, connected: bool) {
+        let changed = if connected {
+            self.lost_neighbours.remove(&neighbour).is_some()
         } else {
-            self.unreachable.insert(relayer);
+            self.lost_neighbours.insert(neighbour)
+        };
+        if changed {
+            self.neighbours_changed.store(true, Ordering::Relaxed);
         }
     }
 
-    /// Whether `relayer` must not be on any path, in any position.
-    pub fn is_dead(&self, relayer: &OffchainPublicKey) -> bool {
-        self.unreachable.contains(relayer) || self.dead.contains(relayer)
+    /// Whether a neighbour came or went since the last call.
+    pub fn take_neighbour_change(&self) -> bool {
+        self.neighbours_changed.swap(false, Ordering::Relaxed)
     }
 
-    /// Re-judges which relayers are dead, once per flush, returning those newly dead and recovered.
-    /// Races open longer than a SURB is remembered can no longer settle, so they are dropped.
-    pub fn refresh_verdicts(&self) -> (Vec<OffchainPublicKey>, Vec<OffchainPublicKey>) {
-        let mut dead: Vec<OffchainPublicKey> = self.unreachable.iter().map(|relayer| *relayer).collect();
+    #[cfg(test)]
+    fn is_dead(&self, relayer: &OffchainPublicKey) -> bool {
+        self.dead.contains(relayer)
+    }
+
+    /// Re-judges every relayer once per flush; returns `(relayer, previous, current)` health changes for
+    /// the graph, dead being `0.0`. A race open longer than a SURB is remembered counts as lost by that
+    /// long. `memory`: margins a race is remembered for, `0` for dead or healthy.
+    pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
+        let mut black_holes = std::collections::HashSet::new();
         for mut entry in self.relayers.iter_mut() {
-            entry.open.retain(|_, race| race.at.elapsed() <= PENDING_SURB_TTL);
-            if entry.is_black_hole() && !dead.contains(entry.key()) {
-                dead.push(*entry.key());
+            // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
+            // a health that low until it proves otherwise, rather than being forgiven by expiry.
+            let mut lost = Vec::new();
+            entry.open.retain(|_, race| {
+                let open = race.at.elapsed() <= PENDING_SURB_TTL;
+                if !open {
+                    lost.push(Race {
+                        at: Instant::now(),
+                        margin: PENDING_SURB_TTL.as_secs_f64(),
+                        ..*race
+                    });
+                }
+                open
+            });
+            entry.races.extend(lost);
+            if entry.is_black_hole() {
+                black_holes.insert(*entry.key());
             }
         }
-        let newly_dead: Vec<OffchainPublicKey> = dead
+        self.dead.retain(|relayer| black_holes.contains(relayer));
+        for relayer in black_holes {
+            self.dead.insert(relayer);
+        }
+
+        let judged: HashMap<OffchainPublicKey, Judgement> = self
+            .relayers
             .iter()
-            .filter(|relayer| !self.dead.contains(relayer))
-            .copied()
+            .map(|entry| *entry.key())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .filter_map(|relayer| self.judge(&relayer, memory).map(|judgement| (relayer, judgement)))
             .collect();
-        // A relayer gone from the candidates races no more; its history only grows the map.
+        // A relayer gone from the paths races no more; its history only grows the map.
         self.relayers.retain(|_, history| {
             !history.open.is_empty()
                 || history
@@ -368,83 +471,47 @@ impl RelayerHealth {
                     .back()
                     .is_some_and(|race| race.at.elapsed() <= history.memory.max(PENDING_SURB_TTL))
         });
-        let recovered: Vec<OffchainPublicKey> = self
-            .dead
-            .iter()
-            .map(|relayer| *relayer)
-            .filter(|relayer| !dead.contains(relayer))
-            .collect();
-        self.dead.retain(|relayer| dead.contains(relayer));
-        for relayer in &newly_dead {
-            self.dead.insert(*relayer);
-        }
-        (newly_dead, recovered)
-    }
-
-    /// Every relayer currently judged dead.
-    pub fn dead_relayers(&self) -> Vec<OffchainPublicKey> {
-        let unreachable = self
-            .unreachable
-            .iter()
-            .map(|relayer| *relayer)
-            .filter(|r| !self.dead.contains(r));
-        self.dead.iter().map(|relayer| *relayer).chain(unreachable).collect()
-    }
-
-    fn forget_factors(&self) {
-        self.cache.lock().clear();
-    }
-
-    /// Per-candidate weight from the reply races of every relayer on it, relative to the best
-    /// candidate: a candidate is as good as its worst relayer, and `0.0` with a dead one. `memory`
-    /// is how many of its own margins a relayer's races are remembered for (`PathPlannerConfig`).
-    pub fn factors(&self, candidates: &[Vec<OffchainPublicKey>], memory: u32) -> Vec<f64> {
-        if let Some(factors) = self.cache.lock().get(candidates) {
-            return factors.clone();
-        }
-        let factors = self.compute_factors(candidates, memory);
-        self.cache.lock().insert(candidates.to_vec(), factors.clone());
-        factors
-    }
-
-    /// A relayer is weighted down by how many round-trips it finishes behind its partners, the
-    /// fastest round-trip any candidate's relayer made being the unit: lagging by less costs
-    /// nothing, as healthy relayers differ by that much anyway.
-    fn compute_factors(&self, candidates: &[Vec<OffchainPublicKey>], memory: u32) -> Vec<f64> {
-        let mut judged: HashMap<OffchainPublicKey, Option<(f64, f64)>> = HashMap::new();
-        for relayer in candidates.iter().flatten() {
-            judged.entry(*relayer).or_insert_with(|| self.judge(relayer, memory));
-        }
         let unit = judged
             .values()
-            .flatten()
-            .map(|(_, fastest)| *fastest)
+            .map(|judgement| judgement.fastest)
             .min_by(f64::total_cmp);
-        let relayer_factor = |relayer: &OffchainPublicKey| {
-            if self.is_dead(relayer) {
-                return 0.0;
-            }
-            match (judged.get(relayer).copied().flatten(), unit) {
-                (Some((lateness, _)), Some(unit)) if lateness > unit => unit / lateness,
-                _ => 1.0,
-            }
-        };
-        let factors: Vec<f64> = candidates
-            .iter()
-            .map(|relayers| relayers.iter().map(relayer_factor).fold(1.0, f64::min))
+
+        let relayers: std::collections::HashSet<OffchainPublicKey> = judged
+            .keys()
+            .copied()
+            .chain(self.published.iter().map(|entry| *entry.key()))
+            .chain(self.dead.iter().map(|relayer| *relayer))
             .collect();
-        // Never all zero, which would leave nothing to draw: the best candidate sets the scale.
-        let best = factors.iter().copied().fold(0.0, f64::max);
-        if best > 0.0 {
-            factors.iter().map(|factor| factor / best).collect()
-        } else {
-            vec![1.0; candidates.len()]
+
+        let mut changed = Vec::new();
+        for relayer in relayers {
+            let previous = self.published.get(&relayer).map_or(1.0, |health| *health);
+            let current = match (judged.get(&relayer), unit) {
+                _ if self.dead.contains(&relayer) => 0.0,
+                (Some(judgement), Some(unit)) if memory > 0 => {
+                    if previous > 0.0 && judgement.indistinct(unit).contains(&previous) {
+                        continue;
+                    }
+                    judgement.health(unit)
+                }
+                _ => 1.0,
+            };
+            if current == previous {
+                continue;
+            }
+            if current < 1.0 {
+                self.published.insert(relayer, current);
+            } else {
+                self.published.remove(&relayer);
+            }
+            changed.push((relayer, previous, current));
         }
+        changed
     }
 
-    /// Lateness (median margin behind its partners, less its uncertainty) and fastest round-trip.
-    /// Races are remembered for `memory` times margin plus spread, so the window scales with the relayer.
-    fn judge(&self, relayer: &OffchainPublicKey, memory: u32) -> Option<(f64, f64)> {
+    /// Margin, its uncertainty and fastest round-trip. Races are remembered for `memory` times
+    /// margin plus spread, so the window scales with the relayer.
+    fn judge(&self, relayer: &OffchainPublicKey, memory: u32) -> Option<Judgement> {
         let mut history = self.relayers.get_mut(relayer)?;
         let remembered = history.memory;
         let recent = |race: &Race| remembered.is_zero() || race.at.elapsed() <= remembered;
@@ -475,7 +542,11 @@ impl RelayerHealth {
             .iter()
             .map(|race| race.winning_round_trip)
             .fold(f64::INFINITY, f64::min);
-        Some((margin - spread / (races.len() as f64).sqrt(), fastest))
+        Some(Judgement {
+            margin,
+            uncertainty: spread / (races.len() as f64).sqrt(),
+            fastest,
+        })
     }
 }
 
@@ -575,7 +646,6 @@ where
     G: hopr_api::graph::NetworkGraphUpdate,
 {
     let (mut legs, mut total_expected, mut total_observed) = (0usize, 0u64, 0u64);
-    registry.relayer_health.forget_factors();
 
     for (paths, expected, observed) in registry.drain() {
         legs += 1;
@@ -600,18 +670,65 @@ where
 
     {
         // One aggregate line per interval rather than one per pair of legs.
-        //
-        // DIAGNOSTIC: at `info` while the recovery gap is under investigation. This is the pair of
-        // numbers that separates "the counterparty never got SURBs" from "it got them, replied, and
-        // the replies did not arrive" -- the two explanations left for a return path carrying
-        // packets while the application receives almost nothing. Drop back to `debug` once settled.
-        tracing::info!(
+        tracing::debug!(
             legs,
             expected = total_expected,
             observed = total_observed,
             "surb round-trip flush tick"
         );
     }
+}
+
+/// Re-judges relayer health, records what changed in the graph, and re-plans when it or a neighbour
+/// changed, before writing off the SURBs of relayers judged dead. Recording precedes the re-plan, so
+/// the re-plan already avoids them; the write-off follows it, so the refill goes over new paths.
+pub async fn refresh_relayer_health<G, F>(
+    registry: &SurbRoundTripRegistry,
+    graph: &G,
+    memory: u32,
+    replan: impl FnOnce() -> F,
+) where
+    G: hopr_api::graph::NetworkGraphUpdate,
+    F: std::future::Future<Output = ()>,
+{
+    let health = &registry.relayer_health;
+    let changed = health.refresh(memory);
+    for (relayer, previous, current) in &changed {
+        match (*previous == 0.0, *current == 0.0) {
+            (false, true) => tracing::info!(%relayer, "relayer judged dead"),
+            (true, false) => tracing::info!(%relayer, health = current, "relayer recovered"),
+            _ => tracing::debug!(%relayer, previous, current, "relayer health changed"),
+        }
+    }
+    if !changed.is_empty() {
+        let healths: Vec<(OffchainPublicKey, f64)> = changed
+            .iter()
+            .map(|(relayer, _, current)| (*relayer, *current))
+            .collect();
+        graph.record_nodes_health(&healths);
+    }
+    if health.take_neighbour_change() || !changed.is_empty() {
+        replan().await;
+    }
+    registry.write_off_dead();
+}
+
+/// The unusable SURBs to hand each session this tick: every current mark, re-applied so a session
+/// opened since picks it up, and `(0, 0.0)` for sessions whose mark has gone.
+pub fn unusable_updates(
+    previous: &HashMap<HoprPseudonym, (u64, f64)>,
+    current: &HashMap<HoprPseudonym, (u64, f64)>,
+) -> Vec<(HoprPseudonym, (u64, f64))> {
+    current
+        .iter()
+        .map(|(session, unusable)| (*session, *unusable))
+        .chain(
+            previous
+                .keys()
+                .filter(|session| !current.contains_key(session))
+                .map(|session| (*session, (0, 0.0))),
+        )
+        .collect()
 }
 
 /// Wraps a codec so the SURBs it mints and consumes are counted per pair of legs.
@@ -653,18 +770,18 @@ impl<C> SurbTelemetryCodec<C> {
     /// them.
     fn on_minted(&self, routing: &ResolvedTransportRouting<HoprSurb>, minted: &[HoprSurbId]) {
         let ResolvedTransportRouting::Forward {
+            pseudonym,
             forward_path,
             return_paths,
-            ..
         } = routing
         else {
             return;
         };
 
         let forward: Vec<_> = forward_path.transport_path().iter().copied().collect();
-        let Some(destination) = forward.last().copied() else {
+        if forward.is_empty() {
             return;
-        };
+        }
 
         tracing::debug!(
             minted = minted.len(),
@@ -703,11 +820,11 @@ impl<C> SurbTelemetryCodec<C> {
                 *surb_id,
                 PendingSurb {
                     paths,
-                    destination,
+                    pseudonym: *pseudonym,
                     return_relayers: return_relayers[i],
                     minted_at,
                     partner: partners[i],
-                    second: i % 2 == 1,
+                    pair_index: i % 2,
                     partner_replied: None,
                 },
             );
@@ -724,9 +841,9 @@ impl<C> SurbTelemetryCodec<C> {
         self.registry.record_observed(pending.paths, 1);
 
         let health = &self.registry.relayer_health;
-        // Only the second SURB settles: the first may have been buried in the replier's store.
+        // Only the fresh SURB settles: the other may have waited in the replier's store.
         if let Some((partner_relayers, partner_home)) = pending.partner_replied {
-            if !pending.second {
+            if pending.pair_index != FRESH_INDEX {
                 return;
             }
             health.record_race(
@@ -751,9 +868,10 @@ impl<C> SurbTelemetryCodec<C> {
                     }
                     None => moka::ops::compute::Op::Nop,
                 });
-            if let moka::ops::compute::CompResult::ReplacedWith(waiting) = updated
-                && waiting.value().second
-            {
+            if let moka::ops::compute::CompResult::ReplacedWith(waiting) = updated {
+                if waiting.value().pair_index != FRESH_INDEX {
+                    return;
+                }
                 health.open_race(
                     &waiting.value().return_relayers,
                     partner,
@@ -838,7 +956,7 @@ where
 mod tests {
     use anyhow::Context;
     use hopr_api::{
-        graph::NetworkGraphWrite,
+        graph::{EdgeObservableRead, NetworkGraphWrite},
         types::{
             crypto::{
                 crypto_traits::Randomizable,
@@ -957,6 +1075,40 @@ mod tests {
         }
     }
 
+    /// Each relayer's health after one flush, `1.0` for one never reported below it.
+    fn health_after_flush(health: &RelayerHealth, relayers: &[OffchainPublicKey]) -> Vec<f64> {
+        health.refresh(4);
+        relayers
+            .iter()
+            .map(|relayer| health.published.get(relayer).map_or(1.0, |health| *health))
+            .collect()
+    }
+
+    fn judged_dead(changes: &[(OffchainPublicKey, f64, f64)]) -> Vec<OffchainPublicKey> {
+        changes
+            .iter()
+            .filter(|(_, previous, current)| *current == 0.0 && *previous > 0.0)
+            .map(|(relayer, ..)| *relayer)
+            .collect()
+    }
+
+    fn pending_to(relayers: &[OffchainPublicKey], partner: Option<HoprSurbId>, pair_index: usize) -> PendingSurb {
+        PendingSurb {
+            paths: ForwardAndReturnPath {
+                forward: [0; PATH_ID_SLOTS],
+                reply: [0; PATH_ID_SLOTS],
+            },
+            pseudonym: *SESSION,
+            return_relayers: leg(relayers),
+            minted_at: Instant::now(),
+            partner,
+            pair_index,
+            partner_replied: None,
+        }
+    }
+
+    static SESSION: std::sync::LazyLock<HoprPseudonym> = std::sync::LazyLock::new(HoprPseudonym::random);
+
     fn open_since(health: &RelayerHealth, relayer: OffchainPublicKey, count: u8, since: Instant) {
         for seed in 1..=count {
             health.relayers.entry(relayer).or_default().open.insert(
@@ -990,7 +1142,7 @@ mod tests {
             );
         }
 
-        let factors = health.factors(&[vec![fast], vec![also_fast], vec![stalled], vec![]], 4);
+        let factors = health_after_flush(&health, &[fast, also_fast, stalled]);
         assert_eq!(
             &[1.0, 1.0],
             &factors[..2],
@@ -1001,7 +1153,6 @@ mod tests {
             "a relayer fifteen round-trips late must lose its weight, got {}",
             factors[2]
         );
-        assert_eq!(1.0, factors[3]);
     }
 
     /// The relayers both legs share see the same delay, so the race blames only the ones that differ.
@@ -1029,24 +1180,13 @@ mod tests {
             }
         }
 
-        let factors = health.factors(
-            &[
-                vec![entry, stalled, exit],
-                vec![entry, healthy, exit],
-                vec![other_entry, healthy, other_exit],
-            ],
-            4,
-        );
+        let factors = health_after_flush(&health, &[stalled, entry, healthy, exit, other_entry, other_exit]);
         assert!(
             factors[0] < 0.1,
-            "the path through the stall must lose its weight, got {}",
+            "the stalled relayer must lose its weight, got {}",
             factors[0]
         );
-        assert_eq!(
-            &[1.0, 1.0],
-            &factors[1..],
-            "its neighbours on that path are not to blame"
-        );
+        assert_eq!(&[1.0; 5], &factors[1..], "its neighbours on that path are not to blame");
     }
 
     #[test]
@@ -1063,7 +1203,7 @@ mod tests {
             );
         }
 
-        assert_eq!(vec![1.0, 1.0], health.factors(&[vec![near], vec![far]], 4));
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[near, far]));
     }
 
     #[test]
@@ -1080,7 +1220,7 @@ mod tests {
             );
         }
 
-        assert_eq!(vec![1.0, 1.0], health.factors(&[vec![fast], vec![young]], 4));
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[fast, young]));
     }
 
     #[test]
@@ -1101,11 +1241,10 @@ mod tests {
             );
         }
         assert!(
-            health.factors(&[vec![fast], vec![recovered]], 4)[1] < 0.1,
+            health_after_flush(&health, &[fast, recovered])[1] < 0.1,
             "precondition: judged stalled"
         );
 
-        health.forget_factors();
         for i in 0..20 {
             let (later, earlier) = if i % 2 == 0 {
                 (fast, recovered)
@@ -1114,7 +1253,7 @@ mod tests {
             };
             health.record_race(&leg(&[later]), surb_id(0), &leg(&[earlier]), ROUND_TRIP, jitter(i));
         }
-        assert_eq!(vec![1.0, 1.0], health.factors(&[vec![fast], vec![recovered]], 4));
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[fast, recovered]));
         Ok(())
     }
 
@@ -1133,7 +1272,7 @@ mod tests {
             .context("monotonic clock younger than two seconds")?;
         open_since(&health, stalled, 5, partners_home);
 
-        let factors = health.factors(&[vec![fast], vec![also_fast], vec![stalled]], 4);
+        let factors = health_after_flush(&health, &[fast, also_fast, stalled]);
         assert_eq!(&[1.0, 1.0], &factors[..2]);
         assert!(
             factors[2] < 0.2,
@@ -1156,21 +1295,19 @@ mod tests {
                 ROUND_TRIP,
             );
         }
-        backdate_open(&health, black_hole, ago(jitter(0) * 2)?);
+        backdate_open(&health, black_hole, ago(ROUND_TRIP * 2)?);
 
-        assert_eq!(vec![black_hole], health.refresh_verdicts().0);
+        assert_eq!(vec![black_hole], judged_dead(&health.refresh(4)));
         assert!(health.is_dead(&black_hole));
         assert_eq!(
             0,
             open_races_of(&health, &entry),
             "relayers on both legs are not to blame"
         );
-        assert_eq!(
-            vec![0.0, 1.0],
-            health.factors(&[vec![healthy, black_hole], vec![entry, healthy, exit]], 4),
-            "a dead relayer sinks every path it is on, in any position"
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "only new verdicts are reported"
         );
-        assert!(health.refresh_verdicts().0.is_empty(), "only new verdicts are reported");
         Ok(())
     }
 
@@ -1186,7 +1323,7 @@ mod tests {
             .context("monotonic clock younger than 200 ms")?;
         open_since(&health, slow, MIN_RACES as u8, just_now);
         assert!(
-            health.refresh_verdicts().0.is_empty(),
+            judged_dead(&health.refresh(4)).is_empty(),
             "out for less than its usual 500 ms"
         );
 
@@ -1194,44 +1331,54 @@ mod tests {
             .checked_sub(Duration::from_secs(2))
             .context("monotonic clock younger than two seconds")?;
         open_since(&health, slow, MIN_RACES as u8, overdue);
-        assert_eq!(vec![slow], health.refresh_verdicts().0);
+        assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
         Ok(())
     }
 
+    /// Expiry alone proves nothing: replies that never came home count as races lost by the whole
+    /// time a SURB is remembered, so the relayer comes back at a sliver of health, not in full.
     #[test]
-    fn a_dead_verdict_from_races_should_lapse_with_the_surbs_it_was_built_on() -> anyhow::Result<()> {
+    fn a_dead_relayer_should_not_be_revived_to_full_health_by_expiry() -> anyhow::Result<()> {
         let health = RelayerHealth::default();
-        let black_hole = key();
+        let [black_hole, healthy] = [(); 2].map(|_| key());
         let expired = Instant::now()
             .checked_sub(PENDING_SURB_TTL + Duration::from_secs(1))
             .context("monotonic clock younger than a SURB's lifetime")?;
+        settled_since(&health, healthy, Instant::now(), jitter(0));
         settled_since(&health, black_hole, expired - Duration::from_secs(1), jitter(0));
-        open_since(&health, black_hole, MIN_RACES as u8, expired);
+        open_since(&health, black_hole, 2 * MIN_RACES as u8, expired);
 
-        assert!(health.refresh_verdicts().0.is_empty());
-        assert!(
-            !health.is_dead(&black_hole),
-            "it can be tried again once its SURBs are gone"
-        );
+        let [revived, _] = health_after_flush(&health, &[black_hole, healthy])[..] else {
+            anyhow::bail!("two relayers asked for");
+        };
+        assert!(!health.is_dead(&black_hole), "no reply is out any more");
+        assert!(revived < 0.01, "revived to a sliver only, got {revived}");
         Ok(())
     }
 
+    /// A lost neighbour only re-plans the paths; its SURBs are not written off, as they work again
+    /// once it is back, and during an outage of every path no replacement could arrive anyway.
     #[test]
-    fn a_relayer_we_lost_our_connection_to_should_be_dead_until_it_returns() {
-        let health = RelayerHealth::default();
-        let relayer = key();
+    fn a_lost_neighbour_should_not_write_off_its_surbs() {
+        let registry = SurbRoundTripRegistry::default();
+        let [neighbour, middle] = [(); 2].map(|_| key());
+        registry
+            .pending
+            .insert(surb_id(1), pending_to(&[middle, neighbour], None, 0));
+        registry
+            .pending
+            .insert(surb_id(2), pending_to(&[neighbour, middle], None, 0));
+        let health = &registry.relayer_health;
 
-        health.set_reachable(relayer, false);
-        assert_eq!((vec![relayer], vec![]), health.refresh_verdicts());
-        assert!(health.is_dead(&relayer));
+        health.set_neighbour_connected(neighbour, false);
+        assert!(registry.unusable().is_empty());
+        assert!(!health.is_dead(&neighbour), "no verdict on the relayer itself");
+        assert!(health.take_neighbour_change());
+        assert!(!health.take_neighbour_change(), "a change is reported once");
 
-        health.set_reachable(relayer, true);
-        assert_eq!(
-            (vec![], vec![relayer]),
-            health.refresh_verdicts(),
-            "recovery is reported too"
-        );
-        assert!(!health.is_dead(&relayer));
+        health.set_neighbour_connected(neighbour, true);
+        assert!(registry.unusable().is_empty());
+        assert!(health.take_neighbour_change());
     }
 
     #[test]
@@ -1245,10 +1392,10 @@ mod tests {
         assert_eq!(1, margins_of(&health, &late).len());
     }
 
-    /// All zero would leave nothing to draw, so the best candidate keeps full weight even when every
-    /// candidate finishes late against some other relayer.
+    /// Health is measured against the fastest round-trip any relayer made, so relayers late
+    /// against a third keep their order.
     #[test]
-    fn the_best_candidate_should_keep_full_weight_when_all_finish_late() {
+    fn relayers_finishing_late_should_be_ordered_by_how_late() {
         let health = RelayerHealth::default();
         let [outsider, late, later] = [(); 3].map(|_| key());
         for i in 0..20 {
@@ -1268,9 +1415,30 @@ mod tests {
             );
         }
 
-        let factors = health.factors(&[vec![late], vec![later]], 4);
-        assert_eq!(1.0, factors[0]);
-        assert!(factors[1] < 1.0, "the later one still weighs less, got {}", factors[1]);
+        let factors = health_after_flush(&health, &[late, later]);
+        assert!(1.0 > factors[0] && factors[0] > factors[1], "{factors:?}");
+    }
+
+    /// A health that moved within the uncertainty of the relayer's own races is noise; reporting it
+    /// would re-plan every path on every flush.
+    #[test]
+    fn a_health_within_its_own_uncertainty_should_not_be_reported_again() {
+        let health = RelayerHealth::default();
+        let [fast, stalled] = [(); 2].map(|_| key());
+        let mut race = |i| {
+            health.record_race(
+                &leg(&[stalled]),
+                surb_id(0),
+                &leg(&[fast]),
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            )
+        };
+        (0..20).for_each(&mut race);
+        assert_eq!(1, health.refresh(4).len(), "precondition: reported once stalled");
+
+        (20..24).for_each(&mut race);
+        assert!(health.refresh(4).is_empty());
     }
 
     /// Whatever two SURBs of one packet spent in the replier's store, they spent together, so only
@@ -1279,19 +1447,11 @@ mod tests {
     fn a_race_should_be_settled_by_the_gap_between_the_two_replies() -> anyhow::Result<()> {
         let (graph, _me, _peers) = graph_with(0);
         let recorder = recorder(graph);
-        let [early, late, destination] = [(); 3].map(|_| key());
+        let [early, late] = [(); 2].map(|_| key());
         let minted_at = Instant::now();
         let pending_via = |relayer, partner| PendingSurb {
-            paths: ForwardAndReturnPath {
-                forward: [0; PATH_ID_SLOTS],
-                reply: [0; PATH_ID_SLOTS],
-            },
-            destination,
-            return_relayers: leg(&[relayer]),
             minted_at,
-            partner: Some(partner),
-            second: relayer == late,
-            partner_replied: None,
+            ..pending_to(&[relayer], Some(partner), usize::from(relayer == late))
         };
         recorder
             .registry
@@ -1312,11 +1472,6 @@ mod tests {
             1,
             open_races_of(health, &late),
             "the reply still out is a race already being lost"
-        );
-        assert_eq!(
-            HashMap::from([(destination, (1, 1.0))]),
-            recorder.registry.unusable_through(&[late]),
-            "a dead relayer's outstanding SURBs count against the destination they went to"
         );
         let mut waiting = recorder
             .registry
@@ -1341,32 +1496,100 @@ mod tests {
     }
 
     #[test]
-    fn unusable_surbs_should_be_counted_and_relative_to_what_is_outstanding() {
+    fn unusable_surbs_should_be_counted_per_session_and_relative_to_what_is_outstanding() {
         let registry = SurbRoundTripRegistry::default();
-        let [dead, alive, destination] = [(); 3].map(|_| key());
+        let [dead, alive] = [(); 2].map(|_| key());
+        let other = HoprPseudonym::random();
         for (seed, relayer) in [(1, dead), (2, alive), (3, alive), (4, alive)] {
-            registry.pending.insert(
-                surb_id(seed),
-                PendingSurb {
-                    paths: ForwardAndReturnPath {
-                        forward: [0; PATH_ID_SLOTS],
-                        reply: [0; PATH_ID_SLOTS],
-                    },
-                    destination,
-                    return_relayers: leg(&[relayer]),
-                    minted_at: Instant::now(),
-                    partner: None,
-                    second: false,
-                    partner_replied: None,
-                },
-            );
+            registry.pending.insert(surb_id(seed), pending_to(&[relayer], None, 0));
         }
-
-        assert_eq!(
-            HashMap::from([(destination, (1, 0.25))]),
-            registry.unusable_through(&[dead])
+        registry.pending.insert(
+            surb_id(5),
+            PendingSurb {
+                pseudonym: other,
+                ..pending_to(&[dead], None, 0)
+            },
         );
-        assert!(registry.unusable_through(&[]).is_empty());
+        registry.write_off_dead();
+        assert!(registry.unusable().is_empty(), "nothing is dead yet");
+
+        registry.relayer_health.dead.insert(dead);
+        registry.write_off_dead();
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 0.25)), (other, (1, 1.0))]),
+            registry.unusable()
+        );
+    }
+
+    /// The counterparty holds dead SURBs long after we stop remembering them as pending, so the write-off
+    /// must outlive the pending map, and end only when the relayer recovers or the session is gone.
+    #[test]
+    fn written_off_surbs_should_stay_unusable_until_their_relayer_recovers() {
+        let registry = SurbRoundTripRegistry::default();
+        let [dead, alive] = [(); 2].map(|_| key());
+        for (seed, relayer) in [(1, dead), (2, alive)] {
+            registry.pending.insert(surb_id(seed), pending_to(&[relayer], None, 0));
+        }
+        registry.relayer_health.dead.insert(dead);
+        registry.write_off_dead();
+
+        registry.pending.invalidate_all();
+        registry.pending.run_pending_tasks();
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.unusable(),
+            "pending SURBs gone, the written-off one still counts"
+        );
+
+        registry.relayer_health.dead.remove(&dead);
+        registry.write_off_dead();
+        assert!(registry.unusable().is_empty(), "a recovered relayer's SURBs work again");
+
+        registry.relayer_health.dead.insert(dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        registry.write_off_dead();
+        registry.forget_session(&SESSION);
+        assert!(registry.unusable().is_empty(), "a closed session is forgotten");
+    }
+
+    #[test]
+    fn unusable_updates_should_reapply_every_mark_and_clear_the_vanished() {
+        let [kept, gone, new] = [(); 3].map(|_| HoprPseudonym::random());
+        let previous = HashMap::from([(kept, (5, 0.5)), (gone, (2, 0.1))]);
+        let current = HashMap::from([(kept, (5, 0.5)), (new, (1, 1.0))]);
+
+        let mut updates = unusable_updates(&previous, &current);
+        updates.sort_by_key(|(session, _)| *session);
+        let mut expected = vec![(kept, (5, 0.5)), (new, (1, 1.0)), (gone, (0, 0.0))];
+        expected.sort_by_key(|(session, _)| *session);
+        assert_eq!(expected, updates, "unchanged marks too, for sessions opened since");
+    }
+
+    /// The graph learns the verdict before the re-plan, so the re-plan avoids the relayer; the
+    /// write-off comes after, so the refill it triggers goes over the new paths.
+    #[tokio::test]
+    async fn a_dead_verdict_should_reach_the_graph_before_the_replan_and_the_write_off_after() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [dead] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        graph.add_edge(&me, &dead)?;
+        let registry = SurbRoundTripRegistry::default();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        let health = registry.relayer_health();
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+
+        let seen_at_replan = std::cell::Cell::new(None);
+        refresh_relayer_health(&registry, &graph, 4, || async {
+            let edge_health = graph.edge(&me, &dead).map(|edge| edge.health());
+            seen_at_replan.set(Some((edge_health, registry.unusable().is_empty())));
+        })
+        .await;
+
+        assert_eq!(Some((Some(0.0), true)), seen_at_replan.get());
+        assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), registry.unusable());
+        Ok(())
     }
 
     /// The first SURB of a pair can be buried under newer ones in the replier's store, so neither its
@@ -1375,27 +1598,16 @@ mod tests {
     fn a_first_surb_still_out_should_not_count_against_its_relayer() {
         let (graph, _me, _peers) = graph_with(0);
         let recorder = recorder(graph);
-        let [buried, home, destination] = [(); 3].map(|_| key());
-        let pending_via = |relayer, partner, second| PendingSurb {
-            paths: ForwardAndReturnPath {
-                forward: [0; PATH_ID_SLOTS],
-                reply: [0; PATH_ID_SLOTS],
-            },
-            destination,
-            return_relayers: leg(&[relayer]),
-            minted_at: Instant::now(),
-            partner: Some(partner),
-            second,
-            partner_replied: None,
-        };
+        let [buried, home] = [(); 2].map(|_| key());
+        let pending_via = |relayer, partner, pair_index| pending_to(&[relayer], Some(partner), pair_index);
         recorder
             .registry
             .pending
-            .insert(surb_id(1), pending_via(buried, surb_id(2), false));
+            .insert(surb_id(1), pending_via(buried, surb_id(2), 0));
         recorder
             .registry
             .pending
-            .insert(surb_id(2), pending_via(home, surb_id(1), true));
+            .insert(surb_id(2), pending_via(home, surb_id(1), 1));
 
         recorder.on_replied(&surb_id(2));
         assert_eq!(0, open_races_of(&recorder.registry.relayer_health, &buried));
@@ -1412,13 +1624,55 @@ mod tests {
         );
     }
 
+    /// After the replier drained old SURBs, round trips include a minute in its store; the bar must
+    /// stay at the margins, which that wait does not reach.
+    #[test]
+    fn time_waited_in_the_repliers_store_should_not_raise_the_bar_for_a_black_hole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        for _ in 0..MIN_RACES {
+            health.record(
+                relayer,
+                Race {
+                    at: ago(Duration::from_secs(10))?,
+                    margin: jitter(0).as_secs_f64(),
+                    winning_round_trip: 54.0,
+                },
+            );
+        }
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// Two healthy relayers trading races by equal jitter both way stay at full health.
+    #[test]
+    fn symmetric_jitter_should_cost_neither_relayer() {
+        let health = RelayerHealth::default();
+        let [a, b] = [(); 2].map(|_| key());
+        for i in 0..20 {
+            let (later, earlier) = if i % 2 == 0 { (a, b) } else { (b, a) };
+            health.record_race(
+                &leg(&[later]),
+                surb_id(i as u8),
+                &leg(&[earlier]),
+                ROUND_TRIP,
+                jitter(i),
+            );
+        }
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[a, b]));
+    }
+
     #[test]
     fn replies_out_without_settled_races_should_not_make_a_black_hole() {
         let health = RelayerHealth::default();
         let relayer = key();
         open_since(&health, relayer, 5, Instant::now() - Duration::from_secs(5));
 
-        assert!(health.refresh_verdicts().0.is_empty());
+        for _ in 0..2 {
+            assert!(judged_dead(&health.refresh(4)).is_empty());
+        }
         assert!(!health.is_dead(&relayer));
     }
 

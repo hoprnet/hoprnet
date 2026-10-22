@@ -106,10 +106,10 @@ pub struct BalancerStateValues {
     pub decay_duration_msec: AtomicU64,
     pub decay_volume_pct: AtomicU8,
     pub buffer_level: AtomicU64,
-    /// SURBs, counted and as a share (`f64` bits) of what is outstanding, returning through a relayer
-    /// judged dead: held and reported by the counterparty, but unable to bring a reply home.
+    /// SURBs counted in [`buffer_level`](Self::buffer_level) whose return path runs through a relayer
+    /// judged dead, and their share of what is outstanding: count in the high and share (of
+    /// `u32::MAX`) in the low 32 bits, so both are read together.
     counterparty_unusable: AtomicU64,
-    counterparty_unusable_share: AtomicU64,
     /// How many SURBs the counterparty can physically hold, or 0 when unknown.
     ///
     /// The level estimate is `produced - consumed - evicted`. The Exit observes its own store's
@@ -239,8 +239,8 @@ impl BalancerStateValues {
     /// has reached its target. Return `1` when balancing is disabled, the estimate is
     /// below target, or the counterparty signals SURB distress.
     ///
-    /// This method uses the raw buffer estimate. During return-path loss, a zero estimate
-    /// correctly keeps organic SURB production enabled.
+    /// This method uses the usable level: SURBs the counterparty holds through a relayer judged dead
+    /// do not hold the gate shut.
     pub fn organic_surbs_per_packet(&self) -> usize {
         // Not defensive boilerplate: nothing rejects a `SurbBalancerConfig` with a zero target, and
         // without this branch `level >= 0` would hold forever and shut organic production off
@@ -286,20 +286,21 @@ impl BalancerStateValues {
     }
 
     pub fn set_counterparty_unusable(&self, count: u64, share: f64) {
-        self.counterparty_unusable
-            .store(count, std::sync::atomic::Ordering::Relaxed);
-        self.counterparty_unusable_share
-            .store(share.clamp(0.0, 1.0).to_bits(), std::sync::atomic::Ordering::Relaxed);
+        let share = (share.clamp(0.0, 1.0) * f64::from(u32::MAX)).round() as u64;
+        self.counterparty_unusable.store(
+            count.min(u64::from(u32::MAX)) << 32 | share,
+            std::sync::atomic::Ordering::Relaxed,
+        );
     }
 
     /// The part of `level` that can still bring a reply home.
     fn usable_level(&self, level: u64) -> u64 {
-        let share = f64::from_bits(
-            self.counterparty_unusable_share
-                .load(std::sync::atomic::Ordering::Relaxed),
+        let packed = self.counterparty_unusable.load(std::sync::atomic::Ordering::Relaxed);
+        let (count, share) = (
+            packed >> 32,
+            (packed & u64::from(u32::MAX)) as f64 / f64::from(u32::MAX),
         );
-        // The count misses SURBs older than we track; the share overstates when spent ones linger.
-        let count = self.counterparty_unusable.load(std::sync::atomic::Ordering::Relaxed);
+        // The count can overstate what the counterparty still holds; the share caps it by its level.
         level.saturating_sub(count.min((level as f64 * share).round() as u64))
     }
 
@@ -696,6 +697,10 @@ mod tests {
             "the count no more than the share of 75"
         );
         assert_eq!(150, state.buffer_level(), "the held level itself is unchanged");
+        state.set_counterparty_unusable(u64::MAX, 1.0);
+        assert_eq!(1, state.organic_surbs_per_packet(), "a saturated count writes off all");
+        state.set_counterparty_unusable(0, 0.0);
+        assert_eq!(0, state.organic_surbs_per_packet(), "clearing restores the held level");
     }
 
     #[test]

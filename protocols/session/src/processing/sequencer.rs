@@ -269,8 +269,10 @@ where
                             return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
                         }
                         let remaining = this.max_wait.saturating_sub(next.buffered_at.elapsed());
-                        this.timer
-                            .set(futures_time::task::sleep(remaining.max(MIN_GAP_WAIT).into()));
+                        // The floor only stands in for a deadline already past, so a sub-millisecond
+                        // `max_wait` is kept as configured.
+                        let wait = if remaining.is_zero() { MIN_GAP_WAIT } else { remaining };
+                        this.timer.set(futures_time::task::sleep(wait.into()));
                     } else {
                         tracing::trace!("buffer is empty");
                     }

@@ -134,7 +134,7 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = { version = "2.0.0" }
+hopr-api = { version = "2.1.0" }
 hopr-types = { version = "2.3.0", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.9.3", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
@@ -148,10 +148,10 @@ hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-featu
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.5.2" }
-hopr-transport = { version = "0.48.1", path = "transport/hopr" }
+hopr-transport = { version = "0.49.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.30.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.31.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.22.3" }
 
@@ -159,7 +159,7 @@ hopr-chain-connector = { version = "0.22.3" }
 hopr-session-server-forwarder = { version = "0.1.2", default-features = false }
 hopr-transport-p2p = { version = "0.9.7", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.4.0", default-features = false }
-hopr-network-graph = { version = "0.5.0", default-features = false }
+hopr-network-graph = { version = "0.5.1", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -228,3 +228,8 @@ ignored = [
   "hopr-session-server-forwarder",
   "hopr-utils-session",
 ]
+
+# Local until hopr-api 2.1.0 and hopr-network-graph 0.5.1 are published.
+[patch.crates-io]
+hopr-api = { path = "../hopr-api" }
+hopr-network-graph = { path = "../hopr-impls/graph" }

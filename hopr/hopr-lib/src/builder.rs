@@ -643,12 +643,10 @@ where
                                 connected,
                             });
 
-                            if connected {
-                                health.set_reachable(opk, true);
-                            } else if !net.is_connected(&peer_id) {
-                                // Dead in every position until it is back; the next telemetry flush
-                                // re-plans around it.
-                                health.set_reachable(opk, false);
+                            // Only the position next to us depends on our own connection; the next
+                            // telemetry flush re-plans around it.
+                            if connected || !net.is_connected(&peer_id) {
+                                health.set_neighbour_connected(opk, connected);
                             }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");

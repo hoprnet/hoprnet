@@ -59,6 +59,8 @@ impl SupplyConstraint for SurbSupply {
         if self.state.is_disabled() {
             return usize::MAX;
         }
+        // Raw level, not the usable one: written-off SURBs must not throttle the data that carries
+        // their replacements.
         (self.state.buffer_level() as usize).saturating_mul(self.bytes_per_reply_packet)
     }
 

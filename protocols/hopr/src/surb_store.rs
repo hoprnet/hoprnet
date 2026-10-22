@@ -73,11 +73,12 @@ fn default_reply_opener_lifetime() -> Duration {
 #[strum(serialize_all = "lowercase")]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum SurbPopOrder {
-    /// Oldest first. Default; preserves the historical behaviour.
-    #[default]
+    /// Oldest first.
     Fifo,
     /// Newest first, so a return-path change applies immediately instead of only after the
-    /// buffered SURBs drain. Stale ones are shed from the other end on overflow.
+    /// buffered SURBs drain. The default: SURBs the sender replaced because their return path broke
+    /// sink below their replacements and are shed from that end on overflow.
+    #[default]
     Lifo,
 }
 
@@ -109,7 +110,7 @@ pub struct SurbStoreConfig {
     pub rb_capacity: usize,
     /// Which end of the per-pseudonym buffer a pop consumes from; see [`SurbPopOrder`].
     ///
-    /// Affects only the replying side. Default is [`SurbPopOrder::Fifo`].
+    /// Affects only the replying side. Default is [`SurbPopOrder::Lifo`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub pop_order: SurbPopOrder,
     /// Threshold for the number of SURBs in the ring buffer, below which it is
@@ -619,29 +620,34 @@ mod tests {
     /// A return path straight to the recipient, which needs no payment channel.
     const DIRECT: u8 = 1;
 
-    #[test]
-    fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated() -> anyhow::Result<()> {
+    /// Two SURBs return via the dead relay, one via a healthy one, inserted so that either pop order
+    /// reaches the invalidated ones first.
+    #[rstest::rstest]
+    #[case::fifo(SurbPopOrder::Fifo, [true, true, false])]
+    #[case::lifo(SurbPopOrder::Lifo, [false, true, true])]
+    fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated(
+        #[case] pop_order: SurbPopOrder,
+        #[case] via_dead: [bool; 3],
+    ) -> anyhow::Result<()> {
         let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
-
-        let store = MemorySurbStore::default();
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            pop_order,
+            ..Default::default()
+        });
         let pseudonym = HoprPseudonym::random();
-
-        // Two SURBs return via the dead relay, one via a healthy one; all are two-hop.
-        store.insert_surbs(
-            pseudonym,
-            vec![
-                ([1u8; 8], surb_via(dead, TWO_HOP)?),
-                ([2u8; 8], surb_via(dead, TWO_HOP)?),
-                ([3u8; 8], surb_via(alive, TWO_HOP)?),
-            ],
-        );
+        let surbs = (1u8..)
+            .zip(via_dead)
+            .map(|(seed, dead_relayer)| Ok(([seed; 8], surb_via(if dead_relayer { dead } else { alive }, TWO_HOP)?)))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let alive_id = surbs[via_dead.iter().position(|d| !d).unwrap_or_default()].0;
+        store.insert_surbs(pseudonym, surbs);
 
         store.invalidate_relayer(&dead);
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
             .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
-        assert_eq!([3u8; 8], found.sender_id.surb_id(), "must skip past the dead relayer");
+        assert_eq!(alive_id, found.sender_id.surb_id(), "must skip past the dead relayer");
         assert_eq!(
             0, found.remaining,
             "the invalidated SURBs must be discarded, not left behind"
@@ -713,9 +719,9 @@ mod tests {
     }
 
     #[test]
-    fn surb_store_config_should_default_to_fifo() {
-        assert_eq!(SurbPopOrder::Fifo, SurbStoreConfig::default().pop_order);
-        assert_eq!(SurbPopOrder::Fifo, SurbPopOrder::default());
+    fn surb_store_config_should_default_to_lifo() {
+        assert_eq!(SurbPopOrder::Lifo, SurbStoreConfig::default().pop_order);
+        assert_eq!(SurbPopOrder::Lifo, SurbPopOrder::default());
     }
 
     /// Eviction always removes the oldest, so both orders see the same surviving set {2,3,4},
@@ -821,8 +827,8 @@ mod tests {
     }
 
     #[test]
-    fn surb_ring_buffer_should_pop_fifo_by_default() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5, SurbPopOrder::default());
+    fn surb_ring_buffer_should_pop_fifo_when_configured() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, SurbPopOrder::Fifo);
 
         let len = rb.push([([1u8; 8], 0)]).retained;
         assert_eq!(1, len);
