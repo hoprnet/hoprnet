@@ -621,10 +621,14 @@ where
     {
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
+        let health = transport_api.relayer_health();
+        let net = network.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
+                    let health = health.clone();
+                    let net = net.clone();
                     async move {
                         let (peer_id, connected) = match event {
                             hopr_api::network::NetworkEvent::PeerConnected(p) => (p, true),
@@ -638,6 +642,12 @@ where
                                 peer: opk,
                                 connected,
                             });
+
+                            // Only the position next to us depends on our own connection; the next
+                            // telemetry flush re-plans around it.
+                            if connected || !net.is_connected(&peer_id) {
+                                health.set_neighbour_connected(opk, connected);
+                            }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
                         }

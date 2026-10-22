@@ -255,6 +255,16 @@ pub struct HoprProtocolConfig {
         serde(default = "default_surb_flush_interval", with = "humantime_serde")
     )]
     pub surb_flush_interval: Duration,
+    /// How long a relayer's SURB reply races are remembered when judging its health, in multiples of
+    /// its own typical margin plus spread. Longer is steadier but slower to notice a stall and to
+    /// forgive a recovery. `0` judges dead or healthy only.
+    #[default(default_latency_race_memory())]
+    #[cfg_attr(feature = "serde", serde(default = "default_latency_race_memory"))]
+    pub latency_race_memory: u32,
+}
+
+fn default_latency_race_memory() -> u32 {
+    4
 }
 
 /// Configuration of the HOPR packet pipeline.

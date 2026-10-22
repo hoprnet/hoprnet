@@ -32,6 +32,8 @@ pub struct PathWithMetrics {
     /// on an edge, which would stale the graph whenever the price moves.
     /// `None` if no edge carries balance data.
     pub fundable_tickets_floor: Option<u128>,
+    /// Product of the health of every relayer along the path, already folded into `cost`.
+    pub health: f64,
 }
 
 /// Selects multi-hop paths through the network.
