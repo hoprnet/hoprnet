@@ -36,8 +36,8 @@ pub(crate) struct StartupSummary {
     max_sessions: usize,
     session_idle_timeout: Duration,
     probe_interval: Duration,
-    mixer_min_delay: Duration,
-    mixer_delay_range: Duration,
+    /// Which mixer runs, with its delay settings.
+    mixer: String,
 }
 
 impl StartupSummary {
@@ -56,8 +56,7 @@ impl StartupSummary {
             max_sessions: cfg.protocol.session.maximum_managed_sessions,
             session_idle_timeout: cfg.protocol.session.idle_timeout,
             probe_interval: cfg.protocol.probe.interval,
-            mixer_min_delay: cfg.protocol.mixer.min_delay,
-            mixer_delay_range: cfg.protocol.mixer.delay_range,
+            mixer: format!("{:?}", cfg.protocol.mixer.mixer_type),
         }
     }
 
@@ -77,8 +76,7 @@ impl StartupSummary {
             max_sessions = self.max_sessions,
             session_idle_timeout = ?self.session_idle_timeout,
             probe_interval = ?self.probe_interval,
-            mixer_min_delay = ?self.mixer_min_delay,
-            mixer_delay_range = ?self.mixer_delay_range,
+            mixer = %self.mixer,
             "starting node"
         );
         tracing::debug!(config = ?cfg, "node configuration");
