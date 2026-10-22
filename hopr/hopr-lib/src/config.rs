@@ -150,12 +150,8 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn explicit_mixer_section_round_trips() -> anyhow::Result<()> {
-        use std::time::Duration;
-
         let mut cfg = super::HoprLibConfig::default();
         cfg.protocol.mixer = super::MixerConfig {
-            min_delay: Duration::from_millis(5),
-            delay_range: Duration::from_millis(50),
             capacity: 1_000,
             ..Default::default()
         };
