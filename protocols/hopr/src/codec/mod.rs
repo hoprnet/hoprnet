@@ -912,7 +912,7 @@ mod tests {
     /// NOTE on what this test can and cannot catch: on a forwarded packet the two ids are equal by
     /// construction, *because* `validate_unacknowledged_ticket` now rejects a ticket whose
     /// counterparty is not the channel destination (see
-    /// `test_ticket_validation_should_fail_if_counterparty_is_not_channel_destination`). That
+    /// `ticket_validation_should_fail_if_counterparty_is_not_channel_destination`). That
     /// rejection is the discriminating test for the key choice; this test pins the weaker but still
     /// useful invariant that the decoder emits a channel id/epoch consistent with the ticket it
     /// validated (i.e. the fields are actually populated and the epoch is not taken from a

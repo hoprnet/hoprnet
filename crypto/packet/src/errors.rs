@@ -116,8 +116,8 @@ mod tests {
         assert_eq!(kind.as_ref(), "low_win_prob");
     }
 
-    /// The `AsRefStr` representation of every variant is used as the `error` label of the
-    /// `hopr_packet_ticket_validation_errors` metric, so the wire-visible names are pinned here
+    /// The `AsRefStr` representation of every variant is used as the value of the `type` label of
+    /// the `hopr_packet_ticket_validation_errors` metric, so the wire-visible names are pinned here
     /// to catch an accidental rename or an added variant that would silently change dashboards.
     #[test]
     fn validation_error_kind_metric_labels_are_stable() {

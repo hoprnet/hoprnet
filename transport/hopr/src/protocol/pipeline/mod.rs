@@ -77,6 +77,10 @@ fn default_pipeline_concurrency(available_parallelism: usize) -> usize {
 /// reachable from tests: the counter itself is behind
 /// `#[cfg(all(feature = "telemetry", not(test)))]`, which would otherwise compile the branch out of
 /// every test build and leave the mapping unverifiable.
+///
+/// Gated to the builds that actually use it (the telemetry counter, or tests): without this, a
+/// plain `--lib` build without `telemetry` would emit a dead-code warning, which is an error in CI.
+#[cfg(any(feature = "telemetry", test))]
 fn unack_rejection_metric_label<T: UnacknowledgedTicketProcessor>(error: &T::Error) -> &'static str {
     if T::is_duplicate_ticket_index_error(error) {
         "duplicate_ticket_index"

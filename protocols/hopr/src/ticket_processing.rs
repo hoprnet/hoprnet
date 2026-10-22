@@ -109,9 +109,12 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     ///
     /// When more tickets are received, the oldest ones are discarded and lost forever.
     ///
-    /// This also bounds replay protection: the accepted-index records share this capacity, so under
-    /// pressure the oldest are evicted and those indices become replayable again. Keep it at least as
-    /// large as the number of unredeemed tickets you expect to track per window.
+    /// This also bounds replay protection: the accepted-index tracker is a separate cache that is
+    /// sized by this same value (so its memory is *additional* to the ticket caches, not shared with
+    /// them). Once it is full, its oldest records are evicted and those indices become replayable
+    /// again; worse, a fresh index the tracker cannot retain is refused outright. Size it for the
+    /// number of tickets you expect to be *accepted* per window — not the unredeemed subset, since
+    /// index records are retired only by expiry and never upon acknowledgement.
     ///
     /// Default is 10 000 000.
     #[default(default_max_unack_tickets())]
@@ -283,7 +286,9 @@ where
                 "replay tracker could not retain this ticket index; rejecting the ticket rather \
                  than accepting it without replay protection (see max_unack_tickets)"
             );
-            return Err(HoprProtocolError::DuplicateTicketIndex(
+            // Deliberately NOT `DuplicateTicketIndex`: nothing was duplicated. Reporting it as a
+            // duplicate would both state a falsehood and raise false replay-attack alerts.
+            return Err(HoprProtocolError::TicketIndexTrackerSaturated(
                 *channel_id,
                 channel_epoch,
                 index,
@@ -1149,6 +1154,76 @@ mod tests {
         Ok(())
     }
 
+    /// A tracker that cannot retain an index must report *saturation*, not a duplicate.
+    ///
+    /// Both refuse the ticket, so the security outcome is the same, but the classification differs:
+    /// reporting saturation as `DuplicateTicketIndex` would state that the index "was already
+    /// accepted" (false) and raise a false replay-attack alert on an undersized tracker, leaving an
+    /// operator unable to tell a misconfiguration from an attack.
+    #[tokio::test]
+    async fn ticket_processor_reports_saturation_separately_from_duplicates() -> anyhow::Result<()> {
+        const CAPACITY: usize = 100;
+
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                max_unack_tickets: CAPACITY,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
+            let ack_share = HalfKey::random();
+            let ticket = build_unack_ticket(index, 1, &ack_share)?;
+            Ok(ticket_processor.insert_unacknowledged_ticket(
+                &TEST_CHANNEL_ID,
+                1,
+                PEERS[2].1.public(),
+                ack_share.to_challenge()?,
+                ticket,
+            ))
+        };
+
+        // Saturate the tracker so admissions start being refused, then probe a fresh index until
+        // one is refused for want of retention rather than for being a duplicate.
+        let mut saw_saturation = false;
+        let mut saw_duplicate = false;
+        for round in 0..40u64 {
+            for index in 0..CAPACITY as u64 {
+                let _ = insert(index)?;
+            }
+            match insert(900_000 + round)? {
+                Ok(()) => {}
+                Err(HoprProtocolError::TicketIndexTrackerSaturated(..)) => {
+                    saw_saturation = true;
+                    break;
+                }
+                Err(HoprProtocolError::DuplicateTicketIndex(..)) => {
+                    saw_duplicate = true;
+                    break;
+                }
+                Err(other) => anyhow::bail!("unexpected error from a fresh index: {other}"),
+            }
+            ticket_processor.seen_ticket_indices.run_pending_tasks();
+        }
+
+        assert!(
+            !saw_duplicate,
+            "a fresh, never-seen index must never be reported as a duplicate"
+        );
+        assert!(
+            saw_saturation,
+            "an index the tracker cannot retain must be refused as saturated; if this no longer happens the tracker \
+             stopped failing closed and the capacity docs should be revisited"
+        );
+
+        Ok(())
+    }
+
     /// The predicate that the packet pipeline consults to pick the rejection metric label must be
     /// true for a duplicate-index rejection and false for every other error.
     ///
@@ -1179,6 +1254,10 @@ mod tests {
             HoprProtocolError::KeyNotFound,
             HoprProtocolError::ChannelNotFound(Address::default(), Address::default()),
             HoprProtocolError::OutOfFunds(Default::default(), HoprBalance::zero()),
+            // Saturation means the tracker could not *retain* the index — nothing was duplicated.
+            // Classifying it as a duplicate would raise false replay-attack alerts on an
+            // undersized tracker, so it must fall through to the generic label.
+            HoprProtocolError::TicketIndexTrackerSaturated(Hash::default(), 1, 5),
         ];
         for error in other_errors {
             assert!(
