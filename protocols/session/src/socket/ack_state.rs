@@ -2,7 +2,8 @@
 //! a reliable socket, with segment/frame retransmission and frame acknowledgements.
 
 use std::{
-    sync::atomic::AtomicBool,
+    collections::{HashMap, HashSet},
+    sync::{Arc, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 
@@ -110,13 +111,55 @@ pub struct AcknowledgementStateConfig {
     /// `None` (default) bounds frames only by [`Self::max_outgoing_frame_retries`] and backoff.
     #[default(None)]
     pub max_frame_age: Option<Duration>,
+
+    /// Minimum interval between two peer-driven retransmission services of the same frame.
+    ///
+    /// Bounds the egress (and SURB/ticket) cost a single peer can induce by replaying
+    /// [segment retransmission requests](SegmentRequest). Deliberately HALF the RTO base
+    /// ([`Self::expected_packet_latency`]): an honest peer's requests for the same frame arrive
+    /// `RTO + jitter` apart, so an interval equal to the RTO could marginally throttle it.
+    ///
+    /// `None` (default) or `ZERO` derives `expected_packet_latency / 2`, so the bound cannot be
+    /// disabled by accident. Internal defaults only; not operator-visible.
+    #[default(None)]
+    pub min_frame_retransmission_interval: Option<Duration>,
+
+    /// Maximum number of times a single frame may be served on a peer's request.
+    ///
+    /// `0` (default) derives
+    /// `max_incoming_frame_retries.max(1) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME`,
+    /// i.e. an 8x margin over the at most `max_incoming_frame_retries` requests the receiver
+    /// itself could ever have issued for the same frame.
+    /// Internal defaults only; not operator-visible.
+    #[default(0)]
+    pub max_frame_retransmission_services: usize,
+
+    /// Maximum number of frames served across a [`Self::frame_retransmission_refill_interval`].
+    ///
+    /// Caps the total amplification one peer's request stream can induce, regardless of how many
+    /// distinct frames it names. `0` (default) derives `2 * SegmentRequest::<C>::MAX_ENTRIES`
+    /// (a full request is worth at most `MAX_ENTRIES` frames).
+    /// Internal defaults only; not operator-visible.
+    #[default(0)]
+    pub max_frame_retransmission_burst: usize,
+
+    /// Interval over which the [`Self::max_frame_retransmission_burst`] allowance refills.
+    ///
+    /// `None` (default) derives `expected_packet_latency`. Internal defaults only; not
+    /// operator-visible.
+    #[default(None)]
+    pub frame_retransmission_refill_interval: Option<Duration>,
 }
 
 impl AcknowledgementStateConfig {
-    fn normalize(self) -> AcknowledgementStateConfig {
+    fn normalize<const C: usize>(self) -> AcknowledgementStateConfig {
+        // Derived budget bounds build on the clamped latency, so a zero latency can never
+        // derive a zero interval (which would disable the bound entirely).
+        let expected_packet_latency = self.expected_packet_latency.max(Duration::from_millis(1));
+
         Self {
             mode: self.mode,
-            expected_packet_latency: self.expected_packet_latency.max(Duration::from_millis(1)),
+            expected_packet_latency,
             backoff_base: self.backoff_base.max(1.0),
             max_incoming_frame_retries: self.max_incoming_frame_retries,
             max_outgoing_frame_retries: self.max_outgoing_frame_retries,
@@ -124,7 +167,185 @@ impl AcknowledgementStateConfig {
             lookbehind_segments: self.lookbehind_segments.max(1024),
             // A zero bound would retire every frame on sight; treat it as "not set".
             max_frame_age: self.max_frame_age.filter(|age| !age.is_zero()),
+            // An interval of zero would allow unlimited same-frame replay; treat it as "unset",
+            // so the peer-driven path can never lose its budget by accident. Deliberately HALF
+            // the RTO base: an honest peer's requests for the same frame arrive `RTO + jitter`
+            // apart, so an interval equal to the RTO could marginally throttle it.
+            min_frame_retransmission_interval: Some(
+                self.min_frame_retransmission_interval
+                    .filter(|interval| !interval.is_zero())
+                    .unwrap_or_else(|| expected_packet_latency / 2),
+            ),
+            // A service cap of zero would refuse every request; derive it from how many times
+            // the receiver itself could ever have asked for the frame. An honest receiver issues
+            // at most `max_incoming_frame_retries` requests per frame, so the product of that and
+            // the per-frame segment count is an 8x margin over what an honest peer can generate.
+            max_frame_retransmission_services: if self.max_frame_retransmission_services == 0 {
+                self.max_incoming_frame_retries.max(1) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME
+            } else {
+                self.max_frame_retransmission_services
+            },
+            // A burst of zero would refuse every request; a full request names at most
+            // `MAX_ENTRIES` frames, so twice that is a comfortable ceiling.
+            max_frame_retransmission_burst: if self.max_frame_retransmission_burst == 0 {
+                2 * SegmentRequest::<C>::MAX_ENTRIES
+            } else {
+                self.max_frame_retransmission_burst
+            },
+            frame_retransmission_refill_interval: Some(
+                self.frame_retransmission_refill_interval
+                    .filter(|interval| !interval.is_zero())
+                    .unwrap_or(expected_packet_latency),
+            ),
         }
+    }
+}
+
+/// How many times a single frame has been served on a peer's request, and when last.
+#[derive(Debug, Clone, Copy)]
+struct FrameServices {
+    served: usize,
+    last: Instant,
+}
+
+/// Peer-driven retransmission budget.
+///
+/// Locally-initiated retransmissions are budgeted (`max_incoming_frame_retries` with backoff,
+/// `max_outgoing_frame_retries`); the peer-driven path historically was not, so a single peer
+/// could replay a `SegmentRequest` naming thousands of segments and force unbounded paid egress.
+/// This bounds it with three limits, derived from [`AcknowledgementStateConfig`]:
+/// a per-frame service count, a minimum interval between two services of the same frame, and a
+/// session-wide token bucket capping how many frames can be served per refill interval.
+///
+/// The budget is shared by all clones of an [`AcknowledgementState`] (it lives behind an
+/// `Arc` in [`AcknowledgementStateContext`]), since the state is cloned per pipeline stage.
+#[derive(Debug)]
+struct RetransmissionBudget {
+    /// Minimum interval between two services of the same frame.
+    min_interval: Duration,
+    /// Maximum number of times a single frame may be served.
+    max_services: usize,
+    /// Interval over which the token bucket refills.
+    refill_interval: Duration,
+    /// Maximum number of tokens the bucket can hold.
+    max_tokens: usize,
+    /// Currently available tokens; one is charged per admitted frame.
+    tokens: usize,
+    /// Last time the bucket was refilled.
+    last_refill: Instant,
+    /// Per-frame service bookkeeping. Bounded by [`Self::capacity`]: frame ids are arbitrary
+    /// `u32`, so recording an entry per *requested* frame would let a bogus request grow this
+    /// map without bound — entries are therefore created only for frames actually found in the
+    /// ring buffer, which is itself bounded by the lookbehind window.
+    services: HashMap<FrameId, FrameServices>,
+    /// Hard bound on [`Self::services`], pruned at as defence in depth.
+    capacity: usize,
+    /// Number of frames refused by [`Self::admit`] since the last [`Self::take_throttled`].
+    throttled: u64,
+}
+
+impl RetransmissionBudget {
+    fn new(min_interval: Duration, max_services: usize, refill_interval: Duration, max_tokens: usize) -> Self {
+        // Guard against zero/absurd refill intervals: a zero interval would grant unlimited
+        // tokens on every call, turning the burst cap off entirely.
+        let refill_interval = if refill_interval.is_zero() {
+            Duration::from_millis(1)
+        } else {
+            refill_interval
+        };
+        Self {
+            min_interval,
+            max_services,
+            refill_interval,
+            max_tokens,
+            tokens: max_tokens,
+            last_refill: Instant::now(),
+            services: HashMap::with_capacity(max_tokens.min(1024)),
+            capacity: max_tokens.saturating_mul(16).max(1024),
+            throttled: 0,
+        }
+    }
+
+    /// Refills the token bucket proportionally to the time elapsed since the last refill.
+    ///
+    /// The bucket earns [`Self::max_tokens`] over one [`Self::refill_interval`], so a full
+    /// allowance is available again after that interval — matching what the config documents
+    /// (`max_frame_retransmission_burst` frames served *across* a refill interval). Earning a
+    /// single token per interval instead would make a full refill take `max_tokens` intervals,
+    /// starving honest retry requests for tens of seconds after any burst.
+    ///
+    /// Elapsed time that is not yet worth a whole token is kept, so a steady stream of calls
+    /// refills at the same average rate as one call would.
+    fn refill(&mut self, now: Instant) {
+        // Nothing to earn while full; keep the clock current so a later drain starts accruing
+        // from now rather than from a stale instant.
+        if self.tokens >= self.max_tokens {
+            self.last_refill = now;
+            return;
+        }
+
+        let interval_nanos = self.refill_interval.as_nanos();
+        if interval_nanos == 0 || self.max_tokens == 0 {
+            return;
+        }
+
+        let elapsed_nanos = now.saturating_duration_since(self.last_refill).as_nanos();
+        let earned = (elapsed_nanos.saturating_mul(self.max_tokens as u128) / interval_nanos) as usize;
+        if earned == 0 {
+            return;
+        }
+
+        // Advance the clock only by the time those whole tokens were worth, so the sub-token
+        // remainder is not discarded on every call.
+        let consumed_nanos = interval_nanos.saturating_mul(earned as u128) / (self.max_tokens as u128);
+        self.last_refill += Duration::from_nanos(consumed_nanos.min(u64::MAX as u128) as u64);
+        self.tokens = self.max_tokens.min(self.tokens.saturating_add(earned));
+    }
+
+    /// Pure admission check for `frame_id`; charges one session-wide token on success.
+    ///
+    /// MUST NOT create any per-frame bookkeeping: requests can name arbitrary, never-seen frame
+    /// ids, and admitting them must not allocate (see [`Self::services`]). Call [`Self::record`]
+    /// once the frame has actually been found in the ring buffer.
+    fn admit(&mut self, frame_id: FrameId, now: Instant) -> bool {
+        self.refill(now);
+
+        let admitted = self.tokens > 0
+            && self.services.get(&frame_id).is_none_or(|s| {
+                now.saturating_duration_since(s.last) >= self.min_interval && s.served < self.max_services
+            });
+
+        if admitted {
+            self.tokens -= 1;
+        } else {
+            self.throttled = self.throttled.saturating_add(1);
+        }
+
+        admitted
+    }
+
+    /// Charges the per-frame budget for a frame that has actually been served.
+    ///
+    /// Called only for frames found in the ring buffer, so this cannot be driven to grow
+    /// [`Self::services`] with bogus frame ids.
+    fn record(&mut self, frame_id: FrameId, now: Instant) {
+        // Never let the bookkeeping map grow without bound, even if a pathological ring-buffer
+        // contents somehow outruns the ring size.
+        if self.services.len() >= self.capacity && !self.services.contains_key(&frame_id) {
+            self.services.clear();
+        }
+
+        let entry = self
+            .services
+            .entry(frame_id)
+            .or_insert(FrameServices { served: 0, last: now });
+        entry.served = entry.served.saturating_add(1);
+        entry.last = now;
+    }
+
+    /// Takes the number of frames refused since the last call, for count-batched logging.
+    fn take_throttled(&mut self) -> u64 {
+        std::mem::take(&mut self.throttled)
     }
 }
 
@@ -137,6 +358,8 @@ struct AcknowledgementStateContext<const C: usize> {
     ack_tx: CrossfireSink<FrameId>,
     inspector: FrameInspector,
     ctl_tx: CrossfireSink<SessionMessage<C>>,
+    /// Peer-driven retransmission budget, shared by all clones of the state.
+    retransmission_budget: Arc<parking_lot::Mutex<RetransmissionBudget>>,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -244,7 +467,7 @@ impl<const C: usize> AcknowledgementState<C> {
     pub fn new<I: std::fmt::Display>(session_id: I, cfg: AcknowledgementStateConfig) -> Self {
         Self {
             id: session_id.to_string(),
-            cfg: cfg.normalize(),
+            cfg: cfg.normalize::<C>(),
             context: Default::default(),
             started: std::sync::Arc::new(AtomicBool::new(false)),
             delivery_tap: None,
@@ -287,6 +510,18 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // Full frame acknowledgements get a special channel with fixed capacity
         let (ack_tx, ack_rx) = bounded_sink_channel::<FrameId>(2 * self.cfg.lookbehind_segments);
 
+        // Shared by every clone of this state, so all pipeline stages draw on one budget.
+        let retransmission_budget = Arc::new(parking_lot::Mutex::new(RetransmissionBudget::new(
+            self.cfg
+                .min_frame_retransmission_interval
+                .unwrap_or_else(|| self.cfg.expected_packet_latency / 2),
+            self.cfg.max_frame_retransmission_services,
+            self.cfg
+                .frame_retransmission_refill_interval
+                .unwrap_or(self.cfg.expected_packet_latency),
+            self.cfg.max_frame_retransmission_burst,
+        )));
+
         let context = self.context.insert(AcknowledgementStateContext {
             rb_tx,
             rb_rx,
@@ -297,6 +532,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             inspector: socket_components
                 .inspector
                 .ok_or(SessionError::InvalidState("inspector is not available".into()))?,
+            retransmission_budget,
         });
 
         if self.cfg.mode.is_partial_ack_enabled() {
@@ -501,49 +737,104 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
-        let (mut missing_seg_ids, mut missing_frame_ids): (Vec<_>, Vec<_>) =
-            request.into_iter().map(|s| (s, s.0)).unzip();
+        let now = Instant::now();
+
+        // Admission pass: decide per frame *before* the request is expanded into one SegmentId
+        // per requested bit. The mutex guard is confined to this block, so it is never held
+        // across the ring-buffer scan below.
+        let admitted_frame_ids: Vec<FrameId> = {
+            let mut budget = ctx.retransmission_budget.lock();
+            request
+                .frames()
+                .filter(|frame_id| budget.admit(*frame_id, now))
+                .collect()
+        };
+
+        if admitted_frame_ids.is_empty() {
+            // Fully throttled: no scan, no egress, no cancellation of our own retry schedule.
+            let throttled = ctx.retransmission_budget.lock().take_throttled();
+            if throttled > 0 {
+                tracing::debug!(throttled, "retransmission request entirely throttled");
+            }
+            return Ok(());
+        }
+
+        // Keep only the segments of the admitted frames; the ids are unique and
+        // sorted, so a set lookup replaces the previous shift-on-every-hit removal.
+        let mut requested_seg_ids: HashSet<SegmentId> = request
+            .into_iter()
+            .filter(|seg_id| admitted_frame_ids.binary_search(&seg_id.0).is_ok())
+            .collect();
 
         // Perform a single find to lock the RB only once
-        let segments = ctx.rb_rx.find(|s| {
-            // SegmentIds are guaranteed to be sorted, so we can use binary search
-            if let Ok(i) = missing_seg_ids.binary_search(&s.id()) {
-                missing_seg_ids.remove(i);
-                true
-            } else {
-                false
-            }
-        });
+        let segments = ctx.rb_rx.find(|s| requested_seg_ids.remove(&s.id()));
 
         tracing::trace!(
             found = segments.len(),
-            requested = missing_frame_ids.len(),
+            requested = admitted_frame_ids.len(),
             "found matching segments to be retransmitted"
         );
 
-        // Partially acknowledged frames will not need to be fully resent in the future.
-        // Cancel all partially acknowledged frame resends.
-        if self.cfg.mode.is_full_ack_enabled() {
-            // Since the FrameIds are guaranteed to be sorted, we can simply dedup them.
-            missing_frame_ids.dedup();
-
-            if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
-                missing_frame_ids
-                    .into_iter()
-                    .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
-            ) {
-                tracing::error!(%error, "failed to cancel frame resend of partially acknowledged frames");
+        // Charge the per-frame budget only for frames that were actually served, so bogus
+        // frame ids in a request cannot grow the budget's bookkeeping. One service per
+        // request and frame, no matter how many of the frame's segments were found.
+        // The set must stay alive: on a fully successful queue below, it also drives the
+        // resend cancellation.
+        // NOTE: the budget mutex guard is dropped at the end of this block and is never
+        // held across the control-stream sends below.
+        let served_frame_ids: Vec<FrameId> = {
+            let mut budget = ctx.retransmission_budget.lock();
+            let mut served_frame_ids: Vec<FrameId> = segments.iter().map(|s| s.frame_id).collect();
+            served_frame_ids.sort_unstable();
+            served_frame_ids.dedup();
+            served_frame_ids
+                .iter()
+                .for_each(|frame_id| budget.record(*frame_id, now));
+            // Count-batched: the handler is already a tracing span per packet.
+            let throttled = budget.take_throttled();
+            if throttled > 0 {
+                tracing::debug!(throttled, "throttled peer-driven retransmission requests");
             }
-        }
+            served_frame_ids
+        };
 
-        // Resend the segments via the Control Stream
+        // Resend the segments via the Control Stream. This MUST happen before the
+        // full-frame resend cancellation below: `ctl_tx` is bounded, and `try_send`
+        // fails once it is full. Only if every found segment was queued successfully
+        // can the frames in `served_frame_ids` be considered actually served. Cancelling
+        // earlier (on merely *found* frames) would remove a frame from our own retry
+        // pipeline without ever sending it, so it would be neither NACK-served nor
+        // full-frame-retransmitted — a permanent gap in reliable mode, with the eventual
+        // `DeliveryTap::on_lost_frame()` report suppressed as well.
         segments
             .into_iter()
             .try_for_each(|s| {
                 tracing::trace!(seg_id = %s.id(), "retransmit segment on request");
                 ctx.ctl_tx.try_send(SessionMessage::Segment(s))
             })
-            .map_err(|e| SessionError::ProcessingError(e.to_string()))
+            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+
+        // Partially acknowledged frames will not need to be fully resent in the future.
+        // Cancel the resend of the SERVED frames only, and only after all their segments
+        // have been queued successfully above: a frame can be admitted by the budget
+        // without being served (e.g. the request names a segment that does not exist in
+        // the ring buffer), or its segments may fail to queue if the control stream is
+        // full (in which case the error above aborts this handler before we get here).
+        // Cancelling a frame we did not serve would let a peer suppress our own
+        // retransmission while getting nothing back, and would suppress the eventual
+        // `DeliveryTap::on_lost_frame()` report.
+        if self.cfg.mode.is_full_ack_enabled()
+            && !served_frame_ids.is_empty()
+            && let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
+                served_frame_ids
+                    .into_iter()
+                    .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
+            )
+        {
+            tracing::error!(%error, "failed to cancel frame resend of partially acknowledged frames");
+        }
+
+        Ok(())
     }
 
     #[tracing::instrument(name = "AcknowledgementState::incoming_acknowledged_frames", skip(self), fields(session_id = self.id))]
@@ -943,7 +1234,6 @@ mod tests {
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
-            max_outgoing_frame_retries: 1,
             ..Default::default()
         };
 
@@ -957,20 +1247,27 @@ mod tests {
         })?;
 
         let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
+        let seq_len = expected_segments.len();
 
         // Load segments into the ring buffer
         for segment in &expected_segments {
             state.segment_sent(segment)?;
         }
 
-        tokio::time::sleep(cfg.expected_packet_latency).await;
-
         // Partially acknowledge the frame (report the first segment as missing)
         state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
 
+        // Wait past the sender-side full-frame RTO (`expected_packet_latency * (seq_len + 1)`), so
+        // a full-frame resend would have had every opportunity to fire. Asserting only that the
+        // requested segment is retransmitted would pass without ever checking the property in the
+        // test's name; waiting is what makes "must not resend the ENTIRE frame" observable. It also
+        // removes a race: a short sleep could land the full-frame resend first, making the count
+        // nondeterministic under CPU contention.
+        tokio::time::sleep(cfg.expected_packet_latency * (seq_len as u32 + 2)).await;
+
         state.stop()?;
 
-        // Only segment 1 must be retransmitted
+        // Only segment 1 must be retransmitted — never the whole frame.
         let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
         assert_eq!(1, ctl_msgs.len());
         assert_eq!(ctl_msgs[0], SessionMessage::Segment(expected_segments[0].clone()));
@@ -984,6 +1281,13 @@ mod tests {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
             max_outgoing_frame_retries: 1,
+            // This test exercises the request -> resend mapping, not the retransmission budget.
+            // The per-frame service cap must stay out of the way, but the minimum interval
+            // between two services of the same frame CANNOT be disabled: `normalize` re-derives
+            // a `ZERO` interval into the safe default, so it is deliberately left at the default
+            // here. That default is `expected_packet_latency / 2` = 1 ms, and the three requests
+            // for frame 2 below are spaced 2 ms apart, so they all clear the interval.
+            max_frame_retransmission_services: usize::MAX,
             ..Default::default()
         };
 
@@ -1280,5 +1584,547 @@ mod tests {
         assert_eq!(ctl_msgs[2], SessionMessage::Acknowledge(vec![1].try_into()?));
 
         Ok(())
+    }
+
+    /// Builds a request for `frame_id` naming the given missing-segment bitmap.
+    fn request_for(frame_id: FrameId, missing: u8) -> SegmentRequest<MTU> {
+        SegmentRequest::from_iter([(frame_id, [missing].into())])
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_not_service_a_replayed_request_twice_within_the_interval() -> anyhow::Result<()> {
+        // Default budget: the same frame cannot be served again within half the RTO base.
+        let cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(50),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+        // Replay immediately: well within `expected_packet_latency / 2`.
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(2, ctl_msgs.len(), "replayed request must not be served again");
+        assert_eq!(SessionMessage::Segment(expected_segments[0].clone()), ctl_msgs[0]);
+        assert_eq!(SessionMessage::Segment(expected_segments[1].clone()), ctl_msgs[1]);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_service_the_same_frame_again_after_the_interval_elapses() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(50),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+        // The default interval is `expected_packet_latency / 2` = 25 ms; wait past it.
+        tokio::time::sleep(cfg.expected_packet_latency).await;
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            4,
+            ctl_msgs.len(),
+            "frame must be servable again once the interval elapses"
+        );
+        for (i, expected_segment) in expected_segments.iter().cycle().take(4).enumerate() {
+            assert_eq!(SessionMessage::Segment(expected_segment.clone()), ctl_msgs[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_throttle_a_frame_past_the_service_cap() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            // Serve the frame at most twice, regardless of how often it is requested.
+            max_frame_retransmission_services: 2,
+            // Freeze the session-wide allowance so only the per-frame cap is exercised.
+            max_frame_retransmission_burst: usize::MAX,
+            frame_retransmission_refill_interval: Some(Duration::from_secs(60)),
+            min_frame_retransmission_interval: Some(Duration::from_millis(1)),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        // Exactly `max_frame_retransmission_services` services must pass...
+        for _ in 0..2 {
+            state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // ...and the next one must be refused.
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(4, ctl_msgs.len(), "exactly two services must have been served");
+        for (i, expected_segment) in expected_segments.iter().cycle().take(4).enumerate() {
+            assert_eq!(SessionMessage::Segment(expected_segment.clone()), ctl_msgs[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_bound_total_service_while_frames_are_cycled() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            // The session-wide allowance is the ceiling under test: only 3 frames may be served
+            // before it refills.
+            max_frame_retransmission_burst: 3,
+            frame_retransmission_refill_interval: Some(Duration::from_secs(60)),
+            max_frame_retransmission_services: usize::MAX,
+            min_frame_retransmission_interval: Some(Duration::from_millis(1)),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = (1..=2)
+            .map(|i| segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, i))
+            .collect::<Result<Vec<_>, _>>()?;
+        for expected_segment in &expected_segments {
+            for segment in expected_segment {
+                state.segment_sent(segment)?;
+            }
+        }
+
+        // Cycle the frames well beyond the allowance: only the first 3 services must pass.
+        for i in 0..6 {
+            state.incoming_retransmission_request(request_for(1 + (i % 2) as FrameId, 0b10000000))?;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            3,
+            ctl_msgs.len(),
+            "the burst cap must bound the total number of services"
+        );
+        for (i, expected_frame) in expected_segments.iter().cycle().take(3).enumerate() {
+            assert_eq!(SessionMessage::Segment(expected_frame[0].clone()), ctl_msgs[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_still_cancel_our_full_frame_resend_when_it_serves_a_frame() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(100), // full-frame RTO = 3 * 100 ms
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        // Serve the whole frame on request: this must also cancel the pending sender-side
+        // full-frame resend of frame 1.
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+
+        // Wait well past the full-frame RTO.
+        tokio::time::sleep(4 * cfg.expected_packet_latency).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            2,
+            ctl_msgs.len(),
+            "only the requested segments must be sent, no full-frame resend"
+        );
+        assert_eq!(SessionMessage::Segment(expected_segments[0].clone()), ctl_msgs[0]);
+        assert_eq!(SessionMessage::Segment(expected_segments[1].clone()), ctl_msgs[1]);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_not_cancel_our_full_frame_resend_when_it_throttles_a_frame() -> anyhow::Result<()>
+    {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(100), // full-frame RTO = 3 * 100 ms
+            // A single sender-side full-frame resend, so the assertion stays deterministic.
+            max_outgoing_frame_retries: 1,
+            // Only one frame may be served before the allowance refills; it is spent on a frame
+            // that is not in the ring buffer, so the request for frame 1 below is refused.
+            max_frame_retransmission_burst: 1,
+            frame_retransmission_refill_interval: Some(Duration::from_secs(60)),
+            max_frame_retransmission_services: usize::MAX,
+            min_frame_retransmission_interval: Some(Duration::from_millis(1)),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Spend the allowance on a frame that is not in the ring buffer.
+        state.incoming_retransmission_request(request_for(2, 0b10000000))?;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // This request for frame 1 must be throttled and must NOT cancel frame 1's pending
+        // sender-side full-frame resend.
+        state.incoming_retransmission_request(request_for(1, 0b11000000))?;
+
+        // Wait well past the full-frame RTO: the sender-side resend must still fire.
+        tokio::time::sleep(4 * cfg.expected_packet_latency).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            2,
+            ctl_msgs.len(),
+            "no segments must be sent on the throttled request, but the full-frame resend must fire"
+        );
+        assert_eq!(SessionMessage::Segment(expected_segments[0].clone()), ctl_msgs[0]);
+        assert_eq!(SessionMessage::Segment(expected_segments[1].clone()), ctl_msgs[1]);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_not_cancel_our_full_frame_resend_when_it_admits_but_cannot_serve_a_frame()
+    -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(100), // full-frame RTO = 3 * 100 ms
+            // A single sender-side full-frame resend, so the assertion stays deterministic.
+            max_outgoing_frame_retries: 1,
+            // A generous budget, so the request below is admitted and the "nothing admitted"
+            // early return is never taken: the frame is admitted but cannot be SERVED, because
+            // the request names a segment index that does not exist in the ring buffer.
+            max_frame_retransmission_services: usize::MAX,
+            max_frame_retransmission_burst: usize::MAX,
+            frame_retransmission_refill_interval: Some(Duration::from_secs(60)),
+            min_frame_retransmission_interval: Some(Duration::from_millis(1)),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * MTU }>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Frame 1 has only 2 segments (indices 0 and 1), so segment index 6 (bit 1 in the Msb0
+        // bitmap, where the MSB is index 0) does not exist in the ring buffer: frame 1 is
+        // admitted, but nothing is served for it and nothing is sent back. This must NOT cancel
+        // frame 1's pending sender-side full-frame resend.
+        state.incoming_retransmission_request(request_for(1, 0b00000010))?;
+
+        // Wait well past the full-frame RTO: the sender-side resend must still fire.
+        tokio::time::sleep(4 * cfg.expected_packet_latency).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            2,
+            ctl_msgs.len(),
+            "nothing must be sent on the unservable request, but the full-frame resend must fire"
+        );
+        assert_eq!(SessionMessage::Segment(expected_segments[0].clone()), ctl_msgs[0]);
+        assert_eq!(SessionMessage::Segment(expected_segments[1].clone()), ctl_msgs[1]);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_service_an_honest_request_unchanged() -> anyhow::Result<()> {
+        // Entirely default configuration: an honest peer must observe no throttling at all.
+        let cfg = AcknowledgementStateConfig::default();
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_types::crypto_random::random_bytes::<{ 8 * MTU }>(), MTU, 1)?;
+        assert_eq!(8, expected_segments.len());
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        // An honest request naming all 8 segments of the frame must get all 8 back.
+        state.incoming_retransmission_request(request_for(1, 0b11111111))?;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            8,
+            ctl_msgs.len(),
+            "all requested segments must be sent under the default config"
+        );
+        for (i, expected_segment) in expected_segments.iter().enumerate() {
+            assert_eq!(SessionMessage::Segment(expected_segment.clone()), ctl_msgs[i]);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retransmission_budget_must_not_grow_on_unserved_frame_ids() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig::default();
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        // A full-size request naming bogus frame ids that are not in the ring buffer: the budget
+        // must admit them (charging tokens) but must not allocate any per-frame bookkeeping.
+        let bogus_request = (1..=SegmentRequest::<MTU>::MAX_ENTRIES)
+            .map(|i| (i as FrameId, [0b11111111].into()))
+            .collect::<SegmentRequest<MTU>>();
+        state.incoming_retransmission_request(bogus_request)?;
+
+        // Cloned out before `stop`, which takes the context away.
+        let budget = state
+            .context
+            .as_ref()
+            .context("state must be running")?
+            .retransmission_budget
+            .clone();
+
+        state.stop()?;
+
+        assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
+
+        let budget = budget.lock();
+        assert!(
+            budget.services.is_empty(),
+            "unserved frame ids must not allocate bookkeeping"
+        );
+        assert_eq!(budget.throttled, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn retransmission_budget_must_refill_a_full_allowance_within_one_refill_interval() {
+        // The config documents the burst as "frames served ACROSS a refill interval", so one whole
+        // interval must restore the entire allowance. Earning a single token per interval instead
+        // would take `max_tokens` intervals to refill, starving honest requests for a long time.
+        const TOKENS: usize = 10;
+        let interval = Duration::from_millis(100);
+        let t0 = Instant::now();
+
+        // A fresh bucket, drained at `t0`. Each scenario gets its own so that the refill clock
+        // advancing during one scenario cannot shift the baseline of the next.
+        let drained = || {
+            let mut budget = RetransmissionBudget::new(
+                Duration::from_millis(1), // per-frame interval, irrelevant here
+                usize::MAX,               // per-frame cap, irrelevant here
+                interval,
+                TOKENS,
+            );
+            for _ in 0..TOKENS {
+                assert!(budget.admit(1, t0), "the initial allowance must be spendable");
+            }
+            assert!(!budget.admit(1, t0), "an exhausted bucket must refuse");
+            budget
+        };
+
+        // Drains the bucket at `at`, returning how many frames were admitted.
+        fn drain_to(budget: &mut RetransmissionBudget, at: Instant) -> usize {
+            let mut admitted = 0;
+            while budget.admit(1, at) {
+                admitted += 1;
+                assert!(admitted <= TOKENS, "must never exceed the allowance");
+            }
+            admitted
+        }
+
+        // Half an interval restores about half the allowance.
+        let mut budget = drained();
+        assert_eq!(TOKENS / 2, drain_to(&mut budget, t0 + interval / 2));
+
+        // A full interval restores the entire allowance.
+        let mut budget = drained();
+        assert_eq!(
+            TOKENS,
+            drain_to(&mut budget, t0 + interval),
+            "a full refill interval must restore the whole allowance"
+        );
+
+        // Idling far longer than the interval must not overfill the bucket.
+        let mut budget = drained();
+        assert_eq!(
+            TOKENS,
+            drain_to(&mut budget, t0 + Duration::from_secs(3600)),
+            "the bucket must cap at max_tokens"
+        );
+
+        // A steady stream of sub-token calls must still refill at the full rate: the leftover
+        // time is carried, so `TOKENS` calls a tenth of the interval apart restore the allowance.
+        let mut budget = drained();
+        let mut admitted = 0;
+        for step in 1..=TOKENS as u32 {
+            admitted += drain_to(&mut budget, t0 + interval * step / TOKENS as u32);
+        }
+        assert_eq!(
+            TOKENS, admitted,
+            "sub-token calls must not discard the elapsed remainder"
+        );
+    }
+
+    #[test]
+    fn ack_state_config_should_derive_retransmission_budget_defaults() {
+        use hopr_protocol_app::prelude::ApplicationData;
+
+        // The production constants these defaults are derived from.
+        assert_eq!(3238, ApplicationData::PAYLOAD_SIZE);
+        assert_eq!(646, SegmentRequest::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_ENTRIES);
+        assert_eq!(
+            8,
+            SegmentRequest::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MISSING_SEGMENTS_PER_FRAME
+        );
+
+        let derived = AcknowledgementStateConfig::default().normalize::<{ ApplicationData::PAYLOAD_SIZE }>();
+        assert_eq!(
+            Some(Duration::from_millis(10)),
+            derived.min_frame_retransmission_interval
+        );
+        assert_eq!(3 * 8, derived.max_frame_retransmission_services);
+        assert_eq!(2 * 646, derived.max_frame_retransmission_burst);
+        assert_eq!(
+            Some(Duration::from_millis(20)),
+            derived.frame_retransmission_refill_interval
+        );
+
+        // ZERO and 0 mean "derive the safe default" and can never disable the bound.
+        let explicit_zero = AcknowledgementStateConfig {
+            min_frame_retransmission_interval: Some(Duration::ZERO),
+            max_frame_retransmission_services: 0,
+            max_frame_retransmission_burst: 0,
+            frame_retransmission_refill_interval: Some(Duration::ZERO),
+            ..Default::default()
+        }
+        .normalize::<{ ApplicationData::PAYLOAD_SIZE }>();
+        assert_eq!(derived, explicit_zero);
+
+        // Explicitly configured values are kept as they are.
+        let explicit = AcknowledgementStateConfig {
+            min_frame_retransmission_interval: Some(Duration::from_millis(5)),
+            max_frame_retransmission_services: 7,
+            max_frame_retransmission_burst: 9,
+            frame_retransmission_refill_interval: Some(Duration::from_millis(11)),
+            ..Default::default()
+        }
+        .normalize::<{ ApplicationData::PAYLOAD_SIZE }>();
+        assert_eq!(
+            Some(Duration::from_millis(5)),
+            explicit.min_frame_retransmission_interval
+        );
+        assert_eq!(7, explicit.max_frame_retransmission_services);
+        assert_eq!(9, explicit.max_frame_retransmission_burst);
+        assert_eq!(
+            Some(Duration::from_millis(11)),
+            explicit.frame_retransmission_refill_interval
+        );
     }
 }
