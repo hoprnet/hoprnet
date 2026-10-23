@@ -267,6 +267,10 @@ pub struct MemorySurbStore {
     /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
     /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
     invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
+    /// Relayers whose disconnect we observed at runtime and that have not reconnected since; not
+    /// seeded at startup. Kept apart from `invalidated_relayers`, so a reconnect never lifts a channel
+    /// invalidation. Bounded by the peers we ever connected to.
+    disconnected_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
     reporters: Arc<EvictionReporters>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -303,6 +307,7 @@ impl MemorySurbStore {
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             invalidated_relayers: Default::default(),
+            disconnected_relayers: Default::default(),
             reporters,
             cfg: cfg.into(),
         }
@@ -320,8 +325,7 @@ impl MemorySurbStore {
     /// to a session's originator would discard perfectly good SURBs.
     fn is_surb_usable(&self, surb: &HoprSurb) -> bool {
         match surb.additional_data_receiver.proof_of_relay_values().chain_length() {
-            // Direct return path: the "first relayer" is the final recipient, which needs no channel.
-            1 => true,
+            _ if is_direct_return_path(surb) => true,
             // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. Refuse it rather
             // than let a malformed value pass as "direct" and bypass the check below.
             //
@@ -348,6 +352,12 @@ impl MemorySurbStore {
     }
 }
 
+/// A direct return path's "first relayer" is the final recipient: it needs no channel, and its
+/// connectivity is not a relayer's.
+fn is_direct_return_path(surb: &HoprSurb) -> bool {
+    surb.additional_data_receiver.proof_of_relay_values().chain_length() == 1
+}
+
 impl Default for MemorySurbStore {
     fn default() -> Self {
         Self::new(SurbStoreConfig::default())
@@ -362,15 +372,33 @@ impl SurbStore for MemorySurbStore {
         let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym)?;
 
         match matcher {
-            // SURBs whose return path no longer has a usable first edge are dropped on the way,
-            // rather than handed out only to have the reply fail to be paid for.
-            SurbMatcher::Pseudonym(_) => surbs_for_pseudonym
-                .pop_next_valid(|_, surb| self.is_surb_usable(surb))
-                .map(|popped_surb| FoundSurb {
-                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                    surb: popped_surb.surb,
-                    remaining: popped_surb.remaining,
-                }),
+            // SURBs whose first edge can no longer be paid are dropped on the way. Those through a
+            // disconnected first relayer are passed over, and used only when nothing else is left.
+            //
+            // Passed-over SURBs still count in `remaining`, deliberately: they are held for the
+            // relayer's return, and the counterparty refills on that count either way.
+            SurbMatcher::Pseudonym(_) => {
+                // Taken before the buffer lock, the only order the two are taken in.
+                let disconnected = self.disconnected_relayers.read();
+                let connected =
+                    |surb: &HoprSurb| is_direct_return_path(surb) || !disconnected.contains(&surb.first_relayer);
+                let popped = surbs_for_pseudonym.pop_next_valid_preferring(
+                    |_, surb| self.is_surb_usable(surb),
+                    (!disconnected.is_empty()).then_some(&connected),
+                )?;
+                if !connected(&popped.surb) {
+                    tracing::debug!(
+                        %pseudonym,
+                        first_relayer = %popped.surb.first_relayer,
+                        "no SURB through a connected relayer left, replying through a disconnected one"
+                    );
+                }
+                Some(FoundSurb {
+                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped.id),
+                    surb: popped.surb,
+                    remaining: popped.remaining,
+                })
+            }
             // The following code intentionally only checks the SURB at the popping end of the
             // ring buffer and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
@@ -448,6 +476,18 @@ impl SurbStore for MemorySurbStore {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
+    fn update_relayer_connectivity(&self, relayer: &HoprKeyIdent, connected: bool) {
+        let changed = if connected {
+            self.disconnected_relayers.write().remove(relayer)
+        } else {
+            self.disconnected_relayers.write().insert(*relayer)
+        };
+        if changed {
+            tracing::debug!(%relayer, connected, "relayer connectivity changed");
+        }
+    }
+
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id), ret)]
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener> {
         self.pseudonym_openers
@@ -514,25 +554,43 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
-    /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
-    ///
-    /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
-    /// handed out nor blocks those behind it. Pass only a validity test — a selective predicate
-    /// (say, a routing preference) would drain the buffer. `None` once it is exhausted without a
-    /// match.
-    ///
-    /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
-    /// calling it inside the critical section would invite lock-order inversion.
+    /// [`Self::pop_next_valid_preferring`] without a preference.
+    #[cfg(test)]
     pub fn pop_next_valid<F>(&self, is_valid: F) -> Option<PoppedSurb<S>>
     where
         F: Fn(&HoprSurbId, &S) -> bool,
     {
+        self.pop_next_valid_preferring(is_valid, None::<&fn(&S) -> bool>)
+    }
+
+    /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`], taking the next
+    /// one `preferred` accepts first, wherever it is; those passed over stay in place. With none
+    /// preferred, or no `preferred` at all, it pops in order.
+    ///
+    /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
+    /// handed out nor blocks those behind it. Pass only a validity test as `is_valid` — a selective
+    /// predicate (say, a routing preference) would drain the buffer. `None` once it is exhausted
+    /// without a match.
+    ///
+    /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
+    /// calling it inside the critical section would invite lock-order inversion. `preferred` runs
+    /// *inside* it, on every stored SURB in the worst case: it must be cheap and must not take locks.
+    pub fn pop_next_valid_preferring<F, P>(&self, is_valid: F, preferred: Option<&P>) -> Option<PoppedSurb<S>>
+    where
+        F: Fn(&HoprSurbId, &S) -> bool,
+        P: Fn(&S) -> bool,
+    {
         loop {
             let (id, surb, remaining) = {
                 let mut rb = self.surbs.lock();
-                let (id, surb) = match self.pop_order {
-                    SurbPopOrder::Fifo => rb.pop_front()?,
-                    SurbPopOrder::Lifo => rb.pop_back()?,
+                let index = preferred.and_then(|preferred| match self.pop_order {
+                    SurbPopOrder::Fifo => rb.iter().position(|(_, surb)| preferred(surb)),
+                    SurbPopOrder::Lifo => rb.iter().rposition(|(_, surb)| preferred(surb)),
+                });
+                let (id, surb) = match (index, self.pop_order) {
+                    (Some(index), _) => rb.remove(index)?,
+                    (None, SurbPopOrder::Fifo) => rb.pop_front()?,
+                    (None, SurbPopOrder::Lifo) => rb.pop_back()?,
                 };
                 (id, surb, rb.len())
             };
@@ -652,6 +710,77 @@ mod tests {
             "no usable SURB should remain"
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_skip_surbs_through_a_disconnected_relayer_until_it_reconnects() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let (gone, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(gone, TWO_HOP)?),
+                ([2u8; 8], surb_via(alive, TWO_HOP)?),
+                ([3u8; 8], surb_via(gone, TWO_HOP)?),
+            ],
+        );
+
+        store.update_relayer_connectivity(&gone, false);
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .context("expected a usable SURB")?;
+        assert_eq!(
+            [2u8; 8],
+            found.sender_id.surb_id(),
+            "must skip the disconnected relayer"
+        );
+
+        assert_eq!(2, found.remaining, "passed over, not discarded");
+
+        store.update_relayer_connectivity(&gone, true);
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .context("usable again after the reconnect")?;
+        assert_eq!([1u8; 8], found.sender_id.surb_id());
+        Ok(())
+    }
+
+    /// When every return path is down at once (an outage on our side), dropping them all would
+    /// leave nothing to reply with, not even to report the level, once the relayers are back.
+    #[test]
+    fn surbs_should_still_be_handed_out_when_every_first_relayer_is_disconnected() -> anyhow::Result<()> {
+        let (a, b) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![([1u8; 8], surb_via(a, TWO_HOP)?), ([2u8; 8], surb_via(b, TWO_HOP)?)],
+        );
+        store.update_relayer_connectivity(&a, false);
+        store.update_relayer_connectivity(&b, false);
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("a SURB must still be handed out"))?;
+        assert_eq!(1, found.remaining, "only the one handed out leaves the buffer");
+        Ok(())
+    }
+
+    #[test]
+    fn a_reconnect_should_not_lift_a_channel_invalidation() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(pseudonym, vec![([1u8; 8], surb_via(relayer, TWO_HOP)?)]);
+
+        store.invalidate_relayer(&relayer);
+        store.update_relayer_connectivity(&relayer, false);
+        store.update_relayer_connectivity(&relayer, true);
+        assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none());
         Ok(())
     }
 

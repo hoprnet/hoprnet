@@ -238,6 +238,27 @@ fn should_explore(exploration: f64) -> bool {
 }
 
 /// Picks a uniformly random index over `len` entries.
+/// Sweep requests at least `min_gap` apart: one arriving sooner waits out the rest of the gap
+/// rather than being dropped, so the last change is always swept, while churn costs at most one
+/// extra sweep per period.
+fn spaced_requests(
+    requests: futures::channel::mpsc::Receiver<()>,
+    min_gap: Duration,
+) -> impl futures::Stream<Item = ()> + Send {
+    futures::stream::unfold(
+        (requests, None::<std::time::Instant>),
+        move |(mut requests, last)| async move {
+            requests.next().await?;
+            if let Some(wait) = last.map(|last| min_gap.saturating_sub(last.elapsed()))
+                && !wait.is_zero()
+            {
+                futures_time::task::sleep(wait.into()).await;
+            }
+            Some(((), (requests, Some(std::time::Instant::now()))))
+        },
+    )
+}
+
 fn pick_uniform_index(len: usize) -> Option<usize> {
     (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
 }
@@ -445,6 +466,11 @@ pub struct PathPlanner<Surb, R, S> {
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
+    /// Asks the background refresh for a sweep now. One shared sender on a zero-capacity channel
+    /// holds at most one pending request, so bursts coalesce.
+    sweep_requests: Arc<parking_lot::Mutex<futures::channel::mpsc::Sender<()>>>,
+    /// Taken once by the background refresh.
+    sweep_receiver: Arc<parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<()>>>>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -461,6 +487,7 @@ where
             .max_capacity(config.max_cache_capacity)
             .time_to_live(config.cache_ttl)
             .build();
+        let (sweep_requests, sweep_receiver) = futures::channel::mpsc::channel(0);
 
         Self {
             me,
@@ -475,7 +502,17 @@ where
             },
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
+            sweep_requests: Arc::new(parking_lot::Mutex::new(sweep_requests)),
+            sweep_receiver: Arc::new(parking_lot::Mutex::new(Some(sweep_receiver))),
         }
+    }
+
+    /// Runs the background sweep now rather than at its next period: every cached entry is
+    /// re-weighted from the current graph. As in the periodic sweep, an entry that rebuilds to
+    /// nothing keeps what it holds. Never blocks; requests made while one is pending coalesce.
+    pub fn request_sweep(&self) {
+        // Full means a sweep is already pending, which is the coalescing.
+        let _ = self.sweep_requests.lock().try_send(());
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -864,11 +901,17 @@ where
         let refresh_period = self.refresh_period;
         let weighting = self.weighting;
         let me = self.me;
+        let requested = futures::stream::iter(self.sweep_receiver.lock().take())
+            .flat_map(move |requests| spaced_requests(requests, refresh_period));
 
         // run at a non-zero interval
-        futures_time::stream::interval(futures_time::time::Duration::from_millis(
-            refresh_period.as_millis() as u64 + 1u64,
-        ))
+        futures::stream::select(
+            futures_time::stream::interval(futures_time::time::Duration::from_millis(
+                refresh_period.as_millis() as u64 + 1u64,
+            ))
+            .map(|_| ()),
+            requested,
+        )
         .for_each(move |_| {
             let cache = cache.clone();
             let resolver = resolver.clone();
@@ -1918,6 +1961,71 @@ mod tests {
             Arc::ptr_eq(&current, &recomputed),
             "the recomputed route is the one still served"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sweep_requests_should_be_spaced_but_never_dropped() -> anyhow::Result<()> {
+        let gap = std::time::Duration::from_millis(200);
+        let (mut tx, rx) = futures::channel::mpsc::channel(0);
+        let spaced = spaced_requests(rx, gap);
+        futures::pin_mut!(spaced);
+
+        tx.try_send(())?;
+        let start = std::time::Instant::now();
+        spaced.next().await.context("first request")?;
+        assert!(start.elapsed() < gap, "the first request is not delayed");
+
+        tx.try_send(())?;
+        spaced.next().await.context("second request")?;
+        assert!(
+            start.elapsed() >= gap,
+            "the next one waits out the gap, got {:?}",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_burst_of_sweep_requests_should_queue_one_sweep() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_return_planner();
+        for _ in 0..5 {
+            planner.request_sweep();
+        }
+        let mut requests = planner.sweep_receiver.lock().take().context("receiver not taken yet")?;
+        assert!(requests.try_recv().is_ok());
+        assert!(requests.try_recv().is_err(), "nothing else is pending");
+        Ok(())
+    }
+
+    /// A requested sweep runs now, not at the next period (60 s here): the lost relayer's edge to us
+    /// is rejected by the walk, so the rebuilt entry no longer draws it.
+    #[cfg(feature = "runtime-tokio")]
+    #[tokio::test]
+    async fn a_requested_sweep_should_drop_a_disconnected_relayer_before_the_period() -> anyhow::Result<()> {
+        use hopr_api::graph::{NetworkGraphWrite, traits::EdgeWeightType};
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, a, b) = (pubkey(&SECRET_ME), pubkey(&SECRET_A), pubkey(&SECRET_B));
+        assert!(share_of(&fill_return_cache(&planner).await, &b) > 0.0, "precondition");
+
+        tokio::spawn(planner.run_background_refresh());
+        graph.upsert_edge(&b, &me, |obs| obs.record(EdgeWeightType::Connected(false)));
+        planner.request_sweep();
+
+        let key = (pubkey(&SECRET_DEST), me, 1);
+        let swept = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if let Some(entry) = planner.cache.get(&key).await
+                    && share_of(&entry, &b) == 0.0
+                {
+                    return entry;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        })
+        .await?;
+        assert!(share_of(&swept, &a) > 0.0, "the live relayer stays");
         Ok(())
     }
 

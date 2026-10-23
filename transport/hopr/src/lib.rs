@@ -172,6 +172,8 @@ pub enum HoprTransportProcess {
     SurbFlush,
     #[strum(to_string = "mixer→wire forwarder")]
     MixerForwarder,
+    #[strum(to_string = "relayer connectivity")]
+    RelayerConnectivity,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
@@ -553,6 +555,42 @@ where
 
         let transport_network = network;
         let transport_layer_process = network_process;
+
+        // -- relayer connectivity: a dropped neighbour is the only relayer of a 1-hop path
+        let connectivity_events = transport_network.subscribe_network_events();
+        let (surb_store, planner, chain, graph) = (
+            self.path_planner.surb_store.clone(),
+            self.path_planner.clone(),
+            self.chain_api.clone(),
+            self.graph.clone(),
+        );
+        processes.insert(
+            HoprTransportProcess::RelayerConnectivity,
+            hopr_utils::spawn_as_abortable!(
+                connectivity_events
+                    .for_each(move |event| {
+                        on_peer_connectivity(
+                            event,
+                            |key| chain.key_id_mapper_ref().map_key_to_id(key),
+                            &surb_store,
+                            |peer, connected| {
+                                graph.record_edge(
+                                    hopr_api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
+                                        peer,
+                                        connected,
+                                    },
+                                )
+                            },
+                            || planner.request_sweep(),
+                        );
+                        futures::future::ready(())
+                    })
+                    .inspect(|_| tracing::warn!(
+                        task = %HoprTransportProcess::RelayerConnectivity,
+                        "long-running background task finished"
+                    ))
+            ),
+        );
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -1309,6 +1347,39 @@ where
 /// Maximum application-layer payload that fits in a single HOPR sphinx packet (bytes).
 pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE;
 
+/// Reacts to a neighbour's connection coming or going: the SURB store passes over replies through
+/// it while it is down, and a lost neighbour has the cached paths re-weighted without waiting for
+/// the periodic sweep.
+///
+/// The connection status is recorded in the graph here as well, before the sweep is requested:
+/// the graph's own updater follows a separate event stream, and a sweep that ran before it would
+/// rebuild from a graph that still shows the neighbour connected. Recording it twice is harmless.
+fn on_peer_connectivity(
+    event: hopr_api::network::NetworkEvent,
+    key_id: impl Fn(&OffchainPublicKey) -> Option<hopr_api::chain::HoprKeyIdent>,
+    surb_store: &impl SurbStore,
+    record_in_graph: impl FnOnce(OffchainPublicKey, bool),
+    request_sweep: impl FnOnce(),
+) {
+    let (peer, connected) = match event {
+        hopr_api::network::NetworkEvent::PeerConnected(peer) => (peer, true),
+        hopr_api::network::NetworkEvent::PeerDisconnected(peer) => (peer, false),
+    };
+    let Ok(key) = peer_id_to_public_key(&peer) else {
+        tracing::debug!(%peer, "connectivity change of a peer without a packet key");
+        return;
+    };
+    match key_id(&key) {
+        Some(relayer) => surb_store.update_relayer_connectivity(&relayer, connected),
+        // Not announced on chain, so no SURB can name it as a first relayer.
+        None => tracing::debug!(%peer, "connectivity change of a peer without a key id"),
+    }
+    record_in_graph(key, connected);
+    if !connected {
+        request_sweep();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
@@ -1318,6 +1389,109 @@ mod tests {
 
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+
+    #[derive(Default)]
+    struct ConnectivityRecorder(parking_lot::Mutex<Vec<(hopr_api::chain::HoprKeyIdent, bool)>>);
+
+    impl super::SurbStore for ConnectivityRecorder {
+        fn find_surb(
+            &self,
+            _: hopr_api::types::internal::prelude::SurbMatcher,
+        ) -> Option<hopr_protocol_hopr::FoundSurb> {
+            None
+        }
+
+        fn insert_surbs(
+            &self,
+            _: hopr_api::types::internal::prelude::HoprPseudonym,
+            _: Vec<(
+                hopr_api::types::internal::prelude::HoprSurbId,
+                hopr_crypto_packet::HoprSurb,
+            )>,
+        ) -> hopr_protocol_hopr::SurbInsertOutcome {
+            Default::default()
+        }
+
+        fn insert_reply_opener(
+            &self,
+            _: hopr_api::types::internal::prelude::HoprSenderId,
+            _: hopr_crypto_packet::prelude::ReplyOpener,
+        ) {
+        }
+
+        fn find_reply_opener(
+            &self,
+            _: &hopr_api::types::internal::prelude::HoprSenderId,
+        ) -> Option<hopr_crypto_packet::prelude::ReplyOpener> {
+            None
+        }
+
+        fn update_relayer_connectivity(&self, relayer: &hopr_api::chain::HoprKeyIdent, connected: bool) {
+            self.0.lock().push((*relayer, connected));
+        }
+    }
+
+    fn peer() -> hopr_api::types::crypto::prelude::PeerId {
+        use hopr_api::types::crypto::prelude::{Keypair, OffchainKeypair};
+        OffchainKeypair::random().public().into()
+    }
+
+    /// `swept` only turns true if the graph was updated first.
+    #[test]
+    fn a_lost_neighbour_should_be_passed_over_and_trigger_a_sweep_after_the_graph_update() {
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
+        let relayer = hopr_api::chain::HoprKeyIdent::from(7u32);
+        super::on_peer_connectivity(
+            hopr_api::network::NetworkEvent::PeerDisconnected(peer()),
+            |_| Some(relayer),
+            &store,
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
+        );
+        assert_eq!(vec![(relayer, false)], *store.0.lock());
+        assert!(swept.get());
+    }
+
+    #[test]
+    fn a_neighbour_coming_back_should_be_used_again_without_a_sweep() {
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
+        let relayer = hopr_api::chain::HoprKeyIdent::from(7u32);
+        super::on_peer_connectivity(
+            hopr_api::network::NetworkEvent::PeerConnected(peer()),
+            |_| Some(relayer),
+            &store,
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
+        );
+        assert_eq!(vec![(relayer, true)], *store.0.lock());
+        assert!(!swept.get());
+    }
+
+    #[test]
+    fn a_peer_without_a_key_id_should_still_trigger_a_sweep_when_lost() {
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
+        super::on_peer_connectivity(
+            hopr_api::network::NetworkEvent::PeerDisconnected(peer()),
+            |_| None,
+            &store,
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
+        );
+        assert!(store.0.lock().is_empty());
+        assert!(swept.get());
+    }
 
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.

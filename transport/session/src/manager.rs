@@ -259,7 +259,9 @@ pub struct SessionManagerConfig {
     #[default(1500)]
     pub frame_mtu: usize,
 
-    /// The maximum time for an incomplete frame to stay in the Session's output buffer.
+    /// The maximum time for an incomplete frame to stay in the Session's output buffer. A missing
+    /// frame is timed from the arrival of the frame right behind it, so after a burst the first gap
+    /// can be declared lost up to one inter-arrival interval later than counted from the gap itself.
     ///
     /// Must exceed the worst-case SURB replenishment latency on the return path.
     /// The SURB balancer replenishes via KeepAlive every ~2 s; the retry loop in

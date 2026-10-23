@@ -60,6 +60,13 @@ pub trait SurbStore {
     ///
     /// Defaults to a no-op, for stores that do not track edge validity.
     fn revalidate_relayer(&self, _relayer: &HoprKeyIdent) {}
+
+    /// Records that our connection to `relayer` came up or went down. While it is down, stored SURBs
+    /// whose return path starts there are passed over in favour of others, but kept.
+    ///
+    /// Independent of [`SurbStore::invalidate_relayer`]: a reconnect never lifts a channel
+    /// invalidation. Defaults to a no-op, for stores that do not track connectivity.
+    fn update_relayer_connectivity(&self, _relayer: &HoprKeyIdent, _connected: bool) {}
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).
