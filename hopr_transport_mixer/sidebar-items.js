@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AnyReceiver","AnySender"],"fn":["create"],"mod":["channel","config","data","dispatch","error","metrics","poisson","pool","sink"]};
