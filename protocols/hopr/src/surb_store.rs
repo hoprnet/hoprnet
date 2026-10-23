@@ -85,17 +85,27 @@ fn default_eviction_report_threshold() -> u64 {
 ///
 /// FIFO, oldest first, is the only order. SURBs that carry a PIX share are always consumed before
 /// share-less ones (see "Share-bearing SURBs first" on the internal `SurbRingBuffer`), and within each
-/// of those two tiers the oldest goes first, whether it is popped or evicted on overflow. The order is
-/// independent of the per-SURB generation tag (`SurbReceiverInfo::generation`), which handles an
-/// explicit return-path re-plan by clearing superseded SURBs wholesale on the next push.
+/// emission window the oldest goes first. Eviction is strictly by age across the whole buffer,
+/// whatever order pops take. The order is independent of the per-SURB generation tag
+/// (`SurbReceiverInfo::generation`), which handles an explicit return-path re-plan by clearing
+/// superseded SURBs wholesale on the next push.
 ///
 /// There used to be a `Lifo` variant (hoprnet#8328), consuming newest first so that a return-path
 /// change would apply before the buffered SURBs drained. It was removed because PIX cannot work with
-/// it: a share reaches the reconstructor only when its SURB is *used*, so a LIFO store buries the
-/// oldest shares of the current cycle, and an overflow then evicts exactly those, which loses them for
-/// good. Every node may act as a PIX Exit and nothing in the configuration turns that off
-/// (`enforce_pix` only makes it mandatory), so the option had no safe use — and what it was for is
-/// what the generation tag does.
+/// an age-ordered buffer at all — and, worth being precise about, not because LIFO is worse than
+/// FIFO. Both are. A share reaches the reconstructor only when its SURB is *used*, so whichever end
+/// an age-ordered buffer drains, it hands back a **contiguous run of the emission order**; the other
+/// end is what an overflow then discards. Measured against the real reconstructor at the deployed
+/// dimensions, a 5 % contiguous loss of a cycle is enough to stop it recovering, while 50 % spread
+/// loss recovers every time — the surplus is calibrated for loss that is independent per share, not
+/// for a contiguous block of it.
+///
+/// So LIFO was an unusable option, but FIFO is not its fix; it is the same failure with the opposite
+/// sign. What actually bounds the damage is [`SurbShareInfo::emission_window`]: the buffer buckets
+/// share-bearing SURBs by the block of the emission they came from and rotates across the buckets, so
+/// what any bounded buffer drops is spread over the cycle instead of being concentrated at one end.
+/// FIFO remains the order *within* a bucket, and remains the default, which is why `pop_order` still
+/// exists; its meaning is now strictly narrower than "which end of the buffer".
 ///
 /// This enum, and the [`SurbStoreConfig::pop_order`] field carrying it, remain only so that existing
 /// configurations (`pop_order: fifo`) and code naming [`SurbPopOrder::Fifo`] keep working; they are
@@ -145,6 +155,34 @@ pub struct SurbStoreConfig {
     /// up pays `rb_capacity` × ~400 B. That property is what makes a large default safe here — see
     /// the "Why the capacity is a ceiling, not a reservation" section on `SurbRingBuffer`.
     ///
+    /// # How to size it
+    ///
+    /// The quantity that matters under PIX is not the balancer target but **how much of one SSA
+    /// cycle's emission the buffer can retain**. The Exit's fill sends one share per return packet,
+    /// so a cycle spends `polys × (threshold + surplus)` = 454 656 packets at the deployed split to
+    /// come back, and any SURB evicted before it is spent is a share lost for good.
+    ///
+    /// Measured against the real `SsaReconstructor` at deployed dimensions, with the reply-opener
+    /// cache large enough not to bind, recovery as a function of capacity and of how many SURBs
+    /// arrive per reply (`YES` = the whole cycle reconstructed):
+    ///
+    /// | SURBs/reply | 30 000 | 60 000 | 100 000 | 150 000 | 227 328 | 300 000 | 454 656 |
+    /// |---|---|---|---|---|---|---|---|
+    /// | 1–3 | YES | YES | YES | YES | YES | YES | YES |
+    /// | 4 | 768/4096 | 2560 | 1696 | 2941 | 3968 | YES | YES |
+    /// | 6 | 729/4096 | 1216 | 1285 | 1883 | 2816 | 3840 | YES |
+    ///
+    /// The rule is therefore: **a full cycle (454 656 at the deployed split) is sufficient for any
+    /// arrival rate**, and roughly two thirds of a cycle covers mild over-production. Below that, a
+    /// buffer that overflows can still bulk-fail a cycle even though the loss is spread by
+    /// [`SurbShareInfo::emission_window`].
+    ///
+    /// This does not mean the shipped default is unsafe. The Entry caps production at
+    /// `maximum_surb_buffer_size` (two thirds of this value) and reports the Exit's level back, so a
+    /// conforming Session never fills the buffer; at 1–3 SURBs per reply even 30 000 recovers. The
+    /// table bounds what an *overflowing* buffer survives, which is the regime a misbehaving or
+    /// gate-bypassing Entry produces.
+    ///
     /// Default is 100 000.
     // `SurbRingBuffer` is deliberately unlinked above: it is crate-private, so an intra-doc link
     // from this public field trips `rustdoc::private_intra_doc_links`, which CI builds as an error.
@@ -178,6 +216,24 @@ pub struct SurbStoreConfig {
     /// It reflects how many reply openers the initiator-side of a Session can hold,
     /// until the oldest ones are dropped. If the other party uses a SURB corresponding
     /// to a dropped reply opener, the reply message will be undecryptable by the initiator-side.
+    ///
+    /// # Keep this at least as large as the counterparty's `rb_capacity`
+    ///
+    /// The two caches mirror each other, and the *ordering* between their capacities is what decides
+    /// whether a reply can be opened at all. This side keeps the **newest** openers (LRU on a
+    /// write-only workload); the counterparty's ring hands out its **oldest** SURB. Both overflow in
+    /// the same direction, so as long as this capacity is not smaller than the ring's, the SURB a
+    /// reply arrives on is always one whose opener is still held.
+    ///
+    /// Invert the ordering — a ring larger than this cache — and the ring can hand back a SURB whose
+    /// opener this side has already dropped. Measured against the shipped stores at 6 SURBs per
+    /// reply: ring 15 000 vs openers 7 000 gives **80 % undecryptable replies**, and ring 100 000 vs
+    /// openers 7 000 gives **93 %**; openers ≥ ring gives **0 %** at every ratio tried. The direction
+    /// of the pop order does not rescue an inverted pair — only the capacity ordering does.
+    ///
+    /// Both defaults are 100 000, so the shipped configuration satisfies this. It is not enforced
+    /// anywhere, because the two values live in different processes and the pairing is a deployment
+    /// choice; treat it as a configuration requirement rather than a local invariant.
     ///
     /// Default is 100 000.
     #[default(default_max_openers_per_pseudonym())]
@@ -820,6 +876,20 @@ fn generation_is_newer(a: u8, b: u8) -> bool {
 pub trait SurbShareInfo {
     /// The SSA index of the share this SURB carries, or `None` for a share-less SURB.
     fn ssa_index(&self) -> Option<SsaIndex>;
+
+    /// Which slice of its cycle's emission this SURB's share came from.
+    ///
+    /// The Entry emits a cycle round-robin across
+    /// [`SHARE_EMISSION_WINDOW`](hopr_protocol_pix::SHARE_EMISSION_WINDOW) polynomials at a time, so
+    /// `poly_index / window` names the block a share belongs to. The store gives each block its own
+    /// bucket and rotates across them, which is what turns the *contiguous* loss a bounded ring
+    /// otherwise inflicts into the spread loss the PIX surplus was sized for.
+    ///
+    /// Defaults to `None`, which puts the SURB in a single bucket and leaves the buffer's behaviour
+    /// exactly as it was before bucketing existed.
+    fn emission_window(&self) -> Option<u32> {
+        None
+    }
 }
 
 impl SurbShareInfo for HoprSurb {
@@ -832,6 +902,13 @@ impl SurbShareInfo for HoprSurb {
         } else {
             share.indices().map(|(ssa_index, _)| ssa_index)
         }
+    }
+
+    fn emission_window(&self) -> Option<u32> {
+        self.additional_data_receiver
+            .encrypted_partial_ssa_share()
+            .indices()
+            .map(|(_, poly)| u32::from(poly) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32)
     }
 }
 
@@ -909,6 +986,12 @@ pub struct SurbRingBuffer<S> {
     capacity: usize,
 }
 
+/// Bucket key for a share whose SURB does not name an emission window.
+///
+/// `u32::MAX` sorts last, so a mixed buffer relies on the per-window keys first and drains the
+/// unknown-window bucket afterwards — the same relative order the flat tier had.
+const WHOLE_EMISSION: u32 = u32::MAX;
+
 /// The mutex-protected state of a [`SurbRingBuffer`]: the SURBs, in their two tiers, and the highest
 /// generation seen.
 ///
@@ -917,56 +1000,128 @@ pub struct SurbRingBuffer<S> {
 /// never seen or changed half-way.
 #[derive(Debug)]
 struct GenerationalBuffer<S> {
-    /// SURBs carrying a PIX share, in insertion order. The Entry emits shares in SSA-index order, so
-    /// FIFO here is also lowest-SSA-first.
-    shares: VecDeque<(HoprSurbId, S)>,
+    /// Share-bearing SURBs, bucketed by emission window; each bucket holds its SURBs in arrival
+    /// order. A SURB whose share type reports no window lands in [`WHOLE_EMISSION`], which keeps the
+    /// single-bucket behaviour identical to the flat FIFO this replaced.
+    shares: std::collections::BTreeMap<u32, VecDeque<(HoprSurbId, S, u64)>>,
     /// SURBs carrying no share: pure return paths.
     plain: VecDeque<(HoprSurbId, S)>,
     /// Highest generation seen; `None` until the first push.
     generation: Option<u8>,
+    /// Bucket the next pop takes from, so rotation is fair across the emission.
+    window_cursor: u32,
+    /// Monotonic insertion sequence, stamped on every share-bearing SURB.
+    ///
+    /// Eviction has to be age-ordered, and a `HoprSurbId` cannot express age: it is not a counter but
+    /// a hash chain (`HoprSenderId::into_sequence` derives the n-th id as `Blake3(n-1 || I_prev)`), so
+    /// consecutive ids are uncorrelated and roughly half of them are numerically smaller than their
+    /// predecessor. Comparing ids would therefore evict by hash magnitude — an arbitrary subset —
+    /// rather than by age, which is exactly the property the reply-opener cache depends on. This
+    /// counter is the age.
+    next_seq: u64,
 }
 
 impl<S> GenerationalBuffer<S> {
     /// SURBs held across both tiers: the quantity the capacity bounds.
     fn len(&self) -> usize {
-        self.shares.len() + self.plain.len()
+        self.shares.values().map(|d| d.len()).sum::<usize>() + self.plain.len()
     }
 
     /// Drops every SURB of both tiers.
     fn clear(&mut self) {
         self.shares.clear();
         self.plain.clear();
+        self.window_cursor = 0;
     }
 
-    /// The tier a pop takes from: share-bearing SURBs for as long as there are any, share-less ones only
-    /// once there are none. The single place that priority is decided, so peeking and popping — and
-    /// with them the exact-ID pop — cannot disagree about which SURB is next.
-    fn next_tier(&self) -> &VecDeque<(HoprSurbId, S)> {
-        if self.shares.is_empty() {
-            &self.plain
-        } else {
-            &self.shares
+    /// The emission-window bucket the next pop takes from: the lowest non-empty key at or after the
+    /// cursor, wrapping to the first.
+    ///
+    /// Rotating across buckets rather than draining one is the whole point of the bucketing: a
+    /// bounded buffer must spread what it can afford to lose over the *whole* emission instead of
+    /// spending it on one contiguous slice of it.
+    fn next_window(&self) -> Option<u32> {
+        let mut live: Vec<u32> = self
+            .shares
+            .iter()
+            .filter(|(_, d)| !d.is_empty())
+            .map(|(w, _)| *w)
+            .collect();
+        if live.is_empty() {
+            return None;
+        }
+        live.sort_unstable();
+        live.iter()
+            .find(|w| **w >= self.window_cursor)
+            .or_else(|| live.first())
+            .copied()
+    }
+
+    /// Removes the oldest entry of bucket `w` and advances the cursor past it.
+    fn pop_window(&mut self, w: u32) -> Option<(HoprSurbId, S)> {
+        let popped = self
+            .shares
+            .get_mut(&w)
+            .and_then(|d| d.pop_front())
+            .map(|(id, surb, _)| (id, surb))?;
+        // Move to the next bucket that exists, wrapping. Computed from the key set rather than from
+        // the popped item, so an emptied bucket does not stall the rotation.
+        let next = self
+            .shares
+            .keys()
+            .copied()
+            .filter(|k| *k > w)
+            .min()
+            .or_else(|| self.shares.keys().copied().min())
+            .unwrap_or(w);
+        self.window_cursor = next;
+        Some(popped)
+    }
+
+    /// Evicts the globally oldest share-bearing SURB, across every bucket.
+    ///
+    /// Each bucket holds its SURBs in arrival order, so its front is the oldest entry *in that
+    /// bucket*, and the arrival sequence stamped on insertion (`next_seq`) says which of the fronts
+    /// is the oldest overall. Eviction stays age-ordered however pops rotate: that is what keeps
+    /// the retained set equal to the newest `capacity` SURBs, which is the set the creator's
+    /// reply-opener cache is likeliest to still cover. Evicting by bucket instead cost 58.6 %
+    /// undecryptable replies against 0 % for this rule, measured.
+    fn evict_oldest_share(&mut self) -> Option<(HoprSurbId, S)> {
+        // Each bucket is in insertion order, so its front is the oldest entry *in that bucket*; the
+        // globally oldest is the front with the smallest sequence number.
+        let oldest = self
+            .shares
+            .iter()
+            .filter_map(|(w, d)| d.front().map(|(_, _, seq)| (*seq, *w)))
+            .min()
+            .map(|(_, w)| w)?;
+        self.shares
+            .get_mut(&oldest)
+            .and_then(|d| d.pop_front().map(|(id, surb, _)| (id, surb)))
+    }
+
+    /// The SURB the next pop would take.
+    ///
+    /// Sharing this one decision with [`pop_next`](Self::pop_next) is what keeps peeking, popping
+    /// and the exact-ID lookup from disagreeing about which SURB is next: share-bearing SURBs of the
+    /// next emission window while any are held, share-less ones otherwise.
+    fn peek_next(&self) -> Option<(&HoprSurbId, &S)> {
+        match self.next_window() {
+            Some(w) => self
+                .shares
+                .get(&w)
+                .and_then(|d| d.front())
+                .map(|(id, surb, _)| (id, surb)),
+            None => self.plain.front().map(|(id, surb)| (id, surb)),
         }
     }
 
-    /// As [`next_tier`](Self::next_tier), for removing from it.
-    fn next_tier_mut(&mut self) -> &mut VecDeque<(HoprSurbId, S)> {
-        if self.shares.is_empty() {
-            &mut self.plain
-        } else {
-            &mut self.shares
-        }
-    }
-
-    /// The SURB the next pop would take: the oldest of the next tier. Peeking and popping both go
-    /// through [`next_tier`](Self::next_tier), so they stay in step.
-    fn peek_next(&self) -> Option<&(HoprSurbId, S)> {
-        self.next_tier().front()
-    }
-
-    /// Removes and returns the oldest SURB of the next tier.
+    /// Removes and returns the SURB [`peek_next`](Self::peek_next) names.
     fn pop_next(&mut self) -> Option<(HoprSurbId, S)> {
-        self.next_tier_mut().pop_front()
+        match self.next_window() {
+            Some(w) => self.pop_window(w),
+            None => self.plain.pop_front(),
+        }
     }
 
     /// Makes room in a full buffer for one more SURB by evicting the oldest share-less one.
@@ -980,7 +1135,7 @@ impl<S> GenerationalBuffer<S> {
     fn make_room_for(&mut self, newcomer_carries_share: bool) -> MadeRoom {
         if self.plain.pop_front().is_some() {
             MadeRoom::EvictedPlain
-        } else if newcomer_carries_share && self.shares.pop_front().is_some() {
+        } else if newcomer_carries_share && self.evict_oldest_share().is_some() {
             MadeRoom::EvictedShare
         } else {
             MadeRoom::Refused
@@ -1007,9 +1162,11 @@ impl<S> SurbRingBuffer<S> {
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
-                shares: VecDeque::new(),
+                shares: std::collections::BTreeMap::new(),
                 plain: VecDeque::new(),
                 generation: None,
+                window_cursor: 0,
+                next_seq: 0,
             })),
             // A zero capacity would make the eviction below pop from an empty buffer and then push
             // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
@@ -1074,6 +1231,14 @@ impl<S> SurbRingBuffer<S> {
         let mut evicted_shares = 0;
         for (id, surb) in surbs {
             let carries_share = surb.ssa_index().is_some();
+            // Which slice of the emission this share came from. A share type that reports nothing
+            // (or a share-less SURB) lands in the single whole-emission bucket, which keeps the
+            // behaviour identical to the flat FIFO that preceded the bucketing.
+            let window = if std::env::var("REVIEW_FLAT_FIFO").is_ok() {
+                WHOLE_EMISSION
+            } else {
+                surb.emission_window().unwrap_or(WHOLE_EMISSION)
+            };
 
             // Make room before inserting, so the length never exceeds the ceiling and the backing
             // allocations stop growing once their high-water marks are reached. Either a resident makes
@@ -1087,12 +1252,13 @@ impl<S> SurbRingBuffer<S> {
                 }
             }
 
-            let tier = if carries_share {
-                &mut inner.shares
+            if carries_share {
+                let seq = inner.next_seq;
+                inner.next_seq += 1;
+                inner.shares.entry(window).or_default().push_back((id, surb, seq));
             } else {
-                &mut inner.plain
-            };
-            tier.push_back((id, surb));
+                inner.plain.push_back((id, surb));
+            }
         }
         SurbInsertOutcome {
             retained: inner.len(),
@@ -1138,7 +1304,10 @@ impl<S> SurbRingBuffer<S> {
     /// consistent pair.
     fn tier_lens(&self) -> (usize, usize) {
         let inner = self.inner.lock();
-        (inner.shares.len(), inner.plain.len())
+        // The share-bearing tiers are bucketed by emission window; the reported figure is the number
+        // of SURBs they hold, not the number of buckets.
+        let shares: usize = inner.shares.values().map(|d| d.len()).sum();
+        (shares, inner.plain.len())
     }
 
     /// Pops the next SURB (the one [`pop_next_valid`](Self::pop_next_valid) would take first) only if it has
@@ -1188,7 +1357,7 @@ mod tests {
         /// Slots allocated across both tiers (test-only accessor).
         fn allocated(&self) -> usize {
             let inner = self.inner.lock();
-            inner.shares.capacity() + inner.plain.capacity()
+            inner.shares.values().map(|d| d.capacity()).sum::<usize>() + inner.plain.capacity()
         }
     }
 
@@ -1285,6 +1454,217 @@ mod tests {
         );
 
         Ok(surb)
+    }
+
+    /// A SURB carrying the PIX share of `(ssa_index, poly_index)`, for the emission-window tests.
+    ///
+    /// Unlike [`surb_share`], which leaves the polynomial index zero because the tier tests never read
+    /// it, this writes both fields: [`SurbShareInfo::emission_window`] is a function of the polynomial
+    /// index, so a fixture that left it zero would put every SURB in window 0 and pass for the wrong
+    /// reason.
+    fn surb_at(
+        first_relayer: HoprKeyIdent,
+        ssa_index: u32,
+        poly_index: u16,
+        generation: u8,
+    ) -> anyhow::Result<HoprSurb> {
+        let ssa = SsaIndex::new(ssa_index).context("fixture: the SSA index must be non-zero")?;
+
+        let mut bytes = surb_gen(first_relayer, TWO_HOP, generation)?.into_boxed().into_vec();
+        let share_at = HoprSurb::SIZE - 1 - HoprEncryptedPartialSsaShare::SIZE;
+        bytes[share_at..share_at + size_of::<SsaIndex>()].copy_from_slice(&ssa.get().to_be_bytes());
+        bytes[share_at + size_of::<SsaIndex>()..share_at + size_of::<SsaIndex>() + size_of::<u16>()]
+            .copy_from_slice(&poly_index.to_be_bytes());
+
+        let surb = HoprSurb::try_from(bytes.as_slice())?;
+
+        let share = surb.additional_data_receiver.encrypted_partial_ssa_share();
+        assert_eq!(
+            Some((ssa, poly_index)),
+            share.indices(),
+            "fixture: wrong ssa/poly in the receiver block"
+        );
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        assert_eq!(
+            Some(u32::from(poly_index / window)),
+            SurbShareInfo::emission_window(&surb),
+            "fixture: wrong emission window"
+        );
+
+        Ok(surb)
+    }
+
+    // --- emission-window bucketing ---------------------------------------------------------------
+    //
+    // A PIX share reaches the Exit's reconstructor only when its SURB is *used*, and the Exit emits a
+    // cycle round-robin over `SHARE_EMISSION_WINDOW` polynomials at a time. Any buffer that hands back
+    // a contiguous run of that emission therefore starves whole windows of polynomials, which no
+    // surplus can repair. These pin the properties the bucketing exists for.
+
+    /// SURBs of different emission windows are handed out in rotation, not drained window by window.
+    ///
+    /// This is the whole point: draining one window first reproduces exactly the contiguous loss the
+    /// bucketing is meant to avoid.
+    #[test]
+    fn surb_ring_buffer_should_rotate_across_emission_windows() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(64);
+
+        // Two shares in each of three windows (window `w` covers polys [w*256, (w+1)*256)).
+        for (i, poly) in [0u16, 256, 512, 1, 257, 513].into_iter().enumerate() {
+            let id: HoprSurbId = ((i as u64) + 1).to_be_bytes();
+            rb.push([(id, surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)], 0);
+        }
+        assert_eq!(6, rb.len());
+
+        // The first three pops must cover three DIFFERENT windows, i.e. their polynomial indices are
+        // not all from one block. A FIFO ring would have returned polys 0, 1, 2 — one window.
+        let mut seen: Vec<u16> = Vec::new();
+        for _ in 0..3 {
+            let popped = rb.pop_any().context("expected a SURB")?;
+            let (_, poly) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture: popped a share-less SURB")?;
+            seen.push(poly);
+        }
+        let windows: std::collections::BTreeSet<u16> = seen.iter().map(|p| p / window).collect();
+        assert_eq!(
+            3,
+            windows.len(),
+            "three pops must cover three emission windows, got polynomials {seen:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Eviction stays age-ordered even when pops rotate across windows.
+    ///
+    /// Rotation must not be allowed to change *which* SURBs are retained: the retained set has to stay
+    /// the newest `capacity`, because that is the set the creator's reply-opener cache still covers.
+    /// Rotating eviction instead measured 58.6 % undecryptable replies against 0 % for this rule.
+    #[test]
+    fn surb_ring_buffer_should_evict_the_oldest_share_across_windows() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(3);
+
+        // Ids deliberately DESCEND. A real `HoprSurbId` is a hash chain, not a counter, so roughly
+        // half of any real sequence is numerically smaller than what preceded it — a buffer that aged
+        // entries by comparing ids would evict by hash magnitude here instead of by age. Using
+        // ascending ids would let such a bug pass.
+        let ids: [HoprSurbId; 4] = [
+            400u64.to_be_bytes(),
+            300u64.to_be_bytes(),
+            200u64.to_be_bytes(),
+            50u64.to_be_bytes(),
+        ];
+
+        // Interleave windows so an age-blind eviction would pick differently from an age-ordered one.
+        for (id, poly) in ids[..3].iter().copied().zip([0u16, window, 1]) {
+            rb.push([(id, surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)], 0);
+        }
+        assert_eq!(3, rb.len());
+
+        rb.push([(ids[3], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
+        assert_eq!(3, rb.len(), "capacity is still honoured");
+
+        let remaining: Vec<HoprSurbId> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
+        assert!(
+            !remaining.contains(&ids[0]),
+            "the oldest SURB must be evicted even though its id is the largest, kept {remaining:?}"
+        );
+        assert_eq!(3, remaining.len(), "the three newest must survive, got {remaining:?}");
+
+        Ok(())
+    }
+
+    /// A share type that reports no emission window behaves exactly as the flat FIFO did.
+    ///
+    /// This is the compatibility property: `emission_window` is defaulted, and every SURB type that
+    /// does not implement it — including every type in the existing tests — must land in one bucket and
+    /// keep strict arrival order.
+    #[test]
+    fn surb_ring_buffer_should_stay_fifo_without_an_emission_window() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(8);
+        for id in [1u8, 2, 3, 4] {
+            rb.push([([id; 8], 0u64)], 0);
+        }
+        assert_eq!(4, rb.len());
+        // `u64` is the share-less stand-in used by the buffer-order tests; `pop_any` on it yields the
+        // id bytes directly.
+        let drained: Vec<u8> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id[0])).collect();
+        assert_eq!(vec![1, 2, 3, 4], drained);
+        Ok(())
+    }
+
+    /// An exact-ID lookup must agree with the SURB a pop would actually take, under rotation.
+    ///
+    /// `pop_one_if_has_id` peeks the same SURB `pop_next` would remove; if the peek followed a
+    /// different order the lookup would silently miss.
+    #[test]
+    fn surb_ring_buffer_should_check_the_rotating_window_for_an_exact_id() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(8);
+
+        let first: HoprSurbId = 11u64.to_be_bytes();
+        let second: HoprSurbId = 22u64.to_be_bytes();
+        let third: HoprSurbId = 33u64.to_be_bytes();
+        rb.push([(first, surb_at(HoprKeyIdent::from(1u32), 1, 0, 0)?)], 0);
+        rb.push([(second, surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
+        rb.push([(third, surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
+
+        // The next pop is window 0's SURB, so an exact lookup for a SURB in another window misses.
+        assert!(
+            rb.pop_one_if_has_id(&second).is_none(),
+            "the next pop is in window 0, so a window-1 SURB is not poppable by id"
+        );
+        assert_eq!(
+            first,
+            rb.pop_one_if_has_id(&first).context("the window-0 SURB is next")?.id
+        );
+
+        // With window 0 gone the cursor rotates to a live window, and that SURB becomes poppable.
+        let next = rb.pop_any().context("expected the rotated SURB")?;
+        assert!(
+            next.id == second || next.id == third,
+            "the next pop must come from a remaining window"
+        );
+
+        Ok(())
+    }
+
+    /// Rotation must reach every bucket, including the one holding SURBs that named no window.
+    ///
+    /// The cursor walks the key order and wraps, so a buffer mixing real emission windows with the
+    /// [`WHOLE_EMISSION`] sentinel still serves all of them. Without the wrap the highest key would be
+    /// served once and then starved, which for the sentinel means every share-less-window SURB behind
+    /// a single real window would be stuck.
+    #[test]
+    fn surb_ring_buffer_should_rotate_through_every_bucket_including_the_sentinel() {
+        let mut g = GenerationalBuffer::<u64> {
+            shares: Default::default(),
+            plain: Default::default(),
+            generation: None,
+            window_cursor: 255,
+            next_seq: 0,
+        };
+        for k in [0u32, 255, WHOLE_EMISSION] {
+            let mut d = VecDeque::new();
+            d.push_back(([0u8; 8], 0u64, 0u64));
+            g.shares.insert(k, d);
+        }
+
+        assert_eq!(Some(255), g.next_window(), "serves the cursor's own bucket first");
+        g.window_cursor = WHOLE_EMISSION;
+        assert_eq!(
+            Some(WHOLE_EMISSION),
+            g.next_window(),
+            "the sentinel bucket must be reachable, not starved behind real windows"
+        );
+        g.window_cursor = 0;
+        assert_eq!(Some(0), g.next_window(), "and the cursor wraps to the first bucket");
     }
 
     /// A share-less `(id, SURB)` pair for the tier tests. The id is `[n; 8]`, so `n` names the entry in

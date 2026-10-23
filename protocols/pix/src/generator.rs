@@ -241,8 +241,17 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
 /// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
 /// a time keeps one part live; the full 4096 would keep every part live at once, `polys × threshold`
-/// shares of peak memory. 256 keeps that peak around half a megabyte while covering a contiguous loss
-/// far larger than the ring buffer's entire overshoot allowance.
+/// shares of peak memory. 256 keeps that peak around half a megabyte (0.5 MiB against the 15.1 MiB
+/// `peak_cycle_bytes` admits), at the cost of widening the whole cycle to 8 MiB.
+///
+/// **What the window buys here is small, and it does not cover the ring's own overshoot.** The
+/// contiguous run this absorbs is `surplus × window` = 20 224 shares at the deployed split, which is
+/// 4.45 % of a cycle. The ring's overshoot allowance — `rb_capacity × 1/3` at the `SURB_BUFFER_TARGET`
+/// ratio — is 33 334 shares, 7.33 % of a cycle, so a ring that actually overflows loses **more**
+/// contiguously than this window can absorb. An earlier revision of this comment claimed the opposite;
+/// it was wrong by 0.61×. A windowed ring that overflows therefore still strands a PIX cycle, which
+/// is why the store shares that responsibility by bucketing on
+/// [`SHARE_EMISSION_WINDOW`] rather than relying on this constant alone.
 ///
 /// ## The window never crosses a cycle boundary
 ///
