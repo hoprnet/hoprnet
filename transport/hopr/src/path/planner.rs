@@ -238,6 +238,27 @@ fn should_explore(exploration: f64) -> bool {
 }
 
 /// Picks a uniformly random index over `len` entries.
+/// Sweep requests at least `min_gap` apart: one arriving sooner waits out the rest of the gap
+/// rather than being dropped, so the last change is always swept, while churn costs at most one
+/// extra sweep per period.
+fn spaced_requests(
+    requests: futures::channel::mpsc::Receiver<()>,
+    min_gap: Duration,
+) -> impl futures::Stream<Item = ()> + Send {
+    futures::stream::unfold(
+        (requests, None::<std::time::Instant>),
+        move |(mut requests, last)| async move {
+            requests.next().await?;
+            if let Some(wait) = last.map(|last| min_gap.saturating_sub(last.elapsed()))
+                && !wait.is_zero()
+            {
+                futures_time::task::sleep(wait.into()).await;
+            }
+            Some(((), (requests, Some(std::time::Instant::now()))))
+        },
+    )
+}
+
 fn pick_uniform_index(len: usize) -> Option<usize> {
     (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
 }
@@ -880,7 +901,8 @@ where
         let refresh_period = self.refresh_period;
         let weighting = self.weighting;
         let me = self.me;
-        let requested = futures::stream::iter(self.sweep_receiver.lock().take()).flatten();
+        let requested = futures::stream::iter(self.sweep_receiver.lock().take())
+            .flat_map(move |requests| spaced_requests(requests, refresh_period));
 
         // run at a non-zero interval
         futures::stream::select(
@@ -1938,6 +1960,28 @@ mod tests {
         assert!(
             Arc::ptr_eq(&current, &recomputed),
             "the recomputed route is the one still served"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sweep_requests_should_be_spaced_but_never_dropped() -> anyhow::Result<()> {
+        let gap = std::time::Duration::from_millis(200);
+        let (mut tx, rx) = futures::channel::mpsc::channel(0);
+        let spaced = spaced_requests(rx, gap);
+        futures::pin_mut!(spaced);
+
+        tx.try_send(())?;
+        let start = std::time::Instant::now();
+        spaced.next().await.context("first request")?;
+        assert!(start.elapsed() < gap, "the first request is not delayed");
+
+        tx.try_send(())?;
+        spaced.next().await.context("second request")?;
+        assert!(
+            start.elapsed() >= gap,
+            "the next one waits out the gap, got {:?}",
+            start.elapsed()
         );
         Ok(())
     }

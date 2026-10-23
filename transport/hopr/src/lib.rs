@@ -558,10 +558,11 @@ where
 
         // -- relayer connectivity: a dropped neighbour is the only relayer of a 1-hop path
         let connectivity_events = transport_network.subscribe_network_events();
-        let (surb_store, planner, chain) = (
+        let (surb_store, planner, chain, graph) = (
             self.path_planner.surb_store.clone(),
             self.path_planner.clone(),
             self.chain_api.clone(),
+            self.graph.clone(),
         );
         processes.insert(
             HoprTransportProcess::RelayerConnectivity,
@@ -572,6 +573,14 @@ where
                             event,
                             |key| chain.key_id_mapper_ref().map_key_to_id(key),
                             &surb_store,
+                            |peer, connected| {
+                                graph.record_edge(
+                                    hopr_api::graph::MeasurableEdge::<NeighborTelemetry, PathTelemetry>::ConnectionStatus {
+                                        peer,
+                                        connected,
+                                    },
+                                )
+                            },
                             || planner.request_sweep(),
                         );
                         futures::future::ready(())
@@ -1341,10 +1350,15 @@ pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::
 /// Reacts to a neighbour's connection coming or going: the SURB store passes over replies through
 /// it while it is down, and a lost neighbour has the cached paths re-weighted without waiting for
 /// the periodic sweep.
+///
+/// The connection status is recorded in the graph here as well, before the sweep is requested:
+/// the graph's own updater follows a separate event stream, and a sweep that ran before it would
+/// rebuild from a graph that still shows the neighbour connected. Recording it twice is harmless.
 fn on_peer_connectivity(
     event: hopr_api::network::NetworkEvent,
     key_id: impl Fn(&OffchainPublicKey) -> Option<hopr_api::chain::HoprKeyIdent>,
     surb_store: &impl SurbStore,
+    record_in_graph: impl FnOnce(OffchainPublicKey, bool),
     request_sweep: impl FnOnce(),
 ) {
     let (peer, connected) = match event {
@@ -1360,6 +1374,7 @@ fn on_peer_connectivity(
         // Not announced on chain, so no SURB can name it as a first relayer.
         None => tracing::debug!(%peer, "connectivity change of a peer without a key id"),
     }
+    record_in_graph(key, connected);
     if !connected {
         request_sweep();
     }
@@ -1421,15 +1436,21 @@ mod tests {
         OffchainKeypair::random().public().into()
     }
 
+    /// `swept` only turns true if the graph was updated first.
     #[test]
-    fn a_lost_neighbour_should_be_passed_over_and_trigger_a_sweep() {
-        let (store, swept) = (ConnectivityRecorder::default(), std::cell::Cell::new(false));
+    fn a_lost_neighbour_should_be_passed_over_and_trigger_a_sweep_after_the_graph_update() {
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
         let relayer = hopr_api::chain::HoprKeyIdent::from(7u32);
         super::on_peer_connectivity(
             hopr_api::network::NetworkEvent::PeerDisconnected(peer()),
             |_| Some(relayer),
             &store,
-            || swept.set(true),
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
         );
         assert_eq!(vec![(relayer, false)], *store.0.lock());
         assert!(swept.get());
@@ -1437,13 +1458,18 @@ mod tests {
 
     #[test]
     fn a_neighbour_coming_back_should_be_used_again_without_a_sweep() {
-        let (store, swept) = (ConnectivityRecorder::default(), std::cell::Cell::new(false));
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
         let relayer = hopr_api::chain::HoprKeyIdent::from(7u32);
         super::on_peer_connectivity(
             hopr_api::network::NetworkEvent::PeerConnected(peer()),
             |_| Some(relayer),
             &store,
-            || swept.set(true),
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
         );
         assert_eq!(vec![(relayer, true)], *store.0.lock());
         assert!(!swept.get());
@@ -1451,12 +1477,17 @@ mod tests {
 
     #[test]
     fn a_peer_without_a_key_id_should_still_trigger_a_sweep_when_lost() {
-        let (store, swept) = (ConnectivityRecorder::default(), std::cell::Cell::new(false));
+        let (store, swept, graphed) = (
+            ConnectivityRecorder::default(),
+            std::cell::Cell::new(false),
+            std::cell::Cell::new(false),
+        );
         super::on_peer_connectivity(
             hopr_api::network::NetworkEvent::PeerDisconnected(peer()),
             |_| None,
             &store,
-            || swept.set(true),
+            |_, _| graphed.set(true),
+            || swept.set(graphed.get()),
         );
         assert!(store.0.lock().is_empty());
         assert!(swept.get());

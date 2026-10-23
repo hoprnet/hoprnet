@@ -44,8 +44,8 @@ pub struct SessionSocketConfig {
     /// Default is 1500 bytes.
     #[default(1500)]
     pub frame_size: usize,
-    /// The maximum time to wait for a frame to be fully received, timed from the arrival of the
-    /// frame right behind it.
+    /// The maximum time to wait for a frame to be fully received. A missing frame is timed from
+    /// the arrival of the frame right behind it.
     ///
     /// Default is 800 ms.
     #[default(Duration::from_millis(800))]
