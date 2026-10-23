@@ -2000,11 +2000,22 @@ mod tests {
     /// bucket rather than being ignored.
     #[test]
     fn surb_ring_buffer_should_consume_newest_first_under_lifo() -> anyhow::Result<()> {
+        // Share-bearing, so this pins the SHARE-bucket order. With a share-less type it would only
+        // exercise the plain tier and say nothing about the bucket the store actually drains.
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
         let expected: [HoprSurbId; 2] = [[2u8; 8], [1u8; 8]];
         let rb = SurbRingBuffer::with_order(5, SurbPopOrder::Lifo);
 
-        assert_eq!(1, rb.push([([1u8; 8], 0)], 0).retained);
-        assert_eq!(2, rb.push([([2u8; 8], 0)], 0).retained);
+        assert_eq!(
+            1,
+            rb.push([([1u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0)
+                .retained
+        );
+        assert_eq!(
+            2,
+            rb.push([([2u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0)
+                .retained
+        );
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!(expected[0], popped.id);
@@ -2014,8 +2025,19 @@ mod tests {
         assert_eq!(expected[1], popped.id);
         assert_eq!(0, popped.remaining);
 
-        // A fresh batch after draining is consumed in the same order.
-        assert_eq!(2, rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0).retained);
+        // A fresh batch after draining is consumed in the same order. Both SURBs go in one batch,
+        // so this also covers the order within a single push.
+        assert_eq!(
+            2,
+            rb.push(
+                [
+                    ([1u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?),
+                    ([2u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?),
+                ],
+                0
+            )
+            .retained
+        );
         assert_eq!(expected[0], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
         assert_eq!(expected[1], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
 
@@ -2048,15 +2070,35 @@ mod tests {
     /// retained set stays the newest `capacity` — the property measured at 0 % undecryptable replies.
     #[test]
     fn surb_ring_buffer_should_still_evict_the_oldest_under_lifo() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::<i32>::with_order(3, SurbPopOrder::Lifo);
-        rb.push([([1u8; 8], 0)], 0);
-        rb.push([([2u8; 8], 0)], 0);
-        rb.push([([3u8; 8], 0)], 0);
-        rb.push([([4u8; 8], 0)], 0);
+        // SHARE-BEARING SURBs, so overflow reaches `evict_oldest_share` rather than the
+        // share-less `plain.pop_front()`. With `i32` (share-less) this test would pass without
+        // ever exercising the eviction rule it exists to pin, and would not notice if eviction
+        // were made to follow the pop order.
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::with_order(3, SurbPopOrder::Lifo);
+        // Two windows, so the victim and the cursor's bucket are genuinely different choices.
+        let ids: [HoprSurbId; 4] = [
+            100u64.to_be_bytes(),
+            200u64.to_be_bytes(),
+            300u64.to_be_bytes(),
+            4000u64.to_be_bytes(),
+        ];
+        for (id, poly) in ids[..3].iter().copied().zip([window, 0, window + 1]) {
+            rb.push([(id, surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)], 0);
+        }
+        rb.push([(ids[3], surb_at(HoprKeyIdent::from(1u32), 1, window + 2, 0)?)], 0);
 
-        // The oldest went on overflow; pops then take the newest end.
-        let drained: Vec<u8> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id[0])).collect();
-        assert_eq!(vec![4u8, 3, 2], drained);
+        // The globally oldest (ids[0], in window 1) went on overflow; LIFO then pops the newest
+        // end of each bucket, so the survivor of the emptied-later bucket comes first.
+        let drained: Vec<HoprSurbId> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
+        assert!(
+            !drained.contains(&ids[0]),
+            "eviction must remain age-ordered under LIFO, kept {drained:?}"
+        );
+        assert!(
+            drained.contains(&ids[3]),
+            "the newest SURB must survive overflow, got {drained:?}"
+        );
 
         Ok(())
     }
