@@ -175,9 +175,10 @@ pub struct SurbStoreConfig {
     /// | 6 | 729/4096 | 1216 | 1285 | 1883 | 2816 | 3840 | YES |
     ///
     /// The rule is therefore: **a full cycle (454 656 at the deployed split) is sufficient for any
-    /// arrival rate**, and roughly two thirds of a cycle covers mild over-production. Below that, a
-    /// buffer that overflows can still bulk-fail a cycle even though the loss is spread by
-    /// [`SurbShareInfo::emission_window`].
+    /// arrival rate**. Below that the outcome depends on the arrival rate, not just the capacity:
+    /// two thirds of a cycle (300 000) still recovers at 4 SURBs per reply but fails at 6, and even
+    /// half a cycle (227 328) recovers only at the mild rates — a buffer that overflows can bulk-fail
+    /// a cycle even though the loss is spread by [`SurbShareInfo::emission_window`].
     ///
     /// This does not mean the shipped default is unsafe. The Entry caps production at
     /// `maximum_surb_buffer_size` (two thirds of this value) and reports the Exit's level back, so a
@@ -233,18 +234,19 @@ pub struct SurbStoreConfig {
     /// while it stays inside the second.
     ///
     /// The quantity that breaks is therefore **`rb_capacity − max_openers_per_pseudonym`**, and that
-    /// is the number to reason about rather than a percentage. Those are the replies at the tail of a
-    /// full drain that no opener covers; every reply before them decrypts. Measured against the
-    /// shipped stores: ring 15 000 / openers 7 000 strands exactly 8 000 replies, and ring 100 000 /
-    /// openers 7 000 strands exactly 93 000 — independent of how many replies are sent in total, so
-    /// the *fraction* depends entirely on how far the run is drained (the same 15 000/7 000 pairing
-    /// reads as 80 % over a 10 000-reply run and 8.8 % over a 90 775-reply one). With openers ≥ ring
-    /// the gap is zero and every reply opens, at any ratio tried.
+    /// is the number to reason about rather than a percentage. Under the shipped FIFO order those are
+    /// the *first* replies of a drain: pops take the oldest SURBs, the ones whose openers this cache
+    /// has already shed, and only once the drain reaches the newest `max_openers_per_pseudonym` SURBs
+    /// do replies start decrypting. Measured against the shipped stores: ring 15 000 / openers 7 000
+    /// strands exactly 8 000 replies, and ring 100 000 / openers 7 000 strands exactly 93 000 —
+    /// independent of how many replies are sent in total, so the *fraction* depends entirely on how
+    /// far the run is drained (the same 15 000/7 000 pairing reads as 80 % over a 10 000-reply run and
+    /// 8.8 % over a 90 775-reply one). With openers ≥ ring the gap is zero and every reply opens, at
+    /// any ratio tried.
     ///
-    /// This holds for the shipped FIFO order. Under the LIFO order v4 used, pops take the newest
-    /// SURBs, whose openers the newest-keeping cache still holds, so a *live* stream decrypts fine and
-    /// the gap shows up only in the drain tail — which is why the two orders were not interchangeable
-    /// for this measurement even though neither is correct under PIX.
+    /// The position of the gap moves with the pop order, its size does not. Under the LIFO order v4
+    /// used, pops take the newest SURBs, whose openers the newest-keeping cache still holds, so the
+    /// gap shows up only in the drain tail — the reverse end from FIFO, the same count.
     ///
     /// Both defaults are 100 000, so the shipped configuration satisfies this. It is not enforced
     /// anywhere, because the two values live in different processes and the pairing is a deployment
@@ -711,9 +713,9 @@ impl SurbStore for MemorySurbStore {
                     surb: popped_surb.surb,
                     remaining: popped_surb.remaining,
                 }),
-            // The following code intentionally only checks the oldest SURB of the tier that would be
-            // consumed next (share-bearing SURBs first, share-less ones once none are left) and does
-            // not search the entire RB.
+            // The following code intentionally only checks the SURB of the bucket that would be
+            // consumed next (share-bearing SURBs first, in rotation across their emission windows;
+            // share-less ones once none are left) and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
             // when there is a single SURB in the RB.
             SurbMatcher::Exact(id) => {
@@ -930,10 +932,12 @@ impl SurbShareInfo for HoprSurb {
 /// Ring buffer of SURBs and their IDs, all belonging to one pseudonym and therefore identified only
 /// by [`HoprSurbId`].
 ///
-/// Backed by two [`VecDeque`] tiers that together are never allowed to exceed `capacity`: a push into
-/// a full buffer evicts first (see below for which SURB goes). Each tier is first in, first out: a pop
-/// consumes the oldest SURB of the tier it draws from, and so does an eviction. See [`SurbPopOrder`]
-/// for why that is the only order.
+/// Backed by two tiers that together are never allowed to exceed `capacity`: a push into a full
+/// buffer evicts first (see below for which SURB goes). The share-less tier is a [`VecDeque`]; the
+/// share-bearing tier is a [`std::collections::BTreeMap`] of [`VecDeque`]s bucketed by emission
+/// window. Each bucket is first in, first out, and a pop rotates across the buckets — so a pop
+/// consumes the oldest SURB of one bucket, not of the tier as a whole. Eviction, by contrast, is
+/// age-ordered across the whole buffer regardless of the rotation. See [`SurbPopOrder`] for why.
 ///
 /// ## Share-bearing SURBs first
 ///
@@ -949,17 +953,20 @@ impl SurbShareInfo for HoprSurb {
 ///
 /// So the buffer keeps two tiers and always hands out the share-bearing one first. [`SurbShareInfo`]
 /// sorts each SURB into `shares` or `plain` as it arrives, and a pop takes from `shares` for as long as
-/// it holds anything and from `plain` after that, the oldest SURB of either first. The Entry emits
-/// shares in SSA-index order, so FIFO inside `shares` is also lowest-SSA-first.
+/// it holds anything and from `plain` after that. Within `shares` the buckets rotate — see
+/// [`SurbShareInfo::emission_window`] — so the "oldest first" rule holds per bucket, not across the
+/// tier; the Entry still emits shares in SSA-index order, so each bucket is lowest-SSA-first for the
+/// emission window it holds.
 ///
 /// Eviction follows the same priority, because a share-less SURB is only a return path while a
 /// share-bearing one is a return path *and* a share nothing can replace. A full buffer gives up share-less
 /// SURBs first, oldest first. A share-less newcomer is refused rather than evict a share. Only when
-/// nothing but shares is held does the oldest share go, as the oldest SURB always used to. A push reports
+/// nothing but shares is held does the globally oldest share go — age-ordered across every bucket,
+/// whatever the rotation is doing — as the oldest SURB always used to. A push reports
 /// how many SURBs it dropped and, of those, how many were shares, so that the loss that matters can be told
 /// from the routine one (see [`SurbInsertOutcome`]).
 ///
-/// What this deliberately does *not* do: order shares across SSAs beyond these two tiers, retire the
+/// What this deliberately does *not* do: order shares across SSAs beyond these tiers, retire the
 /// leftovers of an already-recovered SSA (the supervisor budgets for those, see its
 /// `paid_recovery_tail`), or insist that a batch belong to one SSA — a packet's SURBs legitimately
 /// straddle a cycle boundary, or the step from carrying shares to carrying none.
@@ -1004,7 +1011,7 @@ pub struct SurbRingBuffer<S> {
 /// Bucket key for a share whose SURB does not name an emission window.
 ///
 /// `u32::MAX` sorts last, so a mixed buffer relies on the per-window keys first and drains the
-/// unknown-window bucket afterwards — the same relative order the flat tier had.
+/// unknown-window bucket after them.
 const WHOLE_EMISSION: u32 = u32::MAX;
 
 /// The mutex-protected state of a [`SurbRingBuffer`]: the SURBs, in their two tiers, and the highest
@@ -1173,7 +1180,8 @@ enum MadeRoom {
 
 impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs, popped
-    /// oldest first within each tier.
+    /// in rotation across the emission-window buckets of the share-bearing tier, FIFO within a
+    /// bucket and within the share-less tier.
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
@@ -1278,8 +1286,8 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
-    /// Pops the next SURB that `is_valid` accepts: a share-bearing one while any is held, the oldest of
-    /// each tier first.
+    /// Pops the next SURB that `is_valid` accepts: a share-bearing one while any is held (rotating
+    /// across emission-window buckets, FIFO within each), then the oldest share-less one.
     ///
     /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
     /// handed out nor blocks those behind it. Pass only a validity test — a selective predicate
