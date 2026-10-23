@@ -1234,11 +1234,7 @@ impl<S> SurbRingBuffer<S> {
             // Which slice of the emission this share came from. A share type that reports nothing
             // (or a share-less SURB) lands in the single whole-emission bucket, which keeps the
             // behaviour identical to the flat FIFO that preceded the bucketing.
-            let window = if std::env::var("REVIEW_FLAT_FIFO").is_ok() {
-                WHOLE_EMISSION
-            } else {
-                surb.emission_window().unwrap_or(WHOLE_EMISSION)
-            };
+            let window = surb.emission_window().unwrap_or(WHOLE_EMISSION);
 
             // Make room before inserting, so the length never exceeds the ceiling and the backing
             // allocations stop growing once their high-water marks are reached. Either a resident makes
@@ -1510,15 +1506,19 @@ mod tests {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
         let rb = SurbRingBuffer::new(64);
 
-        // Two shares in each of three windows (window `w` covers polys [w*256, (w+1)*256)).
-        for (i, poly) in [0u16, 256, 512, 1, 257, 513].into_iter().enumerate() {
+        // Pushed in TRUE EMISSION ORDER: the generator drains one 256-polynomial window before
+        // starting the next, so polys 0 and 1 of window 0 arrive before any of window 1. That order
+        // is what makes this test discriminating — a plain FIFO over it pops three window-0 SURBs and
+        // can cover at most one window. An interleaved fixture would let FIFO pass, since it would
+        // happen to receive one SURB from each window in the first three pops.
+        for (i, poly) in [0u16, 1, 256, 257, 512, 513].into_iter().enumerate() {
             let id: HoprSurbId = ((i as u64) + 1).to_be_bytes();
             rb.push([(id, surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)], 0);
         }
         assert_eq!(6, rb.len());
 
-        // The first three pops must cover three DIFFERENT windows, i.e. their polynomial indices are
-        // not all from one block. A FIFO ring would have returned polys 0, 1, 2 — one window.
+        // The first three pops must cover three DIFFERENT windows. A FIFO ring would return polys
+        // 0, 1, 256 — only two windows, and for the first two pops only one.
         let mut seen: Vec<u16> = Vec::new();
         for _ in 0..3 {
             let popped = rb.pop_any().context("expected a SURB")?;
@@ -1630,6 +1630,61 @@ mod tests {
         assert!(
             next.id == second || next.id == third,
             "the next pop must come from a remaining window"
+        );
+
+        Ok(())
+    }
+
+    /// Eviction picks the globally oldest SURB even when the cursor is pointing elsewhere.
+    ///
+    /// Complements [`surb_ring_buffer_should_evict_the_oldest_share_across_windows`], where the
+    /// oldest share happens to sit in the lowest window — so a bug that evicted "the oldest in the
+    /// cursor's bucket" would also pass there. Here the oldest is deliberately in a HIGHER window
+    /// than the cursor's, and its id is larger than a newer entry's, so both plausible shortcuts
+    /// (evict from the cursor's bucket, or evict the smallest id) pick the wrong SURB.
+    #[test]
+    fn surb_ring_buffer_should_evict_by_age_not_by_cursor_or_id() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(3);
+
+        // The OLDEST by arrival is pushed first, sits in the HIGHEST window, and carries the LARGEST
+        // id. So "evict the oldest" disagrees with both "evict from the cursor's bucket" and "evict
+        // the smallest id", and either shortcut picks the wrong SURB.
+        let oldest: HoprSurbId = 900u64.to_be_bytes();
+        let mid: HoprSurbId = 500u64.to_be_bytes();
+        let newest: HoprSurbId = 100u64.to_be_bytes();
+        rb.push([(oldest, surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
+        rb.push([(mid, surb_at(HoprKeyIdent::from(1u32), 1, 0, 0)?)], 0);
+        rb.push([(newest, surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
+        assert_eq!(3, rb.len());
+
+        // Consume one SURB so the cursor is no longer at the oldest's bucket. That leaves room for
+        // exactly one newcomer, so a second is what actually overflows.
+        let first = rb.pop_any().context("expected a SURB")?;
+        assert_ne!(oldest, first.id, "the first pop is not the oldest");
+        rb.push(
+            [(
+                777u64.to_be_bytes(),
+                surb_at(HoprKeyIdent::from(1u32), 1, window + 2, 0)?,
+            )],
+            0,
+        );
+        assert_eq!(3, rb.len(), "precondition: the buffer is full again");
+
+        // Overflow. The entry evicted must be the globally oldest by arrival (id 900, window 257).
+        rb.push(
+            [(
+                888u64.to_be_bytes(),
+                surb_at(HoprKeyIdent::from(1u32), 1, window + 3, 0)?,
+            )],
+            0,
+        );
+        assert_eq!(3, rb.len());
+
+        let remaining: Vec<HoprSurbId> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
+        assert!(
+            !remaining.contains(&oldest),
+            "the globally oldest SURB must be evicted regardless of cursor or id magnitude, kept {remaining:?}"
         );
 
         Ok(())

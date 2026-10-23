@@ -95,7 +95,7 @@ fn surb_for(poly_index: u16) -> anyhow::Result<HoprSurb> {
 ///
 /// `ingest_per_reply` is how many SURBs arrive per reply the Exit spends; above 1 the Entry
 /// out-produces the Exit and the buffer overflows.
-fn run_cycle(rb_capacity: usize, ingest_per_reply: f64) -> anyhow::Result<(u32, bool)> {
+fn run_cycle(rb_capacity: usize, ingest_per_reply: f64) -> anyhow::Result<bool> {
     let generator = SsaShareGenerator::<Spec>::new(SsaGeneratorConfig {
         polynomials_per_ssa: POLYS,
         threshold: THRESHOLD,
@@ -184,10 +184,14 @@ fn run_cycle(rb_capacity: usize, ingest_per_reply: f64) -> anyhow::Result<(u32, 
         }
     }
 
-    {
-        // The shares the buffer never handed back, by window: what the reconstructor must cover
-        // from surplus. Spread across windows is the property under test; a concentration at the
-        // low windows would mean the rotation stalled.
+    // Diagnostics only, behind an env gate so a normal CI run does not pay for the histograms.
+    //
+    // Deliberately NOT asserted: measuring showed that at this capacity a flat FIFO also happens to
+    // ack every window, because the popped ids are spread over the front of the queue. An "every
+    // window got a share" assertion therefore passes identically with and without the bucketing and
+    // would guard nothing. The discriminating assertion is `recovered`, which does fail under flat
+    // FIFO. This trace stays because it is what makes such a failure diagnosable.
+    if std::env::var("SURB_RECOVERY_TRACE").is_ok() {
         let mut left_w: std::collections::BTreeMap<u16, usize> = Default::default();
         for &(_, poly) in awaiting.values() {
             *left_w.entry(poly / SHARE_EMISSION_WINDOW as u16).or_default() += 1;
@@ -208,7 +212,7 @@ fn run_cycle(rb_capacity: usize, ingest_per_reply: f64) -> anyhow::Result<(u32, 
         }
     }
 
-    Ok((0, recovered))
+    Ok(recovered)
 }
 
 /// A buffer holding a fraction of a cycle still lets that cycle reconstruct, because the shares it
@@ -223,7 +227,7 @@ fn a_bounded_surb_buffer_should_not_bulk_fail_a_pix_cycle() -> anyhow::Result<()
     let cycle_shares = usize::from(POLYS) * usize::from(THRESHOLD + SURPLUS);
     let capacity = cycle_shares / 4;
 
-    let (_, recovered) = run_cycle(capacity, 4.0)?;
+    let recovered = run_cycle(capacity, 4.0)?;
     assert!(
         recovered,
         "a {capacity}-SURB buffer (a quarter of the {cycle_shares}-share cycle) must still let the cycle recover; if \
@@ -240,7 +244,7 @@ fn a_bounded_surb_buffer_should_not_bulk_fail_a_pix_cycle() -> anyhow::Result<()
 #[test]
 fn an_unbounded_surb_buffer_should_recover_a_pix_cycle() -> anyhow::Result<()> {
     let cycle_shares = usize::from(POLYS) * usize::from(THRESHOLD + SURPLUS);
-    let (_, recovered) = run_cycle(cycle_shares * 2, 1.0)?;
+    let recovered = run_cycle(cycle_shares * 2, 1.0)?;
     assert!(recovered, "a buffer holding twice the cycle must recover it");
     Ok(())
 }
