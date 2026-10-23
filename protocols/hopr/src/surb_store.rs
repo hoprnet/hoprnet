@@ -894,22 +894,52 @@ pub trait SurbShareInfo {
     /// The SSA index of the share this SURB carries, or `None` for a share-less SURB.
     fn ssa_index(&self) -> Option<SsaIndex>;
 
-    /// Which slice of its cycle's emission this SURB's share came from.
+    /// Whether this SURB carries a share, and if so which slice of the emission it came from.
+    ///
+    /// Returning both together is not cosmetic: on a real SURB each answer costs a parse of the
+    /// same receiver-only block, and `push` needs both for every SURB it stores. Asking twice did
+    /// the parse twice and showed up as a measurable per-packet cost. Implementors that can answer
+    /// both from one look at the data should override this; the default keeps the two existing
+    /// methods authoritative so nothing else has to change.
     ///
     /// The Entry emits a cycle round-robin across
     /// [`SHARE_EMISSION_WINDOW`](hopr_protocol_pix::SHARE_EMISSION_WINDOW) polynomials at a time, so
     /// `poly_index / window` names the block a share belongs to. The store gives each block its own
-    /// bucket and rotates across them, which is what turns the *contiguous* loss a bounded ring
-    /// otherwise inflicts into the spread loss the PIX surplus was sized for.
+    /// bucket and rotates across them, which turns the *contiguous* loss a bounded ring otherwise
+    /// inflicts into the spread loss the PIX surplus was sized for.
     ///
-    /// Defaults to `None`, which puts the SURB in a single bucket and leaves the buffer's behaviour
-    /// exactly as it was before bucketing existed.
+    /// `None` means a share-less SURB, which is filed in a single bucket and keeps the buffer's
+    /// behaviour exactly as it was before bucketing existed.
+    fn share_and_window(&self) -> Option<u32> {
+        if self.ssa_index().is_some() {
+            self.emission_window()
+        } else {
+            None
+        }
+    }
+
+    /// Which slice of its cycle's emission this SURB's share came from.
+    ///
+    /// Defaults to `None`; see [`share_and_window`](Self::share_and_window), which is what the store
+    /// actually calls.
     fn emission_window(&self) -> Option<u32> {
         None
     }
 }
 
 impl SurbShareInfo for HoprSurb {
+    fn share_and_window(&self) -> Option<u32> {
+        // One parse of the receiver block answers both questions. This is the hot path: `push`
+        // runs it for every SURB in every packet.
+        let share = self.additional_data_receiver.encrypted_partial_ssa_share();
+        if share.is_empty() {
+            return None;
+        }
+        share
+            .indices()
+            .map(|(_, poly)| u32::from(poly) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32)
+    }
+
     fn ssa_index(&self) -> Option<SsaIndex> {
         let share = self.additional_data_receiver.encrypted_partial_ssa_share();
         // The very test the packet builder applies when it decides whether a reply carries this share
@@ -1037,6 +1067,13 @@ struct GenerationalBuffer<S> {
     generation: Option<u8>,
     /// Bucket the next pop takes from, so rotation is fair across the emission.
     window_cursor: u32,
+    /// Number of SURBs held in `shares`, maintained on every mutation.
+    ///
+    /// `len()` is on both hot paths — every push compares it against the capacity, and every pop
+    /// reports it as `remaining` — and summing over the buckets made each of those O(buckets). A
+    /// PIX cycle spans `polys / SHARE_EMISSION_WINDOW` ≈ 16 buckets at the deployed split but up to
+    /// 1776 across a whole batch, so that turned an O(1) check into a per-packet scan.
+    share_count: usize,
     /// Monotonic insertion sequence, stamped on every share-bearing SURB.
     ///
     /// Eviction has to be age-ordered, and a `HoprSurbId` cannot express age: it is not a counter but
@@ -1051,7 +1088,7 @@ struct GenerationalBuffer<S> {
 impl<S> GenerationalBuffer<S> {
     /// SURBs held across both tiers: the quantity the capacity bounds.
     fn len(&self) -> usize {
-        self.shares.values().map(|d| d.len()).sum::<usize>() + self.plain.len()
+        self.share_count + self.plain.len()
     }
 
     /// Drops every SURB of both tiers.
@@ -1059,6 +1096,7 @@ impl<S> GenerationalBuffer<S> {
         self.shares.clear();
         self.plain.clear();
         self.window_cursor = 0;
+        self.share_count = 0;
     }
 
     /// The emission-window bucket the next pop takes from: the lowest non-empty key at or after the
@@ -1070,9 +1108,11 @@ impl<S> GenerationalBuffer<S> {
     fn next_window(&self) -> Option<u32> {
         // `BTreeMap` already iterates in ascending key order, which is the order the cursor walks,
         // so this is one ordered scan rather than a collect-and-sort on the reply hot path.
+        // `range` seeks to the cursor in O(log B) rather than walking every lower key, and the
+        // wrap case only runs when the scan found nothing after the cursor.
         self.shares
-            .iter()
-            .find(|(w, d)| **w >= self.window_cursor && !d.is_empty())
+            .range(self.window_cursor..)
+            .find(|(_, d)| !d.is_empty())
             .map(|(w, _)| *w)
             .or_else(|| self.shares.iter().find(|(_, d)| !d.is_empty()).map(|(w, _)| *w))
     }
@@ -1088,17 +1128,17 @@ impl<S> GenerationalBuffer<S> {
                 SurbPopOrder::Lifo => d.pop_back(),
             })
             .map(|(id, surb, _)| (id, surb))?;
-        // Move to the next bucket that exists, wrapping. Computed from the key set rather than from
-        // the popped item, so an emptied bucket does not stall the rotation.
-        let next = self
+        self.share_count -= 1;
+        // Advance the cursor past this bucket, wrapping. This is the second map lookup of the pop;
+        // it stays because the bucket may now be empty and skipped, and `next_window` only has to
+        // skip empties when the frontier drains rather than on every pop.
+        self.window_cursor = self
             .shares
-            .keys()
-            .copied()
-            .filter(|k| *k > w)
-            .min()
-            .or_else(|| self.shares.keys().copied().min())
+            .range((std::ops::Bound::Excluded(w), std::ops::Bound::Unbounded))
+            .next()
+            .map(|(k, _)| *k)
+            .or_else(|| self.shares.keys().next().copied())
             .unwrap_or(w);
-        self.window_cursor = next;
         Some(popped)
     }
 
@@ -1119,9 +1159,14 @@ impl<S> GenerationalBuffer<S> {
             .filter_map(|(w, d)| d.front().map(|(_, _, seq)| (*seq, *w)))
             .min()
             .map(|(_, w)| w)?;
-        self.shares
+        let evicted = self
+            .shares
             .get_mut(&oldest)
-            .and_then(|d| d.pop_front().map(|(id, surb, _)| (id, surb)))
+            .and_then(|d| d.pop_front().map(|(id, surb, _)| (id, surb)));
+        if evicted.is_some() {
+            self.share_count -= 1;
+        }
+        evicted
     }
 
     /// The SURB the next pop would take.
@@ -1215,6 +1260,7 @@ impl<S> SurbRingBuffer<S> {
                 plain: VecDeque::new(),
                 generation: None,
                 window_cursor: 0,
+                share_count: 0,
                 next_seq: 0,
             })),
             // A zero capacity would make the eviction below pop from an empty buffer and then push
@@ -1280,11 +1326,12 @@ impl<S> SurbRingBuffer<S> {
         let mut evicted = 0;
         let mut evicted_shares = 0;
         for (id, surb) in surbs {
-            let carries_share = surb.ssa_index().is_some();
-            // Which slice of the emission this share came from. A share type that reports nothing
-            // (or a share-less SURB) lands in the single whole-emission bucket, which keeps the
-            // behaviour identical to the flat FIFO that preceded the bucketing.
-            let window = surb.emission_window().unwrap_or(WHOLE_EMISSION);
+            // One call answers both questions, because on the wire they come from the same block:
+            // whether this SURB carries a share, and which emission window it belongs to. Asking
+            // separately parsed that block twice per SURB.
+            let window = surb.share_and_window();
+            let carries_share = window.is_some();
+            let window = window.unwrap_or(WHOLE_EMISSION);
 
             // Make room before inserting, so the length never exceeds the ceiling and the backing
             // allocations stop growing once their high-water marks are reached. Either a resident makes
@@ -1302,6 +1349,7 @@ impl<S> SurbRingBuffer<S> {
                 let seq = inner.next_seq;
                 inner.next_seq += 1;
                 inner.shares.entry(window).or_default().push_back((id, surb, seq));
+                inner.share_count += 1;
             } else {
                 inner.plain.push_back((id, surb));
             }
@@ -1744,6 +1792,78 @@ mod tests {
         Ok(())
     }
 
+    /// The O(1) length counter must agree with the actual bucket contents after every kind of
+    /// mutation: push, pop and eviction.
+    ///
+    /// `len()` is what bounds the buffer and what a pop reports as `remaining`, and it is now a
+    /// counter rather than a sum over the buckets. A drift between the two would either let the
+    /// buffer overrun its capacity or evict early, and neither is visible from the outside.
+    #[test]
+    fn the_share_count_must_match_the_buckets_after_every_mutation() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::with_order(4, SurbPopOrder::Fifo);
+
+        let actual = |rb: &SurbRingBuffer<HoprSurb>| {
+            let inner = rb.inner.lock();
+            let counted: usize = inner.shares.values().map(|d| d.len()).sum();
+            assert_eq!(
+                counted, inner.share_count,
+                "share_count drifted from the buckets: {} vs {counted}",
+                inner.share_count
+            );
+            counted + inner.plain.len()
+        };
+
+        assert_eq!(0, rb.len());
+        actual(&rb);
+
+        // Pushes, across more than one window so the counting is not trivially one bucket.
+        for (i, poly) in [0u16, 256, 1, 257].into_iter().enumerate() {
+            rb.push(
+                [(
+                    ((i as u64) + 1).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?,
+                )],
+                0,
+            );
+            actual(&rb);
+        }
+
+        // A pop.
+        rb.pop_any().context("expected a pop")?;
+        actual(&rb);
+
+        // Fill back up, then overflow: the newcomer carries a share, so `evict_oldest_share` runs.
+        assert_eq!(3, rb.len());
+        rb.push(
+            [(
+                50u64.to_be_bytes(),
+                surb_at(HoprKeyIdent::from(1u32), 1, window + 4, 0)?,
+            )],
+            0,
+        );
+        assert_eq!(4, rb.len());
+        actual(&rb);
+        rb.push(
+            [(
+                99u64.to_be_bytes(),
+                surb_at(HoprKeyIdent::from(1u32), 1, window + 5, 0)?,
+            )],
+            0,
+        );
+        assert_eq!(4, rb.len(), "capacity honoured");
+        actual(&rb);
+
+        // Drain, then a generation clear (which resets the buffer wholesale).
+        while rb.pop_any().is_some() {}
+        assert_eq!(0, rb.len());
+        actual(&rb);
+        rb.push([(1u64.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, 0, 0)?)], 5);
+        actual(&rb);
+
+        Ok(())
+    }
+
     /// Rotation must reach every bucket, including the one holding SURBs that named no window.
     ///
     /// The cursor walks the key order and wraps, so a buffer mixing real emission windows with the
@@ -1757,6 +1877,7 @@ mod tests {
             plain: Default::default(),
             generation: None,
             window_cursor: 255,
+            share_count: 0,
             next_seq: 0,
         };
         for k in [0u32, 255, WHOLE_EMISSION] {

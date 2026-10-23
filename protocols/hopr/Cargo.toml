@@ -86,3 +86,7 @@ ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
 ignored = ["humantime-serde"]
+
+[[bench]]
+name = "surb_store_bench"
+harness = false
