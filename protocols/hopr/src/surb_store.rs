@@ -1068,20 +1068,13 @@ impl<S> GenerationalBuffer<S> {
     /// bounded buffer must spread what it can afford to lose over the *whole* emission instead of
     /// spending it on one contiguous slice of it.
     fn next_window(&self) -> Option<u32> {
-        let mut live: Vec<u32> = self
-            .shares
+        // `BTreeMap` already iterates in ascending key order, which is the order the cursor walks,
+        // so this is one ordered scan rather than a collect-and-sort on the reply hot path.
+        self.shares
             .iter()
-            .filter(|(_, d)| !d.is_empty())
+            .find(|(w, d)| **w >= self.window_cursor && !d.is_empty())
             .map(|(w, _)| *w)
-            .collect();
-        if live.is_empty() {
-            return None;
-        }
-        live.sort_unstable();
-        live.iter()
-            .find(|w| **w >= self.window_cursor)
-            .or_else(|| live.first())
-            .copied()
+            .or_else(|| self.shares.iter().find(|(_, d)| !d.is_empty()).map(|(w, _)| *w))
     }
 
     /// Removes the entry at the end `order` consumes from in bucket `w`, and advances the cursor past
@@ -2062,6 +2055,88 @@ mod tests {
         );
         // The other end is still there, untouched.
         assert_eq!(other_end_id, rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
+    }
+
+    /// LIFO rotates ACROSS emission windows; it does not simply take the newest SURB in the buffer.
+    ///
+    /// Distinguishes the intended rule ("back of the bucket the cursor selects, rotating across
+    /// buckets") from the plausible wrong one ("the newest SURB anywhere"). Both pop newest-first;
+    /// only the former spreads consumption over the emission, which is what keeps a PIX cycle
+    /// recoverable. Kills a mutant that ignores the cursor under LIFO.
+    #[test]
+    fn surb_ring_buffer_should_rotate_across_windows_under_lifo() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::with_order(16, SurbPopOrder::Lifo);
+
+        // One poly per window, pushed in emission order. Window `w` covers polys
+        // [w*256, (w+1)*256), so 0/256/512/768 land in windows 0/1/2/3.
+        for (i, poly) in [0u16, 256, 512, 768].into_iter().enumerate() {
+            let id: HoprSurbId = ((i as u64) + 1).to_be_bytes();
+            rb.push([(id, surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)], 0);
+        }
+
+        let mut seen = Vec::new();
+        for _ in 0..3 {
+            let popped = rb.pop_any().context("expected a SURB")?;
+            let (_, poly) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture: popped a share-less SURB")?;
+            seen.push(poly);
+        }
+        let windows: std::collections::BTreeSet<u16> = seen.iter().map(|p| p / window).collect();
+        assert_eq!(
+            seen.len(),
+            windows.len(),
+            "LIFO must visit a DIFFERENT bucket on each pop rather than drain one; got polys {seen:?}"
+        );
+        // LIFO chooses the END of a bucket, not WHICH bucket — the cursor still decides that, and
+        // starts at the lowest key. Pinned here so a later change that made LIFO also reverse the
+        // bucket order would be noticed rather than silently changing which part of the emission
+        // the Exit drains first.
+        assert_eq!(
+            seen[0] / window,
+            0,
+            "the cursor, not the pop order, picks the first bucket; got {seen:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Peek and pop agree on the SHARE-BEARING path under LIFO, not only the share-less tier.
+    ///
+    /// `pop_one_if_has_id` peeks then pops. If peek ignored the order while pop honoured it, the
+    /// lookup would inspect one SURB and remove another. The share tier is what the shipped PIX
+    /// flow drains, so testing this only on the plain tier leaves the real gap open.
+    #[test]
+    fn surb_ring_buffer_should_check_the_newest_share_end_for_an_exact_id_under_lifo() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::with_order(5, SurbPopOrder::Lifo);
+
+        let older: HoprSurbId = [1u8; 8];
+        let newer: HoprSurbId = [2u8; 8];
+        rb.push([(older, surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
+        rb.push([(newer, surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
+
+        assert!(
+            rb.pop_one_if_has_id(&older).is_none(),
+            "LIFO takes the newest entry of the selected bucket, so the older id must not pop first"
+        );
+        assert_eq!(
+            newer,
+            rb.pop_one_if_has_id(&newer)
+                .context("the newest share was not popped by id")?
+                .id
+        );
+        assert_eq!(
+            older,
+            rb.pop_any().context("expected the remaining SURB")?.id,
+            "the older SURB must still be present after the newer one was taken"
+        );
 
         Ok(())
     }
