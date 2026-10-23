@@ -13,6 +13,9 @@ use tracing::instrument;
 
 use crate::{errors::SessionError, protocol::FrameId};
 
+/// Floor on a gap timer, so a gap already past its wait still yields to the runtime once.
+const MIN_GAP_WAIT: Duration = Duration::from_millis(1);
+
 /// Buffer entry pairing an item with when it entered the buffer.
 ///
 /// Ordering delegates entirely to `item`, so the heap behaves exactly as before; `buffered_at`
@@ -66,7 +69,8 @@ impl<T: PartialOrd<FrameId>> PartialOrd<FrameId> for Buffered<T> {
 /// The Sequencer takes to arguments: `max_wait` and `capacity`:
 ///
 /// The `max_wait` indicates the maximum amount of time to wait for a certain `FrameId` to
-/// be yielded from the underlying stream.
+/// be yielded from the underlying stream. Each gap is timed from when the frame behind it was
+/// buffered, so gaps queued behind one another drain together rather than one `max_wait` each.
 /// If this does not happen, the Segmenter yields an error,
 /// indicating that the given frame was discarded.
 ///
@@ -87,7 +91,6 @@ pub struct Sequencer<S: futures::Stream> {
     timer: futures_time::task::Sleep,
     buffer: BinaryHeap<std::cmp::Reverse<Buffered<S::Item>>>,
     next_id: FrameId,
-    last_emitted: Instant,
     max_wait: Duration,
     /// Anti-bufferbloat bound: items buffered longer than this are dropped, not emitted, so a
     /// stall shows up as loss rather than a latency tail. `None` disables it.
@@ -95,6 +98,8 @@ pub struct Sequencer<S: futures::Stream> {
     /// Head-of-line bound: abandon the frame due next once the sequence has advanced this far
     /// past it, rather than holding everything for `max_wait`. `None` disables it.
     max_frames_behind_gap: Option<usize>,
+    /// When the gap being waited on expires; the timer is re-armed only when this changes.
+    gap_deadline: Option<Instant>,
     state: State,
 }
 
@@ -118,15 +123,15 @@ where
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
-            timer: futures_time::task::sleep(max_wait.max(Duration::from_millis(1)).into()),
+            timer: futures_time::task::sleep(max_wait.max(MIN_GAP_WAIT).into()),
             next_id: 1,
-            last_emitted: Instant::now(),
             max_wait,
             max_item_age: max_item_age.filter(|age| !age.is_zero()),
             // Zero would abandon the frame due next before anything had arrived to justify it,
             // turning every momentary gap into loss. One later frame is the strictest evidence
             // that still *is* evidence.
             max_frames_behind_gap: max_frames_behind_gap.map(|n| n.max(1)),
+            gap_deadline: None,
             state: State::Polling,
         }
     }
@@ -179,12 +184,6 @@ where
                                 return Poll::Pending;
                             }
                             (Poll::Ready(Some(item)), _) => {
-                                // We have to reset the last emitted timestamp if
-                                // the buffer was empty until now
-                                if this.buffer.is_empty() {
-                                    *this.last_emitted = Instant::now();
-                                }
-
                                 if item.lt(this.next_id) {
                                     // Do not accept older frame ids
                                     tracing::error!("old item");
@@ -218,13 +217,11 @@ where
                 State::BufferUpdated => {
                     // The buffer has been updated, check if we can yield something
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
+                        let waited = next.buffered_at.elapsed();
                         if next.eq(this.next_id) {
-                            let stale = this
-                                .max_item_age
-                                .is_some_and(|max_age| next.buffered_at.elapsed() >= max_age);
+                            let stale = this.max_item_age.is_some_and(|max_age| waited >= max_age);
 
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Instant::now();
                             *this.state = State::BufferUpdated;
 
                             // Anti-bufferbloat: the frame is the one due next, but it has been held
@@ -241,7 +238,10 @@ where
                             tracing::trace!("emit next frame");
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
-                        } else if this.last_emitted.elapsed() >= *this.max_wait
+                        // Each gap waits `max_wait` from the arrival of the frame right behind it, so
+                        // emissions in between don't push it back: K gaps left by one outage drain
+                        // together instead of one per `max_wait`.
+                        } else if waited >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
                             // The sequence has moved far enough past the gap to conclude the
                             // missing frame was lost rather than reordered. Waiting out `max_wait`
@@ -264,16 +264,20 @@ where
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
-                            // `last_emitted` is intentionally NOT reset here: it is only reset
-                            // when an actual frame is emitted. Resetting it per discarded id would
-                            // drain a contiguous gap of K missing frames at 1 frame per `max_wait`
-                            // (a K x max_wait delivery stall of frames already sitting in the
-                            // buffer), instead of flushing the whole gap once `max_wait` elapses.
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!(discarded, "discard frame");
 
                             return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                        }
+                        let deadline = next.buffered_at + *this.max_wait;
+                        if *this.gap_deadline != Some(deadline) {
+                            *this.gap_deadline = Some(deadline);
+                            let remaining = this.max_wait.saturating_sub(waited);
+                            // The floor only stands in for a deadline already past, so a
+                            // sub-millisecond `max_wait` is kept as configured.
+                            let wait = if remaining.is_zero() { MIN_GAP_WAIT } else { remaining };
+                            this.timer.set(futures_time::task::sleep(wait.into()));
                         }
                     } else {
                         tracing::trace!("buffer is empty");
@@ -318,7 +322,8 @@ where
 /// hint which is which.
 #[derive(Clone, Copy, Debug)]
 pub struct SequencerConfig {
-    /// Longest the frame due next is waited for before it is abandoned.
+    /// Longest the frame due next is waited for before it is abandoned, timed from the arrival of
+    /// the frame right behind it.
     pub max_wait: Duration,
     /// Maximum number of buffered items.
     pub capacity: usize,
@@ -840,6 +845,62 @@ mod tests {
             now.elapsed(),
             7 * timeout
         );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_drain_interleaved_gaps_within_single_timeout_window() -> anyhow::Result<()> {
+        let timeout = Duration::from_millis(50);
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        pin_mut!(tx);
+        tx.send_all(&mut futures::stream::iter([1u32, 3, 5, 7, 9, 11]).map(Ok))
+            .await?;
+
+        let rx = rx.sequencer(timeout, 4096);
+        pin_mut!(rx);
+
+        assert_eq!(Some(1), rx.try_next().await?);
+
+        let now = Instant::now();
+        for frame in [3u32, 5, 7, 9, 11] {
+            assert!(matches!(
+                rx.next().await,
+                Some(Err(SessionError::FrameDiscarded(id))) if id == frame - 1
+            ));
+            assert_eq!(Some(frame), rx.try_next().await?);
+        }
+
+        assert!(
+            now.elapsed() < 2 * timeout,
+            "interleaved gaps took {:?} to drain, expected about one {:?} window",
+            now.elapsed(),
+            timeout
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_not_discard_gap_filled_within_timeout() -> anyhow::Result<()> {
+        let timeout = Duration::from_millis(100);
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        let rx = rx.sequencer(timeout, 4096);
+        pin_mut!(tx);
+        pin_mut!(rx);
+
+        tx.send(1u32).await?;
+        tx.send(3u32).await?;
+        assert_eq!(Some(1), rx.try_next().await?);
+        // Frame 3 is only buffered, and its wait started, once the sequencer is polled again.
+        assert!(futures::poll!(rx.next()).is_pending());
+
+        tokio::time::sleep(timeout / 2).await;
+        tx.send(2u32).await?;
+        assert_eq!(Some(2), rx.try_next().await?);
+        assert_eq!(Some(3), rx.try_next().await?);
 
         Ok(())
     }
