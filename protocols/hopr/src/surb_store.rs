@@ -554,15 +554,7 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
-    /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
-    ///
-    /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
-    /// handed out nor blocks those behind it. Pass only a validity test — a selective predicate
-    /// (say, a routing preference) would drain the buffer. `None` once it is exhausted without a
-    /// match.
-    ///
-    /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
-    /// calling it inside the critical section would invite lock-order inversion.
+    /// [`Self::pop_next_valid_preferring`] without a preference.
     #[cfg(test)]
     pub fn pop_next_valid<F>(&self, is_valid: F) -> Option<PoppedSurb<S>>
     where
@@ -571,11 +563,18 @@ impl<S> SurbRingBuffer<S> {
         self.pop_next_valid_preferring(is_valid, None::<&fn(&S) -> bool>)
     }
 
-    /// As [`Self::pop_next_valid`], but takes the next SURB `preferred` accepts first, wherever it
-    /// is, leaving the ones passed over in place; with none preferred it pops in order.
+    /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`], taking the next
+    /// one `preferred` accepts first, wherever it is; those passed over stay in place. With none
+    /// preferred, or no `preferred` at all, it pops in order.
     ///
-    /// `preferred` runs *inside* the lock, on every stored SURB in the worst case: it must be cheap
-    /// and must not take locks.
+    /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
+    /// handed out nor blocks those behind it. Pass only a validity test as `is_valid` — a selective
+    /// predicate (say, a routing preference) would drain the buffer. `None` once it is exhausted
+    /// without a match.
+    ///
+    /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
+    /// calling it inside the critical section would invite lock-order inversion. `preferred` runs
+    /// *inside* it, on every stored SURB in the worst case: it must be cheap and must not take locks.
     pub fn pop_next_valid_preferring<F, P>(&self, is_valid: F, preferred: Option<&P>) -> Option<PoppedSurb<S>>
     where
         F: Fn(&HoprSurbId, &S) -> bool,
