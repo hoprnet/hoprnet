@@ -18,7 +18,8 @@
 # justfile, which is the source of truth for both the image reference and the chain URL.)
 # Then point the demo at one node's API:
 #
-#   API=http://127.0.0.1:3001/api/v4 TOKEN=<token> LOG=<that node's log> tools/run_demo.sh
+#   API=http://127.0.0.1:3001/api/v4 TOKEN='paste-token-here' LOG='/path/to/node.log' \
+#     tools/run_demo.sh
 #
 # Set `LOG` to the hoprd log file of the node under test (the graph and session diagnostics are
 # parsed out of it).

@@ -92,7 +92,7 @@ fn default_eviction_report_threshold() -> u64 {
 /// is what keeps the retained set equal to the newest `capacity` SURBs.
 ///
 /// Neither order is a correctness fix under PIX. What makes either work is
-/// [`SurbShareInfo::emission_window`]: the buffer buckets share-bearing SURBs by the block of the
+/// emission-window bucketing: the buffer sorts share-bearing SURBs by the block of the
 /// emission they came from and rotates across the buckets, so what a bounded buffer drops is spread
 /// over the cycle instead of concentrated at one end. A share reaches the reconstructor only when its
 /// SURB is *used*, so without that bucketing either order hands back a **contiguous run of the
@@ -174,7 +174,7 @@ pub struct SurbStoreConfig {
     /// arrival rate**. Below that the outcome depends on the arrival rate, not just the capacity:
     /// two thirds of a cycle (300 000) still recovers at 4 SURBs per reply but fails at 6, and even
     /// half a cycle (227 328) recovers only at the mild rates — a buffer that overflows can bulk-fail
-    /// a cycle even though the loss is spread by [`SurbShareInfo::emission_window`].
+    /// a cycle even though the loss is spread by the store's emission-window bucketing.
     ///
     /// This does not mean the shipped default is unsafe. The Entry caps production at
     /// `maximum_surb_buffer_size` (two thirds of this value) and reports the Exit's level back, so a
@@ -1129,6 +1129,14 @@ impl<S> GenerationalBuffer<S> {
             })
             .map(|(id, surb, _)| (id, surb))?;
         self.share_count -= 1;
+        // Drop the bucket once drained. `VecDeque::pop_front` never releases capacity, so a bucket
+        // that once held `rb_capacity` SURBs keeps that allocation for the life of the buffer — and
+        // a counterparty controls which window each SURB lands in, so it can walk a buffer through
+        // every window and leave a full-size empty allocation behind each time. Removing the key is
+        // what keeps retained memory proportional to what is actually held.
+        if self.shares.get(&w).is_some_and(|d| d.is_empty()) {
+            self.shares.remove(&w);
+        }
         // Advance the cursor past this bucket, wrapping. This is the second map lookup of the pop;
         // it stays because the bucket may now be empty and skipped, and `next_window` only has to
         // skip empties when the frontier drains rather than on every pop.
@@ -1165,6 +1173,10 @@ impl<S> GenerationalBuffer<S> {
             .and_then(|d| d.pop_front().map(|(id, surb, _)| (id, surb)));
         if evicted.is_some() {
             self.share_count -= 1;
+            // See `pop_window`: an emptied bucket must not keep its allocation.
+            if self.shares.get(&oldest).is_some_and(|d| d.is_empty()) {
+                self.shares.remove(&oldest);
+            }
         }
         evicted
     }
@@ -1747,47 +1759,106 @@ mod tests {
     #[test]
     fn surb_ring_buffer_should_evict_by_age_not_by_cursor_or_id() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
-        let rb = SurbRingBuffer::new(3);
+        let rb = SurbRingBuffer::new(4);
 
-        // The OLDEST by arrival is pushed first, sits in the HIGHEST window, and carries the LARGEST
-        // id. So "evict the oldest" disagrees with both "evict from the cursor's bucket" and "evict
-        // the smallest id", and either shortcut picks the wrong SURB.
+        // Bucket arithmetic matters here: window `w` covers polys [w*256, (w+1)*256). The oldest
+        // SURB sits in bucket 3 while the cursor is deliberately left in bucket 0, and BOTH must
+        // still be populated when the overflow happens -- otherwise "evict the globally oldest" and
+        // "evict the front of the cursor's bucket" are the same action.
         let oldest: HoprSurbId = 900u64.to_be_bytes();
-        let mid: HoprSurbId = 500u64.to_be_bytes();
-        let newest: HoprSurbId = 100u64.to_be_bytes();
-        rb.push([(oldest, surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
-        rb.push([(mid, surb_at(HoprKeyIdent::from(1u32), 1, 0, 0)?)], 0);
-        rb.push([(newest, surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
-        assert_eq!(3, rb.len());
+        let a: HoprSurbId = 100u64.to_be_bytes();
+        let b: HoprSurbId = 200u64.to_be_bytes();
+        let c: HoprSurbId = 300u64.to_be_bytes();
 
-        // Consume one SURB so the cursor is no longer at the oldest's bucket. That leaves room for
-        // exactly one newcomer, so a second is what actually overflows.
-        let first = rb.pop_any().context("expected a SURB")?;
-        assert_ne!(oldest, first.id, "the first pop is not the oldest");
+        // Oldest by arrival, highest bucket, largest id.
+        rb.push([(oldest, surb_at(HoprKeyIdent::from(1u32), 1, 3 * window, 0)?)], 0);
+        rb.push([(a, surb_at(HoprKeyIdent::from(1u32), 1, 0, 0)?)], 0);
+        rb.push([(b, surb_at(HoprKeyIdent::from(1u32), 1, 1, 0)?)], 0);
+        rb.push([(c, surb_at(HoprKeyIdent::from(1u32), 1, 2, 0)?)], 0);
+        assert_eq!(4, rb.len(), "precondition: full, four buckets live");
+
+        // Overflow with no intervening pop, so every bucket is still populated and the cursor
+        // (bucket 0) points somewhere other than the oldest (bucket 3).
         rb.push(
             [(
                 777u64.to_be_bytes(),
-                surb_at(HoprKeyIdent::from(1u32), 1, window + 2, 0)?,
+                surb_at(HoprKeyIdent::from(1u32), 1, 4 * window, 0)?,
             )],
             0,
         );
-        assert_eq!(3, rb.len(), "precondition: the buffer is full again");
-
-        // Overflow. The entry evicted must be the globally oldest by arrival (id 900, window 257).
-        rb.push(
-            [(
-                888u64.to_be_bytes(),
-                surb_at(HoprKeyIdent::from(1u32), 1, window + 3, 0)?,
-            )],
-            0,
-        );
-        assert_eq!(3, rb.len());
+        assert_eq!(4, rb.len());
 
         let remaining: Vec<HoprSurbId> = std::iter::from_fn(|| rb.pop_any().map(|p| p.id)).collect();
         assert!(
             !remaining.contains(&oldest),
-            "the globally oldest SURB must be evicted regardless of cursor or id magnitude, kept {remaining:?}"
+            "the globally oldest SURB must be evicted even though the cursor is in another bucket and its id is the \
+             largest, kept {remaining:?}"
         );
+        assert!(
+            remaining.contains(&a),
+            "a cursor-bucket victim would be this one; it must survive, kept {remaining:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Draining a bucket must release it, not just empty it.
+    ///
+    /// `VecDeque` never shrinks its allocation, and the counterparty chooses which emission window
+    /// each SURB lands in. Without removing emptied buckets from the map, a peer could walk a buffer
+    /// through every window and leave a `rb_capacity`-sized empty allocation behind at each step:
+    /// with 256 windows plus the sentinel and a 100 000-SURB capacity that is hundreds of MiB per
+    /// pseudonym, retained indefinitely, for SURBs that are already spent.
+    #[test]
+    fn surb_ring_buffer_should_release_a_bucket_once_it_drains() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(16);
+
+        // Fill one window, then a second, so both buckets are large.
+        for poly in [0u16, 1, 2, 3] {
+            rb.push(
+                [(
+                    (poly as u64).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?,
+                )],
+                0,
+            );
+        }
+        for poly in [window, window + 1, window + 2] {
+            rb.push(
+                [(
+                    (poly as u64).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?,
+                )],
+                0,
+            );
+        }
+        let buckets = |rb: &SurbRingBuffer<HoprSurb>| rb.inner.lock().shares.len();
+        assert_eq!(2, buckets(&rb), "precondition: two windows populated");
+
+        // Drain everything; the map must end up holding no buckets at all.
+        while rb.pop_any().is_some() {}
+        assert_eq!(0, rb.len());
+        assert_eq!(
+            0,
+            buckets(&rb),
+            "an emptied bucket must be removed, not retained with its allocation"
+        );
+
+        // Eviction path too: overflow a single-window buffer until that window drains.
+        let rb = SurbRingBuffer::new(2);
+        for poly in [0u16, 1, 2] {
+            rb.push(
+                [(
+                    (poly as u64).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?,
+                )],
+                0,
+            );
+        }
+        assert_eq!(1, buckets(&rb), "one window holding the survivors");
+        while rb.pop_any().is_some() {}
+        assert_eq!(0, buckets(&rb), "drained by eviction and pops alike");
 
         Ok(())
     }
@@ -1885,16 +1956,38 @@ mod tests {
             d.push_back(([0u8; 8], 0u64, 0u64));
             g.shares.insert(k, d);
         }
+        // Built by hand, so the counter must be kept in step: `pop_window` decrements it, and a
+        // fixture that left it at zero would underflow rather than exercise the pop.
+        g.share_count = g.shares.values().map(|d| d.len()).sum();
 
         assert_eq!(Some(255), g.next_window(), "serves the cursor's own bucket first");
+
         g.window_cursor = WHOLE_EMISSION;
         assert_eq!(
             Some(WHOLE_EMISSION),
             g.next_window(),
             "the sentinel bucket must be reachable, not starved behind real windows"
         );
-        g.window_cursor = 0;
-        assert_eq!(Some(0), g.next_window(), "and the cursor wraps to the first bucket");
+
+        // A genuine WRAP: the cursor sits above every non-empty key, so the `or_else` fallback is
+        // the only way to find a bucket. (Cursoring to 0 finds key 0 in the first scan instead,
+        // which is what the previous version of this test asserted and why it never wrapped.)
+        g.shares.remove(&WHOLE_EMISSION);
+        g.window_cursor = WHOLE_EMISSION;
+        assert_eq!(
+            Some(0),
+            g.next_window(),
+            "a cursor past every bucket must wrap to the lowest one"
+        );
+
+        // And the same wrap on the pop side, which advances the cursor itself.
+        g.window_cursor = 255;
+        let popped_from = g.pop_window(255, SurbPopOrder::Fifo);
+        assert!(popped_from.is_some(), "precondition: bucket 255 held an entry");
+        assert_eq!(
+            0, g.window_cursor,
+            "popping the last bucket must leave the cursor wrapped to the lowest remaining one"
+        );
     }
 
     /// A share-less `(id, SURB)` pair for the tier tests. The id is `[n; 8]`, so `n` names the entry in

@@ -8,14 +8,12 @@
 //!
 //! Two traps make the obvious version measure the fixture instead of the operation:
 //!
-//! 1. **Per-iteration setup.** A single pop is tens of nanoseconds. Built inside the timed region,
-//!    the fixture dominates. So each sample performs [`OPS`] operations and the trapezoid is
-//!    amortised away.
-//! 2. **Teardown.** `iter_batched` drops the input batch after the routine, and dropping a
-//!    `MemorySurbStore` holding 100 000 SURBs costs more than the operations themselves — it scales
-//!    with occupancy exactly like the numbers did, which is how the first version of this file
-//!    ended up reporting ~6 µs per pop. [`Criterion::iter_custom`] lets the fixture be built and
-//!    dropped outside the measured span.
+//! 1. **Per-iteration setup.** A single pop is tens of nanoseconds. Built inside the timed region, the fixture
+//!    dominates. So each sample performs [`OPS`] operations and the trapezoid is amortised away.
+//! 2. **Teardown.** `iter_batched` drops the input batch after the routine, and dropping a `MemorySurbStore` holding
+//!    100 000 SURBs costs more than the operations themselves — it scales with occupancy exactly like the numbers did,
+//!    which is how the first version of this file ended up reporting ~6 µs per pop. [`Criterion::iter_custom`] lets the
+//!    fixture be built and dropped outside the measured span.
 //!
 //! Only the public `SurbStore` trait is used, so the identical source compiles against the baseline
 //! and the branch and measures the same operations in both.
@@ -28,8 +26,7 @@ use hopr_api::types::{
     internal::{prelude::*, routing::SurbMatcher},
     primitive::prelude::BytesRepresentable,
 };
-use hopr_crypto_packet::prelude::*;
-use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
+use hopr_crypto_packet::{prelude::*, sphinx::prelude::SphinxHeaderSpec};
 use hopr_protocol_hopr::{MemorySurbStore, SurbStore, SurbStoreConfig};
 
 const SSA_INDEX: u32 = 1;
