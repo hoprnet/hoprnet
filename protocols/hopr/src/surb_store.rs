@@ -237,12 +237,12 @@ pub struct SurbStoreConfig {
     /// is the number to reason about rather than a percentage. Under the shipped FIFO order those are
     /// the *first* replies of a drain: pops take the oldest SURBs, the ones whose openers this cache
     /// has already shed, and only once the drain reaches the newest `max_openers_per_pseudonym` SURBs
-    /// do replies start decrypting. Measured against the shipped stores: ring 15 000 / openers 7 000
-    /// strands exactly 8 000 replies, and ring 100 000 / openers 7 000 strands exactly 93 000 —
-    /// independent of how many replies are sent in total, so the *fraction* depends entirely on how
-    /// far the run is drained (the same 15 000/7 000 pairing reads as 80 % over a 10 000-reply run and
-    /// 8.8 % over a 90 775-reply one). With openers ≥ ring the gap is zero and every reply opens, at
-    /// any ratio tried.
+    /// do replies start decrypting. Measured against the shipped stores, on a pure drain of a
+    /// buffer that has already overflowed: ring 15 000 / openers 7 000 strands exactly 8 000 of its
+    /// 15 000 replies (53 %), and ring 100 000 / openers 7 000 strands exactly 93 000 of its 100 000
+    /// (93 %). The count is the gap; the fraction is that count over however many replies the run
+    /// actually spends, which is why a percentage is not the right way to state it. With openers ≥
+    /// ring the gap is zero and every reply opens, at every ratio tried.
     ///
     /// The position of the gap moves with the pop order, its size does not. Under the LIFO order v4
     /// used, pops take the newest SURBs, whose openers the newest-keeping cache still holds, so the
@@ -1563,11 +1563,13 @@ mod tests {
         Ok(())
     }
 
-    /// Eviction stays age-ordered even when pops rotate across windows.
+    /// Eviction ages entries by arrival, not by `HoprSurbId`.
     ///
-    /// Rotation must not be allowed to change *which* SURBs are retained: the retained set has to stay
-    /// the newest `capacity`, because that is the set the creator's reply-opener cache still covers.
-    /// Rotating eviction instead measured 58.6 % undecryptable replies against 0 % for this rule.
+    /// The retained set must stay the newest `capacity` SURBs, because that is the set the creator's
+    /// reply-opener cache still covers. This pins the *ordering key*: ids descend here, so an
+    /// implementation that aged by comparing ids would evict the wrong entry. (It does not pin the
+    /// bucketing itself — with one bucket the two rules coincide; for that see
+    /// [`surb_ring_buffer_should_evict_by_age_not_by_cursor`].)
     #[test]
     fn surb_ring_buffer_should_evict_the_oldest_share_across_windows() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
@@ -1625,7 +1627,8 @@ mod tests {
     /// An exact-ID lookup must agree with the SURB a pop would actually take, under rotation.
     ///
     /// `pop_one_if_has_id` peeks the same SURB `pop_next` would remove; if the peek followed a
-    /// different order the lookup would silently miss.
+    /// different order the lookup would silently miss. This pins that agreement; it does not by
+    /// itself prove rotation, which [`surb_ring_buffer_should_rotate_across_emission_windows`] covers.
     #[test]
     fn surb_ring_buffer_should_check_the_rotating_window_for_an_exact_id() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
