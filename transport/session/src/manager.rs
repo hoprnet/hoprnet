@@ -1224,6 +1224,12 @@ pub enum DropReason {
     /// No slot for this session id is registered (formerly the `UnknownData` error): the session
     /// was fully deregistered before this packet arrived.
     Unregistered,
+    /// A Start-protocol message that names no state on this node it could ever be handled by:
+    /// neither a Session slot nor a pending initiation under the pseudonym it arrives under. That
+    /// includes one naming a *registered* Session under a mismatched sender pseudonym, which speaks
+    /// about someone else's Session. Rejected at dispatch, before it can occupy a shared handler;
+    /// benign, and quiet for the same reason the others are.
+    StaleStartMessage,
 }
 
 /// Indicates the result of processing a message.
@@ -2125,6 +2131,21 @@ pub struct SessionManager<S> {
     /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
     /// Keyed by SessionId so that only waiters for the relevant session are woken.
     slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
+    /// Pseudonyms of outgoing Session initiations currently in flight.
+    ///
+    /// `session_initiations` is keyed by challenge, but a Start message arriving from the peer
+    /// names the Session by its pseudonym. This is the pseudonym-keyed half, so `dispatch_message`
+    /// can tell in one lookup whether an inbound `SsaRequest` belongs to an initiation this node is
+    /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
+    /// by [`PendingOutgoingGuard`] on every failure path and once the slot exists; the TTL is a
+    /// backstop matching `session_initiations`'.
+    ///
+    /// An initiation claims its entry atomically (see `new_session`), so a marker is owned by at
+    /// most one attempt at a time: a second initiation for a pseudonym that is still pending is
+    /// refused rather than allowed to overwrite the first one's reservation. The value is a
+    /// per-claim token, which lets [`PendingOutgoingGuard`] tell its own claim from a newer one
+    /// that reused the name after the TTL backstop expired the older marker.
+    pending_outgoing: moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -2174,6 +2195,7 @@ impl<S> Clone for SessionManager<S> {
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
+            pending_outgoing: self.pending_outgoing.clone(),
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
         }
@@ -2276,6 +2298,67 @@ fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evict
     estimator
         .evicted
         .fetch_add(evicted, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Removes an outgoing Session's pseudonym from the manager's pending index when dropped.
+///
+/// The index is keyed by the pseudonym the initiation is made under, but the paths that would
+/// otherwise clear it key on the peer-supplied `session_id`, which arrives in the establishment
+/// reply and is never checked against the pseudonym — a mismatched one would clear someone else's
+/// marker, and every early return and a dropped future would clear no one's. The guard ties the
+/// cleanup to the pseudonym actually inserted, so no path has to remember it.
+///
+/// The removal is ownership-checked rather than a plain `remove`, because the marker's TTL is only
+/// a backstop and the guard can outlive it: an initiation that times out runs almost to the TTL,
+/// so a few ticks of clock skew — or a task descheduled between the await resolving and the future
+/// being polled to completion — put the drop past expiry. Once expired, moka reports the key as
+/// absent, so a newer initiation for the same pseudonym can claim the name again; when this guard
+/// then drops, an unconditional `remove` would tear down the newer attempt's marker and leave its
+/// in-flight initiation invisible to the dispatch filter, which would drop that Session's
+/// `SsaRequest`s as `StaleStartMessage`. Comparing the entry's generation token restricts the
+/// removal to the marker this guard's own claim created.
+struct PendingOutgoingGuard<'a> {
+    pending: &'a moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
+    pseudonym: HoprPseudonym,
+    token: PendingOutgoingToken,
+}
+
+impl Drop for PendingOutgoingGuard<'_> {
+    fn drop(&mut self) {
+        // `and_compute_with` reads under moka's per-key compute lock and reports an expired entry
+        // as absent, so an expired marker of ours falls through to `Op::Nop` and nothing is left
+        // to clean up; a marker another attempt claimed after our expiry is likewise left to that
+        // attempt's own guard.
+        self.pending.entry(self.pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                match entry {
+                    // Still ours.
+                    Some(entry) if entry.value() == &self.token => moka::ops::compute::Op::Remove,
+                    // Absent (expired, or already removed by the success path), or a newer
+                    // attempt's claim: nothing to do.
+                    _ => moka::ops::compute::Op::Nop,
+                }
+            },
+        );
+    }
+}
+
+/// Per-claim token distinguishing one initiation's marker from another attempt's under the same
+/// pseudonym.
+///
+/// Uniqueness only has to hold for the lifetime of one claim, which the atomic claim in
+/// `new_session` serialises: two guards for the same pseudonym never overlap on a live marker.
+/// A per-process counter is enough for that, and `Copy` keeps the token cheap to move into and
+/// compare inside the compute closure.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct PendingOutgoingToken(u64);
+
+impl PendingOutgoingToken {
+    fn next() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
 }
 
 async fn send_via_msg_sender<S, D>(
@@ -2448,6 +2531,10 @@ where
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
+            pending_outgoing: moka::sync::Cache::builder()
+                .max_capacity(maximum_sessions as u64)
+                .time_to_live(initiation_timeout)
+                .build(),
             // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
             // race for it, and one evicted between two cycles is simply recreated by the next request.
             // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
@@ -2616,9 +2703,9 @@ where
                             }
                             HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
                             HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(error_type).await
+                                myself.handle_session_error(pseudonym, error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
                                 myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
@@ -2825,6 +2912,46 @@ where
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
+        // Atomically claim the pseudonym in `pending_outgoing` before the initiation is sent so
+        // that a fast Exit's `SsaRequest` — which names the Session by this pseudonym, not by the
+        // challenge — finds it at dispatch. The guard removes it on every path below that does not
+        // reach `drop(_pending_guard)`: each early return, a dropped future, and the two
+        // `allocate_session_slot` failures, which are keyed by the peer-supplied `session_id` and
+        // so cannot clear it themselves.
+        //
+        // The claim, not a plain `insert`, because `moka`'s `insert` would silently overwrite an
+        // existing reservation: two concurrent `new_session` calls under the same explicit
+        // pseudonym would both hold a guard over one shared marker, and the first one to finish
+        // would clear it while the other is still in flight — an `SsaRequest` for that initiation
+        // would then fail the dispatch filter and be dropped as `StaleStartMessage`. Refusing the
+        // overlapping initiation instead keeps each marker owned by exactly one attempt.
+        //
+        // The claim happens AFTER the challenge reservation above, so a failed claim must also
+        // release that reservation: it was taken for an initiation that never starts, and leaving
+        // it would shrink the initiation window for every later attempt.
+        let token = PendingOutgoingToken::next();
+        let claim_result = self.pending_outgoing.entry(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                if entry.is_none() {
+                    moka::ops::compute::Op::Put(token)
+                } else {
+                    // Another initiation already holds this pseudonym.
+                    moka::ops::compute::Op::Nop
+                }
+            },
+        );
+        if !matches!(claim_result, moka::ops::compute::CompResult::Inserted(_)) {
+            self.session_initiations.remove(&challenge);
+            return Err(SessionManagerError::Unacceptable(format!(
+                "an outgoing Session initiation under pseudonym {pseudonym} is already in flight"
+            ))
+            .into());
+        }
+        let _pending_guard = PendingOutgoingGuard {
+            pending: &self.pending_outgoing,
+            pseudonym,
+            token,
+        };
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
@@ -2995,8 +3122,19 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose. Cleared here, before the SURB readiness wait below, which can take
+                    // seconds, rather than after it.
+                    drop(_pending_guard);
 
                     // Prevent the slot from being evicted by time_to_idle while SURBs are
                     // pre-loading. Each `get()` call resets the idle timer; the task is
@@ -3118,8 +3256,18 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose.
+                    drop(_pending_guard);
 
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_NUM_INITIATED_SESSIONS.increment();
@@ -3175,6 +3323,10 @@ where
                     %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
+                // A rejected initiation can never become a Session, so nothing legitimate can name
+                // its pseudonym any more. `handle_session_error` removes the *challenge*, but only
+                // this call knows the pseudonym the rejection was made under — which the guard
+                // removes here.
                 Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
@@ -4227,6 +4379,58 @@ where
             .collect()
     }
 
+    /// Whether an `SsaRequest` for `session_id` names SSA state this node holds or is making.
+    ///
+    /// Only the Exit asks for SSA commitments, and only of its own Entry: a Session this node holds
+    /// as an outgoing (`Forward`) slot, or one this node is still initiating (`pending_outgoing`).
+    /// An Exit-side (`Return`) slot never legitimately receives one, so a request naming one is
+    /// refused.
+    ///
+    /// Lives on [`Self::start_message_is_for_local_state`] only. [`Self::handle_ssa_request`]
+    /// re-checks the two cheap halves of it (slot present, or initiation pending) as a backstop, but
+    /// deliberately not the variant — see there.
+    fn ssa_request_names_local_state(&self, session_id: &SessionId) -> bool {
+        self.pending_outgoing.contains_key(session_id)
+            || self
+                .sessions
+                .get(session_id)
+                .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+    }
+
+    /// Whether a Start-protocol message names Session state this node actually holds.
+    ///
+    /// Start messages share one bounded worker pool, and several handlers park a worker on state a
+    /// bogus message will never have — `handle_ssa_request` waits up to a second for a Session slot
+    /// a random pseudonym never gets. Deciding admission here, where the session lookup is already
+    /// being done, keeps those messages off the pool entirely.
+    fn start_message_is_for_local_state(&self, pseudonym: &HoprPseudonym, msg: &HoprStartProtocol) -> bool {
+        match msg {
+            // Creates the state the other arms are checked against.
+            HoprStartProtocol::StartSession(_) => true,
+
+            // Per-Session control traffic. The pseudonym a Start message arrives under is the
+            // Session's own pseudonym on both sides, so a mismatch names someone else's Session.
+            HoprStartProtocol::KeepAlive(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+            HoprStartProtocol::SsaCommit(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+
+            // Only the Exit asks for SSA commitments, and only of its own Entry: an outgoing
+            // (Forward) Session, or one this node is still initiating. An Exit-side (Return) slot
+            // never legitimately receives one.
+            HoprStartProtocol::SsaRequest(m) => {
+                m.session_id == *pseudonym && self.ssa_request_names_local_state(&m.session_id)
+            }
+
+            // Both are replies to something this node sent: an initiation named by challenge, or —
+            // for `SessionError` only — a post-establishment error naming a registered Session by
+            // its id.
+            HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
+            HoprStartProtocol::SessionError(err) => match err.identifier {
+                ErrorIdentifier::Challenge(challenge) => self.session_initiations.contains_key(&challenge),
+                ErrorIdentifier::SessionId(id) => id == *pseudonym && self.sessions.contains_key(&id),
+            },
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -4241,8 +4445,10 @@ where
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
             // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
-            // before handing it to the protocol worker; incoming Sessions receive this traffic from
-            // the Entry over the forward path and must not be credited.
+            // before anything else: the decode and the admission filter below can both drop the
+            // message, and a packet that is dropped here has already spent its return SURB, so the
+            // credit must not depend on it being decodable or admitted. Incoming Sessions receive
+            // this traffic from the Entry over the forward path and must not be credited.
             if let Some(session_slot) = self.sessions.get(&pseudonym)
                 && matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. })
             {
@@ -4259,15 +4465,31 @@ where
                     .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
             }
 
+            // Decode once, then decide locally whether anything on this node could handle it.
+            // Without this check a peer spraying Start messages for pseudonyms it invented occupies
+            // the shared Start-protocol worker pool — several handlers park a worker on state such
+            // a message never has — and the bounded queue then fills, dropping every message behind
+            // it.
+            let msg = HoprStartProtocol::try_from(in_data.data)?;
+
+            if !self.start_message_is_for_local_state(&pseudonym, &msg) {
+                // Quiet on purpose: a peer spraying Start messages for pseudonyms we never issued
+                // must not be able to fill the log any more than it can fill the handler pool.
+                trace!(%pseudonym, "dropping Start protocol message that names no local session");
+                crate::counters::SESSION_STALE_START_MESSAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_DISPATCHED_MSGS.increment_by(&["dropped_stale_start"], 1);
+                return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
+            }
+
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
-                start_protocol_tx
-                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
-                    .map_err(|error| {
-                        error!(%error, "failed to send Start protocol message to processing task");
-                        SessionManagerError::other(error)
-                    })?;
+                start_protocol_tx.try_send((pseudonym, msg)).map_err(|error| {
+                    crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    error!(%error, "failed to send Start protocol message to processing task");
+                    SessionManagerError::other(error)
+                })?;
             } else {
                 return Err(SessionManagerError::NotStarted.into());
             }
@@ -5116,7 +5338,11 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+    async fn handle_session_error(
+        &self,
+        pseudonym: HoprPseudonym,
+        error_type: StartErrorType<SessionId>,
+    ) -> errors::Result<()> {
         let reason = error_type.reason;
         match error_type.identifier {
             ErrorIdentifier::Challenge(challenge) => {
@@ -5135,6 +5361,10 @@ where
                 }
             }
             ErrorIdentifier::SessionId(session_id) => {
+                if session_id != pseudonym {
+                    debug!(%pseudonym, %session_id, "dropping session error naming a different session");
+                    return Ok(());
+                }
                 error!(
                     %session_id, %reason,
                     "received post-establishment session error — closing session"
@@ -5151,7 +5381,19 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self, msg))]
-    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> errors::Result<()> {
+    async fn handle_keep_alive(
+        &self,
+        pseudonym: HoprPseudonym,
+        msg: KeepAliveMessage<SessionId>,
+    ) -> errors::Result<()> {
+        // The pseudonym a Start message arrives under is the Session's own pseudonym on both sides,
+        // so a mismatch means the sender is naming someone else's Session. Pseudonyms are 80 random
+        // bits, so this only matters on a leak — which is exactly when it matters.
+        if msg.session_id != pseudonym {
+            debug!(%pseudonym, session_id = %msg.session_id, "dropping keep-alive naming a different session");
+            return Ok(());
+        }
+
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -5498,6 +5740,20 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
+        // Deliberately narrower than the dispatch filter's `SsaRequest` arm
+        // (`ssa_request_names_local_state`), which additionally requires the slot to be an outgoing
+        // (`Forward`) one: a compliant peer never sends an `SsaRequest` to an Exit-side (Return)
+        // slot, so dispatch drops that case outright, and re-checking the variant here would only
+        // re-decide what dispatch already decided on the same in-memory state. This guard is the
+        // backstop for the state changing between the two — a message that sat queued long enough
+        // for the session it names to close, or for a `pending_outgoing` initiation to be removed —
+        // and for callers that bypass dispatch entirely. Refusing here rather than after the wait
+        // below is what kept a flood of bogus requests from parking the shared handler pool.
+        if self.sessions.get(&msg.session_id).is_none() && !self.pending_outgoing.contains_key(&msg.session_id) {
+            trace!(session_id = %msg.session_id, "refusing an SSA request for a session this node does not hold");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
         // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
         // has finished allocating the session slot, since both SessionEstablished and SsaRequest
         // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
@@ -5508,7 +5764,7 @@ where
             let waiter_deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 if Instant::now() >= waiter_deadline {
-                    error!(%session_id, "session slot waiter deadline exceeded");
+                    debug!(%session_id, "session slot waiter deadline exceeded");
                     return Err(SessionManagerError::NonExistingSession.into());
                 }
                 // Optimistic cache check
@@ -5554,7 +5810,7 @@ where
                             break slot;
                         }
 
-                        error!(%session_id, "session slot not found after awaiting allocation");
+                        debug!(%session_id, "session slot not found after awaiting allocation");
                         return Err(SessionManagerError::NonExistingSession.into());
                     }
                 }
@@ -6569,6 +6825,232 @@ mod tests {
         // Cleanup: close sender and await handle
         alice_sender.close_channel();
         alice_handle.await??;
+
+        Ok(())
+    }
+
+    /// A failed initiation must leave no `pending_outgoing` marker behind: the marker is what lets
+    /// an `SsaRequest` for the pseudonym wait for a slot at dispatch, and a marker outliving its
+    /// attempt would park a handler on a Session that never arrives — one per leaked attempt, for
+    /// as long as the entry's TTL. The marker was once cleared by hand on each failure path and
+    /// keyed by the peer-supplied `session_id`; the guard that replaces it removes it keyed by the
+    /// pseudonym it was inserted under, on every path.
+    ///
+    /// ## Steps
+    /// 1. The transport swallows the `StartSession` message, so the initiation is never answered and times out (the
+    ///    deterministic failure path; a loopback needs a live manager for it to bounce off).
+    /// 2. `new_session` under a fixed pseudonym fails with `Timeout`.
+    /// 3. An `SsaRequest` naming that pseudonym must be dropped as stale at dispatch — no marker left to admit it.
+    #[test_log::test(tokio::test)]
+    async fn a_failed_session_initiation_must_leave_no_pending_outgoing_marker() -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the StartSession: the initiation times out.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let result = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+        assert!(
+            matches!(result, Err(TransportSessionError::Timeout)),
+            "the fixture must actually fail the initiation, got {result:?}"
+        );
+
+        // With no marker left, the same request a fast Exit could have raced ahead of is refused at
+        // dispatch instead of parking a handler on a slot that will never exist.
+        let refused = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(refused, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "an SsaRequest for a failed initiation's pseudonym must be stale, got {refused:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A second initiation for a pseudonym already claimed by one in flight must be refused, not
+    /// silently overwrite the first one's `pending_outgoing` reservation.
+    ///
+    /// `moka`'s `insert` overwrites an existing entry, so the claim the first initiation holds used
+    /// to be a single shared marker: whichever attempt finished first removed it while the other
+    /// was still awaiting establishment, and an `SsaRequest` for that Session then failed the
+    /// dispatch filter and was dropped as `StaleStartMessage` — a false negative, the exact class
+    /// of miss the filter must not have. `new_session` therefore claims the name atomically and
+    /// refuses the overlap.
+    ///
+    /// ## Steps
+    /// 1. Alice's transport swallows the first `StartSession` (expectation `.once()`), so that initiation stays in
+    ///    flight; its `pending_outgoing` marker is held by its guard.
+    /// 2. A second `new_session` under the SAME pseudonym must fail with `Unacceptable` — and must not have sent
+    ///    anything (the refusal happens before the send).
+    /// 3. The refusal must not have consumed a challenge slot: `session_initiations.entry_count()` stays at 1, the
+    ///    first attempt's reservation.
+    /// 4. The first initiation still owns the marker (its `SsaRequest` dispatches as in flight), and then times out
+    ///    cleanly, leaving no marker and no challenge reservation behind.
+    ///
+    /// Sequential rather than `tokio::join!`-concurrent: the property pinned is that the *second*
+    /// call sees the first one's live claim, which is what the atomic compute serialises — running
+    /// them concurrently would only randomise which call is "first" without strengthening the
+    /// assertion, while the in-flight fixture (swallowed send) requires the first call to be
+    /// parked in its await for the second to observe the claim.
+    #[test_log::test(tokio::test)]
+    async fn a_second_initiation_for_a_pending_pseudonym_must_be_refused_without_consuming_a_challenge_slot()
+    -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the FIRST StartSession only: that initiation stays in flight holding its claim.
+        // The refused attempt must never reach the transport, so `.once()` also pins that.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let client_cfg = SessionClientConfig {
+            capabilities: None.into(),
+            pseudonym: alice_pseudonym.into(),
+            surb_management: None,
+            ..Default::default()
+        };
+
+        // Park the first initiation in flight: the transport swallowed its StartSession, so it
+        // holds both its challenge reservation and its pending-outgoing claim for the whole of
+        // this call's initiation timeout.
+        let in_flight = alice_mgr.new_session(
+            bob_peer,
+            SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            client_cfg.clone(),
+        );
+        futures::pin_mut!(in_flight);
+
+        // Poll the in-flight attempt exactly once, which runs it up to its first await: the claim
+        // (and the challenge reservation) are taken before the send, so a single pending poll is
+        // enough to make the overlap observable — no sleeps, and no runtime-dependent ordering.
+        assert!(
+            futures::poll!(in_flight.as_mut()).is_pending(),
+            "fixture: the swallowed StartSession must leave the initiation pending"
+        );
+
+        // The first attempt's claim is live: an SsaRequest naming the pseudonym is admitted at
+        // dispatch as belonging to an initiation this node is still making (it goes to the handler
+        // pool rather than being dropped as stale).
+        let admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(admitted, DispatchResult::Processed),
+            "an SsaRequest for the in-flight initiation must be admitted, got {admitted:?}"
+        );
+
+        let before = {
+            // moka defers the write op: without this the count is read before the insertion lands.
+            alice_mgr.session_initiations.run_pending_tasks();
+            alice_mgr.session_initiations.entry_count()
+        };
+        assert_eq!(
+            before, 1,
+            "fixture: the in-flight initiation must hold exactly one challenge reservation"
+        );
+
+        // The overlap: the same pseudonym, still pending. Must be refused, not allowed to
+        // overwrite the first attempt's reservation.
+        let refused = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                client_cfg,
+            )
+            .await;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "a second initiation under a pending pseudonym must be refused as Unacceptable, got {refused:?}"
+        );
+
+        // The refusal happened after the challenge reservation but before the send, and released
+        // its own reservation: exactly the in-flight one remains, none consumed by the refusal.
+        alice_mgr.session_initiations.run_pending_tasks();
+        let after = alice_mgr.session_initiations.entry_count();
+        assert_eq!(
+            after, before,
+            "the refused attempt must not consume a challenge slot (before: {before}, after: {after})"
+        );
+        assert_eq!(
+            alice_mgr.num_active_sessions(),
+            0,
+            "neither attempt may have allocated a session slot"
+        );
+
+        // The first initiation is unaffected by the refusal and still owns the claim.
+        let still_admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(still_admitted, DispatchResult::Processed),
+            "the refusal must not have cleared the in-flight initiation's claim, got {still_admitted:?}"
+        );
+
+        // The in-flight initiation then times out cleanly: no marker, no challenge reservation.
+        let timed_out = in_flight.await;
+        assert!(
+            matches!(timed_out, Err(TransportSessionError::Timeout)),
+            "the first initiation must still fail on its own timeout, got {timed_out:?}"
+        );
+        assert_eq!(
+            {
+                alice_mgr.session_initiations.run_pending_tasks();
+                alice_mgr.session_initiations.entry_count()
+            },
+            0,
+            "the timed-out initiation must release its challenge reservation"
+        );
+        let stale = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(stale, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "after the timeout, the pseudonym's marker must be gone, got {stale:?}"
+        );
 
         Ok(())
     }
@@ -8343,7 +8825,9 @@ mod tests {
             identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
-        mgr.handle_session_error(error_type).await?;
+        // The error is challenge-identified, so the handler ignores the sender's pseudonym on this
+        // arm; `new_session` picks a random one, and none is captured here.
+        mgr.handle_session_error(HoprPseudonym::random(), error_type).await?;
 
         // new_session must propagate the error as Rejected.
         let result = handle.await?;
@@ -9817,6 +10301,16 @@ mod tests {
             .map(|slot| slot.surb_mgmt.organic_surbs_per_packet())
     }
 
+    /// The Exit → Entry return-SURB credit the slot has accumulated, which the successor gate is
+    /// denominated in.
+    fn returned_packets_of(mgr: &TestManager, pseudonym: HoprPseudonym) -> u64 {
+        mgr.sessions
+            .get(&pseudonym)
+            .expect("slot must exist")
+            .returned_packets
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     fn session_packet_signalling(signals: PacketSignals) -> anyhow::Result<ApplicationDataIn> {
         let mut data = session_data_packet(b"reply")?;
         data.packet_info.signals_from_sender = signals;
@@ -9893,6 +10387,70 @@ mod tests {
         Ok(())
     }
 
+    /// An Exit → Entry Start packet consumes a return SURB whatever it decodes to and wherever it
+    /// is admitted, so the credit that denominates the successor gate must be paid before the
+    /// decode and the admission filter, not after them. A packet the filter rejects has already
+    /// spent the SURB — under-crediting it can make the gate refuse the next `RequestSsa` and the
+    /// Session close with `CommitmentTimeout`.
+    ///
+    /// ## Steps
+    /// 1. An Entry-side (`Forward`) slot is pre-populated with its gate closed.
+    /// 2. A `KeepAlive` naming another Session — the filter's mismatched-pseudonym drop — must still credit
+    ///    `returned_packets` by one.
+    /// 3. A Start-tagged packet that fails to decode must credit it by one too.
+    #[test_log::test(tokio::test)]
+    async fn a_start_packet_the_filter_drops_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // The manager is not started, but that only matters past the filter; this one is dropped at
+        // the filter itself, for naming a Session the pseudonym it arrives under does not own.
+        let dropped = mgr.dispatch_message(
+            pseudonym,
+            keep_alive_packet_signalling(HoprPseudonym::random(), PacketSignals::default())?,
+        )?;
+        assert!(
+            matches!(dropped, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "the fixture must actually drop this packet at the filter, got {dropped:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet the filter drops has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
+    /// The undecodable half of the same regression: the decode runs after the credit, so a
+    /// Start-tagged packet that fails to parse must still have credited the return SURB it spent.
+    #[test_log::test(tokio::test)]
+    async fn an_undecodable_start_packet_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // Start-protocol tag, but a payload that parses to no Start-protocol message.
+        let mut undecodable = session_data_packet(b"not a start message")?;
+        undecodable.data.application_tag = HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG;
+
+        let result = mgr.dispatch_message(pseudonym, undecodable);
+        assert!(
+            result.is_err(),
+            "the fixture must actually fail to decode this packet, got {result:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet that cannot be decoded has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
     /// Distress is a running state, not a latch: the counterparty recomputes it per packet and stops
     /// setting it once its pool recovers, so a clean packet has to close the gate again.
     #[test_log::test(tokio::test)]
@@ -9939,6 +10497,310 @@ mod tests {
             "an incoming Session must not take the signal as licence to mint"
         );
 
+        Ok(())
+    }
+
+    /// Encodes a [`HoprStartProtocol`] message into the packet form `dispatch_message` takes.
+    ///
+    /// The Start tag is what `dispatch_message` routes on, exactly as
+    /// [`keep_alive_packet_signalling`] builds its packet.
+    fn start_packet(msg: HoprStartProtocol) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::try_from(msg)?,
+            packet_info: Default::default(),
+        })
+    }
+
+    /// An `SsaRequest` for `session_id` with a single identity-element commitment.
+    ///
+    /// The Exit-side point is not checked in dispatch, so the identity element
+    /// ([`ssa_request_for`]) is enough for the message to be decodable and well-formed.
+    fn ssa_request_packet(session_id: SessionId) -> anyhow::Result<ApplicationDataIn> {
+        start_packet(HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            small_pix_params(),
+            ssa_request_for(1),
+            [],
+        )))
+    }
+
+    /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
+    ///
+    /// Before the admission filter, every one of these reached the shared Start-protocol worker
+    /// pool, where `handle_ssa_request` parked its handler for up to a second on a Session slot a
+    /// random pseudonym never gets; ~110 concurrent requests occupied every handler and the bounded
+    /// Start queue then dropped all traffic behind them — including the KeepAlives of live Sessions.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one live (pre-populated Forward) Session.
+    /// 2. ~300 `SsaRequest`s are dispatched, each for a fresh random pseudonym.
+    /// 3. Every one must come back `Dropped(StaleStartMessage)`, counted, and nothing may reach the bounded queue — the
+    ///    send-drop counter must not move.
+    /// 4. A `KeepAlive` for the live Session's own pseudonym must still be dispatched, proving the flood cannot have
+    ///    starved real control traffic.
+    #[test_log::test(tokio::test)]
+    async fn a_flood_of_ssa_requests_for_unknown_pseudonyms_must_not_starve_a_live_session() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let live_pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(
+            live_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(live_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+
+        let stale_before = crate::counters::session_stale_start_message_count();
+        let send_drops_before = crate::counters::start_protocol_send_drop_count();
+
+        const FLOOD: usize = 300;
+        for _ in 0..FLOOD {
+            let stranger = HoprPseudonym::random();
+            let result = mgr.dispatch_message(stranger, ssa_request_packet(stranger)?);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+                "an SSA request for a pseudonym this node never issued must be dropped as stale, got {result:?}"
+            );
+        }
+
+        assert!(
+            crate::counters::session_stale_start_message_count() >= stale_before + FLOOD,
+            "every flooded request must be counted as a stale Start message"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "nothing may reach the bounded queue: the filter must run before try_send"
+        );
+
+        // The live Session's control traffic must still be dispatched — the property the flood used
+        // to destroy by filling the queue.
+        let kept_alive = mgr.dispatch_message(
+            live_pseudonym,
+            keep_alive_packet_signalling(live_pseudonym, PacketSignals::default())?,
+        );
+        assert!(
+            matches!(kept_alive, Ok(DispatchResult::Processed)),
+            "the live Session's keep-alive must still get through, got {kept_alive:?}"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "the keep-alive must not have been dropped at try_send either"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The filter must not be broader than the attack: an `SsaRequest` an Exit legitimately sends to
+    /// its Entry is admitted, while the same request arriving on an Exit-side (Return) slot — which
+    /// no compliant peer ever sends — is dropped as stale.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one Forward (outgoing/Entry-side) slot.
+    /// 2. An `SsaRequest` naming it is admitted to the queue.
+    /// 3. A second Return (incoming/Exit-side) slot; the same request naming it is dropped.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_request_for_an_outgoing_session_is_admitted_and_one_for_an_exit_slot_is_not() -> anyhow::Result<()>
+    {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        // Outgoing (Entry-side) slot: the Entry receives SSA commitments for it, so the request is
+        // legitimate and must be admitted.
+        let entry_pseudonym = HoprPseudonym::random();
+        let _entry_rx = mgr.pre_populate_session_with_receiver(
+            entry_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(entry_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let admitted = mgr.dispatch_message(entry_pseudonym, ssa_request_packet(entry_pseudonym)?);
+        assert!(
+            matches!(admitted, Ok(DispatchResult::Processed)),
+            "an SSA request for an outgoing Session must be admitted, got {admitted:?}"
+        );
+
+        // Incoming (Exit-side) slot: nothing here ever receives an SSA commitment for one.
+        let exit_pseudonym = HoprPseudonym::random();
+        let _exit_rx =
+            mgr.pre_populate_session_with_receiver(exit_pseudonym, DestinationRouting::Return(exit_pseudonym.into()));
+        let refused = mgr.dispatch_message(exit_pseudonym, ssa_request_packet(exit_pseudonym)?);
+        assert!(
+            matches!(refused, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "an SSA request for an incoming Session must be dropped as stale, got {refused:?}"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// Keep-alives and post-establishment session errors naming another Session must be ignored.
+    ///
+    /// A sender names a Session both by the pseudonym it sends under and by the Session id inside
+    /// the message; the two are the same on both sides of a real Session, so a mismatch means the
+    /// sender is speaking about someone else's Session — only reachable if that id leaked. The
+    /// dispatch filter rejects such a message outright, and the handlers refuse it again (point 4 of
+    /// the fix) so the property does not rest on dispatch alone.
+    ///
+    /// ## Steps
+    /// 1. Two Return slots A and B are pre-populated with known balancer targets.
+    /// 2. A `KeepAlive { session_id: B }` arriving under A is refused — at dispatch, and again by the handler when
+    ///    reached directly — and B's balancer target is untouched.
+    /// 3. A `SessionError { identifier: SessionId(B) }` arriving under A is refused the same way, and B stays active.
+    /// 4. Control: the same messages under B's own pseudonym do take effect.
+    #[test_log::test(tokio::test)]
+    async fn keep_alives_and_session_errors_naming_another_session_are_ignored() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let a = HoprPseudonym::random();
+        let b = HoprPseudonym::random();
+        for pseudonym in [a, b] {
+            let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+            let slot = mgr
+                .sessions
+                .get(&pseudonym)
+                .ok_or_else(|| anyhow::anyhow!("slot for {pseudonym} must exist"))?;
+            // Non-disabled balancer with a known target, so the KeepAlive branch is reachable.
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+        }
+
+        let b_target_before = mgr
+            .sessions
+            .get(&b)
+            .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+            .surb_mgmt
+            .controller_bounds()
+            .target();
+
+        let cross_keep_alive = KeepAliveMessage {
+            session_id: b,
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: b_target_before + 1,
+        };
+
+        // Through dispatch, the admission filter refuses it before any handler runs.
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::KeepAlive(cross_keep_alive.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a keep-alive naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+
+        // Point 4: the handler refuses it again even when reached directly, so the property does not
+        // rest on the dispatch filter alone.
+        mgr.handle_keep_alive(a, cross_keep_alive.clone())
+            .await
+            .context("the keep-alive handler must refuse quietly, not error")?;
+        assert_eq!(
+            b_target_before,
+            mgr.sessions
+                .get(&b)
+                .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                .surb_mgmt
+                .controller_bounds()
+                .target(),
+            "a keep-alive naming another session must not move its balancer target"
+        );
+
+        // The same for a post-establishment session error naming B.
+        let cross_error = StartErrorType {
+            identifier: ErrorIdentifier::SessionId(b),
+            reason: StartErrorReason::Unknown,
+        };
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::SessionError(cross_error.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a session error naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+        mgr.handle_session_error(a, cross_error)
+            .await
+            .context("the session-error handler must refuse quietly, not error")?;
+        assert!(
+            mgr.active_sessions().contains(&b),
+            "a session error naming another session must not close it"
+        );
+
+        // Control: the same messages under B's own pseudonym do take effect. Dispatch hands the
+        // message to the Start-protocol worker, so the effect is asynchronous and polled for.
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: b,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: b_target_before + 2,
+            }))?,
+        )?;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let target = mgr
+                    .sessions
+                    .get(&b)
+                    .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                    .surb_mgmt
+                    .controller_bounds()
+                    .target();
+                if target == b_target_before + 2 {
+                    return Ok::<(), anyhow::Error>(());
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed keep-alive must still update the target")??;
+
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::SessionId(b),
+                reason: StartErrorReason::Unknown,
+            }))?,
+        )?;
+        let closed = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if !mgr.active_sessions().contains(&b) {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed session error must close the session");
+        closed?;
+
+        sender.close_channel();
         Ok(())
     }
 
