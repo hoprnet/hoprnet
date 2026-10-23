@@ -98,7 +98,8 @@ fn default_eviction_report_threshold() -> u64 {
 /// end is what an overflow then discards. Measured against the real reconstructor at the deployed
 /// dimensions, a 5 % contiguous loss of a cycle is enough to stop it recovering, while 50 % spread
 /// loss recovers every time — the surplus is calibrated for loss that is independent per share, not
-/// for a contiguous block of it.
+/// for a contiguous block of it. The committed test `tests/surb_pix_recovery.rs` runs a scaled-down
+/// cycle for CI speed and pins that shape rather than these exact figures.
 ///
 /// So LIFO was an unusable option, but FIFO is not its fix; it is the same failure with the opposite
 /// sign. What actually bounds the damage is [`SurbShareInfo::emission_window`]: the buffer buckets
@@ -163,8 +164,9 @@ pub struct SurbStoreConfig {
     /// come back, and any SURB evicted before it is spent is a share lost for good.
     ///
     /// Measured against the real `SsaReconstructor` at deployed dimensions, with the reply-opener
-    /// cache large enough not to bind, recovery as a function of capacity and of how many SURBs
-    /// arrive per reply (`YES` = the whole cycle reconstructed):
+    /// cache large enough not to bind. Each cell is the number of polynomials that reached threshold
+    /// out of 4096 — so `YES` means all 4096 reconstructed and the cycle paid; a bare number is a
+    /// *failure* that recovered only that many:
     ///
     /// | SURBs/reply | 30 000 | 60 000 | 100 000 | 150 000 | 227 328 | 300 000 | 454 656 |
     /// |---|---|---|---|---|---|---|---|
@@ -226,10 +228,23 @@ pub struct SurbStoreConfig {
     /// reply arrives on is always one whose opener is still held.
     ///
     /// Invert the ordering — a ring larger than this cache — and the ring can hand back a SURB whose
-    /// opener this side has already dropped. Measured against the shipped stores at 6 SURBs per
-    /// reply: ring 15 000 vs openers 7 000 gives **80 % undecryptable replies**, and ring 100 000 vs
-    /// openers 7 000 gives **93 %**; openers ≥ ring gives **0 %** at every ratio tried. The direction
-    /// of the pop order does not rescue an inverted pair — only the capacity ordering does.
+    /// opener this side has already dropped. Both caches keep their newest, so the two live windows
+    /// are `[F − rb_capacity, F)` on the ring and `[F − this, F)` here; a pop is openable exactly
+    /// while it stays inside the second.
+    ///
+    /// The quantity that breaks is therefore **`rb_capacity − max_openers_per_pseudonym`**, and that
+    /// is the number to reason about rather than a percentage. Those are the replies at the tail of a
+    /// full drain that no opener covers; every reply before them decrypts. Measured against the
+    /// shipped stores: ring 15 000 / openers 7 000 strands exactly 8 000 replies, and ring 100 000 /
+    /// openers 7 000 strands exactly 93 000 — independent of how many replies are sent in total, so
+    /// the *fraction* depends entirely on how far the run is drained (the same 15 000/7 000 pairing
+    /// reads as 80 % over a 10 000-reply run and 8.8 % over a 90 775-reply one). With openers ≥ ring
+    /// the gap is zero and every reply opens, at any ratio tried.
+    ///
+    /// This holds for the shipped FIFO order. Under the LIFO order v4 used, pops take the newest
+    /// SURBs, whose openers the newest-keeping cache still holds, so a *live* stream decrypts fine and
+    /// the gap shows up only in the drain tail — which is why the two orders were not interchangeable
+    /// for this measurement even though neither is correct under PIX.
     ///
     /// Both defaults are 100 000, so the shipped configuration satisfies this. It is not enforced
     /// anywhere, because the two values live in different processes and the pairing is a deployment

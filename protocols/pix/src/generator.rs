@@ -241,8 +241,9 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
 /// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
 /// a time keeps one part live; the full 4096 would keep every part live at once, `polys × threshold`
-/// shares of peak memory. 256 keeps that peak around half a megabyte (0.5 MiB against the 15.1 MiB
-/// `peak_cycle_bytes` admits), at the cost of widening the whole cycle to 8 MiB.
+/// shares of peak memory. 256 keeps that peak at half a megabyte, at the cost of widening the whole
+/// cycle to 8 MiB — against a `peak_cycle_bytes` of roughly 15 MiB (it is curve-dependent: 15.07 MiB
+/// over secp256k1, 14.79 MiB over BabyJubJub, so it is not quoted to a decimal here).
 ///
 /// **What the window buys here is small, and it does not cover the ring's own overshoot.** The
 /// contiguous run this absorbs is `surplus × window` = 20 224 shares at the deployed split, which is
