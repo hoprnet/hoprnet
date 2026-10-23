@@ -908,11 +908,13 @@ pub trait SurbShareInfo {
     /// bucket and rotates across them, which turns the *contiguous* loss a bounded ring otherwise
     /// inflicts into the spread loss the PIX surplus was sized for.
     ///
-    /// `None` means a share-less SURB, which is filed in a single bucket and keeps the buffer's
-    /// behaviour exactly as it was before bucketing existed.
+    /// `None` means a **share-less** SURB, which goes to the share-less tier. A SURB that carries a
+    /// share but names no window is *not* share-less: it must land in the single
+    /// [`WHOLE_EMISSION`] bucket so it keeps share-tier priority, eviction protection and share
+    /// accounting. Returning `None` for it would silently demote it to a plain return path.
     fn share_and_window(&self) -> Option<u32> {
         if self.ssa_index().is_some() {
-            self.emission_window()
+            Some(self.emission_window().unwrap_or(WHOLE_EMISSION))
         } else {
             None
         }
@@ -1120,26 +1122,28 @@ impl<S> GenerationalBuffer<S> {
     /// Removes the entry at the end `order` consumes from in bucket `w`, and advances the cursor past
     /// it.
     fn pop_window(&mut self, w: u32, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
-        let popped = self
-            .shares
-            .get_mut(&w)
-            .and_then(|d| match order {
-                SurbPopOrder::Fifo => d.pop_front(),
-                SurbPopOrder::Lifo => d.pop_back(),
-            })
-            .map(|(id, surb, _)| (id, surb))?;
+        // One map lookup for the pop and the emptiness test together. This is the reply hot path:
+        // every extra `BTreeMap` search here is paid once per reply packet.
+        let (popped, drained) = {
+            let bucket = self.shares.get_mut(&w)?;
+            let popped = match order {
+                SurbPopOrder::Fifo => bucket.pop_front(),
+                SurbPopOrder::Lifo => bucket.pop_back(),
+            };
+            (popped.map(|(id, surb, _)| (id, surb))?, bucket.is_empty())
+        };
         self.share_count -= 1;
-        // Drop the bucket once drained. `VecDeque::pop_front` never releases capacity, so a bucket
-        // that once held `rb_capacity` SURBs keeps that allocation for the life of the buffer — and
-        // a counterparty controls which window each SURB lands in, so it can walk a buffer through
-        // every window and leave a full-size empty allocation behind each time. Removing the key is
-        // what keeps retained memory proportional to what is actually held.
-        if self.shares.get(&w).is_some_and(|d| d.is_empty()) {
+
+        // Drop the bucket once drained. `VecDeque` never releases capacity, and the counterparty
+        // chooses which window each SURB lands in, so a buffer walked through every window would
+        // otherwise leave an `rb_capacity`-sized empty allocation behind at each step.
+        if drained {
             self.shares.remove(&w);
         }
-        // Advance the cursor past this bucket, wrapping. This is the second map lookup of the pop;
-        // it stays because the bucket may now be empty and skipped, and `next_window` only has to
-        // skip empties when the frontier drains rather than on every pop.
+
+        // Advance the cursor past this bucket, wrapping. Only one search: the successor key, or the
+        // lowest key remaining. When the bucket drained, its successor is unchanged by the removal,
+        // so the same lookup serves both cases.
         self.window_cursor = self
             .shares
             .range((std::ops::Bound::Excluded(w), std::ops::Bound::Unbounded))
@@ -1341,6 +1345,9 @@ impl<S> SurbRingBuffer<S> {
             // One call answers both questions, because on the wire they come from the same block:
             // whether this SURB carries a share, and which emission window it belongs to. Asking
             // separately parsed that block twice per SURB.
+            //
+            // `Some(w)` means share-bearing (with `WHOLE_EMISSION` for "carries one, names no
+            // window"); `None` means share-less and goes to the plain tier.
             let window = surb.share_and_window();
             let carries_share = window.is_some();
             let window = window.unwrap_or(WHOLE_EMISSION);
@@ -1859,6 +1866,54 @@ mod tests {
         assert_eq!(1, buckets(&rb), "one window holding the survivors");
         while rb.pop_any().is_some() {}
         assert_eq!(0, buckets(&rb), "drained by eviction and pops alike");
+
+        Ok(())
+    }
+
+    /// A type that carries a share but names no emission window must still count as share-bearing.
+    ///
+    /// The default `share_and_window` is what every implementor other than `HoprSurb` gets, and it
+    /// composes `ssa_index` with `emission_window`. Returning `None` when the first answers "share"
+    /// and the second answers "no window" would demote the SURB to the share-less tier: it would
+    /// lose pop priority, eviction protection and `evicted_shares` accounting, which is the exact
+    /// opposite of what the `WHOLE_EMISSION` sentinel exists for.
+    #[test]
+    fn a_share_without_a_known_window_must_still_be_share_bearing() -> anyhow::Result<()> {
+        /// Carries a share but deliberately does not implement `emission_window`.
+        #[derive(Debug)]
+        struct WindowlessShare;
+        impl SurbShareInfo for WindowlessShare {
+            fn ssa_index(&self) -> Option<SsaIndex> {
+                SsaIndex::new(1)
+            }
+            // `emission_window` intentionally left at its default (`None`).
+        }
+
+        assert_eq!(
+            Some(WHOLE_EMISSION),
+            SurbShareInfo::share_and_window(&WindowlessShare),
+            "a share-bearing SURB with no window must keep share-bearing status, in the sentinel bucket"
+        );
+
+        // And it must actually be filed there, not in the share-less tier.
+        let rb = SurbRingBuffer::new(4);
+        rb.push([([1u8; 8], WindowlessShare)], 0);
+        let inner = rb.inner.lock();
+        assert_eq!(0, inner.plain.len(), "it must not be demoted to a plain return path");
+        assert_eq!(
+            1,
+            inner.shares.get(&WHOLE_EMISSION).map(|d| d.len()).unwrap_or(0),
+            "it belongs in the sentinel bucket"
+        );
+        drop(inner);
+
+        // A genuinely share-less type still goes to `plain`.
+        let rb = SurbRingBuffer::<i32>::new(4);
+        rb.push([([2u8; 8], 0)], 0);
+        let inner = rb.inner.lock();
+        assert_eq!(1, inner.plain.len());
+        assert_eq!(0, inner.shares.len(), "share-less types create no bucket");
+        assert_eq!(0, inner.share_count);
 
         Ok(())
     }

@@ -74,7 +74,12 @@ fn populated(fill: usize, share_bearing: bool, capacity: usize) -> (MemorySurbSt
     (store, pseudonym)
 }
 
-/// `insert_surbs` on a buffer at the balancer's 7 000-SURB target.
+/// `insert_surbs` on a buffer held at the balancer's 7 000-SURB target.
+///
+/// The fixture is rebuilt for EVERY sample, not once per benchmark. A store that is only built once
+/// accumulates across criterion's samples until it reaches `rb_capacity`, after which the timed
+/// inserts are evictions rather than steady-state insertions — a different thing being measured
+/// under the same name. Rebuilding in the setup closure costs an allocation the timer never sees.
 fn insert_into_populated_store(c: &mut Criterion) {
     let mut group = c.benchmark_group("surb_store/insert");
     group.throughput(Throughput::Elements(OPS as u64));
@@ -82,13 +87,11 @@ fn insert_into_populated_store(c: &mut Criterion) {
     for (label, share_bearing) in [("share_bearing", true), ("share_less", false)] {
         group.bench_function(BenchmarkId::from_parameter(label), |b| {
             let mut id: u64 = 1_000_000;
-            // Built and dropped outside the measured span.
-            let (store, pseudonym) = populated(7_000, share_bearing, 100_000);
             b.iter_custom(|iters| {
-                // Keep occupancy at the target: evict a SURB per insert by popping one, so the
-                // buffer neither fills up nor drains. Both stores pay this identically.
                 let mut elapsed = std::time::Duration::ZERO;
                 for _ in 0..iters {
+                    // Fresh buffer at the target for each sample, built outside the timer.
+                    let (store, pseudonym) = populated(7_000, share_bearing, 100_000);
                     let started = Instant::now();
                     for _ in 0..OPS {
                         let sid: HoprSurbId = id.to_be_bytes();
@@ -101,16 +104,27 @@ fn insert_into_populated_store(c: &mut Criterion) {
                         std::hint::black_box(store.insert_surbs(pseudonym, vec![(sid, surb)]));
                     }
                     elapsed += started.elapsed();
+                    // Dropped outside the measured span.
+                    drop(store);
                 }
                 elapsed
             });
-            drop(store);
         });
     }
     group.finish();
 }
 
 /// `find_surb` — the reply path, one pop per reply packet.
+///
+/// Every successful lookup CONSUMES a SURB, so a fixture filled once would run dry and later
+/// samples would time the empty path. The buffer is therefore topped back up to the advertised
+/// occupancy between samples.
+///
+/// The refill happens OUTSIDE the timer, and the store itself is built once per `iter_custom`
+/// call rather than once per sample: criterion drives `iters` samples per call, and rebuilding a
+/// 100 000-SURB fixture inside that loop would cost far more than the operations being measured
+/// (it is what made an earlier version of this benchmark report ~400 ns per pop at 100k while the
+/// same code measured ~165 ns at 7k).
 fn find_surb_from_populated_store(c: &mut Criterion) {
     let mut group = c.benchmark_group("surb_store/find");
     group.throughput(Throughput::Elements(OPS as u64));
@@ -121,11 +135,30 @@ fn find_surb_from_populated_store(c: &mut Criterion) {
         ("100k_share_bearing", 100_000, true, 1_000_000),
     ] {
         group.bench_function(BenchmarkId::from_parameter(label), |b| {
-            // Sized so repeated samples never drain it: OPS x a few hundred samples at most.
-            let (store, pseudonym) = populated(fill.max(OPS * 64), share_bearing, capacity);
             b.iter_custom(|iters| {
+                let (store, pseudonym) = populated(fill, share_bearing, capacity);
                 let mut elapsed = std::time::Duration::ZERO;
-                for _ in 0..iters {
+                for sample in 0..iters {
+                    // Top back up to `fill` before the timer starts. `OPS` pops per sample need at
+                    // least that many resident; refilling only when needed keeps the fixture
+                    // rebuild out of the vast majority of the timed iterations.
+                    if sample > 0 {
+                        let missing = OPS;
+                        let base = sample * OPS as u64 + fill as u64;
+                        let surbs = (0..missing)
+                            .map(|i| {
+                                let id = base + i as u64;
+                                let sid: HoprSurbId = id.to_be_bytes();
+                                let surb = if share_bearing {
+                                    surb_at((id % 4096) as u16)
+                                } else {
+                                    plain_surb()
+                                };
+                                (sid, surb)
+                            })
+                            .collect::<Vec<_>>();
+                        store.insert_surbs(pseudonym, surbs);
+                    }
                     let started = Instant::now();
                     for _ in 0..OPS {
                         std::hint::black_box(store.find_surb(SurbMatcher::Pseudonym(pseudonym)));
@@ -134,7 +167,6 @@ fn find_surb_from_populated_store(c: &mut Criterion) {
                 }
                 elapsed
             });
-            drop(store);
         });
     }
     group.finish();
