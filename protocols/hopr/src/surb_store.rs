@@ -1038,10 +1038,22 @@ impl SurbShareInfo for HoprSurb {
 /// accounts address space: strict overcommit, `ulimit -v`, `vm.max_map_count`.
 ///
 /// Growth is geometric and amortised, and a deque never shrinks below its high-water mark, so a
-/// pseudonym that genuinely fills up still ends at the same footprint — and stops reallocating
-/// there, however long the steady-state overflow runs. It just has to earn it. Each tier keeps its own
-/// mark, so a pseudonym that has been filled with share-less SURBs and then with shares holds both:
-/// at most twice that footprint, and only after the buffer has been filled twice over.
+/// pseudonym that genuinely fills up still ends at the same footprint. It just has to earn it. Each
+/// tier keeps its own mark, so a pseudonym that has been filled with share-less SURBs and then with
+/// shares holds both: at most twice that footprint, and only after the buffer has been filled twice
+/// over.
+///
+/// The "stops reallocating" corollary holds for the share-less tier only. Share-bearing SURBs are
+/// bucketed by emission window, and a bucket's deque is allocated when that window first receives a
+/// SURB and dropped when it drains — so a steady overflow carrying real window-major emission keeps
+/// allocating as it moves from window to window, instead of reusing a settled deque the way the
+/// plain tier does. Measured over an otherwise identical overflow, crossing 6 window boundaries took
+/// 291 allocations against 195 for the same volume inside one window, and the excess grows linearly
+/// with the number of boundaries crossed, not with the number of buckets alive at any moment. This is
+/// inherent to holding windows in separate deques; the alternative, one deque for every share, gives
+/// up exactly the spread-loss property the bucketing exists for. It costs allocation churn, not
+/// leakage: each bucket is small and is released when it drains, so the footprint claim above still
+/// holds — only the "and stops reallocating there" part of it is scoped to the plain tier.
 #[derive(Clone, Debug)]
 pub struct SurbRingBuffer<S> {
     inner: Arc<parking_lot::Mutex<GenerationalBuffer<S>>>,
@@ -1170,15 +1182,28 @@ impl<S> GenerationalBuffer<S> {
         // every successor-SSA bucket too, rejecting each on the `in_front` predicate — O(all
         // buckets) on the reply hot path, and the bucket count is counterparty-influenced
         // (the SSA index is a raw peer-supplied u32, so the map can hold far more keys than a
-        // well-behaved peer would ever create). Half-open `..next_ssa` stops at the boundary.
-        let end = BucketKey::new(front.saturating_add(1), 0);
+        // well-behaved peer would ever create).
+        //
+        // The upper bound is INCLUSIVE and computed without arithmetic on `front`: the highest key
+        // in cycle `front` is `(front, u32::MAX)` by construction, whereas `front + 1` is not
+        // representable at `front == u32::MAX`. Saturating there collapses the bound to
+        // `(u32::MAX, 0)`, which is *below* a cursor sitting on `(u32::MAX, 1)` — a reversed range,
+        // which `BTreeMap::range` panics on — and leaves `(u32::MAX, 0)`..`(u32::MAX, 0)` empty, so
+        // a pseudonym whose shares all name the highest SSA could never reply again. The SSA index
+        // is peer-supplied, so both are one crafted SURB away.
+        let last = BucketKey::new(front, u32::MAX);
 
         self.window_cursor
             .filter(|c| in_front(c))
-            .and_then(|c| self.shares.range(c..end).find(|(_, d)| !d.is_empty()).map(|(k, _)| *k))
+            .and_then(|c| {
+                self.shares
+                    .range(c..=last)
+                    .find(|(_, d)| !d.is_empty())
+                    .map(|(k, _)| *k)
+            })
             .or_else(|| {
                 self.shares
-                    .range(BucketKey::new(front, 0)..end)
+                    .range(BucketKey::new(front, 0)..=last)
                     .find(|(_, d)| !d.is_empty())
                     .map(|(k, _)| *k)
             })
@@ -1201,11 +1226,11 @@ impl<S> GenerationalBuffer<S> {
         self.share_count -= 1;
 
         self.release_bucket(w, drained);
-        if drained {
-            self.front_index.retain(|(_, k)| *k != w);
-        } else {
-            self.reindex_front(w, previous_front);
-        }
+        // The drained case needs no special handling: `release_bucket` has already removed the
+        // bucket, so `reindex_front` finds nothing to insert and only removes the stale entry — by
+        // key, in O(log B). Scanning the index instead is O(buckets), and with one SURB per bucket
+        // (the adversarial layout) EVERY pop drains its bucket, so every reply would pay it.
+        self.reindex_front(w, previous_front);
 
         // Advance the cursor past this bucket, wrapping. Only one search: the successor key, or the
         // lowest key remaining. When the bucket drained, its successor is unchanged by the removal,
@@ -1281,11 +1306,7 @@ impl<S> GenerationalBuffer<S> {
         if evicted.is_some() {
             self.share_count -= 1;
             self.release_bucket(oldest, drained);
-            if drained {
-                self.front_index.retain(|(_, k)| *k != oldest);
-            } else {
-                self.reindex_front(oldest, previous_front);
-            }
+            self.reindex_front(oldest, previous_front);
         }
         evicted
     }
@@ -1477,7 +1498,16 @@ impl<S> SurbRingBuffer<S> {
                 let seq = inner.next_seq;
                 inner.next_seq += 1;
                 if let Some(key) = key {
-                    inner.shares.entry(key).or_default().push_back((id, surb, seq));
+                    // A fresh bucket starts at exactly one slot. `or_default` defers to `VecDeque`'s
+                    // first-growth rule, which reserves four slots for an element this size, and the
+                    // counterparty chooses how many buckets exist (one SSA index per SURB is free to
+                    // it), so the fourfold rounding is also paid per retained SURB — measured 1105
+                    // against 440 bytes per SURB for the same 16 384 SURBs.
+                    inner
+                        .shares
+                        .entry(key)
+                        .or_insert_with(|| VecDeque::with_capacity(1))
+                        .push_back((id, surb, seq));
                     // A new bucket's only entry becomes its front; an existing bucket's front is
                     // unchanged, so there is no previous entry to remove.
                     inner.reindex_front(key, None);
@@ -1561,7 +1591,10 @@ impl<S> SurbRingBuffer<S> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::{
+        sync::atomic::{AtomicU64, Ordering},
+        time::Duration,
+    };
 
     use anyhow::Context;
     use hopr_api::types::{
@@ -2212,6 +2245,61 @@ mod tests {
         Ok(())
     }
 
+    /// The highest SSA index is representable, so both bounding the scan and serving that cycle must
+    /// work there.
+    ///
+    /// `next_window` confines rotation to the front cycle by bounding its `range` at the next SSA.
+    /// Expressed as `front + 1` that is not representable at `u32::MAX`: saturating collapses the
+    /// bound to `(u32::MAX, 0)`, which is below a cursor on `(u32::MAX, 1)` — a reversed range, which
+    /// `BTreeMap::range` panics on — and leaves the empty range `(u32::MAX, 0)..(u32::MAX, 0)` when
+    /// there is no cursor, so that cycle is never served at all. The SSA index comes straight off the
+    /// SURB, so one crafted packet reaches either. Both halves are asserted here because the fix is
+    /// the same bound: an inclusive `(front, u32::MAX)` needs no arithmetic on `front`.
+    #[test]
+    fn the_highest_ssa_index_must_be_served_and_must_not_panic() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(64);
+
+        // Two windows of the highest cycle: serving one leaves the cursor on the other, which is the
+        // arrangement that reverses the range if the bound saturates.
+        for w in 0..2u16 {
+            rb.push(
+                [(
+                    u64::from(w).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), u32::MAX, w * window, 0)?,
+                )],
+                0,
+            );
+        }
+        assert_eq!(2, rb.len());
+
+        // No-cursor case: the fallback range must not be empty.
+        assert_eq!(
+            Some(BucketKey::new(u32::MAX, 0)),
+            rb.inner.lock().next_window(),
+            "the highest cycle's first window is never selected"
+        );
+
+        // Cursor case: popping from the first window advances onto the second, and the next
+        // `next_window` must find it rather than panic on a reversed range.
+        for i in 0..2 {
+            let popped = rb
+                .pop_any()
+                .with_context(|| format!("share #{} of the highest cycle must be served", i + 1))?;
+            let (ssa, _) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture")?;
+            assert_eq!(u32::MAX, ssa.get());
+        }
+        assert!(rb.pop_any().is_none());
+        assert_eq!(0, rb.len());
+
+        Ok(())
+    }
+
     /// Exactly the scenario claimed to drive `share_count` to zero while `plain` still holds
     /// entries: a buffer full of share-less SURBs, overflowed by share-bearing newcomers, then
     /// drained through a validity predicate that rejects everything.
@@ -2255,40 +2343,64 @@ mod tests {
         Ok(())
     }
 
-    /// Eviction's cost must not scale with the number of buckets the peer has invented.
+    /// Eviction's and pop's cost must not scale with the number of buckets the peer has invented.
     ///
-    /// `evict_oldest_share` scans every bucket front. The SSA index is a raw peer-supplied `u32`
-    /// with no range check, so a peer can create one bucket per retained SURB; if eviction scanned
-    /// all of them per push, sustained overflow would be O(buckets) per packet under the
-    /// per-pseudonym lock. This pins that the scan is bounded by something the store controls.
+    /// The SSA index is a raw peer-supplied `u32` with no range check, so a peer can create one
+    /// bucket per retained SURB. Both paths find the bucket they touch through `front_index`, and both
+    /// used to tidy a drained bucket's entry with `front_index.retain(..)` — a full walk of the index.
+    /// One SURB per bucket means every eviction and every pop drains its bucket, so every such
+    /// operation walked the whole index under the per-pseudonym lock: measured, 241x and 37x more
+    /// expensive at 10x the bucket count.
+    ///
+    /// Timing is the only thing that distinguishes the two implementations, so this measures, but the
+    /// threshold is set far below the effect (6x against a measured 241x) and the comparison is a
+    /// ratio of two runs in the same process, which cancels machine speed.
     #[test]
-    fn eviction_cost_must_not_grow_with_peer_invented_buckets() {
+    fn eviction_cost_must_not_grow_with_peer_invented_buckets() -> anyhow::Result<()> {
         let capacity = 20_000;
 
-        let build = |distinct_ssas: u32| {
+        /// Time one operation per resident entry over a buffer already full of `distinct_ssas` buckets.
+        fn cost_per_op(capacity: usize, distinct_ssas: u32, pop: bool) -> anyhow::Result<Duration> {
             let rb = SurbRingBuffer::new(capacity);
-            // One SURB per invented SSA: maximises bucket count per retained entry.
             for i in 0..capacity as u32 {
+                // One SURB per bucket when `distinct_ssas` is the capacity: the adversarial layout.
                 let ssa = 1 + (i % distinct_ssas);
                 rb.push(
-                    [(
-                        (i as u64).to_be_bytes(),
-                        surb_at(HoprKeyIdent::from(1u32), ssa, 0, 0).expect("fixture"),
-                    )],
+                    [((i as u64).to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), ssa, 0, 0)?)],
                     0,
                 );
             }
-            let inner = rb.inner.lock();
-            inner.shares.len()
-        };
+            // Measure the steady state: the buffer is full, so each push evicts and each pop takes.
+            let started = std::time::Instant::now();
+            for i in 0..capacity as u32 {
+                if pop {
+                    rb.pop_any();
+                } else {
+                    let ssa = 1 + (i % distinct_ssas);
+                    rb.push(
+                        [(
+                            (capacity as u64 + u64::from(i)).to_be_bytes(),
+                            surb_at(HoprKeyIdent::from(1u32), ssa, 0, 0)?,
+                        )],
+                        0,
+                    );
+                }
+            }
+            Ok(started.elapsed())
+        }
 
-        let few = build(1);
-        let many = build(capacity as u32);
-        assert_eq!(1, few, "precondition: one bucket when every share is one cycle");
-        assert!(
-            many > 500,
-            "precondition: the peer-shaped layout really does create many buckets, got {many}"
-        );
+        for (label, pop) in [("overflow eviction", false), ("reply pop", true)] {
+            let few = cost_per_op(capacity, 1, pop)?;
+            let many = cost_per_op(capacity, capacity as u32, pop)?;
+            let ratio = many.as_secs_f64() / few.as_secs_f64().max(f64::MIN_POSITIVE);
+            assert!(
+                ratio < 6.0,
+                "{label} cost {ratio:.1}x more with one bucket per SURB ({many:?} vs {few:?}): it still walks every \
+                 bucket"
+            );
+        }
+
+        Ok(())
     }
 
     /// Eviction must release a sparse bucket's allocation, not only a drained one.
@@ -3191,6 +3303,42 @@ mod tests {
             allocated < CAPACITY / 100,
             "10 SURBs reserved for {allocated} — allocation is tracking capacity, not occupancy"
         );
+    }
+
+    /// Retained capacity must track occupancy on the share tier too, where it is paid per bucket.
+    ///
+    /// The plain tier is one deque, so a per-entry allocation rounds up once. The share tier is one
+    /// deque per emission window, and the counterparty chooses how many windows (and SSAs) exist —
+    /// one bucket per SURB is the adversarial layout. A bucket allocated with `VecDeque::or_default`
+    /// takes the first-growth capacity, four slots for an element this size, so each sparse bucket
+    /// reserves 4x what it holds: measured, the same 16 384 SURBs retained 1105 bytes each against
+    /// 440 when they shared one bucket. Starting a bucket at exactly one slot keeps the overhead to
+    /// the map node rather than the deque.
+    #[test]
+    fn a_sparse_share_bucket_must_not_reserve_a_growth_step() -> anyhow::Result<()> {
+        const N: u32 = 256;
+        let rb = SurbRingBuffer::new(N as usize);
+
+        // One SURB per bucket: the peer-shaped layout that maximises per-bucket rounding.
+        for i in 0..N {
+            rb.push(
+                [(
+                    u64::from(i).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1 + i, 0, 0)?,
+                )],
+                0,
+            );
+        }
+
+        let inner = rb.inner.lock();
+        assert_eq!(N as usize, inner.shares.len(), "precondition: one bucket per SURB");
+        let reserved: usize = inner.shares.values().map(VecDeque::capacity).sum();
+        assert!(
+            reserved <= N as usize,
+            "{N} single-entry buckets reserved {reserved} slots: a fresh bucket is taking a growth step"
+        );
+
+        Ok(())
     }
 
     #[test]
