@@ -912,12 +912,9 @@ pub trait SurbShareInfo {
     /// share but names no window is *not* share-less: it must land in the single
     /// [`WHOLE_EMISSION`] bucket so it keeps share-tier priority, eviction protection and share
     /// accounting. Returning `None` for it would silently demote it to a plain return path.
-    fn share_and_window(&self) -> Option<u32> {
-        if self.ssa_index().is_some() {
-            Some(self.emission_window().unwrap_or(WHOLE_EMISSION))
-        } else {
-            None
-        }
+    fn share_and_window(&self) -> Option<BucketKey> {
+        self.ssa_index()
+            .map(|ssa| BucketKey::new(ssa.get(), self.emission_window().unwrap_or(WHOLE_EMISSION)))
     }
 
     /// Which slice of its cycle's emission this SURB's share came from.
@@ -930,16 +927,19 @@ pub trait SurbShareInfo {
 }
 
 impl SurbShareInfo for HoprSurb {
-    fn share_and_window(&self) -> Option<u32> {
+    fn share_and_window(&self) -> Option<BucketKey> {
         // One parse of the receiver block answers both questions. This is the hot path: `push`
         // runs it for every SURB in every packet.
         let share = self.additional_data_receiver.encrypted_partial_ssa_share();
         if share.is_empty() {
             return None;
         }
-        share
-            .indices()
-            .map(|(_, poly)| u32::from(poly) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32)
+        share.indices().map(|(ssa, poly)| {
+            BucketKey::new(
+                ssa.get(),
+                u32::from(poly) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32,
+            )
+        })
     }
 
     fn ssa_index(&self) -> Option<SsaIndex> {
@@ -1044,10 +1044,35 @@ pub struct SurbRingBuffer<S> {
     order: SurbPopOrder,
 }
 
-/// Bucket key for a share whose SURB does not name an emission window.
+/// Bucket key: `(ssa_index, window)`.
 ///
-/// `u32::MAX` sorts last, so a mixed buffer relies on the per-window keys first and drains the
-/// unknown-window bucket after them.
+/// Ordering is the whole point. `BTreeMap` iterates ascending and rotation walks the keys in that
+/// order, so putting the **SSA index first** makes the store serve every share of an older cycle
+/// before any share of a newer one — exactly what the supervisor requires. With the window alone,
+/// a backlog straddling a cycle boundary interleaves the two cycles, the supervisor reads progress
+/// on the successor as off-front, and closes a conforming Session with `BatchServedOutOfOrder`
+/// (measured: the successor was served at pop #9 with 16 front-cycle shares still buffered).
+///
+/// The window is the inner component, so within one cycle shares are still rotated across the
+/// emission rather than drained window by window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct BucketKey {
+    /// SSA index of the cycle this share belongs to; `0` when the share type does not report one.
+    ssa: u32,
+    /// Emission window within that cycle, or [`WHOLE_EMISSION`] when it names none.
+    window: u32,
+}
+
+impl BucketKey {
+    pub(crate) const fn new(ssa: u32, window: u32) -> Self {
+        Self { ssa, window }
+    }
+}
+
+/// Window component for a share whose SURB does not name an emission window.
+///
+/// `u32::MAX` sorts last within its cycle, so a mixed buffer drains the known windows first and the
+/// unknown-window bucket afterwards — the same relative order the flat tier had.
 const WHOLE_EMISSION: u32 = u32::MAX;
 
 /// The mutex-protected state of a [`SurbRingBuffer`]: the SURBs, in their two tiers, and the highest
@@ -1062,13 +1087,13 @@ struct GenerationalBuffer<S> {
     /// order, so the front is the oldest and the back the newest. A SURB whose share type reports no
     /// window lands in [`WHOLE_EMISSION`], which keeps the single-bucket behaviour identical to the
     /// flat buffer this replaced.
-    shares: std::collections::BTreeMap<u32, VecDeque<(HoprSurbId, S, u64)>>,
+    shares: std::collections::BTreeMap<BucketKey, VecDeque<(HoprSurbId, S, u64)>>,
     /// SURBs carrying no share: pure return paths.
     plain: VecDeque<(HoprSurbId, S)>,
     /// Highest generation seen; `None` until the first push.
     generation: Option<u8>,
     /// Bucket the next pop takes from, so rotation is fair across the emission.
-    window_cursor: u32,
+    window_cursor: Option<BucketKey>,
     /// Number of SURBs held in `shares`, maintained on every mutation.
     ///
     /// `len()` is on both hot paths — every push compares it against the capacity, and every pop
@@ -1097,7 +1122,7 @@ impl<S> GenerationalBuffer<S> {
     fn clear(&mut self) {
         self.shares.clear();
         self.plain.clear();
-        self.window_cursor = 0;
+        self.window_cursor = None;
         self.share_count = 0;
     }
 
@@ -1107,21 +1132,38 @@ impl<S> GenerationalBuffer<S> {
     /// Rotating across buckets rather than draining one is the whole point of the bucketing: a
     /// bounded buffer must spread what it can afford to lose over the *whole* emission instead of
     /// spending it on one contiguous slice of it.
-    fn next_window(&self) -> Option<u32> {
-        // `BTreeMap` already iterates in ascending key order, which is the order the cursor walks,
-        // so this is one ordered scan rather than a collect-and-sort on the reply hot path.
-        // `range` seeks to the cursor in O(log B) rather than walking every lower key, and the
-        // wrap case only runs when the scan found nothing after the cursor.
-        self.shares
-            .range(self.window_cursor..)
-            .find(|(_, d)| !d.is_empty())
-            .map(|(w, _)| *w)
-            .or_else(|| self.shares.iter().find(|(_, d)| !d.is_empty()).map(|(w, _)| *w))
+    fn next_window(&self) -> Option<BucketKey> {
+        // Rotation is confined to the OLDEST SSA present, and wraps only within it.
+        //
+        // Restricting to the lowest SSA is load-bearing, not an optimisation. Ordering the keys by
+        // `(ssa, window)` alone is not enough: once rotation wraps, the cursor returns to a low
+        // window and finds the successor cycle's entries there while the front cycle still holds
+        // the later windows — measured, that served cycle 2 at pop #9 and then a cycle-1 straggler
+        // at #17. The supervisor counts any progress on a non-front cycle as off-front and closes
+        // the Session past 25 %, so the buffer must not serve a successor at all while the front
+        // cycle has anything left.
+        let front = self.shares.keys().next().map(|k| k.ssa)?;
+        let in_front = |k: &BucketKey| k.ssa == front;
+
+        self.window_cursor
+            .filter(|c| in_front(c))
+            .and_then(|c| {
+                self.shares
+                    .range(c..)
+                    .find(|(k, d)| in_front(k) && !d.is_empty())
+                    .map(|(k, _)| *k)
+            })
+            .or_else(|| {
+                self.shares
+                    .iter()
+                    .find(|(k, d)| in_front(k) && !d.is_empty())
+                    .map(|(k, _)| *k)
+            })
     }
 
     /// Removes the entry at the end `order` consumes from in bucket `w`, and advances the cursor past
     /// it.
-    fn pop_window(&mut self, w: u32, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
+    fn pop_window(&mut self, w: BucketKey, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
         // One map lookup for the pop and the emptiness test together. This is the reply hot path:
         // every extra `BTreeMap` search here is paid once per reply packet.
         let (popped, drained) = {
@@ -1134,11 +1176,21 @@ impl<S> GenerationalBuffer<S> {
         };
         self.share_count -= 1;
 
-        // Drop the bucket once drained. `VecDeque` never releases capacity, and the counterparty
-        // chooses which window each SURB lands in, so a buffer walked through every window would
-        // otherwise leave an `rb_capacity`-sized empty allocation behind at each step.
+        // Keep retained memory proportional to what is actually held.
+        //
+        // Removing a drained bucket is not enough on its own: a bucket that still holds a couple of
+        // entries but once held thousands keeps its high-water allocation, and the counterparty
+        // chooses which window each SURB lands in, so it can keep every bucket sparse-but-large
+        // without ever emptying one. `VecDeque` never shrinks on its own, so a bucket that has
+        // fallen to under a quarter of its capacity is shrunk here. `shrink_to_fit` allocates, so
+        // the threshold is deliberately far below 1 — the steady state (a bucket draining one
+        // entry at a time) never triggers it.
         if drained {
             self.shares.remove(&w);
+        } else if let Some(bucket) = self.shares.get_mut(&w)
+            && bucket.len() * 4 < bucket.capacity()
+        {
+            bucket.shrink_to_fit();
         }
 
         // Advance the cursor past this bucket, wrapping. Only one search: the successor key, or the
@@ -1149,8 +1201,7 @@ impl<S> GenerationalBuffer<S> {
             .range((std::ops::Bound::Excluded(w), std::ops::Bound::Unbounded))
             .next()
             .map(|(k, _)| *k)
-            .or_else(|| self.shares.keys().next().copied())
-            .unwrap_or(w);
+            .or_else(|| self.shares.keys().next().copied());
         Some(popped)
     }
 
@@ -1168,9 +1219,9 @@ impl<S> GenerationalBuffer<S> {
         let oldest = self
             .shares
             .iter()
-            .filter_map(|(w, d)| d.front().map(|(_, _, seq)| (*seq, *w)))
+            .filter_map(|(k, d)| d.front().map(|(_, _, seq)| (*seq, *k)))
             .min()
-            .map(|(_, w)| w)?;
+            .map(|(_, k)| k)?;
         let evicted = self
             .shares
             .get_mut(&oldest)
@@ -1275,7 +1326,7 @@ impl<S> SurbRingBuffer<S> {
                 shares: std::collections::BTreeMap::new(),
                 plain: VecDeque::new(),
                 generation: None,
-                window_cursor: 0,
+                window_cursor: None,
                 share_count: 0,
                 next_seq: 0,
             })),
@@ -1346,11 +1397,11 @@ impl<S> SurbRingBuffer<S> {
             // whether this SURB carries a share, and which emission window it belongs to. Asking
             // separately parsed that block twice per SURB.
             //
-            // `Some(w)` means share-bearing (with `WHOLE_EMISSION` for "carries one, names no
-            // window"); `None` means share-less and goes to the plain tier.
-            let window = surb.share_and_window();
-            let carries_share = window.is_some();
-            let window = window.unwrap_or(WHOLE_EMISSION);
+            // `Some(key)` means share-bearing; `None` means share-less and goes to the plain tier.
+            // The key carries the SSA index too, so a successor cycle's shares sort after the front
+            // cycle's and cannot be served first.
+            let key = surb.share_and_window();
+            let carries_share = key.is_some();
 
             // Make room before inserting, so the length never exceeds the ceiling and the backing
             // allocations stop growing once their high-water marks are reached. Either a resident makes
@@ -1367,7 +1418,9 @@ impl<S> SurbRingBuffer<S> {
             if carries_share {
                 let seq = inner.next_seq;
                 inner.next_seq += 1;
-                inner.shares.entry(window).or_default().push_back((id, surb, seq));
+                if let Some(key) = key {
+                    inner.shares.entry(key).or_default().push_back((id, surb, seq));
+                }
                 inner.share_count += 1;
             } else {
                 inner.plain.push_back((id, surb));
@@ -1870,6 +1923,64 @@ mod tests {
         Ok(())
     }
 
+    /// Rotation must not let a LATER cycle's shares overtake the current one.
+    ///
+    /// The bucket key is `poly_index / SHARE_EMISSION_WINDOW`, which carries no SSA index. When a
+    /// backlog straddles a cycle boundary — which it does whenever `ssas_per_request > 1`, since a
+    /// batch commits several cycles — shares of cycle `k+1` land in the same buckets as cycle `k`
+    /// and rotation interleaves them. The supervisor counts progress on any cycle other than the
+    /// front one as "off front", and closes the Session past `max_off_front_share_fraction`
+    /// (25 % by default) with `BatchServedOutOfOrder` — a conforming Session killed with no packet
+    /// loss at all.
+    ///
+    /// The store must therefore serve the OLDEST cycle's shares before any later cycle's.
+    #[test]
+    fn surb_ring_buffer_should_not_let_a_later_cycle_overtake_the_current_one() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(256);
+
+        // This mirrors how the Entry actually emits: cycle 1 goes out in full, then cycle 2 starts
+        // at polynomial 0 again. So cycle 1 occupies every window, and cycle 2 re-occupies the same
+        // windows behind it. A key of the window alone puts the successor in the SAME buckets, and
+        // once rotation wraps it reaches the successor while the front cycle still has entries in
+        // the later buckets — which the supervisor reads as off-front progress.
+        let mut id = 0u64;
+        for cycle in 1u32..=2 {
+            for w in 0..8u16 {
+                for _ in 0..4 {
+                    rb.push(
+                        [(
+                            id.to_be_bytes(),
+                            surb_at(HoprKeyIdent::from(1u32), cycle, w * window, 0)?,
+                        )],
+                        0,
+                    );
+                    id += 1;
+                }
+            }
+        }
+
+        let mut cycle_2_seen = false;
+        while let Some(popped) = rb.pop_any() {
+            let (ssa, _) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture: share-less SURB")?;
+            if ssa.get() == 2 {
+                cycle_2_seen = true;
+            } else if cycle_2_seen {
+                anyhow::bail!(
+                    "a cycle-1 share was served after a cycle-2 share; the successor overtook the front cycle, which \
+                     the supervisor closes the Session over"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     /// A type that carries a share but names no emission window must still count as share-bearing.
     ///
     /// The default `share_and_window` is what every implementor other than `HoprSurb` gets, and it
@@ -1890,7 +2001,7 @@ mod tests {
         }
 
         assert_eq!(
-            Some(WHOLE_EMISSION),
+            Some(BucketKey::new(1, WHOLE_EMISSION)),
             SurbShareInfo::share_and_window(&WindowlessShare),
             "a share-bearing SURB with no window must keep share-bearing status, in the sentinel bucket"
         );
@@ -1902,7 +2013,11 @@ mod tests {
         assert_eq!(0, inner.plain.len(), "it must not be demoted to a plain return path");
         assert_eq!(
             1,
-            inner.shares.get(&WHOLE_EMISSION).map(|d| d.len()).unwrap_or(0),
+            inner
+                .shares
+                .get(&BucketKey::new(1, WHOLE_EMISSION))
+                .map(|d| d.len())
+                .unwrap_or(0),
             "it belongs in the sentinel bucket"
         );
         drop(inner);
@@ -1914,6 +2029,44 @@ mod tests {
         assert_eq!(1, inner.plain.len());
         assert_eq!(0, inner.shares.len(), "share-less types create no bucket");
         assert_eq!(0, inner.share_count);
+
+        Ok(())
+    }
+
+    /// A bucket that has shrunk must release its allocation, not just its length.
+    ///
+    /// Removing drained buckets is not enough: the counterparty picks the emission window of every
+    /// SURB, so it can keep each bucket sparse-but-large and never empty one. `VecDeque` never
+    /// shrinks on its own, so retained memory would scale with the number of windows touched rather
+    /// than with what is held. The store shrinks a bucket once it falls under a quarter of capacity.
+    #[test]
+    fn a_sparse_bucket_must_release_its_allocation() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(4_096);
+
+        // Fill one window deeply, then drain most of it.
+        for i in 0..512u64 {
+            rb.push([(i.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
+        }
+        let key = BucketKey::new(1, u32::from(window) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32);
+        let cap_before = {
+            let inner = rb.inner.lock();
+            inner.shares.get(&key).map(|d| d.capacity()).unwrap_or(0)
+        };
+        assert!(cap_before >= 512, "precondition: the bucket grew to hold 512");
+
+        for _ in 0..500 {
+            rb.pop_any().context("expected a pop")?;
+        }
+
+        let cap_after = {
+            let inner = rb.inner.lock();
+            inner.shares.get(&key).map(|d| d.capacity()).unwrap_or(0)
+        };
+        assert!(
+            cap_after <= 64,
+            "a bucket holding 12 entries should not still reserve {cap_after} slots (was {cap_before})"
+        );
 
         Ok(())
     }
@@ -2002,11 +2155,14 @@ mod tests {
             shares: Default::default(),
             plain: Default::default(),
             generation: None,
-            window_cursor: 255,
+            window_cursor: None,
             share_count: 0,
             next_seq: 0,
         };
-        for k in [0u32, 255, WHOLE_EMISSION] {
+        let k0 = BucketKey::new(1, 0);
+        let k255 = BucketKey::new(1, 255);
+        let ksentinel = BucketKey::new(1, WHOLE_EMISSION);
+        for k in [k0, k255, ksentinel] {
             let mut d = VecDeque::new();
             d.push_back(([0u8; 8], 0u64, 0u64));
             g.shares.insert(k, d);
@@ -2015,11 +2171,12 @@ mod tests {
         // fixture that left it at zero would underflow rather than exercise the pop.
         g.share_count = g.shares.values().map(|d| d.len()).sum();
 
-        assert_eq!(Some(255), g.next_window(), "serves the cursor's own bucket first");
+        g.window_cursor = Some(k255);
+        assert_eq!(Some(k255), g.next_window(), "serves the cursor's own bucket first");
 
-        g.window_cursor = WHOLE_EMISSION;
+        g.window_cursor = Some(ksentinel);
         assert_eq!(
-            Some(WHOLE_EMISSION),
+            Some(ksentinel),
             g.next_window(),
             "the sentinel bucket must be reachable, not starved behind real windows"
         );
@@ -2027,20 +2184,21 @@ mod tests {
         // A genuine WRAP: the cursor sits above every non-empty key, so the `or_else` fallback is
         // the only way to find a bucket. (Cursoring to 0 finds key 0 in the first scan instead,
         // which is what the previous version of this test asserted and why it never wrapped.)
-        g.shares.remove(&WHOLE_EMISSION);
-        g.window_cursor = WHOLE_EMISSION;
+        g.shares.remove(&ksentinel);
+        g.window_cursor = Some(ksentinel);
         assert_eq!(
-            Some(0),
+            Some(k0),
             g.next_window(),
             "a cursor past every bucket must wrap to the lowest one"
         );
 
         // And the same wrap on the pop side, which advances the cursor itself.
-        g.window_cursor = 255;
-        let popped_from = g.pop_window(255, SurbPopOrder::Fifo);
+        g.window_cursor = Some(k255);
+        let popped_from = g.pop_window(k255, SurbPopOrder::Fifo);
         assert!(popped_from.is_some(), "precondition: bucket 255 held an entry");
         assert_eq!(
-            0, g.window_cursor,
+            Some(k0),
+            g.window_cursor,
             "popping the last bucket must leave the cursor wrapped to the lowest remaining one"
         );
     }
