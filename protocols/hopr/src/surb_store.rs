@@ -2071,6 +2071,181 @@ mod tests {
         Ok(())
     }
 
+    /// When the front cycle drains completely, rotation must move on to the successor.
+    ///
+    /// The confinement filters both the scan and the wrap on `k.ssa == front`, where `front` is the
+    /// lowest key present. Once every front-cycle bucket has been removed, the lowest key *is* the
+    /// successor, so `front` moves with it — but only if the cursor does not pin the scan into an
+    /// empty region first. This pins that a fully drained cycle hands over rather than stalling.
+    #[test]
+    fn rotation_must_move_to_the_successor_when_the_front_cycle_drains() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let rb = SurbRingBuffer::new(64);
+
+        let mut id = 0u64;
+        for cycle in 1u32..=2 {
+            for w in 0..4u16 {
+                rb.push(
+                    [(
+                        id.to_be_bytes(),
+                        surb_at(HoprKeyIdent::from(1u32), cycle, w * window, 0)?,
+                    )],
+                    0,
+                );
+                id += 1;
+            }
+        }
+        assert_eq!(8, rb.len());
+
+        // Drain exactly the front cycle's four shares.
+        let mut drained_cycle_1 = 0;
+        while drained_cycle_1 < 4 {
+            let popped = rb.pop_any().context("expected a front-cycle pop")?;
+            let (ssa, _) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture")?;
+            assert_eq!(1, ssa.get(), "the front cycle must be served first");
+            drained_cycle_1 += 1;
+        }
+        assert_eq!(4, rb.len(), "the successor's four shares remain");
+
+        // The successor must now be served — not stalled returning None.
+        for _ in 0..4 {
+            let popped = rb
+                .pop_any()
+                .context("the successor must be served once the front drains")?;
+            let (ssa, _) = popped
+                .surb
+                .additional_data_receiver
+                .encrypted_partial_ssa_share()
+                .indices()
+                .context("fixture")?;
+            assert_eq!(2, ssa.get(), "only the successor is left");
+        }
+        assert!(rb.pop_any().is_none());
+        assert_eq!(0, rb.len());
+
+        Ok(())
+    }
+
+    /// Exactly the scenario claimed to drive `share_count` to zero while `plain` still holds
+    /// entries: a buffer full of share-less SURBs, overflowed by share-bearing newcomers, then
+    /// drained through a validity predicate that rejects everything.
+    #[test]
+    fn share_count_must_not_underflow_when_only_plain_remains() -> anyhow::Result<()> {
+        let capacity = 64;
+        let rb = SurbRingBuffer::new(capacity);
+
+        // Fill entirely with share-less SURBs.
+        for i in 0..capacity as u64 {
+            rb.push([(i.to_be_bytes(), surb_via(HoprKeyIdent::from(1u32), DIRECT)?)], 0);
+        }
+        {
+            let inner = rb.inner.lock();
+            assert_eq!(capacity, inner.plain.len());
+            assert_eq!(0, inner.share_count, "precondition: nothing share-bearing yet");
+        }
+
+        // Overflow with share-bearing SURBs, which evicts the plain ones first.
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        for i in 0..capacity as u64 {
+            rb.push(
+                [(
+                    (1000 + i).to_be_bytes(),
+                    surb_at(HoprKeyIdent::from(1u32), 1, (i as u16) % 4 * window, 0)?,
+                )],
+                0,
+            );
+        }
+
+        // Now drain everything, rejecting every candidate so the discard loop is exercised.
+        while rb.pop_next_valid(|_, _| false).is_some() {}
+
+        let inner = rb.inner.lock();
+        assert_eq!(0, inner.share_count, "counter must not have underflowed");
+        assert_eq!(0, inner.plain.len());
+        assert!(inner.shares.is_empty());
+        drop(inner);
+        assert_eq!(0, rb.len());
+
+        Ok(())
+    }
+
+    /// The length counter must survive an adversarial mix of pushes, pops, evictions and
+    /// predicate-discarded pops over a long run.
+    ///
+    /// `len()` bounds the buffer and a pop reports it as `remaining`; it is now an O(1) counter
+    /// rather than a sum over buckets, so any path that changes a bucket length without touching
+    /// the counter is invisible until it corrupts the capacity check. A single targeted test cannot
+    /// cover the cross-product of share-less/ share-bearing arrivals, overflow, and pops whose SURB
+    /// the validity predicate rejects — so this drives all of them and re-derives the truth from the
+    /// buckets after every step.
+    #[test]
+    fn the_share_count_must_survive_an_adversarial_mix() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let capacity = 1_024;
+        let rb = SurbRingBuffer::new(capacity);
+
+        // Deterministic, so a failure is reproducible.
+        let mut state: u64 = 0x5eed_1234_abcd_0001;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+
+        for step in 0..20_000u64 {
+            match next() % 4 {
+                // Push a share-bearing SURB, spread over several windows and two cycles.
+                0 | 1 => {
+                    let poly = (next() % 4) as u16 * window + (next() % 8) as u16;
+                    let ssa = 1 + (next() % 2) as u32;
+                    rb.push(
+                        [(step.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), ssa, poly, 0)?)],
+                        0,
+                    );
+                }
+                // Push a share-less SURB.
+                2 => {
+                    rb.push([(step.to_be_bytes(), surb_via(HoprKeyIdent::from(1u32), DIRECT)?)], 0);
+                }
+                // Pop, rejecting half the candidates so the discard loop runs.
+                _ => {
+                    let reject_odd = step % 2 == 0;
+                    let _ = rb.pop_next_valid(|id, _| (id[7] % 2 == 0) == reject_odd);
+                }
+            }
+
+            // Re-derive the invariant from the buckets after every step.
+            let inner = rb.inner.lock();
+            let actual_shares: usize = inner.shares.values().map(|d| d.len()).sum();
+            assert_eq!(
+                actual_shares, inner.share_count,
+                "share_count drifted at step {step}: counter {} vs buckets {actual_shares}",
+                inner.share_count
+            );
+            assert_eq!(actual_shares + inner.plain.len(), inner.share_count + inner.plain.len());
+            assert!(
+                inner.share_count + inner.plain.len() <= capacity,
+                "len exceeded capacity at step {step}"
+            );
+            drop(inner);
+        }
+
+        // And the counter still matches after draining everything.
+        while rb.pop_any().is_some() {}
+        let inner = rb.inner.lock();
+        assert_eq!(0, inner.share_count, "counter must return to zero when drained");
+        assert!(inner.shares.is_empty(), "no bucket may survive a full drain");
+        assert!(inner.plain.is_empty());
+
+        Ok(())
+    }
+
     /// The O(1) length counter must agree with the actual bucket contents after every kind of
     /// mutation: push, pop and eviction.
     ///
