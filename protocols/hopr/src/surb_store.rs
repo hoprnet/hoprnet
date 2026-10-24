@@ -728,6 +728,14 @@ impl SurbStore for MemorySurbStore {
         }
     }
 
+    /// Stores a received batch for `pseudonym`, using the first SURB's generation for the batch.
+    ///
+    /// An empty batch leaves the buffer unchanged. SURBs whose generation differs from the first
+    /// are discarded. A newer generation replaces buffered SURBs; an older one is ignored.
+    /// New buffers use the configured pop order and a capacity of at least 1024 SURBs.
+    ///
+    /// Returns the retained count and capacity losses, including the subset carrying PIX shares.
+    /// Generation mismatches and superseded generations do not count as capacity losses.
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
     fn insert_surbs(&self, pseudonym: HoprPseudonym, mut surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome {
         // A batch is one packet's worth of SURBs, minted by the creator at a single generation, so
@@ -894,7 +902,7 @@ pub trait SurbShareInfo {
     /// The SSA index of the share this SURB carries, or `None` for a share-less SURB.
     fn ssa_index(&self) -> Option<SsaIndex>;
 
-    /// Whether this SURB carries a share, and if so which slice of the emission it came from.
+    /// The share's SSA index and emission window, or `None` for a share-less SURB.
     ///
     /// Returning both together is not cosmetic: on a real SURB each answer costs a parse of the
     /// same receiver-only block, and `push` needs both for every SURB it stores. Asking twice did
@@ -910,7 +918,7 @@ pub trait SurbShareInfo {
     ///
     /// `None` means a **share-less** SURB, which goes to the share-less tier. A SURB that carries a
     /// share but names no window is *not* share-less: it must land in the single
-    /// [`WHOLE_EMISSION`] bucket so it keeps share-tier priority, eviction protection and share
+    /// [`WHOLE_EMISSION`] bucket for its SSA so it keeps share-tier priority, eviction protection and share
     /// accounting. Returning `None` for it would silently demote it to a plain return path.
     fn share_and_window(&self) -> Option<BucketKey> {
         self.ssa_index()
@@ -918,6 +926,9 @@ pub trait SurbShareInfo {
     }
 
     /// Which slice of its cycle's emission this SURB's share came from.
+    ///
+    /// `None` means no window is known, including for a share-bearing SURB; the default
+    /// [`share_and_window`](Self::share_and_window) groups such shares together within their SSA.
     ///
     /// Defaults to `None`; see [`share_and_window`](Self::share_and_window), which is what the store
     /// actually calls.
@@ -927,6 +938,10 @@ pub trait SurbShareInfo {
 }
 
 impl SurbShareInfo for HoprSurb {
+    /// Returns the receiver share's SSA index and zero-based emission window.
+    ///
+    /// The window is `poly_index / SHARE_EMISSION_WINDOW`. An empty share, including one with a zero
+    /// SSA index, returns `None` and is treated as share-less by the store.
     fn share_and_window(&self) -> Option<BucketKey> {
         // One parse of the receiver block answers both questions. This is the hot path: `push`
         // runs it for every SURB in every packet.
@@ -953,6 +968,9 @@ impl SurbShareInfo for HoprSurb {
         }
     }
 
+    /// Returns `poly_index / SHARE_EMISSION_WINDOW` from the receiver share's indices.
+    ///
+    /// Windows are zero-based; a share with a zero SSA index returns `None`.
     fn emission_window(&self) -> Option<u32> {
         self.additional_data_receiver
             .encrypted_partial_ssa_share()
@@ -1064,6 +1082,9 @@ pub(crate) struct BucketKey {
 }
 
 impl BucketKey {
+    /// Identifies an SSA cycle and its zero-based emission window for share bucketing.
+    ///
+    /// Use [`WHOLE_EMISSION`] for `window` when the share's emission window is unknown.
     pub(crate) const fn new(ssa: u32, window: u32) -> Self {
         Self { ssa, window }
     }
@@ -1126,8 +1147,11 @@ impl<S> GenerationalBuffer<S> {
         self.share_count = 0;
     }
 
-    /// The emission-window bucket the next pop takes from: the lowest non-empty key at or after the
-    /// cursor, wrapping to the first.
+    /// The next non-empty emission-window bucket within the lowest SSA index still held.
+    ///
+    /// Selects the first bucket at or after the cursor, wrapping within that SSA. A missing cursor
+    /// or one naming another SSA starts at the first bucket of the lowest SSA. Returns `None` when
+    /// no share-bearing SURBs remain.
     ///
     /// Rotating across buckets rather than draining one is the whole point of the bucketing: a
     /// bounded buffer must spread what it can afford to lose over the *whole* emission instead of
@@ -1163,6 +1187,8 @@ impl<S> GenerationalBuffer<S> {
 
     /// Removes the entry at the end `order` consumes from in bucket `w`, and advances the cursor past
     /// it.
+    ///
+    /// Returns `None` without advancing the cursor if the bucket is missing or empty.
     fn pop_window(&mut self, w: BucketKey, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
         // One map lookup for the pop and the emptiness test together. This is the reply hot path:
         // every extra `BTreeMap` search here is paid once per reply packet.
@@ -1209,9 +1235,9 @@ impl<S> GenerationalBuffer<S> {
     ///
     /// Each bucket holds its SURBs in arrival order, so its front is the oldest entry *in that
     /// bucket*, and the arrival sequence stamped on insertion (`next_seq`) says which of the fronts
-    /// is the oldest overall. Eviction stays age-ordered however pops rotate: that is what keeps
-    /// the retained set equal to the newest `capacity` SURBs, which is the set the creator's
-    /// reply-opener cache is likeliest to still cover. Evicting by bucket instead cost 58.6 %
+    /// is the oldest overall. Eviction stays age-ordered however pops rotate, giving up the oldest
+    /// retained share and keeping newer ones whose reply openers the creator is likelier to still
+    /// hold. Returns `None` if no shares remain. Evicting by bucket instead cost 58.6 %
     /// undecryptable replies against 0 % for this rule, measured.
     fn evict_oldest_share(&mut self) -> Option<(HoprSurbId, S)> {
         // Each bucket is in insertion order, so its front is the oldest entry *in that bucket*; the
@@ -1304,7 +1330,7 @@ enum MadeRoom {
 }
 
 impl<S> SurbRingBuffer<S> {
-    /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs, popped
+    /// Creates a buffer holding at most `capacity` SURBs (clamped to at least 1), popped
     /// in rotation across the emission-window buckets of the share-bearing tier, in the default
     /// [`SurbPopOrder::Fifo`] order within a bucket and within the share-less tier.
     ///
@@ -1318,8 +1344,8 @@ impl<S> SurbRingBuffer<S> {
 
     /// As [`new`](Self::new), with the pop order *within* the selected bucket chosen explicitly.
     ///
-    /// The order never affects eviction, which stays globally age-ordered, nor the rotation across
-    /// buckets. See [`SurbPopOrder`] for what it does and does not change.
+    /// Eviction always drops share-less SURBs before shares, taking the oldest within either tier.
+    /// The order also leaves rotation across buckets unchanged; see [`SurbPopOrder`].
     pub fn with_order(capacity: usize, order: SurbPopOrder) -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
@@ -1347,8 +1373,9 @@ impl<S> SurbRingBuffer<S> {
     /// - **equal** → the batch is appended (an ordinary refill);
     /// - **older** → the batch is discarded as a late/reordered leftover.
     ///
-    /// Each SURB is sorted into the share-bearing or the share-less tier by [`SurbShareInfo`]. Once at
-    /// capacity, every one that arrives costs the buffer one SURB, share-less before share-bearing:
+    /// Each SURB is sorted into the share-bearing or the share-less tier by [`SurbShareInfo`]. Shares
+    /// are bucketed by SSA index and emission window for popping. Once at capacity, every one that
+    /// arrives costs the buffer one SURB, share-less before share-bearing:
     /// - if a share-less SURB is held, the oldest of them is evicted;
     /// - else, a share-less newcomer is refused: it is only a return path, and a share-bearing SURB is that plus a
     ///   share nothing can replace;
@@ -1434,8 +1461,8 @@ impl<S> SurbRingBuffer<S> {
     }
 
     /// Pops the next SURB that `is_valid` accepts: a share-bearing one while any is held (rotating
-    /// across emission-window buckets, taking the end this buffer's [`SurbPopOrder`] names within
-    /// each), then the same end of the share-less tier.
+    /// across emission-window buckets of the lowest SSA index still held, taking the end this
+    /// buffer's [`SurbPopOrder`] names within each), then the same end of the share-less tier.
     ///
     /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
     /// handed out nor blocks those behind it. Pass only a validity test — a selective predicate
@@ -1479,6 +1506,9 @@ impl<S> SurbRingBuffer<S> {
 
     /// Pops the next SURB (the one [`pop_next_valid`](Self::pop_next_valid) would take first) only if it has
     /// the given ID.
+    ///
+    /// Checks only that candidate, without testing its validity or searching other buckets or entries.
+    /// Returns `None` without changing the buffer when it is empty or the next ID differs.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Option<PoppedSurb<S>> {
         let mut inner = self.inner.lock();
 
