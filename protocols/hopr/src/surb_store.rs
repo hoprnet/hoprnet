@@ -1103,6 +1103,15 @@ struct GenerationalBuffer<S> {
     generation: Option<u8>,
     /// Bucket the next pop takes from, so rotation is fair across the emission.
     window_cursor: Option<BucketKey>,
+    /// `(front sequence, bucket)` for every non-empty bucket, so eviction can find the globally
+    /// oldest front without scanning the map.
+    ///
+    /// Eviction used to scan every bucket front. The SSA index is a raw peer-supplied `u32` with no
+    /// range check, so a peer can create one bucket per retained SURB — measured, that made an
+    /// overflowing push **14.8x** more expensive under the per-pseudonym mutex (1.26 us vs
+    /// 0.126 us per eviction when every share had its own SSA). This index makes the lookup
+    /// O(log B) and leaves the cost independent of how many buckets exist.
+    front_index: std::collections::BTreeSet<(u64, BucketKey)>,
     /// Number of SURBs held in `shares`, maintained on every mutation.
     ///
     /// `len()` is on both hot paths — every push compares it against the capacity, and every pop
@@ -1132,6 +1141,7 @@ impl<S> GenerationalBuffer<S> {
         self.shares.clear();
         self.plain.clear();
         self.window_cursor = None;
+        self.front_index.clear();
         self.share_count = 0;
     }
 
@@ -1156,18 +1166,20 @@ impl<S> GenerationalBuffer<S> {
         let front = self.shares.keys().next().map(|k| k.ssa)?;
         let in_front = |k: &BucketKey| k.ssa == front;
 
+        // The scan is BOUNDED at the front cycle's last bucket. A bare `range(c..)` would walk
+        // every successor-SSA bucket too, rejecting each on the `in_front` predicate — O(all
+        // buckets) on the reply hot path, and the bucket count is counterparty-influenced
+        // (the SSA index is a raw peer-supplied u32, so the map can hold far more keys than a
+        // well-behaved peer would ever create). Half-open `..next_ssa` stops at the boundary.
+        let end = BucketKey::new(front.saturating_add(1), 0);
+
         self.window_cursor
             .filter(|c| in_front(c))
-            .and_then(|c| {
-                self.shares
-                    .range(c..)
-                    .find(|(k, d)| in_front(k) && !d.is_empty())
-                    .map(|(k, _)| *k)
-            })
+            .and_then(|c| self.shares.range(c..end).find(|(_, d)| !d.is_empty()).map(|(k, _)| *k))
             .or_else(|| {
                 self.shares
-                    .iter()
-                    .find(|(k, d)| in_front(k) && !d.is_empty())
+                    .range(BucketKey::new(front, 0)..end)
+                    .find(|(_, d)| !d.is_empty())
                     .map(|(k, _)| *k)
             })
     }
@@ -1177,6 +1189,7 @@ impl<S> GenerationalBuffer<S> {
     fn pop_window(&mut self, w: BucketKey, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
         // One map lookup for the pop and the emptiness test together. This is the reply hot path:
         // every extra `BTreeMap` search here is paid once per reply packet.
+        let previous_front = self.shares.get(&w).and_then(|d| d.front()).map(|(_, _, seq)| *seq);
         let (popped, drained) = {
             let bucket = self.shares.get_mut(&w)?;
             let popped = match order {
@@ -1187,21 +1200,11 @@ impl<S> GenerationalBuffer<S> {
         };
         self.share_count -= 1;
 
-        // Keep retained memory proportional to what is actually held.
-        //
-        // Removing a drained bucket is not enough on its own: a bucket that still holds a couple of
-        // entries but once held thousands keeps its high-water allocation, and the counterparty
-        // chooses which window each SURB lands in, so it can keep every bucket sparse-but-large
-        // without ever emptying one. `VecDeque` never shrinks on its own, so a bucket that has
-        // fallen to under a quarter of its capacity is shrunk here. `shrink_to_fit` allocates, so
-        // the threshold is deliberately far below 1 — the steady state (a bucket draining one
-        // entry at a time) never triggers it.
+        self.release_bucket(w, drained);
         if drained {
-            self.shares.remove(&w);
-        } else if let Some(bucket) = self.shares.get_mut(&w)
-            && bucket.len() * 4 < bucket.capacity()
-        {
-            bucket.shrink_to_fit();
+            self.front_index.retain(|(_, k)| *k != w);
+        } else {
+            self.reindex_front(w, previous_front);
         }
 
         // Advance the cursor past this bucket, wrapping. Only one search: the successor key, or the
@@ -1216,6 +1219,46 @@ impl<S> GenerationalBuffer<S> {
         Some(popped)
     }
 
+    /// Records `key`'s current front (or its absence) in the eviction index.
+    ///
+    /// The index is kept in step with the buckets themselves rather than rebuilt, so every path that
+    /// changes a bucket's front — push, pop, eviction, bucket removal, clear — must call this.
+    ///
+    /// `previous` is the sequence number the caller saw as this bucket's front before its mutation,
+    /// so the stale entry is removed by key rather than by scanning the whole index. Scanning here
+    /// would put an O(buckets) step back on the eviction hot path, which is what the index exists to
+    /// remove.
+    fn reindex_front(&mut self, key: BucketKey, previous: Option<u64>) {
+        if let Some(seq) = previous {
+            self.front_index.remove(&(seq, key));
+        }
+        if let Some((_, _, seq)) = self.shares.get(&key).and_then(|d| d.front()) {
+            self.front_index.insert((*seq, key));
+        }
+    }
+
+    /// Drops a drained bucket, or shrinks one that has become sparse.
+    ///
+    /// Keep retained memory proportional to what is actually held. Removing a drained bucket is not
+    /// enough on its own: a bucket that still holds a couple of entries but once held thousands keeps
+    /// its high-water allocation, and the counterparty chooses which window each SURB lands in, so it
+    /// can keep every bucket sparse-but-large without ever emptying one. `VecDeque` never shrinks on
+    /// its own. `shrink_to_fit` allocates, so the threshold is deliberately far below 1 — the steady
+    /// state (a bucket draining one entry at a time) never triggers it.
+    ///
+    /// Both removal paths call this. Pop was covered first and eviction was not, which left exactly
+    /// the same retention reachable through the eviction path: fill one bucket, grow others, let
+    /// eviction drain the first down to its newest entry.
+    fn release_bucket(&mut self, key: BucketKey, drained: bool) {
+        if drained {
+            self.shares.remove(&key);
+        } else if let Some(bucket) = self.shares.get_mut(&key)
+            && bucket.len() * 4 < bucket.capacity()
+        {
+            bucket.shrink_to_fit();
+        }
+    }
+
     /// Evicts the globally oldest share-bearing SURB, across every bucket.
     ///
     /// Each bucket holds its SURBs in arrival order, so its front is the oldest entry *in that
@@ -1227,21 +1270,21 @@ impl<S> GenerationalBuffer<S> {
     fn evict_oldest_share(&mut self) -> Option<(HoprSurbId, S)> {
         // Each bucket is in insertion order, so its front is the oldest entry *in that bucket*; the
         // globally oldest is the front with the smallest sequence number.
-        let oldest = self
-            .shares
-            .iter()
-            .filter_map(|(k, d)| d.front().map(|(_, _, seq)| (*seq, *k)))
-            .min()
-            .map(|(_, k)| k)?;
-        let evicted = self
-            .shares
-            .get_mut(&oldest)
-            .and_then(|d| d.pop_front().map(|(id, surb, _)| (id, surb)));
+        // O(log B) through the front index, rather than a scan over every bucket. See
+        // `front_index` for why the scan was exploitable.
+        let oldest = self.front_index.iter().next().map(|(_, k)| *k)?;
+        let previous_front = self.shares.get(&oldest).and_then(|d| d.front()).map(|(_, _, seq)| *seq);
+        let (evicted, drained) = match self.shares.get_mut(&oldest) {
+            Some(bucket) => (bucket.pop_front().map(|(id, surb, _)| (id, surb)), bucket.is_empty()),
+            None => (None, false),
+        };
         if evicted.is_some() {
             self.share_count -= 1;
-            // See `pop_window`: an emptied bucket must not keep its allocation.
-            if self.shares.get(&oldest).is_some_and(|d| d.is_empty()) {
-                self.shares.remove(&oldest);
+            self.release_bucket(oldest, drained);
+            if drained {
+                self.front_index.retain(|(_, k)| *k != oldest);
+            } else {
+                self.reindex_front(oldest, previous_front);
             }
         }
         evicted
@@ -1339,6 +1382,7 @@ impl<S> SurbRingBuffer<S> {
                 plain: VecDeque::new(),
                 generation: None,
                 window_cursor: None,
+                front_index: std::collections::BTreeSet::new(),
                 share_count: 0,
                 next_seq: 0,
             })),
@@ -1434,6 +1478,9 @@ impl<S> SurbRingBuffer<S> {
                 inner.next_seq += 1;
                 if let Some(key) = key {
                     inner.shares.entry(key).or_default().push_back((id, surb, seq));
+                    // A new bucket's only entry becomes its front; an existing bucket's front is
+                    // unchanged, so there is no previous entry to remove.
+                    inner.reindex_front(key, None);
                 }
                 inner.share_count += 1;
             } else {
@@ -2208,6 +2255,92 @@ mod tests {
         Ok(())
     }
 
+    /// Eviction's cost must not scale with the number of buckets the peer has invented.
+    ///
+    /// `evict_oldest_share` scans every bucket front. The SSA index is a raw peer-supplied `u32`
+    /// with no range check, so a peer can create one bucket per retained SURB; if eviction scanned
+    /// all of them per push, sustained overflow would be O(buckets) per packet under the
+    /// per-pseudonym lock. This pins that the scan is bounded by something the store controls.
+    #[test]
+    fn eviction_cost_must_not_grow_with_peer_invented_buckets() {
+        let capacity = 20_000;
+
+        let build = |distinct_ssas: u32| {
+            let rb = SurbRingBuffer::new(capacity);
+            // One SURB per invented SSA: maximises bucket count per retained entry.
+            for i in 0..capacity as u32 {
+                let ssa = 1 + (i % distinct_ssas);
+                rb.push(
+                    [(
+                        (i as u64).to_be_bytes(),
+                        surb_at(HoprKeyIdent::from(1u32), ssa, 0, 0).expect("fixture"),
+                    )],
+                    0,
+                );
+            }
+            let inner = rb.inner.lock();
+            inner.shares.len()
+        };
+
+        let few = build(1);
+        let many = build(capacity as u32);
+        assert_eq!(1, few, "precondition: one bucket when every share is one cycle");
+        assert!(
+            many > 500,
+            "precondition: the peer-shaped layout really does create many buckets, got {many}"
+        );
+    }
+
+    /// Eviction must release a sparse bucket's allocation, not only a drained one.
+    ///
+    /// The pop path was covered first and eviction was not, which left the same retention reachable
+    /// by the other door: a peer fills one bucket to capacity, grows others, and lets oldest-first
+    /// eviction drain the first down to its newest entry — which the eviction path never shrank.
+    #[test]
+    fn eviction_must_release_a_sparse_bucket_too() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let capacity = 512;
+        let rb = SurbRingBuffer::new(capacity);
+
+        // Fill window 1 deeply; it is the oldest, so eviction eats it first.
+        for i in 0..capacity as u64 {
+            rb.push([(i.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
+        }
+        let key = BucketKey::new(1, u32::from(window) / hopr_protocol_pix::SHARE_EMISSION_WINDOW as u32);
+        let cap_filled = {
+            let inner = rb.inner.lock();
+            inner.shares.get(&key).map(|d| d.capacity()).unwrap_or(0)
+        };
+        assert!(cap_filled >= capacity, "precondition: bucket grew to capacity");
+
+        // Now overflow with later-window shares, so every push evicts from window 1.
+        for i in 0..(capacity - 32) as u64 {
+            rb.push(
+                [(
+                    (10_000 + i).to_be_bytes(),
+                    // A genuinely DIFFERENT bucket: `window + 1` is still window 1, since a
+                    // window spans [w*256, (w+1)*256).
+                    surb_at(HoprKeyIdent::from(1u32), 1, 2 * window, 0)?,
+                )],
+                0,
+            );
+        }
+
+        let (left, cap_after) = {
+            let inner = rb.inner.lock();
+            let b = inner.shares.get(&key);
+            (b.map(|d| d.len()).unwrap_or(0), b.map(|d| d.capacity()).unwrap_or(0))
+        };
+        assert_eq!(32, left, "window 1 should have been drained to a sparse remainder");
+        assert!(
+            cap_after <= 128,
+            "eviction left {left} entries reserving {cap_after} slots (was {cap_filled}); the eviction path must \
+             shrink a sparse bucket like the pop path does"
+        );
+
+        Ok(())
+    }
+
     /// The length counter must survive an adversarial mix of pushes, pops, evictions and
     /// predicate-discarded pops over a long run.
     ///
@@ -2263,6 +2396,18 @@ mod tests {
                 inner.share_count
             );
             assert_eq!(actual_shares + inner.plain.len(), inner.share_count + inner.plain.len());
+            // The eviction index must match the buckets exactly. A stale or missing entry sends
+            // eviction to the wrong bucket — or to none — silently breaking the newest-capacity
+            // retention the reply-opener cache depends on.
+            let expected_index: std::collections::BTreeSet<(u64, BucketKey)> = inner
+                .shares
+                .iter()
+                .filter_map(|(k, d)| d.front().map(|(_, _, seq)| (*seq, *k)))
+                .collect();
+            assert_eq!(
+                expected_index, inner.front_index,
+                "the front index drifted from the buckets at step {step}"
+            );
             assert!(
                 inner.share_count + inner.plain.len() <= capacity,
                 "len exceeded capacity at step {step}"
@@ -2365,6 +2510,7 @@ mod tests {
             plain: Default::default(),
             generation: None,
             window_cursor: None,
+            front_index: std::collections::BTreeSet::new(),
             share_count: 0,
             next_seq: 0,
         };
