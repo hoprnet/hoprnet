@@ -71,6 +71,9 @@ pub enum ValidationErrorKind {
     /// Ticket index is lower than the given channel ticket index.
     #[error("ticket index is lower than channel index {0}")]
     IndexTooLow(u64),
+    /// Ticket counterparty does not match the channel destination.
+    #[error("ticket counterparty does not match the channel destination {0}")]
+    WrongCounterparty(Address),
     /// Not enough funds in the given channel to pay for the ticket.
     #[error("ticket value is greater than remaining unrealized balance {1} in channel {0}")]
     InsufficientFunds(ChannelId, HoprBalance),
@@ -95,6 +98,7 @@ mod tests {
     use hopr_types::{
         crypto::prelude::{ChainKeypair, Keypair},
         internal::prelude::TicketBuilder,
+        primitive::traits::BytesRepresentable,
     };
 
     use super::*;
@@ -110,6 +114,51 @@ mod tests {
             )
         );
         assert_eq!(kind.as_ref(), "low_win_prob");
+    }
+
+    /// The `AsRefStr` representation of every variant is used as the value of the `type` label of
+    /// the `hopr_packet_ticket_validation_errors` metric, so the wire-visible names are pinned here
+    /// to catch an accidental rename or an added variant that would silently change dashboards.
+    #[test]
+    fn validation_error_kind_metric_labels_are_stable() {
+        let destination = Address::new(&[0x11; Address::SIZE]);
+
+        let labels = [
+            (ValidationErrorKind::InvalidSigner, "invalid_signer"),
+            (ValidationErrorKind::LowValue(HoprBalance::zero()), "low_value"),
+            (
+                ValidationErrorKind::LowWinProb(WinningProbability::ALWAYS),
+                "low_win_prob",
+            ),
+            (ValidationErrorKind::ChannelClosed(Default::default()), "channel_closed"),
+            (ValidationErrorKind::EpochMismatch(1), "epoch_mismatch"),
+            (ValidationErrorKind::IndexTooLow(1), "index_too_low"),
+            (
+                ValidationErrorKind::WrongCounterparty(destination),
+                "wrong_counterparty",
+            ),
+            (
+                ValidationErrorKind::InsufficientFunds(Default::default(), HoprBalance::zero()),
+                "insufficient_funds",
+            ),
+        ];
+
+        for (kind, expected) in labels {
+            assert_eq!(kind.as_ref(), expected, "unexpected metric label for {kind:?}");
+        }
+    }
+
+    /// The counterparty check is a rejection path reachable from an attacker-controlled ticket,
+    /// so its message must name the expected destination.
+    #[test]
+    fn validation_error_kind_wrong_counterparty_display() {
+        let destination = Address::new(&[0xAB; Address::SIZE]);
+        let kind = ValidationErrorKind::WrongCounterparty(destination);
+
+        assert!(
+            kind.to_string().contains(&destination.to_string()),
+            "message should name the channel destination, got: {kind}"
+        );
     }
 
     #[test]

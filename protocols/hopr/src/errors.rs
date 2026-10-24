@@ -57,6 +57,17 @@ pub enum HoprProtocolError {
     #[error("could not find unacknowledged ticket for challenge {0}")]
     UnacknowledgedTicketNotFound(HalfKeyChallenge),
 
+    #[error("ticket index {2} in channel {0} epoch {1} was already accepted")]
+    DuplicateTicketIndex(ChannelId, u32, u64),
+
+    /// The replay tracker could not retain this ticket index, so it cannot guarantee the index will
+    /// not be replayed. The ticket is refused rather than relayed without replay protection.
+    ///
+    /// This is an operational condition (the tracker is undersized for the traffic, see
+    /// `max_unack_tickets`), not an attack: it must not be reported as a duplicate.
+    #[error("replay tracker could not retain ticket index {2} in channel {0} epoch {1}")]
+    TicketIndexTrackerSaturated(ChannelId, u32, u64),
+
     #[error("chain resolver error: {0}")]
     ResolverError(#[source] anyhow::Error),
 

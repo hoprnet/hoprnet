@@ -63,6 +63,17 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
+    // The ticket counterparty MUST be the channel's destination, otherwise the
+    // ticket is unredeemable by construction (its channel id would not match
+    // any real channel) yet it would still be accepted and relayed here.
+    if inner_ticket.counterparty != channel.destination {
+        return Err(TicketValidationError {
+            kind: ValidationErrorKind::WrongCounterparty(channel.destination),
+            ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
+        });
+    }
+
     // The ticket's index MUST be greater or equal than the channel's ticketIndex
     if inner_ticket.index < channel.ticket_index {
         return Err(TicketValidationError {
@@ -256,6 +267,66 @@ mod tests {
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_validation_should_pass_when_index_equals_channel_index() -> anyhow::Result<()> {
+        let ticket = create_valid_ticket()?;
+        let mut channel = create_channel_entry();
+        channel.ticket_index = ticket.index;
+        channel.channel_epoch = ticket.channel_epoch;
+
+        let ret = validate_unacknowledged_ticket(
+            ticket,
+            &channel,
+            1.into(),
+            1.0.try_into()?,
+            100.into(),
+            &Hash::default(),
+        );
+
+        assert!(
+            ret.is_ok(),
+            "ticket with index == channel.ticket_index must be accepted, got: {:?}",
+            ret
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ticket_validation_should_fail_if_counterparty_is_not_channel_destination() -> anyhow::Result<()> {
+        let bogus_counterparty = ChainKeypair::random();
+        let ticket = TicketBuilder::default()
+            .counterparty(&bogus_counterparty)
+            .amount(1)
+            .index(1)
+            .win_prob(1.0.try_into()?)
+            .channel_epoch(1)
+            .eth_challenge(Default::default())
+            .build_signed(&SENDER_PRIV_KEY, &Hash::default())?
+            .leak();
+
+        let channel = create_channel_entry();
+        assert_ne!(ticket.counterparty, channel.destination);
+
+        let ret = validate_unacknowledged_ticket(
+            ticket,
+            &channel,
+            1.into(),
+            1.0.try_into()?,
+            100.into(),
+            &Hash::default(),
+        );
+
+        let error = ret.expect_err("ticket with bogus counterparty must be rejected");
+        assert!(
+            matches!(error.kind, ValidationErrorKind::WrongCounterparty(_)),
+            "expected WrongCounterparty, got: {:?}",
+            error.kind
+        );
 
         Ok(())
     }
