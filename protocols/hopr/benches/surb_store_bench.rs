@@ -33,6 +33,8 @@ const SSA_INDEX: u32 = 1;
 /// Operations per timed sample.
 const OPS: usize = 256;
 
+/// Builds a synthetic direct-return SURB classified as a share of `SSA_INDEX` at `poly_index`.
+/// The share payload is a placeholder for benchmarking store selection, not decryption.
 fn surb_at(poly_index: u16) -> HoprSurb {
     let mut bytes = vec![0u8; HoprSurb::SIZE];
     let key_id_size = HoprSphinxHeaderSpec::KEY_ID_SIZE.get();
@@ -44,6 +46,7 @@ fn surb_at(poly_index: u16) -> HoprSurb {
     HoprSurb::try_from(bytes.as_slice()).expect("fixture")
 }
 
+/// Builds a synthetic direct-return SURB with no PIX share.
 fn plain_surb() -> HoprSurb {
     let mut bytes = vec![0u8; HoprSurb::SIZE];
     let key_id_size = HoprSphinxHeaderSpec::KEY_ID_SIZE.get();
@@ -52,6 +55,11 @@ fn plain_surb() -> HoprSurb {
     HoprSurb::try_from(bytes.as_slice()).expect("fixture")
 }
 
+/// Returns a fresh store and random pseudonym after inserting `fill` synthetic SURBs for it.
+///
+/// When `share_bearing` is true, polynomial indices cycle through 0–4095 within one SSA; otherwise
+/// the SURBs carry no shares. `capacity` requests the ring limit, subject to the store's minimum;
+/// inserts beyond that limit evict older entries.
 fn populated(fill: usize, share_bearing: bool, capacity: usize) -> (MemorySurbStore, SimplePseudonym) {
     let store = MemorySurbStore::new(SurbStoreConfig {
         rb_capacity: capacity,
