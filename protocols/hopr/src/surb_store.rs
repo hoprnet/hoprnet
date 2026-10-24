@@ -1944,24 +1944,37 @@ mod tests {
         // windows behind it. A key of the window alone puts the successor in the SAME buckets, and
         // once rotation wraps it reaches the successor while the front cycle still has entries in
         // the later buckets — which the supervisor reads as off-front progress.
+        // NON-UNIFORM depth is what makes this discriminate the key change. With equal depth per
+        // bucket, rotation drains one entry per bucket per lap, so the front cycle's entries are all
+        // consumed before any successor entry becomes reachable *regardless of how buckets are
+        // keyed* — a window-only key would pass. Giving the front cycle only ONE entry in window 0
+        // means the very next lap reaches window 0 again while front-cycle shares still sit in the
+        // later windows; under a window-only key the successor is then served first.
         let mut id = 0u64;
-        for cycle in 1u32..=2 {
-            for w in 0..8u16 {
-                for _ in 0..4 {
-                    rb.push(
-                        [(
-                            id.to_be_bytes(),
-                            surb_at(HoprKeyIdent::from(1u32), cycle, w * window, 0)?,
-                        )],
-                        0,
-                    );
-                    id += 1;
-                }
+        for w in 0..8u16 {
+            let depth = if w == 0 { 1 } else { 4 };
+            for _ in 0..depth {
+                rb.push(
+                    [(id.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, w * window, 0)?)],
+                    0,
+                );
+                id += 1;
+            }
+        }
+        for w in 0..8u16 {
+            for _ in 0..4 {
+                rb.push(
+                    [(id.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 2, w * window, 0)?)],
+                    0,
+                );
+                id += 1;
             }
         }
 
         let mut cycle_2_seen = false;
+        let mut pops = 0usize;
         while let Some(popped) = rb.pop_any() {
+            pops += 1;
             let (ssa, _) = popped
                 .surb
                 .additional_data_receiver
@@ -1977,6 +1990,10 @@ mod tests {
                 );
             }
         }
+        // Ordering alone is not enough: a mutant that stalls early (serves too little) satisfies
+        // "no cycle-1 share after a cycle-2 share" vacuously. Measured, a stall mutant popped 8 of
+        // these 64 shares and the test passed without this assertion.
+        assert_eq!(61, pops, "the drain must serve every buffered share, not stop early");
 
         Ok(())
     }
