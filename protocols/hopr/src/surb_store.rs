@@ -2258,30 +2258,52 @@ mod tests {
     #[test]
     fn the_highest_ssa_index_must_be_served_and_must_not_panic() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
-        let rb = SurbRingBuffer::new(64);
 
-        // Two windows of the highest cycle: serving one leaves the cursor on the other, which is the
-        // arrangement that reverses the range if the bound saturates.
-        for w in 0..2u16 {
-            rb.push(
-                [(
-                    u64::from(w).to_be_bytes(),
-                    surb_at(HoprKeyIdent::from(1u32), u32::MAX, w * window, 0)?,
-                )],
-                0,
+        // Two windows of the highest cycle, in a buffer of their own.
+        let fill = |rb: &SurbRingBuffer<HoprSurb>| -> anyhow::Result<()> {
+            for w in 0..2u16 {
+                rb.push(
+                    [(
+                        u64::from(w).to_be_bytes(),
+                        surb_at(HoprKeyIdent::from(1u32), u32::MAX, w * window, 0)?,
+                    )],
+                    0,
+                );
+            }
+            assert_eq!(2, rb.len());
+            Ok(())
+        };
+
+        // The cursor branch is exercised by SETTING the cursor, not by popping first. That distinction
+        // matters: with the saturated bound the no-cursor fallback is empty, so no pop can succeed and
+        // no cursor can be established — the stranding consequently hides the panic, and a test that
+        // reached the cursor by popping would report only the stranding. Driving the state directly is
+        // what makes the reversed-range panic reachable on the old bound.
+        let rb = SurbRingBuffer::new(64);
+        fill(&rb)?;
+        {
+            let mut inner = rb.inner.lock();
+            // A cursor on the cycle's SECOND window is the reversing arrangement: the bound computed
+            // as `(u32::MAX + 1, 0)` saturates to `(u32::MAX, 0)`, which sorts before this cursor.
+            inner.window_cursor = Some(BucketKey::new(u32::MAX, 1));
+            assert_eq!(
+                Some(BucketKey::new(u32::MAX, 1)),
+                inner.next_window(),
+                "the cursor's own window must be selected, not panic on a reversed range"
             );
         }
-        assert_eq!(2, rb.len());
 
-        // No-cursor case: the fallback range must not be empty.
+        // No-cursor branch, on a fresh buffer: the fallback range must not be empty. The buffer above
+        // now carries a cursor, so it is a different branch and needs its own.
+        let rb = SurbRingBuffer::new(64);
+        fill(&rb)?;
         assert_eq!(
             Some(BucketKey::new(u32::MAX, 0)),
             rb.inner.lock().next_window(),
             "the highest cycle's first window is never selected"
         );
 
-        // Cursor case: popping from the first window advances onto the second, and the next
-        // `next_window` must find it rather than panic on a reversed range.
+        // And end to end, a full drain of that cycle must serve both shares.
         for i in 0..2 {
             let popped = rb
                 .pop_any()
@@ -2349,15 +2371,30 @@ mod tests {
     /// bucket per retained SURB. Both paths find the bucket they touch through `front_index`, and both
     /// used to tidy a drained bucket's entry with `front_index.retain(..)` — a full walk of the index.
     /// One SURB per bucket means every eviction and every pop drains its bucket, so every such
-    /// operation walked the whole index under the per-pseudonym lock: measured, 241x and 37x more
-    /// expensive at 10x the bucket count.
+    /// operation walked the whole index under the per-pseudonym lock. Measured at one bucket versus
+    /// one per SURB (the two layouts this test compares), that was ~104x per overflowing push and
+    /// ~87x per pop; the external reproductions measure the same effect as 10x the bucket count.
     ///
-    /// Timing is the only thing that distinguishes the two implementations, so this measures, but the
-    /// threshold is set far below the effect (6x against a measured 241x) and the comparison is a
-    /// ratio of two runs in the same process, which cancels machine speed.
+    /// Timing is the only thing that distinguishes the two implementations, so this measures — but
+    /// carefully, because this test runs in the default suite and a guard that flakes is worse than
+    /// no guard. An earlier single-sample version of this test failed at 93x on a loaded machine with
+    /// the fix already in place. Two things address that:
+    ///
+    /// - Each side is the MINIMUM of several independent runs. A minimum is the right estimator here: scheduling
+    ///   hiccups and cache eviction only ever add time, so the fastest run is the one least polluted by other load,
+    ///   while a single sample can be arbitrarily inflated.
+    /// - The threshold is 10x, chosen from measured distributions rather than guessed. Correct code sits at ~2.1x
+    ///   unloaded (this is a real comparison, so it does not reach 1x: touching a `BTreeMap` node rather than a flat
+    ///   deque costs something). The ratio INFLATES under load, because the many-bucket side is far more
+    ///   cache-sensitive — a tail of 3.4x under 64-way CPU contention. The regression sits at ~90-110x. So 10x is ~3x
+    ///   above the worst observed correct-case ratio and ~10x below the bug: wide both ways, which is what a timing
+    ///   assertion in a default test suite needs to be.
     #[test]
     fn eviction_cost_must_not_grow_with_peer_invented_buckets() -> anyhow::Result<()> {
-        let capacity = 20_000;
+        const CAPACITY: usize = 20_000;
+        /// Independent runs per side, of which the fastest is kept. See the doc comment on why this
+        /// is a minimum rather than a mean.
+        const RUNS: usize = 5;
 
         /// Time one operation per resident entry over a buffer already full of `distinct_ssas` buckets.
         fn cost_per_op(capacity: usize, distinct_ssas: u32, pop: bool) -> anyhow::Result<Duration> {
@@ -2389,12 +2426,20 @@ mod tests {
             Ok(started.elapsed())
         }
 
+        let best_of = |distinct_ssas: u32, pop: bool| -> anyhow::Result<Duration> {
+            let mut best = Duration::MAX;
+            for _ in 0..RUNS {
+                best = best.min(cost_per_op(CAPACITY, distinct_ssas, pop)?);
+            }
+            Ok(best)
+        };
+
         for (label, pop) in [("overflow eviction", false), ("reply pop", true)] {
-            let few = cost_per_op(capacity, 1, pop)?;
-            let many = cost_per_op(capacity, capacity as u32, pop)?;
+            let few = best_of(1, pop)?;
+            let many = best_of(CAPACITY as u32, pop)?;
             let ratio = many.as_secs_f64() / few.as_secs_f64().max(f64::MIN_POSITIVE);
             assert!(
-                ratio < 6.0,
+                ratio < 10.0,
                 "{label} cost {ratio:.1}x more with one bucket per SURB ({many:?} vs {few:?}): it still walks every \
                  bucket"
             );
