@@ -160,7 +160,7 @@ hopr-ticket-manager = { version = "0.8.0" }
 hopr-transport = { version = "0.52.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.33.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.34.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.28.0" }
 
