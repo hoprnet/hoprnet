@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -79,6 +79,10 @@ fn default_eviction_report_interval() -> Duration {
 
 fn default_eviction_report_threshold() -> u64 {
     1000
+}
+
+fn default_unreachable_relayer_grace() -> Duration {
+    Duration::from_secs(30)
 }
 
 /// Which end of the per-pseudonym buffer a pop consumes from. Replying side only.
@@ -251,6 +255,19 @@ pub struct SurbStoreConfig {
     #[default(default_eviction_report_threshold())]
     #[cfg_attr(feature = "serde", serde(default = "default_eviction_report_threshold"))]
     pub eviction_report_threshold: u64,
+    /// How long SURBs through a disconnected first relayer are set aside before they are purged.
+    ///
+    /// Affects only the replying side. Long enough that a relayer which flaps or briefly stalls
+    /// gets its SURBs back on reconnect, instead of every blip forcing the counterparty to re-mint
+    /// them. Under PIX a set-aside SURB also keeps its share, which a purge loses for good.
+    ///
+    /// Default is 30 seconds.
+    #[default(default_unreachable_relayer_grace())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_unreachable_relayer_grace", with = "humantime_serde")
+    )]
+    pub unreachable_relayer_grace: Duration,
 }
 
 /// Basic [`SurbStore`] implementation based on an in-memory cache.
@@ -264,7 +281,10 @@ pub struct MemorySurbStore {
     surbs_per_pseudonym: moka::sync::Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
     /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
     /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
-    invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
+    invalidated_relayers: Arc<parking_lot::RwLock<HashSet<HoprKeyIdent>>>,
+    /// First relayers we lost the connection to, with when. Their SURBs are kept but not used
+    /// until they reconnect, and purged after [`SurbStoreConfig::unreachable_relayer_grace`].
+    unreachable_relayers: Arc<parking_lot::RwLock<HashMap<HoprKeyIdent, Instant>>>,
     /// Current SURB-batch generation per pseudonym we originate for (sending side). Advanced on a
     /// return-path change so the replying side can drop SURBs for the superseded path.
     ///
@@ -552,6 +572,7 @@ impl MemorySurbStore {
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             invalidated_relayers: Default::default(),
+            unreachable_relayers: Default::default(),
             generations: moka::sync::Cache::builder()
                 // Sending-side state, so it is sized and aged like the sibling sending-side
                 // `pseudonym_openers` cache — NOT like the receiving-side `surbs_per_pseudonym`.
@@ -583,38 +604,85 @@ impl MemorySurbStore {
         self.invalidated_relayers.read().contains(relayer)
     }
 
-    /// Whether a stored SURB can still be used to reply: its first relayer must still be payable.
-    ///
-    /// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
-    /// channel (RFC-0003 §3.2, RFC-0006 §6.1). Without that exemption, closing an unrelated channel
-    /// to a session's originator would discard perfectly good SURBs.
-    fn is_surb_usable(&self, surb: &HoprSurb) -> bool {
-        match surb.additional_data_receiver.proof_of_relay_values().chain_length() {
-            // Direct return path: the "first relayer" is the final recipient, which needs no channel.
-            1 => true,
-            // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. Refuse it rather
-            // than let a malformed value pass as "direct" and bypass the check below.
-            //
-            // The length is an unvalidated byte off a SURB minted by the counterparty, so this is a
-            // statement about that peer, not a local fault we could act on: `warn`, not `error`.
-            0 => {
-                tracing::warn!(
-                    first_relayer = %surb.first_relayer,
-                    "refusing a malformed SURB declaring a zero-length return path"
-                );
-                false
-            }
-            _ => {
-                let usable = !self.invalidated_relayers.read().contains(&surb.first_relayer);
-                if !usable {
-                    tracing::trace!(
-                        first_relayer = %surb.first_relayer,
-                        "refusing a SURB whose first relayer is invalidated"
-                    );
-                }
-                usable
-            }
+    /// Marks `relayer` as disconnected: SURBs through it are set aside, not used.
+    pub fn mark_relayer_unreachable(&self, relayer: &HoprKeyIdent) {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.unreachable_relayers.write().entry(*relayer) {
+            e.insert(Instant::now());
+            tracing::info!(%relayer, "setting aside stored SURBs whose return path starts with this disconnected relayer");
         }
+    }
+
+    /// Marks `relayer` as connected again: SURBs through it that were set aside are usable again.
+    pub fn mark_relayer_reachable(&self, relayer: &HoprKeyIdent) {
+        if self.unreachable_relayers.write().remove(relayer).is_some() {
+            tracing::info!(%relayer, "relayer reconnected, its stored SURBs are usable again");
+        }
+    }
+
+    /// How long SURBs through a disconnected first relayer are kept before they are purged.
+    pub fn unreachable_relayer_grace(&self) -> Duration {
+        self.cfg.unreachable_relayer_grace
+    }
+
+    /// Purges SURBs whose first relayer has been unreachable for the configured grace (or is
+    /// invalidated), returning how many. Walks every stored SURB.
+    pub fn purge_unusable_surbs(&self) -> usize {
+        let verdict = self.verdict_fn();
+        self.surbs_per_pseudonym
+            .iter()
+            .map(|(_, rb)| rb.retain_with(|surb| verdict(surb)))
+            .sum()
+    }
+
+    /// Snapshot of the relayer state, so the verdict runs without locks under a buffer's lock.
+    fn verdict_fn(&self) -> impl Fn(&HoprSurb) -> SurbVerdict + use<> {
+        let invalidated = self.invalidated_relayers.read().clone();
+        let unreachable = self.unreachable_relayers.read().clone();
+        let grace = self.cfg.unreachable_relayer_grace;
+        move |surb| surb_verdict(surb, &invalidated, &unreachable, grace)
+    }
+}
+
+/// What a pop does with a stored SURB.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SurbVerdict {
+    Use,
+    /// Skip it but keep it: its first relayer may come back.
+    Keep,
+    Drop,
+}
+
+/// Whether a stored SURB can be used to reply: its first relayer must be payable and connected.
+///
+/// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
+/// channel (RFC-0003 §3.2, RFC-0006 §6.1). Without that exemption, closing an unrelated channel
+/// to a session's originator would discard perfectly good SURBs.
+fn surb_verdict(
+    surb: &HoprSurb,
+    invalidated: &HashSet<HoprKeyIdent>,
+    unreachable: &HashMap<HoprKeyIdent, Instant>,
+    grace: Duration,
+) -> SurbVerdict {
+    match surb.additional_data_receiver.proof_of_relay_values().chain_length() {
+        1 => SurbVerdict::Use,
+        // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. The length is an
+        // unvalidated byte off a SURB minted by the counterparty: `warn`, not `error`.
+        0 => {
+            tracing::warn!(
+                first_relayer = %surb.first_relayer,
+                "refusing a malformed SURB declaring a zero-length return path"
+            );
+            SurbVerdict::Drop
+        }
+        _ if invalidated.contains(&surb.first_relayer) => {
+            tracing::trace!(first_relayer = %surb.first_relayer, "refusing a SURB whose first relayer is invalidated");
+            SurbVerdict::Drop
+        }
+        _ => match unreachable.get(&surb.first_relayer) {
+            Some(since) if since.elapsed() >= grace => SurbVerdict::Drop,
+            Some(_) => SurbVerdict::Keep,
+            None => SurbVerdict::Use,
+        },
     }
 }
 
@@ -633,13 +701,15 @@ impl SurbStore for MemorySurbStore {
         match matcher {
             // SURBs whose return path no longer has a usable first edge are dropped on the way,
             // rather than handed out only to have the reply fail to be paid for.
-            SurbMatcher::Pseudonym(_) => surbs_for_pseudonym
-                .pop_next_valid(|_, surb| self.is_surb_usable(surb))
-                .map(|popped_surb| FoundSurb {
-                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                    surb: popped_surb.surb,
-                    remaining: popped_surb.remaining,
-                }),
+            SurbMatcher::Pseudonym(_) => {
+                surbs_for_pseudonym
+                    .pop_next_with(self.verdict_fn())
+                    .map(|popped_surb| FoundSurb {
+                        sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                        surb: popped_surb.surb,
+                        remaining: popped_surb.remaining,
+                    })
+            }
             // The following code intentionally only checks the oldest SURB of the tier that would be
             // consumed next (share-bearing SURBs first, share-less ones once none are left) and does
             // not search the entire RB.
@@ -924,6 +994,10 @@ struct GenerationalBuffer<S> {
     plain: VecDeque<(HoprSurbId, S)>,
     /// Highest generation seen; `None` until the first push.
     generation: Option<u8>,
+    /// SURBs dropped as unusable since the last push, and how many of them carried a share. Reported
+    /// with the next push as evicted, so the counterparty's estimate of this buffer stops counting them.
+    dropped: usize,
+    dropped_shares: usize,
 }
 
 impl<S> GenerationalBuffer<S> {
@@ -1010,6 +1084,8 @@ impl<S> SurbRingBuffer<S> {
                 shares: VecDeque::new(),
                 plain: VecDeque::new(),
                 generation: None,
+                dropped: 0,
+                dropped_shares: 0,
             })),
             // A zero capacity would make the eviction below pop from an empty buffer and then push
             // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
@@ -1096,9 +1172,62 @@ impl<S> SurbRingBuffer<S> {
         }
         SurbInsertOutcome {
             retained: inner.len(),
-            evicted,
-            evicted_shares,
+            evicted: evicted + std::mem::take(&mut inner.dropped),
+            evicted_shares: evicted_shares + std::mem::take(&mut inner.dropped_shares),
         }
+    }
+
+    /// Pops the next SURB that `verdict` says to use: a usable share-bearing one while any is held,
+    /// the oldest of each tier first.
+    ///
+    /// SURBs judged [`SurbVerdict::Drop`] on the way are removed, [`SurbVerdict::Keep`] ones stay in
+    /// place, so a share set aside behind a disconnected relayer is not lost. `verdict` runs under the
+    /// buffer's lock, so it must not take locks of its own.
+    pub fn pop_next_with<F>(&self, verdict: F) -> Option<PoppedSurb<S>>
+    where
+        F: Fn(&S) -> SurbVerdict,
+    {
+        let mut inner = self.inner.lock();
+        for is_shares in [true, false] {
+            let mut idx = 0;
+            loop {
+                let tier = if is_shares { &mut inner.shares } else { &mut inner.plain };
+                let Some((_, surb)) = tier.get(idx) else { break };
+                match verdict(surb) {
+                    SurbVerdict::Use => {
+                        let (id, surb) = tier.remove(idx)?;
+                        return Some(PoppedSurb {
+                            id,
+                            surb,
+                            remaining: inner.len(),
+                        });
+                    }
+                    SurbVerdict::Keep => idx += 1,
+                    SurbVerdict::Drop => {
+                        tier.remove(idx);
+                        inner.dropped += 1;
+                        inner.dropped_shares += usize::from(is_shares);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Removes every SURB that `verdict` says to drop, from both tiers, returning how many.
+    pub fn retain_with<F>(&self, verdict: F) -> usize
+    where
+        F: Fn(&S) -> SurbVerdict,
+    {
+        let mut inner = self.inner.lock();
+        let (shares_before, plain_before) = (inner.shares.len(), inner.plain.len());
+        inner.shares.retain(|(_, surb)| verdict(surb) != SurbVerdict::Drop);
+        inner.plain.retain(|(_, surb)| verdict(surb) != SurbVerdict::Drop);
+        let purged_shares = shares_before - inner.shares.len();
+        let purged = purged_shares + plain_before - inner.plain.len();
+        inner.dropped += purged;
+        inner.dropped_shares += purged_shares;
+        purged
     }
 
     /// Pops the next SURB that `is_valid` accepts: a share-bearing one while any is held, the oldest of
@@ -1111,6 +1240,7 @@ impl<S> SurbRingBuffer<S> {
     ///
     /// `is_valid` runs *outside* the lock: it is caller-supplied and may take locks of its own, so
     /// calling it inside the critical section would invite lock-order inversion.
+    #[cfg(test)]
     pub fn pop_next_valid<F>(&self, is_valid: F) -> Option<PoppedSurb<S>>
     where
         F: Fn(&HoprSurbId, &S) -> bool,
@@ -1372,6 +1502,88 @@ mod tests {
         store.invalidate_relayer(&relayer);
 
         assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_set_aside_a_share_through_an_unreachable_relayer_until_it_reconnects()
+    -> anyhow::Result<()> {
+        let (gone, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_share(gone, 1)?),
+                ([2u8; 8], surb_share(alive, 1)?),
+                ([3u8; 8], surb_via(alive, TWO_HOP)?),
+            ],
+        );
+
+        store.mark_relayer_unreachable(&gone);
+        let next = |store: &MemorySurbStore| {
+            store
+                .find_surb(SurbMatcher::Pseudonym(pseudonym))
+                .map(|found| found.sender_id.surb_id())
+        };
+        assert_eq!(Some([2u8; 8]), next(&store), "the usable share goes first");
+        assert_eq!(
+            Some([3u8; 8]),
+            next(&store),
+            "then share-less, past the set-aside share"
+        );
+        assert_eq!(None, next(&store));
+
+        store.mark_relayer_reachable(&gone);
+        assert_eq!(Some([1u8; 8]), next(&store), "the share must survive the outage");
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_purge_and_report_surbs_through_a_relayer_gone_past_the_grace() -> anyhow::Result<()> {
+        let (gone, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_share(gone, 1)?),
+                ([2u8; 8], surb_via(gone, TWO_HOP)?),
+                ([3u8; 8], surb_via(alive, TWO_HOP)?),
+            ],
+        );
+
+        let since = Instant::now()
+            .checked_sub(store.unreachable_relayer_grace())
+            .ok_or(anyhow::anyhow!("clock too young for the fixture"))?;
+        store.unreachable_relayers.write().insert(gone, since);
+
+        assert_eq!(2, store.purge_unusable_surbs());
+        let outcome = store.insert_surbs(pseudonym, vec![([4u8; 8], surb_via(alive, TWO_HOP)?)]);
+        assert_eq!(
+            2, outcome.evicted,
+            "purged SURBs must reach the level estimate as evicted"
+        );
+        assert_eq!(1, outcome.evicted_shares, "the purged share must be reported as lost");
+        assert_eq!(2, outcome.retained);
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_not_set_aside_surbs_with_a_direct_return_path() -> anyhow::Result<()> {
+        let recipient = HoprKeyIdent::from(1u32);
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(pseudonym, vec![([1u8; 8], surb_via(recipient, DIRECT)?)]);
+
+        store.mark_relayer_unreachable(&recipient);
+        assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_some());
 
         Ok(())
     }
