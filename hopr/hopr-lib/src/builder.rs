@@ -446,6 +446,26 @@ where
 {
     let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
+    // First, so it is in the log even when the configuration or the chain fails below.
+    const ENABLED_FEATURES: &[&str] = include!(concat!(env!("OUT_DIR"), "/enabled_features.rs"));
+    tracing::info!(
+        version = constants::APP_VERSION,
+        features = ?ENABLED_FEATURES,
+        peer = %ctx.packet_key.public().to_peerid_str(),
+        peer_addr = %ctx.chain_key.public().to_address(),
+        safe = %ctx.cfg.safe_module.safe_address,
+        module = %ctx.cfg.safe_module.module_address,
+        host = %ctx.cfg.host,
+        publish = ctx.cfg.publish,
+        outgoing_ticket_price = ?ctx.cfg.protocol.packet.codec.outgoing_ticket_price.map(|price| price.to_string()),
+        outgoing_win_prob = ?ctx.cfg.protocol.packet.codec.outgoing_win_prob.map(|prob| prob.to_string()),
+        max_sessions = ctx.cfg.protocol.session.maximum_managed_sessions,
+        session_idle_timeout = ?ctx.cfg.protocol.session.idle_timeout,
+        probe_interval = ?ctx.cfg.protocol.probe.interval,
+        mixer = ?ctx.cfg.protocol.mixer.mixer_type,
+        "starting node"
+    );
+    tracing::debug!(config = ?ctx.cfg, "node configuration");
     ctx.cfg.validate()?;
 
     let chain_api = (configured
@@ -562,11 +582,21 @@ where
         )));
     }
 
+    // The network the node joined, with the minimums it enforces: what a log reader needs to judge
+    // ticket problems. Best effort, because the checks above have already passed.
+    let (network_name, network_chain_id) = match chain_api.chain_info().await {
+        Ok(info) => (info.hopr_network_name, Some(info.chain_id)),
+        Err(error) => {
+            tracing::warn!(%error, "could not read the network information");
+            (String::new(), None)
+        }
+    };
     tracing::info!(
-        peer_id = %transport_id.public().to_peerid_str(),
-        address = %me_onchain,
-        hopr_lib_version = constants::APP_VERSION,
-        "Node information"
+        network = network_name,
+        chain_id = network_chain_id,
+        %network_min_ticket_price,
+        %network_min_win_prob,
+        "network information"
     );
 
     let safe_addr = ctx.cfg.safe_module.safe_address;
