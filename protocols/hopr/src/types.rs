@@ -65,6 +65,14 @@ pub struct AuxiliaryPacketInfo {
     /// SURBs that left or never entered the store, not the number of lost shares. See
     /// `counterparty_buffer_capacity` in `hopr-transport-session`.
     pub num_evicted_surbs: usize,
+    /// Fewest intermediate hops on the return path of any SURB the packet carried, or `None` if it
+    /// carried none.
+    ///
+    /// Read off each SURB's Proof-of-Relay chain length (`hops + 1`), the same value the reply
+    /// ticket is priced by, so it is the SURB creator's word rather than something this node checked.
+    /// `Some(0)` means at least one SURB routes the reply straight back to its creator, with no first
+    /// relayer to acknowledge it — and that acknowledgement is what a PIX share is decrypted with.
+    pub min_return_path_hops: Option<u8>,
 }
 
 /// An incoming packet with a payload intended for us.
