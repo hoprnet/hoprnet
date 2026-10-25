@@ -81,28 +81,33 @@ fn default_eviction_report_threshold() -> u64 {
     1000
 }
 
-/// Which end of the emission-window bucket a pop consumes from. Replying side only.
+/// Which end of a pop takes from. Replying side only, and **share-less SURBs only**.
 ///
 /// Both orders consume SURBs that carry a PIX share before share-less ones (see "Share-bearing SURBs
-/// first" on the internal `SurbRingBuffer`). Within each emission-window bucket, [`Fifo`](Self::Fifo)
-/// takes the oldest SURB and [`Lifo`](Self::Lifo) the newest; the share-less tier follows the same
-/// order. The order selects which end of the *selected* bucket a pop takes — not which bucket: the
-/// cursor still rotates across buckets under either. Eviction is unaffected too, and strictly by age
-/// across the whole buffer (the globally oldest share-bearing SURB goes, whichever end pops use), which
-/// is what keeps the retained set equal to the newest `capacity` SURBs.
+/// first" on the internal `SurbRingBuffer`). The order applies to the share-less tier:
+/// [`Fifo`](Self::Fifo) takes the oldest, [`Lifo`](Self::Lifo) the newest.
 ///
-/// Neither order is a correctness fix under PIX. What makes either work is
-/// emission-window bucketing: the buffer sorts share-bearing SURBs by the block of the
-/// emission they came from and rotates across the buckets, so what a bounded buffer drops is spread
-/// over the cycle instead of concentrated at one end. A share reaches the reconstructor only when its
-/// SURB is *used*, so without that bucketing either order hands back a **contiguous run of the
-/// emission order** and the surplus — calibrated for loss that is independent per share — cannot
-/// absorb it (measured against the real reconstructor: a 5 % contiguous loss of a cycle stops it
-/// recovering, while 50 % spread loss recovers every time). With the bucketing, both orders recover
-/// identically (measured). LIFO is therefore not a fix for anything; it exists because the PopOrder
-/// experiment needs it, and FIFO remains the default. The committed test
-/// `tests/surb_pix_recovery.rs` runs a scaled-down cycle for CI speed and pins that shape rather than
-/// these exact figures.
+/// **Share-bearing buckets always drain in arrival order, under either variant.** That is not an
+/// optimisation and it is not a preference — it is what makes the two orders recover identically.
+/// Eviction takes the front of the globally oldest bucket, so a back-popping bucket would be
+/// destroyed at one end and consumed from the other. Within a single emission window those two ends
+/// apply opposite phase shifts to the 256-polynomial cycle and the composition resonates: measured at
+/// the shipped dimensions with 3 SURBs per reply, popping the back gave the even-indexed polynomials
+/// of every window 24 shares and the odd-indexed 53, leaving 1664 of 4096 below threshold. A cycle
+/// that never reaches threshold strands the deposit, and because the shipped batch is a single cycle,
+/// `max_recovery_idle` then closes the Session. See `both_pop_orders_must_recover_a_cycle_at_production_dimensions`.
+///
+/// What makes either order work at all is emission-window bucketing: the buffer sorts share-bearing
+/// SURBs by the block of the emission they came from and rotates across the buckets, so what a bounded
+/// buffer drops is spread over the cycle instead of concentrated at one end. A share reaches the
+/// reconstructor only when its SURB is *used*, so without that bucketing a pop hands back a
+/// **contiguous run of the emission order** and the surplus — calibrated for loss that is independent
+/// per share — cannot absorb it (measured against the real reconstructor: a 5 % contiguous loss of a
+/// cycle stops it recovering, while 50 % spread loss recovers every time).
+///
+/// So neither variant is a correctness fix for anything, and neither may be described as one: the
+/// bucketing and the rotation do the work, and the variant decides only what a *return path* costs.
+/// `Lifo` exists because the PopOrder experiment needs it; `Fifo` remains the default.
 ///
 /// The order is independent of the per-SURB generation tag (`SurbReceiverInfo::generation`), which
 /// handles an explicit return-path re-plan by clearing superseded SURBs wholesale on the next push.
@@ -111,10 +116,12 @@ fn default_eviction_report_threshold() -> u64 {
 #[strum(serialize_all = "lowercase")]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum SurbPopOrder {
-    /// Oldest first: a pop takes the front of the selected bucket. The default.
+    /// Oldest first: a pop takes the front of the share-less tier. The default.
     #[default]
     Fifo,
-    /// Newest first: a pop takes the back of the selected bucket.
+    /// Newest first: a pop takes the back of the share-less tier. Share-bearing buckets drain in
+    /// arrival order regardless — see the type documentation for why draining them from the back
+    /// strands PIX cycles.
     Lifo,
 }
 
@@ -191,11 +198,12 @@ pub struct SurbStoreConfig {
     pub rb_capacity: usize,
     /// Pop order of the per-pseudonym buffer within each emission-window bucket; see [`SurbPopOrder`].
     ///
-    /// [`SurbPopOrder::Fifo`] (the default) pops the oldest SURB of the bucket the cursor selects,
-    /// [`SurbPopOrder::Lifo`] the newest. Neither changes which bucket is selected — they still rotate
-    /// — nor which SURB is evicted on overflow, which is always the globally oldest. And neither is a
-    /// correctness fix under PIX: the emission-window bucketing is what makes either order work, and
-    /// both recover identically (see [`SurbPopOrder`]). `lifo` is accepted because the PopOrder
+    /// Applies to the **share-less tier only**. [`SurbPopOrder::Fifo`] (the default) pops the oldest
+    /// share-less SURB, [`SurbPopOrder::Lifo`] the newest. Share-bearing buckets always drain in
+    /// arrival order under either variant, which is what makes the two recover identically — see
+    /// [`SurbPopOrder`] for the measurement behind that and for why the alternative strands cycles.
+    /// Neither variant changes which bucket the cursor selects (they still rotate) nor which SURB is
+    /// evicted on overflow (always the globally oldest). `lifo` is accepted because the PopOrder
     /// experiment needs it; `fifo` remains the default.
     ///
     /// Affects only the replying side. Default is [`SurbPopOrder::Fifo`].
@@ -1217,10 +1225,24 @@ impl<S> GenerationalBuffer<S> {
         let previous_front = self.shares.get(&w).and_then(|d| d.front()).map(|(_, _, seq)| *seq);
         let (popped, drained) = {
             let bucket = self.shares.get_mut(&w)?;
-            let popped = match order {
-                SurbPopOrder::Fifo => bucket.pop_front(),
-                SurbPopOrder::Lifo => bucket.pop_back(),
-            };
+            // Share-bearing buckets drain in ARRIVAL order under both `SurbPopOrder`s.
+            //
+            // Popping the back instead is not the harmless mirror it looks like. Eviction takes the
+            // front of the *oldest* bucket, so a back-popping bucket is destroyed from one end and
+            // consumed from the other: within one emission window the two ends apply opposite
+            // phase shifts to the 256-polynomial cycle, and the composition is a parity resonance.
+            // Measured at the shipped default with 3 SURBs/reply, LIFO gave the even-indexed
+            // polynomials of every window 24 shares and the odd-indexed 53 — starving 128 of 256 in
+            // each of 14 windows, 1664 polynomials below threshold, so the cycle could never
+            // reconstruct. FIFO, popping and evicting the same end, is uniform.
+            //
+            // Draining both orders in arrival order is what makes the two recover identically, which
+            // is what the type's contract has always claimed. It costs nothing: the bucketing and the
+            // rotation are what spread the loss, and neither depends on which end of a bucket is
+            // taken. `order` still selects the end of the *share-less* tier, where a contiguous run
+            // costs a return path rather than a PIX cycle.
+            let _ = order;
+            let popped = bucket.pop_front();
             (popped.map(|(id, surb, _)| (id, surb))?, bucket.is_empty())
         };
         self.share_count -= 1;
@@ -1319,13 +1341,13 @@ impl<S> GenerationalBuffer<S> {
     /// front or the back of the selected bucket.
     fn peek_next(&self, order: SurbPopOrder) -> Option<(&HoprSurbId, &S)> {
         match self.next_window() {
+            // Share buckets always peek the front, matching [`pop_window`](Self::pop_window)'s
+            // arrival-order drain. Peeking the back here while popping the front would make the
+            // exact-ID lookup disagree with the pop.
             Some(w) => self
                 .shares
                 .get(&w)
-                .and_then(|d| match order {
-                    SurbPopOrder::Fifo => d.front(),
-                    SurbPopOrder::Lifo => d.back(),
-                })
+                .and_then(|d| d.front())
                 .map(|(id, surb, _)| (id, surb)),
             None => match order {
                 SurbPopOrder::Fifo => self.plain.front(),
@@ -2929,72 +2951,106 @@ mod tests {
     /// Under LIFO the same {1, 2} batch is handed out 2 then 1, and the same holds for a fresh batch
     /// pushed after the buffer drains. This is the mirror of
     /// [`surb_ring_buffer_should_consume_oldest_first`] and pins that the order selects the end of a
-    /// bucket rather than being ignored.
+    /// Share-bearing buckets drain in ARRIVAL order under BOTH pop orders.
+    ///
+    /// This replaces an earlier test that asserted the opposite (`Lifo` consumes the newest share
+    /// first). That behaviour is what stranded PIX cycles: eviction takes the front of the oldest
+    /// bucket, so a back-popping bucket is destroyed from one end and consumed from the other, and
+    /// the composition resonates against the 256-polynomial emission window. Measured at the shipped
+    /// default with 3 SURBs/reply, `Lifo` left 1664 of 4096 polynomials below threshold; with this
+    /// rule the two orders recover identically in every capacity/rate cell measured.
+    ///
+    /// The share-less tier still follows `order` — see
+    /// `surb_ring_buffer_should_consume_the_plain_tier_newest_first_under_lifo`.
     #[test]
-    fn surb_ring_buffer_should_consume_newest_first_under_lifo() -> anyhow::Result<()> {
-        // Share-bearing, so this pins the SHARE-bucket order. With a share-less type it would only
-        // exercise the plain tier and say nothing about the bucket the store actually drains.
+    fn share_buckets_must_drain_in_arrival_order_under_both_orders() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
-        let expected: [HoprSurbId; 2] = [[2u8; 8], [1u8; 8]];
+        let expected: [HoprSurbId; 2] = [[1u8; 8], [2u8; 8]];
+
+        for order in [SurbPopOrder::Fifo, SurbPopOrder::Lifo] {
+            let rb = SurbRingBuffer::with_order(5, order);
+
+            assert_eq!(
+                1,
+                rb.push([([1u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0)
+                    .retained
+            );
+            assert_eq!(
+                2,
+                rb.push([([2u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0)
+                    .retained
+            );
+
+            let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
+            assert_eq!(expected[0], popped.id, "{order:?} took the wrong end of a share bucket");
+            assert_eq!(1, popped.remaining);
+
+            let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
+            assert_eq!(expected[1], popped.id, "{order:?} took the wrong end of a share bucket");
+            assert_eq!(0, popped.remaining);
+        }
+
+        Ok(())
+    }
+
+    /// The share-less tier DOES follow `pop_order`; only the share tier is order-independent.
+    ///
+    /// Pins that the change above did not simply ignore `order` everywhere. A contiguous run of
+    /// share-less SURBs costs a return path, not a PIX cycle, so there is nothing to protect here
+    /// and the operator's stated preference is honoured.
+    #[test]
+    fn surb_ring_buffer_should_consume_the_plain_tier_newest_first_under_lifo() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::with_order(5, SurbPopOrder::Lifo);
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
 
+        // No share on either, so both land in the plain tier.
         assert_eq!(
-            1,
-            rb.push([([1u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0)
-                .retained
+            [2u8; 8],
+            rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id,
+            "LIFO must take the newest share-less SURB"
         );
         assert_eq!(
-            2,
-            rb.push([([2u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0)
-                .retained
+            [1u8; 8],
+            rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id,
+            "then the older one"
         );
 
-        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!(expected[0], popped.id);
-        assert_eq!(1, popped.remaining);
+        Ok(())
+    }
 
-        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!(expected[1], popped.id);
-        assert_eq!(0, popped.remaining);
-
-        // A fresh batch after draining is consumed in the same order. Both SURBs go in one batch,
-        // so this also covers the order within a single push.
-        assert_eq!(
-            2,
+    /// The exact-ID lookup must agree with the pop on a share bucket, under either order.
+    ///
+    /// With share buckets draining in arrival order, the peek under `Lifo` must look at the FRONT
+    /// too. If `peek_next` kept looking at the back while `pop_window` took the front, the exact-ID
+    /// lookup would decide against one SURB and remove another.
+    #[test]
+    fn the_exact_id_lookup_must_agree_with_the_share_bucket_drain() -> anyhow::Result<()> {
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        for order in [SurbPopOrder::Fifo, SurbPopOrder::Lifo] {
+            let rb = SurbRingBuffer::with_order(5, order);
             rb.push(
                 [
                     ([1u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?),
                     ([2u8; 8], surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?),
                 ],
-                0
-            )
-            .retained
-        );
-        assert_eq!(expected[0], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
-        assert_eq!(expected[1], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+                0,
+            );
 
-        Ok(())
-    }
-
-    /// Under LIFO the exact-ID lookup must move with the order: given {1, 2} the back (2) is the
-    /// popping end, so a match for 1 is not popped. If `peek_next` ignored the order, this lookup
-    /// would peek 1 and `pop_next` would remove 2 — a silent mismatch.
-    #[test]
-    fn surb_ring_buffer_should_check_the_newest_end_for_an_exact_id_under_lifo() -> anyhow::Result<()> {
-        let (other_end_id, popping_end_id) = ([1u8; 8], [2u8; 8]);
-        let rb = SurbRingBuffer::with_order(5, SurbPopOrder::Lifo);
-        rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-
-        assert!(rb.pop_one_if_has_id(&other_end_id).is_none());
-        assert_eq!(
-            popping_end_id,
-            rb.pop_one_if_has_id(&popping_end_id)
-                .ok_or(anyhow::anyhow!("expected pop"))?
-                .id
-        );
-        // The other end is still there, untouched.
-        assert_eq!(other_end_id, rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
-
+            // The popping end is the front (1) under both orders, so 2 is not poppable by id.
+            assert!(
+                rb.pop_one_if_has_id(&[2u8; 8]).is_none(),
+                "{order:?}: pop-by-id must not remove a SURB the pop would not take next"
+            );
+            assert_eq!(
+                [1u8; 8],
+                rb.pop_one_if_has_id(&[1u8; 8])
+                    .ok_or(anyhow::anyhow!("expected pop"))?
+                    .id,
+                "{order:?}: pop-by-id must take the popping end"
+            );
+            // The other end is still there, untouched.
+            assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        }
         Ok(())
     }
 
@@ -3046,37 +3102,90 @@ mod tests {
         Ok(())
     }
 
-    /// Peek and pop agree on the SHARE-BEARING path under LIFO, not only the share-less tier.
+    /// LIFO must recover every cycle FIFO recovers, at the dimensions where the defect appears.
     ///
-    /// `pop_one_if_has_id` peeks then pops. If peek ignored the order while pop honoured it, the
-    /// lookup would inspect one SURB and remove another. The share tier is what the shipped PIX
-    /// flow drains, so testing this only on the plain tier leaves the real gap open.
+    /// The defect: popping the back of a share bucket while eviction takes the front of the oldest
+    /// one resonates against the 256-polynomial emission window, starving the even-indexed
+    /// polynomials of every window (24 shares against 53 for the odd-indexed). At the shipped
+    /// default that left 1664 of 4096 polynomials below threshold, so the cycle could never
+    /// reconstruct — the deposit was lost and, because the shipped batch is a single cycle,
+    /// `max_recovery_idle` then closed the Session.
+    ///
+    /// Production dimensions are REQUIRED here, not a convenience. A scaled-down version of this
+    /// test was measured against the bug and passed: with few windows and a wide threshold margin
+    /// (2 shares of 7, against 32 of 111) a starved polynomial still clears its threshold, so the
+    /// resonance never turns into an unrecovered cycle. Swept 256/512/768/1024 polynomials with
+    /// three threshold/surplus splits and three capacities each: zero divergences against the bug.
+    /// Only at 4096 polynomials does the starvation cross the threshold, which is the shipped
+    /// configuration and the one that matters.
+    ///
+    /// Runs in well under a second at this size, so it is not ignored.
     #[test]
-    fn surb_ring_buffer_should_check_the_newest_share_end_for_an_exact_id_under_lifo() -> anyhow::Result<()> {
+    fn both_pop_orders_must_recover_a_cycle_at_production_dimensions() -> anyhow::Result<()> {
+        const POLYS: u16 = 4096;
+        const THRESHOLD: u32 = 32;
+        const SURPLUS: u16 = 79;
+        // Capacity and reply rate that discriminate hardest, measured: FIFO 4096/4096, LIFO
+        // 2432/4096 against the bug.
+        const CAPACITY: usize = 30_000;
+        const SURBS_PER_REPLY: u32 = 3;
+
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
-        let rb = SurbRingBuffer::with_order(5, SurbPopOrder::Lifo);
+        let mut emission = Vec::with_capacity(usize::from(POLYS) * usize::from(THRESHOLD as u16 + SURPLUS));
+        for lo in (0..POLYS).step_by(usize::from(window)) {
+            for _ in 0..THRESHOLD as u16 + SURPLUS {
+                emission.extend(lo..(lo + window).min(POLYS));
+            }
+        }
 
-        let older: HoprSurbId = [1u8; 8];
-        let newer: HoprSurbId = [2u8; 8];
-        rb.push([(older, surb_at(HoprKeyIdent::from(1u32), 1, window, 0)?)], 0);
-        rb.push([(newer, surb_at(HoprKeyIdent::from(1u32), 1, window + 1, 0)?)], 0);
+        let mut recovered = Vec::new();
+        for order in [SurbPopOrder::Fifo, SurbPopOrder::Lifo] {
+            let rb = SurbRingBuffer::with_order(CAPACITY, order);
+            let mut credited = vec![0u32; usize::from(POLYS)];
 
-        assert!(
-            rb.pop_one_if_has_id(&older).is_none(),
-            "LIFO takes the newest entry of the selected bucket, so the older id must not pop first"
+            let mut owed = 0u32;
+            for (i, &poly) in emission.iter().enumerate() {
+                rb.push(
+                    [((i as u64).to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)],
+                    0,
+                );
+                owed += 1;
+                if owed >= SURBS_PER_REPLY {
+                    owed = 0;
+                    if let Some(p) = rb.pop_any() {
+                        let (_, poly) = p
+                            .surb
+                            .additional_data_receiver
+                            .encrypted_partial_ssa_share()
+                            .indices()
+                            .context("fixture")?;
+                        credited[usize::from(poly)] += 1;
+                    }
+                }
+            }
+            while let Some(p) = rb.pop_any() {
+                let (_, poly) = p
+                    .surb
+                    .additional_data_receiver
+                    .encrypted_partial_ssa_share()
+                    .indices()
+                    .context("fixture")?;
+                credited[usize::from(poly)] += 1;
+            }
+
+            recovered.push(credited.iter().filter(|&&c| c >= THRESHOLD).count());
+        }
+
+        assert_eq!(
+            POLYS as usize, recovered[0],
+            "precondition: FIFO must recover the cycle at 3 SURBs per reply, which the sizing table documents as safe"
         );
         assert_eq!(
-            newer,
-            rb.pop_one_if_has_id(&newer)
-                .context("the newest share was not popped by id")?
-                .id
+            recovered[0], recovered[1],
+            "FIFO recovered {} of {POLYS} polynomials but LIFO only {}: the pop order changes PIX recovery, so a \
+             `pop_order: lifo` Exit can strand a cycle its Entry has already paid for",
+            recovered[0], recovered[1]
         );
-        assert_eq!(
-            older,
-            rb.pop_any().context("expected the remaining SURB")?.id,
-            "the older SURB must still be present after the newer one was taken"
-        );
-
         Ok(())
     }
 
