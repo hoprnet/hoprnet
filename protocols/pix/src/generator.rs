@@ -241,11 +241,20 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
 /// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
 /// a time keeps one part live; the full 4096 would keep every part live at once, `polys × threshold`
-/// shares of peak memory. 256 keeps that peak at half a megabyte, at the cost of widening the whole
-/// cycle to 8 MiB — against a `peak_cycle_bytes` of roughly 15 MiB. That figure is curve-dependent
-/// and is modelled in full on [`peak_cycle_bytes`](crate::peak_cycle_bytes), which is the place to
-/// read it from; measured, the same dimensions come to 14.79 MiB over BabyJubJub and 15.35 MiB over
-/// secp256k1, so no single decimal is quoted here.
+/// shares of peak memory. 256 bounds that at half a megabyte **while the Exit consumes the emission
+/// in order**, at the cost of widening the whole cycle to 8 MiB — against a `peak_cycle_bytes` of
+/// roughly 15 MiB. That figure is curve-dependent and is modelled in full on
+/// [`peak_cycle_bytes`](crate::peak_cycle_bytes), which is the place to read it from; measured, the
+/// same dimensions come to 14.79 MiB over BabyJubJub and 15.35 MiB over secp256k1, so no single
+/// decimal is quoted here.
+///
+/// That "in order" is load-bearing, and it is not what the Exit does. The SURB store buckets shares
+/// by emission window and rotates its replies across every bucket it holds, so a backlog spanning
+/// several windows reaches the reconstructor interleaved and their parts fill in parallel: measured
+/// with a conforming Entry gated at two thirds of `rb_capacity`, 1024 parts live at the 100 000
+/// default and 3840 at a cycle-sized ring, against 256 for strictly in-order consumption. So this
+/// window bounds the Entry's *emission* order, not the Exit's *consumption* order, and the
+/// half-megabyte figure describes the latter only when no backlog spans two windows.
 ///
 /// **What the window buys here is small, and it does not cover the ring's own overshoot.** The
 /// contiguous run this absorbs is `surplus × window` = 20 224 shares at the deployed split, which is

@@ -379,12 +379,20 @@ pub fn peak_share_buffer_bytes<S: PixSpec>(params: &PixParams) -> u64 {
 /// This is the figure the Session layer's live-cycle budget is denominated in, and it is
 /// deliberately the **adversarial** peak rather than the conforming one. Nothing constrains the
 /// order in which an Entry emits shares within a cycle: the shipped generator walks polynomials in
-/// blocks of [`SHARE_EMISSION_WINDOW`](crate::SHARE_EMISSION_WINDOW), so only that window holds
-/// share buffers at once and a conforming cycle peaks below this — a few MiB against
-/// 13.1 MiB measured at the deployed dimensions — but a peer running anything else can drive *every*
-/// polynomial to one share short of its threshold and hold the lot.
+/// blocks of [`SHARE_EMISSION_WINDOW`](crate::SHARE_EMISSION_WINDOW), but a peer running anything
+/// else can drive *every* polynomial to one share short of its threshold and hold the lot.
 /// `SsaPartBuilder::release_verification_state` frees a buffer when its polynomial reconstructs; a
 /// polynomial one share short never reconstructs.
+///
+/// **The conforming peak is not one window, either.** The shipped generator does emit window-major,
+/// but the Exit's SURB store buckets incoming shares by emission window and rotates its replies
+/// across every bucket it holds, so a backlog spanning several windows reaches this reconstructor
+/// *interleaved* and their parts fill in parallel. Measured with a conforming Entry gated at two
+/// thirds of `rb_capacity` and 4096 X 111 shares per cycle: 256 parts live at every capacity when
+/// the emission is consumed in order, but 1024 at the 100 000 default (4x) and 3840 at a cycle-sized
+/// 454 656 ring (15x), i.e. 0.5 MiB rising to 7.5 MiB of share buffers. Admission control stays
+/// sound because this bound charges every part as live regardless — but the adversarial peak is now
+/// reachable by conforming traffic, which is the case this figure was thought not to describe.
 ///
 /// Not free to the peer, which is why this is a capacity bound and not a security one: a share only
 /// reaches the Exit on a return SURB the Exit itself spends, so reaching this peak costs a full

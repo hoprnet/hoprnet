@@ -167,13 +167,16 @@ pub struct SurbStoreConfig {
     /// come back, and any SURB evicted before it is spent is a share lost for good.
     ///
     /// Measured against the real `SsaReconstructor` at deployed dimensions, with the reply-opener
-    /// cache large enough not to bind. Each cell is the number of polynomials that reached threshold
-    /// out of 4096 — so `YES` means all 4096 reconstructed and the cycle paid; a bare number is a
-    /// *failure* that recovered only that many:
+    /// cache large enough not to bind. **The arrival model is one reply after every `k` arriving
+    /// SURBs, strictly periodic** — it is stated because the numbers depend on it, and jittered
+    /// arrival at the same mean rate recovers less (see below). Each cell is the number of
+    /// polynomials that reached threshold out of 4096 — so `YES` means all 4096 reconstructed and the
+    /// cycle paid; a bare number is a *failure* that recovered only that many:
     ///
     /// | SURBs/reply | 30 000 | 60 000 | 100 000 | 150 000 | 227 328 | 300 000 | 454 656 |
     /// |---|---|---|---|---|---|---|---|
-    /// | 1–3 | YES | YES | YES | YES | YES | YES | YES |
+    /// | 1–2 | YES | YES | YES | YES | YES | YES | YES |
+    /// | 3, periodic only | YES | YES | YES | YES | YES | YES | YES |
     /// | 4 | 768/4096 | 2560 | 1696 | 2941 | 3968 | YES | YES |
     /// | 6 | 729/4096 | 1216 | 1285 | 1883 | 2816 | 3840 | YES |
     ///
@@ -183,11 +186,31 @@ pub struct SurbStoreConfig {
     /// half a cycle (227 328) recovers only at the mild rates — a buffer that overflows can bulk-fail
     /// a cycle even though the loss is spread by the store's emission-window bucketing.
     ///
+    /// ## Why 3 is separated out
+    ///
+    /// At 3 SURBs/reply each polynomial emits `threshold + surplus` = 111 shares and the Exit spends
+    /// a third of them — **37 on average against a threshold of 32**. That is a margin of five, and
+    /// periodic arrival lands every polynomial almost exactly on it (minimum 36 at 30 000, 35 at
+    /// 100 000). Any reordering of which shares arrive therefore decides the cycle, and ordinary
+    /// jitter supplies it: with a reply after each SURB with probability 1/3 — the same mean rate —
+    /// no cycle recovered at 30 000, 60 000 or 100 000 across five seeds each (3887–3897, 4004–4036
+    /// and 4075–4085 polynomials at threshold), and one of five at 150 000. Poisson arrival and a
+    /// gap uniform in [2, 4] fail the same way. Recovery is reliable again from 227 328 up.
+    ///
+    /// Fractional rates are not uniformly safe even periodically: at 30 000, `k` = 2.5 recovers
+    /// 1736/4096 and 2.9 recovers 2848/4096 while 2.4, 2.6 and 2.8 recover, because the reply phase
+    /// interacts with the 256-polynomial window boundary and 30 000 is under one full window of
+    /// headroom at those rates. `max_surbs_per_data_packet` can produce such rates.
+    ///
+    /// So the rate that holds at every capacity and arrival pattern measured is **≤ 2 SURBs/reply**;
+    /// 3 holds only under strictly periodic arrival and only below ~227 000.
+    ///
     /// This does not mean the shipped default is unsafe. The Entry caps production at
     /// `maximum_surb_buffer_size` (two thirds of this value) and reports the Exit's level back, so a
-    /// conforming Session never fills the buffer; at 1–3 SURBs per reply even 30 000 recovers. The
+    /// conforming Session never fills the buffer; at ≤ 2 SURBs per reply even 30 000 recovers. The
     /// table bounds what an *overflowing* buffer survives, which is the regime a misbehaving or
-    /// gate-bypassing Entry produces.
+    /// gate-bypassing Entry produces — and it is the only regime where these numbers are consulted,
+    /// since a conforming Entry does not overflow at all.
     ///
     /// Default is 100 000.
     // `SurbRingBuffer` is deliberately unlinked above: it is crate-private, so an intra-doc link
@@ -1584,10 +1607,11 @@ impl<S> SurbRingBuffer<S> {
     /// consistent pair.
     fn tier_lens(&self) -> (usize, usize) {
         let inner = self.inner.lock();
-        // The share-bearing tiers are bucketed by emission window; the reported figure is the number
-        // of SURBs they hold, not the number of buckets.
-        let shares: usize = inner.shares.values().map(|d| d.len()).sum();
-        (shares, inner.plain.len())
+        // `share_count` is the running total, so this is O(1). Summing over the buckets instead is
+        // O(buckets) under the per-pseudonym lock, and the bucket count is counterparty-chosen — the
+        // same scan `share_count` was introduced to remove from `len()`. Measured at 60 000
+        // single-SURB buckets: 186 us per call summed, 0.12 us from the counter.
+        (inner.share_count, inner.plain.len())
     }
 
     /// Pops the next SURB (the one [`pop_next_valid`](Self::pop_next_valid) would take first) only if it has
@@ -1777,6 +1801,21 @@ mod tests {
             "fixture: wrong emission window"
         );
 
+        Ok(surb)
+    }
+
+    /// A SURB carrying no PIX share: it lands in the plain tier.
+    ///
+    /// The share block is left zeroed, so `ssa_index()` is `None` and `share_and_window()` returns
+    /// `None`. Everything else matches [`surb_at`] so the SURB is otherwise valid to hand out.
+    fn surb_at_plain(first_relayer: HoprKeyIdent) -> anyhow::Result<HoprSurb> {
+        let bytes = surb_gen(first_relayer, TWO_HOP, 0)?.into_boxed().into_vec();
+        let surb = HoprSurb::try_from(bytes.as_slice())?;
+        assert_eq!(
+            None,
+            SurbShareInfo::ssa_index(&surb),
+            "fixture: a plain SURB must carry no share"
+        );
         Ok(surb)
     }
 
@@ -2397,28 +2436,43 @@ mod tests {
     /// one per SURB (the two layouts this test compares), that was ~104x per overflowing push and
     /// ~87x per pop; the external reproductions measure the same effect as 10x the bucket count.
     ///
-    /// Timing is the only thing that distinguishes the two implementations, so this measures — but
-    /// carefully, because this test runs in the default suite and a guard that flakes is worse than
-    /// no guard. An earlier single-sample version of this test failed at 93x on a loaded machine with
-    /// the fix already in place. Two things address that:
+    /// Timing is the only thing that distinguishes the two implementations, so this measures — and
+    /// measures THREAD CPU TIME, not wall time, because this test runs in the default suite and a
+    /// guard that flakes is worse than no guard.
     ///
-    /// - Each side is the MINIMUM of several independent runs. A minimum is the right estimator here: scheduling
-    ///   hiccups and cache eviction only ever add time, so the fastest run is the one least polluted by other load,
-    ///   while a single sample can be arbitrarily inflated.
-    /// - The threshold is 10x, chosen from measured distributions rather than guessed. Correct code sits at ~2.1x
-    ///   unloaded (this is a real comparison, so it does not reach 1x: touching a `BTreeMap` node rather than a flat
-    ///   deque costs something). The ratio INFLATES under load, because the many-bucket side is far more
-    ///   cache-sensitive — a tail of 3.4x under 64-way CPU contention. The regression sits at ~90-110x. So 10x is ~3x
-    ///   above the worst observed correct-case ratio and ~10x below the bug: wide both ways, which is what a timing
-    ///   assertion in a default test suite needs to be.
+    /// Wall time was wrong here, and the reason is worth recording because it is not obvious. An
+    /// earlier version took wall time and failed on loaded machines with the fix already applied.
+    /// Taking the minimum of several runs was meant to fix it, and made it worse: the single-bucket
+    /// window (~2.6 ms) fits inside one scheduler time slice, so *some* of its runs complete
+    /// unpreempted and the minimum finds one, while the many-bucket window (~4.5 ms) cannot fit in a
+    /// slice, so *every* run absorbs at least one wait of roughly `(runnable - 1) x slice`. The
+    /// minimum therefore converges on an inflated ratio that grows with machine load. Measured with
+    /// wall time at ~8 runnable tasks per core: 17% of runs failed at the 10x threshold, worst 19.6x,
+    /// including whole-suite invocations. `CLOCK_THREAD_CPUTIME_ID` does not advance while the thread
+    /// is preempted, so it removes the effect: 0 of 90 runs failed at 8, 10 or 16 runnable tasks per
+    /// core, worst ratio 2.18.
+    ///
+    /// So the minimum-of-N is gone: with CPU time there is nothing for it to filter, and one sample
+    /// per side is both sufficient and cheaper. The threshold stays at 10x, against ~2x measured for
+    /// correct code and ~90-110x for the regression.
     #[test]
     fn eviction_cost_must_not_grow_with_peer_invented_buckets() -> anyhow::Result<()> {
         const CAPACITY: usize = 20_000;
-        /// Independent runs per side, of which the fastest is kept. See the doc comment on why this
-        /// is a minimum rather than a mean.
-        const RUNS: usize = 5;
 
-        /// Time one operation per resident entry over a buffer already full of `distinct_ssas` buckets.
+        /// Thread CPU time consumed so far.
+        ///
+        /// Unlike wall time this does not advance while the thread is preempted, so a loaded runner
+        /// cannot inflate one side of the ratio and not the other.
+        fn thread_cpu() -> Duration {
+            let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+            // SAFETY: `ts` is a valid, exclusively borrowed out-parameter for the duration of the call.
+            let rc = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+            assert_eq!(0, rc, "clock_gettime(CLOCK_THREAD_CPUTIME_ID)");
+            Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32)
+        }
+
+        /// CPU time for one operation per resident entry over a buffer already full of `distinct_ssas`
+        /// buckets.
         fn cost_per_op(capacity: usize, distinct_ssas: u32, pop: bool) -> anyhow::Result<Duration> {
             let rb = SurbRingBuffer::new(capacity);
             for i in 0..capacity as u32 {
@@ -2430,7 +2484,7 @@ mod tests {
                 );
             }
             // Measure the steady state: the buffer is full, so each push evicts and each pop takes.
-            let started = std::time::Instant::now();
+            let started = thread_cpu();
             for i in 0..capacity as u32 {
                 if pop {
                     rb.pop_any();
@@ -2445,20 +2499,12 @@ mod tests {
                     );
                 }
             }
-            Ok(started.elapsed())
+            Ok(thread_cpu() - started)
         }
 
-        let best_of = |distinct_ssas: u32, pop: bool| -> anyhow::Result<Duration> {
-            let mut best = Duration::MAX;
-            for _ in 0..RUNS {
-                best = best.min(cost_per_op(CAPACITY, distinct_ssas, pop)?);
-            }
-            Ok(best)
-        };
-
         for (label, pop) in [("overflow eviction", false), ("reply pop", true)] {
-            let few = best_of(1, pop)?;
-            let many = best_of(CAPACITY as u32, pop)?;
+            let few = cost_per_op(CAPACITY, 1, pop)?;
+            let many = cost_per_op(CAPACITY, CAPACITY as u32, pop)?;
             let ratio = many.as_secs_f64() / few.as_secs_f64().max(f64::MIN_POSITIVE);
             assert!(
                 ratio < 10.0,
@@ -3184,6 +3230,80 @@ mod tests {
             recovered[0], recovered[1],
             "FIFO recovered {} of {POLYS} polynomials but LIFO only {}: the pop order changes PIX recovery, so a \
              `pop_order: lifo` Exit can strand a cycle its Entry has already paid for",
+            recovered[0], recovered[1]
+        );
+        Ok(())
+    }
+
+    /// The share-less tier's order must not leak into PIX recovery either.
+    ///
+    /// After `both_pop_orders_must_recover_a_cycle_at_production_dimensions` the only difference left
+    /// between the variants is which end of the *plain* tier a pop takes. On a mixed buffer that still
+    /// changes which SURB is evicted — a plain SURB taken first displaces a different share — so the
+    /// identity is a property of the mix, not just of the share tier, and is worth pinning separately.
+    ///
+    /// One plain SURB per two share-bearing ones, at the capacity and rate that discriminate hardest.
+    /// Measured with every share credited: identical at ratios of 0, 8, 4, 2 and 1 plain-per-share, at
+    /// two capacities and two rates (20 of 20 cells), so this samples the case rather than sweeping it.
+    #[test]
+    fn the_plain_tiers_order_must_not_change_pix_recovery() -> anyhow::Result<()> {
+        const POLYS: u16 = 4096;
+        const THRESHOLD: u32 = 32;
+        const SURPLUS: u16 = 79;
+        const CAPACITY: usize = 30_000;
+        const SURBS_PER_REPLY: u32 = 3;
+        /// One share-less SURB arrives after every this many share-bearing ones.
+        const PLAIN_EVERY: usize = 2;
+
+        let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
+        let mut emission = Vec::new();
+        for lo in (0..POLYS).step_by(usize::from(window)) {
+            for _ in 0..THRESHOLD as u16 + SURPLUS {
+                emission.extend(lo..(lo + window).min(POLYS));
+            }
+        }
+
+        let mut recovered = Vec::new();
+        for order in [SurbPopOrder::Fifo, SurbPopOrder::Lifo] {
+            let rb = SurbRingBuffer::with_order(CAPACITY, order);
+            let mut credited = vec![0u32; usize::from(POLYS)];
+            let mut next_id = 0u64;
+
+            let mut owed = 0u32;
+            for &poly in &emission {
+                rb.push(
+                    [(next_id.to_be_bytes(), surb_at(HoprKeyIdent::from(1u32), 1, poly, 0)?)],
+                    0,
+                );
+                next_id += 1;
+                if (next_id as usize).is_multiple_of(PLAIN_EVERY) {
+                    // No share block, so this lands in the plain tier.
+                    rb.push([(next_id.to_be_bytes(), surb_at_plain(HoprKeyIdent::from(1u32))?)], 0);
+                    next_id += 1;
+                }
+                owed += 1;
+                if owed >= SURBS_PER_REPLY {
+                    owed = 0;
+                    if let Some(p) = rb.pop_any()
+                        && let Some((_, poly)) = p.surb.additional_data_receiver.encrypted_partial_ssa_share().indices()
+                    {
+                        credited[usize::from(poly)] += 1;
+                    }
+                }
+            }
+            while let Some(p) = rb.pop_any() {
+                if let Some((_, poly)) = p.surb.additional_data_receiver.encrypted_partial_ssa_share().indices() {
+                    credited[usize::from(poly)] += 1;
+                }
+            }
+
+            recovered.push(credited.iter().filter(|&&c| c >= THRESHOLD).count());
+        }
+
+        assert_eq!(
+            recovered[0], recovered[1],
+            "on a buffer mixing share-bearing and share-less SURBs, FIFO recovered {} of {POLYS} polynomials and LIFO \
+             only {}: the plain tier's pop order is influencing PIX recovery",
             recovered[0], recovered[1]
         );
         Ok(())
