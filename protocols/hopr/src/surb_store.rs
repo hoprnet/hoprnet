@@ -81,7 +81,7 @@ fn default_eviction_report_threshold() -> u64 {
     1000
 }
 
-/// Which end of a pop takes from. Replying side only, and **share-less SURBs only**.
+/// Which end of the share-less tier a pop takes from. Replying side only.
 ///
 /// Both orders consume SURBs that carry a PIX share before share-less ones (see "Share-bearing SURBs
 /// first" on the internal `SurbRingBuffer`). The order applies to the share-less tier:
@@ -202,8 +202,9 @@ pub struct SurbStoreConfig {
     /// interacts with the 256-polynomial window boundary and 30 000 is under one full window of
     /// headroom at those rates. `max_surbs_per_data_packet` can produce such rates.
     ///
-    /// So the rate that holds at every capacity and arrival pattern measured is **≤ 2 SURBs/reply**;
-    /// 3 holds only under strictly periodic arrival and only below ~227 000.
+    /// So the rate that holds at every capacity and arrival pattern measured is **≤ 2 SURBs/reply**.
+    /// At 3, recovery holds at every capacity only under strictly periodic arrival; with jitter it
+    /// needs ~227 000 or more.
     ///
     /// This does not mean the shipped default is unsafe. The Entry caps production at
     /// `maximum_surb_buffer_size` (two thirds of this value) and reports the Exit's level back, so a
@@ -219,7 +220,7 @@ pub struct SurbStoreConfig {
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
     pub rb_capacity: usize,
-    /// Pop order of the per-pseudonym buffer within each emission-window bucket; see [`SurbPopOrder`].
+    /// Pop order of the per-pseudonym buffer's share-less tier; see [`SurbPopOrder`].
     ///
     /// Applies to the **share-less tier only**. [`SurbPopOrder::Fifo`] (the default) pops the oldest
     /// share-less SURB, [`SurbPopOrder::Lifo`] the newest. Share-bearing buckets always drain in
@@ -1007,10 +1008,10 @@ impl SurbShareInfo for HoprSurb {
 /// Backed by two tiers that together are never allowed to exceed `capacity`: a push into a full
 /// buffer evicts first (see below for which SURB goes). The share-less tier is a [`VecDeque`]; the
 /// share-bearing tier is a [`std::collections::BTreeMap`] of [`VecDeque`]s bucketed by emission
-/// window. A pop rotates across the buckets and takes one end of the selected bucket — the front under
-/// [`SurbPopOrder::Fifo`], the back under [`SurbPopOrder::Lifo`] — so it never consumes across the
-/// tier as a whole. Eviction, by contrast, is age-ordered across the whole buffer regardless of both
-/// the rotation and the order. See [`SurbPopOrder`] for why.
+/// window. A pop rotates across the buckets and takes the front of the selected bucket, its oldest
+/// entry, under either [`SurbPopOrder`], so it never consumes across the tier as a whole; the order
+/// picks an end of the share-less tier only. Eviction, by contrast, is age-ordered across the whole
+/// buffer regardless of both the rotation and the order. See [`SurbPopOrder`] for why.
 ///
 /// ## Share-bearing SURBs first
 ///
@@ -1027,9 +1028,9 @@ impl SurbShareInfo for HoprSurb {
 /// So the buffer keeps two tiers and always hands out the share-bearing one first. [`SurbShareInfo`]
 /// sorts each SURB into `shares` or `plain` as it arrives, and a pop takes from `shares` for as long as
 /// it holds anything and from `plain` after that. Within `shares` the buckets rotate — see
-/// [`SurbShareInfo::emission_window`] — and the order picks an end of the selected bucket, not an end
-/// of the tier. The Entry still emits shares in SSA-index order, so under FIFO each bucket is
-/// lowest-SSA-first for the emission window it holds, and under LIFO highest-SSA-first.
+/// [`SurbShareInfo::emission_window`] — and each bucket drains in arrival order whatever the pop
+/// order, which picks an end of `plain` only. Rotation stays within the lowest SSA until its buckets
+/// are empty, so cycles are served in the SSA-index order the Entry emits them in.
 ///
 /// Eviction follows the same priority, because a share-less SURB is only a return path while a
 /// share-bearing one is a return path *and* a share nothing can replace. A full buffer gives up share-less
@@ -1240,9 +1241,8 @@ impl<S> GenerationalBuffer<S> {
             })
     }
 
-    /// Removes the entry at the end `order` consumes from in bucket `w`, and advances the cursor past
-    /// it.
-    fn pop_window(&mut self, w: BucketKey, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
+    /// Removes the oldest entry of bucket `w`, and advances the cursor past it.
+    fn pop_window(&mut self, w: BucketKey) -> Option<(HoprSurbId, S)> {
         // One map lookup for the pop and the emptiness test together. This is the reply hot path:
         // every extra `BTreeMap` search here is paid once per reply packet.
         let previous_front = self.shares.get(&w).and_then(|d| d.front()).map(|(_, _, seq)| *seq);
@@ -1262,9 +1262,8 @@ impl<S> GenerationalBuffer<S> {
             // Draining both orders in arrival order is what makes the two recover identically, which
             // is what the type's contract has always claimed. It costs nothing: the bucketing and the
             // rotation are what spread the loss, and neither depends on which end of a bucket is
-            // taken. `order` still selects the end of the *share-less* tier, where a contiguous run
-            // costs a return path rather than a PIX cycle.
-            let _ = order;
+            // taken. The pop order still selects the end of the *share-less* tier (`pop_next`), where
+            // a contiguous run costs a return path rather than a PIX cycle.
             let popped = bucket.pop_front();
             (popped.map(|(id, surb, _)| (id, surb))?, bucket.is_empty())
         };
@@ -1359,9 +1358,9 @@ impl<S> GenerationalBuffer<S> {
     /// The SURB the next pop would take.
     ///
     /// Sharing this one decision with [`pop_next`](Self::pop_next) is what keeps peeking, popping
-    /// and the exact-ID lookup from disagreeing about which SURB is next: share-bearing SURBs of the
-    /// next emission window while any are held, share-less ones otherwise — and, under `order`, the
-    /// front or the back of the selected bucket.
+    /// and the exact-ID lookup from disagreeing about which SURB is next: the front of the next
+    /// emission window's bucket while any share-bearing SURB is held, otherwise the front or the back
+    /// of the share-less tier, under `order`.
     fn peek_next(&self, order: SurbPopOrder) -> Option<(&HoprSurbId, &S)> {
         match self.next_window() {
             // Share buckets always peek the front, matching [`pop_window`](Self::pop_window)'s
@@ -1383,7 +1382,7 @@ impl<S> GenerationalBuffer<S> {
     /// Removes and returns the SURB [`peek_next`](Self::peek_next) names.
     fn pop_next(&mut self, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
         match self.next_window() {
-            Some(w) => self.pop_window(w, order),
+            Some(w) => self.pop_window(w),
             None => match order {
                 SurbPopOrder::Fifo => self.plain.pop_front(),
                 SurbPopOrder::Lifo => self.plain.pop_back(),
@@ -1425,8 +1424,8 @@ enum MadeRoom {
 
 impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs, popped
-    /// in rotation across the emission-window buckets of the share-bearing tier, in the default
-    /// [`SurbPopOrder::Fifo`] order within a bucket and within the share-less tier.
+    /// in rotation across the emission-window buckets of the share-bearing tier, each in arrival
+    /// order, and in the default [`SurbPopOrder::Fifo`] order within the share-less tier.
     ///
     /// The store constructs its buffers with [`with_order`](Self::with_order) so that the configured
     /// order reaches them; this remains as the shorthand for the default and to keep the FIFO call
@@ -1436,9 +1435,9 @@ impl<S> SurbRingBuffer<S> {
         Self::with_order(capacity, SurbPopOrder::default())
     }
 
-    /// As [`new`](Self::new), with the pop order *within* the selected bucket chosen explicitly.
+    /// As [`new`](Self::new), with the share-less tier's pop order chosen explicitly.
     ///
-    /// The order also applies to the share-less tier. Eviction always removes the oldest share-less
+    /// Share-bearing buckets drain in arrival order under either order. Eviction always removes the oldest share-less
     /// SURB first, or the globally oldest share-bearing SURB when no share-less ones remain.
     /// The order does not affect rotation across buckets. See [`SurbPopOrder`].
     pub fn with_order(capacity: usize, order: SurbPopOrder) -> Self {
@@ -2774,7 +2773,7 @@ mod tests {
 
         // And the same wrap on the pop side, which advances the cursor itself.
         g.window_cursor = Some(k255);
-        let popped_from = g.pop_window(k255, SurbPopOrder::Fifo);
+        let popped_from = g.pop_window(k255);
         assert!(popped_from.is_some(), "precondition: bucket 255 held an entry");
         assert_eq!(
             Some(k0),
@@ -2994,9 +2993,6 @@ mod tests {
         Ok(())
     }
 
-    /// Under LIFO the same {1, 2} batch is handed out 2 then 1, and the same holds for a fresh batch
-    /// pushed after the buffer drains. This is the mirror of
-    /// [`surb_ring_buffer_should_consume_oldest_first`] and pins that the order selects the end of a
     /// Share-bearing buckets drain in ARRIVAL order under BOTH pop orders.
     ///
     /// This replaces an earlier test that asserted the opposite (`Lifo` consumes the newest share
@@ -3100,12 +3096,12 @@ mod tests {
         Ok(())
     }
 
-    /// LIFO rotates ACROSS emission windows; it does not simply take the newest SURB in the buffer.
+    /// Under LIFO too, pops rotate ACROSS emission windows starting at the cursor; LIFO does not take
+    /// the newest share-bearing SURB in the buffer.
     ///
-    /// Distinguishes the intended rule ("back of the bucket the cursor selects, rotating across
-    /// buckets") from the plausible wrong one ("the newest SURB anywhere"). Both pop newest-first;
-    /// only the former spreads consumption over the emission, which is what keeps a PIX cycle
-    /// recoverable. Kills a mutant that ignores the cursor under LIFO.
+    /// Pins that the pop order changes neither which bucket a pop selects nor where rotation starts,
+    /// so the share-bearing tier is consumed the same way under both orders. Kills a mutant that
+    /// ignores the cursor under LIFO.
     #[test]
     fn surb_ring_buffer_should_rotate_across_windows_under_lifo() -> anyhow::Result<()> {
         let window = hopr_protocol_pix::SHARE_EMISSION_WINDOW as u16;
@@ -3135,10 +3131,9 @@ mod tests {
             windows.len(),
             "LIFO must visit a DIFFERENT bucket on each pop rather than drain one; got polys {seen:?}"
         );
-        // LIFO chooses the END of a bucket, not WHICH bucket — the cursor still decides that, and
-        // starts at the lowest key. Pinned here so a later change that made LIFO also reverse the
-        // bucket order would be noticed rather than silently changing which part of the emission
-        // the Exit drains first.
+        // The pop order does not choose WHICH bucket — the cursor decides that, and starts at the
+        // lowest key. Pinned here so a later change that made LIFO reverse the bucket order would be
+        // noticed rather than silently changing which part of the emission the Exit drains first.
         assert_eq!(
             seen[0] / window,
             0,
