@@ -18,6 +18,8 @@ on:
   # then never auto-close and the dashboard goes stale indefinitely.
   push:
     branches: [master]
+    paths:
+      - ".github/**"
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-zizmor
