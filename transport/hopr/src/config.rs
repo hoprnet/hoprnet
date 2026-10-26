@@ -9,7 +9,7 @@ use std::{
 use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbPopOrder, SurbStoreConfig};
 use hopr_protocol_pix::SsaReconstructorConfig;
-pub use hopr_transport_mixer::config::MixerConfig;
+pub use hopr_transport_mixer::config::{MixerConfig, MixerType, UniformConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,

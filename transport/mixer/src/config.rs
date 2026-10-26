@@ -156,14 +156,12 @@ pub enum MixerType {
     Poisson(PoissonConfig),
 }
 
+/// Uniform is the default engine, not Poisson: relays and exits don't yet have the throughput
+/// headroom to absorb Poisson's load-dependent delay without regressing existing traffic. A
+/// session client knows its own traffic's shape and can opt into Poisson deliberately, via
+/// [`MixerConfig::new_poisson`] or config. Revisit once relay/exit headroom is confirmed.
 impl Default for MixerType {
     fn default() -> Self {
-        // Uniform is the default engine, not Poisson, even though Poisson gives a better
-        // delay/anonymity trade-off. Relays and exits do not yet carry enough throughput to
-        // absorb Poisson's load-dependent delay without a latency regression for existing
-        // traffic, and only session clients know their own traffic's shape and can pick Poisson
-        // deliberately via `MixerConfig::new_poisson(_constant_privacy)` or config. Revisit this
-        // once relay/exit throughput headroom is confirmed, then flip the priority below.
         #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
         return MixerType::Uniform(UniformConfig::default());
         #[cfg(all(
