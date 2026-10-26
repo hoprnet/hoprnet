@@ -146,6 +146,8 @@ pub(crate) fn read_tcp_congestion_control() -> TcpCongestionControl {
 
 #[cfg(test)]
 mod sysctl_tests {
+    use anyhow::Context;
+
     use super::{parse_sysctl_string, parse_sysctl_u64, read_tcp_congestion_control_from, read_udp_buffer_limits_from};
 
     #[test]
@@ -185,19 +187,21 @@ mod sysctl_tests {
         assert_eq!(parse_sysctl_string("\n"), None);
     }
 
-    fn write_sysctl_file(root: &std::path::Path, relative: &str, contents: &str) {
+    fn write_sysctl_file(root: &std::path::Path, relative: &str, contents: &str) -> anyhow::Result<()> {
         let path = root.join(relative);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, contents).unwrap();
+        let parent = path.parent().context("sysctl file path has no parent directory")?;
+        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        std::fs::write(&path, contents).with_context(|| format!("writing {}", path.display()))?;
+        Ok(())
     }
 
     #[test]
-    fn read_udp_buffer_limits_reads_all_present_values() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n");
-        write_sysctl_file(dir.path(), "net/core/rmem_max", "4194304\n");
-        write_sysctl_file(dir.path(), "net/core/wmem_default", "212992\n");
-        write_sysctl_file(dir.path(), "net/core/wmem_max", "4194304\n");
+    fn read_udp_buffer_limits_reads_all_present_values() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n")?;
+        write_sysctl_file(dir.path(), "net/core/rmem_max", "4194304\n")?;
+        write_sysctl_file(dir.path(), "net/core/wmem_default", "212992\n")?;
+        write_sysctl_file(dir.path(), "net/core/wmem_max", "4194304\n")?;
 
         let limits = read_udp_buffer_limits_from(dir.path());
 
@@ -205,12 +209,13 @@ mod sysctl_tests {
         assert_eq!(limits.rmem_max, Some(4194304));
         assert_eq!(limits.wmem_default, Some(212992));
         assert_eq!(limits.wmem_max, Some(4194304));
+        Ok(())
     }
 
     #[test]
-    fn read_udp_buffer_limits_leaves_missing_files_as_none() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n");
+    fn read_udp_buffer_limits_leaves_missing_files_as_none() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n")?;
         // rmem_max, wmem_default, wmem_max intentionally absent.
 
         let limits = read_udp_buffer_limits_from(dir.path());
@@ -219,68 +224,74 @@ mod sysctl_tests {
         assert_eq!(limits.rmem_max, None);
         assert_eq!(limits.wmem_default, None);
         assert_eq!(limits.wmem_max, None);
+        Ok(())
     }
 
     #[test]
-    fn read_udp_buffer_limits_leaves_garbage_content_as_none() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/core/rmem_default", "not-a-number\n");
+    fn read_udp_buffer_limits_leaves_garbage_content_as_none() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "not-a-number\n")?;
 
         let limits = read_udp_buffer_limits_from(dir.path());
 
         assert_eq!(limits.rmem_default, None);
+        Ok(())
     }
 
     #[test]
-    fn read_tcp_congestion_control_reports_bbr_already_active() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "bbr\n");
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic bbr\n");
+    fn read_tcp_congestion_control_reports_bbr_already_active() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "bbr\n")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic bbr\n")?;
 
         let cc = read_tcp_congestion_control_from(dir.path());
 
         assert_eq!(cc.current.as_deref(), Some("bbr"));
         assert_eq!(cc.bbr_available, Some(true));
+        Ok(())
     }
 
     #[test]
-    fn read_tcp_congestion_control_reports_bbr_available_but_unused() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
+    fn read_tcp_congestion_control_reports_bbr_available_but_unused() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n")?;
         write_sysctl_file(
             dir.path(),
             "net/ipv4/tcp_available_congestion_control",
             "cubic bbr reno\n",
-        );
+        )?;
 
         let cc = read_tcp_congestion_control_from(dir.path());
 
         assert_eq!(cc.current.as_deref(), Some("cubic"));
         assert_eq!(cc.bbr_available, Some(true));
+        Ok(())
     }
 
     #[test]
-    fn read_tcp_congestion_control_reports_bbr_unavailable() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic reno\n");
+    fn read_tcp_congestion_control_reports_bbr_unavailable() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic reno\n")?;
 
         let cc = read_tcp_congestion_control_from(dir.path());
 
         assert_eq!(cc.current.as_deref(), Some("cubic"));
         assert_eq!(cc.bbr_available, Some(false));
+        Ok(())
     }
 
     #[test]
-    fn read_tcp_congestion_control_leaves_missing_available_list_as_none() {
-        let dir = tempfile::tempdir().unwrap();
-        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
+    fn read_tcp_congestion_control_leaves_missing_available_list_as_none() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("creating tempdir")?;
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n")?;
         // tcp_available_congestion_control intentionally absent.
 
         let cc = read_tcp_congestion_control_from(dir.path());
 
         assert_eq!(cc.current.as_deref(), Some("cubic"));
         assert_eq!(cc.bbr_available, None);
+        Ok(())
     }
 }
 
