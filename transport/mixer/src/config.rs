@@ -162,13 +162,21 @@ pub enum MixerType {
 /// [`MixerConfig::new_poisson`] or config. Revisit once relay/exit headroom is confirmed.
 impl Default for MixerType {
     fn default() -> Self {
-        #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
+        // `create()` can only dispatch a `Uniform` default to an engine when `uniform-channel` is
+        // on (see its adapter-only fallback below); prefer it here only under that same
+        // condition, falling through to Poisson otherwise so `create()` never panics on a config
+        // built from `default()`.
+        #[cfg(feature = "uniform-channel")]
         return MixerType::Uniform(UniformConfig::default());
-        #[cfg(all(
-            feature = "poisson",
-            not(any(feature = "uniform-channel", feature = "uniform-adapter"))
-        ))]
+        #[cfg(all(feature = "poisson", not(feature = "uniform-channel")))]
         return MixerType::Poisson(PoissonConfig::default());
+        // `uniform-adapter` alone (no `uniform-channel`, no `poisson`) has no `create()` to
+        // dispatch to at all; `MixerSink` is driven directly, so Uniform is still the only choice.
+        #[cfg(all(
+            feature = "uniform-adapter",
+            not(any(feature = "uniform-channel", feature = "poisson"))
+        ))]
+        return MixerType::Uniform(UniformConfig::default());
         #[cfg(not(any(feature = "uniform-channel", feature = "uniform-adapter", feature = "poisson")))]
         compile_error!("at least one mixer implementation feature must be enabled");
     }
@@ -275,9 +283,27 @@ pub struct PoissonConfig {
 mod tests {
     use super::*;
 
-    #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
+    #[cfg(feature = "uniform-channel")]
     #[test]
-    fn default_mixer_type_should_be_uniform() {
+    fn default_mixer_type_should_be_uniform_when_uniform_channel_is_available() {
+        assert!(matches!(MixerType::default(), MixerType::Uniform(_)));
+    }
+
+    /// Without `uniform-channel`, `dispatch::create()` has no engine to dispatch a `Uniform`
+    /// default to (see its adapter-only panic arm), so Poisson must win here even with
+    /// `uniform-adapter` also enabled.
+    #[cfg(all(feature = "poisson", not(feature = "uniform-channel")))]
+    #[test]
+    fn default_mixer_type_should_be_poisson_without_uniform_channel() {
+        assert!(matches!(MixerType::default(), MixerType::Poisson(_)));
+    }
+
+    #[cfg(all(
+        feature = "uniform-adapter",
+        not(any(feature = "uniform-channel", feature = "poisson"))
+    ))]
+    #[test]
+    fn default_mixer_type_should_be_uniform_for_adapter_only() {
         assert!(matches!(MixerType::default(), MixerType::Uniform(_)));
     }
 
