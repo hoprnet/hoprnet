@@ -499,6 +499,12 @@ where
         }));
     }
 
+    if legs == 0 {
+        // An idle node flushes every interval; an INFO line for nothing would bury the ones that count.
+        tracing::trace!("surb round-trip flush tick: nothing to flush");
+        return;
+    }
+
     {
         // One aggregate line per interval rather than one per pair of legs.
         //
@@ -865,6 +871,66 @@ mod tests {
         // keep reporting a round-trip that happened once as though it kept happening.
         assert!(recorder.registry.drain().is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn an_idle_flush_should_log_nothing_at_info() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+
+        let idle = Arc::new(InfoCounter::default());
+        tracing::subscriber::with_default(idle.clone(), || {
+            flush_into(&SurbRoundTripRegistry::default(), &graph, 0)
+        });
+        assert_eq!(0, idle.infos.load(Ordering::Relaxed), "nothing was minted or replied");
+
+        let recorder = recorder(graph.clone());
+        recorder.on_minted(
+            &ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(destination, address()),
+                return_paths: vec![ValidatedPath::direct(me, address())],
+            },
+            &[surb_id(1)],
+        );
+        let busy = Arc::new(InfoCounter::default());
+        tracing::subscriber::with_default(busy.clone(), || flush_into(&recorder.registry, &graph, 0));
+        assert_eq!(
+            1,
+            busy.infos.load(Ordering::Relaxed),
+            "one summary line for the interval"
+        );
+        Ok(())
+    }
+
+    /// Counts INFO events; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct InfoCounter {
+        infos: AtomicU64,
+    }
+
+    impl tracing::Subscriber for InfoCounter {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            if *event.metadata().level() == tracing::Level::INFO {
+                self.infos.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
     }
 
     #[test]
