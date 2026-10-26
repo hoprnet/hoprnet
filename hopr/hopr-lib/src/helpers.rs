@@ -44,6 +44,246 @@ pub(crate) async fn wait_for_balance<C: Currency, R: ChainValues>(
     Err(())
 }
 
+/// Kernel UDP socket buffer defaults and caps, as reported by the OS (Linux only; see
+/// <https://github.com/hoprnet/hoprnet/issues/8503>).
+pub(crate) struct UdpBufferLimits {
+    pub rmem_default: Option<u64>,
+    pub rmem_max: Option<u64>,
+    pub wmem_default: Option<u64>,
+    pub wmem_max: Option<u64>,
+}
+
+/// Current and available TCP congestion-control algorithms, as reported by the OS (Linux only).
+pub(crate) struct TcpCongestionControl {
+    /// Currently active algorithm (`net.ipv4.tcp_congestion_control`), e.g. `"cubic"` or `"bbr"`.
+    pub current: Option<String>,
+    /// Whether `"bbr"` is listed in `net.ipv4.tcp_available_congestion_control`.
+    ///
+    /// `None` when the kernel doesn't expose that sysctl at all.
+    pub bbr_available: Option<bool>,
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn parse_sysctl_u64(raw: &str) -> Option<u64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    trimmed.parse().ok()
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn parse_sysctl_string(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn read_udp_buffer_limits_from(proc_sys_root: &std::path::Path) -> UdpBufferLimits {
+    let read_u64 = |relative: &str| {
+        std::fs::read_to_string(proc_sys_root.join(relative))
+            .ok()
+            .and_then(|raw| parse_sysctl_u64(&raw))
+    };
+
+    UdpBufferLimits {
+        rmem_default: read_u64("net/core/rmem_default"),
+        rmem_max: read_u64("net/core/rmem_max"),
+        wmem_default: read_u64("net/core/wmem_default"),
+        wmem_max: read_u64("net/core/wmem_max"),
+    }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn read_tcp_congestion_control_from(proc_sys_root: &std::path::Path) -> TcpCongestionControl {
+    let current = std::fs::read_to_string(proc_sys_root.join("net/ipv4/tcp_congestion_control"))
+        .ok()
+        .and_then(|raw| parse_sysctl_string(&raw));
+
+    let bbr_available = std::fs::read_to_string(proc_sys_root.join("net/ipv4/tcp_available_congestion_control"))
+        .ok()
+        .and_then(|raw| parse_sysctl_string(&raw))
+        .map(|available| available.split_whitespace().any(|algo| algo == "bbr"));
+
+    TcpCongestionControl { current, bbr_available }
+}
+
+/// Reads kernel UDP socket buffer defaults and caps. Only supported on Linux (reads `/proc/sys`);
+/// returns all-`None` elsewhere.
+#[cfg(target_os = "linux")]
+pub(crate) fn read_udp_buffer_limits() -> UdpBufferLimits {
+    read_udp_buffer_limits_from(std::path::Path::new("/proc/sys"))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn read_udp_buffer_limits() -> UdpBufferLimits {
+    UdpBufferLimits {
+        rmem_default: None,
+        rmem_max: None,
+        wmem_default: None,
+        wmem_max: None,
+    }
+}
+
+/// Reads the current and available TCP congestion-control algorithms. Only supported on Linux
+/// (reads `/proc/sys`); returns all-`None` elsewhere.
+#[cfg(target_os = "linux")]
+pub(crate) fn read_tcp_congestion_control() -> TcpCongestionControl {
+    read_tcp_congestion_control_from(std::path::Path::new("/proc/sys"))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn read_tcp_congestion_control() -> TcpCongestionControl {
+    TcpCongestionControl {
+        current: None,
+        bbr_available: None,
+    }
+}
+
+#[cfg(test)]
+mod sysctl_tests {
+    use super::{parse_sysctl_string, parse_sysctl_u64, read_tcp_congestion_control_from, read_udp_buffer_limits_from};
+
+    #[test]
+    fn parse_sysctl_u64_accepts_plain_digits() {
+        assert_eq!(parse_sysctl_u64("4194304"), Some(4194304));
+    }
+
+    #[test]
+    fn parse_sysctl_u64_trims_trailing_newline() {
+        assert_eq!(parse_sysctl_u64("212992\n"), Some(212992));
+    }
+
+    #[test]
+    fn parse_sysctl_u64_trims_surrounding_whitespace() {
+        assert_eq!(parse_sysctl_u64("  212992  \n"), Some(212992));
+    }
+
+    #[test]
+    fn parse_sysctl_u64_rejects_empty_string() {
+        assert_eq!(parse_sysctl_u64(""), None);
+        assert_eq!(parse_sysctl_u64("\n"), None);
+    }
+
+    #[test]
+    fn parse_sysctl_u64_rejects_non_numeric_garbage() {
+        assert_eq!(parse_sysctl_u64("not-a-number"), None);
+    }
+
+    #[test]
+    fn parse_sysctl_string_trims_trailing_newline() {
+        assert_eq!(parse_sysctl_string("bbr\n"), Some("bbr".to_string()));
+    }
+
+    #[test]
+    fn parse_sysctl_string_rejects_empty_string() {
+        assert_eq!(parse_sysctl_string(""), None);
+        assert_eq!(parse_sysctl_string("\n"), None);
+    }
+
+    fn write_sysctl_file(root: &std::path::Path, relative: &str, contents: &str) {
+        let path = root.join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
+
+    #[test]
+    fn read_udp_buffer_limits_reads_all_present_values() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n");
+        write_sysctl_file(dir.path(), "net/core/rmem_max", "4194304\n");
+        write_sysctl_file(dir.path(), "net/core/wmem_default", "212992\n");
+        write_sysctl_file(dir.path(), "net/core/wmem_max", "4194304\n");
+
+        let limits = read_udp_buffer_limits_from(dir.path());
+
+        assert_eq!(limits.rmem_default, Some(212992));
+        assert_eq!(limits.rmem_max, Some(4194304));
+        assert_eq!(limits.wmem_default, Some(212992));
+        assert_eq!(limits.wmem_max, Some(4194304));
+    }
+
+    #[test]
+    fn read_udp_buffer_limits_leaves_missing_files_as_none() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "212992\n");
+        // rmem_max, wmem_default, wmem_max intentionally absent.
+
+        let limits = read_udp_buffer_limits_from(dir.path());
+
+        assert_eq!(limits.rmem_default, Some(212992));
+        assert_eq!(limits.rmem_max, None);
+        assert_eq!(limits.wmem_default, None);
+        assert_eq!(limits.wmem_max, None);
+    }
+
+    #[test]
+    fn read_udp_buffer_limits_leaves_garbage_content_as_none() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/core/rmem_default", "not-a-number\n");
+
+        let limits = read_udp_buffer_limits_from(dir.path());
+
+        assert_eq!(limits.rmem_default, None);
+    }
+
+    #[test]
+    fn read_tcp_congestion_control_reports_bbr_already_active() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "bbr\n");
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic bbr\n");
+
+        let cc = read_tcp_congestion_control_from(dir.path());
+
+        assert_eq!(cc.current.as_deref(), Some("bbr"));
+        assert_eq!(cc.bbr_available, Some(true));
+    }
+
+    #[test]
+    fn read_tcp_congestion_control_reports_bbr_available_but_unused() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
+        write_sysctl_file(
+            dir.path(),
+            "net/ipv4/tcp_available_congestion_control",
+            "cubic bbr reno\n",
+        );
+
+        let cc = read_tcp_congestion_control_from(dir.path());
+
+        assert_eq!(cc.current.as_deref(), Some("cubic"));
+        assert_eq!(cc.bbr_available, Some(true));
+    }
+
+    #[test]
+    fn read_tcp_congestion_control_reports_bbr_unavailable() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_available_congestion_control", "cubic reno\n");
+
+        let cc = read_tcp_congestion_control_from(dir.path());
+
+        assert_eq!(cc.current.as_deref(), Some("cubic"));
+        assert_eq!(cc.bbr_available, Some(false));
+    }
+
+    #[test]
+    fn read_tcp_congestion_control_leaves_missing_available_list_as_none() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sysctl_file(dir.path(), "net/ipv4/tcp_congestion_control", "cubic\n");
+        // tcp_available_congestion_control intentionally absent.
+
+        let cc = read_tcp_congestion_control_from(dir.path());
+
+        assert_eq!(cc.current.as_deref(), Some("cubic"));
+        assert_eq!(cc.bbr_available, None);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
