@@ -289,9 +289,15 @@ mod tests {
     const CAP: Duration = Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS);
     const LEEWAY: Duration = Duration::from_millis(500);
 
+    /// `MixerConfig::default()` now selects the Uniform engine (see [`crate::config::MixerType::default`]),
+    /// so these Poisson-engine tests build their config explicitly instead.
+    fn poisson_default() -> MixerConfig {
+        MixerConfig::new_poisson(CAP, crate::config::HOPR_MIXER_DEFAULT_MISS_PROBABILITY)
+    }
+
     #[tokio::test]
     async fn should_pass_an_element() -> anyhow::Result<()> {
-        let (tx, mut rx) = poisson_channel(MixerConfig::default());
+        let (tx, mut rx) = poisson_channel(poisson_default());
         tx.send(1)?;
         assert_eq!(timeout(CAP + LEEWAY, rx.recv()).await?, Some(1));
         Ok(())
@@ -300,7 +306,7 @@ mod tests {
     #[tokio::test]
     async fn should_deliver_all_and_close() -> anyhow::Result<()> {
         const N: u32 = 2000;
-        let (tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
+        let (tx, mut rx) = poisson_channel::<u32>(poisson_default());
         for i in 0..N {
             tx.send(i)?;
         }
@@ -353,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_should_fail_after_receiver_dropped() -> anyhow::Result<()> {
-        let (tx, rx) = poisson_channel::<u32>(MixerConfig::default());
+        let (tx, rx) = poisson_channel::<u32>(poisson_default());
         drop(rx);
 
         // `Receiver::drop` flips the flag under the pool lock, so this re-checks authoritatively.
@@ -369,7 +375,7 @@ mod tests {
     async fn should_stay_open_until_last_sender_clone_drops() -> anyhow::Result<()> {
         // Exercises the `sender_count` AcqRel/Acquire handshake: the channel must stay open while
         // any clone lives and close (yield `None`) only once the last one drops.
-        let (tx_a, mut rx) = poisson_channel::<u32>(MixerConfig::default());
+        let (tx_a, mut rx) = poisson_channel::<u32>(poisson_default());
         let tx_b = tx_a.clone();
 
         tx_a.send(1)?;
@@ -411,7 +417,7 @@ mod tests {
         // The transport wires the sender as a `Sink`, so exercise that path (not just the
         // inherent `send`): `SinkExt::send` drives poll_ready -> start_send -> poll_flush.
         use futures::SinkExt;
-        let (mut tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
+        let (mut tx, mut rx) = poisson_channel::<u32>(poisson_default());
         SinkExt::send(&mut tx, 7).await?;
         assert_eq!(timeout(CAP + LEEWAY, rx.recv()).await?, Some(7));
         Ok(())

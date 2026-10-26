@@ -4,7 +4,6 @@ expression: cfg
 ---
 capacity: 20000
 mixer_type:
-  Poisson:
-    max_delay: 20ms
-    miss_probability: 0.01
-    target_occupancy: 0
+  Uniform:
+    min_delay: 0s
+    delay_range: 10ms

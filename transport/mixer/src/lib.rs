@@ -2,9 +2,10 @@
 //!
 //! Each mixer implementation is behind its own feature so a consumer compiles only what it
 //! uses:
-//! - `poisson` (default) — the virtual-clock timing-wheel release engine, pool shared behind `Arc<Mutex<_>>` on the
-//!   consumer task (no dedicated thread), `poisson_channel()`.
-//! - `uniform-channel` — the uniform-delay min-heap channel, `channel()`.
+//! - `poisson` — the virtual-clock timing-wheel release engine, pool shared behind `Arc<Mutex<_>>` on the consumer task
+//!   (no dedicated thread), `poisson_channel()`.
+//! - `uniform-channel` — the uniform-delay min-heap channel, `channel()`. [`config::MixerType::default`] selects this
+//!   engine over Poisson when both are compiled in: see its doc comment for why.
 //! - `uniform-adapter` — the uniform-delay `Sink` adapter, `MixerSink`.
 
 pub mod config;

@@ -359,7 +359,7 @@ mod tests {
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
 
-    /// Uniform config with the crate's default delay span (0–20 ms).
+    /// Uniform config with the crate's default delay span (0–10 ms).
     fn uniform_default() -> MixerConfig {
         MixerConfig::new_uniform(
             Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),

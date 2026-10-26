@@ -3,7 +3,7 @@ use std::time::Duration;
 use validator::{Validate, ValidationError};
 
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
-pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
+pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 10;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 /// The average-delay metric window is sized to this many times the active engine's nominal max
 /// delay (in ms), so a larger configured delay smooths the EMA over proportionally more packets.
@@ -158,13 +158,19 @@ pub enum MixerType {
 
 impl Default for MixerType {
     fn default() -> Self {
-        #[cfg(feature = "poisson")]
-        return MixerType::Poisson(PoissonConfig::default());
-        #[cfg(all(
-            any(feature = "uniform-channel", feature = "uniform-adapter"),
-            not(feature = "poisson")
-        ))]
+        // Uniform is the default engine, not Poisson, even though Poisson gives a better
+        // delay/anonymity trade-off. Relays and exits do not yet carry enough throughput to
+        // absorb Poisson's load-dependent delay without a latency regression for existing
+        // traffic, and only session clients know their own traffic's shape and can pick Poisson
+        // deliberately via `MixerConfig::new_poisson(_constant_privacy)` or config. Revisit this
+        // once relay/exit throughput headroom is confirmed, then flip the priority below.
+        #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
         return MixerType::Uniform(UniformConfig::default());
+        #[cfg(all(
+            feature = "poisson",
+            not(any(feature = "uniform-channel", feature = "uniform-adapter"))
+        ))]
+        return MixerType::Poisson(PoissonConfig::default());
         #[cfg(not(any(feature = "uniform-channel", feature = "uniform-adapter", feature = "poisson")))]
         compile_error!("at least one mixer implementation feature must be enabled");
     }
@@ -271,10 +277,10 @@ pub struct PoissonConfig {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "poisson")]
+    #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     #[test]
-    fn default_mixer_type_should_be_poisson() {
-        assert!(matches!(MixerType::default(), MixerType::Poisson(_)));
+    fn default_mixer_type_should_be_uniform() {
+        assert!(matches!(MixerType::default(), MixerType::Uniform(_)));
     }
 
     /// `Duration::as_millis()` returns `u128`; an unchecked `as u64` cast on a pathologically
