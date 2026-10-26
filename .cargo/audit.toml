@@ -17,6 +17,7 @@ ignore = [
   "RUSTSEC-2026-0249", # `smartstring` unmaintained, requires `opentelemetry-prometheus-text-exporter` > 0.3.0
   "RUSTSEC-2026-0253", # `lru` <0.18.2 use-after-free if a key's `Drop` panics in `pop()`; pinned at 0.16.4 by alloy-provider 2.2.0 (via hopr-bindings -> hopr-types). 0.18.2 is semver-incompatible, so this needs an alloy bump — same blocker as RUSTSEC-2026-0220
   "RUSTSEC-2026-0258", # `h2` unbounded empty DATA frames, requires new version of `cynic` in `blokli-client`
+  "RUSTSEC-2026-0387", # `crypto-bigint` 0.5.5 timing variability, pulled by elliptic-curve 0.13.8 -> k256 0.13.4 (alloy's signer stack); fix needs elliptic-curve 0.14.x / k256 0.14.x, same blocker as RUSTSEC-2026-0220/0253 — needs an alloy bump
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
