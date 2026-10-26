@@ -12,6 +12,8 @@ use hopr_api::{
     },
 };
 
+use crate::constants;
+
 /// Polls the on-chain balance of `address` for currency `C` with exponential backoff,
 /// returning `Ok` as soon as it reaches `min_balance`, or `Err` once the per-iteration
 /// backoff grows past `max_delay`.
@@ -46,6 +48,7 @@ pub(crate) async fn wait_for_balance<C: Currency, R: ChainValues>(
 
 /// Kernel UDP socket buffer defaults and caps, as reported by the OS (Linux only; see
 /// <https://github.com/hoprnet/hoprnet/issues/8503>).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct UdpBufferLimits {
     pub rmem_default: Option<u64>,
     pub rmem_max: Option<u64>,
@@ -54,6 +57,7 @@ pub(crate) struct UdpBufferLimits {
 }
 
 /// Current and available TCP congestion-control algorithms, as reported by the OS (Linux only).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TcpCongestionControl {
     /// Currently active algorithm (`net.ipv4.tcp_congestion_control`), e.g. `"cubic"` or `"bbr"`.
     pub current: Option<String>,
@@ -144,11 +148,80 @@ pub(crate) fn read_tcp_congestion_control() -> TcpCongestionControl {
     }
 }
 
+/// Host OS network tuning state relevant to node throughput (UDP buffer sizing, TCP congestion
+/// control), plus the recommendations derived from it. See
+/// <https://github.com/hoprnet/hoprnet/issues/8503>.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct NetworkTuningReport {
+    pub udp: UdpBufferLimits,
+    pub congestion_control: TcpCongestionControl,
+}
+
+impl NetworkTuningReport {
+    /// Reads the current host's network tuning state (Linux only; all-`None` elsewhere).
+    pub(crate) fn collect() -> Self {
+        Self {
+            udp: read_udp_buffer_limits(),
+            congestion_control: read_tcp_congestion_control(),
+        }
+    }
+
+    /// Actionable tuning recommendations, one per issue found; empty when nothing needs attention.
+    pub(crate) fn recommendations(&self) -> Vec<String> {
+        let mut recommendations = Vec::new();
+
+        if self
+            .udp
+            .rmem_default
+            .is_some_and(|v| v < constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES)
+            || self
+                .udp
+                .wmem_default
+                .is_some_and(|v| v < constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES)
+        {
+            recommendations.push(format!(
+                "kernel UDP socket buffer defaults are below the recommended minimum ({} bytes) and can cause packet \
+                 drops under load; raise them with: sysctl -w net.core.rmem_default={0} net.core.wmem_default={0} \
+                 (persist in /etc/sysctl.conf)",
+                constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES
+            ));
+        }
+
+        if let Some(current) = self.congestion_control.current.as_deref()
+            && current != constants::RECOMMENDED_CONGESTION_CONTROL
+            && self.congestion_control.bbr_available == Some(true)
+        {
+            recommendations.push(format!(
+                "TCP congestion control is set to {current}, not {rec}; {rec} generally gives better throughput on \
+                 lossy/high-latency links; switch with: sysctl -w net.ipv4.tcp_congestion_control={rec} (persist in \
+                 /etc/sysctl.conf)",
+                rec = constants::RECOMMENDED_CONGESTION_CONTROL
+            ));
+        }
+
+        recommendations
+    }
+}
+
+impl std::fmt::Display for NetworkTuningReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let recommendations = self.recommendations();
+        if recommendations.is_empty() {
+            write!(f, "OS network tuning looks fine")
+        } else {
+            write!(f, "{}", recommendations.join("; "))
+        }
+    }
+}
+
 #[cfg(test)]
 mod sysctl_tests {
     use anyhow::Context;
 
-    use super::{parse_sysctl_string, parse_sysctl_u64, read_tcp_congestion_control_from, read_udp_buffer_limits_from};
+    use super::{
+        NetworkTuningReport, TcpCongestionControl, UdpBufferLimits, parse_sysctl_string, parse_sysctl_u64,
+        read_tcp_congestion_control_from, read_udp_buffer_limits_from,
+    };
 
     #[test]
     fn parse_sysctl_u64_accepts_plain_digits() {
@@ -292,6 +365,84 @@ mod sysctl_tests {
         assert_eq!(cc.current.as_deref(), Some("cubic"));
         assert_eq!(cc.bbr_available, None);
         Ok(())
+    }
+
+    #[test]
+    fn recommendations_empty_when_tuned_well() {
+        let report = NetworkTuningReport {
+            udp: UdpBufferLimits {
+                rmem_default: Some(4 * 1024 * 1024),
+                rmem_max: Some(4 * 1024 * 1024),
+                wmem_default: Some(4 * 1024 * 1024),
+                wmem_max: Some(4 * 1024 * 1024),
+            },
+            congestion_control: TcpCongestionControl {
+                current: Some("bbr".to_string()),
+                bbr_available: Some(true),
+            },
+        };
+
+        assert!(report.recommendations().is_empty());
+        assert_eq!(report.to_string(), "OS network tuning looks fine");
+    }
+
+    #[test]
+    fn recommendations_flag_low_udp_buffer_default() {
+        let report = NetworkTuningReport {
+            udp: UdpBufferLimits {
+                rmem_default: Some(212992),
+                wmem_default: Some(212992),
+                ..Default::default()
+            },
+            congestion_control: TcpCongestionControl::default(),
+        };
+
+        let recommendations = report.recommendations();
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("sysctl -w net.core.rmem_default=4194304 net.core.wmem_default=4194304"));
+    }
+
+    #[test]
+    fn recommendations_ignore_low_max_when_default_is_fine() {
+        let report = NetworkTuningReport {
+            udp: UdpBufferLimits {
+                rmem_default: Some(4 * 1024 * 1024),
+                rmem_max: Some(212992),
+                wmem_default: Some(4 * 1024 * 1024),
+                wmem_max: Some(212992),
+            },
+            congestion_control: TcpCongestionControl::default(),
+        };
+
+        assert!(report.recommendations().is_empty());
+    }
+
+    #[test]
+    fn recommendations_flag_bbr_available_but_unused() {
+        let report = NetworkTuningReport {
+            udp: UdpBufferLimits::default(),
+            congestion_control: TcpCongestionControl {
+                current: Some("cubic".to_string()),
+                bbr_available: Some(true),
+            },
+        };
+
+        let recommendations = report.recommendations();
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("sysctl -w net.ipv4.tcp_congestion_control=bbr"));
+    }
+
+    #[test]
+    fn recommendations_skip_bbr_suggestion_when_unavailable() {
+        let report = NetworkTuningReport {
+            udp: UdpBufferLimits::default(),
+            congestion_control: TcpCongestionControl {
+                current: Some("cubic".to_string()),
+                bbr_available: Some(false),
+            },
+        };
+
+        assert!(report.recommendations().is_empty());
     }
 }
 

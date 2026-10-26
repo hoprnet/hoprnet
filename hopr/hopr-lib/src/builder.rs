@@ -448,53 +448,10 @@ where
     let ctx = configured.ctx;
     ctx.cfg.validate()?;
 
-    let udp_limits = crate::helpers::read_udp_buffer_limits();
-    tracing::info!(
-        rmem_default = ?udp_limits.rmem_default,
-        rmem_max = ?udp_limits.rmem_max,
-        wmem_default = ?udp_limits.wmem_default,
-        wmem_max = ?udp_limits.wmem_max,
-        "OS UDP socket buffer limits"
-    );
-    if udp_limits
-        .rmem_default
-        .is_some_and(|v| v < constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES)
-        || udp_limits
-            .wmem_default
-            .is_some_and(|v| v < constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES)
-    {
-        tracing::warn!(
-            recommended_bytes = constants::RECOMMENDED_MIN_UDP_BUFFER_BYTES,
-            "kernel UDP socket buffer defaults are below the recommended minimum and can cause packet drops under \
-             load; raise them with: sysctl -w net.core.rmem_default=4194304 net.core.wmem_default=4194304 (persist in \
-             /etc/sysctl.conf)"
-        );
-    }
-
-    let congestion_control = crate::helpers::read_tcp_congestion_control();
-    tracing::info!(
-        current = ?congestion_control.current,
-        bbr_available = ?congestion_control.bbr_available,
-        "OS TCP congestion control"
-    );
-    if congestion_control
-        .current
-        .as_deref()
-        .is_some_and(|c| c != constants::RECOMMENDED_CONGESTION_CONTROL)
-    {
-        if congestion_control.bbr_available == Some(true) {
-            tracing::warn!(
-                current = ?congestion_control.current,
-                "TCP congestion control is not set to bbr, which generally gives better throughput on \
-                 lossy/high-latency links; switch with: sysctl -w net.ipv4.tcp_congestion_control=bbr \
-                 (persist in /etc/sysctl.conf)"
-            );
-        } else {
-            tracing::debug!(
-                current = ?congestion_control.current,
-                "bbr congestion control not available on this kernel"
-            );
-        }
+    let network_tuning = crate::helpers::NetworkTuningReport::collect();
+    tracing::info!(?network_tuning, "OS network tuning specs");
+    for recommendation in network_tuning.recommendations() {
+        tracing::warn!("{recommendation}");
     }
 
     let chain_api = (configured
