@@ -4190,41 +4190,14 @@ where
         Ok(())
     }
 
-    /// Marks the return path to `destination` as degraded on every Session routed there.
-    ///
-    /// The Session layer cannot tell a dead return path from a peer with nothing to say -- both
-    /// simply stop consuming SURBs -- so the judgement is made where sibling paths can be compared
-    /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
-    /// their counterparty buffer estimate for `grace`.
-    ///
-    /// Returns the pseudonyms of the Sessions that were marked (empty when nothing routes there).
-    ///
-    /// The caller uses these to advance each Session's SURB generation: the return path to
-    /// `destination` has just been re-planned, so the fresh SURB batch must supersede the SURBs the
-    /// counterparty still holds for the dead path.
-    pub fn mark_return_path_degraded(
-        &self,
-        destination: &hopr_api::types::internal::NodeId,
-        grace: std::time::Duration,
-    ) -> Vec<HoprPseudonym> {
+    /// Sets how many SURBs of `session`, held in the counterparty's store, are invalid: their return
+    /// path runs through a relayer judged dead on any hop. Also their share of what it was handed, so the
+    /// balancer replaces them. `false` if there is no such Session.
+    pub fn set_invalid_surbs(&self, session: &SessionId, count: u64, share: f64) -> bool {
         self.sessions
-            .iter()
-            .filter(|(_, slot)| {
-                // Only sessions that actually run a return path are affected: with `return_options:
-                // None` the session mints no return SURBs, so the counterparty holds none to
-                // supersede and there is nothing to mark or bump.
-                matches!(
-                    &slot.routing_opts,
-                    DestinationRouting::Forward { destination: d, return_options: Some(_), .. }
-                    if d.as_ref() == destination
-                )
-            })
-            .map(|(pseudonym, slot)| {
-                slot.surb_mgmt.mark_return_path_degraded(grace);
-                // The session cache is keyed by pseudonym, which is exactly the SURB-generation key.
-                *pseudonym.as_ref()
-            })
-            .collect()
+            .get(session)
+            .map(|slot| slot.surb_mgmt.set_invalid_surbs(count, share))
+            .is_some()
     }
 
     /// The main method to be called whenever data are received.
@@ -4937,7 +4910,6 @@ where
                 // No SURB decay at the Exit, since we know almost exactly how many SURBs
                 // were received
                 surb_decay: None,
-                sustain_on_return_path_loss: false,
             };
 
             slot.surb_mgmt.update(&balancer_config);
@@ -10003,61 +9975,54 @@ mod tests {
         Ok(())
     }
 
-    /// `mark_return_path_degraded` must mark exactly the Sessions routed to the given destination
-    /// **that run a return path**, and return their pseudonyms (the SURB-generation keys the caller
-    /// bumps), leaving Sessions bound for other destinations — and one-way Sessions with no return
-    /// path — untouched.
-    #[test_log::test(tokio::test)]
-    async fn session_manager_mark_return_path_degraded_should_return_the_marked_pseudonyms() -> anyhow::Result<()> {
-        use std::collections::HashSet;
+    #[test]
+    fn an_invalid_surb_share_should_reopen_the_gate_only_for_that_session() -> anyhow::Result<()> {
+        use anyhow::Context as _;
 
-        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let destination = Address::from(&ChainKeypair::random());
+        let [hit_session, other_session] = [(); 2].map(|_| HoprPseudonym::random());
+        for session in [hit_session, other_session] {
+            mgr.pre_populate_session(
+                session,
+                DestinationRouting::Forward {
+                    destination: Box::new(destination.into()),
+                    pseudonym: Some(session),
+                    forward_options: RoutingOptions::Hops(1.try_into()?),
+                    return_options: None,
+                },
+            );
+            let slot = mgr.sessions.get(&session).context("slot must exist")?;
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+            slot.surb_mgmt
+                .buffer_level
+                .store(200, std::sync::atomic::Ordering::Relaxed);
+        }
 
-        let dest_a: Address = (&ChainKeypair::random()).into();
-        let dest_b: Address = (&ChainKeypair::random()).into();
+        assert!(mgr.set_invalid_surbs(&hit_session, 120, 0.6));
+        assert!(!mgr.set_invalid_surbs(&HoprPseudonym::random(), 120, 0.6));
 
-        let hops = || RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN);
-        let forward_to =
-            |addr: Address, ps: HoprPseudonym, return_options: Option<RoutingOptions>| DestinationRouting::Forward {
-                destination: Box::new(addr.into()),
-                pseudonym: Some(ps),
-                forward_options: hops(),
-                return_options,
-            };
-
-        // Two Sessions route to `dest_a` with a return path, one to `dest_b`, and one one-way Session
-        // (no return path) to `dest_a` that must be skipped.
-        let (ps_a1, ps_a2, ps_b, ps_a_oneway) = (
-            HoprPseudonym::random(),
-            HoprPseudonym::random(),
-            HoprPseudonym::random(),
-            HoprPseudonym::random(),
-        );
-        mgr.pre_populate_session(ps_a1, forward_to(dest_a, ps_a1, Some(hops())));
-        mgr.pre_populate_session(ps_a2, forward_to(dest_a, ps_a2, Some(hops())));
-        mgr.pre_populate_session(ps_b, forward_to(dest_b, ps_b, Some(hops())));
-        mgr.pre_populate_session(ps_a_oneway, forward_to(dest_a, ps_a_oneway, None));
-        mgr.sessions.run_pending_tasks();
-
-        let node_a = hopr_api::types::internal::NodeId::Chain(dest_a);
-        let marked: HashSet<_> = mgr
-            .mark_return_path_degraded(&node_a, Duration::from_secs(30))
-            .into_iter()
-            .collect();
+        let organic = |session| -> anyhow::Result<usize> {
+            Ok(mgr
+                .sessions
+                .get(&session)
+                .context("slot must exist")?
+                .surb_mgmt
+                .organic_surbs_per_packet())
+        };
         assert_eq!(
-            marked,
-            HashSet::from([ps_a1, ps_a2]),
-            "only return-path Sessions routed to dest_a must be marked; the one-way Session is skipped"
+            1,
+            organic(hit_session)?,
+            "80 usable of 200 held is below the target of 100"
         );
-
-        // A destination nothing routes to marks nothing.
-        let node_c = hopr_api::types::internal::NodeId::Chain((&ChainKeypair::random()).into());
-        assert!(
-            mgr.mark_return_path_degraded(&node_c, Duration::from_secs(30))
-                .is_empty(),
-            "a destination with no Sessions must return no pseudonyms"
+        assert_eq!(
+            0,
+            organic(other_session)?,
+            "other sessions to the same destination are untouched"
         );
-
         Ok(())
     }
 

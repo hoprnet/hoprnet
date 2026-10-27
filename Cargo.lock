@@ -4165,9 +4165,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "4.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da72d7cfdba3bc36ec2ad790ce87c6f71cb2fc69e44b1a58f903fec471727b78"
+version = "4.5.0"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4329,9 +4327,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009f463e7c597f55aa8fda7b5a4c5df5d28cec3f119e9cc13b94628c7cc2c386"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "bimap",
