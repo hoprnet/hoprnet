@@ -54,7 +54,7 @@ mod frames;
 mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 pub use frames::{Frame, FrameId, OrderedFrame, Segment, SegmentId, SeqIndicator, SeqNum};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
@@ -177,6 +177,11 @@ impl<const C: usize> Decoder for SessionCodec<C> {
     type Error = SessionError;
     type Item = SessionMessage<C>;
 
+    /// Decodes one message from `src`.
+    ///
+    /// On error, the bad bytes are always removed from `src`. The framed reader calls `decode`
+    /// again on the same buffer after an error, so bytes left in place would fail again on
+    /// every poll and the reader would never move on.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
 
@@ -187,6 +192,8 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Protocol version
         if src[0] != SessionMessage::<C>::VERSION {
+            // The header cannot be trusted, so the message length is unknown: drop everything.
+            src.clear();
             return Err(SessionError::WrongVersion);
         }
 
@@ -198,28 +205,28 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Check the maximum message length for version 1
         if payload_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+            // The length cannot be trusted either: drop everything.
+            src.clear();
             return Err(SessionError::IncorrectMessageLength);
         }
 
         // Check if there's enough data so that we can read the rest of the message
-        if src.len() < SessionMessage::<C>::HEADER_SIZE + payload_len {
+        let message_len = SessionMessage::<C>::HEADER_SIZE + payload_len;
+        if src.len() < message_len {
             return Ok(None);
         }
 
-        // Read the message
+        // Take the whole message out of the buffer first, so a message that fails to parse
+        // below is skipped and the next one can still be read.
+        let message = src.split_to(message_len);
+        let payload = &message[SessionMessage::<C>::HEADER_SIZE..];
+
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(payload.try_into()?),
+            SessionMessageDiscriminants::Request => SessionMessage::Request(payload.try_into()?),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(payload.try_into()?),
         };
 
-        src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
         Ok(Some(res))
     }
 }
