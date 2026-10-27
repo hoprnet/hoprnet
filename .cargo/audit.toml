@@ -17,6 +17,20 @@ ignore = [
   "RUSTSEC-2026-0249", # `smartstring` unmaintained, requires `opentelemetry-prometheus-text-exporter` > 0.3.0
   "RUSTSEC-2026-0253", # `lru` <0.18.2 use-after-free if a key's `Drop` panics in `pop()`; pinned at 0.16.4 by alloy-provider 2.2.0 (via hopr-bindings -> hopr-types). 0.18.2 is semver-incompatible, so this needs an alloy bump — same blocker as RUSTSEC-2026-0220
   "RUSTSEC-2026-0258", # `h2` unbounded empty DATA frames, requires new version of `cynic` in `blokli-client`
+  "RUSTSEC-2026-0387", # `crypto-bigint` timing variability in constant-time ops; local-only (blst); no fix yet
+  "RUSTSEC-2026-0391", # `zstd` data leaks across streams on reused context; version pinned by upstream deps
+  "RUSTSEC-2026-0395", # `zstd-safe` [unsound] UAF with CParameter::StableInBuffer; pinned via zstd-safe transitive dep
+  "RUSTSEC-2026-0396", # `zstd-safe` [unsound] Seekable reads NULL/out-of-bounds seek table
+  "RUSTSEC-2026-0397", # `zstd-safe` [unsound] OutBuffer::around_pos exposes uninitialized memory
+  "RUSTSEC-2026-0398", # `zstd-safe` Seekable::decompress sets Vec length beyond capacity
+  "RUSTSEC-2026-0399", # `zstd-safe` [unsound] UAF through init_using_cdict/init_using_ddict
+  "RUSTSEC-2026-0400", # `zstd-safe` [unsound] UAF of dictionary after one-shot call
+  "RUSTSEC-2026-0401", # `zstd-safe` [unsound] OOB read in train_from_buffer when sample sizes overflow
+  "RUSTSEC-2026-0402", # `zstd-safe` [unsound] Heap buffer overflow in CCtx::try_clone on multithreaded context
+  "RUSTSEC-2026-0403", # `zstd-safe` Uninitialized memory exposed when streaming decompression of legacy frame fails
+  "RUSTSEC-2026-0404", # `zstd-safe` [unsound] Double free in DCtx::try_clone
+  "RUSTSEC-2026-0405", # `zstd-safe` [unsound] OOB read with out-of-range InBuffer::pos
+  "RUSTSEC-2026-0406", # `zstd-safe` [unsound] UAF when changing multithreaded context with unfinished frame
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
