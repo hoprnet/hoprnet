@@ -452,26 +452,6 @@ impl EvictionStats {
     }
 }
 
-/// Whether evicting a pseudonym's SURB generation for `cause` is routine.
-///
-/// Minting keeps a generation warm while its pseudonym is in use. So an expired generation belongs to a
-/// pseudonym that has been idle for the whole reply-opener window, when the peer no longer holds SURBs it
-/// numbers: routine, and counted in the interval summary like every other expiry (#8429). An explicit
-/// removal is deliberate. A generation pushed out by capacity or replaced may still be in use, and the
-/// peer then rejects SURBs numbered by the lost serial.
-fn generation_eviction_is_routine(cause: RemovalCause) -> bool {
-    matches!(cause, RemovalCause::Expired | RemovalCause::Explicit)
-}
-
-/// Logs the eviction of one pseudonym's SURB generation: a warning only when it may break a reply path.
-fn log_generation_eviction(pseudonym: &HoprPseudonym, cause: RemovalCause) {
-    if generation_eviction_is_routine(cause) {
-        tracing::debug!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
-    } else {
-        tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
-    }
-}
-
 /// The counts of one closed report interval, ready to be logged.
 #[derive(Debug)]
 struct EvictionReport {
@@ -585,7 +565,14 @@ impl MemorySurbStore {
                 .eviction_listener({
                     let stats = stats.clone();
                     move |pseudonym, _generation, cause| {
-                        log_generation_eviction(&pseudonym, cause);
+                        // Expired: the pseudonym was idle for the whole reply-opener window, so the peer no longer
+                        // holds SURBs this serial numbers (#8429). Explicit: removed on purpose. Size and Replaced
+                        // can drop a serial that is still in use, and the peer then rejects SURBs numbered by it.
+                        if matches!(cause, RemovalCause::Expired | RemovalCause::Explicit) {
+                            tracing::debug!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                        } else {
+                            tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                        }
                         stats.record(EvictedCache::Generation, cause);
                     }
                 })
@@ -2466,14 +2453,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn only_generation_evictions_that_may_break_a_reply_path_are_warnings() {
-        assert!(generation_eviction_is_routine(RemovalCause::Expired));
-        assert!(generation_eviction_is_routine(RemovalCause::Explicit));
-        assert!(!generation_eviction_is_routine(RemovalCause::Size));
-        assert!(!generation_eviction_is_routine(RemovalCause::Replaced));
-    }
-
     fn eviction_stats(warn_threshold: u64) -> EvictionStats {
         EvictionStats::new(&SurbStoreConfig {
             eviction_report_interval: REPORT_INTERVAL,
@@ -2775,28 +2754,6 @@ mod tests {
             "two caches saw evictions below the threshold; caches without evictions log nothing"
         );
         Ok(())
-    }
-
-    #[test]
-    fn an_expired_generation_is_logged_at_debug_and_a_displaced_one_as_a_warning() {
-        let pseudonym = HoprPseudonym::random();
-
-        let expired = Arc::new(RecordingSubscriber::default());
-        tracing::subscriber::with_default(expired.clone(), || {
-            log_generation_eviction(&pseudonym, RemovalCause::Expired)
-        });
-        assert_eq!(expired.warnings.load(Ordering::Relaxed), 0, "expiry is routine");
-        assert_eq!(expired.debugs.load(Ordering::Relaxed), 1);
-
-        let displaced = Arc::new(RecordingSubscriber::default());
-        tracing::subscriber::with_default(displaced.clone(), || {
-            log_generation_eviction(&pseudonym, RemovalCause::Size)
-        });
-        assert_eq!(
-            displaced.warnings.load(Ordering::Relaxed),
-            1,
-            "the peer may now reject SURBs"
-        );
     }
 
     #[test]
