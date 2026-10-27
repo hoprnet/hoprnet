@@ -93,8 +93,8 @@ moka = { version = "0.12.16", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 oas3 = "0.22.0"
-opentelemetry-prometheus-text-exporter = { version = "0.4.0" }
-opentelemetry_sdk = { version = "0.33.1" }
+opentelemetry-prometheus-text-exporter = { version = "0.3" }
+opentelemetry_sdk = { version = "0.32.1" }
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.13.0"
 pcap-file = "2.0.0"
