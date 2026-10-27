@@ -4318,6 +4318,7 @@ dependencies = [
  "serial_test",
  "smart-default",
  "strum",
+ "tempfile",
  "test-log",
  "thiserror 2.0.21",
  "tokio",
