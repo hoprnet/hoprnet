@@ -2,35 +2,13 @@
 ignore = [
   "RUSTSEC-2024-0436", # 'paste' dependency in 'libp2p' [unmaintained]
   "RUSTSEC-2024-0388", # 'derivative' in 'alloy' [unmaintained],
-  "RUSTSEC-2025-0073", # 'alloy-dyn-abi' in 'alloy' - will be removed in 4.0
-  "RUSTSEC-2025-0137", # `alloy` - held back until removed, see https://github.com/hoprnet/hoprnet/issues/7707
-  "RUSTSEC-2026-0049", # `rustls-webpki` - needs alloy removal
-  "RUSTSEC-2026-0097", # workspace already pins `rand` 0.10.1, but Cargo.lock still contains transitive `rand` 0.9.3; remove this ignore once upstream deps stop pulling 0.9.3
-  "RUSTSEC-2026-0098", # `rustls-webpki` 0.101.7 pulled transitively by blokli-client -> eventsource-client 0.16.2 -> hyper-rustls 0.24.2; our own `rustls-webpki` bumped to >=0.103.12 in Cargo.lock. Drop once blokli-client upgrades eventsource-client (see https://github.com/hoprnet/blokli/issues/107)
   "RUSTSEC-2026-0118", # `hickory-proto` 0.25.2 pulled by libp2p-dns 0.44.0 -> libp2p 0.56.0; no fix for 0.25.x; cannot remove without a major libp2p bump
   "RUSTSEC-2026-0119", # same root cause as 0118 (different advisory DB version); hickory-proto 0.26.x is fixed via hickory-proto 0.26.1
   "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained; pulled by validator_derive -> validator -> hopr-transport-tag-allocator; drop once validator upgrades or is replaced
-  "RUSTSEC-2026-0185", # needs libp2p-quic and reqwest patch
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
-  "RUSTSEC-2026-0220", # ruint <1.20.0 pulled transitively by nybbles → alloy-trie → alloy; upgrade blocked on alloy bump
   "RUSTSEC-2026-0249", # `smartstring` unmaintained, requires `opentelemetry-prometheus-text-exporter` > 0.3.0
-  "RUSTSEC-2026-0253", # `lru` <0.18.2 use-after-free if a key's `Drop` panics in `pop()`; pinned at 0.16.4 by alloy-provider 2.2.0 (via hopr-bindings -> hopr-types). 0.18.2 is semver-incompatible, so this needs an alloy bump — same blocker as RUSTSEC-2026-0220
-  "RUSTSEC-2026-0258", # `h2` unbounded empty DATA frames, requires new version of `cynic` in `blokli-client`
   "RUSTSEC-2026-0387", # `crypto-bigint` timing variability in constant-time ops; local-only (blst); no fix yet
-  "RUSTSEC-2026-0391", # `zstd` data leaks across streams on reused context; version pinned by upstream deps
-  "RUSTSEC-2026-0395", # `zstd-safe` [unsound] UAF with CParameter::StableInBuffer; pinned via zstd-safe transitive dep
-  "RUSTSEC-2026-0396", # `zstd-safe` [unsound] Seekable reads NULL/out-of-bounds seek table
-  "RUSTSEC-2026-0397", # `zstd-safe` [unsound] OutBuffer::around_pos exposes uninitialized memory
-  "RUSTSEC-2026-0398", # `zstd-safe` Seekable::decompress sets Vec length beyond capacity
-  "RUSTSEC-2026-0399", # `zstd-safe` [unsound] UAF through init_using_cdict/init_using_ddict
-  "RUSTSEC-2026-0400", # `zstd-safe` [unsound] UAF of dictionary after one-shot call
-  "RUSTSEC-2026-0401", # `zstd-safe` [unsound] OOB read in train_from_buffer when sample sizes overflow
-  "RUSTSEC-2026-0402", # `zstd-safe` [unsound] Heap buffer overflow in CCtx::try_clone on multithreaded context
-  "RUSTSEC-2026-0403", # `zstd-safe` Uninitialized memory exposed when streaming decompression of legacy frame fails
-  "RUSTSEC-2026-0404", # `zstd-safe` [unsound] Double free in DCtx::try_clone
-  "RUSTSEC-2026-0405", # `zstd-safe` [unsound] OOB read with out-of-range InBuffer::pos
-  "RUSTSEC-2026-0406", # `zstd-safe` [unsound] UAF when changing multithreaded context with unfinished frame
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
