@@ -2238,27 +2238,35 @@ fn initialize_session_telemetry(
 
 /// Caps how many SURBs an outgoing Session data packet may carry, per the SURB balancer.
 ///
-/// The default cap of `1` follows the balancer's target. Explicit limits of `0` or more than `1`
-/// take precedence; `usize::MAX` leaves the packet's existing limit untouched.
+/// Every finite `max_surbs` is gated by the balancer's target: the packet carries the client's number
+/// of SURBs while the counterparty is estimated to be below its target, and none once it is at or above
+/// it. The default of `1` is the plain case. A larger client value, which exists to save the balancer
+/// work on highly asymmetric traffic, is gated the same way, so no setting but `usize::MAX` can hold
+/// the counterparty more than one packet's SURBs above the target. An explicit `0` always wins, whatever
+/// the estimate. `usize::MAX` leaves the packet's existing limit untouched and is the one way to opt out
+/// of the gate.
 ///
-/// Otherwise the cap comes from [`BalancerStateValues::organic_surbs_per_packet`], which yields `0`
-/// once the counterparty is estimated to be at its target. That zero is the whole point of the
-/// function: without it, the balancer can silence its keep-alives and still have organic SURBs
-/// pouring into a full buffer, where each one evicts an older SURB and destroys the PIX share it
-/// carried.
+/// The gate is [`BalancerStateValues::organic_surbs_per_packet`], which yields `0` once the
+/// counterparty is estimated to be at its target. That zero is the whole point of the function:
+/// without it, the balancer can silence its keep-alives and still have organic SURBs pouring into a
+/// full buffer, where each one evicts an older SURB and destroys the PIX share it carried. It also
+/// bounds the stock the counterparty holds, which is what lets a SURB generation change wipe it at a
+/// cost the PIX surplus can absorb.
 ///
 /// Nothing else has to change to keep the SURB accounting straight. This runs in front of the
 /// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
 /// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
 /// queued for a packet that can actually deliver it.
 fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt: &BalancerStateValues) {
-    if max_surbs != usize::MAX {
-        data.packet_info.get_or_insert_default().max_surbs_in_packet = if max_surbs == 1 {
-            surb_mgmt.organic_surbs_per_packet()
-        } else {
-            max_surbs
-        };
+    if max_surbs == usize::MAX {
+        return;
     }
+    let cap = if max_surbs == 0 || surb_mgmt.organic_surbs_per_packet() == 0 {
+        0
+    } else {
+        max_surbs
+    };
+    data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
 }
 
 /// Books an incoming packet's SURBs into the Exit's flow estimator.
@@ -6310,16 +6318,35 @@ mod tests {
         Ok(())
     }
 
+    /// An explicit zero is the client's own statement that its packets carry no SURBs, and it holds
+    /// whatever the balancer estimates.
     #[test]
-    fn cap_organic_surbs_should_honor_explicit_packet_limits() -> anyhow::Result<()> {
-        for limit in [0, 2] {
-            for buffer_level in [10, 200] {
-                let mut data = small_outgoing_packet()?;
-                cap_organic_surbs(&mut data, limit, &gate_state(100, buffer_level));
+    fn cap_organic_surbs_should_let_an_explicit_zero_always_win() -> anyhow::Result<()> {
+        for buffer_level in [10, 200] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 0, &gate_state(100, buffer_level));
 
-                assert_eq!(Some(limit), data.packet_info.map(|info| info.max_surbs_in_packet));
-                assert_eq!(limit, data.estimate_surbs_with_msg());
-            }
+            assert_eq!(Some(0), data.packet_info.map(|info| info.max_surbs_in_packet));
+            assert_eq!(0, data.estimate_surbs_with_msg());
+        }
+        Ok(())
+    }
+
+    /// A client that asks for more than one SURB per packet gets them only while the counterparty is
+    /// below its target; at or above it the packet carries none, like the default. Otherwise the
+    /// counterparty's stock is unbounded by the target, and so is what a generation wipe costs.
+    #[test]
+    fn a_larger_explicit_limit_should_be_gated_like_the_default_one() -> anyhow::Result<()> {
+        for (buffer_level, expected) in [(10, 2), (99, 2), (100, 0), (200, 0)] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 2, &gate_state(100, buffer_level));
+
+            assert_eq!(
+                Some(expected),
+                data.packet_info.map(|info| info.max_surbs_in_packet),
+                "level {buffer_level} against a target of 100"
+            );
+            assert_eq!(expected, data.estimate_surbs_with_msg());
         }
         Ok(())
     }

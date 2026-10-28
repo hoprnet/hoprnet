@@ -148,10 +148,13 @@ pub struct SessionClientConfig {
     /// carry the maximum number of SURBs possible. Setting this to a higher number will put additional CPU
     /// pressure on the local node as it will generate the given number of SURBs for each data packet.
     ///
-    /// The default `1` follows the balancer's target: data packets carry no SURBs while the
-    /// counterparty is estimated to have a full buffer. Values greater than `1` bypass this gate;
-    /// use them only if the underlying traffic is highly asymmetric. Setting this to `0` leaves
-    /// all SURB production to the SURB balancer (if configured).
+    /// Every finite value follows the balancer's target: data packets carry no SURBs while the
+    /// counterparty is estimated to have a full buffer, and this many while it is below its target.
+    /// A value greater than `1` therefore only saves the balancer work while the counterparty is
+    /// short; it cannot keep the counterparty more than one packet's SURBs above its target. Use it only if the
+    /// underlying traffic is highly asymmetric. Setting this to `0` leaves all SURB production to the SURB
+    /// balancer (if configured). `usize::MAX` is the one value that is not gated: every packet
+    /// carries as many SURBs as fit, whatever the balancer estimates.
     ///
     /// The maximum number is naturally limited by the maximum payload size of a HOPR packet.
     ///
