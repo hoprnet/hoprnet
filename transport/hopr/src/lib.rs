@@ -1064,7 +1064,7 @@ where
                     protocol::surb_telemetry::flush_into(&surb_round_trips, &surb_flush_graph, now_ms);
                     // Relayer health lives in the graph, so path selection prunes the dead and weights
                     // the stalled natively.
-                    protocol::surb_telemetry::refresh_relayer_health(
+                    let reached = protocol::surb_telemetry::refresh_relayer_health(
                         &surb_round_trips,
                         &surb_flush_graph,
                         latency_race_memory,
@@ -1072,6 +1072,28 @@ where
                         || surb_flush_planner.refresh_cached_paths(),
                     )
                     .await;
+
+                    // The counterparty sees only the first hop of the SURBs it holds, so it cannot tell
+                    // which of them run through the dead relayer, and a FIFO store would spend them into
+                    // the void until it turned over. Advancing the session's SURB generation makes it
+                    // drop its whole stock on the next push. The write-off above is count-only (the SURBs
+                    // through the relayer); the session's balancer is told the stock is gone instead, so
+                    // that it refills from empty over the re-planned paths, at a pace (see
+                    // `REFILL_PACING_SECS`) the paths can carry. The session is asked first: a session
+                    // the manager no longer knows is only forgotten, its generation is not advanced
+                    // (that would leave a stray entry in the store and log a bump for a closed session).
+                    for pseudonym in reached {
+                        if !surb_flush_smgr.on_counterparty_surbs_wiped(&pseudonym) {
+                            surb_round_trips.forget_session(&pseudonym);
+                            continue;
+                        }
+                        let generation = surb_flush_planner.surb_store.bump_generation(&pseudonym);
+                        tracing::info!(
+                            %pseudonym,
+                            generation,
+                            "dead relayer verdict: SURB generation advanced, the counterparty drops its stock on the next push"
+                        );
+                    }
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
                     // told how many of those it holds, to replace them.
