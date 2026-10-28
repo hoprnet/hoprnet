@@ -180,7 +180,36 @@ pub struct BalancerStateValues {
     /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
     /// inactive. See [`REFILL_PACING_SECS`].
     refill_pacing: AtomicU64,
+    /// The instant [`last_heard`](Self::last_heard) and [`last_sent`](Self::last_sent) count from.
+    epoch: ActivityEpoch,
+    /// When the counterparty was last heard from, in milliseconds since `epoch` plus one, so that `0`
+    /// is "never". Any packet from it counts, and so does a reply the estimator counted as consumed.
+    /// Entry-side only; see [`silence_sustain`](Self::silence_sustain).
+    last_heard: AtomicU64,
+    /// When a Session data packet last went out, in the same unit as [`last_heard`](Self::last_heard).
+    last_sent: AtomicU64,
 }
+
+/// The instant the activity stamps of a [`BalancerStateValues`] count from: when it was made.
+#[derive(Debug, Clone, Copy)]
+struct ActivityEpoch(std::time::Instant);
+
+impl Default for ActivityEpoch {
+    fn default() -> Self {
+        Self(std::time::Instant::now())
+    }
+}
+
+/// How long data can go out with nothing at all coming back before the Entry sustains the
+/// counterparty's SURBs on its own: three seconds.
+///
+/// The Exit reports its SURB level at least every second and replies at the rate of the data it
+/// receives, so three seconds of data going out and nothing coming back, neither a report, nor any
+/// other packet, nor a reply home, means that the Exit's consumption is invisible: its stock may be
+/// draining into a return path that delivers nothing, and the balancer, which learns the level from
+/// those reports and replies, cannot see it and would mint nothing. See
+/// [`silence_sustain`](BalancerStateValues::silence_sustain).
+pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 
 /// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
 /// one fifth of the target per second, so the refill takes about as many seconds.
@@ -269,6 +298,8 @@ impl BalancerStateValues {
     /// is a superset of `SurbDistress` on the wire, so `contains` catches both, whereas an equality
     /// match against `SurbDistress` would silently ignore the more severe of the two.
     pub fn observe_counterparty_signals(&self, signals: PacketSignals) {
+        // Any packet from the counterparty carries them, so this is the Entry hearing the Exit.
+        self.note_heard();
         let distress = signals.contains(PacketSignal::SurbDistress);
         self.counterparty_in_surb_distress
             .store(distress, std::sync::atomic::Ordering::Relaxed);
@@ -300,6 +331,8 @@ impl BalancerStateValues {
     pub fn observe_reported_level(&self, new_level: u64) {
         use std::sync::atomic::Ordering::Relaxed;
 
+        // Heard even when the report is dropped below: it is the Exit speaking.
+        self.note_heard();
         let prev = self.buffer_level.load(Relaxed);
         if new_level > prev && self.refill_pacing_active() {
             tracing::debug!(
@@ -376,6 +409,70 @@ impl BalancerStateValues {
             0
         } else {
             1
+        }
+    }
+
+    /// Records that the counterparty was heard from now.
+    pub(crate) fn note_heard(&self) {
+        self.stamp(&self.last_heard, std::time::Instant::now());
+    }
+
+    /// Records that a Session data packet is going out now.
+    pub(crate) fn note_sent(&self) {
+        self.stamp(&self.last_sent, std::time::Instant::now());
+    }
+
+    /// Test hook: as if the counterparty had last been heard from `ago` ago.
+    ///
+    /// The stamps count from the instant the state was made, so for one to lie in the past the epoch
+    /// has to be moved back before it.
+    #[cfg(test)]
+    pub(crate) fn last_heard_ago(mut self, ago: Duration) -> Self {
+        let now = std::time::Instant::now();
+        self.epoch = ActivityEpoch(
+            now.checked_sub(ago + Duration::from_secs(60))
+                .expect("monotonic clock younger than the heard-ago offset"),
+        );
+        self.stamp(
+            &self.last_heard,
+            now.checked_sub(ago).expect("monotonic clock younger than `ago`"),
+        );
+        self
+    }
+
+    /// Stamps `slot` with `at`, never moving it back.
+    fn stamp(&self, slot: &AtomicU64, at: std::time::Instant) {
+        let ms = u64::try_from(at.saturating_duration_since(self.epoch.0).as_millis()).unwrap_or(u64::MAX - 1);
+        slot.fetch_max(ms.saturating_add(1), std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether data is going out into silence: the balancer is enabled, the counterparty was heard from
+    /// at least once, and the latest data packet went out more than [`SILENCE_SUSTAIN_AFTER`] after the
+    /// last time it was.
+    ///
+    /// The Entry then keeps one SURB in each data packet it sends even though its level estimate is at
+    /// or above the target (see `cap_organic_surbs` in the session manager). The estimate is fed by the
+    /// Exit's reports and replies; with none arriving it stays where it was, while the Exit goes on
+    /// answering the data it gets, one SURB for each reply, into a return path that may be delivering
+    /// nothing. The estimate then never falls below the target and the Entry mints nothing, until the
+    /// Exit's stock is empty. One SURB per data packet is what the Exit can be expected to spend and no
+    /// more: the sustain is bounded by the rate of the data, makes no burst, and wipes nothing. It ends
+    /// at the first packet or reply from the Exit.
+    ///
+    /// Judged between the two stamps, not against the clock, so that the answer is about the packet being
+    /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.
+    pub(crate) fn silence_sustain(&self) -> bool {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        if self.is_disabled() {
+            return false;
+        }
+        match self.last_heard.load(Relaxed) {
+            0 => false,
+            heard => {
+                let after = u64::try_from(SILENCE_SUSTAIN_AFTER.as_millis()).unwrap_or(u64::MAX);
+                self.last_sent.load(Relaxed) > heard.saturating_add(after)
+            }
         }
     }
 
@@ -594,6 +691,12 @@ where
             return current;
         };
 
+        // A reply came home since the last tick: the counterparty answered, whether or not any of its
+        // packets reached the hooks that record it.
+        if snapshot.consumed > self.last_estimator_state.consumed {
+            self.state.note_heard();
+        }
+
         self.last_estimator_state = snapshot;
         if self.state.take_counterparty_wiped() {
             // The counterparty dropped everything it held, so what this tick's production and
@@ -720,6 +823,7 @@ where
                     .state
                     .counterparty_in_surb_distress
                     .load(std::sync::atomic::Ordering::Relaxed),
+                silent = self.state.silence_sustain(),
                 "surb balancer state"
             );
         }
@@ -1930,5 +2034,82 @@ mod tests {
         let state = BalancerStateValues::default();
         state.on_counterparty_wiped();
         assert_eq!(None, state.pace_refill(Duration::from_millis(50)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Sustaining the counterparty's SURBs through a silence
+    // -----------------------------------------------------------------------
+
+    /// The sustain is about data going out into a silence. Without a packet sent after the last time the
+    /// counterparty was heard, more than the grace later, there is nothing to sustain, and neither is
+    /// there before it was heard at all, or while there is no balancer.
+    #[test]
+    fn silence_without_outgoing_data_should_not_sustain() {
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        assert!(
+            !state.silence_sustain(),
+            "heard 10 s ago, and nothing has been sent since"
+        );
+
+        // A packet that goes out inside the grace after the last time it was heard is not a silence yet.
+        state.stamp(&state.last_sent, std::time::Instant::now() - Duration::from_secs(8));
+        assert!(!state.silence_sustain(), "sent 2 s after it was heard");
+
+        let never_heard = gate_state(100, 200);
+        never_heard.note_sent();
+        assert!(
+            !never_heard.silence_sustain(),
+            "nothing was ever heard, so nothing has gone quiet"
+        );
+
+        let disabled = gate_state(0, 0).last_heard_ago(Duration::from_secs(10));
+        disabled.note_sent();
+        assert!(!disabled.silence_sustain(), "no balancer, no sustain");
+
+        let silent = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        silent.note_sent();
+        assert!(
+            silent.silence_sustain(),
+            "a packet 10 s after the last word is a silence"
+        );
+    }
+
+    /// Whatever the Exit says is heard: a report of its level, and any packet at all, whose signals are
+    /// all the Entry reads of it.
+    #[test]
+    fn a_report_or_any_packet_from_the_counterparty_should_count_as_heard() {
+        let state = gate_state(100, 200);
+        assert_eq!(
+            0,
+            state.last_heard.load(std::sync::atomic::Ordering::Relaxed),
+            "nothing heard yet"
+        );
+
+        state.observe_counterparty_signals(PacketSignals::default());
+        let after_a_packet = state.last_heard.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(after_a_packet > 0, "a packet from the Exit");
+
+        let state = gate_state(100, 200);
+        state.observe_reported_level(50);
+        assert!(
+            state.last_heard.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "a level report"
+        );
+    }
+
+    /// A reply home is the Exit answering, counted by the estimator as a SURB consumed, even where none of
+    /// its packets reached the hooks that record it. Production minted and nothing consumed is not.
+    #[test_log::test]
+    fn a_reply_counted_as_consumed_should_count_as_heard() {
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(small_target_config());
+        let heard = || state.last_heard.load(std::sync::atomic::Ordering::Relaxed);
+
+        for _ in 0..5 {
+            tick(&mut balancer, &estimator, &output, 0);
+        }
+        assert_eq!(0, heard(), "SURBs minted and none consumed: nobody has answered");
+
+        tick(&mut balancer, &estimator, &output, 3);
+        assert!(heard() > 0, "three replies came home in that tick");
     }
 }

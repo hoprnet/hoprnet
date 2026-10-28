@@ -2373,6 +2373,13 @@ fn initialize_session_telemetry(
 /// bounds the stock the counterparty holds, which is what lets a SURB generation change wipe it at a
 /// cost the PIX surplus can absorb.
 ///
+/// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`]),
+/// a closed gate gives exactly one SURB per packet, whatever the client asked for. The estimate that
+/// closed it is fed by the counterparty, and the counterparty has not been heard from for a while, so
+/// the estimate cannot see the stock draining and would hold the gate shut until it is empty. One SURB
+/// per data packet is about what the counterparty spends answering it: no burst, bounded by the data
+/// rate, and it ends with the first report or reply.
+///
 /// Nothing else has to change to keep the SURB accounting straight. This runs in front of the
 /// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
 /// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
@@ -2381,10 +2388,16 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     if max_surbs == usize::MAX {
         return;
     }
-    let cap = if max_surbs == 0 || surb_mgmt.organic_surbs_per_packet() == 0 {
+    // This packet is going out, which is what a silence is measured against.
+    surb_mgmt.note_sent();
+    let cap = if max_surbs == 0 {
         0
-    } else {
+    } else if surb_mgmt.organic_surbs_per_packet() > 0 {
         max_surbs
+    } else if surb_mgmt.silence_sustain() {
+        1
+    } else {
+        0
     };
     data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
 }
@@ -6481,6 +6494,68 @@ mod tests {
                 "level {buffer_level} against a target of 100"
             );
             assert_eq!(expected, data.estimate_surbs_with_msg());
+        }
+        Ok(())
+    }
+
+    /// A closed gate gives one SURB per packet while data goes out into a silence, the stock of an
+    /// Exit that cannot be heard cannot be seen draining, and a report ends it.
+    #[test]
+    fn silence_with_data_flowing_should_keep_one_organic_surb_per_packet() -> anyhow::Result<()> {
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &state);
+        assert_eq!(
+            Some(1),
+            data.packet_info.map(|info| info.max_surbs_in_packet),
+            "level at its target, nothing heard for 4 s, a packet now"
+        );
+        assert_eq!(1, data.estimate_surbs_with_msg(), "the cap reaches the SURB accounting");
+
+        // The Exit reports a full stock: no longer a silence.
+        state.observe_reported_level(100);
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &state);
+        assert_eq!(
+            Some(0),
+            data.packet_info.map(|info| info.max_surbs_in_packet),
+            "a report from the Exit, and the gate is shut again"
+        );
+        Ok(())
+    }
+
+    /// Short of the grace, or before anything was heard, a closed gate stays closed as it always was.
+    #[test]
+    fn a_short_silence_or_none_heard_yet_should_not_sustain() -> anyhow::Result<()> {
+        for (state, why) in [
+            (
+                gate_state(100, 200).last_heard_ago(Duration::from_secs(2)),
+                "heard 2 s ago",
+            ),
+            (gate_state(100, 200), "nothing heard yet"),
+        ] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 1, &state);
+            assert_eq!(Some(0), data.packet_info.map(|info| info.max_surbs_in_packet), "{why}");
+        }
+        Ok(())
+    }
+
+    /// One, whatever the client asked for: the sustain assumes the Exit spends about one SURB per
+    /// packet it answers, and a client's larger number is for the balancer's convenience, not for this.
+    /// An explicit zero still wins.
+    #[test]
+    fn the_sustain_should_send_one_surb_even_when_the_client_asks_for_more() -> anyhow::Result<()> {
+        for (asked, expected) in [(8, 1), (2, 1), (0, 0)] {
+            let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, asked, &state);
+            assert_eq!(
+                Some(expected),
+                data.packet_info.map(|info| info.max_surbs_in_packet),
+                "the client asks for {asked}"
+            );
         }
         Ok(())
     }
