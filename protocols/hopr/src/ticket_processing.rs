@@ -92,10 +92,11 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     ///
     /// If the counterparty does not send an acknowledgement within this period, the ticket is lost forever.
     ///
-    /// This also bounds replay protection: the record that a given ticket index was already accepted
-    /// expires on the same timeout, so an index whose ticket was accepted but never redeemed can be
-    /// replayed once the window has passed. Raising this strengthens that protection at the cost of
-    /// memory; lowering it weakens it.
+    /// This also bounds replay protection: the record that a ticket index was already accepted expires
+    /// on the same timeout, so an index can be replayed once this period has passed. Raising it
+    /// strengthens that protection at the cost of memory, but unless
+    /// [`max_unack_tickets`](Self::max_unack_tickets) is raised accordingly, the capacity becomes the binding limit
+    /// sooner.
     ///
     /// Default is 30 seconds.
     #[default(default_unack_ticket_timeout())]
@@ -109,12 +110,10 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     ///
     /// When more tickets are received, the oldest ones are discarded and lost forever.
     ///
-    /// This also bounds replay protection: the accepted-index tracker is a separate cache that is
-    /// sized by this same value (so its memory is *additional* to the ticket caches, not shared with
-    /// them). Once it is full, its oldest records are evicted and those indices become replayable
-    /// again; worse, a fresh index the tracker cannot retain is refused outright. Size it for the
-    /// number of tickets you expect to be *accepted* per window — not the unredeemed subset, since
-    /// index records are retired only by expiry and never upon acknowledgement.
+    /// This also sizes the separate replay-protection cache of accepted ticket indices (additional
+    /// memory). Once it is full, its least-recently-used records are evicted and those indices become
+    /// replayable again; fresh indices are never refused. Size it for the number of tickets accepted
+    /// per [`unack_ticket_timeout`](Self::unack_ticket_timeout) window.
     ///
     /// Default is 10 000 000.
     #[default(default_max_unack_tickets())]
@@ -136,21 +135,18 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
 pub struct HoprUnacknowledgedTicketProcessor<Chain> {
     unacknowledged_tickets:
         moka::sync::Cache<OffchainPublicKey, moka::sync::Cache<HalfKeyChallenge, UnacknowledgedTicket>>,
-    /// Tracks ticket indices already accepted per channel and epoch, so a counterparty cannot
-    /// replay the same index in many tickets (only one of which would ever be redeemable).
+    /// Tracks ticket indices already accepted per (issuer -> this node channel, epoch), so a
+    /// counterparty cannot replay the same index in many tickets (only one of which would ever be
+    /// redeemable).
     ///
     /// An entry is never removed upon acknowledgement: a ticket whose acknowledgement is withheld,
-    /// or that turns out to be losing, must not allow its index to be replayed either. Entries
-    /// simply expire via TTL.
+    /// or that turns out to be losing, must not allow its index to be replayed either.
     ///
-    /// Keyed by the *decoder-resolved* channel (the `previous_hop -> me` channel), never by
-    /// [`Ticket::channel_id`](hopr_api::types::internal::prelude::Ticket), which is derived from the
-    /// ticket's counterparty and is therefore attacker-controllable.
-    ///
-    /// Bounded by [`unack_ticket_timeout`](HoprUnacknowledgedTicketProcessorConfig::unack_ticket_timeout)
-    /// and [`max_unack_tickets`](HoprUnacknowledgedTicketProcessorConfig::max_unack_tickets), so
-    /// replay protection shares the lifetime and capacity of the unacknowledged-ticket cache: it is
-    /// in-memory only and does not survive a restart.
+    /// Entries expire after
+    /// [`unack_ticket_timeout`](HoprUnacknowledgedTicketProcessorConfig::unack_ticket_timeout) and, once
+    /// [`max_unack_tickets`](HoprUnacknowledgedTicketProcessorConfig::max_unack_tickets) is reached, the
+    /// least-recently-used ones are evicted (see the LRU note in `insert_unacknowledged_ticket`).
+    /// The tracker is in-memory only and does not survive a restart.
     seen_ticket_indices: moka::sync::Cache<(ChannelId, u32, u64), ()>,
     chain_api: Chain,
     chain_key: ChainKeypair,
@@ -216,6 +212,7 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
             seen_ticket_indices: moka::sync::Cache::builder()
                 .time_to_live(cfg.unack_ticket_timeout)
                 .max_capacity(cfg.max_unack_tickets as u64)
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .build(),
             chain_api,
             chain_key,
@@ -235,8 +232,6 @@ where
     #[tracing::instrument(skip(self, next_hop, challenge, ticket), level = "trace", fields(next_hop = next_hop.to_peerid_str()))]
     fn insert_unacknowledged_ticket(
         &self,
-        channel_id: &ChannelId,
-        channel_epoch: u32,
         next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
@@ -248,48 +243,33 @@ where
         // ever be redeemable on-chain.
         // NOTE: entries are never removed upon acknowledgement, so an index whose ticket
         // was losing or whose acknowledgement was withheld cannot be replayed either.
-        // This is atomic: moka coalesces concurrent calls on the same absent key, so only
+        //
+        // The channel is derived here from the signature-verified issuer and this node, never from the
+        // ticket's counterparty field, so it cannot be varied by the sender even if a decoder skipped
+        // the counterparty check. It is the same channel `acknowledge_tickets` resolves via
+        // `channel_by_parties`, and the decoder has already validated the epoch against it (EpochMismatch).
+        let channel_id = generate_channel_id(ticket.ticket.verified_issuer(), self.chain_key.as_ref());
+        let channel_epoch = ticket.verified_ticket().channel_epoch;
+        let index = ticket.verified_ticket().index;
+        let key = (channel_id, channel_epoch, index);
+
+        // The claim is atomic: moka coalesces concurrent calls on the same absent key, so only
         // one of them observes `is_fresh() == true`.
         //
-        // `is_fresh()` alone is NOT sufficient. moka admits entries through an admission
-        // policy (TinyLFU by default) and applies evictions lazily, so under capacity
-        // pressure `is_fresh()` can report `true` for an entry that maintenance then drops
-        // without ever storing it. Trusting it made the check fail OPEN: a replayed index
-        // was accepted again and again. So after claiming the key we force maintenance and
-        // verify the entry actually survived. If it did not, the tracker cannot vouch for
-        // this index and we refuse the ticket rather than relay it unaccounted (fail
-        // closed). `run_pending_tasks` + `contains_key` cost ~0.5us together, which is
-        // negligible next to the ticket signature verification on the same path.
-        let index = ticket.verified_ticket().index;
-        let key = (*channel_id, channel_epoch, index);
-
+        // The tracker uses LRU eviction because moka's default TinyLFU admission filter rejects new keys
+        // once the cache is at capacity. That would either make `is_fresh()` unreliable (failing open), or,
+        // if every insert were verified, refuse honest traffic on all channels. With LRU a fresh index is
+        // always admitted and, at capacity, the least-recently-used records are evicted: those indices
+        // become replayable again, but fresh indices are never refused.
         if !self
             .seen_ticket_indices
             .entry_by_ref(&key)
             .or_insert_with(|| ())
             .is_fresh()
         {
-            tracing::warn!(%channel_id, channel_epoch, index, "duplicate ticket index rejected");
+            tracing::debug!(%channel_id, channel_epoch, index, "duplicate ticket index rejected");
             return Err(HoprProtocolError::DuplicateTicketIndex(
-                *channel_id,
-                channel_epoch,
-                index,
-            ));
-        }
-
-        self.seen_ticket_indices.run_pending_tasks();
-        if !self.seen_ticket_indices.contains_key(&key) {
-            tracing::error!(
-                %channel_id,
-                channel_epoch,
-                index,
-                "replay tracker could not retain this ticket index; rejecting the ticket rather \
-                 than accepting it without replay protection (see max_unack_tickets)"
-            );
-            // Deliberately NOT `DuplicateTicketIndex`: nothing was duplicated. Reporting it as a
-            // duplicate would both state a falsehood and raise false replay-attack alerts.
-            return Err(HoprProtocolError::TicketIndexTrackerSaturated(
-                *channel_id,
+                channel_id,
                 channel_epoch,
                 index,
             ));
@@ -353,7 +333,7 @@ where
 
     #[inline]
     fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool {
-        matches!(error, HoprProtocolError::DuplicateTicketIndex(..))
+        error.is_duplicate_ticket_index()
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(peer = peer.to_peerid_str()))]
@@ -460,6 +440,7 @@ mod tests {
     // Channel id of the channel the test tickets are issued on: the utils.rs channels go
     // `PEERS[i] -> PEERS[(i+1)%5]` with epoch 1, and the test tickets are signed by `PEERS[0]`
     // with counterparty `PEERS[1]`, i.e. they travel on the `PEERS[0] -> PEERS[1]` channel.
+    // The processor under test is node 1 (`PEERS[1]`), the destination of that channel.
     lazy_static::lazy_static! {
         static ref TEST_CHANNEL_ID: ChannelId =
             generate_channel_id(&PEERS[0].0.public().to_address(), &PEERS[1].0.public().to_address());
@@ -468,17 +449,42 @@ mod tests {
     /// Builds an unacknowledged ticket on the `PEERS[0] -> PEERS[1]` channel with the given
     /// `index` and `channel_epoch`, solved by the given `ack_share`.
     fn build_unack_ticket(index: u64, channel_epoch: u32, ack_share: &HalfKey) -> anyhow::Result<UnacknowledgedTicket> {
+        build_unack_ticket_from(&PEERS[0].0, &PEERS[1].0, index, channel_epoch, ack_share)
+    }
+
+    /// Same as [`build_unack_ticket`], but signed by `issuer` with the ticket's counterparty field set to
+    /// `counterparty`.
+    fn build_unack_ticket_from(
+        issuer: &ChainKeypair,
+        counterparty: &ChainKeypair,
+        index: u64,
+        channel_epoch: u32,
+        ack_share: &HalfKey,
+    ) -> anyhow::Result<UnacknowledgedTicket> {
         let own_share = HalfKey::random();
         let challenge = Challenge::from_own_share_and_half_key(&own_share.to_challenge()?, ack_share)?;
 
         Ok(TicketBuilder::default()
-            .counterparty(&PEERS[1].0)
+            .counterparty(counterparty)
             .index(index)
             .channel_epoch(channel_epoch)
             .amount(10_u32)
             .challenge(challenge)
-            .build_signed(&PEERS[0].0, &Hash::default())?
+            .build_signed(issuer, &Hash::default())?
             .into_unacknowledged(own_share))
+    }
+
+    /// Inserts a fresh ticket with the given `index` on the `PEERS[0] -> PEERS[1]` channel and epoch 1.
+    fn insert_index<Chain>(
+        ticket_processor: &HoprUnacknowledgedTicketProcessor<Chain>,
+        index: u64,
+    ) -> anyhow::Result<Result<(), HoprProtocolError>>
+    where
+        Chain: ChainReadChannelOperations + Send + Sync,
+    {
+        let ack_share = HalfKey::random();
+        let ticket = build_unack_ticket(index, 1, &ack_share)?;
+        Ok(ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket))
     }
 
     #[parameterized::parameterized(batch = { true, false })]
@@ -516,8 +522,6 @@ mod tests {
                 .into_unacknowledged(own_share);
 
             ticket_processor.insert_unacknowledged_ticket(
-                &TEST_CHANNEL_ID,
-                1,
                 PEERS[2].1.public(),
                 ack_share.to_challenge()?,
                 unack_ticket,
@@ -590,13 +594,7 @@ mod tests {
             .build_signed(&PEERS[0].0, &Hash::default())?
             .into_unacknowledged(own_share);
 
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            unack_ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
 
         // Create an acknowledgement from a DIFFERENT peer, but we'll try to pass it as if it's from PEERS[2]
         let bogus_ack_share = HalfKey::random();
@@ -635,13 +633,7 @@ mod tests {
             .build_signed(&PEERS[0].0, &Hash::default())?
             .into_unacknowledged(own_share);
 
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            unack_ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
 
         // Now we send TWO acks: one for the ticket we inserted, and one random/unknown
         let unknown_ack_share = HalfKey::random();
@@ -682,13 +674,7 @@ mod tests {
             .build_signed(&PEERS[0].0, &Hash::default())?
             .into_unacknowledged(own_share);
 
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            unack_ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
 
         let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
         let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
@@ -723,13 +709,7 @@ mod tests {
             .build_signed(&unknown_issuer, &Hash::default())?
             .into_unacknowledged(own_share);
 
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            unack_ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
 
         let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
         let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
@@ -768,13 +748,7 @@ mod tests {
             .build_signed(&PEERS[0].0, &Hash::default())?
             .into_unacknowledged(own_share);
 
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            unack_ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, unack_ticket)?;
 
         let ack = VerifiedAcknowledgement::new(ack_share, &PEERS[2].1).leak();
         let resolutions = ticket_processor.acknowledge_tickets(*PEERS[2].1.public(), vec![ack])?;
@@ -802,8 +776,6 @@ mod tests {
         let first_ack_share = HalfKey::random();
         let first_ticket = build_unack_ticket(5, 1, &first_ack_share).context("should build first ticket")?;
         ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
             PEERS[2].1.public(),
             first_ack_share.to_challenge()?,
             first_ticket,
@@ -813,8 +785,6 @@ mod tests {
         let second_ack_share = HalfKey::random();
         let second_ticket = build_unack_ticket(5, 1, &second_ack_share).context("should build second ticket")?;
         let result = ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
             PEERS[2].1.public(),
             second_ack_share.to_challenge()?,
             second_ticket,
@@ -851,13 +821,7 @@ mod tests {
             let ticket = build_unack_ticket(index, 1, &ack_share)
                 .with_context(|| format!("should build ticket with index {index}"))?;
             ticket_processor
-                .insert_unacknowledged_ticket(
-                    &TEST_CHANNEL_ID,
-                    1,
-                    PEERS[2].1.public(),
-                    ack_share.to_challenge()?,
-                    ticket,
-                )
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket)
                 .with_context(|| format!("ticket with index {index} must be accepted"))?;
         }
 
@@ -880,13 +844,7 @@ mod tests {
             let ticket = build_unack_ticket(5, epoch, &ack_share)
                 .with_context(|| format!("should build ticket with epoch {epoch}"))?;
             ticket_processor
-                .insert_unacknowledged_ticket(
-                    &TEST_CHANNEL_ID,
-                    epoch,
-                    PEERS[2].1.public(),
-                    ack_share.to_challenge()?,
-                    ticket,
-                )
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket)
                 .with_context(|| format!("ticket with epoch {epoch} must be accepted"))?;
         }
 
@@ -925,13 +883,7 @@ mod tests {
         let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
             let ack_share = HalfKey::random();
             let ticket = build_unack_ticket(index, 1, &ack_share)?;
-            Ok(ticket_processor.insert_unacknowledged_ticket(
-                &TEST_CHANNEL_ID,
-                1,
-                PEERS[2].1.public(),
-                ack_share.to_challenge()?,
-                ticket,
-            ))
+            Ok(ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket))
         };
 
         insert(42)
@@ -965,19 +917,68 @@ mod tests {
             HoprUnacknowledgedTicketProcessorConfig::default(),
         );
 
-        // The other channel direction between the same peers, and the channel from PEERS[1] on:
-        // the tracker key is the channel, so the same index is fine on each of them.
-        let other_channel_id =
-            generate_channel_id(&PEERS[1].0.public().to_address(), &PEERS[0].0.public().to_address());
-        assert_ne!(*TEST_CHANNEL_ID, other_channel_id);
-
-        for channel_id in [&*TEST_CHANNEL_ID, &other_channel_id] {
+        // The tracker key is the issuer -> this node channel (this node is `PEERS[1]`), so the same
+        // index from a different issuer is on a different channel and must be accepted.
+        for issuer in [&PEERS[0].0, &PEERS[2].0] {
             let ack_share = HalfKey::random();
-            let ticket = build_unack_ticket(5, 1, &ack_share).context("should build ticket")?;
+            let ticket =
+                build_unack_ticket_from(issuer, &PEERS[1].0, 5, 1, &ack_share).context("should build ticket")?;
             ticket_processor
-                .insert_unacknowledged_ticket(channel_id, 1, PEERS[2].1.public(), ack_share.to_challenge()?, ticket)
-                .with_context(|| format!("ticket on channel {channel_id} must be accepted"))?;
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket)
+                .with_context(|| format!("ticket from issuer {} must be accepted", issuer.public().to_address()))?;
         }
+
+        Ok(())
+    }
+
+    /// The tracker key must not depend on the ticket's counterparty field, which the issuer chooses
+    /// freely: were it part of the key (as it is of `Ticket::channel_id`), one issuer could mint an
+    /// unlimited number of distinct keys for the same index and replay it at will.
+    #[tokio::test]
+    async fn ticket_processor_should_reject_same_ticket_index_with_different_counterparty() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig::default(),
+        );
+
+        let first_ack_share = HalfKey::random();
+        let first_ticket = build_unack_ticket_from(&PEERS[0].0, &PEERS[1].0, 5, 1, &first_ack_share)
+            .context("should build first ticket")?;
+        ticket_processor.insert_unacknowledged_ticket(
+            PEERS[2].1.public(),
+            first_ack_share.to_challenge()?,
+            first_ticket,
+        )?;
+
+        // Same issuer, epoch and index, but the counterparty field differs, so the ticket's own channel
+        // id differs as well.
+        let second_ack_share = HalfKey::random();
+        let second_ticket = build_unack_ticket_from(&PEERS[0].0, &PEERS[3].0, 5, 1, &second_ack_share)
+            .context("should build second ticket")?;
+        assert_ne!(
+            first_ticket.ticket.channel_id(),
+            second_ticket.ticket.channel_id(),
+            "sanity: the tickets must differ in their own channel id"
+        );
+
+        let result = ticket_processor.insert_unacknowledged_ticket(
+            PEERS[2].1.public(),
+            second_ack_share.to_challenge()?,
+            second_ticket,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(HoprProtocolError::DuplicateTicketIndex(channel_id, epoch, index))
+                    if channel_id == *TEST_CHANNEL_ID && epoch == 1 && index == 5
+            ),
+            "expected DuplicateTicketIndex, got: {:?}",
+            result
+        );
 
         Ok(())
     }
@@ -995,13 +996,7 @@ mod tests {
 
         let ack_share = HalfKey::random();
         let ticket = build_unack_ticket(5, 1, &ack_share).context("should build first ticket")?;
-        ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
-            PEERS[2].1.public(),
-            ack_share.to_challenge()?,
-            ticket,
-        )?;
+        ticket_processor.insert_unacknowledged_ticket(PEERS[2].1.public(), ack_share.to_challenge()?, ticket)?;
 
         // The index is NOT removed from the tracker upon acknowledgement: a counterparty could
         // otherwise replay any index whose ticket was losing or whose acknowledgement it withheld.
@@ -1012,8 +1007,6 @@ mod tests {
         let replay_ack_share = HalfKey::random();
         let replay_ticket = build_unack_ticket(5, 1, &replay_ack_share).context("should build replayed ticket")?;
         let result = ticket_processor.insert_unacknowledged_ticket(
-            &TEST_CHANNEL_ID,
-            1,
             PEERS[2].1.public(),
             replay_ack_share.to_challenge()?,
             replay_ticket,
@@ -1055,7 +1048,7 @@ mod tests {
                         let challenge = ack_share.to_challenge().context("should derive challenge")?;
                         barrier.wait().await;
                         ticket_processor
-                            .insert_unacknowledged_ticket(&TEST_CHANNEL_ID, 1, PEERS[2].1.public(), challenge, ticket)
+                            .insert_unacknowledged_ticket(PEERS[2].1.public(), challenge, ticket)
                             .map_err(anyhow::Error::from)
                     }
                     .await;
@@ -1079,23 +1072,19 @@ mod tests {
         Ok(())
     }
 
-    /// No accepted index may ever become replayable, including at capacity and under heavy
-    /// eviction pressure.
-    ///
-    /// This pins the fail-closed guarantee, which is subtler than it looks. moka admits entries
-    /// through an admission policy (TinyLFU by default) and evicts lazily, so `is_fresh()` can
-    /// report `true` for an entry that maintenance then drops without ever storing it. A check
-    /// that trusted `is_fresh()` alone therefore failed OPEN: with a frequently-accessed resident
-    /// set, the same index was accepted 8 times out of 8. The tracker now forces maintenance and
-    /// verifies retention before accepting, so an index it cannot remember is refused instead.
-    ///
-    /// The pressure loop is what makes this discriminating: replaying immediately after the first
-    /// insert passes even with the bug, because the drop is deferred. If the retention check is
-    /// ever removed, the repeated replays below succeed and this test fails.
-    #[tokio::test]
-    async fn ticket_processor_never_replays_an_accepted_index_even_at_capacity() -> anyhow::Result<()> {
-        const CAPACITY: usize = 100;
+    /// Capacity used by the LRU tests below. It equals the minimum accepted by the config validator.
+    const SMALL_TRACKER_CAPACITY: usize = 100;
 
+    /// Once the tracker is full, every further fresh index must still be accepted: the tracker evicts
+    /// its least-recently-used records instead of refusing newcomers, so honest traffic (on any
+    /// channel) is never dropped because the tracker is saturated.
+    ///
+    /// With moka's default TinyLFU policy plus a retention probe after each insert (an earlier design of
+    /// this tracker), this test fails: TinyLFU's admission filter rejects new keys at capacity, so the
+    /// probe refused fresh indices. `ticket_processor_should_reject_recent_ticket_index_when_the_tracker_is_full`
+    /// is the one that fails if the LRU policy alone is reverted.
+    #[tokio::test]
+    async fn ticket_processor_should_accept_every_fresh_ticket_index_once_the_tracker_is_full() -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
         let node = create_node(1, &blokli_client).await?;
         let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
@@ -1103,67 +1092,30 @@ mod tests {
             node.chain_key.clone(),
             Hash::default(),
             HoprUnacknowledgedTicketProcessorConfig {
-                max_unack_tickets: CAPACITY,
+                max_unack_tickets: SMALL_TRACKER_CAPACITY,
                 ..HoprUnacknowledgedTicketProcessorConfig::default()
             },
         );
 
-        let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
-            let ack_share = HalfKey::random();
-            let ticket = build_unack_ticket(index, 1, &ack_share)?;
-            Ok(ticket_processor.insert_unacknowledged_ticket(
-                &TEST_CHANNEL_ID,
-                1,
-                PEERS[2].1.public(),
-                ack_share.to_challenge()?,
-                ticket,
-            ))
-        };
-
-        // A resident set that is re-accessed repeatedly, which is what drives TinyLFU to reject
-        // every new admission (and is exactly the shape a busy channel produces).
-        for index in 0..CAPACITY as u64 {
-            insert(index)
-                .context("filling to capacity must succeed")?
-                .with_context(|| format!("distinct index {index} must be accepted"))?;
+        for index in 0..(5 * SMALL_TRACKER_CAPACITY) as u64 {
+            insert_index(&ticket_processor, index)
+                .with_context(|| format!("should build ticket with index {index}"))?
+                .with_context(|| format!("fresh index {index} must be accepted, even at capacity"))?;
         }
 
-        let target = 123_456u64;
-        let mut accepted = 0usize;
-        for _ in 0..8 {
-            if insert(target)
-                .context("insert of the target index must be attempted")?
-                .is_ok()
-            {
-                accepted += 1;
-            }
-            for _ in 0..20 {
-                for index in 0..CAPACITY as u64 {
-                    insert(index).context("resident re-access must not error")?;
-                }
-            }
-            ticket_processor.seen_ticket_indices.run_pending_tasks();
-        }
-
-        assert_eq!(
-            accepted, 1,
-            "the same index must be accepted exactly once across 8 attempts under eviction pressure; more than one \
-             means the replay tracker failed open"
+        ticket_processor.seen_ticket_indices.run_pending_tasks();
+        assert!(
+            ticket_processor.seen_ticket_indices.entry_count() <= SMALL_TRACKER_CAPACITY as u64,
+            "the tracker must stay bounded by its capacity"
         );
 
         Ok(())
     }
 
-    /// A tracker that cannot retain an index must report *saturation*, not a duplicate.
-    ///
-    /// Both refuse the ticket, so the security outcome is the same, but the classification differs:
-    /// reporting saturation as `DuplicateTicketIndex` would state that the index "was already
-    /// accepted" (false) and raise a false replay-attack alert on an undersized tracker, leaving an
-    /// operator unable to tell a misconfiguration from an attack.
+    /// A recently accepted index must still be rejected once the tracker is full: LRU eviction only
+    /// ever drops the oldest records.
     #[tokio::test]
-    async fn ticket_processor_reports_saturation_separately_from_duplicates() -> anyhow::Result<()> {
-        const CAPACITY: usize = 100;
-
+    async fn ticket_processor_should_reject_recent_ticket_index_when_the_tracker_is_full() -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
         let node = create_node(1, &blokli_client).await?;
         let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
@@ -1171,54 +1123,81 @@ mod tests {
             node.chain_key.clone(),
             Hash::default(),
             HoprUnacknowledgedTicketProcessorConfig {
-                max_unack_tickets: CAPACITY,
+                max_unack_tickets: SMALL_TRACKER_CAPACITY,
                 ..HoprUnacknowledgedTicketProcessorConfig::default()
             },
         );
 
-        let insert = |index: u64| -> anyhow::Result<Result<(), HoprProtocolError>> {
-            let ack_share = HalfKey::random();
-            let ticket = build_unack_ticket(index, 1, &ack_share)?;
-            Ok(ticket_processor.insert_unacknowledged_ticket(
-                &TEST_CHANNEL_ID,
-                1,
-                PEERS[2].1.public(),
-                ack_share.to_challenge()?,
-                ticket,
-            ))
-        };
-
-        // Saturate the tracker so admissions start being refused, then probe a fresh index until
-        // one is refused for want of retention rather than for being a duplicate.
-        let mut saw_saturation = false;
-        let mut saw_duplicate = false;
-        for round in 0..40u64 {
-            for index in 0..CAPACITY as u64 {
-                let _ = insert(index)?;
-            }
-            match insert(900_000 + round)? {
-                Ok(()) => {}
-                Err(HoprProtocolError::TicketIndexTrackerSaturated(..)) => {
-                    saw_saturation = true;
-                    break;
-                }
-                Err(HoprProtocolError::DuplicateTicketIndex(..)) => {
-                    saw_duplicate = true;
-                    break;
-                }
-                Err(other) => anyhow::bail!("unexpected error from a fresh index: {other}"),
-            }
-            ticket_processor.seen_ticket_indices.run_pending_tasks();
+        let last_index = (5 * SMALL_TRACKER_CAPACITY) as u64 - 1;
+        for index in 0..=last_index {
+            insert_index(&ticket_processor, index)
+                .with_context(|| format!("should build ticket with index {index}"))?
+                .with_context(|| format!("fresh index {index} must be accepted"))?;
         }
+        ticket_processor.seen_ticket_indices.run_pending_tasks();
+
+        let result = insert_index(&ticket_processor, last_index).context("should build replayed ticket")?;
+        assert!(
+            matches!(
+                result,
+                Err(HoprProtocolError::DuplicateTicketIndex(channel_id, 1, index))
+                    if channel_id == *TEST_CHANNEL_ID && index == last_index
+            ),
+            "a recently accepted index must be rejected at capacity, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    /// Documents and pins the second *accepted* residual of the tracker: replay protection is bounded
+    /// by `max_unack_tickets` as well as by `unack_ticket_timeout`.
+    ///
+    /// Once the tracker is full, its least-recently-used records are evicted, so the oldest index
+    /// becomes replayable after enough fresh indices were accepted, even within its TTL. This is the
+    /// price of never refusing a fresh index; the capacity should be sized for the number of tickets
+    /// accepted per `unack_ticket_timeout` window (see the docs on `max_unack_tickets`).
+    ///
+    /// If the tracker ever gains stronger retention, this test should be inverted rather than deleted,
+    /// so the guarantee is asserted in whichever direction is intended.
+    #[tokio::test]
+    async fn ticket_processor_replay_is_possible_once_the_tracker_evicts_the_oldest_index() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        let oldest_index = 0u64;
+        insert_index(&ticket_processor, oldest_index)
+            .context("first insert must be attempted")?
+            .context("a fresh index must be accepted")?;
+        assert!(
+            insert_index(&ticket_processor, oldest_index)
+                .context("immediate replay must be attempted")?
+                .is_err(),
+            "an index must not be replayable while its record is retained"
+        );
+
+        for index in 1..(5 * SMALL_TRACKER_CAPACITY) as u64 {
+            insert_index(&ticket_processor, index)
+                .with_context(|| format!("should build ticket with index {index}"))?
+                .with_context(|| format!("fresh index {index} must be accepted"))?;
+        }
+        ticket_processor.seen_ticket_indices.run_pending_tasks();
 
         assert!(
-            !saw_duplicate,
-            "a fresh, never-seen index must never be reported as a duplicate"
-        );
-        assert!(
-            saw_saturation,
-            "an index the tracker cannot retain must be refused as saturated; if this no longer happens the tracker \
-             stopped failing closed and the capacity docs should be revisited"
+            insert_index(&ticket_processor, oldest_index)
+                .context("post-eviction replay must be attempted")?
+                .is_ok(),
+            "if this now fails the tracker retains the oldest index beyond its capacity, which is strictly stronger \
+             than documented and should update the docs on max_unack_tickets"
         );
 
         Ok(())
@@ -1254,10 +1233,6 @@ mod tests {
             HoprProtocolError::KeyNotFound,
             HoprProtocolError::ChannelNotFound(Address::default(), Address::default()),
             HoprProtocolError::OutOfFunds(Default::default(), HoprBalance::zero()),
-            // Saturation means the tracker could not *retain* the index — nothing was duplicated.
-            // Classifying it as a duplicate would raise false replay-attack alerts on an
-            // undersized tracker, so it must fall through to the generic label.
-            HoprProtocolError::TicketIndexTrackerSaturated(Hash::default(), 1, 5),
         ];
         for error in other_errors {
             assert!(

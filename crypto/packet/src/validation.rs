@@ -100,6 +100,7 @@ pub fn validate_unacknowledged_ticket(
 mod tests {
     use std::ops::Add;
 
+    use anyhow::Context;
     use hex_literal::hex;
     use hopr_types::crypto::prelude::*;
     use lazy_static::lazy_static;
@@ -303,10 +304,11 @@ mod tests {
             .counterparty(&bogus_counterparty)
             .amount(1)
             .index(1)
-            .win_prob(1.0.try_into()?)
+            .win_prob(1.0.try_into().context("should convert win prob")?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
-            .build_signed(&SENDER_PRIV_KEY, &Hash::default())?
+            .build_signed(&SENDER_PRIV_KEY, &Hash::default())
+            .context("should build signed ticket")?
             .leak();
 
         let channel = create_channel_entry();
@@ -316,7 +318,7 @@ mod tests {
             ticket,
             &channel,
             1.into(),
-            1.0.try_into()?,
+            1.0.try_into().context("should convert required win prob")?,
             100.into(),
             &Hash::default(),
         );

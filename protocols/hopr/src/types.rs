@@ -115,10 +115,6 @@ pub struct IncomingForwardedPacket {
     pub ack_challenge: HalfKeyChallenge,
     /// Ticket to be acknowledged by solving the `ack_challenge`.
     pub received_ticket: UnacknowledgedTicket,
-    /// Channel on which the received ticket was issued (decoder-resolved).
-    pub channel_id: ChannelId,
-    /// Epoch of that channel.
-    pub channel_epoch: u32,
     /// Acknowledgement payload to be sent to the previous hop
     pub ack_key_prev_hop: HalfKey,
 }
@@ -130,8 +126,6 @@ impl std::fmt::Debug for IncomingForwardedPacket {
             .field("previous_hop", &self.previous_hop)
             .field("next_hop", &self.next_hop)
             .field("received_ticket", &self.received_ticket)
-            .field("channel_id", &self.channel_id)
-            .field("channel_epoch", &self.channel_epoch)
             .field("ack_challenge", &self.ack_challenge)
             .field("ack_key_prev_hop", &self.ack_key_prev_hop)
             .finish_non_exhaustive()

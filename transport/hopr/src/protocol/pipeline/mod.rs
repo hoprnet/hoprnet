@@ -305,6 +305,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     let ack_outgoing_success = ack_outgoing.clone();
     let ack_outgoing_failure = ack_outgoing;
     let ticket_proc_success = ticket_proc;
+    let ticket_events_unack = ticket_events.clone();
 
     let res = wire_incoming
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
@@ -458,6 +459,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     let ticket_proc = ticket_proc_success.clone();
                     let mut wire_outgoing = wire_outgoing.clone();
                     let mut ack_outgoing_success = ack_outgoing_success.clone();
+                    let mut ticket_events_reject = ticket_events_unack.clone();
                     let counters = counters.clone();
                     Either::Right(Either::Right(async move {
                         let IncomingForwardedPacket {
@@ -467,23 +469,50 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             ack_key_prev_hop,
                             ack_challenge,
                             received_ticket,
-                            channel_id,
-                            channel_epoch,
                             ..
                         } = *fwd_packet;
                         // Per requirements, this call is not blocking
-                        if let Err(error) =
-                            ticket_proc.insert_unacknowledged_ticket(&channel_id, channel_epoch, &next_hop, ack_challenge, received_ticket)
-                        {
-                            tracing::error!(
-                                previous_hop = previous_hop.to_peerid_str(),
-                                next_hop = next_hop.to_peerid_str(),
-                                %error,
-                                "failed to insert unacknowledged ticket into the ticket processor"
-                            );
+                        if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket) {
+                            // The processor itself only logs a duplicate at debug level, so this is the
+                            // single line logged for a rejected packet
+                            if T::is_duplicate_ticket_index_error(&error) {
+                                tracing::warn!(
+                                    previous_hop = previous_hop.to_peerid_str(),
+                                    next_hop = next_hop.to_peerid_str(),
+                                    %error,
+                                    "rejected packet with an already accepted ticket index"
+                                );
+                            } else {
+                                tracing::error!(
+                                    previous_hop = previous_hop.to_peerid_str(),
+                                    next_hop = next_hop.to_peerid_str(),
+                                    %error,
+                                    "failed to insert unacknowledged ticket into the ticket processor"
+                                );
+                            }
+
+                            // `UnacknowledgedTicket` is `Copy`, so `received_ticket` is still usable here
+                            if let Err(error) = ticket_events_reject
+                                .send(TicketEvent::RejectedTicket(
+                                    Box::new(*received_ticket.verified_ticket()),
+                                    Some(*received_ticket.ticket.verified_issuer()),
+                                ))
+                                .await {
+                                tracing::error!(%error, "failed to notify rejection of the ticket not accepted by the ticket processor");
+                            }
+                            // The packet is not forwarded, but we send back a random acknowledgement
+                            ack_outgoing_success
+                                .send((previous_hop, None))
+                                .await
+                                .unwrap_or_else(|error| {
+                                    tracing::error!(%error, "failed to send ack to the egress queue");
+                                });
 
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            METRIC_PACKET_REJECTED_COUNT.increment(&[unack_rejection_metric_label::<T>(&error)]);
+                            {
+                                METRIC_PACKET_REJECTED_COUNT.increment(&[unack_rejection_metric_label::<T>(&error)]);
+                                METRIC_TICKETS_COUNT.increment(&["rejected"]);
+                            }
 
                             return None;
                         }
@@ -919,8 +948,6 @@ impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
     #[inline]
     fn insert_unacknowledged_ticket(
         &self,
-        _: &ChannelId,
-        _: u32,
         _: &OffchainPublicKey,
         _: HalfKeyChallenge,
         _: UnacknowledgedTicket,
@@ -1205,8 +1232,6 @@ mod tests {
 
         fn insert_unacknowledged_ticket(
             &self,
-            _: &ChannelId,
-            _: u32,
             _: &OffchainPublicKey,
             _: HalfKeyChallenge,
             _: UnacknowledgedTicket,
@@ -1215,7 +1240,7 @@ mod tests {
         }
 
         fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool {
-            matches!(error, HoprProtocolError::DuplicateTicketIndex(..))
+            error.is_duplicate_ticket_index()
         }
 
         fn acknowledge_tickets(
@@ -1515,8 +1540,6 @@ mod tests {
 
         fn insert_unacknowledged_ticket(
             &self,
-            _: &ChannelId,
-            _: u32,
             _: &OffchainPublicKey,
             _: HalfKeyChallenge,
             _: UnacknowledgedTicket,

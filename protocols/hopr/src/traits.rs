@@ -178,20 +178,14 @@ pub trait UnacknowledgedTicketProcessor {
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
     ///
-    /// `channel_id` and `channel_epoch` identify the channel the ticket was issued on, as resolved
-    /// by the decoder. They MUST be supplied by the caller and not derived from
-    /// [`ticket`](UnacknowledgedTicket) itself, because the ticket's channel id is
-    /// attacker-controllable.
-    ///
-    /// Returns `Err` if this ticket index was already accepted on that channel and epoch and has
-    /// not yet been retired (duplicate detection: an attacker must not be able to have many
-    /// tickets accepted on the same index, since only one of them would ever be redeemable).
+    /// Duplicates are detected per (issuer -> this node channel, epoch, index): `Err` is returned if
+    /// a ticket with the same index was already accepted on that channel and epoch (an attacker must
+    /// not be able to have many tickets accepted on the same index, since only one of them would
+    /// ever be redeemable).
     ///
     /// This operation should be reasonably fast and should not block the main processing pipeline.
     fn insert_unacknowledged_ticket(
         &self,
-        channel_id: &ChannelId,
-        channel_epoch: u32,
         next_hop: &OffchainPublicKey,
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
