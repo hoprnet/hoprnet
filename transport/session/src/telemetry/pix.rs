@@ -294,7 +294,7 @@ lazy_static::lazy_static! {
     static ref METRIC_PIX_CYCLE_ACCEPTED_SHARE_FRACTION: hopr_api::types::telemetry::MultiHistogram = hopr_api::types::telemetry::MultiHistogram::new(
         "hopr_pix_cycle_accepted_share_fraction",
         "Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus",
-        vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0],
+        vec![0.05, 0.25, 0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
         &["outcome"]
     ).unwrap();
     static ref METRIC_PIX_SESSIONS_STALLED: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(

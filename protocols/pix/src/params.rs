@@ -195,6 +195,15 @@ impl PixParams {
         self.polys_per_ssa as u64 * self.shares_per_poly as u64
     }
 
+    /// The largest per-share loss rate at which a cycle of these dimensions still recovers at 99 %.
+    ///
+    /// See [`tolerated_share_loss`](crate::tolerated_share_loss), and note that it is not
+    /// `surplus_shares / emitted_shares_per_poly`.
+    #[inline]
+    pub fn tolerated_share_loss(&self) -> f64 {
+        crate::tolerated_share_loss(self.polys_per_ssa, self.shares_per_poly, self.surplus_shares)
+    }
+
     /// The elliptic curve suite these parameters were produced under.
     #[inline]
     pub const fn suite(&self) -> PixSuite {

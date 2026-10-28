@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.52.1"
+version = "0.52.2"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -140,7 +140,13 @@ hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-pix = { workspace = true, features = ["rayon"] }
-hopr-transport-mixer = { workspace = true }
+# All engines are compiled so the mixer implementation can be selected at runtime via
+# `MixerConfig::mixer_type`.
+hopr-transport-mixer = { workspace = true, features = [
+  "uniform-channel",
+  "uniform-adapter",
+  "poisson",
+] }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
