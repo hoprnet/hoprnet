@@ -4486,9 +4486,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-ticket-manager"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2219a766732e0970cc3f31fcf55ca86619a37733c8db40e2f18b20ef8dbc852"
+version = "0.9.0"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=fix%2Fticket-index-persistence#17a0b17d9e4a50b6a89b57e0bf4e9d4eb8116410"
 dependencies = [
  "ahash",
  "anyhow",

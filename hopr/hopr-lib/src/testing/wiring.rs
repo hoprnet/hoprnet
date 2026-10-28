@@ -113,7 +113,8 @@ where
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
     }
 
-    let ticket_factory = ticket_factory_from_chain(&chain_connector)
+    // Test nodes are never restarted, so their outgoing ticket indices need not outlive them
+    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
 
@@ -153,7 +154,8 @@ where
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
     }
 
-    let (ticket_manager, ticket_factory) = ticket_manager_from_chain(&chain_connector)
+    // Test nodes are never restarted, so their tickets and outgoing ticket indices need not outlive them
+    let (ticket_manager, ticket_factory) = ticket_manager_from_chain(&chain_connector, RedbStore::new_temp()?)
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket manager: {e}"))?;
 
@@ -199,7 +201,8 @@ where
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
     }
 
-    let ticket_factory = ticket_factory_from_chain(&chain_connector)
+    // Test nodes are never restarted, so their outgoing ticket indices need not outlive them
+    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
 
@@ -242,7 +245,8 @@ where
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
     }
 
-    let ticket_factory = ticket_factory_from_chain(&chain_connector)
+    // Test nodes are never restarted, so their outgoing ticket indices need not outlive them
+    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
 
