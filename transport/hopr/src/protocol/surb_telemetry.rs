@@ -23,9 +23,11 @@
 //!   `HoprProtocolConfig::relayer_health_weight` (`0` off). Must not fight: the return-path temper, which flattens it
 //!   along with path quality.
 //! - **Dead verdict.** Trigger: at least `MIN_RACES` replies trailing their partners by more than any race the relayer
-//!   settled, none home since. Effect: health `0`, the walk prunes it. Lapses once no reply through it is out (about
-//!   `PENDING_SURB_TTL`); its lost races keep its health near zero. Must not fight: common-mode outages, where no
-//!   partner gets home and nothing is judged.
+//!   settled, none home since, and a reply home through some relayer after the first of them fell due. A reply is
+//!   overdue only while others are delivering: a pause in the replier's stream, or an outage of every return relayer,
+//!   leaves nothing arriving and so nothing overdue, however long the replies stay out. Effect: health `0`, the walk
+//!   prunes it. Lapses once no reply through it is out (about `PENDING_SURB_TTL`); its lost races keep its health near
+//!   zero. Must not fight: common-mode outages, where no partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict. Effect: each session is told how many SURBs in its counterparty's
 //!   store run through that relayer; the balancer subtracts them from its level and sends replacements. Lasts until a
 //!   reply through the relayer comes home or the session ends, not just the verdict: the counterparty still holds them.
@@ -359,6 +361,26 @@ pub struct RelayerHealth {
     dead: DashSet<OffchainPublicKey>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
+    /// When a reply last came home, through any relayer, for any session.
+    last_reply: LastReply,
+}
+
+/// When a reply last came home, kept in atomics: it is recorded for every reply, on the packet hot path.
+///
+/// Milliseconds since an epoch fixed at construction, plus one, so that `0` is "none yet".
+#[derive(Debug)]
+struct LastReply {
+    epoch: Instant,
+    since_epoch_ms_plus_one: AtomicU64,
+}
+
+impl Default for LastReply {
+    fn default() -> Self {
+        Self {
+            epoch: Instant::now(),
+            since_epoch_ms_plus_one: AtomicU64::new(0),
+        }
+    }
 }
 
 /// The position, in a pair of SURBs minted together, of the one the replier spends first: the second
@@ -418,7 +440,15 @@ impl RaceHistory {
 
     /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than any race it
     /// finished took, and none has come home since the oldest was due.
-    fn is_black_hole(&self) -> bool {
+    ///
+    /// A reply is overdue only if a reply came home, through any relayer, after its grace ran out
+    /// (`last_reply`): the network was delivering while this relayer was not. Without that, nothing
+    /// tells a dead relayer from a pause. The replier's stream stops for a settle, a phase change or
+    /// idle, nothing is home for anybody during it, and a few replies lost at random before it would
+    /// pass for a verdict, each costing the session its whole stock. An outage of every return
+    /// relayer is likewise no verdict on any one of them. When the stream resumes an alive relayer
+    /// settles a race, which clears the condition below, while a dead one never does.
+    fn is_black_hole(&self, last_reply: Option<Instant>) -> bool {
         let finished: Vec<&Race> = self.races.iter().filter(|race| !race.lost()).collect();
         if finished.len() < MIN_RACES {
             return false;
@@ -426,10 +456,17 @@ impl RaceHistory {
         // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
         // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
         let usual = finished.iter().map(|race| race.margin.abs()).fold(0.0, f64::max);
+        let grace = Duration::from_secs_f64(usual);
         let overdue: Vec<Instant> = self
             .open
             .values()
-            .filter(|race| race.at.elapsed().as_secs_f64() > usual)
+            .filter(|race| race.at.elapsed() > grace)
+            .filter(|race| {
+                race.at
+                    .checked_add(grace)
+                    .zip(last_reply)
+                    .is_some_and(|(due, reply)| reply > due)
+            })
             .map(|race| race.at)
             .collect();
         let Some(oldest_overdue) = overdue.iter().min().copied() else {
@@ -542,6 +579,26 @@ impl RelayerHealth {
         self.neighbours_changed.swap(false, Ordering::Relaxed)
     }
 
+    /// Records that a reply came home now, through any relayer, for any session.
+    pub(crate) fn record_reply(&self) {
+        self.record_reply_at(Instant::now());
+    }
+
+    fn record_reply_at(&self, at: Instant) {
+        let ms = u64::try_from(at.saturating_duration_since(self.last_reply.epoch).as_millis()).unwrap_or(u64::MAX - 1);
+        self.last_reply
+            .since_epoch_ms_plus_one
+            .fetch_max(ms + 1, Ordering::Relaxed);
+    }
+
+    /// When a reply last came home, to millisecond resolution, or `None` if none has.
+    fn last_reply(&self) -> Option<Instant> {
+        let stored = self.last_reply.since_epoch_ms_plus_one.load(Ordering::Relaxed);
+        stored
+            .checked_sub(1)
+            .and_then(|ms| self.last_reply.epoch.checked_add(Duration::from_millis(ms)))
+    }
+
     #[cfg(test)]
     fn is_dead(&self, relayer: &OffchainPublicKey) -> bool {
         self.dead.contains(relayer)
@@ -551,6 +608,7 @@ impl RelayerHealth {
     /// the graph, dead being `0.0`. A race open longer than a SURB is remembered counts as lost by that
     /// long. `memory`: margins a race is remembered for, `0` for dead or healthy.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
+        let last_reply = self.last_reply();
         let mut black_holes = std::collections::HashSet::new();
         for mut entry in self.relayers.iter_mut() {
             // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
@@ -568,7 +626,7 @@ impl RelayerHealth {
                 open
             });
             entry.races.extend(lost);
-            if entry.is_black_hole() {
+            if entry.is_black_hole(last_reply) {
                 black_holes.insert(*entry.key());
             }
         }
@@ -985,6 +1043,8 @@ impl<C> SurbTelemetryCodec<C> {
         self.registry.end_write_off(&pending.return_relayers);
 
         let health = &self.registry.relayer_health;
+        // Whatever it says about the legs it came home on, a reply home is the network delivering.
+        health.record_reply();
         // Only a SURB the replier's pop order makes attributable settles: the other may have waited in
         // the replier's store.
         if let Some((partner_relayers, partner_home)) = pending.partner_replied {
@@ -1446,6 +1506,8 @@ mod tests {
             );
         }
         backdate_open(&health, black_hole, ago(ROUND_TRIP * 2)?);
+        // The partners came home, through `healthy`: the network is delivering.
+        health.record_reply();
 
         assert_eq!(vec![black_hole], judged_dead(&health.refresh(4)));
         assert!(health.is_dead(&black_hole));
@@ -1481,6 +1543,8 @@ mod tests {
             .checked_sub(Duration::from_secs(2))
             .context("monotonic clock younger than two seconds")?;
         open_since(&health, slow, MIN_RACES as u8, overdue);
+        // Other relayers' replies are coming home meanwhile.
+        health.record_reply();
         assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
         Ok(())
     }
@@ -1906,6 +1970,7 @@ mod tests {
         let health = registry.relayer_health();
         settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
         open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
 
         let seen_at_replan = std::cell::Cell::new(None);
         let bumped = refresh_relayer_health(&registry, &graph, 4, 1.0, || async {
@@ -1935,6 +2000,7 @@ mod tests {
         let health = registry.relayer_health();
         settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
         open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
         refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
 
         graph.add_edge(&me, &dead)?;
@@ -1966,6 +2032,7 @@ mod tests {
         if dead {
             settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
             open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+            health.record_reply();
         } else {
             settled_since(&health, relayer, ago(Duration::from_secs(1))?, Duration::from_secs(2));
         }
@@ -2146,8 +2213,84 @@ mod tests {
             );
         }
         open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
 
         assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// Three first-spent replies lost at random, then the replier's stream pauses: nothing is home for
+    /// anybody, so nothing is overdue however long they stay out, and no verdict follows. When the
+    /// stream resumes through another relayer the same three are overdue, and now it is a verdict.
+    #[test]
+    fn three_lost_replies_and_a_pause_must_not_make_a_dead_verdict() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let victim = key();
+        settled_since(
+            &health,
+            victim,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(&health, victim, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty() && !health.is_dead(&victim),
+            "five seconds of silence with nothing home anywhere is a pause, not a verdict"
+        );
+
+        health.record_reply();
+        assert_eq!(
+            vec![victim],
+            judged_dead(&health.refresh(4)),
+            "a reply home through another relayer after they fell due makes them overdue"
+        );
+        Ok(())
+    }
+
+    /// Every return relayer silent at once is no verdict on any one of them.
+    #[test]
+    fn a_total_return_outage_judges_no_relayer_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayers = [(); 3].map(|_| key());
+        for relayer in relayers {
+            settled_since(
+                &health,
+                relayer,
+                ago(Duration::from_secs(10))?,
+                Duration::from_millis(50),
+            );
+            open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        }
+
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(relayers.iter().all(|relayer| !health.is_dead(relayer)));
+        Ok(())
+    }
+
+    /// A reply home before a race fell due says nothing about it: the corroboration has to come from
+    /// after its grace ran out.
+    #[test]
+    fn a_reply_home_before_a_race_fell_due_does_not_corroborate_it() -> anyhow::Result<()> {
+        let mut health = RelayerHealth::default();
+        health.last_reply.epoch = ago(Duration::from_secs(30))?;
+        let victim = key();
+        settled_since(
+            &health,
+            victim,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(&health, victim, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+
+        health.record_reply_at(ago(Duration::from_secs(7))?);
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "the last reply home predates the races, so nothing was delivering while they were out"
+        );
+
+        health.record_reply_at(ago(Duration::from_secs(2))?);
+        assert_eq!(vec![victim], judged_dead(&health.refresh(4)));
         Ok(())
     }
 
