@@ -1,6 +1,6 @@
 use hopr_api::{
     chain::ChainReadChannelOperations,
-    types::{crypto::prelude::*, internal::prelude::*},
+    types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::Address},
 };
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
@@ -75,6 +75,10 @@ fn default_max_unack_tickets() -> usize {
     10_000_000
 }
 
+fn default_max_tracked_ticket_indices() -> usize {
+    10_000_000
+}
+
 fn just_true() -> bool {
     true
 }
@@ -95,8 +99,8 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
     /// This also bounds replay protection: the record that a ticket index was already accepted expires
     /// on the same timeout, so an index can be replayed once this period has passed. Raising it
     /// strengthens that protection at the cost of memory, but unless
-    /// [`max_unack_tickets`](Self::max_unack_tickets) is raised accordingly, the capacity becomes the binding limit
-    /// sooner.
+    /// [`max_tracked_ticket_indices`](Self::max_tracked_ticket_indices) is raised accordingly, that capacity
+    /// becomes the binding limit sooner.
     ///
     /// Default is 30 seconds.
     #[default(default_unack_ticket_timeout())]
@@ -106,20 +110,26 @@ pub struct HoprUnacknowledgedTicketProcessorConfig {
         serde(default = "default_unack_ticket_timeout", with = "humantime_serde")
     )]
     pub unack_ticket_timeout: std::time::Duration,
-    /// Maximum number of unacknowledged tickets that can be stored in the cache at any given time.
+    /// Maximum number of unacknowledged tickets that can be stored per next hop at any given time.
     ///
     /// When more tickets are received, the oldest ones are discarded and lost forever.
-    ///
-    /// This also sizes the separate replay-protection cache of accepted ticket indices (additional
-    /// memory). Once it is full, its least-recently-used records are evicted and those indices become
-    /// replayable again; fresh indices are never refused. Size it for the number of tickets accepted
-    /// per [`unack_ticket_timeout`](Self::unack_ticket_timeout) window.
     ///
     /// Default is 10 000 000.
     #[default(default_max_unack_tickets())]
     #[validate(range(min = 100))]
     #[cfg_attr(feature = "serde", serde(default = "default_max_unack_tickets"))]
     pub max_unack_tickets: usize,
+    /// Maximum number of accepted ticket indices remembered for replay protection, across all channels.
+    ///
+    /// Once the limit is reached, the least-recently-used records are evicted and those indices become
+    /// replayable again; fresh indices are never refused. Size it for the number of tickets accepted per
+    /// [`unack_ticket_timeout`](Self::unack_ticket_timeout) window.
+    ///
+    /// Default is 10 000 000.
+    #[default(default_max_tracked_ticket_indices())]
+    #[validate(range(min = 100))]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_tracked_ticket_indices"))]
+    pub max_tracked_ticket_indices: usize,
     /// Indicates whether to use batch verification algorithm for acknowledgements.
     ///
     /// This has a positive performance impact on higher workloads.
@@ -139,15 +149,19 @@ pub struct HoprUnacknowledgedTicketProcessor<Chain> {
     /// counterparty cannot replay the same index in many tickets (only one of which would ever be
     /// redeemable).
     ///
+    /// Keyed by the verified issuer address rather than the channel id: the destination of the
+    /// channel is always this node, so the issuer identifies the channel equally well, with a
+    /// smaller key and no hashing per ticket.
+    ///
     /// An entry is never removed upon acknowledgement: a ticket whose acknowledgement is withheld,
     /// or that turns out to be losing, must not allow its index to be replayed either.
     ///
     /// Entries expire after
     /// [`unack_ticket_timeout`](HoprUnacknowledgedTicketProcessorConfig::unack_ticket_timeout) and, once
-    /// [`max_unack_tickets`](HoprUnacknowledgedTicketProcessorConfig::max_unack_tickets) is reached, the
-    /// least-recently-used ones are evicted (see the LRU note in `insert_unacknowledged_ticket`).
-    /// The tracker is in-memory only and does not survive a restart.
-    seen_ticket_indices: moka::sync::Cache<(ChannelId, u32, u64), ()>,
+    /// [`max_tracked_ticket_indices`](HoprUnacknowledgedTicketProcessorConfig::max_tracked_ticket_indices)
+    /// is reached, the least-recently-used ones are evicted (see the LRU note in
+    /// `insert_unacknowledged_ticket`). The tracker is in-memory only and does not survive a restart.
+    seen_ticket_indices: moka::sync::Cache<(Address, u32, u64), ()>,
     chain_api: Chain,
     chain_key: ChainKeypair,
     channels_dst: Hash,
@@ -211,7 +225,7 @@ impl<Chain> HoprUnacknowledgedTicketProcessor<Chain> {
             unacknowledged_tickets: builder.build(),
             seen_ticket_indices: moka::sync::Cache::builder()
                 .time_to_live(cfg.unack_ticket_timeout)
-                .max_capacity(cfg.max_unack_tickets as u64)
+                .max_capacity(cfg.max_tracked_ticket_indices as u64)
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .build(),
             chain_api,
@@ -244,14 +258,15 @@ where
         // NOTE: entries are never removed upon acknowledgement, so an index whose ticket
         // was losing or whose acknowledgement was withheld cannot be replayed either.
         //
-        // The channel is derived here from the signature-verified issuer and this node, never from the
-        // ticket's counterparty field, so it cannot be varied by the sender even if a decoder skipped
-        // the counterparty check. It is the same channel `acknowledge_tickets` resolves via
-        // `channel_by_parties`, and the decoder has already validated the epoch against it (EpochMismatch).
-        let channel_id = generate_channel_id(ticket.ticket.verified_issuer(), self.chain_key.as_ref());
+        // The channel is identified by the signature-verified issuer (its destination is always this
+        // node), never by the ticket's counterparty field, so it cannot be varied by the sender even if
+        // a decoder skipped the counterparty check. It is the same channel `acknowledge_tickets`
+        // resolves via `channel_by_parties`, and the decoder has already validated the epoch against
+        // it (EpochMismatch).
+        let issuer = *ticket.ticket.verified_issuer();
         let channel_epoch = ticket.verified_ticket().channel_epoch;
         let index = ticket.verified_ticket().index;
-        let key = (channel_id, channel_epoch, index);
+        let key = (issuer, channel_epoch, index);
 
         // The claim is atomic: moka coalesces concurrent calls on the same absent key, so only
         // one of them observes `is_fresh() == true`.
@@ -267,6 +282,7 @@ where
             .or_insert_with(|| ())
             .is_fresh()
         {
+            let channel_id = generate_channel_id(&issuer, self.chain_key.as_ref());
             tracing::debug!(%channel_id, channel_epoch, index, "duplicate ticket index rejected");
             return Err(HoprProtocolError::DuplicateTicketIndex(
                 channel_id,
@@ -277,10 +293,14 @@ where
 
         self.unacknowledged_tickets
             .get_with_by_ref(next_hop, || {
+                // LRU so that, at capacity, the oldest unacknowledged tickets are discarded (they are the
+                // least likely to still be acknowledged): moka's default TinyLFU would instead refuse the
+                // newest ones.
                 #[allow(unused_mut)]
                 let mut builder = moka::sync::Cache::builder()
                     .time_to_live(self.cfg.unack_ticket_timeout)
-                    .max_capacity(self.cfg.max_unack_tickets as u64);
+                    .max_capacity(self.cfg.max_unack_tickets as u64)
+                    .eviction_policy(moka::policy::EvictionPolicy::lru());
 
                 #[cfg(all(feature = "telemetry", not(test)))]
                 {
@@ -1092,7 +1112,7 @@ mod tests {
             node.chain_key.clone(),
             Hash::default(),
             HoprUnacknowledgedTicketProcessorConfig {
-                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                max_tracked_ticket_indices: SMALL_TRACKER_CAPACITY,
                 ..HoprUnacknowledgedTicketProcessorConfig::default()
             },
         );
@@ -1123,7 +1143,7 @@ mod tests {
             node.chain_key.clone(),
             Hash::default(),
             HoprUnacknowledgedTicketProcessorConfig {
-                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                max_tracked_ticket_indices: SMALL_TRACKER_CAPACITY,
                 ..HoprUnacknowledgedTicketProcessorConfig::default()
             },
         );
@@ -1151,12 +1171,12 @@ mod tests {
     }
 
     /// Documents and pins the second *accepted* residual of the tracker: replay protection is bounded
-    /// by `max_unack_tickets` as well as by `unack_ticket_timeout`.
+    /// by `max_tracked_ticket_indices` as well as by `unack_ticket_timeout`.
     ///
     /// Once the tracker is full, its least-recently-used records are evicted, so the oldest index
     /// becomes replayable after enough fresh indices were accepted, even within its TTL. This is the
     /// price of never refusing a fresh index; the capacity should be sized for the number of tickets
-    /// accepted per `unack_ticket_timeout` window (see the docs on `max_unack_tickets`).
+    /// accepted per `unack_ticket_timeout` window (see the docs on `max_tracked_ticket_indices`).
     ///
     /// If the tracker ever gains stronger retention, this test should be inverted rather than deleted,
     /// so the guarantee is asserted in whichever direction is intended.
@@ -1169,7 +1189,7 @@ mod tests {
             node.chain_key.clone(),
             Hash::default(),
             HoprUnacknowledgedTicketProcessorConfig {
-                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                max_tracked_ticket_indices: SMALL_TRACKER_CAPACITY,
                 ..HoprUnacknowledgedTicketProcessorConfig::default()
             },
         );
@@ -1197,7 +1217,94 @@ mod tests {
                 .context("post-eviction replay must be attempted")?
                 .is_ok(),
             "if this now fails the tracker retains the oldest index beyond its capacity, which is strictly stronger \
-             than documented and should update the docs on max_unack_tickets"
+             than documented and should update the docs on max_tracked_ticket_indices"
+        );
+
+        Ok(())
+    }
+
+    /// The replay tracker is sized by `max_tracked_ticket_indices` alone: lowering the per-next-hop
+    /// `max_unack_tickets` must not shrink replay protection.
+    #[tokio::test]
+    async fn ticket_processor_replay_protection_should_not_depend_on_max_unack_tickets() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        for index in 0..(5 * SMALL_TRACKER_CAPACITY) as u64 {
+            insert_index(&ticket_processor, index)
+                .with_context(|| format!("should build ticket with index {index}"))?
+                .with_context(|| format!("fresh index {index} must be accepted"))?;
+        }
+        ticket_processor.seen_ticket_indices.run_pending_tasks();
+
+        let result = insert_index(&ticket_processor, 0).context("should build replayed ticket")?;
+        assert!(
+            matches!(result, Err(HoprProtocolError::DuplicateTicketIndex(_, 1, 0))),
+            "the oldest index must still be remembered when only max_unack_tickets is small, got: {:?}",
+            result
+        );
+
+        Ok(())
+    }
+
+    /// At capacity, a next hop's unacknowledged-ticket cache must discard its oldest tickets and keep
+    /// the newest, which are the ones still likely to be acknowledged.
+    #[tokio::test]
+    async fn ticket_processor_should_discard_the_oldest_unacknowledged_tickets_at_capacity() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let node = create_node(1, &blokli_client).await?;
+        let ticket_processor = HoprUnacknowledgedTicketProcessor::new(
+            node.chain_api.clone(),
+            node.chain_key.clone(),
+            Hash::default(),
+            HoprUnacknowledgedTicketProcessorConfig {
+                max_unack_tickets: SMALL_TRACKER_CAPACITY,
+                ..HoprUnacknowledgedTicketProcessorConfig::default()
+            },
+        );
+
+        let mut challenges = Vec::with_capacity(5 * SMALL_TRACKER_CAPACITY);
+        for index in 0..(5 * SMALL_TRACKER_CAPACITY) as u64 {
+            let ack_share = HalfKey::random();
+            let ticket = build_unack_ticket(index, 1, &ack_share)
+                .with_context(|| format!("should build ticket with index {index}"))?;
+            let challenge = ack_share.to_challenge().context("should derive challenge")?;
+            ticket_processor
+                .insert_unacknowledged_ticket(PEERS[2].1.public(), challenge, ticket)
+                .with_context(|| format!("ticket with index {index} must be accepted"))?;
+            challenges.push(challenge);
+        }
+
+        let awaiting_ack = ticket_processor
+            .unacknowledged_tickets
+            .get(PEERS[2].1.public())
+            .context("the next hop should have an unacknowledged-ticket cache")?;
+        awaiting_ack.run_pending_tasks();
+
+        let (oldest, newest) = (
+            challenges.first().context("should have the oldest challenge")?,
+            challenges.last().context("should have the newest challenge")?,
+        );
+        assert!(
+            awaiting_ack.contains_key(newest),
+            "the newest unacknowledged ticket must be kept at capacity"
+        );
+        assert!(
+            !awaiting_ack.contains_key(oldest),
+            "the oldest unacknowledged ticket must be discarded at capacity"
+        );
+        assert!(
+            awaiting_ack.entry_count() <= SMALL_TRACKER_CAPACITY as u64,
+            "the cache must stay bounded by max_unack_tickets"
         );
 
         Ok(())
