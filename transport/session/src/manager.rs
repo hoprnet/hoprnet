@@ -4200,6 +4200,18 @@ where
             .is_some()
     }
 
+    /// Tells `session` that its counterparty dropped every SURB it held, because the session's SURB
+    /// generation advanced: the counterparty clears its store on the first batch of the new one.
+    ///
+    /// The balancer restarts its level estimate from empty and paces the refill, instead of reading
+    /// back the level the counterparty last reported. `false` if there is no such Session.
+    pub fn on_counterparty_surbs_wiped(&self, session: &SessionId) -> bool {
+        self.sessions
+            .get(session)
+            .map(|slot| slot.surb_mgmt.on_counterparty_wiped())
+            .is_some()
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -10021,6 +10033,56 @@ mod tests {
         assert_eq!(
             0,
             organic(other_session)?,
+            "other sessions to the same destination are untouched"
+        );
+        Ok(())
+    }
+
+    /// A wipe belongs to the one session whose SURB generation advanced: its level estimate restarts
+    /// from empty, so the organic gate reopens, and the other sessions to the same destination keep
+    /// theirs.
+    #[test]
+    fn on_counterparty_surbs_wiped_should_reset_only_that_session() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let destination = Address::from(&ChainKeypair::random());
+        let [hit_session, other_session] = [(); 2].map(|_| HoprPseudonym::random());
+        for session in [hit_session, other_session] {
+            mgr.pre_populate_session(
+                session,
+                DestinationRouting::Forward {
+                    destination: Box::new(destination.into()),
+                    pseudonym: Some(session),
+                    forward_options: RoutingOptions::Hops(1.try_into()?),
+                    return_options: None,
+                },
+            );
+            let slot = mgr.sessions.get(&session).context("slot must exist")?;
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+            slot.surb_mgmt
+                .buffer_level
+                .store(200, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        assert!(mgr.on_counterparty_surbs_wiped(&hit_session));
+        assert!(!mgr.on_counterparty_surbs_wiped(&HoprPseudonym::random()));
+
+        let state = |session| -> anyhow::Result<(u64, usize)> {
+            let slot = mgr.sessions.get(&session).context("slot must exist")?;
+            Ok((slot.surb_mgmt.buffer_level(), slot.surb_mgmt.organic_surbs_per_packet()))
+        };
+        assert_eq!(
+            (0, 1),
+            state(hit_session)?,
+            "nothing is held any more, so the gate is open"
+        );
+        assert_eq!(
+            (200, 0),
+            state(other_session)?,
             "other sessions to the same destination are untouched"
         );
         Ok(())
