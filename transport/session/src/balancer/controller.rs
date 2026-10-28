@@ -166,7 +166,40 @@ pub struct BalancerStateValues {
     /// Consecutive reported levels that did not rise while below target -- the plateau hysteresis
     /// behind [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
     pub capacity_plateau_count: AtomicU64,
+    /// Set by [`on_counterparty_wiped`](Self::on_counterparty_wiped), consumed by the next balancer
+    /// update: the counterparty dropped its whole stock, so that update restarts the level estimate
+    /// from empty.
+    ///
+    /// A flag rather than a plain store of `0` into [`buffer_level`](Self::buffer_level) because the
+    /// level has another writer: the update in flight, which would write back the level it loaded
+    /// before the reset. (The counterparty's keep-alive is the other, which may still carry its
+    /// pre-wipe level; [`observe_reported_level`](Self::observe_reported_level) drops such a report
+    /// while the refill is paced.)
+    counterparty_wiped: AtomicBool,
+    /// Paces the refill after a wipe: the rate in SURBs per second in the high 32 bits and the
+    /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
+    /// inactive. See [`REFILL_PACING_SECS`].
+    refill_pacing: AtomicU64,
 }
+
+/// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
+/// one fifth of the target per second, so the refill takes about as many seconds.
+///
+/// After a wipe the level is zero against the target, and left alone the PID commands its output
+/// limit (`max_surbs_per_sec`; the prototype hit 4975 per second against a ceiling of 5000 per
+/// second in the integration cluster) until the level is
+/// back. On a path through two or three relayers on one machine that burst congests the relays
+/// themselves, the replies it is meant to restore arrive late, and late replies are what the
+/// verdicts are made of. The organic gate is open for the whole refill anyway, so spreading it over
+/// a few seconds costs little: the SURBs of the next data packets arrive in the meantime.
+///
+/// While the window lasts the PID does not run: the balancer commands the cap while the level is
+/// below the target and nothing from the moment it is reached. A cap applied to the PID's output
+/// instead would let it integrate the full error for the whole window and answer a level at or past
+/// the target with its ceiling when the window ends. The controller is rebuilt with its own gains and
+/// bounds when the window ends, so that it starts from the current error. Neither `max_surbs_per_sec`
+/// nor the bounds [`SurbBalancer::start_control_loop`] rebuilds the PID from change.
+pub const REFILL_PACING_SECS: u64 = 5;
 
 /// Consecutive non-rising reported levels (below target, no distress) before the counterparty's
 /// store capacity is inferred. Small, but greater than one: a single flat sample is ordinary churn,
@@ -257,10 +290,25 @@ impl BalancerStateValues {
     /// Called on every `BalancerState` keep-alive, including one that repeats the last value -- a
     /// level that stops rising while the Entry is still minting toward the target is the plateau
     /// signal. See [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
+    ///
+    /// While the refill after a wipe is paced, a report above the level believed here is dropped
+    /// altogether: stored by neither the level nor the plateau bookkeeping. It is the counterparty
+    /// reporting the stock it had before it saw the new SURB generation, and storing it would put the
+    /// level back at the target, shut the organic gate and silence the PID while the counterparty holds
+    /// nothing. A legitimate report is never above this side's own belief, which counts a SURB as
+    /// produced when it is sent and as consumed only when the reply is home.
     pub fn observe_reported_level(&self, new_level: u64) {
         use std::sync::atomic::Ordering::Relaxed;
 
         let prev = self.buffer_level.load(Relaxed);
+        if new_level > prev && self.refill_pacing_active() {
+            tracing::debug!(
+                reported = new_level,
+                believed = prev,
+                "dropping a counterparty SURB level above the believed one while the refill after a wipe is paced"
+            );
+            return;
+        }
         let target = self.target_surb_buffer_size.load(Relaxed);
         let distress = self.counterparty_in_surb_distress.load(Relaxed);
         let inferred = self.observed_counterparty_capacity.load(Relaxed);
@@ -329,6 +377,61 @@ impl BalancerStateValues {
         } else {
             1
         }
+    }
+
+    /// Tells the state that the counterparty dropped every SURB it held, because the SURB generation
+    /// of the session advanced and the counterparty clears its store on the first batch of the new one.
+    ///
+    /// The level estimate restarts from empty at the next balancer update, and for
+    /// [`REFILL_PACING_SECS`] the refill is held to `target / REFILL_PACING_SECS` SURBs per second.
+    /// The counterparty's own reports follow suit once the first SURBs of the new generation reach
+    /// it. Until then it may still report the level it had before; for the paced window such a
+    /// report, being above what is believed here, is dropped (see
+    /// [`observe_reported_level`](Self::observe_reported_level)).
+    pub fn on_counterparty_wiped(&self) {
+        use std::sync::atomic::Ordering::{Relaxed, Release};
+
+        self.buffer_level.store(0, Release);
+        self.counterparty_wiped.store(true, Release);
+        if self.is_disabled() {
+            return;
+        }
+        let cap = (self.target_surb_buffer_size.load(Relaxed) / REFILL_PACING_SECS).clamp(1, u64::from(u32::MAX));
+        self.refill_pacing
+            .store((cap << 32) | (REFILL_PACING_SECS * 1000), Relaxed);
+    }
+
+    /// Takes the one-shot request to restart the level estimate from empty, if there is one.
+    fn take_counterparty_wiped(&self) -> bool {
+        self.counterparty_wiped.swap(false, std::sync::atomic::Ordering::AcqRel)
+    }
+
+    /// Whether the refill after a wipe is still paced. Read-only: unlike [`pace_refill`](Self::pace_refill)
+    /// it does not use up any of the window.
+    fn refill_pacing_active(&self) -> bool {
+        self.refill_pacing.load(std::sync::atomic::Ordering::Relaxed) & u64::from(u32::MAX) > 0
+    }
+
+    /// The cap on the control output while the refill after a wipe is paced, in SURBs per second, and
+    /// uses up `elapsed` of the pacing window. `None` when no pacing is active.
+    fn pace_refill(&self, elapsed: Duration) -> Option<u64> {
+        const REMAINING: u64 = u32::MAX as u64;
+
+        let elapsed_ms = elapsed.as_millis().min(u128::from(u32::MAX)) as u64;
+        self.refill_pacing
+            .fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |packed| {
+                    let remaining = packed & REMAINING;
+                    (remaining > 0).then(|| match remaining.saturating_sub(elapsed_ms) {
+                        0 => 0,
+                        left => (packed & !REMAINING) | left,
+                    })
+                },
+            )
+            .ok()
+            .map(|packed| packed >> 32)
     }
 
     /// Sets how many stored SURBs are invalid and their share of what is outstanding.
@@ -425,6 +528,9 @@ pub struct SurbBalancer<C, E, F> {
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
+    /// Whether the previous update ran inside the refill pacing window of a wipe, to notice the one
+    /// in which the window ends.
+    was_pacing: bool,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
 }
@@ -461,6 +567,7 @@ where
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
+            was_pacing: false,
             last_report: std::time::Instant::now(),
         }
     }
@@ -488,7 +595,18 @@ where
         };
 
         self.last_estimator_state = snapshot;
-        current = current.saturating_add_signed(target_buffer_change);
+        if self.state.take_counterparty_wiped() {
+            // The counterparty dropped everything it held, so what this tick's production and
+            // consumption add to the level belongs to the stock that is gone: restart from empty.
+            tracing::debug!(
+                believed = current,
+                delta = target_buffer_change,
+                "counterparty SURBs were wiped, restarting the level estimate from empty"
+            );
+            current = 0;
+        } else {
+            current = current.saturating_add_signed(target_buffer_change);
+        }
 
         // If SURB decaying is enabled, check if the decay window has elapsed
         // and calculate the number of SURBs that will be discarded
@@ -548,7 +666,36 @@ where
             "estimated SURB buffer change"
         );
 
-        let output = self.controller.next_control_output(usable);
+        // After a wipe the level is far below the target and the PID would command its output limit
+        // until it is back. Hold the refill to a pace the return paths can carry instead. The PID does
+        // not run at all while the window lasts: clamping its output would still let it integrate the
+        // full error for the whole window, and when the window ends it would answer a level at or past
+        // the target with the ceiling. The refill stops by itself the moment the target is reached. The
+        // controller's bounds are not touched.
+        let refill_cap = self.state.pace_refill(dt);
+        let output = match refill_cap {
+            Some(cap) => {
+                if usable >= self.controller.bounds().target() {
+                    0
+                } else {
+                    cap
+                }
+            }
+            None => {
+                if self.was_pacing {
+                    // The window just ended. Start the controller from the current error rather than
+                    // from whatever it had accumulated before the wipe, which no longer describes
+                    // anything: setting the bounds it already has rebuilds it with its own gains.
+                    self.controller.set_target_and_limit(self.controller.bounds());
+                    tracing::debug!(
+                        current,
+                        "refill pacing is over, the controller restarts from the current level"
+                    );
+                }
+                self.controller.next_control_output(usable)
+            }
+        };
+        self.was_pacing = refill_cap.is_some();
         tracing::trace!(output, "next balancer control output for session");
 
         // Both ends run this same loop -- the Entry with the PID driving production, the Exit with
@@ -566,6 +713,7 @@ where
                 invalid = current - usable,
                 target = self.controller.bounds().target(),
                 output,
+                refill_cap = refill_cap.unwrap_or(0),
                 produced = self.surb_estimator.estimate_surbs_produced(),
                 consumed = self.surb_estimator.estimate_surbs_consumed(),
                 distress = self
@@ -1490,5 +1638,297 @@ mod tests {
         assert_eq!(1, state.organic_surbs_per_packet(), "a saturated count writes off all");
         state.set_invalid_surbs(0, 0.0);
         assert_eq!(0, state.organic_surbs_per_packet(), "clearing restores the held level");
+    }
+
+    type TestBalancer = SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>;
+
+    /// One sampling interval of `dt`, without waiting for it: the balancer's clock is wound back instead.
+    fn tick_for(balancer: &mut TestBalancer, dt: Duration) {
+        balancer.last_update = std::time::Instant::now()
+            .checked_sub(dt)
+            .expect("monotonic clock too young");
+        balancer.update();
+    }
+
+    /// The configuration of a session at the client's usual target, against the usual mint ceiling.
+    fn paced_refill_config() -> SurbBalancerConfig {
+        SurbBalancerConfig {
+            target_surb_buffer_size: 7_000,
+            max_surbs_per_sec: 5_000,
+            surb_decay: None,
+        }
+    }
+
+    /// A wipe means the counterparty holds nothing, whatever the estimate says, and the estimate must
+    /// say so at the next update: not the update that was already running, nor the production that was
+    /// in flight when the SURB generation advanced, and not a report from the counterparty that has
+    /// not seen the new generation yet may bring it back.
+    #[test_log::test]
+    fn a_wipe_should_restart_the_estimate_from_empty_and_survive_the_next_tick() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
+        let step = Duration::from_millis(50);
+
+        state.observe_reported_level(7_000);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            7_000,
+            state.buffer_level(),
+            "precondition: the counterparty is at target"
+        );
+
+        // 300 SURBs were minted for the old generation just before it advanced.
+        estimator.produced.fetch_add(300, Relaxed);
+        state.on_counterparty_wiped();
+        assert_eq!(0, state.buffer_level(), "the level is reset at once");
+
+        // The counterparty reports what it held until its first SURB of the new generation lands.
+        state.observe_reported_level(7_000);
+        assert_eq!(0, state.buffer_level(), "a report above the believed level is dropped");
+
+        // An update that was already running writes back the level it loaded before the reset.
+        state.buffer_level.store(7_000, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            0,
+            state.buffer_level(),
+            "the stale level and the old generation's production must not survive the first update"
+        );
+
+        // From then on the estimate counts what is minted for the new generation, and is not reset again.
+        estimator.produced.fetch_add(200, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(200, state.buffer_level());
+        estimator.consumed.fetch_add(50, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(150, state.buffer_level(), "the reset is one-shot");
+    }
+
+    /// The counterparty keeps reporting the stock it had until the first SURB of the new generation
+    /// reaches it. A report that lands after the first update, when the level is already rebuilding,
+    /// must not put the level back at the target, which would shut the organic gate and silence the PID
+    /// while the counterparty holds nothing. Reports at or below what is believed are legitimate, and
+    /// everything is taken again once the paced window is over.
+    #[test_log::test]
+    fn a_stale_report_after_the_first_tick_should_not_restore_the_wiped_level() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
+        let step = Duration::from_millis(50);
+
+        state.observe_reported_level(7_000);
+        tick_for(&mut balancer, step);
+        state.on_counterparty_wiped();
+        tick_for(&mut balancer, step);
+        assert_eq!(0, state.buffer_level(), "precondition: restarted from empty");
+
+        estimator.produced.fetch_add(200, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            200,
+            state.buffer_level(),
+            "precondition: 200 SURBs of the new generation sent"
+        );
+
+        state.observe_reported_level(7_000);
+        assert_eq!(
+            200,
+            state.buffer_level(),
+            "the pre-wipe level is dropped for the window"
+        );
+        assert_eq!(
+            1,
+            state.organic_surbs_per_packet(),
+            "the organic gate stays open while the counterparty holds almost nothing"
+        );
+
+        state.observe_reported_level(150);
+        assert_eq!(
+            150,
+            state.buffer_level(),
+            "a report at or below the belief is legitimate"
+        );
+
+        // Past the window (5 s of 50 ms ticks, and then some) a report is taken as it comes.
+        for _ in 0..110 {
+            tick_for(&mut balancer, step);
+        }
+        state.observe_reported_level(7_000);
+        assert_eq!(
+            7_000,
+            state.buffer_level(),
+            "after the window the counterparty is believed again"
+        );
+    }
+
+    /// What a freshly built controller commands for `level`: the answer the first tick after the pacing
+    /// window has to give, and the one a wound-up integral would corrupt.
+    fn fresh_controller_output(cfg: SurbBalancerConfig, level: u64) -> u64 {
+        let mut controller = PidBalancerController::default();
+        controller.set_target_and_limit(cfg.as_controller_bounds());
+        controller.next_control_output(level)
+    }
+
+    /// After a wipe the PID would command its output limit until the level is back. The refill is held
+    /// to a fifth of the target per second for five seconds, and left alone after that.
+    #[test_log::test]
+    fn a_wipe_should_cap_output_for_the_pacing_window() {
+        let cfg = paced_refill_config();
+        let (mut balancer, _estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+        assert_eq!(1_400, cap);
+
+        state.on_counterparty_wiped();
+
+        // Nothing is minted, so the level stays empty and the PID asks for everything it may.
+        let mut outputs = Vec::new();
+        for _ in 0..120 {
+            tick_for(&mut balancer, step);
+            outputs.push(output.load(std::sync::atomic::Ordering::Relaxed));
+        }
+
+        // Margins of half a second either side of the five-second window, so that a slow tick cannot
+        // move the edge into the assertion.
+        let window = (REFILL_PACING_SECS * 1000 / step.as_millis() as u64) as usize;
+        assert!(
+            outputs[..window - 10].iter().all(|output| *output == cap),
+            "the output must be the cap, {cap}, for the window: {outputs:?}"
+        );
+        assert!(
+            outputs[window + 10..].iter().all(|output| *output > cap),
+            "after the window the controller runs free: {outputs:?}"
+        );
+
+        // The first free tick is a fresh controller's answer to the level, not an accumulated one. At
+        // an empty level that is as much as the controller may command: one tick of its proportional
+        // and integral terms already exceeds the limit.
+        let first_free = outputs
+            .iter()
+            .position(|output| *output != cap)
+            .expect("the window ends");
+        assert_eq!(fresh_controller_output(cfg, 0), outputs[first_free]);
+    }
+
+    /// The PID does not run while the refill is paced, so it integrates nothing. Whatever it had
+    /// accumulated before the wipe (here, an integral wound up to its limit by a stretch at an empty
+    /// level) is dropped when the window ends, and the first free tick answers the level the refill
+    /// reached with a fresh controller's output. An integral carried through would answer the same
+    /// level with the ceiling, and a level at or past the target with a burst.
+    #[test_log::test]
+    fn the_first_tick_after_the_pacing_window_should_start_from_the_current_level() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+
+        // The PID winds its integral up against an empty counterparty.
+        for _ in 0..20 {
+            tick_for(&mut balancer, step);
+        }
+        assert_eq!(
+            cfg.max_surbs_per_sec,
+            output.load(Relaxed),
+            "precondition: at the ceiling"
+        );
+
+        // A wipe, and a refill that reaches 80 % of the target inside the window.
+        state.on_counterparty_wiped();
+        for _ in 0..20 {
+            tick_for(&mut balancer, step);
+        }
+        let level = cfg.target_surb_buffer_size * 4 / 5;
+        estimator.produced.fetch_add(level, Relaxed);
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            assert!(
+                state.refill_pacing_active() || state.buffer_level() == level,
+                "the level is the refill's"
+            );
+        }
+
+        tick_for(&mut balancer, step);
+        let first_free = output.load(Relaxed);
+        assert_eq!(fresh_controller_output(cfg, level), first_free);
+        assert!(
+            first_free < cfg.max_surbs_per_sec,
+            "a level at 80 % of the target is not met with the ceiling: {first_free}"
+        );
+    }
+
+    /// The refill stops by itself the moment the target is reached, and stays stopped until the window
+    /// ends, when the controller, fresh, answers a level at the target with nothing.
+    #[test_log::test]
+    fn pacing_should_stop_the_refill_once_the_target_is_reached_inside_the_window() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+
+        state.on_counterparty_wiped();
+        for _ in 0..60 {
+            tick_for(&mut balancer, step);
+            assert_eq!(cap, output.load(Relaxed), "refilling at the cap while below the target");
+        }
+
+        // Three seconds in, the refill has delivered the target.
+        estimator.produced.fetch_add(cfg.target_surb_buffer_size, Relaxed);
+        let mut after_target = Vec::new();
+        for _ in 0..30 {
+            tick_for(&mut balancer, step);
+            after_target.push(output.load(Relaxed));
+        }
+        assert_eq!(cfg.target_surb_buffer_size, state.buffer_level());
+        assert!(
+            after_target.iter().all(|output| *output == 0),
+            "nothing more is commanded once the target is reached, inside the window or at its end: {after_target:?}"
+        );
+
+        // And on past the window's end, which the level holds at the target through.
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            assert_eq!(0, output.load(Relaxed));
+        }
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            0,
+            output.load(Relaxed),
+            "the first free tick at the target commands nothing"
+        );
+    }
+
+    /// The pacing is a rate the balancer commands, not a bound. The PID is rebuilt whenever the state's
+    /// bounds differ from its own, which would discard its integral, so the pacing must not be
+    /// implemented as a bound.
+    #[test_log::test]
+    fn pacing_must_not_reconfigure_the_controller_bounds() {
+        let cfg = paced_refill_config();
+        let (mut balancer, _estimator, state, _output) = balancer_with_feedback(cfg);
+        let bounds = state.controller_bounds();
+        assert_eq!(bounds, balancer.controller.bounds(), "precondition: in step");
+
+        state.on_counterparty_wiped();
+        for _ in 0..120 {
+            tick_for(&mut balancer, Duration::from_millis(50));
+            assert_eq!(
+                bounds,
+                state.controller_bounds(),
+                "the state's bounds are what the control loop compares the controller's against"
+            );
+            assert_eq!(bounds, balancer.controller.bounds());
+        }
+        assert_eq!(cfg, state.as_config());
+    }
+
+    /// With no target there is no balancing, and nothing to hold back.
+    #[test]
+    fn a_wipe_of_a_disabled_balancer_should_arm_no_pacing() {
+        let state = BalancerStateValues::default();
+        state.on_counterparty_wiped();
+        assert_eq!(None, state.pace_refill(Duration::from_millis(50)));
     }
 }
