@@ -121,6 +121,7 @@ smart-default = "0.7.1"
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 temp-env = "0.3.6"
+tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }
 thiserror = "2.0.20"
 tikv-jemallocator = "0.7.0"
