@@ -19,10 +19,14 @@
 //!
 //! # What is asserted
 //!
-//! Liveness and recovery only. No probe may hang past its own timeout plus a small grace, and probe
-//! latency after the flood must return to a loose multiple of the idle baseline. The delay itself is
-//! reported, never asserted: the saturated latency is the measurement this test exists to produce,
-//! not a failure.
+//! Probes have to keep getting through while the egress is saturated: every probe taken under load
+//! must be answered inside the probe layer's own timeout, since a probe that stalls there is what
+//! degrades the graph parameters path selection reads. On top of that no probe anywhere may hang past
+//! its timeout plus a small grace, and both probe latency and the probe-derived graph latency have to
+//! return to a loose multiple of the idle baseline once the flood stops.
+//!
+//! The delay itself is reported, never asserted: the saturated latency is the measurement this test
+//! exists to produce, not a failure.
 //!
 //! Saturation here floods the node's shared internal queues. Link-level shaping (NIC or WAN) is not
 //! simulated; the shaped reproduction belongs to hoprnet/hopr-integration-tests#75.
@@ -87,6 +91,9 @@ const SATURATION_WINDOW: Duration = Duration::from_secs(15);
 
 /// Minimum volume that counts as a saturated phase.
 const MIN_FLOOD_BYTES: u64 = 1024 * 1024;
+
+/// Fewest probes the saturated phase must produce for its liveness verdict to mean anything.
+const MIN_SATURATION_PROBES: usize = 3;
 
 /// Gap between probes while the egress is saturated.
 const SATURATION_PROBE_PERIOD: Duration = Duration::from_millis(200);
@@ -243,8 +250,27 @@ async fn probe_delay_should_be_measured_when_egress_is_saturated() -> anyhow::Re
         "the flood wrote only {flooded_bytes} bytes in {flood_duration:?}, which is not saturation"
     );
     anyhow::ensure!(
-        saturated.attempts() > 0,
-        "the saturated phase recorded no probes at all"
+        saturated.attempts() >= MIN_SATURATION_PROBES,
+        "the saturated phase recorded only {} probe(s), too few to judge whether probes get through",
+        saturated.attempts()
+    );
+
+    // Probes get through while the egress is saturated, which is what keeps the graph parameters path
+    // selection reads from degrading into a stall. A probe the pinger itself gave up on is a stalled
+    // probe, so neither a failure nor a hang is tolerated here; only the magnitude of the delay is
+    // left to the report.
+    anyhow::ensure!(
+        saturated.failures.is_empty() && saturated.hangs == 0,
+        "{} of {} probes did not get through while the egress was saturated: {} failed, {} hung{}",
+        saturated.failures.len() + saturated.hangs,
+        saturated.attempts(),
+        saturated.failures.len(),
+        saturated.hangs,
+        saturated
+            .failures
+            .first()
+            .map(|first| format!(" (first failure: {first})"))
+            .unwrap_or_default(),
     );
 
     // Recovery: once the flood stops the pipeline drains and probes return to roughly their idle
@@ -263,6 +289,18 @@ async fn probe_delay_should_be_measured_when_egress_is_saturated() -> anyhow::Re
          median {idle_median:?} × {RECOVERY_FACTOR} + {RECOVERY_GRACE:?}), with {} of {} recovery probes failing",
         recovery.failures.len(),
         recovery.attempts(),
+    );
+
+    // The graph parameters path selection consumes come from these same probes, so they have to
+    // recover as well: an edge left degraded by the flood keeps steering traffic off a healthy route.
+    let idle_graph =
+        idle_graph_latency.context("the graph reported no latency for the probed peer before the flood")?;
+    let recovery_graph =
+        recovery_graph_latency.context("the graph reported no latency for the probed peer after the flood")?;
+    anyhow::ensure!(
+        recovery_graph <= idle_graph * RECOVERY_FACTOR + RECOVERY_GRACE,
+        "the probe-derived graph latency stayed degraded after the flood: {recovery_graph:?} against an idle baseline \
+         of {idle_graph:?} (bound {RECOVERY_FACTOR}× the baseline plus {RECOVERY_GRACE:?})"
     );
 
     // Saturated latencies are intentionally not asserted: their magnitude is a finding, and this
