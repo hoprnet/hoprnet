@@ -57,6 +57,8 @@ pub enum HoprProtocolError {
     #[error("could not find unacknowledged ticket for challenge {0}")]
     UnacknowledgedTicketNotFound(HalfKeyChallenge),
 
+    /// A ticket with this index (channel id, epoch, index) was already accepted and is still remembered
+    /// by the replay tracker.
     #[error("ticket index {2} in channel {0} epoch {1} was already accepted")]
     DuplicateTicketIndex(ChannelId, u32, u64),
 

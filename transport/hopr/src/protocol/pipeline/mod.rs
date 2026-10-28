@@ -474,7 +474,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         // Per requirements, this call is not blocking
                         if let Err(error) = ticket_proc.insert_unacknowledged_ticket(&next_hop, ack_challenge, received_ticket) {
                             // The processor itself only logs a duplicate at debug level, so this is the
-                            // single line logged for a rejected packet
+                            // only line this pipeline logs for a rejected packet
                             if T::is_duplicate_ticket_index_error(&error) {
                                 tracing::warn!(
                                     previous_hop = previous_hop.to_peerid_str(),

@@ -181,7 +181,9 @@ pub trait UnacknowledgedTicketProcessor {
     /// Duplicates are detected per (issuer -> this node channel, epoch, index): `Err` is returned if
     /// a ticket with the same index was already accepted on that channel and epoch (an attacker must
     /// not be able to have many tickets accepted on the same index, since only one of them would
-    /// ever be redeemable).
+    /// ever be redeemable). Implementations may bound how long an accepted index is remembered (the
+    /// HOPR implementation forgets it after `unack_ticket_timeout` or once its capacity is exceeded),
+    /// after which the same index is accepted again.
     ///
     /// This operation should be reasonably fast and should not block the main processing pipeline.
     fn insert_unacknowledged_ticket(
