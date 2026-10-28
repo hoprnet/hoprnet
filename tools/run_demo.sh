@@ -30,24 +30,7 @@ python3 "$SCRIPT_DIR/test_n_hop_session.py" \
   --address-file "$RESULTS_DIR/my_address" \
   2>&1 | tee "$RESULTS_DIR/test_output.log"
 
-# Step 2: Read our address from step 1
-MY_ADDRESS=$(cat "$RESULTS_DIR/my_address")
-echo ""
-echo "=== Generating animated graph visualization ==="
-echo "  Our address: $MY_ADDRESS"
-
-# Step 3: Visualize with graph-timelapse
-uv run --project "$SCRIPT_DIR/graph-timelapse" \
-  graph-timelapse \
-  "$LOG" \
-  "$RESULTS_DIR/network_graph.dot" \
-  --out-dir "$RESULTS_DIR" \
-  --me "$MY_ADDRESS" \
-  --no-gif
-
 echo ""
 echo "Results stored in: $RESULTS_DIR"
-echo "  Graph HTML:  $RESULTS_DIR/graph.html"
 echo "  Graph DOT:   $RESULTS_DIR/network_graph.dot"
-echo "  Graph PNG:   $RESULTS_DIR/network_graph.png"
 echo "  Test log:    $RESULTS_DIR/test_output.log"

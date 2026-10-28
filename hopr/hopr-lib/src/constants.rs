@@ -23,3 +23,12 @@ pub const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Dura
 /// Default minimum quality of stored peer entries to re-sync from the persistent storage on
 /// node's startup.
 pub const DEFAULT_MIN_QUALITY_TO_SYNC: f64 = 0.9;
+
+/// Recommended minimum kernel UDP socket buffer size (`net.core.rmem_default` /
+/// `net.core.wmem_default`), matching the value that resolved the throughput regression
+/// described in <https://github.com/hoprnet/hoprnet/issues/8503>.
+pub const RECOMMENDED_MIN_UDP_BUFFER_BYTES: u64 = 4 * 1024 * 1024;
+
+/// TCP congestion-control algorithm recommended for better throughput on lossy/high-latency
+/// links (`net.ipv4.tcp_congestion_control`).
+pub const RECOMMENDED_CONGESTION_CONTROL: &str = "bbr";
