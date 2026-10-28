@@ -87,18 +87,31 @@ fn default_eviction_report_threshold() -> u64 {
 /// first" on the internal `SurbRingBuffer`); the order applies within each of the two tiers. Overflow
 /// evicts the oldest in either order.
 ///
-/// LIFO is the default: SURBs the sender replaced because their return path broke sink below their
-/// replacements instead of being spent first. Under PIX it buries the oldest shares of a cycle, which an
-/// overflow then evicts (hoprnet#8473); FIFO avoids that.
+/// FIFO is the default. A PIX share reaches the reconstructor only when its SURB is spent, so the
+/// oldest shares of a cycle have to go first. LIFO buries them under the newer ones: an overflow then
+/// evicts exactly those, and a dip in the level surfaces them out of order, so polynomials are left
+/// short and cycles complete late or not at all (hoprnet#8473 dropped LIFO for that reason; with only
+/// the pop order varied, the PIX scenarios passed 8 of 8 on FIFO and 6 of 8 on LIFO).
+///
+/// What FIFO gives up is that SURBs the sender replaced, because their return path broke, are spent
+/// before their replacements, so a dead relayer's SURBs are spent into the void until the buffer turns
+/// over. The sender makes up for it: when a relayer is judged dead it advances the session's SURB
+/// generation, and this side drops everything it holds on the next push (see "Generations" on the
+/// internal `SurbRingBuffer`). That is the same invalidation LIFO achieves by sinking the old SURBs, at
+/// the price of the stock rather than of the shares.
+///
+/// [`Lifo`](Self::Lifo) stays selectable for deployments without PIX Exits, where there are no shares
+/// to bury.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumString, strum::Display)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[strum(serialize_all = "lowercase")]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum SurbPopOrder {
     /// Oldest first.
-    Fifo,
-    /// Newest first, so a return-path change applies before the buffered SURBs drain.
     #[default]
+    Fifo,
+    /// Newest first, so SURBs minted after a return-path change are spent before the ones they
+    /// replace. Buries the oldest shares of a PIX cycle; see the enum.
     Lifo,
 }
 
@@ -145,7 +158,7 @@ pub struct SurbStoreConfig {
     pub rb_capacity: usize,
     /// Pop order of the per-pseudonym buffer; see [`SurbPopOrder`].
     ///
-    /// Affects only the replying side. Default is [`SurbPopOrder::Lifo`].
+    /// Affects only the replying side. Default is [`SurbPopOrder::Fifo`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub pop_order: SurbPopOrder,
     /// Threshold for the number of SURBs in the ring buffer, below which it is
@@ -837,9 +850,10 @@ impl SurbShareInfo for HoprSurb {
 /// by [`HoprSurbId`].
 ///
 /// Backed by two [`VecDeque`] tiers that together are never allowed to exceed `capacity`: a push into
-/// a full buffer evicts first (see below for which SURB goes). Each tier is first in, first out: a pop
-/// consumes the oldest SURB of the tier it draws from, and so does an eviction. See [`SurbPopOrder`]
-/// for why that is the only order.
+/// a full buffer evicts first (see below for which SURB goes). Each tier is first in, first out by
+/// default: a pop consumes the oldest SURB of the tier it draws from (the newest under
+/// [`SurbPopOrder::Lifo`]), and an eviction always takes the oldest. See [`SurbPopOrder`] for why FIFO
+/// is the default.
 ///
 /// ## Share-bearing SURBs first
 ///
@@ -1424,9 +1438,9 @@ mod tests {
     }
 
     #[test]
-    fn surb_store_config_should_default_to_lifo() {
-        assert_eq!(SurbPopOrder::Lifo, SurbStoreConfig::default().pop_order);
-        assert_eq!(SurbPopOrder::Lifo, SurbPopOrder::default());
+    fn surb_store_config_should_default_to_fifo() {
+        assert_eq!(SurbPopOrder::Fifo, SurbStoreConfig::default().pop_order);
+        assert_eq!(SurbPopOrder::Fifo, SurbPopOrder::default());
     }
 
     #[test]
@@ -1473,8 +1487,8 @@ mod tests {
     }
 
     /// Two SURBs pushed as {1, 2} are handed out 1 then 2 — and the same order holds for a fresh
-    /// batch pushed after the buffer drains. (That the store itself defaults to LIFO is asserted
-    /// separately by `surb_store_config_should_default_to_lifo`.)
+    /// batch pushed after the buffer drains. (That the store itself defaults to FIFO is asserted
+    /// separately by `surb_store_config_should_default_to_fifo`.)
     #[test]
     fn surb_ring_buffer_should_consume_oldest_first() -> anyhow::Result<()> {
         let expected: [HoprSurbId; 2] = [[1u8; 8], [2u8; 8]];
@@ -2451,7 +2465,7 @@ mod tests {
         while let Some(found) = store.find_surb(SurbMatcher::Pseudonym(pseudonym)) {
             order_seen.push(found.sender_id.surb_id()[0]);
         }
-        assert_eq!(vec![2, 3, 1], order_seen, "shares first, then plain SURBs newest first");
+        assert_eq!(vec![2, 1, 3], order_seen, "shares first, then plain SURBs oldest first");
 
         Ok(())
     }
