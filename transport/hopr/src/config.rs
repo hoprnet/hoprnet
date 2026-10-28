@@ -93,6 +93,12 @@ pub struct StreamProtocolConfig {
     /// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
     /// target 7 000 / max 5 000/s).
     ///
+    /// When the per-peer channel is full, the egress drain drops the newest
+    /// packet (drop-newest) for both open and still-opening streams. The mixer's
+    /// hard capacity bound (`MixerConfig::capacity`) provides the upstream
+    /// backpressure layer, so this drop is a rate-limiting measure that prevents
+    /// one congested peer from head-of-line-blocking the shared drain loop.
+    ///
     /// Defaults to 5 000.
     #[validate(range(min = 1))]
     #[default(default_per_peer_channel_capacity())]
@@ -131,22 +137,17 @@ pub struct StreamProtocolConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_frame_writer_backpressure_bytes"))]
     pub frame_writer_backpressure_bytes: usize,
 
-    /// Maximum time the egress drain waits on a full — but open and draining — per-peer channel
-    /// before falling back to drop-newest.
+    /// Write-pump stall timeout for a per-peer egress channel.
     ///
-    /// While the stream is open, a full channel means the wire is slower than the producer, so
-    /// waiting here propagates wire-rate backpressure up through the mixer and session socket to the
-    /// application writer (no packet loss). The bound ensures a single permanently-stalled peer cannot
-    /// head-of-line-block delivery to other peers indefinitely: after this timeout the packet is
-    /// dropped and the drain moves on. Healthy peers drain far faster than this, so the timeout is not
-    /// hit in normal operation.
+    /// If the pump feeding a peer's QUIC stream makes no write progress for this long (the remote
+    /// stopped reading, parking quinn's `poll_write` forever), the pump fails and its cache entry
+    /// is evicted so the next send reopens the stream rather than parking the shared drain loop.
+    /// This prevents one stalled peer from head-of-line-blocking other peers indefinitely.
+    /// Previously this timeout also governed an inline backpressure wait in the shared egress
+    /// drain (replaced by drop-newest at the egress, with upstream backpressure from the mixer's
+    /// hard capacity bound).
     ///
-    /// It doubles as the per-peer write-pump stall timeout: if the pump makes no progress writing to
-    /// a peer's stream for this long (a remote that stopped reading parks quinn's `poll_write`
-    /// forever), the pump fails and its cache entry is evicted so the next send reopens the stream,
-    /// rather than the pump parking indefinitely and the drain serialising on it.
-    ///
-    /// Defaults to 2 seconds. Must be at least 1 ms — a zero value would defeat the feature.
+    /// Defaults to 2 seconds. Must be at least 1 ms.
     #[validate(custom(function = "validate_egress_backpressure_timeout"))]
     #[default(default_egress_backpressure_timeout())]
     #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
