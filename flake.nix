@@ -197,8 +197,8 @@
             # `Cargo.lock`, so there is nothing to trim down for a dependencies-only source.
             depsSrc = ticketInspectorSrc;
             cargoToml = "${ticketInspectorSrc}/Cargo.toml";
-            # `cli` and `redb` are the binary's `required-features`; `serde` matches the
-            # feature set the workspace enables on the same crate in `Cargo.toml`.
+            # `cli` and `redb` are the binary's `required-features`; `serde` enables the
+            # binary's JSON output, which the workspace itself never turns on.
             cargoExtraArgs = "--bin ticket-inspector -F redb,serde,cli";
           };
 
