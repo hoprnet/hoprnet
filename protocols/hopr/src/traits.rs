@@ -30,7 +30,9 @@ pub trait SurbStore {
     /// discarded lightly: it is the only evidence that the sender is over-producing. Evictions fall on
     /// share-less SURBs first, so an evicted SURB takes an undelivered PIX share with it only once the
     /// buffer holds nothing but share-bearing ones; [`SurbInsertOutcome::evicted_shares`] is the exact
-    /// number of shares lost that way.
+    /// number of shares lost that way. SURBs that a change of SURB generation took out of play (the
+    /// stock a newer generation cleared, or an older-generation batch that was refused) are not
+    /// evictions; they are reported apart, as [`SurbInsertOutcome::superseded`].
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome;
 
     /// How many SURBs are held for `pseudonym` in each of the store's tiers, as `(share-bearing,

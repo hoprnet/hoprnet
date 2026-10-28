@@ -250,7 +250,13 @@ where
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    info.num_evicted_surbs = outcome.evicted;
+                    // `num_surbs` above counts every SURB the packet carried, so everything that did
+                    // not stay in the store has to be booked as gone, or the Exit's level estimate
+                    // (`produced - consumed - evicted`) drifts above what the store holds. That is
+                    // the overflow, and also the stock a newer SURB generation wiped and the batch an
+                    // older one refused: after the Entry bumps the generation the Exit's whole stock
+                    // is gone, and its keep-alive must report that rather than the pre-wipe level.
+                    info.num_evicted_surbs = outcome.evicted + outcome.superseded;
 
                     // The tier split costs a second lookup and a lock, so take it only if the line below is
                     // going to be emitted.

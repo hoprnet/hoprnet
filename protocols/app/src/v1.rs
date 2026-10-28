@@ -144,12 +144,14 @@ pub struct IncomingPacketInfo {
     pub signals_from_sender: PacketSignals,
     /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
     pub num_saved_surbs: usize,
-    /// How many of those SURBs were discarded on arrival because the SURB buffer for this sender was
-    /// already full.
+    /// How many SURBs were lost on arrival: discarded because the SURB buffer for this sender was
+    /// already full, or taken out of play by a change of the sender's SURB generation (the stock a
+    /// newer generation wiped, or a late batch of an older one that was refused).
     ///
-    /// Non-zero means the sender is producing SURBs faster than this side can hold them, and the
-    /// surplus was destroyed rather than queued. Under PIX a destroyed share-bearing SURB also destroys
-    /// the partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
+    /// Non-zero from a full buffer means the sender is producing SURBs faster than this side can hold
+    /// them, and the surplus was destroyed rather than queued; the generation part is the sender
+    /// re-planning its return paths, which is no over-production. Under PIX a destroyed share-bearing SURB also
+    /// destroys the partial SSA share it carried, since a share only reaches the reconstructor when its SURB is
     /// used. The store gives up share-less SURBs first, so the count is an upper bound on the shares
     /// lost; the exact number is the store's own, reported in its eviction summary (the `ring_share`
     /// value of the `cache` label of `hopr_surb_store_evictions_count`). This is not a bandwidth
