@@ -402,7 +402,9 @@ where
             ..cfg.packet.surb_store
         };
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        // The race telemetry reads a reply's lateness according to the order the replier spends its
+        // SURBs in. That is the replier's configuration; ours is assumed to be the network's.
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::new(surb_store_cfg.pop_order);
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
