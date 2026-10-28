@@ -9,8 +9,8 @@
 //! # Phases
 //!
 //! 1. `idle`: probes to the direct neighbor before any session traffic exists.
-//! 2. `saturated`: the same probes while a bulk session (`src→relay→dst`) writes back-to-back, which
-//!    keeps the source's egress queues full.
+//! 2. `saturated`: the same probes while a bulk session (`src→relay→dst`) writes back-to-back, which keeps the source's
+//!    egress queues full.
 //! 3. `recovery`: the same probes after the flood stops and the pipeline has drained.
 //!
 //! [`HoprTransport::ping`] reports half the measured round trip, so every latency below is one-way.
@@ -259,9 +259,8 @@ async fn probe_delay_should_be_measured_when_egress_is_saturated() -> anyhow::Re
     let recovery_bound = idle_median * RECOVERY_FACTOR + RECOVERY_GRACE;
     anyhow::ensure!(
         recovery_median <= recovery_bound,
-        "probe latency did not recover: median {recovery_median:?} after the flood exceeds {recovery_bound:?} \
-         (idle median {idle_median:?} × {RECOVERY_FACTOR} + {RECOVERY_GRACE:?}), with {} of {} recovery probes \
-         failing",
+        "probe latency did not recover: median {recovery_median:?} after the flood exceeds {recovery_bound:?} (idle \
+         median {idle_median:?} × {RECOVERY_FACTOR} + {RECOVERY_GRACE:?}), with {} of {} recovery probes failing",
         recovery.failures.len(),
         recovery.attempts(),
     );
