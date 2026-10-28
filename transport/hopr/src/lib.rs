@@ -138,6 +138,16 @@ lazy_static::lazy_static! {
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
 
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SURB_GENERATION_BUMPS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_surb_generation_bumps_total",
+            "SURB generation bumps after a dead relayer verdict",
+        )
+        .unwrap();
+}
+
 /// Fraction of the SURB ring buffer a Session's balancer target may occupy.
 ///
 /// The remainder is headroom for balancer overshoot. The target used to be the ring buffer capacity
@@ -1054,6 +1064,8 @@ where
         let surb_flush_planner = self.path_planner.clone();
         let latency_race_memory = self.cfg.latency_race_memory;
         let relayer_health_weight = self.cfg.relayer_health_weight;
+        #[cfg(all(feature = "telemetry", not(test)))]
+        lazy_static::initialize(&METRIC_SURB_GENERATION_BUMPS);
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1090,6 +1102,8 @@ where
                             continue;
                         }
                         let generation = surb_flush_planner.surb_store.bump_generation(&pseudonym);
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_SURB_GENERATION_BUMPS.increment();
                         tracing::info!(
                             %pseudonym,
                             generation,
