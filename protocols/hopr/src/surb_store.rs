@@ -565,9 +565,14 @@ impl MemorySurbStore {
                 .eviction_listener({
                     let stats = stats.clone();
                     move |pseudonym, _generation, cause| {
-                        // Minting keeps this warm, so each eviction earns a line: a reset serial has the peer reject
-                        // SURBs.
-                        tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                        // Expired: the pseudonym was idle for the whole reply-opener window, so the peer no longer
+                        // holds SURBs this serial numbers (#8429). Explicit: removed on purpose. Size and Replaced
+                        // can drop a serial that is still in use, and the peer then rejects SURBs numbered by it.
+                        if matches!(cause, RemovalCause::Expired | RemovalCause::Explicit) {
+                            tracing::debug!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                        } else {
+                            tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                        }
                         stats.record(EvictedCache::Generation, cause);
                     }
                 })
