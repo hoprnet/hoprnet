@@ -25,9 +25,12 @@
 //! - **Dead verdict.** Trigger: at least `MIN_RACES` replies trailing their partners by more than any race the relayer
 //!   settled, none home since, and a reply home through some relayer after the first of them fell due. A reply is
 //!   overdue only while others are delivering: a pause in the replier's stream, or an outage of every return relayer,
-//!   leaves nothing arriving and so nothing overdue, however long the replies stay out. Effect: health `0`, the walk
-//!   prunes it. Lapses once no reply through it is out (about `PENDING_SURB_TTL`); its lost races keep its health near
-//!   zero. Must not fight: common-mode outages, where no partner gets home and nothing is judged.
+//!   leaves nothing arriving and so nothing overdue, however long the replies stay out. A relayer that has settled too
+//!   few races to have a margin of its own borrows the bar of the best-measured relayer, and none is judged while no
+//!   relayer has one; its own races that expired open are booked as lost and are not replies that came home, so they do
+//!   not reset the clock. Effect: health `0`, the walk prunes it. Lapses once no reply through it is out (about
+//!   `PENDING_SURB_TTL`); its lost races keep its health near zero. Must not fight: common-mode outages, where no
+//!   partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict. Effect: each session is told how many SURBs in its counterparty's
 //!   store run through that relayer; the balancer subtracts them from its level and sends replacements. Lasts until a
 //!   reply through the relayer comes home or the session ends, not just the verdict: the counterparty still holds them.
@@ -438,6 +441,18 @@ impl RaceHistory {
         }
     }
 
+    /// The races that settled, as opposed to those that expired open and were booked as lost.
+    fn finished(&self) -> impl Iterator<Item = &Race> {
+        self.races.iter().filter(|race| !race.lost())
+    }
+
+    /// How late a reply of this relayer usually is: the largest margin of its settled races, or `None`
+    /// until it has settled [`MIN_RACES`] of them, too few for the figure to mean anything.
+    fn usual_margin(&self) -> Option<f64> {
+        (self.finished().count() >= MIN_RACES)
+            .then(|| self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max))
+    }
+
     /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than any race it
     /// finished took, and none has come home since the oldest was due.
     ///
@@ -448,14 +463,21 @@ impl RaceHistory {
     /// pass for a verdict, each costing the session its whole stock. An outage of every return
     /// relayer is likewise no verdict on any one of them. When the stream resumes an alive relayer
     /// settles a race, which clears the condition below, while a dead one never does.
-    fn is_black_hole(&self, last_reply: Option<Instant>) -> bool {
-        let finished: Vec<&Race> = self.races.iter().filter(|race| !race.lost()).collect();
-        if finished.len() < MIN_RACES {
-            return false;
-        }
+    ///
+    /// A relayer that has settled fewer than [`MIN_RACES`] races has no margin of its own to go by,
+    /// and races settle only in the abnormal order, so a clean history is common. It borrows
+    /// `fallback_usual`, the bar of the best-measured relayer, and is not judged at all while no relayer
+    /// has one. "Home since" counts settled races only: the relayer's own races that expired open and
+    /// were booked as lost are not replies that came home, and must not reset the clock.
+    fn is_black_hole(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> bool {
+        let own = self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max);
         // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
         // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
-        let usual = finished.iter().map(|race| race.margin.abs()).fold(0.0, f64::max);
+        let usual = match (self.usual_margin(), fallback_usual) {
+            (Some(usual), _) => usual,
+            (None, Some(fallback)) => own.max(fallback),
+            (None, None) => return false,
+        };
         let grace = Duration::from_secs_f64(usual);
         let overdue: Vec<Instant> = self
             .open
@@ -472,7 +494,8 @@ impl RaceHistory {
         let Some(oldest_overdue) = overdue.iter().min().copied() else {
             return false;
         };
-        overdue.len() >= MIN_RACES && self.races.back().is_none_or(|settled| settled.at < oldest_overdue)
+        let latest_settled = self.finished().map(|race| race.at).max();
+        overdue.len() >= MIN_RACES && latest_settled.is_none_or(|settled| settled < oldest_overdue)
     }
 }
 
@@ -609,6 +632,12 @@ impl RelayerHealth {
     /// long. `memory`: margins a race is remembered for, `0` for dead or healthy.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
         let last_reply = self.last_reply();
+        // The bar of the best-measured relayer, for those with too short a history of their own.
+        let fallback_usual = self
+            .relayers
+            .iter()
+            .filter_map(|entry| entry.usual_margin())
+            .max_by(f64::total_cmp);
         let mut black_holes = std::collections::HashSet::new();
         for mut entry in self.relayers.iter_mut() {
             // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
@@ -626,7 +655,7 @@ impl RelayerHealth {
                 open
             });
             entry.races.extend(lost);
-            if entry.is_black_hole(last_reply) {
+            if entry.is_black_hole(last_reply, fallback_usual) {
                 black_holes.insert(*entry.key());
             }
         }
@@ -2245,6 +2274,84 @@ mod tests {
             judged_dead(&health.refresh(4)),
             "a reply home through another relayer after they fell due makes them overdue"
         );
+        Ok(())
+    }
+
+    /// A relayer that never settled a race has no margin of its own, and under the first-spent rule
+    /// races settle only in the abnormal order, so a clean history is common. It is judged against the
+    /// bar of the best-measured relayer rather than escaping every verdict.
+    #[test]
+    fn a_relayer_with_a_clean_history_can_still_be_judged_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [measured, newcomer] = [(); 2].map(|_| key());
+        settled_since(
+            &health,
+            measured,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(100),
+        );
+        open_since(&health, newcomer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+
+        assert_eq!(vec![newcomer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// A relayer's own expired races are booked as lost, at the moment they expire. They are not replies
+    /// that came home, so they must not make the next overdue replies look as if something settled
+    /// since.
+    #[test]
+    fn expired_open_races_must_not_mask_a_black_hole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, measured] = [(); 2].map(|_| key());
+        settled_since(
+            &health,
+            relayer,
+            ago(Duration::from_secs(70))?,
+            Duration::from_millis(50),
+        );
+        // Booking the expired races as lost also shortens the relayer's own memory to its few latest
+        // races, and the settled ones fall out of it. Its bar is then the best-measured relayer's,
+        // which is what the second verdict is made against.
+        settled_since(
+            &health,
+            measured,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(
+            &health,
+            relayer,
+            MIN_RACES as u8,
+            ago(PENDING_SURB_TTL + Duration::from_secs(5))?,
+        );
+        health.record_reply();
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "the races that expired are booked as lost, none is open any more"
+        );
+        assert_eq!(0, open_races_of(&health, &relayer));
+
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+        assert_eq!(
+            vec![relayer],
+            judged_dead(&health.refresh(4)),
+            "three more overdue replies, with the network delivering, are a verdict however the earlier ones ended"
+        );
+        Ok(())
+    }
+
+    /// With no margin history anywhere there is no bar to call a reply overdue by.
+    #[test]
+    fn without_any_margin_history_anywhere_nothing_is_judged_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(!health.is_dead(&relayer));
         Ok(())
     }
 
