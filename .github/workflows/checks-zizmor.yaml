@@ -12,6 +12,14 @@ on:
       - ".github/**"
   merge_group:
     types: [checks_requested]
+  # Refresh the code-scanning baseline for the default branch. Without this, the only
+  # SARIF ever uploaded against refs/heads/master is whatever push happened to trigger
+  # one historically — nothing here re-scans master on its own, so alerts fixed since
+  # then never auto-close and the dashboard goes stale indefinitely.
+  push:
+    branches: [master]
+    paths:
+      - ".github/**"
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-zizmor
