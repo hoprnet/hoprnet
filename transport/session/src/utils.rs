@@ -1,11 +1,15 @@
 use std::{
     future::Future,
     pin::Pin,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     task::{Context, Poll, Waker},
+    time::{Duration, Instant},
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
@@ -17,7 +21,7 @@ use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_utils::network_types::utils::{transfer_session, transfer_session_datagram};
 use hopr_utils::runtime::AbortHandle;
-use tracing::{Instrument, debug, error, instrument};
+use tracing::{Instrument, debug, instrument, warn};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
@@ -245,7 +249,57 @@ pub(crate) enum SurbNotificationMode {
     Level(AtomicSurbFlowEstimator),
 }
 
+/// How often a stream reports keep-alives it could not send: at most once per this.
+const KEEP_ALIVE_FAILURE_REPORT_PERIOD: Duration = Duration::from_secs(1);
+
+/// Rate limit for the report of keep-alives that could not be sent, which at a keep-alive rate of
+/// hundreds a second would otherwise be a line per packet for as long as the SURBs stay out.
+#[derive(Debug)]
+struct KeepAliveFailureReport {
+    epoch: Instant,
+    /// Milliseconds since `epoch` of the last report, plus one so that `0` is "none yet".
+    last_ms_plus_one: AtomicU64,
+    /// Failures not reported since the last report.
+    suppressed: AtomicU64,
+}
+
+impl KeepAliveFailureReport {
+    fn new(epoch: Instant) -> Self {
+        Self {
+            epoch,
+            last_ms_plus_one: AtomicU64::new(0),
+            suppressed: AtomicU64::new(0),
+        }
+    }
+
+    /// Notes a failure at `now`. Returns the number of failures swallowed since the last report when it
+    /// is time to report this one, `None` when it is not.
+    fn note_failure(&self, now: Instant) -> Option<u64> {
+        let at = u64::try_from(now.saturating_duration_since(self.epoch).as_millis())
+            .unwrap_or(u64::MAX - 1)
+            .saturating_add(1);
+        let period = u64::try_from(KEEP_ALIVE_FAILURE_REPORT_PERIOD.as_millis()).unwrap_or(u64::MAX);
+        let due = self
+            .last_ms_plus_one
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |last| {
+                (last == 0 || at.saturating_sub(last) >= period).then_some(at)
+            })
+            .is_ok();
+        if due {
+            Some(self.suppressed.swap(0, Ordering::Relaxed))
+        } else {
+            self.suppressed.fetch_add(1, Ordering::Relaxed);
+            None
+        }
+    }
+}
+
 /// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
+///
+/// A keep-alive that fails to send is logged and skipped; the stream goes on. It used to end at the
+/// first failure, and the usual failure is that no SURB was available at that moment, which is a
+/// condition that passes: one such packet silenced the Exit's keep-alives, its level reports among
+/// them, for the rest of the Session's life.
 ///
 /// `controller` is supplied rather than created here because the Exit shares this one stream between
 /// two independent producers — its SURB-level notification and the PIX filler — and both the rate and
@@ -303,6 +357,7 @@ where
 
     let sender_clone = sender.clone();
     let fwd_routing_clone = routing.clone();
+    let failures = Arc::new(KeepAliveFailureReport::new(Instant::now()));
 
     // This task will automatically terminate once the returned abort handle is used.
     debug!(%session_id, "spawning keep-alive stream");
@@ -317,28 +372,37 @@ where
             .map(move |msg| {
                 ApplicationData::try_from(msg)
                     .map(|data| (fwd_routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
+                    .map_err(TransportSessionError::from)
             })
-            .map_err(TransportSessionError::from)
-            .try_for_each_concurrent(None, move |msg| {
+            .for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
                 let keep_alive_diag = keep_alive_diag.clone();
+                let failures = failures.clone();
                 keep_alive_diag.wrap(|| async move {
-                    sender_clone
-                        .send(msg)
-                        .await
-                        .map_err(TransportSessionError::packet_sending)
+                    let sent = match msg {
+                        Ok(msg) => sender_clone
+                            .send(msg)
+                            .await
+                            .map_err(TransportSessionError::packet_sending),
+                        Err(error) => Err(error),
+                    };
+                    if let Err(error) = sent {
+                        match failures.note_failure(Instant::now()) {
+                            Some(suppressed) => {
+                                warn!(%session_id, %error, suppressed, "a keep-alive could not be sent, going on");
+                            }
+                            None => debug!(%session_id, %error, "a keep-alive could not be sent, going on"),
+                        }
+                    }
                 })
             })
-            .then(move |res| {
-                match res {
-                    Ok(_) => tracing::debug!(
-                        component = "session",
-                        %session_id,
-                        task = "session keepalive",
-                        "background task finished"
-                    ),
-                    Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
-                }
+            .then(move |()| {
+                tracing::debug!(
+                    component = "session",
+                    %session_id,
+                    task = "session keepalive",
+                    "background task finished"
+                );
                 futures::future::ready(())
             })
             .in_current_span(),
@@ -357,6 +421,7 @@ mod tests {
 
     use anyhow::anyhow;
     use futures::FutureExt;
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
 
@@ -703,5 +768,93 @@ mod tests {
             .expect("timeout")
             .expect("task panicked");
         assert_eq!(result, 42);
+    }
+
+    /// A sender that refuses its first `fail_next` messages, as one without a SURB does.
+    #[derive(Clone)]
+    struct FlakySender {
+        inner: futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        fail_next: Arc<AtomicU64>,
+    }
+
+    impl futures::Sink<(DestinationRouting, ApplicationDataOut)> for FlakySender {
+        type Error = std::io::Error;
+
+        fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner).poll_ready(cx).map_err(std::io::Error::other)
+        }
+
+        fn start_send(
+            mut self: Pin<&mut Self>,
+            item: (DestinationRouting, ApplicationDataOut),
+        ) -> Result<(), Self::Error> {
+            if self
+                .fail_next
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |left| left.checked_sub(1))
+                .is_ok()
+            {
+                return Err(std::io::Error::other("no SURB available"));
+            }
+            Pin::new(&mut self.inner)
+                .start_send(item)
+                .map_err(std::io::Error::other)
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner).poll_flush(cx).map_err(std::io::Error::other)
+        }
+
+        fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner).poll_close(cx).map_err(std::io::Error::other)
+        }
+    }
+
+    /// One keep-alive that finds no SURB must not silence the stream: the next one is sent.
+    #[tokio::test]
+    async fn a_keep_alive_that_fails_to_send_should_not_end_the_stream() -> anyhow::Result<()> {
+        let (tx, mut sent) = futures::channel::mpsc::unbounded();
+        let sender = FlakySender {
+            inner: tx,
+            fail_next: Arc::new(AtomicU64::new(1)),
+        };
+        let controller = RateController::new(200, Duration::from_secs(1));
+        let pseudonym = HoprPseudonym::random();
+        let abort = spawn_keep_alive_stream(
+            pseudonym,
+            sender,
+            DestinationRouting::Return(pseudonym.into()),
+            SurbNotificationMode::DoNotNotify,
+            Arc::new(BalancerStateValues::from(crate::SurbBalancerConfig::default())),
+            &controller,
+            || true,
+        );
+
+        for n in 1..=3 {
+            tokio::time::timeout(Duration::from_secs(5), sent.next())
+                .await
+                .map_err(|_| anyhow!("keep-alive {n} after the failed one never arrived"))?
+                .ok_or_else(|| anyhow!("the stream ended after the failed keep-alive"))?;
+        }
+        abort.abort();
+        Ok(())
+    }
+
+    /// At most one report a second per stream, with the number of failures it swallowed since the last.
+    #[test]
+    fn keep_alive_failures_should_be_reported_at_most_once_a_second() {
+        let epoch = Instant::now();
+        let report = KeepAliveFailureReport::new(epoch);
+        let at = |ms| epoch + Duration::from_millis(ms);
+
+        assert_eq!(Some(0), report.note_failure(at(0)), "the first is reported at once");
+        assert_eq!(None, report.note_failure(at(10)));
+        assert_eq!(None, report.note_failure(at(999)));
+        assert_eq!(
+            Some(2),
+            report.note_failure(at(1_000)),
+            "a second on, with the two it swallowed"
+        );
+        assert_eq!(None, report.note_failure(at(1_500)));
+        assert_eq!(Some(1), report.note_failure(at(2_600)));
     }
 }
