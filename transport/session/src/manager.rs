@@ -170,6 +170,101 @@ fn acquire_egress_permit(
     }
 }
 
+/// How often a data packet held back for the keep-alive reserve looks at the SURB estimate again.
+const SURB_RESERVE_POLL: Duration = Duration::from_millis(50);
+
+/// SURBs the Exit keeps back from its data, so that its keep-alives can still be sent.
+///
+/// The Exit's SURB-level reports and its distress signals each need a SURB, and nothing else the Exit
+/// sends is as important to the Entry: a report is how a balancer that cannot see the Exit's stock
+/// learns it is running dry. One percent of the Entry's buffer target, at least 32, covers about that
+/// many seconds of a total outage at the one-second notification cadence, which is long enough for
+/// the Entry to hear it and refill.
+///
+/// Never more than a quarter of the target, as for the PIX fill reserve
+/// ([`effective_surb_reserve`]): an Entry that asks for a buffer shallower than the floor must not
+/// find the Exit unable to send it anything at all.
+fn keep_alive_surb_reserve(target: u64) -> u64 {
+    (target / 100).max(32).min(target / 4)
+}
+
+/// Holds an outgoing data packet back while the Exit's SURB stock is down to `reserve`.
+///
+/// Returns `None`, with nothing allocated, in the common case of a stock above the reserve. Otherwise
+/// the future resolves once the stock has risen above it, polling the estimate every
+/// [`SURB_RESERVE_POLL`]. It has no deadline of its own: the Session's own deadlines apply, and a
+/// Session that is closed drops the future with the sink.
+///
+/// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
+/// directly (see [`SessionManager::spawn_exit_keep_alive`]), and the PIX fill packets are bounded by
+/// their own `min_surb_reserve`. That is the point of the reserve: they are what it is held for.
+fn hold_for_surb_reserve(
+    session_id: SessionId,
+    estimator: &AtomicSurbFlowEstimator,
+    reserve: u64,
+) -> Option<futures::future::BoxFuture<'static, ()>> {
+    let stock = estimator.saturating_diff();
+    if stock > reserve {
+        return None;
+    }
+
+    debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
+    let estimator = estimator.clone();
+    Some(Box::pin(async move {
+        let held_since = Instant::now();
+        while estimator.saturating_diff() <= reserve {
+            hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
+        }
+        debug!(
+            %session_id,
+            held_for = ?held_since.elapsed(),
+            stock = estimator.saturating_diff(),
+            reserve,
+            "releasing held data: the SURB stock is above its keep-alive reserve again"
+        );
+    }))
+}
+
+/// The Exit's data egress for a rate-controlled Session: holds each packet back while the SURB stock
+/// is down to `reserve`, books the SURB it consumes, and passes it through the PIX egress gate.
+///
+/// Built as one piece, and not inline where the Session is set up, so that the order of its three
+/// steps can be tested: the SURB is booked only when the packet goes on, so a packet that is held is
+/// not counted against the very stock it is waiting for.
+fn exit_data_egress<Si>(
+    sink: Si,
+    session_id: SessionId,
+    estimator: AtomicSurbFlowEstimator,
+    reserve: u64,
+    gate: Option<Arc<ServiceGate>>,
+) -> impl Sink<EgressItem, Error = std::io::Error>
+where
+    Si: Sink<EgressItem, Error = std::io::Error>,
+{
+    sink.with(move |(routing, data): EgressItem| -> EgressPermit {
+        // Each outgoing packet consumes one SURB
+        let book_consumed = move |estimator: &AtomicSurbFlowEstimator| {
+            estimator.consumed.fetch_add(1, Ordering::Relaxed);
+            #[cfg(feature = "telemetry")]
+            telemetry::record_session_surb_consumed(&session_id, 1);
+        };
+        match hold_for_surb_reserve(session_id, &estimator, reserve) {
+            None => {
+                book_consumed(&estimator);
+                acquire_egress_permit(gate.clone(), routing, data)
+            }
+            Some(held) => {
+                let (estimator, gate) = (estimator.clone(), gate.clone());
+                futures::future::Either::Right(Box::pin(async move {
+                    held.await;
+                    book_consumed(&estimator);
+                    acquire_egress_permit(gate, routing, data).await
+                }))
+            }
+        }
+    })
+}
+
 /// Closes an established Session.
 ///
 /// Logs the counterpart of "new session established" (see [`SessionSlotGuard::commit`]): one line
@@ -4925,21 +5020,19 @@ where
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
                 (
-                    // Sent packets = SURB consumption estimate
-                    msg_sender
-                        .clone()
-                        .sink_map_err(std::io::Error::other)
-                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            // Each outgoing packet consumes one SURB
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_consumed(&session_id, 1);
-                            acquire_egress_permit(egress_gate.clone(), routing, data)
-                        })
-                        .rate_limit_with_controller(&egress_rate_control)
-                        .buffer((2 * target_surb_buffer_size) as usize),
+                    // Sent packets = SURB consumption estimate. Data is held back once the stock is down
+                    // to the reserve for the keep-alives: a rate-controlled Session has a balancer on the
+                    // other side that acts on what the Exit reports, which the `NoRateControl` branch
+                    // below has not.
+                    exit_data_egress(
+                        msg_sender.clone().sink_map_err(std::io::Error::other),
+                        session_id,
+                        surb_estimator_tx,
+                        keep_alive_surb_reserve(target_surb_buffer_size),
+                        egress_gate,
+                    )
+                    .rate_limit_with_controller(&egress_rate_control)
+                    .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate. Session data packets only: the
                     // SURBs of a keep-alive are booked in `handle_keep_alive`.
                     session_rx.inspect(move |data| {
@@ -15238,6 +15331,107 @@ mod tests {
             probe::non_zero(),
             "a Session that negotiated no PIX must contribute to no PIX aggregate"
         );
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // The Exit's keep-alive SURB reserve
+    // -----------------------------------------------------------------------
+
+    /// One percent of the target, at least 32, and never more than a quarter of it.
+    #[test]
+    fn the_keep_alive_reserve_should_be_one_percent_of_the_target_and_never_more_than_a_quarter() {
+        for (target, reserve, why) in [
+            (19_264, 192, "production target: one percent"),
+            (2_400, 32, "test-scale target: the floor"),
+            (3_200, 32, "one percent is the floor exactly"),
+            (10_000, 100, "one percent above the floor"),
+            (128, 32, "smallest target the floor fits in a quarter of"),
+            (40, 10, "a shallow buffer keeps three quarters for data"),
+            (0, 0, "no buffer, no reserve"),
+        ] {
+            assert_eq!(reserve, keep_alive_surb_reserve(target), "{why}");
+        }
+    }
+
+    fn data_packet() -> anyhow::Result<EgressItem> {
+        Ok((
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        ))
+    }
+
+    /// The Exit must not spend its last SURBs on data: they are what its keep-alives, level reports
+    /// and distress signals go out on. At the reserve the sink holds the packet, and it counts it
+    /// against the stock only when it goes on; once the stock is above the reserve again it goes.
+    #[tokio::test]
+    async fn data_should_be_held_back_while_the_surb_stock_sits_at_the_keep_alive_reserve() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let reserve = 32;
+        estimator.produced.store(reserve, Ordering::Relaxed);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            reserve,
+            None,
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { sink.send(item).await });
+
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                forwarded.next()
+            )
+            .await
+            .is_err(),
+            "a stock at the reserve must not send data"
+        );
+        assert_eq!(0, estimator.estimate_surbs_consumed(), "a held packet consumes nothing");
+        assert!(!sending.is_finished());
+
+        // A level report or a refill brings one more SURB than the reserve.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), forwarded.next())
+            .await
+            .context("the packet must go once the stock is above the reserve")?
+            .context("the sink must have forwarded it")?;
+        timeout(Duration::from_secs(5), sending).await???;
+        assert_eq!(1, estimator.estimate_surbs_consumed());
+        Ok(())
+    }
+
+    /// The common case: above the reserve nothing waits, and the packet is booked as it was.
+    #[tokio::test]
+    async fn data_should_pass_straight_through_above_the_keep_alive_reserve() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(33, Ordering::Relaxed);
+
+        let session_id = HoprPseudonym::random();
+        assert!(
+            hold_for_surb_reserve(session_id, &estimator, 32).is_none(),
+            "no hold, no allocation"
+        );
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            session_id,
+            estimator.clone(),
+            32,
+            None,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("above the reserve the packet must not wait")??;
+        assert!(forwarded.try_recv().is_ok(), "forwarded");
+        assert_eq!(1, estimator.estimate_surbs_consumed());
         Ok(())
     }
 }
