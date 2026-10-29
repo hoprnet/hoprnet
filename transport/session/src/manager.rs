@@ -3165,10 +3165,16 @@ where
                         }
                     });
 
+                    // The session is ready once a quarter of the target is believed to be at the
+                    // counterparty: that is the point the first replies can come home, and a quarter of
+                    // the target is already several seconds of replies at any rate the balancer sustains.
+                    // The first fill is paced at a fifth of the target a second, so this arrives after
+                    // about 1.25 s whatever the target, where half the target took about 2.5 s.
+                    //
                     // TODO: consider making this interactive = other party reports the exact level periodically
                     let wait_result = level_stream
                         .skip_while(|current_level| {
-                            futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
+                            futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 4)
                         })
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
@@ -7933,8 +7939,9 @@ mod tests {
     /// ## Steps
     /// 1. Alice's manager is started with no `PixToolbox` and a `SurbBalancerConfig` with `target_surb_buffer_size:
     ///    100`. Bob's manager is configured with a 500ms `surb_balance_notify_period`. Alice's first fill is paced, a
-    ///    fifth of the target a second, so the session is ready after about 2.5 s; Alice's balancer is seen to have
-    ///    armed the pacing, and Bob's not.
+    ///    fifth of the target a second, and a session is ready at a quarter of the target, so it is ready after 1.25 s
+    ///    of fill plus up to a sampling tick (1.5 s measured), and not before 0.8 s, which an unpaced fill at this
+    ///    test's ceiling would beat; Alice's balancer is seen to have armed the pacing, and Bob's not.
     /// 2. Alice initiates a session with the balancer config and PIX quota set; the `StartSession` /
     ///    `SessionEstablished` handshake completes via mock transports.
     /// 3. Both managers report the same `target_surb_buffer_size` via `get_surb_balancer_config` (confirmed from both
@@ -8155,8 +8162,9 @@ mod tests {
         };
 
         pin_mut!(new_session_rx_bob);
-        // The first fill is paced, so readiness (half the target) takes about 2.5 s whatever the target.
-        // Alice's slot exists from before the readiness wait, and the first thing seen of it is whether
+        // The first fill is paced, so readiness (a quarter of the target) takes 1.25 s of fill whatever the
+        // target, plus up to a sampling tick (1.5 s measured); the open is given 4 s. Alice's slot exists
+        // from before the readiness wait, and the first thing seen of it is whether
         // her balancer, the Entry's, armed the pacing of the first fill.
         let alice_slot_seen = async {
             loop {
@@ -8166,8 +8174,9 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         };
+        let opened_at = Instant::now();
         let (alice_session, bob_session, alice_first_fill_paced) = timeout(
-            Duration::from_secs(8),
+            Duration::from_secs(4),
             futures::future::join3(
                 alice_mgr.new_session(
                     bob_peer,
@@ -8184,9 +8193,16 @@ mod tests {
             ),
         )
         .await?;
+        let opening = opened_at.elapsed();
 
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+        // A quarter of a target of 100 at 20 SURBs a second is 1.25 s; the ceiling of this test, 100 a
+        // second, would have been ready in about a quarter of that.
+        assert!(
+            opening >= Duration::from_millis(800),
+            "a paced first fill cannot make the session ready this fast, it took {opening:?}"
+        );
         assert!(
             alice_first_fill_paced,
             "the Entry's balancer must pace its first fill like the refill after a wipe"
@@ -8216,7 +8232,7 @@ mod tests {
                 .get(alice_session.id())
                 .ok_or(anyhow!("alice must hold the session slot"))?;
 
-            // At cold start the gate must be open: readiness only waits for half the target, so a
+            // At cold start the gate must be open: readiness only waits for a quarter of the target, so a
             // gate that closed at or below that would stop the very production it is waiting on.
             assert_eq!(
                 1,
