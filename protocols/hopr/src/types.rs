@@ -57,8 +57,9 @@ pub struct AuxiliaryPacketInfo {
     /// `ring_share` value of the `cache` label of `hopr_surb_store_evictions_count`, and a warning per
     /// report interval). The redundancy budget that absorbs those losses is a fixed surplus per
     /// polynomial, and emission is windowed, so on deployed dimensions a burst of roughly
-    /// `surplus × SHARE_EMISSION_WINDOW` evicted share-bearing SURBs is enough to put polynomials
-    /// below their threshold — and a cycle short of recovery is worth nothing at all. See
+    /// `surplus × SHARE_EMISSION_WINDOW` evicted share-bearing SURBs (40 448 at the deployed 79 surplus
+    /// shares and a window of 512) is enough to put polynomials below their threshold — and a cycle
+    /// short of recovery is worth nothing at all. See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
     /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
     ///
