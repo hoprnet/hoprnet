@@ -370,7 +370,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 
                         #[cfg(all(feature = "telemetry", not(test)))]
                         {
-                            METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
+                            METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_metric_label()]);
                             METRIC_PACKET_REJECTED_COUNT.increment(&["invalid_ticket"]);
                             METRIC_TICKETS_COUNT.increment(&["rejected"]);
                         }
@@ -944,6 +944,11 @@ pub struct NoopTicketProcessor;
 
 impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
     type Error = std::convert::Infallible;
+
+    #[inline]
+    fn is_duplicate_ticket_index_error(_: &Self::Error) -> bool {
+        false
+    }
 
     #[inline]
     fn insert_unacknowledged_ticket(
@@ -1537,6 +1542,10 @@ mod tests {
 
     impl UnacknowledgedTicketProcessor for ScriptedTicketProc {
         type Error = ScriptedError;
+
+        fn is_duplicate_ticket_index_error(_: &Self::Error) -> bool {
+            false
+        }
 
         fn insert_unacknowledged_ticket(
             &self,

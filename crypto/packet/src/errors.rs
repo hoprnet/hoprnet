@@ -50,8 +50,7 @@ pub type Result<T> = std::result::Result<T, PacketError>;
 
 /// Contains all possible validation errors that can occur during [ticket
 /// validation](crate::validation::validate_unacknowledged_ticket).
-#[derive(Debug, Clone, Copy, Error, strum::AsRefStr)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Debug, Clone, Copy, Error)]
 pub enum ValidationErrorKind {
     /// Ticket signer does not match the sender.
     #[error("ticket signer does not match the sender")]
@@ -77,6 +76,26 @@ pub enum ValidationErrorKind {
     /// Not enough funds in the given channel to pay for the ticket.
     #[error("ticket value is greater than remaining unrealized balance {1} in channel {0}")]
     InsufficientFunds(ChannelId, HoprBalance),
+}
+
+impl ValidationErrorKind {
+    /// Stable metric label of each variant, used as the value of the `type` label of the
+    /// `hopr_packet_ticket_validation_errors` metric.
+    ///
+    /// This is the single source of truth for these names; adding a variant does not compile
+    /// until its label has been decided here.
+    pub const fn as_metric_label(&self) -> &'static str {
+        match self {
+            Self::InvalidSigner => "invalid_signer",
+            Self::LowValue(_) => "low_value",
+            Self::LowWinProb(_) => "low_win_prob",
+            Self::ChannelClosed(_) => "channel_closed",
+            Self::EpochMismatch(_) => "epoch_mismatch",
+            Self::IndexTooLow(_) => "index_too_low",
+            Self::WrongCounterparty(_) => "wrong_counterparty",
+            Self::InsufficientFunds(..) => "insufficient_funds",
+        }
+    }
 }
 
 /// Contains errors returned by [validate_unacknowledged_ticket](crate::validation::validate_unacknowledged_ticket).
@@ -113,42 +132,38 @@ mod tests {
                 WinningProbability::ALWAYS
             )
         );
-        assert_eq!(kind.as_ref(), "low_win_prob");
+        assert_eq!(kind.as_metric_label(), "low_win_prob");
     }
 
-    /// The `AsRefStr` representation of every variant is used as the value of the `type` label of
-    /// the `hopr_packet_ticket_validation_errors` metric, so the wire-visible names are pinned here
-    /// to catch an accidental rename.
-    ///
-    /// The expected label is derived from an exhaustive `match` (no wildcard arm), so adding a variant
-    /// does not compile until its metric label has been decided explicitly here.
+    /// The values of the `type` label of the `hopr_packet_ticket_validation_errors` metric are
+    /// pinned here to catch an accidental rename; they come from the single source of truth
+    /// ([ValidationErrorKind::as_metric_label]) itself.
     #[test]
     fn validation_error_kind_metric_labels_are_stable() {
         let destination = Address::new(&[0x11; Address::SIZE]);
 
         let kinds = [
-            ValidationErrorKind::InvalidSigner,
-            ValidationErrorKind::LowValue(HoprBalance::zero()),
-            ValidationErrorKind::LowWinProb(WinningProbability::ALWAYS),
-            ValidationErrorKind::ChannelClosed(Default::default()),
-            ValidationErrorKind::EpochMismatch(1),
-            ValidationErrorKind::IndexTooLow(1),
-            ValidationErrorKind::WrongCounterparty(destination),
-            ValidationErrorKind::InsufficientFunds(Default::default(), HoprBalance::zero()),
+            (ValidationErrorKind::InvalidSigner, "invalid_signer"),
+            (ValidationErrorKind::LowValue(HoprBalance::zero()), "low_value"),
+            (
+                ValidationErrorKind::LowWinProb(WinningProbability::ALWAYS),
+                "low_win_prob",
+            ),
+            (ValidationErrorKind::ChannelClosed(Default::default()), "channel_closed"),
+            (ValidationErrorKind::EpochMismatch(1), "epoch_mismatch"),
+            (ValidationErrorKind::IndexTooLow(1), "index_too_low"),
+            (
+                ValidationErrorKind::WrongCounterparty(destination),
+                "wrong_counterparty",
+            ),
+            (
+                ValidationErrorKind::InsufficientFunds(Default::default(), HoprBalance::zero()),
+                "insufficient_funds",
+            ),
         ];
 
-        for kind in kinds {
-            let expected = match kind {
-                ValidationErrorKind::InvalidSigner => "invalid_signer",
-                ValidationErrorKind::LowValue(_) => "low_value",
-                ValidationErrorKind::LowWinProb(_) => "low_win_prob",
-                ValidationErrorKind::ChannelClosed(_) => "channel_closed",
-                ValidationErrorKind::EpochMismatch(_) => "epoch_mismatch",
-                ValidationErrorKind::IndexTooLow(_) => "index_too_low",
-                ValidationErrorKind::WrongCounterparty(_) => "wrong_counterparty",
-                ValidationErrorKind::InsufficientFunds(..) => "insufficient_funds",
-            };
-            assert_eq!(kind.as_ref(), expected, "unexpected metric label for {kind:?}");
+        for (kind, expected) in kinds {
+            assert_eq!(kind.as_metric_label(), expected, "unexpected metric label for {kind:?}");
         }
     }
 

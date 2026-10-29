@@ -198,11 +198,9 @@ pub trait UnacknowledgedTicketProcessor {
     /// ticket whose index was already accepted on the same channel and epoch).
     ///
     /// Used by the processing pipeline to give such rejections their own rejection metric label.
-    /// Defaults to `false` for processors that cannot produce this error.
-    fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool {
-        let _ = error;
-        false
-    }
+    /// This method has no default so every processor must state explicitly whether its error type
+    /// can carry this rejection.
+    fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool;
 
     /// Finds and acknowledges previously inserted tickets, using incoming [`Acknowledgements`](Acknowledgement) from
     /// the upstream [`peer`](OffchainPublicKey).
