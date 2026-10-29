@@ -447,22 +447,11 @@ where
     let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
     // First, so it is in the log even when the configuration or the chain fails below.
-    const ENABLED_FEATURES: &[&str] = include!(concat!(env!("OUT_DIR"), "/enabled_features.rs"));
     tracing::info!(
         version = constants::APP_VERSION,
-        features = ?ENABLED_FEATURES,
+        features = env!("ACTIVE_FEATURES"),
         peer = %ctx.packet_key.public().to_peerid_str(),
-        peer_addr = %ctx.chain_key.public().to_address(),
-        safe = %ctx.cfg.safe_module.safe_address,
-        module = %ctx.cfg.safe_module.module_address,
-        host = %ctx.cfg.host,
-        publish = ctx.cfg.publish,
-        outgoing_ticket_price = ?ctx.cfg.protocol.packet.codec.outgoing_ticket_price.map(|price| price.to_string()),
-        outgoing_win_prob = ?ctx.cfg.protocol.packet.codec.outgoing_win_prob.map(|prob| prob.to_string()),
-        max_sessions = ctx.cfg.protocol.session.maximum_managed_sessions,
-        session_idle_timeout = ?ctx.cfg.protocol.session.idle_timeout,
-        probe_interval = ?ctx.cfg.protocol.probe.interval,
-        mixer = ?ctx.cfg.protocol.mixer.mixer_type,
+        chain_addr = %ctx.chain_key.public().to_address(),
         "starting node"
     );
     tracing::debug!(config = ?ctx.cfg, "node configuration");
