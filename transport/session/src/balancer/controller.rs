@@ -222,6 +222,14 @@ pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 /// verdicts are made of. The organic gate is open for the whole refill anyway, so spreading it over
 /// a few seconds costs little: the SURBs of the next data packets arrive in the meantime.
 ///
+/// The start of a session at the Entry is the same state: the counterparty holds nothing, the level
+/// estimate says so, and the PID would command its ceiling from the first tick. That flood lost
+/// replies at session start (one flush tick about three seconds in: 1037 expected, 201 observed),
+/// the corroborated verdict judged the two slowest relayers dead on those, and wiped the fresh
+/// stock; hoprnet#8484's cold burst was the same flood seen from the data path. The Entry arms the
+/// same pacing when its balancer starts ([`BalancerStateValues::arm_refill_pacing`]), and the fill
+/// reaches the target in about five seconds instead of one and a half, sparing the relays.
+///
 /// While the window lasts the PID does not run: the balancer commands the cap while the level is
 /// below the target and nothing from the moment it is reached. A cap applied to the PID's output
 /// instead would let it integrate the full error for the whole window and answer a level at or past
@@ -486,10 +494,25 @@ impl BalancerStateValues {
     /// report, being above what is believed here, is dropped (see
     /// [`observe_reported_level`](Self::observe_reported_level)).
     pub fn on_counterparty_wiped(&self) {
-        use std::sync::atomic::Ordering::{Relaxed, Release};
+        use std::sync::atomic::Ordering::Release;
 
         self.buffer_level.store(0, Release);
         self.counterparty_wiped.store(true, Release);
+        self.arm_refill_pacing();
+    }
+
+    /// Holds the refill of an empty counterparty to `target / REFILL_PACING_SECS` SURBs per second for
+    /// [`REFILL_PACING_SECS`] (at least one per second), whatever the PID would command. A disabled
+    /// balancer arms nothing.
+    ///
+    /// The second half of [`on_counterparty_wiped`](Self::on_counterparty_wiped), and what the Entry
+    /// calls when its balancer starts: a session that has just been opened is in the same state as one
+    /// that has just been wiped, the counterparty holds nothing and the level estimate says so, and
+    /// the PID would command its ceiling just the same. Unlike a wipe it resets nothing: the estimate
+    /// is already empty, and what the first tick produced is the new session's.
+    pub fn arm_refill_pacing(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+
         if self.is_disabled() {
             return;
         }
@@ -505,7 +528,7 @@ impl BalancerStateValues {
 
     /// Whether the refill after a wipe is still paced. Read-only: unlike [`pace_refill`](Self::pace_refill)
     /// it does not use up any of the window.
-    fn refill_pacing_active(&self) -> bool {
+    pub(crate) fn refill_pacing_active(&self) -> bool {
         self.refill_pacing.load(std::sync::atomic::Ordering::Relaxed) & u64::from(u32::MAX) > 0
     }
 
@@ -1960,6 +1983,71 @@ mod tests {
             first_free < cfg.max_surbs_per_sec,
             "a level at 80 % of the target is not met with the ceiling: {first_free}"
         );
+    }
+
+    /// A session that has just been opened is in the state a wipe leaves: the counterparty holds nothing
+    /// and the PID would command its ceiling at once. The Entry arms the same pacing when its balancer
+    /// starts, and the output is the cap, a fifth of the target, for the whole window, whatever the PID
+    /// would say; then a fresh controller answers the level the fill reached. Nothing is reset on the
+    /// way in: what was minted before the first tick is the new session's.
+    #[test_log::test]
+    fn a_fresh_entry_balancer_should_pace_its_initial_fill() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+        assert_eq!(1_400, cap);
+        assert!(!state.refill_pacing_active(), "precondition: a new state paces nothing");
+
+        // What the Entry does as its balancer starts; some SURBs are already on their way.
+        state.arm_refill_pacing();
+        estimator.produced.fetch_add(100, Relaxed);
+
+        let mut outputs = Vec::new();
+        tick_for(&mut balancer, step);
+        outputs.push(output.load(Relaxed));
+        assert_eq!(100, state.buffer_level(), "starting paced does not reset the estimate");
+
+        // The fill reaches 80 % of the target inside the window; the PID, if it ran, would still ask for
+        // everything it may.
+        let level = cfg.target_surb_buffer_size * 4 / 5;
+        estimator.produced.fetch_add(level - 100, Relaxed);
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            outputs.push(output.load(Relaxed));
+            assert!(outputs.len() < 200, "the window must end");
+        }
+
+        // The window is five seconds of 50 ms ticks; margins of half a second either side, so that a slow
+        // tick cannot move the edge into the assertion.
+        let window = (REFILL_PACING_SECS * 1000 / step.as_millis() as u64) as usize;
+        assert!(
+            outputs.len().abs_diff(window) <= 10,
+            "the window lasts about {window} ticks: {}",
+            outputs.len()
+        );
+        assert!(
+            outputs.iter().all(|output| *output == cap),
+            "the output is the cap, {cap}, on every tick of the window: {outputs:?}"
+        );
+
+        tick_for(&mut balancer, step);
+        let first_free = output.load(Relaxed);
+        assert_eq!(fresh_controller_output(cfg, level), first_free);
+        assert!(
+            first_free < cfg.max_surbs_per_sec,
+            "a level at 80 % of the target is not met with the ceiling: {first_free}"
+        );
+    }
+
+    /// Arming does nothing for a balancer that is switched off.
+    #[test]
+    fn arming_the_pacing_of_a_disabled_balancer_should_do_nothing() {
+        let state = BalancerStateValues::default();
+        state.arm_refill_pacing();
+        assert!(!state.refill_pacing_active());
     }
 
     /// The refill stops by itself the moment the target is reached, and stays stopped until the window
