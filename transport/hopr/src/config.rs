@@ -1125,12 +1125,13 @@ mod tests {
         // produces, and the liveness counter is what absorbs it.
         let surplus_run = cfg.pix.surplus_shares() as u64 * cfg.pix.num_ssa_parts.min(SHARE_EMISSION_WINDOW) as u64;
         assert_eq!(
-            20_224, surplus_run,
-            "the shipped dimensions produce a 20 224-packet run of non-useful shares. This is a tripwire on the \
-             product of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` \
-             (or the surplus: `additional_shares`, or the default an unset one resolves to), \
-             `PixGlobalConfig::num_ssa_parts`, or `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive \
-             the run, then re-check that nothing has started keying liveness on useful shares again"
+            40_448, surplus_run,
+            "the shipped dimensions produce a 40 448-packet run of non-useful shares (79 x a window of 512; it was 20 \
+             224 at a window of 256). This is a tripwire on the product of three values rather than an invariant: if \
+             it moves, one of `PixGlobalConfig::ssa_part_size` (or the surplus: `additional_shares`, or the default \
+             an unset one resolves to), `PixGlobalConfig::num_ssa_parts`, or \
+             `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive the run, then re-check that nothing \
+             has started keying liveness on useful shares again"
         );
     }
 

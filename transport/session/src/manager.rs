@@ -5824,14 +5824,14 @@ where
         // reached the last committed cycle — which, with the window clamped to one cycle, means every
         // earlier one is exhausted — *and* it must be far enough into that cycle. Checking only the
         // index admitted a successor batch on the last cycle's very first share, i.e. ~0 % of the way
-        // through the batch rather than the ~83 % at which a conforming Exit asks. That is nearly a
+        // through the batch rather than the ~79 % at which a conforming Exit asks. That is nearly a
         // whole cycle of unearned deposits, on a gate whose entire purpose is to prevent them.
         //
         // The boundary is derived rather than guessed — see `min_emission_for_early_recovery`, which
         // accounts for the Exit counting *polynomials* and for emission running in lockstep windows
         // that spend their whole surplus before the next window starts. A flat fraction of the cycle
         // gets this badly wrong in the unsafe direction: 0.85 over the 3.47× surplus factor is 24.5 %,
-        // against a true boundary of 83.0 % at the deployed dimensions.
+        // against a true boundary of 78.6 % at the deployed dimensions.
         //
         // Being early is refused rather than fatal, and deliberately not via `refuse_ssa_request`,
         // which closes the Session: that message is dropped and the Session left running. A correct
@@ -12903,12 +12903,13 @@ mod tests {
             &params,
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
-        assert_eq!(377_498, undiscounted);
+        assert_eq!(357_274, undiscounted);
 
-        // floor(μ − 4σ) for μ = 377 498 × (1 − L) = 187 660.58 and σ = √(377 498 · L · (1 − L)) =
-        // 307.20, at L = 0.502 883 257 4… computed independently at 60 significant digits.
+        // floor(μ − 4σ) for μ = 357 274 × (1 − L) = 177 606.89 and σ = √(357 274 · L · (1 − L)) =
+        // 298.86, at L = 0.502 883 257 4… computed independently at 90 significant digits. (At a
+        // window of 256 the boundary was 377 498 and the bar 186 431.)
         let required = required_returned_packets(&params, 1);
-        assert_eq!(186_431, required);
+        assert_eq!(176_411, required);
 
         let tolerated = params.tolerated_share_loss();
         let mean = undiscounted as f64 * (1.0 - tolerated);
@@ -12922,8 +12923,8 @@ mod tests {
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.409..0.411).contains(&fraction),
-            "the deployed successor boundary must sit at ~41.0% of a cycle's returned packets, got {fraction}"
+            (0.387..0.389).contains(&fraction),
+            "the deployed successor boundary must sit at ~38.8% of a cycle's returned packets, got {fraction}"
         );
 
         // A lossless conforming Exit asks no earlier than `ceil(0.85 × 4096)` recovered polynomials,
@@ -12961,8 +12962,8 @@ mod tests {
     /// The discount is the tolerance of the *negotiated* split, so an Entry that expects unreliable
     /// return relayers and buys more surplus loosens its own gate by exactly that much: how strict the
     /// gate is follows from the Entry's insurance choice rather than being a knob of its own. At
-    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~11.3 % of a cycle's
-    /// packets against the deployed split's ~41.0 %.
+    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~10.4 % of a cycle's
+    /// packets against the deployed split's ~38.8 %.
     ///
     /// Driven through `handle_ssa_request` at the real dimensions rather than only through
     /// [`required_returned_packets`], because the property is that the gate reads the Session's own
@@ -12977,15 +12978,15 @@ mod tests {
         );
 
         let required = required_returned_packets(&params, 1);
-        // floor(μ − 4σ) for μ = 346 522 × (1 − L) = 48 876.87 and σ = 204.90, at L = 0.858 950 169 2…
-        // computed independently at 80 significant digits.
-        assert_eq!(346_522, undiscounted);
-        assert_eq!(48_057, required);
+        // floor(μ − 4σ) for μ = 320 410 × (1 − L) = 45 193.78 and σ = 197.03, at L = 0.858 950 169 2…
+        // computed independently at 90 significant digits. (At a window of 256: 346 522 and 48 057.)
+        assert_eq!(320_410, undiscounted);
+        assert_eq!(44_405, required);
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.112..0.114).contains(&fraction),
-            "the successor boundary of 4096 x (2 + 102) must sit at ~11.3% of a cycle's returned packets, got \
+            (0.103..0.105).contains(&fraction),
+            "the successor boundary of 4096 x (2 + 102) must sit at ~10.4% of a cycle's returned packets, got \
              {fraction}"
         );
 
@@ -13161,14 +13162,17 @@ mod tests {
     /// at this split ~18 % of the time by more than the near-miss window, at once; `RequestSsa` is
     /// never retried, so the Session then died on `max_ssa_delivery_time`.
     ///
-    /// The draw is the one an independent review reproduced that with, at the surplus derived for
-    /// `2048 × 64`: 151 352 of 303 565 packets arrived, 391 short of the mean.
+    /// The draw is a reproduction of that at the surplus derived for `2048 × 64`: 159 028 of 319 693
+    /// packets arrived, 777 short of the mean (an independent review's draw at the window of 256 was
+    /// 391 short; the window is now twice as wide, so the fixture has to fall further short to be more
+    /// than one window short).
     #[test_log::test(tokio::test)]
     async fn an_honest_exit_at_the_tolerated_loss_is_not_refused_for_its_variance() -> anyhow::Result<()> {
         use hopr_protocol_pix::{MIN_EARLY_RECOVERY_THRESHOLD, SHARE_EMISSION_WINDOW, default_surplus_for};
 
-        // 303 565 independent fair bits (Python `random.Random(3)`).
-        const ARRIVED: u64 = 151_352;
+        // 319 693 independent fair bits: `sum(r.getrandbits(1) for _ in range(319_693))` with
+        // `r = random.Random(60)`. (Seed 3 and 303 565 bits, 151 352 arrivals, at a window of 256.)
+        const ARRIVED: u64 = 159_028;
 
         let params = PixParams::try_new(2048, 64, default_surplus_for(2048, 64), LOCAL_PIX_SUITE)?;
         assert_eq!(123, params.surplus_shares());
@@ -13180,17 +13184,17 @@ mod tests {
         );
 
         let boundary = hopr_protocol_pix::min_emission_for_early_recovery(&params, MIN_EARLY_RECOVERY_THRESHOLD);
-        assert_eq!(303_565, boundary);
+        assert_eq!(319_693, boundary);
 
-        // floor(μ − 4σ) for μ = 303 565 × (1 − L) = 151 743.28 and σ = 275.48, at
+        // floor(μ − 4σ) for μ = 319 693 × (1 − L) = 159 805.20 and σ = 282.71, at
         // L = 0.500 129 201 488 385 6.
         let required = required_returned_packets(&params, 1);
-        assert_eq!(150_641, required);
+        assert_eq!(158_674, required);
 
         // What this pins: a bar at the mean would have refused the draw outright, never reaching the
         // near-miss wait, where the confidence bound admits it.
         let at_the_mean = (boundary as f64 * (1.0 - params.tolerated_share_loss())) as u64;
-        assert_eq!(151_743, at_the_mean);
+        assert_eq!(159_805, at_the_mean);
         assert!(
             ARRIVED + (SHARE_EMISSION_WINDOW as u64) < at_the_mean,
             "the draw must fall more than one emission window short of the mean, or a mean bar would have waited"
