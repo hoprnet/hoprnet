@@ -3096,6 +3096,14 @@ where
                     );
                     abort_handles.insert(SessionHandles::KeepAlive, ka_abort_handle);
 
+                    // The Exit holds nothing yet, which is the state a wipe leaves it in: pace the
+                    // first fill like the refill after one, or the PID commands its ceiling from the
+                    // first tick and the flood loses the replies the verdicts are made of. The target
+                    // is set from the configuration here, so this is the point it first is non-zero;
+                    // the `BalancerTarget` keep-alive path is the Exit receiving the Entry's target,
+                    // and does not arm anything.
+                    surb_mgmt.arm_refill_pacing();
+
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
                     let balancer = SurbBalancer::new(
@@ -6560,6 +6568,49 @@ mod tests {
         Ok(())
     }
 
+    /// The Exit's balancer is not paced at its start. It holds the SURBs the Entry sends and paces the
+    /// Exit's own egress; the fill of an empty counterparty is the Entry's to pace, and the Exit's
+    /// incoming-session path is not where that is armed.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_balancer_is_not_paced_at_start() -> anyhow::Result<()> {
+        for (offer, balancing, why) in [
+            (no_pix_offer(), true, "a rate-controlled session"),
+            (
+                StartInitiation {
+                    capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::NoRateControl),
+                    ..no_pix_offer()
+                },
+                false,
+                "a session that opts out of rate control",
+            ),
+        ] {
+            let (mgr, sender, transport, _err_rx, _incoming) =
+                started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+            let pseudonym = HoprPseudonym::random();
+            mgr.handle_incoming_session_initiation(pseudonym, offer).await?;
+
+            {
+                let slot = mgr
+                    .sessions
+                    .get(&pseudonym)
+                    .ok_or(anyhow!("the incoming session must have a slot"))?;
+                assert_eq!(
+                    balancing,
+                    !slot.surb_mgmt.is_disabled(),
+                    "{why}: precondition, the Exit's balancer runs exactly when the session is rate controlled"
+                );
+                assert!(
+                    !slot.surb_mgmt.refill_pacing_active(),
+                    "{why}: no pacing at the Exit's start"
+                );
+            }
+
+            sender.close_channel();
+            transport.await??;
+        }
+        Ok(())
+    }
+
     #[async_trait::async_trait]
     trait SendMsg {
         async fn send_message(
@@ -7881,13 +7932,15 @@ mod tests {
     ///
     /// ## Steps
     /// 1. Alice's manager is started with no `PixToolbox` and a `SurbBalancerConfig` with `target_surb_buffer_size:
-    ///    10`. Bob's manager is configured with a 500ms `surb_balance_notify_period`.
+    ///    100`. Bob's manager is configured with a 500ms `surb_balance_notify_period`. Alice's first fill is paced, a
+    ///    fifth of the target a second, so the session is ready after about 2.5 s; Alice's balancer is seen to have
+    ///    armed the pacing, and Bob's not.
     /// 2. Alice initiates a session with the balancer config and PIX quota set; the `StartSession` /
     ///    `SessionEstablished` handshake completes via mock transports.
     /// 3. Both managers report the same `target_surb_buffer_size` via `get_surb_balancer_config` (confirmed from both
     ///    Alice and Bob's perspective).
     /// 4. A 1500ms sleep allows the SURB balancer's periodic keep-alive timer to fire multiple times.
-    /// 5. `update_surb_balancer_config` is called to raise the target to 50. After another 1500ms, Bob's manager
+    /// 5. `update_surb_balancer_config` is called to raise the target to 200. After another 1500ms, Bob's manager
     ///    reflects the updated target via `get_surb_balancer_config`, confirming keep-alives communicated the change.
     /// 6. `get_surb_level_estimates` is called on both sides; both report positive sent/received/used counts,
     ///    confirming the balancer collected SURB statistics.
@@ -7962,7 +8015,9 @@ mod tests {
                 })
             });
 
-        const INITIAL_BALANCER_TARGET: u64 = 10;
+        // Large enough for the paced first fill (a fifth of the target per second) to have delivered
+        // something by Bob's first level report, 500 ms in; the mock accepts only reports above zero.
+        const INITIAL_BALANCER_TARGET: u64 = 100;
 
         // Alice sends the KeepAlive messages reporting the initial balancer target
         let bob_mgr_clone = bob_mgr.clone();
@@ -7991,7 +8046,7 @@ mod tests {
                 })
             });
 
-        const NEXT_BALANCER_TARGET: u64 = 50;
+        const NEXT_BALANCER_TARGET: u64 = 200;
 
         // Alice sends also the KeepAlive messages reporting the updated balancer target
         let bob_mgr_clone = bob_mgr.clone();
@@ -8100,9 +8155,20 @@ mod tests {
         };
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = timeout(
-            Duration::from_secs(2),
-            futures::future::join(
+        // The first fill is paced, so readiness (half the target) takes about 2.5 s whatever the target.
+        // Alice's slot exists from before the readiness wait, and the first thing seen of it is whether
+        // her balancer, the Entry's, armed the pacing of the first fill.
+        let alice_slot_seen = async {
+            loop {
+                if let Some(slot) = alice_mgr.sessions.get(&alice_pseudonym) {
+                    break slot.surb_mgmt.refill_pacing_active();
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        };
+        let (alice_session, bob_session, alice_first_fill_paced) = timeout(
+            Duration::from_secs(8),
+            futures::future::join3(
                 alice_mgr.new_session(
                     bob_peer,
                     SessionTarget::TcpStream(target.clone()),
@@ -8114,12 +8180,26 @@ mod tests {
                     },
                 ),
                 new_session_rx_bob.next(),
+                alice_slot_seen,
             ),
         )
         .await?;
 
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+        assert!(
+            alice_first_fill_paced,
+            "the Entry's balancer must pace its first fill like the refill after a wipe"
+        );
+        assert!(
+            !bob_mgr
+                .sessions
+                .get(bob_session.session.id())
+                .ok_or(anyhow!("bob must hold the session slot"))?
+                .surb_mgmt
+                .refill_pacing_active(),
+            "the Exit's balancer does not pace anything at its start"
+        );
 
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
