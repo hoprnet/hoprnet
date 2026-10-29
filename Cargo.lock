@@ -2804,7 +2804,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -4131,9 +4131,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "4.13.0"
+version = "4.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8be6fd9b90421c230f80c6ba872cd02c65cfd5e84cdb99956edbd8a6dac6334c"
+checksum = "6e85561b44edb53ac213e410dc7dcd7f63dc5033c1eeedd3bbbc176865e0d569"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4149,9 +4149,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.22.3"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c805b5755f0ce79e8047da0325e28b94a18fc3d56e55736e40e5012d43a33c0"
+checksum = "fb05e85fff1d50a43e1c96b7cc97ba3b7680409499f4df1b1e134cdf9dbf1bb4"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4612,9 +4612,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "2.3.0"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a19fe24538d5d68590496763119afbb5f8ccb466f88abbf36cda7a8c7d49e1f1"
+checksum = "bec92b423d1908e069067096294adb8119b4e25fb2ae687f97020d61b3f6954b"
 dependencies = [
  "aes 0.9.2",
  "anyhow",
@@ -4676,9 +4676,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7883d6a0c8865972b9e700972ed5fc6c76f96a02721bf37176890939682d64f1"
+checksum = "1ba683da5035a6a5fa45822c2ba59872874c7c49aad77f06a7ac17e23d8a6311"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -8698,7 +8698,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
