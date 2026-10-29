@@ -42,6 +42,10 @@ name = "transport_p2p-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_probe_delay-size3"
+required-features = ["testing"]
+
+[[test]]
 name = "transport_session"
 required-features = ["testing"]
 
