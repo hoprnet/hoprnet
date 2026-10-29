@@ -56,7 +56,11 @@ fn default_target_occupancy() -> usize {
     serde(deny_unknown_fields)
 )]
 pub struct MixerConfig {
-    /// Preallocated buffer capacity; more items may still be inserted, triggering reallocation.
+    /// Hard upper bound on the mixer heap size.
+    ///
+    /// Items beyond this capacity are rejected via `SenderError::Full` or
+    /// cause `poll_ready` to return `Pending` (backpressure). Also used as a
+    /// pre-allocation hint via `BinaryHeap::reserve`.
     #[default(HOPR_MIXER_CAPACITY)]
     #[validate(range(min = 1))]
     pub capacity: usize,

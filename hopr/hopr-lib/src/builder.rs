@@ -468,6 +468,12 @@ where
     tracing::debug!(config = ?ctx.cfg, "node configuration");
     ctx.cfg.validate()?;
 
+    let network_tuning = crate::helpers::NetworkTuningReport::collect();
+    tracing::info!(?network_tuning, "OS network tuning specs");
+    for recommendation in network_tuning.recommendations() {
+        tracing::warn!("{recommendation}");
+    }
+
     let chain_api = (configured
         .chain_factory
         .ok_or(HoprLibError::BuilderError("missing chain factory"))?)(&ctx);
