@@ -45,6 +45,17 @@ impl<const C: usize> SegmentRequest<C> {
     pub fn is_empty(&self) -> bool {
         self.0.iter().take(Self::MAX_ENTRIES).all(|(_, e)| e.count_ones() == 0)
     }
+
+    /// Iterates the frame IDs named by this request, in ascending order.
+    ///
+    /// Bounded to [`Self::MAX_ENTRIES`] entries, like [`Self::len`] and [`Self::is_empty`].
+    ///
+    /// Exists so a handler can decide admission per frame *before* [`IntoIterator`] materialises one
+    /// [`SegmentId`] per requested bit — up to `MAX_ENTRIES * MAX_MISSING_SEGMENTS_PER_FRAME` ids for a
+    /// full request, which a throttled request must not pay for.
+    pub fn frames(&self) -> impl Iterator<Item = FrameId> + '_ {
+        self.0.keys().take(Self::MAX_ENTRIES).copied()
+    }
 }
 
 impl<const C: usize> IntoIterator for SegmentRequest<C> {
