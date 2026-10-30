@@ -25,6 +25,7 @@
 //! | `hopr_pix_cycles_active` | MultiGauge | cycles | supervisor turn (census delta) | `phase` = `awaiting_commitment\|awaiting_deposit\|recovering\|paid_tail` |
 //! | `hopr_pix_predeposit_exposure_packets` | SimpleGauge | packets | supervisor turn (census delta) | — |
 //! | `hopr_pix_live_cycle_bytes` | SimpleGauge | bytes | admission reservation / release | — |
+//! | `hopr_pix_held_shares` | SimpleGauge | shares | resolution drain (recomputed) | — |
 //! | `hopr_pix_cycle_bytes_reserved_total` | SimpleCounter | bytes | admission reservation | — |
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
@@ -240,6 +241,10 @@ lazy_static::lazy_static! {
         "hopr_pix_live_cycle_bytes",
         "Reconstructor-cycle bytes currently reserved against the node's max_live_cycle_bytes"
     ).unwrap();
+    static ref METRIC_PIX_HELD_SHARES: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
+        "hopr_pix_held_shares",
+        "Shares held by the part builders of live PIX cycles on this Exit, until their polynomial reconstructs"
+    ).unwrap();
     static ref METRIC_PIX_CYCLE_BYTES_RESERVED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_pix_cycle_bytes_reserved_total",
         "Reconstructor-cycle bytes ever reserved at PIX session admission"
@@ -365,6 +370,16 @@ pub(crate) fn record_admission_rejection(reason: PixAdmissionRejection) {
 /// sound only because the two mutations are exactly paired: `CycleBudgetReservation::release` is
 /// idempotent and `Drop`-backed, so every reservation is returned exactly once. The cumulative
 /// counters are what let an operator check that from outside — see the module's query on leaks.
+/// Publishes the shares the reconstructor's live part builders hold right now.
+///
+/// The reservation gauge above is the adversarial bound a cycle is admitted against; this is the
+/// occupancy a conforming Entry actually produces, which the emission window bounds at
+/// `SHARE_EMISSION_WINDOW × (threshold − 1)` per cycle. Read together they say how much of the
+/// budget is in use rather than merely reserved.
+pub(crate) fn set_held_shares(count: usize) {
+    METRIC_PIX_HELD_SHARES.set(count as f64);
+}
+
 pub(crate) fn record_cycle_bytes_reserved(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RESERVED.increment_by(bytes);
     METRIC_PIX_LIVE_CYCLE_BYTES.increment(bytes as f64);
