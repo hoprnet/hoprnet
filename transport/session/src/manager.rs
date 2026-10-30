@@ -2157,7 +2157,9 @@ pub struct SessionManager<S> {
     /// upwards races past it.
     ///
     /// An async lock rather than a blocking one because the guarded region awaits — commitment
-    /// generation goes to a blocking pool, and publication awaits the transport.
+    /// generation goes to a blocking pool, and publication awaits the transport. It is only ever
+    /// `try_lock`ed, though: a request that finds it held is refused rather than parked on a shared
+    /// Start handler behind the holder (see `handle_ssa_request`).
     ///
     /// A `moka` cache rather than a map, for its idle eviction: a `HashMap` keyed by pseudonym would
     /// otherwise retain one entry per Session for the life of the process.
@@ -5906,11 +5908,23 @@ where
         // Everything from here to the end of the batch is serialised per pseudonym. Start messages run
         // under `for_each_concurrent`, so the successor gate below would otherwise be read by several
         // requests before any of them advanced it, and every one would pass. See `ssa_request_locks`.
+        //
+        // Taken without waiting: a request that finds another one already here is refused, not
+        // queued. The holder can keep it for a whole commitment generation and publication, and every
+        // request waiting behind it would park one of the shared Start handlers for that long — so an
+        // Exit spending one SURB per request on its own Session could occupy all of them. A
+        // conforming Exit never has two of these in flight; it asks for a successor only once the
+        // current batch is nearly recovered, long after that batch was committed.
         let request_lock = self
             .ssa_request_locks
             .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
             .await;
-        let _request_guard = request_lock.lock().await;
+        let Some(_request_guard) = request_lock.try_lock() else {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "an SSA request for {pseudonym} is already being processed"
+            ))
+            .into());
+        };
 
         // Successor gate, the Entry's half of the one in `SessionPixSupervisor`. A correct Exit asks
         // for the next batch when the *last* cycle of the current one is nearly recovered, by which
@@ -13124,6 +13138,65 @@ mod tests {
             "refusing an Exit that returned nothing took {elapsed:?}, which is within reach of the \
              {SSA_SUCCESSOR_SERVICE_WAIT:?} near-miss wait — it must not have entered it at all"
         );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A request that finds its Session's request lock held is refused at once, not queued behind it.
+    ///
+    /// The holder may keep the lock for a whole commitment generation and publication. Every request
+    /// waiting on it would park one of the shared Start handlers for that long, so an Exit sending
+    /// requests for its own Session, one SURB each, could occupy all of them — the same symptom the
+    /// dispatch filter closes for pseudonyms nobody issued.
+    ///
+    /// ## Steps
+    /// 1. The Session's request lock is held, as a batch being committed holds it.
+    /// 2. An otherwise acceptable opening request is refused as `Unacceptable` without waiting, and opens no cycle.
+    /// 3. Control: once the lock is released, the same request is accepted.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_request_finding_its_session_busy_is_refused_without_waiting() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, _generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        let request_lock = mgr
+            .ssa_request_locks
+            .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
+            .await;
+        let held = request_lock.lock().await;
+
+        let refused = timeout(
+            Duration::from_secs(1),
+            mgr.handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            ),
+        )
+        .await
+        .context("a request finding its Session busy must not wait for the lock")?;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "expected Unacceptable, got {refused:?}"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "a refused request must not open a cycle"
+        );
+
+        drop(held);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the same request must be accepted once the lock is free")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         bob_sender.close_channel();
         bob_handle.await??;
