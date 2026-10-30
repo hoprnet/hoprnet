@@ -10671,6 +10671,140 @@ mod tests {
         Ok(())
     }
 
+    /// The filter's remaining arms: an `SsaCommit` is admitted only for a registered Session named
+    /// under its own pseudonym, and a `SessionEstablished` or `SessionError(Challenge)` only for a
+    /// challenge this node is still waiting on.
+    ///
+    /// ## Steps
+    /// 1. A started manager holds one Return (Exit-side) slot, which is where `SsaCommit`s go, and two pending
+    ///    initiation challenges — one per reply, so the handler consuming one cannot race the other's dispatch.
+    /// 2. Each message naming state the node lacks is dropped as stale: an `SsaCommit` for an unregistered Session or
+    ///    naming the slot under another pseudonym, and a `SessionEstablished` and a `SessionError` for a challenge
+    ///    nobody issued.
+    /// 3. Each message naming that state is admitted.
+    #[test_log::test(tokio::test)]
+    async fn ssa_commits_and_initiation_replies_are_admitted_only_for_local_state() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let exit_pseudonym = HoprPseudonym::random();
+        let _exit_rx =
+            mgr.pre_populate_session_with_receiver(exit_pseudonym, DestinationRouting::Return(exit_pseudonym.into()));
+
+        // Reserved the way `new_session` reserves them. The receivers are kept so that a reply the
+        // handler forwards has somewhere to go.
+        let established_challenge = MIN_CHALLENGE;
+        let error_challenge = MIN_CHALLENGE + 1;
+        let unknown_challenge = MIN_CHALLENGE + 2;
+        let _receivers = [established_challenge, error_challenge]
+            .into_iter()
+            .map(|challenge| {
+                let (tx, rx): (
+                    crossfire::MTx<crossfire::mpsc::One<_>>,
+                    crossfire::AsyncRx<crossfire::mpsc::One<_>>,
+                ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
+                mgr.session_initiations.insert(challenge, tx);
+                rx
+            })
+            .collect::<Vec<_>>();
+
+        let identity = HoprPixGroupElement::try_from(
+            hopr_protocol_pix::PixGroup::<HoprPixSpec>::default()
+                .to_bytes()
+                .as_ref(),
+        )
+        .ok()
+        .context("identity element must be valid")?;
+        // A non-constant term, so it is well-formed without a commitment proof.
+        let ssa_commit = |session_id: SessionId| {
+            start_packet(HoprStartProtocol::SsaCommit(SsaClientCommitmentMessage {
+                session_id,
+                ssa_index: SsaIndex::new(1).context("non-zero")?,
+                coefficient_index: 1,
+                commitment_proof: None,
+                coefficient_commitments: [(0, identity)].into(),
+            }))
+        };
+        // The filter keys both replies on the challenge alone, not on the pseudonym they arrive under.
+        let replier = HoprPseudonym::random();
+        let established = |orig_challenge: StartChallenge| {
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge,
+                session_id: replier,
+            }))
+        };
+        let error = |challenge: StartChallenge| {
+            start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(challenge),
+                reason: StartErrorReason::Unknown,
+            }))
+        };
+
+        let stranger = HoprPseudonym::random();
+        for (case, pseudonym, packet) in [
+            (
+                "an SsaCommit for an unregistered Session",
+                stranger,
+                ssa_commit(stranger)?,
+            ),
+            (
+                "an SsaCommit naming a registered Session under another pseudonym",
+                stranger,
+                ssa_commit(exit_pseudonym)?,
+            ),
+            (
+                "a SessionEstablished for a challenge nobody issued",
+                replier,
+                established(unknown_challenge)?,
+            ),
+            (
+                "a SessionError for a challenge nobody issued",
+                replier,
+                error(unknown_challenge)?,
+            ),
+        ] {
+            let result = mgr.dispatch_message(pseudonym, packet);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+                "{case} must be dropped as stale, got {result:?}"
+            );
+        }
+
+        for (case, pseudonym, packet) in [
+            (
+                "an SsaCommit for a registered Session",
+                exit_pseudonym,
+                ssa_commit(exit_pseudonym)?,
+            ),
+            (
+                "a SessionEstablished for a pending challenge",
+                replier,
+                established(established_challenge)?,
+            ),
+            (
+                "a SessionError for a pending challenge",
+                replier,
+                error(error_challenge)?,
+            ),
+        ] {
+            let result = mgr.dispatch_message(pseudonym, packet);
+            assert!(
+                matches!(result, Ok(DispatchResult::Processed)),
+                "{case} must be admitted, got {result:?}"
+            );
+        }
+
+        sender.close_channel();
+        Ok(())
+    }
+
     /// Keep-alives and post-establishment session errors naming another Session must be ignored.
     ///
     /// A sender names a Session both by the pseudonym it sends under and by the Session id inside
