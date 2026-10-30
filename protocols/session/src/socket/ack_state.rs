@@ -181,7 +181,9 @@ impl AcknowledgementStateConfig {
             // at most `max_incoming_frame_retries` requests per frame, so the product of that and
             // the per-frame segment count is an 8x margin over what an honest peer can generate.
             max_frame_retransmission_services: if self.max_frame_retransmission_services == 0 {
-                self.max_incoming_frame_retries.max(1) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME
+                self.max_incoming_frame_retries
+                    .max(1)
+                    .saturating_mul(SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME)
             } else {
                 self.max_frame_retransmission_services
             },
@@ -775,18 +777,31 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             "found matching segments to be retransmitted"
         );
 
-        // Charge the per-frame budget only for frames that were actually served, so bogus
-        // frame ids in a request cannot grow the budget's bookkeeping. One service per
-        // request and frame, no matter how many of the frame's segments were found.
-        // The set must stay alive: on a fully successful queue below, it also drives the
-        // resend cancellation.
-        // NOTE: the budget mutex guard is dropped at the end of this block and is never
-        // held across the control-stream sends below.
-        let served_frame_ids: Vec<FrameId> = {
+        // Resend the segments via the Control Stream. This MUST happen before the
+        // full-frame resend cancellation below: `ctl_tx` is bounded, and `try_send`
+        // fails once it is full. Only if every found segment was queued successfully
+        // may the full-frame resend of `served_frame_ids` be cancelled. Cancelling
+        // earlier (on merely *found* frames) would remove a frame from our own retry
+        // pipeline without ever sending it, so it would be neither NACK-served nor
+        // full-frame-retransmitted — a permanent gap in reliable mode, with the eventual
+        // `DeliveryTap::on_lost_frame()` report suppressed as well.
+        let mut served_frame_ids: Vec<FrameId> = Vec::with_capacity(admitted_frame_ids.len());
+        let queued = segments.into_iter().try_for_each(|s| {
+            tracing::trace!(seg_id = %s.id(), "retransmit segment on request");
+            let frame_id = s.frame_id;
+            ctx.ctl_tx
+                .try_send(SessionMessage::Segment(s))
+                .map(|_| served_frame_ids.push(frame_id))
+        });
+        served_frame_ids.sort_unstable();
+        served_frame_ids.dedup();
+
+        // Charge the per-frame budget only for frames that had at least one segment queued,
+        // so neither bogus frame ids nor a full control stream consume a frame's allowance.
+        // One service per request and frame, no matter how many of its segments were sent.
+        // NOTE: the budget mutex is taken only after the control-stream sends above.
+        {
             let mut budget = ctx.retransmission_budget.lock();
-            let mut served_frame_ids: Vec<FrameId> = segments.iter().map(|s| s.frame_id).collect();
-            served_frame_ids.sort_unstable();
-            served_frame_ids.dedup();
             served_frame_ids
                 .iter()
                 .for_each(|frame_id| budget.record(*frame_id, now));
@@ -795,24 +810,9 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             if throttled > 0 {
                 tracing::debug!(throttled, "throttled peer-driven retransmission requests");
             }
-            served_frame_ids
-        };
+        }
 
-        // Resend the segments via the Control Stream. This MUST happen before the
-        // full-frame resend cancellation below: `ctl_tx` is bounded, and `try_send`
-        // fails once it is full. Only if every found segment was queued successfully
-        // can the frames in `served_frame_ids` be considered actually served. Cancelling
-        // earlier (on merely *found* frames) would remove a frame from our own retry
-        // pipeline without ever sending it, so it would be neither NACK-served nor
-        // full-frame-retransmitted — a permanent gap in reliable mode, with the eventual
-        // `DeliveryTap::on_lost_frame()` report suppressed as well.
-        segments
-            .into_iter()
-            .try_for_each(|s| {
-                tracing::trace!(seg_id = %s.id(), "retransmit segment on request");
-                ctx.ctl_tx.try_send(SessionMessage::Segment(s))
-            })
-            .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
+        queued.map_err(|e| SessionError::ProcessingError(e.to_string()))?;
 
         // Partially acknowledged frames will not need to be fully resent in the future.
         // Cancel the resend of the SERVED frames only, and only after all their segments
@@ -1924,6 +1924,63 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_not_charge_a_frame_whose_segments_could_not_be_queued() -> anyhow::Result<()> {
+        let cfg = AcknowledgementStateConfig {
+            // No sender-side full-frame resends competing for the control stream.
+            mode: AcknowledgementMode::Partial,
+            // Any recorded service would throttle an immediate re-request of the same frame.
+            min_frame_retransmission_interval: Some(Duration::from_secs(60)),
+            max_frame_retransmission_burst: usize::MAX,
+            frame_retransmission_refill_interval: Some(Duration::from_secs(60)),
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        // Room for a single segment only.
+        let (ctl_tx, mut ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let frame_1 = segment(hopr_types::crypto_random::random_bytes::<MTU>(), MTU, 1)?;
+        let frame_2 = segment(hopr_types::crypto_random::random_bytes::<MTU>(), MTU, 2)?;
+        for segment in frame_1.iter().chain(frame_2.iter()) {
+            state.segment_sent(segment)?;
+        }
+
+        // Frame 1's segment fills the control stream, so frame 2's segment cannot be queued.
+        let both = SegmentRequest::from_iter([(1, [0b10000000].into()), (2, [0b10000000].into())]);
+        assert!(matches!(
+            state.incoming_retransmission_request(both),
+            Err(SessionError::ProcessingError(_))
+        ));
+
+        let msg = tokio::time::timeout(Duration::from_millis(100), ctl_rx.next())
+            .await
+            .context("timeout receiving Control message")?;
+        assert_eq!(Some(SessionMessage::Segment(frame_1[0].clone())), msg);
+
+        // Frame 2 was never sent, so its allowance must be intact: an immediate re-request is
+        // served. Frame 1 was sent, so its immediate re-request is throttled by the interval.
+        state.incoming_retransmission_request(request_for(2, 0b10000000))?;
+        state.incoming_retransmission_request(request_for(1, 0b10000000))?;
+
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(
+            vec![SessionMessage::Segment(frame_2[0].clone())],
+            ctl_msgs,
+            "only the unqueued frame must be servable again"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn ack_state_receiver_must_service_an_honest_request_unchanged() -> anyhow::Result<()> {
         // Entirely default configuration: an honest peer must observe no throttling at all.
         let cfg = AcknowledgementStateConfig::default();
@@ -1964,7 +2021,12 @@ mod tests {
 
     #[tokio::test]
     async fn retransmission_budget_must_not_grow_on_unserved_frame_ids() -> anyhow::Result<()> {
-        let cfg = AcknowledgementStateConfig::default();
+        let cfg = AcknowledgementStateConfig {
+            max_frame_retransmission_burst: 2 * SegmentRequest::<MTU>::MAX_ENTRIES,
+            // Freeze the refill, so the token count below reflects exactly what was charged.
+            frame_retransmission_refill_interval: Some(Duration::from_secs(3600)),
+            ..Default::default()
+        };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
@@ -1999,7 +2061,11 @@ mod tests {
             budget.services.is_empty(),
             "unserved frame ids must not allocate bookkeeping"
         );
-        assert_eq!(budget.throttled, 0);
+        assert_eq!(
+            budget.max_tokens - SegmentRequest::<MTU>::MAX_ENTRIES,
+            budget.tokens,
+            "every bogus frame must have been admitted and charged one token"
+        );
 
         Ok(())
     }
