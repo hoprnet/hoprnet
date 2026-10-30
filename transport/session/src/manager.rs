@@ -44,8 +44,8 @@ use crate::telemetry::{
     set_session_state,
 };
 use crate::{
-    AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
-    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    AdmissionToken, AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession,
+    SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbAdmissionControl, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, MAX_WAIT_CHUNK, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection, SurbFlowEstimator,
@@ -170,23 +170,136 @@ fn acquire_egress_permit(
     }
 }
 
+/// How long a teardown waits before retiring its Session's pseudonym from the SURB store's admitted
+/// class.
+///
+/// Derived from the packet pipeline's SURB-resolution window: a return-routed packet whose SURB has
+/// not arrived is retried there for the pipeline's `surb_resolution_wait` — 6 s at the library
+/// default — before it is dropped, and a closing Exit's own notification is exactly such a packet.
+/// The grace must cover the whole wait, so the ring is still there when the resolution stage last
+/// looks; the margin below adds room for the queueing between the send and the lookup, without being
+/// so long that a pseudonym's admitted ring outlives its Session by anything an operator could
+/// notice. The window is operator-configurable, so the grace is derived from it rather than pinned
+/// to a literal that only clears the default.
+fn surb_retire_grace(surb_resolution_wait: Duration) -> Duration {
+    surb_resolution_wait + Duration::from_secs(1)
+}
+
+/// Retires `pseudonym` on behalf of `token`, after a grace derived from the pipeline's
+/// SURB-resolution window (see [`surb_retire_grace`]), when a runtime is running.
+///
+/// Spawned through `Handle::try_current` rather than `tokio::spawn` because the teardowns that
+/// reach this helper are synchronous ([`close_session`], the sessions cache's eviction listener,
+/// [`SessionSlotGuard::drop`]) and can run off-runtime, where `tokio::spawn` panics. The
+/// off-runtime fallback retires inline, which is correct rather than merely convenient: a teardown
+/// with no runtime under it has no packet pipeline resolving return routes on its behalf either, so
+/// the SURB-resolution window the deferral exists to cover cannot be in progress — there is nothing
+/// to wait out.
+fn defer_admission_retire(
+    admission: Option<Arc<dyn SurbAdmissionControl>>,
+    #[cfg_attr(
+        not(any(feature = "runtime-tokio", test, feature = "testing")),
+        allow(unused_variables)
+    )]
+    grace: Duration,
+    session_id: &SessionId,
+    token: AdmissionToken,
+) {
+    let Some(admission) = admission else {
+        return;
+    };
+
+    // The runtime check needs tokio, which this crate carries only behind `runtime-tokio` (and in
+    // test builds). Without it the crate is runtime-agnostic by design, so there is no runtime to
+    // ask for — which is the `Err` branch: retire inline.
+    #[cfg(any(feature = "runtime-tokio", test, feature = "testing"))]
+    match tokio::runtime::Handle::try_current() {
+        Ok(runtime) => {
+            let session_id = *session_id;
+            let retire = async move {
+                tokio::time::sleep(grace).await;
+                tracing::debug!(%session_id, "retiring session pseudonym from the SURB store's admitted class");
+                admission.retire(&session_id, token);
+            };
+            runtime.spawn(retire);
+        }
+        // No runtime: see the doc comment — retire inline, as the synchronous world always did.
+        Err(_) => admission.retire(session_id, token),
+    }
+    #[cfg(not(any(feature = "runtime-tokio", test, feature = "testing")))]
+    admission.retire(session_id, token);
+}
+
 /// Closes an established Session.
 ///
 /// Logs the counterpart of "new session established" (see [`SessionSlotGuard::commit`]): one line
 /// per Session at INFO, so its whole lifetime can be read from a production log without the
 /// per-frame detail of the socket.
-fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+///
+/// `admission` is the SURB-store seam, forwarded to [`release_session_slot`]; `None` only ever
+/// reaches here from a teardown that had no seam to call.
+fn close_session(
+    session_id: SessionId,
+    session_data: SessionSlot,
+    reason: ClosureReason,
+    admission: Option<Arc<dyn SurbAdmissionControl>>,
+    grace: Duration,
+    token: AdmissionToken,
+) {
     tracing::info!(%session_id, %reason, "session closed");
-    release_session_slot(session_id, session_data, reason);
+    release_session_slot(session_id, session_data, reason, admission, grace, token);
 }
 
 /// Tears down a Session slot: stops its tasks and returns what it holds.
 ///
 /// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
 /// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
-#[tracing::instrument(level = "debug", skip(session_data))]
-fn release_session_slot(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+///
+/// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
+/// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
+/// notification a closing Exit has just enqueued — the PIX-failure notice is the one such packet —
+/// still finds its ring when the resolution stage comes to look it up. Retiring inline destroyed
+/// that ring mid-lookup, the packet was dropped, and the Entry never learned that its Session was
+/// gone (hoprnet#8515's `deposit_timeout_closes_session` fails exactly there).
+///
+/// Deferring is only safe because the retire carries the [`AdmissionToken`] its `admit` returned and
+/// the store honours it only while it still names the pseudonym's current admission. Without that
+/// guard, a retire landing in the window could invalidate a *successor* Session's ring: the
+/// pseudonym is client-chosen ([`SessionClientConfig::pseudonym`]) and freely reusable, so a Session
+/// can be re-established on the same one while the previous teardown is still waiting. That failure
+/// is worse than the one being fixed — the successor would go on inserting its SURBs into the small
+/// un-admitted quarantine with nothing logged anywhere — which is why the token is load-bearing here
+/// rather than an optional nicety. Conversely, the guard means no teardown path needs its retire
+/// suppressed: a stale retire is a no-op at the store, never a lost one.
+///
+/// Synchronous-or-spawned, decided by the runtime: when one is running, the delayed retire is spawned
+/// on it; when none is — a `Drop` or the public `close_session` can run off-runtime — the retire
+/// happens inline. The fallback is correct because a teardown with no runtime has no packet pipeline
+/// resolving anything on its behalf either: the SURB-resolution window the deferral exists for is a
+/// property of that pipeline, so there is nothing to wait out, and retiring inline is exactly the
+/// behaviour the synchronous world had before the deferral.
+///
+/// Idempotent by contract, so a rollback — a Session that was never committed, hence never admitted
+/// — pays a no-op here rather than needing a separate "was it admitted?" flag threaded through the
+/// guard.
+///
+/// [`SessionClientConfig::pseudonym`]: crate::SessionClientConfig::pseudonym
+#[tracing::instrument(level = "debug", skip(session_data, admission))]
+fn release_session_slot(
+    session_id: SessionId,
+    session_data: SessionSlot,
+    reason: ClosureReason,
+    admission: Option<Arc<dyn SurbAdmissionControl>>,
+    grace: Duration,
+    token: AdmissionToken,
+) {
     debug!("closing session");
+
+    // Deferred past the packet pipeline's SURB-resolution window — see the doc comment above — and
+    // made safe by the token, so the retire is never suppressed: a stale one is a no-op at the store.
+    // Cloned rather than moved: the teardown below keeps using `session_id` for the metrics and the
+    // channel bookkeeping that follow the retire.
+    defer_admission_retire(admission, grace, &session_id, token);
 
     #[cfg(feature = "telemetry")]
     {
@@ -684,6 +797,15 @@ impl SessionSsaState {
     }
 }
 
+/// The admission-token cell a [`SessionSlot`] shares with the [`SessionSlotGuard`] that allocated it.
+///
+/// Behind an `Arc` for two reasons. The slot is cloned into the sessions cache and into the guard, so
+/// the token `commit` writes through the guard has to land in the *cached* copy every teardown reads
+/// from — the `Arc` is that one shared cell. And it lets [`commit_slot_guard`] recognise its own slot
+/// when it re-reads the cache by key: the key is a reusable pseudonym, so the entry found there may be
+/// a successor Session's, and comparing this cell by identity is what rejects a foreign slot.
+type AdmissionCell = Arc<OnceLock<AdmissionToken>>;
+
 #[derive(Clone)]
 pub(crate) struct SessionSlot {
     // Sender does not need to be in Arc, because the receiver part is always
@@ -764,6 +886,35 @@ pub(crate) struct SessionSlot {
     /// the closure; the `Drop` behind the `Arc` is the backstop for anything that bypasses that
     /// function. Both are safe to run because the release is idempotent.
     cycle_budget: Option<Arc<CycleBudgetReservation>>,
+    /// The SURB-store admission this Session's `commit` obtains, threaded to the teardown so its
+    /// retire can be matched to the admission it belongs to.
+    ///
+    /// Behind an `Arc` and empty until `commit` because the guard — which performs the `admit` — and
+    /// the slot in the sessions cache are two clones of one value: the token has to land in the
+    /// cached copy, and `commit` runs after the slot was inserted. Every teardown reads the token
+    /// from the slot it removes, so it travels with the Session however long the teardown is delayed;
+    /// empty stays [`AdmissionToken::NONE`], which matches no admission, so a rolled-back Session's
+    /// retire is the no-op the seam's idempotency is there for.
+    ///
+    /// The same cell is what identifies this slot to the commit that allocated it — see
+    /// [`AdmissionCell`].
+    admission_token: AdmissionCell,
+}
+
+impl SessionSlot {
+    /// Claims the slot's admission-token cell on behalf of a teardown and returns what it holds.
+    ///
+    /// Empty means no `commit` has run yet, and the teardown claims the cell by storing
+    /// [`AdmissionToken::NONE`] into it. That write is what lets a `commit` racing this teardown tell
+    /// it lost: its own `set` then fails, and it retires the admission it just made instead of leaving
+    /// a ring no teardown will ever remove. Without the claim, a teardown that read the empty cell
+    /// would schedule a no-op retire, and a `commit` landing afterwards would admit a Session that is
+    /// already gone — the leak the exit-side `SessionEstablished`-before-commit ordering makes
+    /// reachable. Returns the token a later `commit` would have stored, or `NONE` when this teardown
+    /// got there first (or the Session was never admitted at all).
+    fn claim_admission_token(&self) -> AdmissionToken {
+        *self.admission_token.get_or_init(|| AdmissionToken::NONE)
+    }
 }
 
 /// The Exit's control over the single Exit → Entry keep-alive stream a Session runs.
@@ -1140,6 +1291,56 @@ impl Drop for CycleBudgetReservation {
     }
 }
 
+/// Commits `guard`, admitting `session_id` into the SURB store for `capacity` SURBs.
+///
+/// Free function rather than a method on [`SessionManager`] because the guard borrows the manager's
+/// cache, so a method would fight the same borrow the call sites are already inside. `surb_admission`
+/// is passed separately for the same reason — the call sites hold `&self` while the guard holds the
+/// cache borrow.
+///
+/// The slot is re-read from the cache rather than kept from allocation: the token `admit` returns has
+/// to land in the *cached* copy of the slot, and that copy and the one the guard rolled in are two
+/// clones of one value — see [`SessionSlot::claim_admission_token`] for why the cell they share is
+/// behind an `Arc`. Re-reading is what keeps this honest when the cache has since handed the entry to
+/// another reader: they all share the one cell.
+///
+/// An absent slot is not an error: the Session *was* established on this path, and `commit` runs with
+/// `None` so the guard is still marked committed and the Session still counted. The teardown that
+/// removed the slot already decremented `METRIC_ACTIVE_SESSIONS` and logged "session closed", so
+/// skipping the commit here would drift the gauge down by one and leave that close unpaired (see
+/// [`SessionSlotGuard::commit`]).
+///
+/// A slot found by key that is *not* the one this establishment allocated is treated exactly like an
+/// absent one, and for the same reason: the re-read is by a reusable pseudonym, so between this
+/// Session's `SessionEstablished` send and its parked commit a teardown can remove its slot and a
+/// successor Session can be allocated under the same key. Admitting into the successor's slot would
+/// stamp the successor's ring with this Session's token, and the successor's own commit would then
+/// find the cell occupied and retire the successor's live admission — dropping a running Session to
+/// the quarantine, the failure this whole seam exists to prevent. The guard holds its own slot's
+/// [`AdmissionCell`], so the re-read can reject a foreign slot by identity; the commit itself still
+/// runs, since this Session *was* established.
+fn commit_slot_guard(
+    guard: &mut SessionSlotGuard<'_>,
+    sessions: &moka::sync::Cache<SessionId, SessionSlot>,
+    session_id: SessionId,
+    surb_admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
+    capacity: usize,
+) {
+    // Re-read so the token lands in the cached copy; `None` means a teardown already removed it, and
+    // the commit below still runs — only the admission is skipped. A slot that has since been
+    // reallocated to another Session on this same pseudonym is discarded the same way: its cell is not
+    // the guard's, so it is not this commit's to admit into.
+    let slot = sessions
+        .get(&session_id)
+        .filter(|slot| Arc::ptr_eq(&slot.admission_token, guard.admission_token()));
+
+    guard.commit(
+        slot.as_ref(),
+        surb_admission.get().map(|a| a.as_ref() as &dyn SurbAdmissionControl),
+        capacity,
+    );
+}
+
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
 /// session setup is explicitly [committed](SessionSlotGuard::commit).
 ///
@@ -1157,6 +1358,19 @@ struct SessionSlotGuard<'a> {
     sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     session_id: SessionId,
+    /// The SURB-store seam, cloned from the manager at allocation so `commit` and `Drop` can both
+    /// reach it without holding the manager borrow. Held rather than looked up at call time because
+    /// the rollback in `Drop` runs after the establishing task has already failed, and a guard that
+    /// captured the manager's borrow there would fight the lifetimes for no gain.
+    admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
+    /// The packet pipeline's SURB-resolution window, cloned at allocation with the seam for the same
+    /// reason: the rollback's deferred retire has to wait it out, and the guard outlives the
+    /// establishing call that could otherwise read the manager's config.
+    surb_resolution_wait: Duration,
+    /// The admission-token cell of the slot this guard allocated, so a commit that re-reads the cache
+    /// by key can tell its own slot from a successor's — see [`AdmissionCell`] and
+    /// [`commit_slot_guard`].
+    admission_cell: AdmissionCell,
     committed: bool,
 }
 
@@ -1165,13 +1379,26 @@ impl<'a> SessionSlotGuard<'a> {
         sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
         session_id: SessionId,
         active_sessions: Arc<std::sync::atomic::AtomicUsize>,
+        admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
+        surb_resolution_wait: Duration,
+        admission_cell: AdmissionCell,
     ) -> Self {
         Self {
             sessions,
             active_sessions,
             session_id,
+            admission,
+            surb_resolution_wait,
+            admission_cell,
             committed: false,
         }
+    }
+
+    /// The admission-token cell of the slot this guard allocated. [`commit_slot_guard`] compares it
+    /// against the cell of the slot the cache hands back for the same key, so a slot reallocated to a
+    /// successor Session is recognised as foreign.
+    fn admission_token(&self) -> &AdmissionCell {
+        &self.admission_cell
     }
 
     /// Marks the session as successfully established, preventing the slot from
@@ -1179,9 +1406,63 @@ impl<'a> SessionSlotGuard<'a> {
     ///
     /// Logs "new session established" here, on both the Entry and the Exit side, so that every
     /// "session closed" line from [`close_session`] has a matching start line.
-    fn commit(&mut self) {
+    ///
+    /// This is also where the Session's pseudonym is admitted into the SURB store: deliberately
+    /// here, at the point the Session becomes live, and not in
+    /// [`allocate_session_slot`](SessionManager::allocate_session_slot), which runs while the Start
+    /// handshake is still in flight — admitting there would put an unauthenticated peer into the
+    /// store's admitted class, the exact state the admission control exists to prevent
+    /// (hoprnet#8515). The Exit's negotiated `announced_surb_target` is likewise only known by the
+    /// time its branch reaches `commit`, which allocation is too early to see.
+    ///
+    /// `admission` is `Some` on every production path — the guard carries the manager's seam, and
+    /// `capacity` is the buffer target this branch announced. The `Option` keeps the guard usable
+    /// from tests and callers that run without a store.
+    ///
+    /// The token `admit` returns lands in the slot's own cell rather than on the guard: the guard is
+    /// gone by the time the Session is torn down, and the teardown reads the token from the slot it
+    /// removes. Writing it here, after the `admit`, is what lets a later `release_session_slot`
+    /// retire exactly this admission.
+    ///
+    /// `slot` is the cached copy when the caller could still find it *and* it is this establishment's
+    /// own, and `None` when the slot was already torn down or has been reallocated to a successor
+    /// Session on the same pseudonym — [`commit_slot_guard`] discards the latter before calling here.
+    /// Committing without a slot is still a commit: the Session *was* established (the Exit sends
+    /// `SessionEstablished` before it commits, so an Entry can close or answer with a
+    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed and
+    /// the Session counted, or the teardown's decrement would leave `METRIC_ACTIVE_SESSIONS` drifting
+    /// down and `close_session` would log a "session closed" with no matching "new session
+    /// established". Only the `admit` is skipped — there is no cell left to carry its token.
+    ///
+    /// When a slot *is* present, it is this Session's own (the caller checked), so its cell arbitrates
+    /// against a teardown racing this commit and nothing else can be writing to it. The teardown claims
+    /// the cell (see [`SessionSlot::claim_admission_token`]), so if this commit's own `set` fails, a
+    /// teardown has already passed the point where it read the cell: it saw nothing to retire, and this
+    /// admission would otherwise leak a ring no teardown ever removes. The commit therefore retires it
+    /// — immediately, not deferred: the deferral exists so a closing Session's own return-routed
+    /// notification still finds its ring, but here the Session is already gone and no packet of its is
+    /// in flight for this admission, which was never visible to the pipeline.
+    fn commit(&mut self, slot: Option<&SessionSlot>, admission: Option<&dyn SurbAdmissionControl>, capacity: usize) {
         self.committed = true;
         tracing::info!(session_id = %self.session_id, "new session established");
+
+        // Only a slot that is this Session's own can carry the admission's token to a teardown, so
+        // `None` means nothing to admit for: either the Session was torn down — its teardown already
+        // ran its (no-op) retire, and any batch a peer sends meanwhile lands in the quarantine like any
+        // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
+        // this admission's to stamp. The commit itself — logging and the metric below — still happens.
+        if let (Some(admission), Some(slot)) = (admission, slot) {
+            let token = admission.admit(&self.session_id, capacity);
+            if slot.admission_token.set(token).is_err() {
+                // A teardown claimed the cell first, so nothing will retire this admission. Retire
+                // it here — see the doc comment for why this is immediate rather than deferred.
+                tracing::debug!(
+                    session_id = %self.session_id,
+                    "session was torn down while it committed; retiring the admission it could not record"
+                );
+                admission.retire(&self.session_id, token);
+            }
+        }
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.increment(1.0);
@@ -1199,7 +1480,20 @@ impl Drop for SessionSlotGuard<'_> {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
                 // Not `close_session`: the Session was never established, so there is no
                 // "session closed" line to pair with "new session established".
-                release_session_slot(session_id, slot, ClosureReason::Eviction);
+                //
+                // The token is `NONE` by construction — admission happens at `commit`, and this
+                // guard never committed — so the retire is the no-op that keeps every teardown wired
+                // through the same seam without asking the store's accounting to trust that. Claiming
+                // the cell rather than reading it keeps every teardown using one protocol.
+                let token = slot.claim_admission_token();
+                release_session_slot(
+                    session_id,
+                    slot,
+                    ClosureReason::Eviction,
+                    self.admission.get().cloned(),
+                    surb_retire_grace(self.surb_resolution_wait),
+                    token,
+                );
             }
         }
     }
@@ -1744,6 +2038,21 @@ pub struct SessionManagerConfig {
     /// Default is 2 seconds.
     #[default(Duration::from_secs(2))]
     pub session_admission_timeout: Duration,
+
+    /// How long the packet pipeline retries a return-routed packet whose SURBs have not arrived
+    /// before dropping it.
+    ///
+    /// The composition root supplies this from its own packet-pipeline config, because the retire of
+    /// a closing Session's SURB admission must wait it out — the teardown's grace is this window plus
+    /// a small margin. A Session
+    /// teardown that retired before the window closed would drop the closing Exit's own
+    /// return-routed notification mid-lookup, and the Entry would then never learn that its Session
+    /// was gone. The manager cannot see the pipeline config, so it is threaded here rather than
+    /// pinned against a default that an operator's larger setting would silently invalidate.
+    ///
+    /// Default is 6 seconds, the packet pipeline's own default.
+    #[default(Duration::from_secs(6))]
+    pub surb_resolution_wait: Duration,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -2159,6 +2468,16 @@ pub struct SessionManager<S> {
     /// of concurrent initiations — the bound would not bound. `try_send` never blocks, so the lock
     /// is held only for the enqueue itself.
     admission_tx: Arc<OnceLock<parking_lot::Mutex<SessionAdmissionSink>>>,
+    /// The SURB-store admission seam, set once by the composition root after construction.
+    ///
+    /// Injected late — rather than through [`SessionManager::new`] — because the only in-tree
+    /// implementation wraps the SURB store, which is built in the same crate as this manager's
+    /// caller but cannot be named here (`hopr-transport-session` does not depend on
+    /// `hopr-protocol-hopr`). A manager without one still works: it simply never admits, and every
+    /// Session's SURBs then live in the store's quarantine class, which is why
+    /// [`set_surb_admission`](Self::set_surb_admission) exists and why a missed call is observable
+    /// in the store's own admission metrics rather than silent here.
+    surb_admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -2176,6 +2495,7 @@ impl<S> Clone for SessionManager<S> {
             slot_allocated: Arc::clone(&self.slot_allocated),
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
+            surb_admission: self.surb_admission.clone(),
         }
     }
 }
@@ -2416,6 +2736,15 @@ where
         let initiation_timeout =
             2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
         let pix_toolbox: Arc<OnceLock<PixToolbox>> = Arc::new(OnceLock::new());
+        // Captured by the eviction listener below, which is built here and has no `&self` to read
+        // later — same shape as `active_sessions_for_listener`. Cloned before the closure moves the
+        // last binding, since the struct literal needs its own handle to the same lock.
+        let surb_admission_for_listener: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>> = Arc::default();
+        let surb_admission_in_struct = surb_admission_for_listener.clone();
+        // The retire grace the listener's teardowns wait out, captured for the same reason: the
+        // closure has no `&self`, and the window is operator-configurable, so it cannot be re-derived
+        // from a literal at the call site.
+        let surb_resolution_wait_for_listener = cfg.surb_resolution_wait;
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
@@ -2425,8 +2754,12 @@ where
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
-                .eviction_listener(
-                    move |session_id: Arc<SessionId>, entry: SessionSlot, reason| match &reason {
+                .eviction_listener(move |session_id: Arc<SessionId>, entry: SessionSlot, reason| {
+                    // The seam is captured at cache-build time rather than read from the
+                    // manager here: this closure is not `&self`, and the eviction may fire
+                    // long after the manager that built the cache has been cloned elsewhere.
+                    let surb_admission = surb_admission_for_listener.get().cloned();
+                    match &reason {
                         moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                             trace!(?session_id, ?reason, "session evicted from the cache");
                             // Reconstructor state is released by `close_session` aborting the PIX
@@ -2435,11 +2768,19 @@ where
                             // cycles actually in flight, where enumerating every index this Session
                             // had ever used was unbounded in its lifetime.
                             active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
-                            close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
+                            let token = entry.claim_admission_token();
+                            close_session(
+                                *session_id.as_ref(),
+                                entry,
+                                ClosureReason::Eviction,
+                                surb_admission,
+                                surb_retire_grace(surb_resolution_wait_for_listener),
+                                token,
+                            );
                         }
                         _ => {}
-                    },
-                )
+                    }
+                })
                 .build(),
             pix_toolbox,
             session_notifiers: Arc::new(OnceLock::new()),
@@ -2455,6 +2796,7 @@ where
                 .time_to_idle(Duration::from_secs(1800))
                 .build(),
             admission_tx: Arc::new(OnceLock::new()),
+            surb_admission: surb_admission_in_struct,
         }
     }
 
@@ -2643,6 +2985,23 @@ where
         self.session_notifiers.get().is_some()
     }
 
+    /// Installs the SURB-store admission seam this manager calls at Session establishment and
+    /// teardown.
+    ///
+    /// Late-injected through a `OnceLock` for the same reason `msg_sender` and `admission_tx` are:
+    /// the only in-tree implementation wraps the SURB store, which the composition root builds
+    /// alongside — but never inside — this crate. `false` means a controller was already installed,
+    /// which no in-tree caller can produce (it installs exactly one, right after construction) and
+    /// is reported rather than ignored so a double-wired node is visible at the call site.
+    ///
+    /// Leaving it unset is *functional*, not fatal: the manager then never admits, and every
+    /// Session's SURBs land in the store's quarantine class. That failure mode is what the store's
+    /// admission counters exist to surface, which is why this does not fall back to a no-op
+    /// controller that would hide the absence.
+    pub fn set_surb_admission(&self, ctl: Arc<dyn SurbAdmissionControl>) -> bool {
+        self.surb_admission.set(ctl).is_ok()
+    }
+
     /// Atomically allocates a new [`SessionSlot`] for `session_id` and returns an RAII
     /// [`SessionSlotGuard`] for it.
     ///
@@ -2682,6 +3041,11 @@ where
             return None;
         }
 
+        // Lift the slot's admission cell out before the slot is moved into the cache: the guard keeps
+        // it so `commit_slot_guard` can recognise the cached slot as this establishment's own by cell
+        // identity, even though the key it re-reads by is a reusable pseudonym.
+        let admission_cell = slot.admission_token.clone();
+
         let result =
             self.sessions
                 .entry(session_id)
@@ -2709,8 +3073,16 @@ where
                         let _ = w.send(());
                     }
                 }
-                // take_guard borrows self, so the guard stores the counter clone separately.
-                Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
+                // take_guard borrows self, so the guard stores the counter and the admission seam
+                // as clones rather than borrowing them.
+                Some(SessionSlotGuard::new(
+                    &self.sessions,
+                    session_id,
+                    counter.clone(),
+                    self.surb_admission.clone(),
+                    self.cfg.surb_resolution_wait,
+                    admission_cell,
+                ))
             }
             _ => None,
         }
@@ -2990,6 +3362,7 @@ where
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
                                 cycle_budget: None,
+                                admission_token: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -3075,7 +3448,17 @@ where
                         Some(&surb_mgmt),
                     );
 
-                    slot_guard.commit();
+                    // Admitted at the established point, not at allocation: this is the first moment
+                    // the Session exists on our terms. `maximum_surb_buffer_size` is what this Entry
+                    // announced as its target, so the store sizes the ring off the buffer we
+                    // actually intend to fill.
+                    commit_slot_guard(
+                        &mut slot_guard,
+                        &self.sessions,
+                        session_id,
+                        self.surb_admission.clone(),
+                        self.cfg.maximum_surb_buffer_size,
+                    );
                     Ok(session)
                 } else {
                     // Routine for short-lived sessions (health checks, bridges); not a fault.
@@ -3113,6 +3496,7 @@ where
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
                                 cycle_budget: None,
+                                admission_token: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -3150,7 +3534,16 @@ where
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None);
 
-                    slot_guard.commit();
+                    // Same admission point as the balanced branch above, with the same announced
+                    // target: a Session without SURB balancing still holds a return path worth
+                    // protecting.
+                    commit_slot_guard(
+                        &mut slot_guard,
+                        &self.sessions,
+                        session_id,
+                        self.surb_admission.clone(),
+                        self.cfg.maximum_surb_buffer_size,
+                    );
                     Ok(session)
                 }
             }
@@ -3521,7 +3914,15 @@ where
 
             if let Some(slot) = myself.sessions.remove(&session_id) {
                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                close_session(session_id, slot, ClosureReason::PixFailure);
+                let token = slot.claim_admission_token();
+                close_session(
+                    session_id,
+                    slot,
+                    ClosureReason::PixFailure,
+                    myself.surb_admission.get().cloned(),
+                    surb_retire_grace(myself.cfg.surb_resolution_wait),
+                    token,
+                );
             }
         })
     }
@@ -4059,7 +4460,15 @@ where
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             // Reconstructor state is released by `close_session` aborting the PIX action driver,
             // whose commitment guards retire on drop.
-            close_session(*id, slot, reason);
+            let token = slot.claim_admission_token();
+            close_session(
+                *id,
+                slot,
+                reason,
+                self.surb_admission.get().cloned(),
+                surb_retire_grace(self.cfg.surb_resolution_wait),
+                token,
+            );
             true
         } else {
             false
@@ -4372,6 +4781,7 @@ where
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
+            admission_token: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -4405,6 +4815,7 @@ where
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
+            admission_token: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -4790,6 +5201,7 @@ where
             pix_fill: Default::default(),
             returned_packets: Default::default(),
             cycle_budget,
+            admission_token: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -5089,7 +5501,17 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_NUM_ESTABLISHED_SESSIONS.increment();
 
-        slot_guard.commit();
+        // `announced_surb_target` — the buffer the Entry asked for — is what this Session will
+        // actually fill, so the store sizes the admitted ring off it rather than off our own
+        // ceiling. It is live only from its resolution at the top of this function, which is why
+        // the admit rides on `commit` rather than on slot allocation.
+        commit_slot_guard(
+            &mut slot_guard,
+            &self.sessions,
+            session_id,
+            self.surb_admission.clone(),
+            announced_surb_target as usize,
+        );
 
         Ok(())
     }
@@ -6404,6 +6826,27 @@ mod tests {
 
     const SESSION_FORWARD_CAPACITY: usize = 10000;
 
+    /// Waits (bounded) until `admission` has recorded at least `count` retires of `pseudonym`.
+    ///
+    /// The retire is deferred past the SURB-resolution window by [`release_session_slot`], and the
+    /// teardown that asks for it does not always run on the test's own task — the slot-guard rollback
+    /// removes the slot on a spawned task, and the cache's eviction listener runs on moka's
+    /// maintenance thread — so a test that counts immediately after triggering a teardown would race
+    /// it twice over. Polling keeps the test honest about the ordering it actually asserts (retire
+    /// happens, and after the admit) without sleeping a fixed delay in every test that touches the
+    /// seam. `surb_retire_grace`'s one-second margin is what bounds the wait below the ten-second
+    /// ceiling even when a test keeps the default `surb_resolution_wait`.
+    async fn wait_for_retire(admission: &RecordingAdmission, pseudonym: &SessionId, count: usize) -> usize {
+        for _ in 0..200 {
+            let retired = admission.retired(pseudonym);
+            if retired >= count {
+                return retired;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        admission.retired(pseudonym)
+    }
+
     /// Verifies that a session's SURB balancer config can be retrieved and updated via the manager API.
     ///
     /// ## Steps
@@ -6440,6 +6883,7 @@ mod tests {
                 pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
+                admission_token: Default::default(),
             },
         );
 
@@ -6779,15 +7223,29 @@ mod tests {
     /// first establish the stream is alive proves nothing when it later sees silence.
     async fn exit_session_originating_keep_alives(
         cfg: SessionManagerConfig,
-    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+        admission: Option<Arc<dyn SurbAdmissionControl>>,
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        HoprPseudonym,
+    )> {
         let mgr = RecordingManager::new(SessionManagerConfig {
             surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
             ..cfg
         });
 
+        if let Some(admission) = admission {
+            assert!(
+                mgr.set_surb_admission(admission),
+                "a freshly constructed fixture manager must accept the SURB admission seam"
+            );
+        }
+
         let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
-        // Held, not dropped: dropping it would fail the establishment notification instead.
-        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        // Returned rather than dropped: a second establishment on the same manager — the
+        // pseudonym-reuse test — would otherwise fail its notification and roll back.
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
         mgr.start(msg_tx, new_session_tx, None, None)?;
 
         let pseudonym = HoprPseudonym::random();
@@ -6819,7 +7277,7 @@ mod tests {
             observed.len()
         );
 
-        Ok((mgr, msg_rx, pseudonym))
+        Ok((mgr, msg_rx, new_session_rx, pseudonym))
     }
 
     /// Asserts `mgr` originates nothing further for `pseudonym`.
@@ -6840,6 +7298,125 @@ mod tests {
         );
     }
 
+    /// Records the `admit`/`retire` calls the manager makes, in order.
+    ///
+    /// Deliberately not mockall: the seam is two one-word methods on a trait whose implementations
+    /// the tests assert about *sequentially* (admit must precede the retire that ends the Session),
+    /// and a plain log the test can filter is easier to read than expectations wired against a
+    /// sequence that cross-thread `Drop` validation cannot order anyway. The log is `Arc<Mutex<Vec>>`
+    /// for the same reason the manager's own fields are: `admit` runs on whatever task commits the
+    /// Session and `retire` on whatever task tears it down.
+    #[derive(Clone, Default)]
+    struct RecordingAdmission {
+        events: Arc<Mutex<Vec<(String, SessionId)>>>,
+        /// The tokens `admit` minted, in call order.
+        ///
+        /// Kept separate from the retires so each list answers one question: what admissions were
+        /// distinguished, and what a teardown actually presented. One combined list cannot — a
+        /// retire's token would read as a mint, so a regression that presented the wrong token would
+        /// hide behind the admit that also wrote the list.
+        admit_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// The tokens `retire` presented, in call order.
+        retire_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// Mints the tokens `admit` returns, so each admission of a pseudonym is distinguishable —
+        /// the property the token guard below pins.
+        token_counter: Arc<std::sync::atomic::AtomicU64>,
+    }
+
+    impl RecordingAdmission {
+        fn admitted(&self, session_id: &SessionId) -> usize {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .filter(|(event, id)| event == "admit" && id == session_id)
+                .count()
+        }
+
+        fn retired(&self, session_id: &SessionId) -> usize {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .filter(|(event, id)| event == "retire" && id == session_id)
+                .count()
+        }
+
+        fn retire_precedes_admit(&self, session_id: &SessionId) -> bool {
+            let events = self.events.lock().unwrap_or_else(|e| e.into_inner());
+            match (
+                events.iter().position(|(e, id)| e == "retire" && id == session_id),
+                events.iter().position(|(e, id)| e == "admit" && id == session_id),
+            ) {
+                (Some(retired_at), Some(admitted_at)) => retired_at < admitted_at,
+                _ => false,
+            }
+        }
+
+        /// The full `admit`/`retire` sequence recorded for `session_id`, in order.
+        ///
+        /// Counting admits and retires separately is not enough once a pseudonym can be reused: the
+        /// property the store depends on is the *interleaving* — the teardown's retire must land
+        /// between the two admits of a Session that was closed and re-established on the same
+        /// pseudonym — and only the order of the log shows that.
+        fn sequence(&self, session_id: &SessionId) -> Vec<String> {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .filter(|(_, id)| id == session_id)
+                .map(|(event, _)| event.clone())
+                .collect()
+        }
+
+        /// Every token minted by an `admit` of this mock, in call order.
+        ///
+        /// Admissions of the same pseudonym must be distinguishable — that is what lets a deferred
+        /// retire name the admission it belongs to rather than "whatever is admitted now".
+        fn minted_tokens(&self) -> Vec<AdmissionToken> {
+            self.admit_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        }
+
+        /// The tokens presented by retires, in call order.
+        fn retire_tokens(&self) -> Vec<AdmissionToken> {
+            self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        }
+    }
+
+    impl SurbAdmissionControl for RecordingAdmission {
+        fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(("admit".into(), *pseudonym));
+            // `expected_surbs` is only observable here, so assert the contract inline rather than
+            // thread a second channel out of the mock: a manager that admitted with a zero target
+            // would defeat the store's sizing, so it is worth catching at the one point it happens.
+            assert!(
+                expected_surbs <= MAXIMUM_SURB_BUFFER_SIZE_FOR_TESTS,
+                "admit was called with a target of {expected_surbs}, which no configuration in this crate produces"
+            );
+            // Distinct per admit, mirroring what the store does: the guard test below relies on a
+            // stale retire never matching a successor's admission.
+            let token =
+                AdmissionToken::from_raw(self.token_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1);
+            self.admit_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+            token
+        }
+
+        fn retire(&self, pseudonym: &SessionId, token: AdmissionToken) {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(("retire".into(), *pseudonym));
+            self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+        }
+    }
+
+    /// Upper bound the recording mock asserts `admit` targets against. Matches the manager config
+    /// the fixtures below run with, which is the only place a target comes from.
+    const MAXIMUM_SURB_BUFFER_SIZE_FOR_TESTS: usize = 10_000;
+
     /// An Exit session must originate nothing once it has been closed explicitly.
     ///
     /// The Exit's keep-alive stream is a `repeat_with` on a rate limiter: it produces a
@@ -6855,7 +7432,8 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn an_exit_session_should_originate_nothing_after_an_explicit_close() -> anyhow::Result<()> {
         // Default idle timeout (180 s), so eviction cannot confound what the explicit close proves.
-        let (mgr, mut msg_rx, pseudonym) = exit_session_originating_keep_alives(Default::default()).await?;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) =
+            exit_session_originating_keep_alives(Default::default(), None).await?;
 
         assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
 
@@ -6872,10 +7450,13 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn an_exit_session_should_originate_nothing_after_idle_eviction() -> anyhow::Result<()> {
         let idle_timeout = KEEP_ALIVE_PERIOD * 3;
-        let (mgr, mut msg_rx, _) = exit_session_originating_keep_alives(SessionManagerConfig {
-            idle_timeout,
-            ..Default::default()
-        })
+        let (mgr, mut msg_rx, _new_session_rx, _) = exit_session_originating_keep_alives(
+            SessionManagerConfig {
+                idle_timeout,
+                ..Default::default()
+            },
+            None,
+        )
         .await?;
 
         // Moka evicts lazily, so drive its maintenance rather than waiting for the manager's own
@@ -7231,10 +7812,14 @@ mod tests {
         capabilities: Capabilities,
         notify_period: Option<Duration>,
         fill: crate::supervision::PixFillConfig,
+        admission: Option<Arc<dyn SurbAdmissionControl>>,
     ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
         let params = fill_pix_params();
         let mgr = RecordingManager::new(SessionManagerConfig {
             surb_balance_notify_period: notify_period,
+            // The admission tests over this fixture wait out the deferred retire; a short window
+            // keeps them fast without changing the seam they exercise.
+            surb_resolution_wait: Duration::from_millis(100),
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=pix_params_to_quota(&params),
                 supervision: SupervisorConfig {
@@ -7251,6 +7836,13 @@ mod tests {
             },
             ..Default::default()
         });
+
+        if let Some(admission) = admission {
+            assert!(
+                mgr.set_surb_admission(admission),
+                "a freshly constructed fixture manager must accept the SURB admission seam"
+            );
+        }
 
         let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
         let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
@@ -7337,6 +7929,7 @@ mod tests {
                 drain_after_close: false,
                 ..Default::default()
             },
+            None,
         )
         .await?;
 
@@ -7385,6 +7978,7 @@ mod tests {
     /// stream was observably running before it.
     async fn drainable_exit_pix_session(
         notify_period: Duration,
+        admission: Option<Arc<dyn SurbAdmissionControl>>,
     ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
         let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
             Capabilities::empty(),
@@ -7393,6 +7987,7 @@ mod tests {
                 min_surb_reserve: 1,
                 ..Default::default()
             },
+            admission,
         )
         .await?;
 
@@ -7422,7 +8017,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_closed_pix_session_keeps_originating_until_its_cycle_recovers() -> anyhow::Result<()> {
         let notify = Duration::from_secs(1);
-        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(notify).await?;
+        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(notify, None).await?;
 
         assert!(
             mgr.close_session(&pseudonym),
@@ -7475,6 +8070,7 @@ mod tests {
                 min_surb_reserve: 1,
                 ..Default::default()
             },
+            None,
         )
         .await?;
 
@@ -7512,6 +8108,7 @@ mod tests {
                 drain_after_close: false,
                 ..Default::default()
             },
+            None,
         )
         .await?;
 
@@ -7544,7 +8141,7 @@ mod tests {
     /// carries `WriteClosed`/`EmptyRead` and is absorbed.
     #[test_log::test(tokio::test)]
     async fn a_second_close_of_a_draining_session_tears_it_down() -> anyhow::Result<()> {
-        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(Duration::from_secs(1)).await?;
+        let (mgr, mut msg_rx, pseudonym) = drainable_exit_pix_session(Duration::from_secs(1), None).await?;
 
         assert!(mgr.close_session(&pseudonym), "the first close starts the drain");
         assert!(
@@ -7580,6 +8177,7 @@ mod tests {
                 min_surb_reserve: 500,
                 ..Default::default()
             },
+            None,
         )
         .await?;
         assert_eq!(
@@ -7627,6 +8225,7 @@ mod tests {
                 min_surb_reserve: 1,
                 ..Default::default()
             },
+            None,
         )
         .await?;
 
@@ -7643,6 +8242,304 @@ mod tests {
         );
 
         assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
+    /// An established Session must be admitted exactly once, and a teardown must retire it exactly
+    /// once — while a SURB drain must retire nothing.
+    ///
+    /// This is the seam the SURB store's admission control hangs off (hoprnet#8515). Three properties
+    /// are load-bearing and none is observable from the store alone:
+    ///
+    /// * **admit at establishment, not at allocation.** `handle_incoming_session_initiation` inserts the slot long
+    ///   before the Start handshake completes; admitting there would put an unauthenticated peer into the store's
+    ///   admitted class. Only the commit at the end of the Exit's establishment path counts, so the count below being
+    ///   exactly one after the Session is live — and the fixture's keep-alives proving the Session really was
+    ///   established, not merely allocated — is the security property itself.
+    /// * **retire at every teardown.** The explicit close is the one teardown path a test can drive deterministically;
+    ///   the eviction listener and the PIX-failure path funnel through the same `release_session_slot` this exercises.
+    /// * **no retire on drain.** `begin_surb_drain` deliberately keeps the slot so the drain can spend the Session's
+    ///   remaining SURBs; retiring there would size the store for a Session that is still spending. The close below
+    ///   starts a drain (the fixture funds the buffer), and the retire count staying at zero while the drain runs is
+    ///   what proves the drain path left the seam alone. The supervisor's own teardown of the drained Session then
+    ///   supplies the single retire.
+    #[test_log::test(tokio::test)]
+    async fn an_established_session_is_admitted_once_retired_once_and_drain_retires_nothing() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, mut msg_rx, pseudonym) =
+            drainable_exit_pix_session(Duration::from_secs(1), Some(Arc::new(admission.clone()))).await?;
+
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            1,
+            "an established Session must be admitted exactly once, at commit"
+        );
+        assert_eq!(
+            admission.retired(&pseudonym),
+            0,
+            "nothing before the close may retire an established Session"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+
+        // The close starts a drain, so the slot survives it on purpose — and so must the admission.
+        assert!(
+            mgr.active_sessions().contains(&pseudonym),
+            "the drain fixture's close must have started a drain for the assertions below to mean anything"
+        );
+        assert_eq!(
+            admission.retired(&pseudonym),
+            0,
+            "a close answered by a SURB drain must not retire the Session — the drain still spends its SURBs"
+        );
+        assert!(
+            !admission.retire_precedes_admit(&pseudonym),
+            "no retire may be recorded before the Session's own admit"
+        );
+
+        // End the drain the way the supervisor does, and let its teardown run: the retire belongs to
+        // *that* path, not to the close that started the drain.
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::new(1).expect("index one is non-zero"));
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+            .await?;
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "a recovered cycle must end the drain and tear the Session down"
+        );
+        assert_eq!(
+            wait_for_retire(&admission, &pseudonym, 1).await,
+            1,
+            "the drain's teardown must retire the Session exactly once"
+        );
+
+        // Drain the packets the teardown is still holding so the fixture's sender task finishes.
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+        Ok(())
+    }
+
+    /// A Session whose establishment fails after the slot is inserted must never be admitted.
+    ///
+    /// The rollback path is the one place an unestablished peer comes closest to the admitted class:
+    /// the slot exists, the pseudonym is set, and only the failed notification stands between it and
+    /// the commit. The admit riding on `commit` — rather than on allocation — is what keeps it out,
+    /// and the retired count of one is the rollback's own no-op retire flowing through the same seam
+    /// as every teardown (idempotent against a pseudonym that was never admitted, but recorded here
+    /// so the path is visibly wired rather than merely harmless).
+    #[test_log::test(tokio::test)]
+    async fn a_rolled_back_session_is_never_admitted() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        // Short grace: the rollback's retire is deferred, and the default window would make this
+        // test wait out the library default in real time for no added coverage.
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_resolution_wait: Duration::from_millis(100),
+            ..Default::default()
+        });
+        mgr.set_surb_admission(Arc::new(admission.clone()));
+
+        // Drop the receiver so that notifying about the new incoming session fails *after* the slot
+        // has already been inserted — the same fixture the rollback test above uses.
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        drop(new_session_rx);
+        let (sender, handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: HoprSessionCapabilities::empty(),
+                    additional_data: 0,
+                },
+            )
+            .await;
+        assert!(
+            result.is_err(),
+            "the fixture's dropped notification channel must fail the establishment"
+        );
+
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "the partially established session slot was not rolled back"
+        );
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            0,
+            "a Session that never committed must never be admitted — admission happens at commit, not at slot \
+             allocation, and this is the peer the distinction exists to keep out"
+        );
+        assert_eq!(
+            wait_for_retire(&admission, &pseudonym, 1).await,
+            1,
+            "the rollback must run the retire through the same seam as every teardown"
+        );
+
+        sender.close_channel();
+        handle.await??;
+        Ok(())
+    }
+
+    /// A teardown on a reused pseudonym must present *its own* admission's token, not the successor's.
+    ///
+    /// The pseudonym is client-chosen (`SessionClientConfig::pseudonym`) and freely reusable, so
+    /// "close Session A, open Session B on the same pseudonym" is a real sequence, not an exotic
+    /// one. A's retire is deliberately deferred past the packet pipeline's SURB-resolution window —
+    /// A's own return-routed notification needs its ring while the resolution stage looks it up — so
+    /// it lands *after* B's commit, and an unconditional retire would invalidate B's already-admitted
+    /// ring: B would go on inserting its SURBs into the 16-cap un-admitted quarantine and never
+    /// recover, with nothing logged anywhere.
+    ///
+    /// The deferral is guarded by the token: `admit` returns one naming its admission, the teardown
+    /// threads that token to its retire, and the store honours a retire only while its token still
+    /// names the pseudonym's current admission. This test pins the manager half of that — the
+    /// successor's admit is real and distinguished, and A's retire presents A's token rather than B's
+    /// (the failure a teardown re-looking-up the slot under the pseudonym would produce). The store's
+    /// own matching is pinned by `a_stale_retire_must_not_clobber_a_successor_admissions_ring` over in
+    /// `hopr-protocol-hopr`, which is where the matching lives.
+    ///
+    /// The grace is shortened through `surb_resolution_wait` so the deferral is exercised without
+    /// waiting out the library default in real time.
+    #[test_log::test(tokio::test)]
+    async fn a_reused_pseudonym_keeps_the_successor_ring_when_the_stale_retire_fires() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_originating_keep_alives(
+            SessionManagerConfig {
+                surb_resolution_wait: Duration::from_millis(100),
+                ..Default::default()
+            },
+            Some(Arc::new(admission.clone())),
+        )
+        .await?;
+
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            1,
+            "the first Session must be established for the reuse below to mean anything"
+        );
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+
+        // Re-establish on the same pseudonym, the way a client reusing its configured pseudonym
+        // would. The initiation runs the same handshake the first one did, so the second admit
+        // comes from the same commit point.
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        // The successor's admit is in the log, and A's retire is deferred: the interleaving below is
+        // the one the grace produces — B's admit first, A's retire after — which is exactly the case
+        // the token makes safe. Waiting the retire out before asserting keeps the order pinned rather
+        // than assumed.
+        assert_eq!(
+            wait_for_retire(&admission, &pseudonym, 1).await,
+            1,
+            "the first teardown's retire must still be paid — deferred past the SURB-resolution window, never \
+             suppressed"
+        );
+        assert_eq!(
+            admission.sequence(&pseudonym),
+            vec!["admit", "admit", "retire"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>(),
+            "the successor must be admitted before A's deferred retire fires — the case the token exists for"
+        );
+
+        let minted = admission.minted_tokens();
+        assert_eq!(
+            minted.len(),
+            2,
+            "two Sessions on one pseudonym must mint two admissions"
+        );
+        assert_ne!(
+            minted[0], minted[1],
+            "the two admissions must carry distinct tokens, or no retire could tell them apart"
+        );
+        assert_eq!(
+            admission.retire_tokens(),
+            vec![minted[0]],
+            "A's retire must present A's token and not B's — a teardown that re-looked-up the slot under the \
+             pseudonym would present B's and invalidate the live ring"
+        );
+
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+        Ok(())
+    }
+
+    /// A stale teardown token must not retire a successor Session's admission.
+    ///
+    /// This is the manager side of the token guard the deferred retire leans on. The first Session's
+    /// teardown captures its own token; a successor is then admitted on the same client-chosen
+    /// pseudonym before that token is presented. The seam is wired so the teardown of a Session can
+    /// only ever present the token its own `commit` obtained — the slot carries the token `commit`
+    /// stamped into it, not whatever the teardown could otherwise reach for — which is the property
+    /// this pins. The store's matching of token against admission is pinned over in
+    /// `hopr-protocol-hopr`, which is where the matching lives.
+    #[test_log::test(tokio::test)]
+    async fn a_teardown_presents_the_token_of_the_session_it_is_tearing_down() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_originating_keep_alives(
+            SessionManagerConfig {
+                // Shortened so the deferred retire is exercised without waiting out the library
+                // default in real time.
+                surb_resolution_wait: Duration::from_millis(100),
+                ..Default::default()
+            },
+            Some(Arc::new(admission.clone())),
+        )
+        .await?;
+
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            1,
+            "the first Session must be established for the token threading below to mean anything"
+        );
+        let first_token = admission
+            .minted_tokens()
+            .first()
+            .copied()
+            .ok_or(anyhow!("the first Session's commit must have minted a token"))?;
+
+        // Close the first Session: its teardown captures the token its own commit obtained and
+        // schedules the retire with it. The token is read from the slot the teardown removes, so
+        // what reaches the retire is that Session's, never a successor's.
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+
+        // The deferred retire carries the first admission's token, which the mock records; a
+        // successor admitted in the meantime — as the reuse test above establishes — would then be
+        // immune to it by construction, since the tokens differ. The retire must still be paid.
+        assert_eq!(
+            wait_for_retire(&admission, &pseudonym, 1).await,
+            1,
+            "the teardown must present a token to the store — an unsuppressed retire is the contract, and the store's \
+             matching is what makes the stale case safe"
+        );
+        let presented = admission
+            .retire_tokens()
+            .last()
+            .copied()
+            .ok_or(anyhow!("the teardown must have presented a token to the store"))?;
+        assert_eq!(
+            presented, first_token,
+            "the teardown must present the token its own Session's commit obtained, not a successor's — a successor \
+             admitted in the deferred-retire window would otherwise be invalidated"
+        );
+        assert!(
+            !admission.retire_precedes_admit(&pseudonym),
+            "no retire may be recorded before the Session's own admit"
+        );
+
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
         Ok(())
     }
 
@@ -10115,6 +11012,7 @@ mod tests {
                 pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
+                admission_token: Default::default(),
             },
         );
 
@@ -10225,6 +11123,7 @@ mod tests {
                 pix_fill: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
+                admission_token: Default::default(),
             },
         );
 
@@ -14547,23 +15446,23 @@ mod tests {
 
         let (session_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
 
-        // Allocate the slot — this should signal the waiter
-        let guard = mgr.allocate_session_slot(
-            session_id,
-            SessionSlot {
-                session_tx,
-                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(session_id)),
-                abort_handles: Default::default(),
-                surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
-                surb_estimator: Default::default(),
-                current_ssa_state: Default::default(),
-                pix_supervisor: Default::default(),
-                pix_egress_gate: Default::default(),
-                pix_fill: Default::default(),
-                returned_packets: Default::default(),
-                cycle_budget: None,
-            },
-        );
+        // Allocate the slot — this should signal the waiter. The slot is inserted here so that the
+        // `commit` below can find it: that is where the token `admit` returns lands.
+        let slot = SessionSlot {
+            session_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(session_id)),
+            abort_handles: Default::default(),
+            surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+            pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
+            returned_packets: Default::default(),
+            cycle_budget: None,
+            admission_token: Default::default(),
+        };
+        let guard = mgr.allocate_session_slot(session_id, slot.clone());
         assert!(guard.is_some(), "slot allocation must succeed");
 
         // The waiter should receive Some(()) — the direct signal, not Canceled
@@ -14572,8 +15471,188 @@ mod tests {
             "waiter must be signaled with Ok(()), not canceled"
         );
 
-        guard.unwrap().commit();
+        guard.unwrap().commit(Some(&slot), None, 0);
 
+        Ok(())
+    }
+
+    /// Builds a slot for `session_id` that is not yet in any cache, for the guard tests below.
+    fn unregistered_slot(session_id: SessionId) -> SessionSlot {
+        let (session_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        SessionSlot {
+            session_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(session_id)),
+            abort_handles: Default::default(),
+            surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+            pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
+            pix_fill: Default::default(),
+            returned_packets: Default::default(),
+            cycle_budget: None,
+            admission_token: Default::default(),
+        }
+    }
+
+    /// A commit that finds its slot already gone must still commit the Session.
+    ///
+    /// The Session *was* established on this path — the Exit sends `SessionEstablished` before it
+    /// commits, so an Entry can close or answer with a `SessionId`-scoped `SessionError` in that
+    /// window — so the guard must be marked committed rather than rolled back, and the Session still
+    /// counted. Only the admission is skipped: there is no slot left to carry its token. Skipping the
+    /// commit instead would drift `METRIC_ACTIVE_SESSIONS` down (the teardown already decremented it)
+    /// and leave the teardown's "session closed" unpaired.
+    #[test_log::test(tokio::test)]
+    async fn a_commit_without_a_slot_still_commits_the_session() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let slot = unregistered_slot(session_id);
+        let mut guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("slot allocation must succeed")?;
+
+        // The teardown wins the race and removes the slot before the commit runs.
+        assert!(
+            mgr.sessions.remove(&session_id).is_some(),
+            "the slot must have been registered"
+        );
+
+        guard.commit(None, Some(&admission), 0);
+
+        assert!(
+            guard.committed,
+            "a Session that was established must be committed, not rolled back, even with no slot left"
+        );
+        assert_eq!(
+            admission.admitted(&session_id),
+            0,
+            "with no slot to carry the token, nothing may be admitted"
+        );
+        assert_eq!(
+            admission.retired(&session_id),
+            0,
+            "a commit that admitted nothing must retire nothing"
+        );
+        Ok(())
+    }
+
+    /// A teardown that claims the token cell before `commit` runs forces the commit to retire its own
+    /// admission.
+    ///
+    /// The order is the Exit-side one: `SessionEstablished` goes out before the commit, so a peer can
+    /// close in that window. The teardown claims the cell and reads `NONE` (a no-op retire), and the
+    /// commit then finds its `set` rejected — so it retires the admission it just made, or the ring
+    /// would leak with no teardown ever removing it.
+    #[test_log::test(tokio::test)]
+    async fn a_teardown_claiming_the_cell_first_forces_the_commit_to_retire_its_admission() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let slot = unregistered_slot(session_id);
+        let mut guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("slot allocation must succeed")?;
+
+        // The teardown gets there first: it claims the cell and reads `NONE`, so its scheduled retire
+        // is a no-op.
+        assert_eq!(
+            slot.claim_admission_token(),
+            AdmissionToken::NONE,
+            "an uncommitted slot's claimed token must be NONE"
+        );
+
+        // The commit still runs and admits, but cannot record the token — so it must retire it.
+        guard.commit(Some(&slot), Some(&admission), 100);
+
+        let minted = admission.minted_tokens();
+        assert_eq!(
+            minted.len(),
+            1,
+            "the commit must still admit the Session it was told to commit"
+        );
+        assert_eq!(
+            admission.retire_tokens(),
+            vec![minted[0]],
+            "the admission the commit could not record must be retired by the commit itself"
+        );
+        Ok(())
+    }
+
+    /// A commit whose re-read finds a *successor's* slot on the same pseudonym must not admit into it.
+    ///
+    /// The pseudonym is client-chosen and reusable, so a slot can be torn down and reallocated under
+    /// the same key between a Session's `SessionEstablished` send and its parked commit. That commit
+    /// re-reads the cache by key to land its token in the cached copy, and the copy it finds is then
+    /// the successor's — admitting into it would stamp the successor's ring with this Session's token,
+    /// and the successor's own commit would find the cell occupied and retire the successor's live
+    /// admission, dropping a running Session to the quarantine. This is the commit-vs-commit arm the
+    /// teardown-vs-commit test above does not reach: the slot is *present*, just not this one's, so the
+    /// ownership marker — not absence — has to reject it.
+    ///
+    /// A true concurrent commit is not drivable from a test without instrumenting the manager, so the
+    /// interleaving is built explicitly: A allocates and is torn down (freeing the key), B is allocated
+    /// under the same key, and only then does A's parked commit run through `commit_slot_guard`.
+    #[test_log::test(tokio::test)]
+    async fn a_commit_must_not_admit_into_a_successors_slot_on_the_same_pseudonym() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let pseudonym = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        mgr.set_surb_admission(Arc::new(admission.clone()));
+
+        // A allocates and then loses its slot to a teardown, which also claims the cell.
+        let mut guard_a = mgr
+            .allocate_session_slot(pseudonym, unregistered_slot(pseudonym))
+            .context("A's slot allocation must succeed")?;
+        let slot_a = mgr
+            .sessions
+            .remove(&pseudonym)
+            .context("the teardown must have found A's slot")?;
+        assert_eq!(
+            slot_a.claim_admission_token(),
+            AdmissionToken::NONE,
+            "A's teardown must claim the cell and read nothing, so its scheduled retire is a no-op"
+        );
+
+        // B is allocated under the same key before A's commit resumes. B's slot is the one the cache
+        // now hands back for that pseudonym.
+        let guard_b = mgr
+            .allocate_session_slot(pseudonym, unregistered_slot(pseudonym))
+            .context("B's slot allocation must succeed under the freed pseudonym")?;
+
+        // A's commit re-reads the key and finds B's slot, which it must refuse as not its own.
+        commit_slot_guard(&mut guard_a, &mgr.sessions, pseudonym, mgr.surb_admission.clone(), 100);
+
+        assert!(
+            guard_a.committed,
+            "A was established, so its commit must still mark it committed"
+        );
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            0,
+            "A must not admit into B's slot — a foreign slot is no more A's to admit into than an absent one"
+        );
+        assert_eq!(
+            admission.retired(&pseudonym),
+            0,
+            "A must not retire anything either: it admitted nothing"
+        );
+
+        // B's own commit is the one that admits, and it must land on B's untouched cell.
+        let mut guard_b = guard_b;
+        commit_slot_guard(&mut guard_b, &mgr.sessions, pseudonym, mgr.surb_admission.clone(), 100);
+        assert_eq!(
+            admission.admitted(&pseudonym),
+            1,
+            "B's commit is the only admission on this pseudonym and must still happen"
+        );
+        assert!(
+            admission.retire_tokens().is_empty(),
+            "B's live admission must not be retired by A's commit — the successor ring is not A's to release"
+        );
         Ok(())
     }
 

@@ -436,7 +436,12 @@ mod tests {
 
         // The first packet leaves a real, share-less SURB behind. Take it, and fill the buffer to capacity
         // with copies of it, as a sender that has been outproducing the Exit for a while would have.
+        // The full-buffer arithmetic is admitted-ring arithmetic: unadmitted SURBs would cap out at the
+        // quarantine's 16, so admit the pseudonym the way an established Session would have.
         receive(from_relay()?)?;
+        f.receiver
+            .surb_store
+            .admit(&pseudonym, SurbStoreConfig::default().rb_capacity);
         let surb = f
             .receiver
             .surb_store
