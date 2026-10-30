@@ -216,7 +216,9 @@ pub(super) async fn process_chain_events<C, G, S>(
             | ChainEvent::ServiceTypeRegistrationBurnChanged(..)
             | ChainEvent::ServiceTypeUpdateBurnChanged(..)
             | ChainEvent::ServiceTypeRegistrationFeeChanged(_)
-            | ChainEvent::ServiceRegistryPointerChanged(_) => {}
+            | ChainEvent::ServiceRegistryPointerChanged(_)
+            // The Safe allowance for the channels contract does not feed the channel graph or the ticket price.
+            | ChainEvent::SafeAllowanceChanged(..) => {}
         }
     }
 }
