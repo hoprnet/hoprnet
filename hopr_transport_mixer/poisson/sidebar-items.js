@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["poisson_channel","wake"],"struct":["Pool","Receiver","Sender","Shared"]};
