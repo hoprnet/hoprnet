@@ -127,7 +127,10 @@
 //! max_ssa_delivery_time` (batch-scaled); a member that has reported a part keeps its own clocks. A batch counts as
 //! answered only when *every* member has, because the Entry publishes a batch one member after another and a
 //! publication cut at a member boundary leaves the later members with nothing while the earlier ones are complete. The
-//! Entry's repeat branch publishes only the members it still owes, so repeating the whole batch is harmless. Behind the
+//! Entry's repeat branch publishes only the members it still owes, so repeating the whole batch is harmless. The one
+//! exception is a repeat that reaches the Entry more than a few seconds after the batch went out in full. The bursts
+//! were then lost after the Entry's transport took them, and the Entry sends the whole burst of every member again,
+//! without a second `ReadyToDeposit`, spending one of each cycle's commitment retransmissions. Behind the
 //! front means a paid FIFO tail is still draining, or the earliest live cycle belongs to another batch; it is
 //! absorbing, so a batch that has reached the front is never re-sent, and its deadline stops moving. Only the successor
 //! is covered: the opening request is sent once, since nothing has been paid for before it. This is a different
@@ -667,7 +670,7 @@
 //! | `PixGlobalConfig::additional_shares` (Entry) | 16 | Set explicitly, because this profile assumes a path that loses little: a 1.25× surplus factor and a fifth of the quota, carrying ~6 % share loss at 99 % of cycles. Left unset it derives 123 for 50 % loss, and the quota grows to 530.3 MiB. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
 //! | `ssas_per_request` | **1** | The 85 % early signal leaves a 24 627-packet runway — **41 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 226.9 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
-//! | `ssa_request_resend_interval` | 3 s | Shipped value. Each re-send costs one SURB and a few hundred bytes, and the Entry answers a repeat of a request it has published in full with a no-op (one whose publication was cut short it finishes instead), so the cadence only sets how soon after the Entry's bar is met the request is admitted; 3 s is a rounding error against the 41 s runway above |
+//! | `ssa_request_resend_interval` | 3 s | Shipped value. Each re-send costs one SURB and a few hundred bytes, and the Entry answers a repeat of a request it has published in full with a no-op unless the batch went out more than 3 s before, when the bursts must have been lost and it sends them again (one whose publication was cut short it finishes instead), so the cadence only sets how soon after the Entry's bar is met the request is admitted, or a lost burst is sent again; 3 s is a rounding error against the 41 s runway above |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
 //! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is the most exposed against an unfunded front after the initial grant or a paid handoff — 5.9 MB. Use `0` for strict prepay at every rotation; normal overlap usually funds the successor before it reaches the front |
 //! | `max_served_without_progress` | 2048 | Shipped value, and no longer dimension-dependent: the surplus run resets it like any other share, so this bounds genuine silence only |

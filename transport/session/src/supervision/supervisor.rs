@@ -350,7 +350,11 @@ pub struct SessionPixSupervisor {
     /// measure a commitment that is under way. So a re-send the Entry admits always has a whole window
     /// to deliver in, and a batch that is not yet needed cannot time out. Repeating the whole batch
     /// for the members that are done is harmless: the Entry's repeat branch publishes only the members
-    /// it still owes. At the front, and for the opening batch, nothing is re-sent and the deadline
+    /// it still owes. The exception is a repeat that reaches the Entry more than a few seconds after
+    /// the batch went out in full, which says a burst was lost on the way. The Entry then sends every
+    /// member's burst again, without a second `ReadyToDeposit`, and a member that is done absorbs the
+    /// copy. That is also what recovers a member whose whole burst was lost, since it has no part a
+    /// re-request could name. At the front, and for the opening batch, nothing is re-sent and the deadline
     /// stops moving: the batch is then lost on `CommitmentTimeout` at most one window after the last
     /// re-send. Never asking at the front also means a request admitted late cannot leave the Entry
     /// with a `ReadyToDeposit` for a cycle the Exit has already given up on.
@@ -1406,8 +1410,10 @@ impl SessionPixSupervisor {
     ///
     /// One member's part does not end them: it shows the request was admitted, not that the Entry got
     /// as far as the members after it (see [`batch_is_answered`](Self::batch_is_answered)). Until the
-    /// last member reports, the whole batch keeps being re-sent — the Entry's repeat branch publishes
-    /// only the members it still owes, so repeating for the ones that are done costs nothing.
+    /// last member reports, the whole batch keeps being re-sent. The Entry's repeat branch publishes
+    /// only the members it still owes, so repeating for the ones that are done costs nothing until
+    /// the repeats outlast the Entry's grace. From then on the Entry takes the bursts to have been
+    /// lost and sends every member's again, at the cost of one commitment retransmission each.
     fn note_commitment_seen(&mut self, idx: usize) {
         self.ssas[idx].commitment_seen = true;
         let batch_id = self.ssas[idx].batch_id;

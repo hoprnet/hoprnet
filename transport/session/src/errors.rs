@@ -76,8 +76,9 @@ pub enum SessionManagerError {
     /// it came too early, before emission reached the successor boundary; it is under-served, since
     /// the returned packets have not yet earned it; it is stale, naming indices at or below the
     /// committed watermark that are not the batch last committed; or the transport cut short the
-    /// publication of a commitment — the Entry's own, or the resumption of one a repeat or a scoped
-    /// re-request prompted. The Session keeps running and the peer is told nothing.
+    /// sending of a commitment — the Entry's own publication, the resumption of one a repeat or a
+    /// scoped re-request prompted, or the re-send of a published batch's bursts that a late repeat
+    /// prompted. The Session keeps running and the peer is told nothing.
     ///
     /// Whether a later request succeeds depends on the cause. The first three can succeed on a later
     /// re-send of the same request, once the lock is free or the Entry's state has caught up, and the
@@ -98,9 +99,12 @@ pub enum SessionManagerError {
     /// Exit's own deadline ends the cycle, and nothing is stranded for that member because nothing was
     /// announced for it.
     ///
-    /// A repeat of the batch last committed otherwise returns `Ok(())` — as a no-op if it was published
-    /// in full, and after finishing the publication if it was not. Callers that report errors should
-    /// treat this as an ordinary outcome rather than a fault.
+    /// A repeat of the batch last committed otherwise returns `Ok(())`. If the batch was published in
+    /// full, that is a no-op while the batch went out less than three seconds ago (the manager's
+    /// `SSA_REPEAT_RESEND_GRACE`). A repeat arriving later says the bursts were lost on the way, and
+    /// returns after re-sending those of the announced members. If the batch was not published in
+    /// full, it returns after finishing the publication. Callers that report errors should treat this
+    /// as an ordinary outcome rather than a fault.
     #[error("the request was not admitted: {0}")]
     NotAdmitted(String),
     #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     pin::Pin,
     sync::{Arc, Mutex, OnceLock, atomic::Ordering},
     time::{Duration, Instant},
@@ -374,6 +374,22 @@ const SSA_SUCCESSOR_SERVICE_WAIT: Duration = Duration::from_secs(2);
 /// which would put a branch on every inbound packet to serve a case that arises once per SSA cycle.
 const SSA_SUCCESSOR_SERVICE_POLL: Duration = Duration::from_millis(250);
 
+/// How long after a batch's commitments last went out the Entry takes a repeat of its request to
+/// mean that they were lost on the way, rather than that the repeat crossed them.
+///
+/// The Exit repeats a successor request while some member of it has received no part of its
+/// commitment. A repeat it sent before the burst reached it can still be arriving up to a round trip
+/// after the burst went out, and answering that one would spend a retransmission on a burst that is
+/// not lost. A repeat that arrives later says the burst went out and none of it arrived. Publishing
+/// a burst only means the local transport took it, and a relayer that dies on the forward path loses
+/// all of it. The Exit then has no part it could name in a scoped re-request, so the repeat is the
+/// only prompt there is. See [`SessionSsaState::unpublished`].
+///
+/// Well over a round trip, and equal to the Exit's default re-send interval. A path slower than this
+/// costs at most one needless re-send per grace, and each re-send spends one of the cycle's
+/// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS).
+const SSA_REPEAT_RESEND_GRACE: Duration = Duration::from_secs(3);
+
 /// Standard deviations below an honest Exit's expected returned packets at which the successor gate
 /// sets its bar — see [`successor_required_packets`].
 ///
@@ -617,9 +633,12 @@ struct SessionSsaState {
     ///
     /// Stored once phase two has staged the whole request rather than after the burst is published.
     /// A burst that fails to send has still moved the generator, so its re-sends must read as repeats —
-    /// read as stale instead, each of them would be logged as a fault. And a repeat is not always a
-    /// no-op: while [`unpublished`](Self::unpublished) still holds members of that batch, the repeat is
-    /// the Exit's prompt to finish publishing them.
+    /// read as stale instead, each of them would be logged as a fault. Not stored any earlier, though:
+    /// a batch that fails *during* phase two after moving the generator can never be committed, and
+    /// that failure closes the Session rather than leaving its re-sends to be told apart. And a repeat
+    /// is not always a no-op: while [`unpublished`](Self::unpublished) still holds members of that
+    /// batch, the repeat is the Exit's prompt to finish publishing them, and once it has been published
+    /// a repeat that comes too late to have crossed the bursts is the prompt to send them again.
     last_committed_first: std::sync::atomic::AtomicU32,
     /// Members of the batch last staged whose commitment burst and `ReadyToDeposit` have not both gone
     /// out, with exactly the announcement that is still owed for each.
@@ -666,6 +685,15 @@ struct SessionSsaState {
     /// * a cycle whose retransmissions are spent, which can never be published again. It is dropped from here with one
     ///   warning (see [`resume_publication`]).
     ///
+    /// A member that has been published is out of the owed set, but publishing only means the local
+    /// transport took the burst. If a relayer on the forward path dies, the whole burst can still be
+    /// lost. The Exit then has no part it could re-request, so only a repeat reaches the member. A
+    /// repeat that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch last went out has the
+    /// whole burst of every announced member sent again, and nothing announced (see
+    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a batch at the
+    /// front is never repeated, so a lost opening burst is not recovered, and each re-send spends one
+    /// of the cycle's retransmissions.
+    ///
     /// None of these strands a deposit, because nothing was announced for the member concerned: the
     /// Exit's own deadline ends the cycle. The opposite hazard exists, though. A resumed burst answers a
     /// re-request, and the Exit's re-request timer asks until just before the cycle's commitment
@@ -686,7 +714,8 @@ struct SessionSsaState {
     sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprPixDepositPayload>>>,
 }
 
-/// The members of the batch last staged that are still owed their publication.
+/// The members of the batch last staged that are still owed their publication, and the ones that
+/// have had it.
 ///
 /// The members are what is owed; the `batch` counter is there for one reason. A member that was
 /// claimed is out of the map while its publication is attempted, and if that attempt fails it is put
@@ -699,12 +728,23 @@ struct OwedPublications {
     /// Which staging the members belong to. Incremented every time a batch is staged.
     batch: u64,
     members: BTreeMap<SsaIndex, AgreedSsaQuota>,
+    /// Members of the same batch whose publication completed: their whole burst went out and their
+    /// `ReadyToDeposit` was queued.
+    ///
+    /// The only members a late repeat may have sent again
+    /// ([`SessionSsaState::claim_republication`]). Sending the burst of a member that is owed, or
+    /// that someone is publishing right now, would hand the Exit a complete commitment for a cycle
+    /// nobody has yet been told to fund.
+    announced: BTreeSet<SsaIndex>,
+    /// When a burst of this batch last went out in full, `None` before the first.
+    last_sent: Option<Instant>,
 }
 
 /// A member taken out of [`OwedPublications`] by whoever is publishing it.
 ///
 /// Holding one is the right to publish the member and announce its deposit. It is either spent by
-/// completing the publication or handed back to [`SessionSsaState::restore_unpublished`].
+/// completing the publication ([`SessionSsaState::complete_publication`]) or handed back to
+/// [`SessionSsaState::restore_unpublished`].
 #[derive(Debug)]
 struct ClaimedPublication {
     /// The staging the member was claimed from.
@@ -832,6 +872,8 @@ impl SessionSsaState {
             .into_iter()
             .map(|quota| (quota.ssa_id.ssa_index(), quota))
             .collect();
+        unpublished.announced.clear();
+        unpublished.last_sent = None;
     }
 
     /// Takes the right to publish `index`, or `None` if nothing is owed for it or someone else holds it.
@@ -856,6 +898,44 @@ impl SessionSsaState {
         if claim.batch == unpublished.batch {
             unpublished.members.insert(claim.quota.ssa_id.ssa_index(), claim.quota);
         }
+    }
+
+    /// Spends a claim whose publication completed at `now`: the member's whole burst is out and its
+    /// `ReadyToDeposit` queued.
+    ///
+    /// Recorded only while the claim's batch is the current one. A newer batch has replaced it
+    /// otherwise, and the Exit no longer repeats the request this member belonged to.
+    pub fn complete_publication(&self, claim: ClaimedPublication, now: Instant) {
+        let mut unpublished = self.unpublished.lock();
+        if claim.batch == unpublished.batch {
+            unpublished.announced.insert(claim.quota.ssa_id.ssa_index());
+            unpublished.last_sent = Some(now);
+        }
+    }
+
+    /// The announced members whose bursts a repeat arriving at `now` should have sent again, or
+    /// nothing if the batch last went out less than `grace` ago.
+    ///
+    /// When it returns members, the batch counts as sent at `now`. The repeats that follow therefore
+    /// wait out a whole `grace` again, and so do the ones that were already on their way. Whether
+    /// the re-send then gets out does not matter: one that fails is retried no sooner than one that
+    /// succeeded, which keeps a congested transport from being handed a burst on every repeat.
+    pub fn claim_republication(&self, now: Instant, grace: Duration) -> Vec<SsaIndex> {
+        let mut unpublished = self.unpublished.lock();
+        let recently_sent = unpublished
+            .last_sent
+            .is_some_and(|sent| now.saturating_duration_since(sent) < grace);
+        if recently_sent || unpublished.announced.is_empty() {
+            return Vec::new();
+        }
+        unpublished.last_sent = Some(now);
+        unpublished.announced.iter().copied().collect()
+    }
+
+    /// Stops counting `index` as announced once the generator will not rebuild its burst, so later
+    /// repeats do not ask for it again.
+    pub fn forget_announced(&self, index: SsaIndex) {
+        self.unpublished.lock().announced.remove(&index);
     }
 
     /// Indices still owed a publication, ascending.
@@ -2230,12 +2310,14 @@ impl PixToolbox {
 /// [`ssa_request_resend_interval`](crate::SupervisorConfig::ssa_request_resend_interval), which has
 /// the action driver send the stored message again, byte for byte, and pushes the batch's
 /// `max_ssa_delivery_time` deadline with it. The Entry answers a repeat of a request it already
-/// committed to with a no-op once it has published the batch in full; a batch whose publication
-/// the transport cut short is finished instead, with whole bursts and the `ReadyToDeposit`s still
-/// owed, whenever the Exit asks again. A request that arrives while the Entry is still processing
-/// another one is dropped rather than queued. The re-sends end once every member of the batch has
-/// reported a part of its commitment, and once the batch reaches the front nothing is sent and the
-/// deadline runs out as it always did.
+/// committed to with a no-op once it has published the batch in full. The exception is a repeat
+/// that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch went out, which says the
+/// bursts were lost after the transport took them; they are sent again, without a second
+/// `ReadyToDeposit`. A batch whose publication the transport cut short is finished instead, with
+/// whole bursts and the `ReadyToDeposit`s still owed, whenever the Exit asks again. A request that
+/// arrives while the Entry is still processing another one is dropped rather than queued. The
+/// re-sends end once every member of the batch has reported a part of its commitment, and once the
+/// batch reaches the front nothing is sent and the deadline runs out as it always did.
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -2563,7 +2645,8 @@ enum ResendDecision<'a> {
 /// `missing_commitment_runs`). A member whose commitment is complete is no reason to refuse: the
 /// supervisor re-sends the whole batch until *every* member has heard from the Entry, because the
 /// Entry publishes a batch one member after another and may have been cut short before the later ones,
-/// and the Entry's repeat branch publishes only the members it still owes.
+/// and the Entry's repeat branch publishes only the members it still owes. It sends the bursts of the
+/// others again only when the repeat comes long enough after the batch went out to mean they were lost.
 ///
 /// Every member is read, with no early exit, because reading a registration refreshes its idle timer —
 /// see [`SsaReconstructor::missing_commitment_runs`] — which is what keeps a registration alive across
@@ -2772,6 +2855,7 @@ where
 
         match outcome {
             Ok(Resumed::Published) => {
+                ssa_state.complete_publication(claim, Instant::now());
                 tracing::info!(%session_id, %ssa_index, "finished publishing an interrupted SSA commitment");
             }
             Ok(Resumed::Unpublishable(cause)) => {
@@ -2784,6 +2868,92 @@ where
             }
             Err(error) => return Err(publication_cut_short(session_id, ssa_state, claim, &error)),
         }
+    }
+    Ok(())
+}
+
+/// Sends the whole burst of each of `members` again, rebuilt from the material the generator
+/// retains, and announces nothing.
+///
+/// This answers a repeat that arrives too late to have crossed the batch's bursts (see
+/// [`SSA_REPEAT_RESEND_GRACE`]): some member's burst went out and none of it reached the Exit. The
+/// repeat names the whole batch, not the member that is missing, so every announced member is sent
+/// again, and a member the Exit already holds absorbs the copy. There is no `ReadyToDeposit`,
+/// because each of `members` was announced when its publication completed (see
+/// [`OwedPublications::announced`]).
+///
+/// Each re-send spends one of the cycle's
+/// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), the same
+/// budget a scoped re-request draws on. Once the generator refuses to rebuild a cycle, because that
+/// budget is spent or its material is gone, the cycle is no longer counted as announced, so later
+/// repeats do not ask again. A transport failure stops the re-send where it is and is the non-fatal
+/// [`SessionManagerError::NotAdmitted`]. The Exit's next repeat after the grace tries again.
+async fn republish_commitments<S>(
+    session_id: SessionId,
+    pseudonym: HoprPseudonym,
+    routing: &DestinationRouting,
+    ssa_state: &SessionSsaState,
+    pix_toolbox: &PixToolbox,
+    msg_sender: &mut S,
+    members: Vec<SsaIndex>,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+{
+    let whole_cycle = [(
+        0,
+        ssa_state.params.polys_per_ssa() as hopr_protocol_pix::PolynomialIndex - 1,
+    )];
+
+    for ssa_index in members {
+        let generator = pix_toolbox.share_generator.clone();
+        let recommitted = hopr_utils::parallelize::cpu::spawn_blocking(
+            move || generator.recommit(&pseudonym, ssa_index, whole_cycle),
+            "client_ssa_recommitment",
+        )
+        .await
+        .map_err(SessionManagerError::other)?;
+        let commitment = match recommitted {
+            Ok(commitment) => commitment,
+            Err(
+                error @ (hopr_protocol_pix::errors::PixError::InvalidInput
+                | hopr_protocol_pix::errors::PixError::MissingSsaCommitment),
+            ) => {
+                ssa_state.forget_announced(ssa_index);
+                tracing::warn!(
+                    %session_id, %ssa_index, error = %error,
+                    "a lost SSA commitment can no longer be re-sent"
+                );
+                continue;
+            }
+            Err(error) => return Err(SessionManagerError::PixError(error).into()),
+        };
+
+        let burst =
+            SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
+        let num_messages = burst.len();
+        for commitment_msg in burst {
+            if let Err(error) = send_via_msg_sender(
+                msg_sender,
+                routing.clone(),
+                HoprStartProtocol::SsaCommit(commitment_msg),
+                "re-sent client SSA commitment message",
+            )
+            .await
+            {
+                tracing::warn!(
+                    %session_id, %ssa_index, %error,
+                    "re-sending a lost SSA commitment was cut short; the Exit's next repeat tries again"
+                );
+                return Err(SessionManagerError::NotAdmitted(format!(
+                    "re-sending the SSA commitment for {ssa_index} was cut short ({error})"
+                ))
+                .into());
+            }
+        }
+
+        tracing::info!(%session_id, %ssa_index, num_messages, "re-sent the whole commitment of a published SSA");
     }
     Ok(())
 }
@@ -6059,20 +6229,26 @@ where
                     .collect()
             })
             .unwrap_or_default();
-        if let Some(ssa_state) = session_slot.current_ssa_state.get()
-            && !cut_short.is_empty()
-        {
-            tracing::info!(%session_id, ?cut_short, "a re-request names cycles whose publication was cut short — resuming it");
-            resume_publication(
-                session_id,
-                pseudonym,
-                &session_slot.routing_opts,
-                ssa_state,
-                &pix_toolbox,
-                &mut msg_sender,
-            )
-            .await?;
-        }
+
+        // A resumption's failure is kept rather than returned at once. The cycles of this request
+        // that were published in full are repairs of their own, and a resumption the transport cut
+        // short is no reason to make them wait a whole re-request interval. It is reported once they
+        // have been sent.
+        let resumed = match session_slot.current_ssa_state.get() {
+            Some(ssa_state) if !cut_short.is_empty() => {
+                tracing::info!(%session_id, ?cut_short, "a re-request names cycles whose publication was cut short — resuming it");
+                resume_publication(
+                    session_id,
+                    pseudonym,
+                    &session_slot.routing_opts,
+                    ssa_state,
+                    &pix_toolbox,
+                    &mut msg_sender,
+                )
+                .await
+            }
+            _ => Ok(()),
+        };
 
         for (ssa_index, runs) in msg.missing {
             if cut_short.contains(&ssa_index) {
@@ -6107,7 +6283,7 @@ where
             info!(%session_id, %ssa_index, num_messages, "re-sent the requested SSA commitment parts");
         }
 
-        Ok(())
+        resumed
     }
 
     /// Handled by the Entry, when the Exit sends PIX initiation request
@@ -6308,16 +6484,22 @@ where
         // before either half of the successor gate, because neither half has anything to say about it.
         //
         // Two things look the same from the watermark and are not. A *repeat* names the batch this
-        // Session committed to last: the Exit re-sends an unanswered successor request until the first
-        // `SsaCommit` reaches it, so once one is admitted the re-sends already in flight arrive at an
-        // Entry that has nothing left to do for them. For a batch that was published in full they
-        // succeed without effect — no second burst, no second `ReadyToDeposit`, and above all no second
-        // deposit. A batch whose publication was cut short is the exception: members still owed are
-        // published now, whole, and the repeat succeeds only if that did (see
-        // `SessionSsaState::unpublished`); otherwise it is a non-fatal refusal and the Exit's next
-        // re-send tries again. A *stale* request names indices at or below the watermark that are not
-        // that batch; it is dropped, and is not `refuse_ssa_request`, since it can be nothing worse
-        // than an Exit that lost track of what it asked for, which its own deadlines already end.
+        // Session committed to last: the Exit re-sends an unanswered successor request until a part of
+        // every member's commitment reaches it, so once one is admitted the re-sends already in flight
+        // arrive at an Entry that has nothing left to do for them. For a batch that was published in
+        // full they succeed without effect — no second burst, no second `ReadyToDeposit`, and above all
+        // no second deposit. That holds while they arrive within `SSA_REPEAT_RESEND_GRACE` of the batch
+        // last going out. A repeat that arrives later was sent after the bursts should have reached the
+        // Exit, so one of them was lost after the transport took it. Every announced member's burst
+        // then goes out again, still with no `ReadyToDeposit`. A batch whose publication was cut short
+        // is the other exception: members still owed are published now, whole, and the repeat succeeds
+        // only if that did (see `SessionSsaState::unpublished`); otherwise it is a non-fatal refusal
+        // and the Exit's next re-send tries again. A *stale* request names indices at or below the
+        // watermark that are not that batch; it is dropped, and is not `refuse_ssa_request`, since it
+        // can be nothing worse than an Exit that lost track of what it asked for, which its own
+        // deadlines already end. The one other way to have committed past the batch last recorded is
+        // a batch that moved the generator and then failed to stage, and that failure ends the
+        // Session instead (see phase two below).
         //
         // The opening batch has no watermark and passes this untouched.
         let first_asked = msg.commitments.keys().next().copied();
@@ -6326,7 +6508,25 @@ where
             && first <= watermark
         {
             if ssa_state.last_committed_first() == Some(first) {
-                if ssa_state.unpublished_indices().is_empty() {
+                if !ssa_state.unpublished_indices().is_empty() {
+                    tracing::info!(
+                        session_id = %msg.session_id, %first, %watermark,
+                        "a repeat of an SSA request whose publication was cut short — resuming it"
+                    );
+                    let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+                    return resume_publication(
+                        msg.session_id,
+                        pseudonym,
+                        &session_slot.routing_opts,
+                        ssa_state,
+                        &pix_toolbox,
+                        &mut msg_sender,
+                    )
+                    .await;
+                }
+
+                let lost = ssa_state.claim_republication(Instant::now(), SSA_REPEAT_RESEND_GRACE);
+                if lost.is_empty() {
                     tracing::debug!(
                         session_id = %msg.session_id, %first, %watermark,
                         "ignored a repeat of an SSA request this Session already committed to"
@@ -6335,17 +6535,18 @@ where
                 }
 
                 tracing::info!(
-                    session_id = %msg.session_id, %first, %watermark,
-                    "a repeat of an SSA request whose publication was cut short — resuming it"
+                    session_id = %msg.session_id, %first, %watermark, members = ?lost,
+                    "a repeat of an SSA request long after it was published — re-sending its commitments"
                 );
                 let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-                return resume_publication(
+                return republish_commitments(
                     msg.session_id,
                     pseudonym,
                     &session_slot.routing_opts,
                     ssa_state,
                     &pix_toolbox,
                     &mut msg_sender,
+                    lost,
                 )
                 .await;
             }
@@ -6617,72 +6818,96 @@ where
         // `new_ssa_commitment` appends to the per-pseudonym polynomial queue. Failing here therefore
         // leaves queued polynomials the Exit never learns of — wasted work rather than a leaked
         // deposit instruction, and the generator's own monotonic index keeps them from being mistaken
-        // for a later cycle's.
+        // for a later cycle's. That same index makes a failure after the first member was generated
+        // the end of the Session, below.
+        let watermark_before = ssa_state.committed_watermark();
         let mut staged: Vec<(AgreedSsaQuota, CommitmentBurst)> = Vec::with_capacity(validated.len());
-        for (ssa_index, exit_point) in validated {
-            // Use the global `pix_toolbox.share_generator` to generate the client
-            // commitment. The generator is shared with the packet pipeline's
-            // `next_share`, so polynomials created here will be used when the
-            // pipeline embeds PIX shares into return-path SURBs.
-            //
-            // The generator dimension (polys × threshold) must match what the
-            // Exit's reconstructor expects — both are set from the session's
-            // negotiated PIX params (pix_global_config on Entry → SsaRequest
-            // params on Exit).  If the client sends commitments that exceed the
-            // Exit's expected dimensions, the Exit rejects them as InvalidInput.
-            let pix_toolbox_clone = pix_toolbox.clone();
-            let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
-                move || {
-                    pix_toolbox_clone
-                        .share_generator
-                        .new_ssa_commitment(&pseudonym, ssa_index)
-                },
-                "client_ssa_commitment",
-            )
-            .await
-            .map_err(SessionManagerError::other)?
-            .map_err(SessionManagerError::PixError)?;
+        let staging: errors::Result<()> = async {
+            for (ssa_index, exit_point) in validated {
+                // Use the global `pix_toolbox.share_generator` to generate the client
+                // commitment. The generator is shared with the packet pipeline's
+                // `next_share`, so polynomials created here will be used when the
+                // pipeline embeds PIX shares into return-path SURBs.
+                //
+                // The generator dimension (polys × threshold) must match what the
+                // Exit's reconstructor expects — both are set from the session's
+                // negotiated PIX params (pix_global_config on Entry → SsaRequest
+                // params on Exit).  If the client sends commitments that exceed the
+                // Exit's expected dimensions, the Exit rejects them as InvalidInput.
+                let pix_toolbox_clone = pix_toolbox.clone();
+                let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                    move || {
+                        pix_toolbox_clone
+                            .share_generator
+                            .new_ssa_commitment(&pseudonym, ssa_index)
+                    },
+                    "client_ssa_commitment",
+                )
+                .await
+                .map_err(SessionManagerError::other)?
+                .map_err(SessionManagerError::PixError)?;
 
-            // The generator has been advanced for this index, so the Session records it now rather
-            // than after the publish phase. Recording it early is the safe direction: the watermark
-            // only ever makes the successor gate stricter, and a batch abandoned between here and
-            // publication has still moved the generator.
-            if let Some(state) = session_slot.current_ssa_state.get() {
-                state.note_committed(
-                    ssa_index,
-                    session_slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed),
-                );
+                // The generator has been advanced for this index, so the Session records it now rather
+                // than after the publish phase. Recording it early is the safe direction: the watermark
+                // only ever makes the successor gate stricter, and a batch abandoned between here and
+                // publication has still moved the generator.
+                if let Some(state) = session_slot.current_ssa_state.get() {
+                    state.note_committed(
+                        ssa_index,
+                        session_slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed),
+                    );
+                }
+
+                // Construct the full SSA by adding the client and exit commitments, getting the deposit address
+                let full_ssa = client_commitment.ssa_commitment + exit_point;
+                let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(
+                    SessionManagerError::other(anyhow::anyhow!("failed to convert SSA to deposit address")),
+                )?;
+
+                // Split the SSA client commitment into Start protocol commitment messages
+                let commitment_msgs = SsaClientCommitmentMessage::new_multiple(session_id, client_commitment)
+                    .map_err(SessionManagerError::other)?;
+                debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
+
+                // What `ReadyToDeposit` will say, fixed here with the address. Kept whole so that a
+                // publication that is cut short can still announce it later: nothing about it can be
+                // derived again once this request is gone, the deposit data least of all.
+                let quota = AgreedSsaQuota {
+                    ssa_id: SsaId::new(pseudonym, ssa_index),
+                    deposit_address,
+                    quota_per_ssa,
+                    // Rebuilt rather than carried: the `id` is not on the wire, because this message
+                    // already says which Session and which SSA these bytes belong to.
+                    deposit_data: PixDepositData {
+                        id: PixAddressId::new(&pseudonym, ssa_index),
+                        data: deposit_payloads
+                            .remove(&ssa_index)
+                            .map(|payload| payload.0)
+                            .unwrap_or_default(),
+                    },
+                };
+                staged.push((quota, commitment_msgs));
             }
-
-            // Construct the full SSA by adding the client and exit commitments, getting the deposit address
-            let full_ssa = client_commitment.ssa_commitment + exit_point;
-            let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
-                anyhow::anyhow!("failed to convert SSA to deposit address"),
-            ))?;
-
-            // Split the SSA client commitment into Start protocol commitment messages
-            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(session_id, client_commitment)
-                .map_err(SessionManagerError::other)?;
-            debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
-
-            // What `ReadyToDeposit` will say, fixed here with the address. Kept whole so that a
-            // publication that is cut short can still announce it later: nothing about it can be
-            // derived again once this request is gone, the deposit data least of all.
-            let quota = AgreedSsaQuota {
-                ssa_id: SsaId::new(pseudonym, ssa_index),
-                deposit_address,
-                quota_per_ssa,
-                // Rebuilt rather than carried: the `id` is not on the wire, because this message
-                // already says which Session and which SSA these bytes belong to.
-                deposit_data: PixDepositData {
-                    id: PixAddressId::new(&pseudonym, ssa_index),
-                    data: deposit_payloads
-                        .remove(&ssa_index)
-                        .map(|payload| payload.0)
-                        .unwrap_or_default(),
-                },
-            };
-            staged.push((quota, commitment_msgs));
+            Ok(())
+        }
+        .await;
+        if let Err(error) = staging {
+            // Nothing generated yet means nothing moved, and the Exit's next re-send tries the whole
+            // batch again. Once a member has been generated, though, the batch can never be committed.
+            // The generator refuses that member's index for good, so every re-send of this request
+            // would be dropped as stale until the Exit's deadline closed the Session,
+            // and meanwhile the polynomials it queued would go on to be emitted for a cycle whose
+            // commitment the Exit never receives. Terminal, like lost generator state, and for the
+            // same reason: this half of the Session can make no further PIX progress.
+            if ssa_state.committed_watermark() != watermark_before {
+                tracing::error!(
+                    %session_id, %error,
+                    "staging an admitted SSA batch failed after part of it was generated; it can never be committed"
+                );
+                self.refuse_ssa_request(session_id, session_slot.routing_opts.clone())
+                    .await;
+            }
+            return Err(error);
         }
 
         // Recorded once phase two has staged the whole request, and before anything is published: a
@@ -6721,7 +6946,7 @@ where
                 continue;
             };
 
-            if let Err(error) = publish_commitment(
+            match publish_commitment(
                 &pix_toolbox,
                 &mut msg_sender,
                 &session_slot.routing_opts,
@@ -6731,7 +6956,8 @@ where
             )
             .await
             {
-                return Err(publication_cut_short(session_id, ssa_state, claim, &error));
+                Ok(()) => ssa_state.complete_publication(claim, Instant::now()),
+                Err(error) => return Err(publication_cut_short(session_id, ssa_state, claim, &error)),
             }
         }
 
@@ -14193,16 +14419,23 @@ mod tests {
     /// through the same sender, and a keep-alive spending the budget would move the point at which a
     /// burst is cut.
     #[derive(Clone)]
-    struct SendBudget(Arc<std::sync::atomic::AtomicU64>);
+    struct SendBudget {
+        allowed: Arc<std::sync::atomic::AtomicU64>,
+        /// Commitment messages refused before `allowed` is consulted at all.
+        refusals: Arc<std::sync::atomic::AtomicU64>,
+    }
 
     impl SendBudget {
         fn unlimited() -> Self {
-            Self(Arc::new(std::sync::atomic::AtomicU64::new(u64::MAX)))
+            Self {
+                allowed: Arc::new(std::sync::atomic::AtomicU64::new(u64::MAX)),
+                refusals: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            }
         }
 
         /// Lets `sends` more commitment messages through, then refuses every one.
         fn allow(&self, sends: u64) {
-            self.0.store(sends, Ordering::SeqCst);
+            self.allowed.store(sends, Ordering::SeqCst);
         }
 
         /// Ends the failure: every send is let through again.
@@ -14210,8 +14443,21 @@ mod tests {
             self.allow(u64::MAX);
         }
 
+        /// Refuses the next `sends` commitment messages, and goes back to [`allow`](Self::allow)'s
+        /// budget after them: a transport that gives up once and then recovers.
+        fn refuse_next(&self, sends: u64) {
+            self.refusals.store(sends, Ordering::SeqCst);
+        }
+
         fn take(&self) -> bool {
-            self.0
+            if self
+                .refusals
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| left.checked_sub(1))
+                .is_ok()
+            {
+                return false;
+            }
+            self.allowed
                 .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
                     if left == u64::MAX {
                         Some(left)
@@ -14640,6 +14886,217 @@ mod tests {
         Ok(())
     }
 
+    /// A resumption the transport cuts short does not hold up the rest of the re-request that
+    /// prompted it.
+    ///
+    /// A re-request can name a cycle whose publication was cut short beside one that was published in
+    /// full. The first is answered by resuming the batch and the second by its scoped parts, and the
+    /// two are separate repairs. Returning on the resumption's failure left the second one waiting a
+    /// whole re-request interval on the first.
+    #[test_log::test(tokio::test)]
+    async fn a_cut_short_resumption_does_not_hold_up_the_rest_of_a_rerequest() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let mut batch = ssa_request_for(1);
+        batch.extend(ssa_request_for(2));
+        let (first, second) = (
+            SsaIndex::new(1).context("non-zero")?,
+            SsaIndex::new(2).context("non-zero")?,
+        );
+
+        // The first member goes out whole; the second is cut after one message.
+        sends.allow(burst as u64 + 1);
+        mgr.handle_ssa_request(pseudonym, SsaServerCommitmentMessage::new(pseudonym, params, batch, []))
+            .await
+            .expect_err("a batch whose second burst is cut must fail the request");
+        assert_eq!(vec![second], owed(&mgr, &pseudonym)?);
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        let before = settled_commit_count(&wire).await;
+        sends.restore();
+
+        // The Exit asks for ten polynomials of each. The transport gives up on the first message of
+        // the resumption and recovers straight after.
+        sends.refuse_next(1);
+        let failure = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::recommit(
+                    pseudonym,
+                    params,
+                    [(first, vec![(0u16, 9)]), (second, vec![(0u16, 9)])],
+                ),
+            )
+            .await
+            .expect_err("the resumption that was cut short is still reported");
+        assert!(
+            is_a_cut_short_publication(&failure),
+            "reported as the non-fatal refusal, got {failure:?}"
+        );
+        assert_eq!(
+            before + 1,
+            settled_commit_count(&wire).await,
+            "the published cycle's ten polynomials went out all the same, in one message"
+        );
+        assert_eq!(vec![second], owed(&mgr, &pseudonym)?, "and the cut cycle stays owed");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "nothing was announced");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Moves the moment the Session's last batch went out back by a whole
+    /// [`SSA_REPEAT_RESEND_GRACE`], as if the repeat about to be handled were arriving that much later.
+    fn backdate_last_sent<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym) -> anyhow::Result<()>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    {
+        let slot = mgr.sessions.get(pseudonym).context("session must exist")?;
+        let state = slot.current_ssa_state.get().context("a PIX session has SSA state")?;
+        let mut unpublished = state.unpublished.lock();
+        let sent = unpublished.last_sent.context("the batch must have gone out")?;
+        unpublished.last_sent = Some(
+            sent.checked_sub(SSA_REPEAT_RESEND_GRACE)
+                .context("the clock must reach back a grace")?,
+        );
+        Ok(())
+    }
+
+    /// A repeat that arrives long after the batch went out in full has its bursts sent again, and
+    /// nothing announced.
+    ///
+    /// Publishing a burst only means the local transport took it. If a relayer on the forward path
+    /// dies, all of it can be lost, and then the Exit holds no part it could name in a scoped
+    /// re-request. Its repeat is the only prompt left. A repeat that arrives within the grace may have
+    /// crossed the burst and gets nothing, which is what keeps the ordinary in-flight repeats from
+    /// costing a retransmission each.
+    ///
+    /// The opening batch stands in for a successor here. Nothing on the Entry tells them apart, and it
+    /// spares the test serving a cycle first.
+    #[test_log::test(tokio::test)]
+    async fn a_late_repeat_sends_the_published_bursts_again_without_announcing_them() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(burst, settled_commit_count(&wire).await);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat inside the grace must succeed")?;
+        assert_eq!(burst, settled_commit_count(&wire).await, "and send nothing");
+
+        backdate_last_sent(&mgr, &pseudonym)?;
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a late repeat must be answered")?;
+        assert_eq!(
+            2 * burst,
+            settled_commit_count(&wire).await,
+            "with the whole burst again"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "and no second announcement for the same cycle"
+        );
+
+        // The re-send starts the grace over, so the repeats that crossed it get nothing.
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat right after a re-send must succeed")?;
+        assert_eq!(2 * burst, settled_commit_count(&wire).await);
+
+        // A re-send the transport cuts short is not fatal, and also starts the grace over, so a
+        // congested transport is not handed a burst on every repeat.
+        backdate_last_sent(&mgr, &pseudonym)?;
+        sends.allow(1);
+        let failure = mgr
+            .handle_ssa_request(pseudonym, request())
+            .await
+            .expect_err("a re-send that cannot get out must fail the request");
+        assert!(
+            matches!(
+                failure,
+                TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))
+            ),
+            "reported as the non-fatal refusal, got {failure:?}"
+        );
+        sends.restore();
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat right after a failed re-send must succeed")?;
+        assert_eq!(2 * burst + 1, settled_commit_count(&wire).await);
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session lives");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A lost burst whose cycle has no retransmissions left is given up on, once.
+    ///
+    /// The re-send of a published burst draws on the same per-cycle budget as a scoped re-request, so
+    /// a peer cannot farm whole bursts out of this node by repeating its request. Once that budget is
+    /// spent the generator refuses, and the cycle stops counting as announced, so the repeats after it
+    /// do not even ask.
+    #[test_log::test(tokio::test)]
+    async fn a_lost_burst_with_no_retransmissions_left_is_given_up_on() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, _sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(burst, settled_commit_count(&wire).await);
+
+        for _ in 0..hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            generator.recommit(&pseudonym, SsaIndex::new(1).context("non-zero")?, [(0, 0)])?;
+        }
+
+        backdate_last_sent(&mgr, &pseudonym)?;
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a spent cycle is given up on, which is not a failure of the request")?;
+        assert_eq!(burst, settled_commit_count(&wire).await, "nothing was sent");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "and nothing announced");
+        assert!(
+            mgr.sessions
+                .get(&pseudonym)
+                .context("session must exist")?
+                .current_ssa_state
+                .get()
+                .context("a PIX session has SSA state")?
+                .unpublished
+                .lock()
+                .announced
+                .is_empty(),
+            "the cycle is no longer one a late repeat sends again"
+        );
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session lives");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     /// Once a cycle has used up its retransmissions it can never be published again, so it is dropped.
     ///
     /// Resuming spends one of a cycle's [`MAX_COMMITMENT_RETRANSMISSIONS`] answers, and that cap is
@@ -15003,6 +15460,59 @@ mod tests {
             state.unpublished_indices(),
             "an older batch's member has nothing left to be owed to"
         );
+        Ok(())
+    }
+
+    /// Only members whose publication completed are sent again, only once the batch has been out for
+    /// a whole grace, and a re-send starts the grace over.
+    #[test]
+    fn a_late_repeat_resends_only_announced_members_once_per_grace() -> anyhow::Result<()> {
+        let state = SessionSsaState::new(small_pix_params());
+        let pseudonym = HoprPseudonym::random();
+        let owed = |index: u32| owed_quota(pseudonym, index);
+        let index = |index: u32| SsaIndex::new(index).context("non-zero");
+        let grace = SSA_REPEAT_RESEND_GRACE;
+        let t0 = Instant::now();
+
+        state.stage_unpublished([owed(3)?, owed(4)?]);
+        assert!(
+            state.claim_republication(t0 + grace * 10, grace).is_empty(),
+            "nothing has been announced yet"
+        );
+
+        let first = state.claim_unpublished(index(3)?).context("owed, so claimable")?;
+        state.complete_publication(first, t0);
+        let second = state.claim_unpublished(index(4)?).context("owed, so claimable")?;
+        assert!(
+            state.claim_republication(t0 + grace / 2, grace).is_empty(),
+            "a repeat inside the grace may have crossed the burst"
+        );
+        assert_eq!(
+            vec![index(3)?],
+            state.claim_republication(t0 + grace, grace),
+            "a member still being published is not sent again behind its claimant's back"
+        );
+        assert!(
+            state.claim_republication(t0 + grace + grace / 2, grace).is_empty(),
+            "a re-send starts the grace over"
+        );
+
+        state.complete_publication(second, t0 + grace * 2);
+        assert_eq!(
+            vec![index(3)?, index(4)?],
+            state.claim_republication(t0 + grace * 3, grace)
+        );
+
+        state.forget_announced(index(3)?);
+        assert_eq!(vec![index(4)?], state.claim_republication(t0 + grace * 4, grace));
+
+        // A newer batch starts with nothing announced, and a straggling claimant of an older one
+        // adds nothing to it.
+        state.stage_unpublished([owed(5)?]);
+        let straggler = state.claim_unpublished(index(5)?).context("owed, so claimable")?;
+        state.stage_unpublished([owed(7)?]);
+        state.complete_publication(straggler, t0 + grace * 5);
+        assert!(state.claim_republication(t0 + grace * 10, grace).is_empty());
         Ok(())
     }
 
@@ -17112,7 +17622,7 @@ mod tests {
     /// Entry publishes a batch one member after another, so a complete first member beside a second
     /// that never arrived is exactly the state a publication cut at a member boundary leaves. The
     /// Entry's repeat branch publishes only the members it still owes, so sending the whole batch costs
-    /// nothing for the one that is done.
+    /// nothing for the one that is done, short of a repeat late enough to mean a burst was lost.
     #[test]
     fn a_resend_goes_out_while_any_member_is_still_waiting() -> anyhow::Result<()> {
         for completed_position in [0, 1] {
