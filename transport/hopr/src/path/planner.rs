@@ -109,12 +109,15 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
-    /// Exponent applied to return-path weights before sampling, flattening the distribution.
+    /// Exponent applied to path weights before sampling, flattening the distribution. Despite the
+    /// name it applies to forward draws as well as to return draws (the name is kept for
+    /// configuration compatibility).
     ///
-    /// Return paths are drawn weighted-random by path value, which concentrates a session's SURBs
-    /// on the few highest-valued relays — losing one then costs far more than the reliable-mode
-    /// loss tolerance. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and
-    /// bad candidates without changing their order: `w' = w^γ`.
+    /// Paths are drawn weighted-random by path value, which concentrates a session's SURBs, and its
+    /// forward packets, on the few highest-valued relays — losing one then costs far more than the
+    /// reliable-mode loss tolerance, and a forward path that collapses on one relayer goes dark
+    /// with it. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and bad
+    /// candidates without changing their order: `w' = w^γ`.
     ///
     /// `1.0` samples by raw path value (most traffic on the best relays, largest blast radius when
     /// one dies). Values approaching `0.0` tend to a uniform draw (smallest blast radius, most
@@ -125,7 +128,8 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_weight_temper"))]
     #[default = 0.5]
     pub return_path_weight_temper: f64,
-    /// Fraction of return-path draws made uniformly at random instead of by weight.
+    /// Fraction of path draws, forward and return, made uniformly at random instead of by weight
+    /// (the name is kept for configuration compatibility).
     ///
     /// Weights come from observations, and observations only exist for paths that get selected — a
     /// closed loop in which a path that falls out of favour stops being measured, so its score can
@@ -205,16 +209,15 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     pwc.cost * lat * cap
 }
 
-/// The weight a candidate is drawn by, as the walk valued it: a return path's weight is tempered to
-/// spread SURBs over relayers (see [`PathPlannerConfig::return_path_weight_temper`]), relayer health
-/// included.
-fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams, returning: bool) -> f64 {
-    let weight = composite_weight(pwc, hops, params);
-    if returning {
-        temper_weights(&[weight], params.return_path_weight_temper)[0]
-    } else {
-        weight
-    }
+/// The weight a candidate is drawn by, as the walk valued it, tempered to spread the draws over
+/// relayers (see [`PathPlannerConfig::return_path_weight_temper`]), relayer health included.
+///
+/// Forward and return paths alike: an untempered forward draw put most of a session's packets on
+/// its single best path, and with the candidate prune diversifying first relayers only, on one
+/// middle relayer, whose death then took the whole forward direction with it (see
+/// `selector::MIDDLE_HOP_SHARE`).
+fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams) -> f64 {
+    temper_weights(&[composite_weight(pwc, hops, params)], params.return_path_weight_temper)[0]
 }
 
 /// Picks an index into `weights` with probability proportional to the weight; `None` if all are
@@ -363,8 +366,7 @@ where
             match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
                 Ok(vp) => {
                     // Return paths are planned from the destination back to us.
-                    let returning = dest_key == me;
-                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting, returning)));
+                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting)));
                     path_metrics.push(pwc);
                 }
                 Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
@@ -693,7 +695,18 @@ where
 
                 // Format from the `NodeId`s rather than re-resolving them: `cached_paths` has
                 // already done that, and for `NodeId::Chain` each resolution is a resolver lookup.
-                paths.pick_one().ok_or_else(|| {
+                //
+                // Explored like a return draw (see `return_path_exploration`): weights exist only for
+                // paths that get drawn, so without it a forward candidate that fell out of favour is
+                // never measured again, and the stream settles on one path.
+                let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
+                    pick_uniform_index(paths.len())
+                        .and_then(|i| paths.iter().nth(i))
+                        .map(|(vp, _)| vp.clone())
+                } else {
+                    paths.pick_one()
+                };
+                drawn.ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(
                         hops_usize,
                         source.to_string(),
@@ -2021,6 +2034,47 @@ mod tests {
         (planner, graph)
     }
 
+    /// The mirror of [`two_relayer_return_planner`]: a `me -> {a,b} -> dest` forward topology.
+    fn two_relayer_forward_planner() -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [(me, a), (a, dest), (me, b), (b, dest)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(me_addr(), b_addr())
+            .with_open_channel(b_addr(), dest_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
     /// Same `me <- {a,b} <- dest` return topology as [`two_relayer_return_planner_with_floor`], but
     /// `unresolvable` is left out of the chain resolver's key-to-address map -- present in the graph,
     /// so the selector still offers it as a candidate relayer, but `ValidatedPath::new` cannot map it
@@ -2343,6 +2397,47 @@ mod tests {
         assert!(
             paths.iter().any(|vp| vp.first() == Some(&a)),
             "the healthy relayer must keep carrying the return stream"
+        );
+        Ok(())
+    }
+
+    /// A forward draw explores like a return draw: the weaker relayer keeps a floor of the forward
+    /// packets, so it stays measured and a session does not settle on one path. The health here is
+    /// a sixteenth; tempered that is a quarter of the weight, and exploration adds a twentieth.
+    #[tokio::test]
+    async fn forward_draws_should_be_tempered_and_explored() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+        graph.record_node_health(&b, 1.0 / 16.0);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            } else {
+                assert_eq!(Some(&a), path.first(), "a forward path leaves through A or B");
+            }
+        }
+        // Untempered and unexplored the weaker relayer would get about a seventeenth (~235); a
+        // sixteenth of the health tempered to a quarter gives it about a fifth, plus the exploration.
+        assert!(
+            (500..1500).contains(&via_b),
+            "the weaker relayer keeps a tempered share of the forward draws, got {via_b} of 4000"
         );
         Ok(())
     }
