@@ -328,6 +328,14 @@ pub struct PixTurnEvents {
     pub recovered: u32,
     /// Cycles retired without recovering.
     pub failed: u32,
+    /// Unanswered successor `SsaRequest`s the supervisor asked to have sent again.
+    ///
+    /// One per re-send, not per index of the batch it names. Deliberately not a
+    /// [`PixCycleEvent`]: that enum is the lifecycle transitions that
+    /// `requested = recovered + failed + live` is built from, and a re-send moves no cycle through
+    /// any of them — counting it there would break the identity the census exists to keep exact. It
+    /// is a rate of repeats, and only that.
+    pub ssa_requests_resent: u32,
     /// Newly accepted shares that advanced reconstruction.
     pub useful_shares: u64,
     /// Newly accepted shares that did not — the negotiated surplus, and duplicates.
@@ -458,7 +466,8 @@ enum EventScope {
     /// count that retired the cycle.
     ///
     /// What survives is everything that is only ever a rate: `committed` and `funded`, which are
-    /// edges between census buckets rather than entries or exits, and the share arrivals. Dropping
+    /// edges between census buckets rather than entries or exits, the share arrivals, and the
+    /// re-sends of an unanswered successor request. Dropping
     /// those would understate throughput at teardown for nothing — no gauge and no invariant reads
     /// them, so there is no second copy for them to disagree with.
     EdgesOnly,
@@ -690,6 +699,12 @@ fn record_events(events: PixTurnEvents, scope: EventScope) {
             emit_shares_total(kind, count);
         }
     }
+    // Re-sends are a rate of repeats and nothing reads them back either, so they are counted in both
+    // scopes for the same reason. They are also kept out of `counts()` on purpose: those are the
+    // lifecycle transitions `requested = recovered + failed + live` is built from.
+    if events.ssa_requests_resent > 0 {
+        emit_ssa_requests_resent(u64::from(events.ssa_requests_resent));
+    }
     // Confirmed deposit value pairs with `Funded`, which is not census-coupled, so it is emitted in
     // both scopes for the same reason that count is.
     if events.deposit_confirmed_uhopr > 0 {
@@ -775,6 +790,15 @@ fn emit_cycles_total(event: PixCycleEvent, count: u64) {
     probe::add(&format!("cycles_total/{event}"), count as i64);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = (event, count);
+}
+
+fn emit_ssa_requests_resent(count: u64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::pix::add_ssa_requests_resent(count);
+    #[cfg(test)]
+    probe::add("ssa_requests_resent", count as i64);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = count;
 }
 
 fn emit_egress_packets(mode: PixGateMode, count: u64) {
@@ -1114,6 +1138,7 @@ mod tests {
                 funded: 1,
                 recovered: 1,
                 failed: 1,
+                ssa_requests_resent: 5,
                 useful_shares: 7,
                 surplus_shares: 4,
                 deposit_confirmed_uhopr: 500_000,
@@ -1137,6 +1162,11 @@ mod tests {
             "a share arrival is only ever a rate"
         );
         assert_eq!(4, probe::get("shares_total/surplus"));
+        assert_eq!(
+            5,
+            probe::get("ssa_requests_resent"),
+            "a re-send is only ever a rate, like a share arrival, and moves no cycle through the census"
+        );
         for coupled in ["requested", "recovered", "failed"] {
             assert_eq!(
                 0,
@@ -1306,6 +1336,42 @@ mod tests {
             }
             .is_empty()
         );
+        assert!(
+            !PixTurnEvents {
+                ssa_requests_resent: 1,
+                ..Default::default()
+            }
+            .is_empty(),
+            "a turn whose only event was a re-send still has something to publish"
+        );
+    }
+
+    /// A re-send is counted on its own series and moves no lifecycle counter.
+    ///
+    /// `hopr_pix_cycles_total` is the lifecycle transitions of `requested = recovered + failed +
+    /// live`, and a repeat of an unanswered request moves no cycle through any of them. Counting it
+    /// there would make `requested` overshoot by one per re-send and break that identity for exactly
+    /// the Sessions the re-sends are rescuing.
+    #[test]
+    fn a_resend_is_counted_apart_from_the_cycle_lifecycle() {
+        probe::reset();
+        let telemetry = handle();
+        telemetry.publish(
+            snapshot(PixGateMode::Predeposit, 1),
+            PixTurnEvents {
+                ssa_requests_resent: 3,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(3, probe::get("ssa_requests_resent"));
+        for event in ["requested", "committed", "funded", "recovered", "failed"] {
+            assert_eq!(
+                0,
+                probe::get(&format!("cycles_total/{event}")),
+                "a re-send must not count as a {event} cycle"
+            );
+        }
     }
 
     // -----------------------------------------------------------------------
