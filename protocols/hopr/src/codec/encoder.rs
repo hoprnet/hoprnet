@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bytes::{BufMut, BytesMut};
 use hopr_api::{
     chain::*,
@@ -19,6 +21,49 @@ use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, errors::H
 pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
     (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
+/// Maximum number of decompressed packet keys kept by [`CachingKeyExpander`].
+///
+/// A sender only ever expands the keys of the relays on the paths it currently uses, which is a
+/// far smaller set than the peers it knows about.
+const EXPANDED_KEY_CACHE_CAPACITY: usize = 4_096;
+
+/// A [`KeyExpander`] that memoizes the decompressed form of a packet key.
+///
+/// Deriving shared secrets for an outgoing packet needs the expanded key of every hop, on both the
+/// forward path and each SURB return path - up to twelve per packet. Decompression is a field
+/// exponentiation, so paying it per packet would be a measurable share of packet construction,
+/// whereas the set of relays a sender uses turns over slowly.
+///
+/// This memoizes a pure function of public data, so it deliberately avoids an eviction-tracking
+/// cache: a plain map behind an `RwLock` costs nothing to construct and a read is a single hash,
+/// where a managed cache would charge per-entry bookkeeping on the packet path.
+#[derive(Debug, Default)]
+pub struct CachingKeyExpander(parking_lot::RwLock<HashMap<OffchainPublicKey, ExpandedOffchainPublicKey>>);
+
+impl KeyExpander for CachingKeyExpander {
+    fn expand(&self, key: &OffchainPublicKey) -> hopr_api::types::crypto::errors::Result<ExpandedOffchainPublicKey> {
+        if let Some(expanded) = self.0.read().get(key) {
+            return Ok(expanded.clone());
+        }
+
+        // Two senders racing on the same missing key will both decompress it. That is cheaper
+        // than holding the lock across the computation, and is not a correctness concern.
+        let expanded = DirectKeyExpander.expand(key)?;
+
+        let mut cache = self.0.write();
+
+        // The set of relays in use turns over slowly, so overflowing the bound means the node's
+        // routing has changed wholesale; dropping everything then is rarer and cheaper than
+        // tracking recency on every packet.
+        if cache.len() >= EXPANDED_KEY_CACHE_CAPACITY {
+            cache.clear();
+        }
+        cache.insert(*key, expanded.clone());
+
+        Ok(expanded)
+    }
+}
+
 /// Default [encoder](PacketEncoder) implementation for HOPR packets.
 pub struct HoprEncoder<Chain, G, S, T> {
     chain_api: Chain,
@@ -27,6 +72,7 @@ pub struct HoprEncoder<Chain, G, S, T> {
     chain_key: ChainKeypair,
     channels_dst: Hash,
     ssa_generator: G,
+    key_expander: CachingKeyExpander,
     cfg: HoprCodecConfig,
 }
 
@@ -48,6 +94,7 @@ impl<Chain, G, S, T> HoprEncoder<Chain, G, S, T> {
             chain_key,
             channels_dst,
             ssa_generator,
+            key_expander: CachingKeyExpander::default(),
             cfg,
         }
     }
@@ -108,6 +155,7 @@ where
             &self.chain_key,
             next_ticket,
             self.chain_api.key_id_mapper_ref(),
+            &self.key_expander,
             &self.channels_dst,
             &self.ssa_generator,
             signals,
