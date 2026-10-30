@@ -998,8 +998,10 @@ macro_rules! impl_build_methods {
                         {
                             tracing::error!(%error, "failed to insert incoming ticket");
                         }
-                        if let Err(error) = new_ticket_tx.try_broadcast(event) {
-                            tracing::error!(%error, "failed to broadcast ticket event");
+                        match new_ticket_tx.try_broadcast(event) {
+                            // No subscriber is listening right now, so there is nothing to deliver to
+                            Ok(_) | Err(async_broadcast::TrySendError::Inactive(_)) => {}
+                            Err(error) => tracing::error!(%error, "failed to broadcast ticket event"),
                         }
                         futures::future::ready(())
                     })

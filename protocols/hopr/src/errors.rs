@@ -34,7 +34,7 @@ impl<E: std::error::Error> IncomingPacketError<E> {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, strum::EnumIs)]
 pub enum HoprProtocolError {
     #[error("packet is in invalid state: {0}")]
     InvalidState(&'static str),
@@ -56,6 +56,11 @@ pub enum HoprProtocolError {
 
     #[error("could not find unacknowledged ticket for challenge {0}")]
     UnacknowledgedTicketNotFound(HalfKeyChallenge),
+
+    /// A ticket with this index (channel id, epoch, index) was already accepted and is still remembered
+    /// by the replay tracker.
+    #[error("ticket index {2} in channel {0} epoch {1} was already accepted")]
+    DuplicateTicketIndex(ChannelId, u32, u64),
 
     #[error("chain resolver error: {0}")]
     ResolverError(#[source] anyhow::Error),
