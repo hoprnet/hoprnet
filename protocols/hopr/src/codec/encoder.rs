@@ -51,6 +51,11 @@ impl KeyExpander for CachingKeyExpander {
         let expanded = DirectKeyExpander.expand(key)?;
 
         let mut cache = self.0.write();
+        // Another thread may have inserted this key while the lock was not held; without this check it would be
+        // inserted again, and at capacity the insert would flush the whole map for a key that is already cached.
+        if let Some(existing) = cache.get(key) {
+            return Ok(existing.clone());
+        }
 
         // The set of relays in use turns over slowly, so overflowing the bound means the node's
         // routing has changed wholesale; dropping everything then is rarer and cheaper than
@@ -266,5 +271,103 @@ where
             PacketRouting::NoAck(*destination),
             HoprPseudonym::random(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+    use hopr_api::types::crypto::keypairs::OffchainKeypair;
+
+    use super::*;
+
+    fn random_key() -> OffchainPublicKey {
+        *OffchainKeypair::random().public()
+    }
+
+    /// A key the compact parser accepts but that is not a point on the curve.
+    fn off_curve_key() -> anyhow::Result<OffchainPublicKey> {
+        (1..=u8::MAX)
+            .map(|b| OffchainPublicKey::try_from([b; OffchainPublicKey::SIZE].as_slice()))
+            .filter_map(Result::ok)
+            .find(|key| DirectKeyExpander.expand(key).is_err())
+            .context("no off-curve key among the candidates")
+    }
+
+    #[test]
+    fn expanding_a_key_gives_the_same_result_as_direct_expansion() -> anyhow::Result<()> {
+        let key = random_key();
+        let expander = CachingKeyExpander::default();
+
+        let cached = expander.expand(&key).context("caching expansion")?;
+        let direct = DirectKeyExpander.expand(&key).context("direct expansion")?;
+
+        assert_eq!(OffchainPublicKey::from(&cached), OffchainPublicKey::from(&direct));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_is_stored_on_the_first_expansion_and_served_from_the_cache_after() -> anyhow::Result<()> {
+        let key = random_key();
+        let expander = CachingKeyExpander::default();
+        assert!(expander.0.read().is_empty());
+
+        let first = expander.expand(&key).context("first expansion")?;
+        assert_eq!(expander.0.read().len(), 1);
+
+        let second = expander.expand(&key).context("second expansion")?;
+        assert_eq!(expander.0.read().len(), 1, "a hit must not add an entry");
+        assert_eq!(OffchainPublicKey::from(&first), OffchainPublicKey::from(&second));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_that_is_not_on_the_curve_is_rejected_and_not_cached() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+
+        assert!(expander.expand(&off_curve_key()?).is_err());
+        assert!(expander.0.read().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reaching_the_capacity_drops_the_cache_and_keeps_only_the_new_key() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+        let expanded = DirectKeyExpander
+            .expand(&random_key())
+            .context("expanding a filler key")?;
+        {
+            let mut cache = expander.0.write();
+            while cache.len() < EXPANDED_KEY_CACHE_CAPACITY {
+                cache.insert(random_key(), expanded.clone());
+            }
+        }
+        let newcomer = random_key();
+
+        expander.expand(&newcomer).context("expanding at capacity")?;
+
+        let cache = expander.0.read();
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains_key(&newcomer));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_already_cached_at_capacity_does_not_flush_the_cache() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+        let cached = random_key();
+        let expanded = DirectKeyExpander.expand(&cached).context("expanding the cached key")?;
+        {
+            let mut cache = expander.0.write();
+            cache.insert(cached, expanded.clone());
+            while cache.len() < EXPANDED_KEY_CACHE_CAPACITY {
+                cache.insert(random_key(), expanded.clone());
+            }
+        }
+
+        expander.expand(&cached).context("expanding a cached key at capacity")?;
+
+        assert_eq!(expander.0.read().len(), EXPANDED_KEY_CACHE_CAPACITY);
+        Ok(())
     }
 }
