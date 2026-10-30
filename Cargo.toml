@@ -163,7 +163,7 @@ hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.33.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.30.0" }
+hopr-chain-connector = { version = "0.30.1" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.6.0", default-features = false }

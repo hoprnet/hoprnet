@@ -4204,9 +4204,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.30.0"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a35082b158debca13143dfec060b947784b789d4719021d128f15fea6e3046d"
+checksum = "91968d9f9f3752351d2ac50b7cc0488fe30ba18c52c90fa368503d186c57cf3f"
 dependencies = [
  "ahash",
  "anyhow",
