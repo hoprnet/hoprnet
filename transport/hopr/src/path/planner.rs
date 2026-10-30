@@ -2334,7 +2334,11 @@ mod tests {
         // Untouched it would carry about half; a sixteenth of the health, tempered, leaves about a quarter.
         assert!(
             via_b < 1300,
-            "the stalled relayer must lose its share, got {via_b} of 4000"
+            "the stalled relayer's share must shrink, got {via_b} of 4000"
+        );
+        assert!(
+            via_b > 0,
+            "a stalled relayer must stay drawable, or it can never prove recovery"
         );
         assert!(
             paths.iter().any(|vp| vp.first() == Some(&a)),
