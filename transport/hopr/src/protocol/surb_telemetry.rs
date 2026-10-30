@@ -27,8 +27,9 @@
 //!   `PENDING_SURB_TTL`); its lost races keep its health near zero. Must not fight: common-mode outages, where no
 //!   partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict. Effect: each session is told how many SURBs in its counterparty's
-//!   store run through that relayer; the balancer subtracts them from its level and sends replacements. Lasts as long
-//!   as the verdict. Must not fight: flow control, which keeps the raw level so the replacements are not throttled.
+//!   store run through that relayer; the balancer subtracts them from its level and sends replacements. Lasts until a
+//!   reply through the relayer comes home or the session ends, not just the verdict: the counterparty still holds them.
+//!   Must not fight: flow control, which keeps the raw level so the replacements are not throttled.
 //! - **Lost neighbour.** Trigger: our own connection drops. Effect: re-plan only; the graph's connection status already
 //!   rejects that edge, so its SURBs are not invalidated.
 
@@ -104,8 +105,8 @@ pub struct SurbRoundTripRegistry {
     /// Every outstanding SURB, shared by both codec halves.
     pending: PendingLegs,
     /// Per session, SURBs written off because their return path runs through a relayer judged dead,
-    /// by that relayer. Kept while the verdict holds, which lapses about a pending TTL after the last
-    /// SURB through it, even though the counterparty may still hold them.
+    /// by that relayer. Kept past the verdict, which only times out: until a reply through the relayer
+    /// comes home, or the session is gone.
     written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, u64>>>,
 }
 
@@ -139,13 +140,9 @@ impl SurbRoundTripRegistry {
     }
 
     /// Moves outstanding SURBs whose return path runs through a relayer judged dead into the
-    /// per-session write-off, and drops the write-off of relayers that recovered.
+    /// per-session write-off.
     pub fn write_off_dead(&self) {
         let health = &self.relayer_health;
-        for mut session in self.written_off.iter_mut() {
-            session.retain(|relayer, _| health.dead.contains(relayer));
-        }
-        self.written_off.retain(|_, session| !session.is_empty());
         if health.dead.is_empty() {
             return;
         }
@@ -182,6 +179,19 @@ impl SurbRoundTripRegistry {
                 (*session.key(), (count, count as f64 / total.max(1) as f64))
             })
             .collect()
+    }
+
+    /// A reply came home through these relayers, so the SURBs written off through them work again.
+    fn end_write_off(&self, relayers: &ReturnRelayers) {
+        if self.written_off.is_empty() {
+            return;
+        }
+        for mut session in self.written_off.iter_mut() {
+            for relayer in relayers_of(relayers) {
+                session.remove(&relayer);
+            }
+        }
+        self.written_off.retain(|_, session| !session.is_empty());
     }
 
     /// Drops the write-off of a session that no longer exists.
@@ -875,6 +885,7 @@ impl<C> SurbTelemetryCodec<C> {
             return;
         };
         self.registry.record_observed(pending.paths, 1);
+        self.registry.end_write_off(&pending.return_relayers);
 
         let health = &self.registry.relayer_health;
         // Only the fresh SURB settles: the other may have waited in the replier's store.
@@ -1558,11 +1569,13 @@ mod tests {
         );
     }
 
-    /// The counterparty holds dead SURBs long after we stop remembering them as pending, so the write-off
-    /// must outlive the pending map, and end only when the relayer recovers or the session is gone.
+    /// The counterparty holds dead SURBs long after we stop remembering them as pending, and a lapsed
+    /// verdict is only a timeout: the write-off ends when a reply through the relayer comes home.
     #[test]
-    fn written_off_surbs_should_stay_invalid_until_their_relayer_recovers() {
-        let registry = SurbRoundTripRegistry::default();
+    fn written_off_surbs_should_stay_invalid_until_a_reply_proves_their_relayer() {
+        let (graph, ..) = graph_with(1);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
         let [dead, alive] = [(); 2].map(|_| key());
         for (seed, relayer) in [(1, dead), (2, alive)] {
             registry.pending.insert(surb_id(seed), pending_to(&[relayer], None, 0));
@@ -1580,7 +1593,25 @@ mod tests {
 
         registry.relayer_health.dead.remove(&dead);
         registry.write_off_dead();
-        assert!(registry.invalid().is_empty(), "a recovered relayer's SURBs work again");
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "a lapsed verdict is no evidence of recovery"
+        );
+
+        registry.pending.insert(surb_id(4), pending_to(&[alive], None, 0));
+        recorder.on_replied(&surb_id(4));
+        assert!(
+            !registry.invalid().is_empty(),
+            "a reply over another relayer proves nothing"
+        );
+
+        registry.pending.insert(surb_id(5), pending_to(&[dead], None, 0));
+        recorder.on_replied(&surb_id(5));
+        assert!(
+            registry.invalid().is_empty(),
+            "a reply through it proves the relayer works again"
+        );
 
         registry.relayer_health.dead.insert(dead);
         registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
