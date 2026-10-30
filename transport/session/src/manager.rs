@@ -2311,7 +2311,7 @@ impl PixToolbox {
 /// the action driver send the stored message again, byte for byte, and pushes the batch's
 /// `max_ssa_delivery_time` deadline with it. The Entry answers a repeat of a request it already
 /// committed to with a no-op once it has published the batch in full. The exception is a repeat
-/// that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch went out, which says the
+/// that arrives more than `SSA_REPEAT_RESEND_GRACE` after the batch went out, which says the
 /// bursts were lost after the transport took them; they are sent again, without a second
 /// `ReadyToDeposit`. A batch whose publication the transport cut short is finished instead, with
 /// whole bursts and the `ReadyToDeposit`s still owed, whenever the Exit asks again. A request that
