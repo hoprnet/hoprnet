@@ -1,4 +1,28 @@
 #!/usr/bin/env bash
+#
+# Demo: drive a running HOPR node through an N-hop session and render the network graph.
+#
+# Prerequisites
+# -------------
+# The demo talks to an already-running hoprd (`API`, default http://127.0.0.1:3001/api/v4)
+# that has funded channels. A local cluster needs a local chain, and the repo's chain image
+# for that is the Blokli Anvil image already used by the `just localcluster` recipe:
+#
+#   docker rm -f anvil_blokli || true
+#   docker run --rm --name anvil_blokli --platform linux/amd64 -p 8080:8080 -d \
+#     europe-west3-docker.pkg.dev/hoprassociation/docker-images/bloklid-anvil:latest
+#   cargo run -p hoprd-localcluster -- --chain-url http://localhost:8080 \
+#     --hoprd-bin ./result/bin/hoprd --size 3
+#
+# (`just localcluster <size>` does all of the above; see the `localcluster` recipe in the
+# justfile, which is the source of truth for both the image reference and the chain URL.)
+# Then point the demo at one node's API:
+#
+#   API=http://127.0.0.1:3001/api/v4 TOKEN='paste-token-here' LOG='/path/to/node.log' \
+#     tools/run_demo.sh
+#
+# Set `LOG` to the hoprd log file of the node under test (the graph and session diagnostics are
+# parsed out of it).
 set -euo pipefail
 
 RESULTS_DIR="/tmp/hopr-demo-results"

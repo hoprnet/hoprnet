@@ -4381,6 +4381,7 @@ dependencies = [
  "hopr-utilities",
  "humantime-serde",
  "lazy_static",
+ "libc",
  "moka",
  "parameterized",
  "parking_lot 0.12.5",

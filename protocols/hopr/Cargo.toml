@@ -60,6 +60,9 @@ hopr-ticket-manager = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+# Thread CPU time, so the SURB store's cost guard does not measure scheduler preemption. See
+# `eviction_cost_must_not_grow_with_peer_invented_buckets`.
+libc = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
@@ -86,3 +89,7 @@ ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
 ignored = ["humantime-serde"]
+
+[[bench]]
+name = "surb_store_bench"
+harness = false
