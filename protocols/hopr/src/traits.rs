@@ -178,6 +178,13 @@ pub trait UnacknowledgedTicketProcessor {
     /// and awaits to be [acknowledged](UnacknowledgedTicketProcessor::acknowledge_tickets)
     /// once an [`Acknowledgement`] is received from the `next_hop`.
     ///
+    /// Duplicates are detected per (issuer -> this node channel, epoch, index): `Err` is returned if
+    /// a ticket with the same index was already accepted on that channel and epoch (an attacker must
+    /// not be able to have many tickets accepted on the same index, since only one of them would
+    /// ever be redeemable). Implementations may bound how long an accepted index is remembered (the
+    /// HOPR implementation forgets it after `unack_ticket_timeout` or once its capacity is exceeded),
+    /// after which the same index is accepted again.
+    ///
     /// This operation should be reasonably fast and should not block the main processing pipeline.
     fn insert_unacknowledged_ticket(
         &self,
@@ -185,6 +192,15 @@ pub trait UnacknowledgedTicketProcessor {
         challenge: HalfKeyChallenge,
         ticket: UnacknowledgedTicket,
     ) -> Result<(), Self::Error>;
+
+    /// Returns `true` if the given [`Self::Error`] was produced by a duplicate ticket index
+    /// rejection ([`insert_unacknowledged_ticket`](Self::insert_unacknowledged_ticket) refusing a
+    /// ticket whose index was already accepted on the same channel and epoch).
+    ///
+    /// Used by the processing pipeline to give such rejections their own rejection metric label.
+    /// This method has no default so every processor must state explicitly whether its error type
+    /// can carry this rejection.
+    fn is_duplicate_ticket_index_error(error: &Self::Error) -> bool;
 
     /// Finds and acknowledges previously inserted tickets, using incoming [`Acknowledgements`](Acknowledgement) from
     /// the upstream [`peer`](OffchainPublicKey).

@@ -448,6 +448,12 @@ where
     let ctx = configured.ctx;
     ctx.cfg.validate()?;
 
+    let network_tuning = crate::helpers::NetworkTuningReport::collect();
+    tracing::info!(?network_tuning, "OS network tuning specs");
+    for recommendation in network_tuning.recommendations() {
+        tracing::warn!("{recommendation}");
+    }
+
     let chain_api = (configured
         .chain_factory
         .ok_or(HoprLibError::BuilderError("missing chain factory"))?)(&ctx);
@@ -992,8 +998,10 @@ macro_rules! impl_build_methods {
                         {
                             tracing::error!(%error, "failed to insert incoming ticket");
                         }
-                        if let Err(error) = new_ticket_tx.try_broadcast(event) {
-                            tracing::error!(%error, "failed to broadcast ticket event");
+                        match new_ticket_tx.try_broadcast(event) {
+                            // No subscriber is listening right now, so there is nothing to deliver to
+                            Ok(_) | Err(async_broadcast::TrySendError::Inactive(_)) => {}
+                            Err(error) => tracing::error!(%error, "failed to broadcast ticket event"),
                         }
                         futures::future::ready(())
                     })

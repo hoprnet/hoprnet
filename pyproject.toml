@@ -18,7 +18,7 @@ members = ["sdk/python/localcluster", "sdk/python/api"]
 
 [dependency-groups]
 dev = ["ruff>=0.16.1"]
-lint = ["black==26.5.1"]
+lint = ["black==26.10.1"]
 
 [tool.black]
 line-length = 120
