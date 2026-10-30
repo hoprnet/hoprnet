@@ -4236,7 +4236,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4281,7 +4281,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "5.0.0-rc.5"
+version = "5.0.0-rc.6"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4363,7 +4363,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "6.4.0"
+version = "6.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4509,7 +4509,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.52.2"
+version = "0.52.3"
 dependencies = [
  "ahash",
  "anyhow",
