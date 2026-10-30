@@ -1242,7 +1242,7 @@ pub enum SessionPixEvent {
         observed_total: u64,
         /// Relayer that carried the offending share. Diagnostic only — it reaches the close log and
         /// nothing else, since the cycle is condemned whoever relayed the share.
-        peer: Box<OffchainPublicKey>,
+        peer: OffchainPublicKey,
     },
     /// The session layer closed this Session at the Exit.
     ///
@@ -1735,10 +1735,10 @@ pub(crate) fn scaled_deadline(per_cycle: Duration, ssas_per_request: usize) -> D
 // operator of this crate would run.
 /// An arbitrary relayer, for the tests that have to name one in a `SessionPixEvent`.
 #[cfg(test)]
-pub(crate) fn test_peer() -> Box<OffchainPublicKey> {
+pub(crate) fn test_peer() -> OffchainPublicKey {
     use hopr_api::{OffchainKeypair, types::crypto::prelude::Keypair};
 
-    Box::new(*OffchainKeypair::random().public())
+    *OffchainKeypair::random().public()
 }
 
 #[cfg(test)]
