@@ -228,3 +228,7 @@ deploy/nfpm/*.1.gz
 # pcap packet capture files
 **/*.pcap
 jeprof-pull-*/
+
+# Local generated artifacts
+/tmp/
+/output/
