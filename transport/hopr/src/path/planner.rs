@@ -161,6 +161,7 @@ struct WeightingParams {
     latency_halflife: Duration,
     capacity_reference: u128,
     return_path_weight_temper: f64,
+    return_path_exploration: f64,
 }
 
 /// Continuous, monotonically decreasing latency factor, bounded in (0, 1].
@@ -388,6 +389,13 @@ where
 
         let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
         let total_wt = weighted.total_weight();
+        // Return draws spend `exploration` of their picks uniformly, so log what a draw actually does.
+        let exploration = if dest_key == me {
+            weighting.return_path_exploration
+        } else {
+            0.0
+        };
+        let candidates = weighted.iter().count() as f64;
         for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
             tracing::debug!(
                 kind,
@@ -396,7 +404,11 @@ where
                 path = %vp,
                 cost = pwm.cost,
                 selection_weight = w,
-                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                sampling_probability = if total_wt > 0.0 {
+                    (1.0 - exploration) * w.max(0.0) / total_wt + exploration / candidates
+                } else {
+                    0.0
+                },
                 total_latency_ms = ?pwm.total_latency_ms,
                 min_probe_success_rate = ?pwm.min_probe_success_rate,
                 min_ack_rate = ?pwm.min_ack_rate,
@@ -568,7 +580,6 @@ pub struct PathPlanner<Surb, R, S> {
     paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
-    return_path_exploration: f64,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -608,13 +619,13 @@ where
                     latency_halflife: config.latency_halflife,
                     capacity_reference: config.capacity_reference,
                     return_path_weight_temper: config.return_path_weight_temper,
+                    return_path_exploration: config.return_path_exploration,
                 },
                 me,
                 collapsed_diversity,
             }),
             cache,
             refresh_period: config.refresh_period,
-            return_path_exploration: config.return_path_exploration,
         }
     }
 
@@ -882,13 +893,13 @@ where
             candidates = items.len(),
             distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
             temper = self.paths.weighting.return_path_weight_temper,
-            exploration = self.return_path_exploration,
+            exploration = self.paths.weighting.return_path_exploration,
             "drawing return paths from tempered weights"
         );
 
         let drawn = (0..count)
             .filter_map(|_| {
-                if should_explore(self.return_path_exploration) {
+                if should_explore(self.paths.weighting.return_path_exploration) {
                     pick_uniform_index(items.len())
                 } else {
                     pick_weighted_index(&weights)
@@ -2619,6 +2630,7 @@ mod tests {
             latency_halflife: Duration::from_millis(100),
             capacity_reference: 10_000_000,
             return_path_weight_temper: 1.0,
+            return_path_exploration: 0.0,
         }
     }
 
