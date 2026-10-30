@@ -879,6 +879,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.ssa_cycles.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
+    /// Shares currently held by the part builders of every live cycle on this node: the memory the
+    /// emission window bounds in practice, as opposed to [`peak_cycle_bytes`], which prices the
+    /// adversarial case. A conforming Entry keeps at most `SHARE_EMISSION_WINDOW × (threshold − 1)`
+    /// of them per cycle; the figure is what `hopr_pix_held_shares` exports.
+    ///
+    /// Walks every live cycle and takes each part's lock briefly, so it is for an occasional reading
+    /// (once per supervisor turn, a resolution drain), not for the share path.
+    pub fn held_shares(&self) -> usize {
+        self.ssa_cycles.iter().map(|(_, cycle)| cycle.held_shares()).sum()
+    }
+
     /// Polynomial-index runs of `ssa_id` whose constant-term commitment never arrived, so the caller
     /// can ask the peer to re-send exactly those.
     ///
