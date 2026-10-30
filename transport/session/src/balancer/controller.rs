@@ -250,16 +250,14 @@ pub const REFILL_PACING_SECS: u64 = 5;
 /// of this long before a report arrives is added to the level it carries.
 ///
 /// A report says what the counterparty held when it was written, before the SURBs that were in
-/// flight to it reached it. Taken as it is, it pulled the believed level below the truth by that
-/// much, and after a wipe, when the refill runs at the pacing rate, by thousands: measured after a
-/// bump at production dimensions (a 19 264 target), a report of 207 was adopted while about 8 000
-/// SURBs of the new generation were in flight, the PID answered the phantom deficit with a burst,
-/// the organic gate stayed open until the next report, and the counterparty ended up holding twice
-/// its target for the rest of the cycle (1.5 to 2.3 times the target in 17 of 44 bump windows at
-/// test scale). Two seconds is above the one-way latency of a multi-hop return path with mixing; a
-/// lag taken too long errs on the high side, which the counterparty's distress signal corrects
-/// within a packet, where a lag taken too short errs low and is corrected only by the next report.
-pub const REPORT_LAG: Duration = Duration::from_secs(2);
+/// flight to it reached it, so taken as it stands it pulls the believed level below the truth by
+/// that much. One second covers the one-way latency of a multi-hop return path with mixing; a lag
+/// taken too long errs on the high side, which the counterparty's distress signal corrects within a
+/// packet, where a lag taken too short errs low and is corrected only by the next report. (The much
+/// larger lag measured after a bump, a whole notify period, was the keep-alive stream sampling the
+/// level when the rate limiter pulled the item rather than when it released it; that is fixed at the
+/// source in `spawn_keep_alive_stream` and no longer something this constant has to cover.)
+pub const REPORT_LAG: Duration = Duration::from_secs(1);
 
 /// Consecutive non-rising reported levels (below target, no distress) before the counterparty's
 /// store capacity is inferred. Small, but greater than one: a single flat sample is ordinary churn,
@@ -355,10 +353,10 @@ impl BalancerStateValues {
     ///
     /// `produced_now` is this side's `produced` count at the moment the report arrives. The report
     /// was written [`REPORT_LAG`] or less ago, so the SURBs produced since then were still on their
-    /// way when it was written and are added to it: adopting a report as it stands pulled the level
-    /// below the truth by exactly that production, and after a wipe by the whole paced refill (see
-    /// [`REPORT_LAG`]). A report that still lowers the believed level marks the next balancer update
-    /// so that its output is held to the pacing rate: a correction, not a deficit to burst for.
+    /// way when it was written and are added to it: adopting a report as it stands pulls the level
+    /// below the truth by exactly that production. A report that still lowers the believed level marks
+    /// the next balancer update so that its output is held to the pacing rate: a correction, not a
+    /// deficit to burst for.
     ///
     /// While the refill after a wipe is paced, every report is dropped, stored by neither the level
     /// nor the plateau bookkeeping: a report above the believed level is the counterparty reporting
@@ -2024,18 +2022,23 @@ mod tests {
     fn the_produced_history_should_answer_with_the_count_from_before_the_lag() {
         let mut history = ProducedHistory::default();
         let t0 = Instant::now();
-        let at = |secs_x10: u64| t0 + Duration::from_millis(secs_x10 * 100);
+        // In twentieths of the lag, so the test follows the constant.
+        let at = |twentieths: u32| t0 + REPORT_LAG * twentieths / 20;
 
         assert_eq!(100, history.record(at(0), 100), "a lone sample is its own past");
         assert_eq!(100, history.record(at(10), 300));
         assert_eq!(
             100,
             history.record(at(25), 500),
-            "2.5 s in, the sample 2 s ago is still the first"
+            "1.25 lags in, the sample one lag ago is still the first"
         );
-        assert_eq!(300, history.record(at(31), 600), "3.1 s in, the 1 s sample is 2 s old");
+        assert_eq!(
+            300,
+            history.record(at(31), 600),
+            "1.55 lags in, the 0.5 sample is one lag old"
+        );
         assert_eq!(300, history.record(at(44), 700));
-        assert_eq!(500, history.record(at(46), 800), "the 2.5 s sample is now 2 s old");
+        assert_eq!(500, history.record(at(46), 800), "the 1.25 sample is now one lag old");
         assert_eq!(
             4,
             history.samples.len(),
