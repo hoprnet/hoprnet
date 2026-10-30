@@ -4615,7 +4615,8 @@ where
     /// The hop count is the SURB creator's word (its declared Proof-of-Relay chain length), so this
     /// turns a misconfigured Entry away early rather than bounding a malicious one — the egress gate
     /// does that. Only the initiation packet is inspected: a conforming Entry keeps its return-path
-    /// hop count for the lifetime of the Session.
+    /// hop count for the lifetime of the Session. A node with no PIX support lets the offer through, so
+    /// `handle_incoming_session_initiation` refuses it for that more fundamental reason.
     ///
     /// Returns `true` if the offer was refused and a `SessionError` was sent.
     async fn refuse_pix_over_direct_return_path(
@@ -4624,7 +4625,10 @@ where
         session_req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
         min_return_path_hops: Option<u8>,
     ) -> errors::Result<bool> {
-        if !session_req.capabilities.0.contains(Capability::UsePIX) || min_return_path_hops != Some(0) {
+        if !session_req.capabilities.0.contains(Capability::UsePIX)
+            || min_return_path_hops != Some(0)
+            || self.pix_toolbox.get().is_none()
+        {
             return Ok(false);
         }
 
@@ -9267,6 +9271,21 @@ mod tests {
         assert!(
             err_rx.await.is_err(),
             "no SessionError may be sent for an offer that was let through"
+        );
+        Ok(())
+    }
+
+    /// A node with no PIX support leaves a PIX offer over a direct return path to the no-PIX-support
+    /// guard, so the refusal is attributed to the missing toolbox rather than to the return path.
+    #[test_log::test(tokio::test)]
+    async fn the_direct_return_path_check_defers_to_missing_pix_support() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig::default());
+
+        assert!(
+            !mgr.refuse_pix_over_direct_return_path(HoprPseudonym::random(), &pix_offer(), Some(0))
+                .await?,
+            "a node with no PIX support must not refuse the offer for its return path"
         );
         Ok(())
     }
