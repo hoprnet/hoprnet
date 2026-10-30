@@ -326,33 +326,39 @@ where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    // DropAbortable not needed because the stream only generates items when polled
+    // DropAbortable not needed because the stream only generates items when polled.
+    //
+    // The message is built *after* the rate limiter releases a slot, not before: the limiter pulls
+    // its next item as soon as it has emitted one and holds it for the whole period, so a message
+    // built on the way in would carry the level sampled a notify period (15 s by default) before it
+    // is sent. Measured after a SURB generation bump: the Entry read the Exit's pre-refill level
+    // 15 s late, took it for a deficit, burst to its ceiling and opened its organic gate, and the Exit
+    // ended up holding twice its target (three times at production dimensions).
     let (ka_stream, abort_handle) = futures::stream::abortable(
-        futures::stream::repeat_with(move || match &notification_mode {
-            SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: KeepAliveFlag::BalancerTarget.into(),
-                additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
-            }),
-            // Report the level this side acts on: the balancer's accumulator, fed by
-            // `produced - consumed - evicted` and clamped to the store capacity on every update. The
-            // raw estimator diff now tracks true occupancy too, but the accumulator additionally
-            // collapses to 0 while the return path is degraded, which is exactly the moment the Entry
-            // should mint at maximum rather than read the counterparty as full. The estimator stays in
-            // the enum for the callers.
-            SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: KeepAliveFlag::BalancerState.into(),
-                additional_data: cfg.buffer_level(),
-            }),
-            SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: None.into(),
-                additional_data: 0,
-            }),
-        })
-        .rate_limit_with_controller(controller)
-        .filter(move |_| futures::future::ready(admit())),
+        futures::stream::repeat_with(|| ())
+            .rate_limit_with_controller(controller)
+            .map(move |_| match &notification_mode {
+                SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+                }),
+                // Report the level this side acts on: the balancer's accumulator, fed by
+                // `produced - consumed - evicted` and clamped to the store capacity on every update,
+                // read at the moment the keep-alive goes out. The estimator stays in the enum for the
+                // callers.
+                SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: KeepAliveFlag::BalancerState.into(),
+                    additional_data: cfg.buffer_level(),
+                }),
+                SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: None.into(),
+                    additional_data: 0,
+                }),
+            })
+            .filter(move |_| futures::future::ready(admit())),
     );
 
     let sender_clone = sender.clone();
@@ -836,6 +842,47 @@ mod tests {
                 .ok_or_else(|| anyhow!("the stream ended after the failed keep-alive"))?;
         }
         abort.abort();
+        Ok(())
+    }
+
+    /// The level a keep-alive reports is read when the keep-alive goes out, not when the rate
+    /// limiter pulled the next item a whole period earlier.
+    #[tokio::test]
+    async fn a_keep_alive_should_report_the_level_at_the_moment_it_is_sent() -> anyhow::Result<()> {
+        let (tx, mut sent) = futures::channel::mpsc::unbounded();
+        let controller = RateController::new(2, Duration::from_secs(1));
+        let pseudonym = HoprPseudonym::random();
+        let state = Arc::new(BalancerStateValues::from(crate::SurbBalancerConfig::default()));
+        state.buffer_level.store(100, std::sync::atomic::Ordering::Relaxed);
+        let abort = spawn_keep_alive_stream(
+            pseudonym,
+            tx,
+            DestinationRouting::Return(pseudonym.into()),
+            SurbNotificationMode::Level(crate::balancer::AtomicSurbFlowEstimator::default()),
+            state.clone(),
+            &controller,
+            || true,
+        );
+        // The stream has pulled its first slot by now; the level moves before the slot is released.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        state.buffer_level.store(7_000, std::sync::atomic::Ordering::Relaxed);
+
+        let (_, data) = tokio::time::timeout(Duration::from_secs(5), sent.next())
+            .await
+            .map_err(|_| anyhow!("the first keep-alive never arrived"))?
+            .ok_or_else(|| anyhow!("the stream ended"))?;
+        abort.abort();
+        let msg = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)?;
+        match msg {
+            HoprStartProtocol::KeepAlive(ka) => {
+                assert!(ka.flags.contains(KeepAliveFlag::BalancerState));
+                assert_eq!(
+                    7_000, ka.additional_data,
+                    "the level at send time, not the one from a period earlier"
+                );
+            }
+            other => anyhow::bail!("not a keep-alive: {other:?}"),
+        }
         Ok(())
     }
 
