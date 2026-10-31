@@ -170,6 +170,101 @@ fn acquire_egress_permit(
     }
 }
 
+/// How often a data packet held back for the keep-alive reserve looks at the SURB estimate again.
+const SURB_RESERVE_POLL: Duration = Duration::from_millis(50);
+
+/// SURBs the Exit keeps back from its data, so that its keep-alives can still be sent.
+///
+/// The Exit's SURB-level reports and its distress signals each need a SURB, and nothing else the Exit
+/// sends is as important to the Entry: a report is how a balancer that cannot see the Exit's stock
+/// learns it is running dry. One percent of the Entry's buffer target, at least 32, covers about that
+/// many seconds of a total outage at the one-second notification cadence, which is long enough for
+/// the Entry to hear it and refill.
+///
+/// Never more than a quarter of the target, as for the PIX fill reserve
+/// ([`effective_surb_reserve`]): an Entry that asks for a buffer shallower than the floor must not
+/// find the Exit unable to send it anything at all.
+fn keep_alive_surb_reserve(target: u64) -> u64 {
+    (target / 100).max(32).min(target / 4)
+}
+
+/// Holds an outgoing data packet back while the Exit's SURB stock is down to `reserve`.
+///
+/// Returns `None`, with nothing allocated, in the common case of a stock above the reserve. Otherwise
+/// the future resolves once the stock has risen above it, polling the estimate every
+/// [`SURB_RESERVE_POLL`]. It has no deadline of its own: the Session's own deadlines apply, and a
+/// Session that is closed drops the future with the sink.
+///
+/// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
+/// directly (see [`SessionManager::spawn_exit_keep_alive`]), and the PIX fill packets are bounded by
+/// their own `min_surb_reserve`. That is the point of the reserve: they are what it is held for.
+fn hold_for_surb_reserve(
+    session_id: SessionId,
+    estimator: &AtomicSurbFlowEstimator,
+    reserve: u64,
+) -> Option<futures::future::BoxFuture<'static, ()>> {
+    let stock = estimator.saturating_diff();
+    if stock > reserve {
+        return None;
+    }
+
+    debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
+    let estimator = estimator.clone();
+    Some(Box::pin(async move {
+        let held_since = Instant::now();
+        while estimator.saturating_diff() <= reserve {
+            hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
+        }
+        debug!(
+            %session_id,
+            held_for = ?held_since.elapsed(),
+            stock = estimator.saturating_diff(),
+            reserve,
+            "releasing held data: the SURB stock is above its keep-alive reserve again"
+        );
+    }))
+}
+
+/// The Exit's data egress for a rate-controlled Session: holds each packet back while the SURB stock
+/// is down to `reserve`, books the SURB it consumes, and passes it through the PIX egress gate.
+///
+/// Built as one piece, and not inline where the Session is set up, so that the order of its three
+/// steps can be tested: the SURB is booked only when the packet goes on, so a packet that is held is
+/// not counted against the very stock it is waiting for.
+fn exit_data_egress<Si>(
+    sink: Si,
+    session_id: SessionId,
+    estimator: AtomicSurbFlowEstimator,
+    reserve: u64,
+    gate: Option<Arc<ServiceGate>>,
+) -> impl Sink<EgressItem, Error = std::io::Error>
+where
+    Si: Sink<EgressItem, Error = std::io::Error>,
+{
+    sink.with(move |(routing, data): EgressItem| -> EgressPermit {
+        // Each outgoing packet consumes one SURB
+        let book_consumed = move |estimator: &AtomicSurbFlowEstimator| {
+            estimator.consumed.fetch_add(1, Ordering::Relaxed);
+            #[cfg(feature = "telemetry")]
+            telemetry::record_session_surb_consumed(&session_id, 1);
+        };
+        match hold_for_surb_reserve(session_id, &estimator, reserve) {
+            None => {
+                book_consumed(&estimator);
+                acquire_egress_permit(gate.clone(), routing, data)
+            }
+            Some(held) => {
+                let (estimator, gate) = (estimator.clone(), gate.clone());
+                futures::future::Either::Right(Box::pin(async move {
+                    held.await;
+                    book_consumed(&estimator);
+                    acquire_egress_permit(gate, routing, data).await
+                }))
+            }
+        }
+    })
+}
+
 /// Closes an established Session.
 ///
 /// Logs the counterpart of "new session established" (see [`SessionSlotGuard::commit`]): one line
@@ -2278,6 +2373,13 @@ fn initialize_session_telemetry(
 /// bounds the stock the counterparty holds, which is what lets a SURB generation change wipe it at a
 /// cost the PIX surplus can absorb.
 ///
+/// One exception: while data goes out into a silence (see [`BalancerStateValues::silence_sustain`]),
+/// a closed gate gives exactly one SURB per packet, whatever the client asked for. The estimate that
+/// closed it is fed by the counterparty, and the counterparty has not been heard from for a while, so
+/// the estimate cannot see the stock draining and would hold the gate shut until it is empty. One SURB
+/// per data packet is about what the counterparty spends answering it: no burst, bounded by the data
+/// rate, and it ends with the first report or reply.
+///
 /// Nothing else has to change to keep the SURB accounting straight. This runs in front of the
 /// counting sink, so `estimate_surbs_with_msg` reports the capped figure; and the PIX share for a
 /// SURB is drawn per SURB while it is built, so a cap of `0` draws no share at all and leaves it
@@ -2286,10 +2388,16 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     if max_surbs == usize::MAX {
         return;
     }
-    let cap = if max_surbs == 0 || surb_mgmt.organic_surbs_per_packet() == 0 {
+    // This packet is going out, which is what a silence is measured against.
+    surb_mgmt.note_sent();
+    let cap = if max_surbs == 0 {
         0
-    } else {
+    } else if surb_mgmt.organic_surbs_per_packet() > 0 {
         max_surbs
+    } else if surb_mgmt.silence_sustain() {
+        1
+    } else {
+        0
     };
     data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
 }
@@ -2988,6 +3096,14 @@ where
                     );
                     abort_handles.insert(SessionHandles::KeepAlive, ka_abort_handle);
 
+                    // The Exit holds nothing yet, which is the state a wipe leaves it in: pace the
+                    // first fill like the refill after one, or the PID commands its ceiling from the
+                    // first tick and the flood loses the replies the verdicts are made of. The target
+                    // is set from the configuration here, so this is the point it first is non-zero;
+                    // the `BalancerTarget` keep-alive path is the Exit receiving the Entry's target,
+                    // and does not arm anything.
+                    surb_mgmt.arm_refill_pacing();
+
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
                     let balancer = SurbBalancer::new(
@@ -3049,10 +3165,16 @@ where
                         }
                     });
 
+                    // The session is ready once a quarter of the target is believed to be at the
+                    // counterparty: that is the point the first replies can come home, and a quarter of
+                    // the target is already several seconds of replies at any rate the balancer sustains.
+                    // The first fill is paced at a fifth of the target a second, so this arrives after
+                    // about 1.25 s whatever the target, where half the target took about 2.5 s.
+                    //
                     // TODO: consider making this interactive = other party reports the exact level periodically
                     let wait_result = level_stream
                         .skip_while(|current_level| {
-                            futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
+                            futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 4)
                         })
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
@@ -4925,21 +5047,19 @@ where
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
                 (
-                    // Sent packets = SURB consumption estimate
-                    msg_sender
-                        .clone()
-                        .sink_map_err(std::io::Error::other)
-                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            // Each outgoing packet consumes one SURB
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_consumed(&session_id, 1);
-                            acquire_egress_permit(egress_gate.clone(), routing, data)
-                        })
-                        .rate_limit_with_controller(&egress_rate_control)
-                        .buffer((2 * target_surb_buffer_size) as usize),
+                    // Sent packets = SURB consumption estimate. Data is held back once the stock is down
+                    // to the reserve for the keep-alives: a rate-controlled Session has a balancer on the
+                    // other side that acts on what the Exit reports, which the `NoRateControl` branch
+                    // below has not.
+                    exit_data_egress(
+                        msg_sender.clone().sink_map_err(std::io::Error::other),
+                        session_id,
+                        surb_estimator_tx,
+                        keep_alive_surb_reserve(target_surb_buffer_size),
+                        egress_gate,
+                    )
+                    .rate_limit_with_controller(&egress_rate_control)
+                    .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate. Session data packets only: the
                     // SURBs of a keep-alive are booked in `handle_keep_alive`.
                     session_rx.inspect(move |data| {
@@ -5194,7 +5314,13 @@ where
                         // the last value -- a level that stops rising while we are still minting is
                         // exactly the plateau signal, so this must not dedup equal reports.
                         let changed = session_slot.surb_mgmt.buffer_level() != msg.additional_data;
-                        session_slot.surb_mgmt.observe_reported_level(msg.additional_data);
+                        let produced_now = session_slot
+                            .surb_estimator
+                            .produced
+                            .load(std::sync::atomic::Ordering::Relaxed);
+                        session_slot
+                            .surb_mgmt
+                            .observe_reported_level(msg.additional_data, produced_now);
                         if changed {
                             debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
                         }
@@ -6388,6 +6514,111 @@ mod tests {
                 "level {buffer_level} against a target of 100"
             );
             assert_eq!(expected, data.estimate_surbs_with_msg());
+        }
+        Ok(())
+    }
+
+    /// A closed gate gives one SURB per packet while data goes out into a silence, the stock of an
+    /// Exit that cannot be heard cannot be seen draining, and a report ends it.
+    #[test]
+    fn silence_with_data_flowing_should_keep_one_organic_surb_per_packet() -> anyhow::Result<()> {
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &state);
+        assert_eq!(
+            Some(1),
+            data.packet_info.map(|info| info.max_surbs_in_packet),
+            "level at its target, nothing heard for 4 s, a packet now"
+        );
+        assert_eq!(1, data.estimate_surbs_with_msg(), "the cap reaches the SURB accounting");
+
+        // The Exit reports a full stock: no longer a silence.
+        state.observe_reported_level(100, 0);
+        let mut data = small_outgoing_packet()?;
+        cap_organic_surbs(&mut data, 1, &state);
+        assert_eq!(
+            Some(0),
+            data.packet_info.map(|info| info.max_surbs_in_packet),
+            "a report from the Exit, and the gate is shut again"
+        );
+        Ok(())
+    }
+
+    /// Short of the grace, or before anything was heard, a closed gate stays closed as it always was.
+    #[test]
+    fn a_short_silence_or_none_heard_yet_should_not_sustain() -> anyhow::Result<()> {
+        for (state, why) in [
+            (
+                gate_state(100, 200).last_heard_ago(Duration::from_secs(2)),
+                "heard 2 s ago",
+            ),
+            (gate_state(100, 200), "nothing heard yet"),
+        ] {
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, 1, &state);
+            assert_eq!(Some(0), data.packet_info.map(|info| info.max_surbs_in_packet), "{why}");
+        }
+        Ok(())
+    }
+
+    /// One, whatever the client asked for: the sustain assumes the Exit spends about one SURB per
+    /// packet it answers, and a client's larger number is for the balancer's convenience, not for this.
+    /// An explicit zero still wins.
+    #[test]
+    fn the_sustain_should_send_one_surb_even_when_the_client_asks_for_more() -> anyhow::Result<()> {
+        for (asked, expected) in [(8, 1), (2, 1), (0, 0)] {
+            let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+            let mut data = small_outgoing_packet()?;
+            cap_organic_surbs(&mut data, asked, &state);
+            assert_eq!(
+                Some(expected),
+                data.packet_info.map(|info| info.max_surbs_in_packet),
+                "the client asks for {asked}"
+            );
+        }
+        Ok(())
+    }
+
+    /// The Exit's balancer is not paced at its start. It holds the SURBs the Entry sends and paces the
+    /// Exit's own egress; the fill of an empty counterparty is the Entry's to pace, and the Exit's
+    /// incoming-session path is not where that is armed.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_balancer_is_not_paced_at_start() -> anyhow::Result<()> {
+        for (offer, balancing, why) in [
+            (no_pix_offer(), true, "a rate-controlled session"),
+            (
+                StartInitiation {
+                    capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::NoRateControl),
+                    ..no_pix_offer()
+                },
+                false,
+                "a session that opts out of rate control",
+            ),
+        ] {
+            let (mgr, sender, transport, _err_rx, _incoming) =
+                started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+            let pseudonym = HoprPseudonym::random();
+            mgr.handle_incoming_session_initiation(pseudonym, offer).await?;
+
+            {
+                let slot = mgr
+                    .sessions
+                    .get(&pseudonym)
+                    .ok_or(anyhow!("the incoming session must have a slot"))?;
+                assert_eq!(
+                    balancing,
+                    !slot.surb_mgmt.is_disabled(),
+                    "{why}: precondition, the Exit's balancer runs exactly when the session is rate controlled"
+                );
+                assert!(
+                    !slot.surb_mgmt.refill_pacing_active(),
+                    "{why}: no pacing at the Exit's start"
+                );
+            }
+
+            sender.close_channel();
+            transport.await??;
         }
         Ok(())
     }
@@ -7713,13 +7944,16 @@ mod tests {
     ///
     /// ## Steps
     /// 1. Alice's manager is started with no `PixToolbox` and a `SurbBalancerConfig` with `target_surb_buffer_size:
-    ///    10`. Bob's manager is configured with a 500ms `surb_balance_notify_period`.
+    ///    100`. Bob's manager is configured with a 500ms `surb_balance_notify_period`. Alice's first fill is paced, a
+    ///    fifth of the target a second, and a session is ready at a quarter of the target, so it is ready after 1.25 s
+    ///    of fill plus up to a sampling tick (1.5 s measured), and not before 0.8 s, which an unpaced fill at this
+    ///    test's ceiling would beat; Alice's balancer is seen to have armed the pacing, and Bob's not.
     /// 2. Alice initiates a session with the balancer config and PIX quota set; the `StartSession` /
     ///    `SessionEstablished` handshake completes via mock transports.
     /// 3. Both managers report the same `target_surb_buffer_size` via `get_surb_balancer_config` (confirmed from both
     ///    Alice and Bob's perspective).
     /// 4. A 1500ms sleep allows the SURB balancer's periodic keep-alive timer to fire multiple times.
-    /// 5. `update_surb_balancer_config` is called to raise the target to 50. After another 1500ms, Bob's manager
+    /// 5. `update_surb_balancer_config` is called to raise the target to 200. After another 1500ms, Bob's manager
     ///    reflects the updated target via `get_surb_balancer_config`, confirming keep-alives communicated the change.
     /// 6. `get_surb_level_estimates` is called on both sides; both report positive sent/received/used counts,
     ///    confirming the balancer collected SURB statistics.
@@ -7794,7 +8028,9 @@ mod tests {
                 })
             });
 
-        const INITIAL_BALANCER_TARGET: u64 = 10;
+        // Large enough for the paced first fill (a fifth of the target per second) to have delivered
+        // something by Bob's first level report, 500 ms in; the mock accepts only reports above zero.
+        const INITIAL_BALANCER_TARGET: u64 = 100;
 
         // Alice sends the KeepAlive messages reporting the initial balancer target
         let bob_mgr_clone = bob_mgr.clone();
@@ -7823,7 +8059,7 @@ mod tests {
                 })
             });
 
-        const NEXT_BALANCER_TARGET: u64 = 50;
+        const NEXT_BALANCER_TARGET: u64 = 200;
 
         // Alice sends also the KeepAlive messages reporting the updated balancer target
         let bob_mgr_clone = bob_mgr.clone();
@@ -7932,9 +8168,22 @@ mod tests {
         };
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = timeout(
-            Duration::from_secs(2),
-            futures::future::join(
+        // The first fill is paced, so readiness (a quarter of the target) takes 1.25 s of fill whatever the
+        // target, plus up to a sampling tick (1.5 s measured); the open is given 4 s. Alice's slot exists
+        // from before the readiness wait, and the first thing seen of it is whether
+        // her balancer, the Entry's, armed the pacing of the first fill.
+        let alice_slot_seen = async {
+            loop {
+                if let Some(slot) = alice_mgr.sessions.get(&alice_pseudonym) {
+                    break slot.surb_mgmt.refill_pacing_active();
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        };
+        let opened_at = Instant::now();
+        let (alice_session, bob_session, alice_first_fill_paced) = timeout(
+            Duration::from_secs(4),
+            futures::future::join3(
                 alice_mgr.new_session(
                     bob_peer,
                     SessionTarget::TcpStream(target.clone()),
@@ -7946,12 +8195,33 @@ mod tests {
                     },
                 ),
                 new_session_rx_bob.next(),
+                alice_slot_seen,
             ),
         )
         .await?;
+        let opening = opened_at.elapsed();
 
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+        // A quarter of a target of 100 at 20 SURBs a second is 1.25 s; the ceiling of this test, 100 a
+        // second, would have been ready in about a quarter of that.
+        assert!(
+            opening >= Duration::from_millis(800),
+            "a paced first fill cannot make the session ready this fast, it took {opening:?}"
+        );
+        assert!(
+            alice_first_fill_paced,
+            "the Entry's balancer must pace its first fill like the refill after a wipe"
+        );
+        assert!(
+            !bob_mgr
+                .sessions
+                .get(bob_session.session.id())
+                .ok_or(anyhow!("bob must hold the session slot"))?
+                .surb_mgmt
+                .refill_pacing_active(),
+            "the Exit's balancer does not pace anything at its start"
+        );
 
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
@@ -7968,7 +8238,7 @@ mod tests {
                 .get(alice_session.id())
                 .ok_or(anyhow!("alice must hold the session slot"))?;
 
-            // At cold start the gate must be open: readiness only waits for half the target, so a
+            // At cold start the gate must be open: readiness only waits for a quarter of the target, so a
             // gate that closed at or below that would stop the very production it is waiting on.
             assert_eq!(
                 1,
@@ -15238,6 +15508,107 @@ mod tests {
             probe::non_zero(),
             "a Session that negotiated no PIX must contribute to no PIX aggregate"
         );
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // The Exit's keep-alive SURB reserve
+    // -----------------------------------------------------------------------
+
+    /// One percent of the target, at least 32, and never more than a quarter of it.
+    #[test]
+    fn the_keep_alive_reserve_should_be_one_percent_of_the_target_and_never_more_than_a_quarter() {
+        for (target, reserve, why) in [
+            (19_264, 192, "production target: one percent"),
+            (2_400, 32, "test-scale target: the floor"),
+            (3_200, 32, "one percent is the floor exactly"),
+            (10_000, 100, "one percent above the floor"),
+            (128, 32, "smallest target the floor fits in a quarter of"),
+            (40, 10, "a shallow buffer keeps three quarters for data"),
+            (0, 0, "no buffer, no reserve"),
+        ] {
+            assert_eq!(reserve, keep_alive_surb_reserve(target), "{why}");
+        }
+    }
+
+    fn data_packet() -> anyhow::Result<EgressItem> {
+        Ok((
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        ))
+    }
+
+    /// The Exit must not spend its last SURBs on data: they are what its keep-alives, level reports
+    /// and distress signals go out on. At the reserve the sink holds the packet, and it counts it
+    /// against the stock only when it goes on; once the stock is above the reserve again it goes.
+    #[tokio::test]
+    async fn data_should_be_held_back_while_the_surb_stock_sits_at_the_keep_alive_reserve() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let reserve = 32;
+        estimator.produced.store(reserve, Ordering::Relaxed);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            reserve,
+            None,
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { sink.send(item).await });
+
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                forwarded.next()
+            )
+            .await
+            .is_err(),
+            "a stock at the reserve must not send data"
+        );
+        assert_eq!(0, estimator.estimate_surbs_consumed(), "a held packet consumes nothing");
+        assert!(!sending.is_finished());
+
+        // A level report or a refill brings one more SURB than the reserve.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), forwarded.next())
+            .await
+            .context("the packet must go once the stock is above the reserve")?
+            .context("the sink must have forwarded it")?;
+        timeout(Duration::from_secs(5), sending).await???;
+        assert_eq!(1, estimator.estimate_surbs_consumed());
+        Ok(())
+    }
+
+    /// The common case: above the reserve nothing waits, and the packet is booked as it was.
+    #[tokio::test]
+    async fn data_should_pass_straight_through_above_the_keep_alive_reserve() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(33, Ordering::Relaxed);
+
+        let session_id = HoprPseudonym::random();
+        assert!(
+            hold_for_surb_reserve(session_id, &estimator, 32).is_none(),
+            "no hold, no allocation"
+        );
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            session_id,
+            estimator.clone(),
+            32,
+            None,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("above the reserve the packet must not wait")??;
+        assert!(forwarded.try_recv().is_ok(), "forwarded");
+        assert_eq!(1, estimator.estimate_surbs_consumed());
         Ok(())
     }
 }
