@@ -54,7 +54,7 @@ mod frames;
 mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 pub use frames::{Frame, FrameId, OrderedFrame, Segment, SegmentId, SeqIndicator, SeqNum};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
@@ -177,6 +177,11 @@ impl<const C: usize> Decoder for SessionCodec<C> {
     type Error = SessionError;
     type Item = SessionMessage<C>;
 
+    /// Decodes one message from `src`.
+    ///
+    /// On error, the bad bytes are always removed from `src`. The framed reader calls `decode`
+    /// again on the same buffer after an error, so bytes left in place would fail again on
+    /// every poll and the reader would never move on.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
 
@@ -187,6 +192,8 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Protocol version
         if src[0] != SessionMessage::<C>::VERSION {
+            // The header cannot be trusted, so the message length is unknown: drop everything.
+            src.clear();
             return Err(SessionError::WrongVersion);
         }
 
@@ -198,28 +205,28 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Check the maximum message length for version 1
         if payload_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+            // The length cannot be trusted either: drop everything.
+            src.clear();
             return Err(SessionError::IncorrectMessageLength);
         }
 
         // Check if there's enough data so that we can read the rest of the message
-        if src.len() < SessionMessage::<C>::HEADER_SIZE + payload_len {
+        let message_len = SessionMessage::<C>::HEADER_SIZE + payload_len;
+        if src.len() < message_len {
             return Ok(None);
         }
 
-        // Read the message
+        // Take the whole message out of the buffer first, so a message that fails to parse
+        // below is skipped and the next one can still be read.
+        let message = src.split_to(message_len);
+        let payload = &message[SessionMessage::<C>::HEADER_SIZE..];
+
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(payload.try_into()?),
+            SessionMessageDiscriminants::Request => SessionMessage::Request(payload.try_into()?),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(payload.try_into()?),
         };
 
-        src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
         Ok(Some(res))
     }
 }
@@ -315,6 +322,93 @@ mod tests {
         assert_eq!(msg_1, msg_2);
 
         Ok(())
+    }
+
+    /// Encodes a valid acknowledgement message, used after a bad message in the tests below.
+    fn valid_ack<const C: usize>() -> (SessionMessage<C>, Vec<u8>) {
+        let msg = SessionMessage::<C>::Acknowledge(vec![1 as FrameId, 2].try_into().expect("ack fits"));
+        let data = Vec::from(msg.clone());
+        (msg, data)
+    }
+
+    #[test]
+    fn decode_should_skip_a_message_with_an_unknown_tag() -> anyhow::Result<()> {
+        const MTU: usize = 466;
+        let (valid, valid_data) = valid_ack::<MTU>();
+
+        // Correct version and length, but a tag that does not exist
+        let mut src = BytesMut::from(&[SessionMessage::<MTU>::VERSION, 0xff, 0, 2, 0xaa, 0xbb][..]);
+        src.extend_from_slice(&valid_data);
+
+        let mut codec = SessionCodec::<MTU>;
+        assert!(matches!(codec.decode(&mut src), Err(SessionError::UnknownMessageTag)));
+        assert_eq!(src.len(), valid_data.len(), "the bad message must be consumed");
+        assert_eq!(codec.decode(&mut src)?, Some(valid));
+        assert!(src.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn decode_should_skip_a_message_that_cannot_be_parsed() -> anyhow::Result<()> {
+        const MTU: usize = 466;
+        let (valid, valid_data) = valid_ack::<MTU>();
+
+        // A valid tag and length, but a segment payload that is too short to be a segment
+        let disc = SessionMessageDiscriminants::Segment as u8;
+        let mut src = BytesMut::from(&[SessionMessage::<MTU>::VERSION, disc, 0, 1, 0xaa][..]);
+        src.extend_from_slice(&valid_data);
+
+        let mut codec = SessionCodec::<MTU>;
+        assert!(codec.decode(&mut src).is_err());
+        assert_eq!(src.len(), valid_data.len(), "the bad message must be consumed");
+        assert_eq!(codec.decode(&mut src)?, Some(valid));
+
+        Ok(())
+    }
+
+    #[test]
+    fn decode_should_drop_the_buffer_when_the_header_is_bad() {
+        const MTU: usize = 466;
+        let mut codec = SessionCodec::<MTU>;
+
+        let mut wrong_version = BytesMut::from(&[0xee_u8; 16][..]);
+        assert!(matches!(
+            codec.decode(&mut wrong_version),
+            Err(SessionError::WrongVersion)
+        ));
+        assert!(wrong_version.is_empty());
+
+        // Header claims a payload longer than the protocol allows
+        let mut too_long = BytesMut::from(&[SessionMessage::<MTU>::VERSION, 0, 0xff, 0xff][..]);
+        too_long.extend_from_slice(&[0; 12]);
+        assert!(matches!(
+            codec.decode(&mut too_long),
+            Err(SessionError::IncorrectMessageLength)
+        ));
+        assert!(too_long.is_empty());
+    }
+
+    #[test]
+    fn framed_reader_should_move_on_after_a_bad_message() {
+        use futures::StreamExt;
+
+        const MTU: usize = 466;
+        let (valid, valid_data) = valid_ack::<MTU>();
+
+        let mut data = vec![SessionMessage::<MTU>::VERSION, 0xff, 0, 2, 0xaa, 0xbb];
+        data.extend_from_slice(&valid_data);
+
+        // Before the fix, the reader returned the same error forever; `take` keeps the test from hanging
+        let items = futures::executor::block_on(
+            asynchronous_codec::FramedRead::new(futures::io::Cursor::new(data), SessionCodec::<MTU>)
+                .take(10)
+                .collect::<Vec<_>>(),
+        );
+
+        assert_eq!(items.len(), 2, "expected one error, then the valid message");
+        assert!(matches!(items[0], Err(SessionError::UnknownMessageTag)));
+        assert_eq!(items[1].as_ref().ok(), Some(&valid));
     }
 
     #[test]
