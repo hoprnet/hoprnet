@@ -879,6 +879,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.ssa_cycles.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
+    /// Shares currently held by the part builders of every live cycle on this node: the memory the
+    /// emission window bounds in practice, as opposed to [`peak_cycle_bytes`], which prices the
+    /// adversarial case. A conforming Entry keeps at most `SHARE_EMISSION_WINDOW × (threshold − 1)`
+    /// of them per cycle; the figure is what `hopr_pix_held_shares` exports.
+    ///
+    /// Walks every live cycle and takes each part's lock briefly, so it is for an occasional reading
+    /// (once per supervisor turn, a resolution drain), not for the share path.
+    pub fn held_shares(&self) -> usize {
+        self.ssa_cycles.iter().map(|(_, cycle)| cycle.held_shares()).sum()
+    }
+
     /// Polynomial-index runs of `ssa_id` whose constant-term commitment never arrived, so the caller
     /// can ask the peer to re-send exactly those.
     ///
@@ -1084,7 +1095,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             //
             // Reported rather than swallowed, even though it advances nothing. Polynomials in an
             // emission window run in lockstep, so they reach `threshold` together and then take their
-            // surplus together — `surplus × window` consecutive shares, 20 224 at the deployed
+            // surplus together — `surplus × window` consecutive shares, 40 448 at the deployed
             // dimensions, none of them useful. A consumer that only ever hears about useful shares
             // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
             // moves, `useful_shares` does not.
@@ -3380,7 +3391,7 @@ mod tests {
     ///
     /// This is the distinction the Exit's egress gate and recovery-idle deadline turn on. A conforming
     /// Entry emits `threshold + surplus` shares per polynomial, and a whole emission window reaches its
-    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 20 224 packets
+    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 40 448 packets
     /// at the deployed dimensions. A consumer told only about *useful* shares reads that run as the
     /// Entry having gone quiet, and if it answers by withholding service it removes the only thing that
     /// could have produced the next useful share.

@@ -3431,7 +3431,7 @@ mod tests {
     /// A snapshot carrying only surplus must keep the cycle alive without paying it anything.
     ///
     /// This is the whole of C1 at the supervisor. A conforming Entry drains an emission window's
-    /// surplus in one contiguous run — `surplus × min(polys, 256)` packets, 20 224 at the shipped
+    /// surplus in one contiguous run — `surplus × min(polys, 512)` packets, 40 448 at the shipped
     /// dimensions — during which `useful_shares` does not move at all. Every one of those packets is
     /// service the Exit is consuming, so a supervisor that keyed liveness on `useful_shares` would
     /// let the run exhaust `max_served_without_progress`, park the writer, and then close an honest

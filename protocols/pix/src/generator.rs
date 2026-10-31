@@ -171,11 +171,12 @@ impl EmissionProgress {
 /// window emits its entire surplus before the next window starts. So every window before the one
 /// holding the boundary has already spent `threshold + surplus` per polynomial, not `threshold`.
 ///
-/// At the deployed 4096 × (32 + 79) that is 13 whole windows — 3328 polynomials, `3328 × 111`
-/// shares — plus 31 full passes of the 14th and 154 shares of its 32nd, i.e. **83.0 % of the cycle**.
-/// Dividing the Exit's 0.85 by the 3.47× surplus factor gives 24.5 %, and admitting there would hand
-/// out the next deposit a large fraction of a cycle's quota before it could possibly have been
-/// earned.
+/// At the deployed 4096 × (32 + 79) and a window of 512 that is 6 whole windows — 3072 polynomials,
+/// `3072 × 111` shares — plus 31 full passes of the 7th and 410 shares of its 32nd, i.e. **78.6 % of
+/// the cycle** (at the previous window of 256: 13 whole windows, 3328 polynomials, then 31 passes of
+/// the 14th and 154 shares of its 32nd, 83.0 %). Dividing the Exit's 0.85 by the 3.47× surplus factor
+/// gives 24.5 %, and admitting there would hand out the next deposit a large fraction of a cycle's
+/// quota before it could possibly have been earned.
 ///
 /// ## Which threshold to pass
 ///
@@ -241,8 +242,19 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
 /// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
 /// a time keeps one part live; the full 4096 would keep every part live at once, `polys × threshold`
-/// shares of peak memory. 256 keeps that peak around half a megabyte while covering a contiguous loss
-/// far larger than the ring buffer's entire overshoot allowance.
+/// shares of peak memory. 512 keeps that peak around a megabyte (half that at the 256 this was) while
+/// covering a contiguous loss far larger than the ring buffer's entire overshoot allowance.
+///
+/// ## Why 512
+///
+/// A wipe of the Exit's stock, or an outage that lets it drain into a dead return path, is a
+/// contiguous run of `burst` emitted shares, and the round-robin spreads it over the window: each
+/// polynomial of the active window loses `burst / window` of its `surplus_shares`. At the deployed
+/// 19 264-SURB stock and 79 surplus shares that is about 75 shares per polynomial at a window of 256
+/// (a margin of 3 to 4 shares, measured) and about 38 at 512 (a margin of 41, measured). The tolerated
+/// burst, `surplus_shares × SHARE_EMISSION_WINDOW`, is 20 224 at 256 and 40 448 at 512. The window is
+/// an Entry-side emission order and nothing on the wire: the Exit's reconstructor files shares by
+/// polynomial and does not read this constant.
 ///
 /// ## The window never crosses a cycle boundary
 ///
@@ -259,7 +271,7 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
 /// `polys / window` full-width blocks and the last one is swept out inside a single `next_share`
 /// call. A cycle whose polynomial count is *not* a multiple runs its final partial block at that
 /// remainder's width, absorbing a proportionally shorter contiguous loss.
-pub const SHARE_EMISSION_WINDOW: usize = 256;
+pub const SHARE_EMISSION_WINDOW: usize = 512;
 
 /// Builds a Shamir polynomial of degree `t - 1` over `secret` and commits to its constant term.
 ///
@@ -1148,17 +1160,23 @@ mod tests {
         let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
         assert_eq!(454_656, cycle);
 
-        // 13 whole windows (3328 polynomials, `3328 x 111` shares), then 31 full passes of the 14th
-        // plus 154 shares of its 32nd — the instant the 3482nd polynomial reaches its threshold.
+        // needed = ceil(0.85 x 4096) = 3482 polynomials, the 3482nd reaching its threshold being the
+        // instant the Exit can first signal. With windows of 512: (3482 - 1) / 512 = 6 whole windows
+        // are exhausted, surplus included (3072 polynomials, `3072 x 111` shares); the 3482nd is the
+        // 3482 - 3072 = 410th polynomial of the 7th, which completes on the 32nd pass, after 31 full
+        // passes of the 512-wide window plus 410 shares of that pass. So
+        // 3072 x 111 + 31 x 512 + 410 = 340 992 + 15 872 + 410 = 357 274.
+        // (At the window of 256 this was 3328 x 111 + 31 x 256 + 154 = 377 498, 83.0 % of the cycle.)
         let boundary = min_emission_for_early_recovery(&params, 0.85);
-        assert_eq!(3328 * 111 + 31 * 256 + 154, boundary);
+        assert_eq!(3072 * 111 + 31 * 512 + 410, boundary);
+        assert_eq!(357_274, boundary);
 
         // The surplus factor is now much larger, so the naive estimate is further below the truth
         // than it was — which is the point of computing the boundary rather than estimating it.
         let fraction = boundary as f64 / cycle as f64;
         assert!(
-            (0.830..0.831).contains(&fraction),
-            "the deployed boundary must be ~83.0% of emission, got {fraction}"
+            (0.785..0.786).contains(&fraction),
+            "the deployed boundary must be ~78.6% of emission, got {fraction}"
         );
         let naive = 0.85 / (DEFAULT_SURPLUS_SHARES as f64 / DEFAULT_POLY_THRESHOLD as f64 + 1.0);
         assert!(

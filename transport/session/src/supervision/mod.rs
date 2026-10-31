@@ -519,10 +519,10 @@
 //!
 //! ### The surplus run, and why it no longer constrains anything
 //!
-//! Emission is round-robin over a window of up to `hopr_protocol_pix::SHARE_EMISSION_WINDOW` (256)
+//! Emission is round-robin over a window of up to `hopr_protocol_pix::SHARE_EMISSION_WINDOW` (512)
 //! polynomials advancing in lockstep. They reach `threshold` on the same pass and then take their
 //! surplus shares together, so every block ends with `surplus_shares × window` consecutive packets
-//! carrying no *useful* share — **20 224 at the shipped dimensions**, against a
+//! carrying no *useful* share — **40 448 at the shipped dimensions**, against a
 //! `max_served_without_progress` of 2048.
 //!
 //! That used to be a live constraint on two parameters, and an unmeetable one: the ceiling and the
@@ -562,7 +562,7 @@
 //! 157.4 MiB to 629.6 MiB, a quarter of what the default dimensions imply up to all of it — so no
 //! range change is needed. The default `4096 × (32 + 79)` would make that 12.6 min per cycle, 71 % of it
 //! surplus bought against 50 % share loss, which at 6 s settlement is a long time to leave one
-//! cycle's traffic unsettled on a path that loses little. Keep it a multiple of 256 so the emission
+//! cycle's traffic unsettled on a path that loses little. Keep it a multiple of 512 so the emission
 //! window never narrows.
 //!
 //! | Parameter | Value | Why, at this profile |
@@ -570,7 +570,7 @@
 //! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 226.9 MiB quota, 4.5 min cycle; multiple of the emission window |
 //! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | The threshold shipped before the current 32, near the Exit-only optimum; with the surplus below, it is what fixes the quota |
 //! | `PixGlobalConfig::additional_shares` (Entry) | 16 | Set explicitly, because this profile assumes a path that loses little: a 1.25× surplus factor and a fifth of the quota, carrying ~6 % share loss at 99 % of cycles. Left unset it derives 123 for 50 % loss, and the quota grows to 530.3 MiB. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
-//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 24 627-packet runway — **41 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 226.9 MiB` |
+//! | `ssas_per_request` | **1** | The 85 % early signal leaves an 8 499-packet runway — **14 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 226.9 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
 //! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is the most exposed against an unfunded front after the initial grant or a paid handoff — 5.9 MB. Use `0` for strict prepay at every rotation; normal overlap usually funds the successor before it reaches the front |
@@ -601,7 +601,7 @@
 //! | `SessionManagerConfig::maximum_surb_buffer_size` | 10 000 | Ceiling the balancer may be steered to |
 //! | `SsaReconstructorConfig::max_ack_await_time` | 30 s | Bounds how long an unacknowledged share is held; both `max_recovery_idle` and `tombstone_retention_window` must clear it |
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
-//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the pipelining runway derived for `ssas_per_request` above — 24 627 packets, 41 s. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
+//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the pipelining runway derived for `ssas_per_request` above — 8 499 packets, 14 s. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
 //! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
 //! | `IncomingSessionPixConfig::max_live_cycle_bytes` | 3 GiB | Shipped value. At `2048 × 64 + 16` a Session reserves ≈23.4 MiB, so this profile admits ≈131 concurrent PIX Sessions, where the default dimensions admit exactly 100. It is the ceiling on live reconstructor state; this profile's ≈131 sits above the default `maximum_managed_sessions` of 100, which is reached first unless raised, and past that it — not `maximum_managed_sessions` — is what decides how many PIX Sessions this Exit accepts |
 
@@ -793,7 +793,7 @@ pub struct SupervisorConfig {
     ///
     /// The clock starts when the cycle reaches the paid transport front. That is deliberately later
     /// than merely becoming the earliest unrecovered record: the predecessor's buffered surplus tail
-    /// can still occupy ~20 224 packets, over a minute even at fill's default ceiling, and remains
+    /// can still occupy ~40 448 packets, over two minutes even at fill's default ceiling, and remains
     /// bounded by the predecessor's original hard clock. Starting the successor at the FIFO boundary
     /// prevents that pipeline delay from being charged twice. A funded cycle that reaches the front
     /// and is never served is still caught.
@@ -922,7 +922,7 @@ pub struct SupervisorConfig {
     ///
     /// Those events now follow `shares_seen` rather than `useful_shares`, which is what makes a flat
     /// 2048 safe at any dimensions. Keyed on useful shares, this had to exceed
-    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 20 224 at the shipped dimensions, nearly ten
+    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 40 448 at the shipped dimensions, nearly twenty
     /// times this value — because a conforming Entry emits a whole window's surplus in one contiguous run
     /// during which no share is useful. The gate parked the writer partway through, and a parked
     /// writer spends no SURBs, so nothing could arrive to release it. See
