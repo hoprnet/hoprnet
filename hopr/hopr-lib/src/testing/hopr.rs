@@ -82,6 +82,7 @@ pub fn create_hopr_instance_config(
             pix: pix_global_config.unwrap_or_default(),
             incoming_session_pix_config: pix_config.unwrap_or_default(),
             surb_flush_interval: std::time::Duration::from_secs(1),
+            ..Default::default()
         },
         publish: true,
         ..Default::default()
