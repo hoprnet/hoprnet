@@ -138,6 +138,16 @@ lazy_static::lazy_static! {
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
 
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SURB_GENERATION_BUMPS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_surb_generation_bumps_total",
+            "SURB generation bumps after a dead relayer verdict",
+        )
+        .unwrap();
+}
+
 /// Fraction of the SURB ring buffer a Session's balancer target may occupy.
 ///
 /// The remainder is headroom for balancer overshoot. The target used to be the ring buffer capacity
@@ -402,7 +412,9 @@ where
             ..cfg.packet.surb_store
         };
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        // The race telemetry reads a reply's lateness according to the order the replier spends its
+        // SURBs in. That is the replier's configuration; ours is assumed to be the network's.
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::new(surb_store_cfg.pop_order);
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -1052,6 +1064,8 @@ where
         let surb_flush_planner = self.path_planner.clone();
         let latency_race_memory = self.cfg.latency_race_memory;
         let relayer_health_weight = self.cfg.relayer_health_weight;
+        #[cfg(all(feature = "telemetry", not(test)))]
+        lazy_static::initialize(&METRIC_SURB_GENERATION_BUMPS);
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1064,7 +1078,7 @@ where
                     protocol::surb_telemetry::flush_into(&surb_round_trips, &surb_flush_graph, now_ms);
                     // Relayer health lives in the graph, so path selection prunes the dead and weights
                     // the stalled natively.
-                    protocol::surb_telemetry::refresh_relayer_health(
+                    let reached = protocol::surb_telemetry::refresh_relayer_health(
                         &surb_round_trips,
                         &surb_flush_graph,
                         latency_race_memory,
@@ -1072,6 +1086,30 @@ where
                         || surb_flush_planner.refresh_cached_paths(),
                     )
                     .await;
+
+                    // The counterparty sees only the first hop of the SURBs it holds, so it cannot tell
+                    // which of them run through the dead relayer, and a FIFO store would spend them into
+                    // the void until it turned over. Advancing the session's SURB generation makes it
+                    // drop its whole stock on the next push. The write-off above is count-only (the SURBs
+                    // through the relayer); the session's balancer is told the stock is gone instead, so
+                    // that it refills from empty over the re-planned paths, at a pace (see
+                    // `REFILL_PACING_SECS`) the paths can carry. The session is asked first: a session
+                    // the manager no longer knows is only forgotten, its generation is not advanced
+                    // (that would leave a stray entry in the store and log a bump for a closed session).
+                    for pseudonym in reached {
+                        if !surb_flush_smgr.on_counterparty_surbs_wiped(&pseudonym) {
+                            surb_round_trips.forget_session(&pseudonym);
+                            continue;
+                        }
+                        let generation = surb_flush_planner.surb_store.bump_generation(&pseudonym);
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_SURB_GENERATION_BUMPS.increment();
+                        tracing::info!(
+                            %pseudonym,
+                            generation,
+                            "dead relayer verdict: SURB generation advanced, the counterparty drops its stock on the next push"
+                        );
+                    }
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
                     // told how many of those it holds, to replace them.
