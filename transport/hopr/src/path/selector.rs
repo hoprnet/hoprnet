@@ -174,13 +174,14 @@ where
 }
 
 /// Trim the candidate set to lower median latency and minimise variance while
-/// preserving an anonymity floor.
+/// preserving an anonymity floor and relayer diversity in every position.
 ///
 /// Behaviour:
 /// - If `candidates.len() <= floor`, returns all candidates unchanged (`min(found_count, floor)` semantics — the floor
 ///   is never a minimum to fabricate).
 /// - Sorts candidates with a known `total_latency_ms` ascending.
-/// - Drops from the high-latency tail until the total count equals `floor`, or until no populated candidates remain.
+/// - Keeps `floor` of them preferring distinct first relayers and bounding how often a relayer recurs in each later
+///   position (see [`take_relayer_diverse`] and [`MIDDLE_HOP_SHARE`]), lowest latency first within those rules.
 /// - If still over the floor with no populated candidates left, drops unpopulated candidates from the input-order tail.
 ///
 /// A path is "fully measured" — and therefore preferred over unmeasured alternatives —
@@ -215,34 +216,93 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
     result
 }
 
-/// Takes `n` candidates from `sorted`, preferring not-yet-represented first relayers.
+/// A relayer may sit in the same position past the first in at most `n.div_ceil(MIDDLE_HOP_SHARE)`
+/// of the `n` candidates [`take_relayer_diverse`] keeps, while the pool allows it.
+///
+/// Distinct first relayers alone leave every other position free to collapse: the best path from
+/// each first relayer often runs through the same second hop, so one relayer sat in the middle of
+/// every forward candidate, and when it died the whole forward direction went dark at once, with
+/// nothing left to corroborate a verdict against (measured: the busiest relay of a 2-hop session
+/// carried 29 % of all relayed packets; killed, the session never recovered). A third bounds what
+/// one relayer's death costs to about a third of the draws before the weights are even looked at.
+const MIDDLE_HOP_SHARE: usize = 3;
+
+/// Takes `n` candidates from `sorted`, preferring not-yet-represented first relayers and bounding
+/// how often any relayer recurs in each later position.
 ///
 /// Plain truncation keeps the `n` lowest-latency paths, which in a well-connected network are often
 /// the *same* few relayers reached by different routes; every downstream draw then inherits that
-/// concentration. Relative order is preserved, so each pass stays latency-ordered.
+/// concentration. Relative order is preserved, so each pass stays latency-ordered. Three passes:
+/// paths with a new first relayer whose later relayers are all under the [`MIDDLE_HOP_SHARE`] cap
+/// for their position; then any path under the cap; then the best of the rest, so a thin pool still
+/// fills the floor.
 fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithMetrics> {
     if sorted.len() <= n {
         return sorted;
     }
 
+    let cap = n.div_ceil(MIDDLE_HOP_SHARE).max(1);
     let mut seen: Vec<OffchainPublicKey> = Vec::with_capacity(n);
+    let mut per_position: std::collections::HashMap<(usize, OffchainPublicKey), usize> = Default::default();
     let mut taken = vec![false; sorted.len()];
     let mut count = 0;
 
-    // First pass: one path per distinct first relayer, best (lowest-latency) first.
+    // The relayers of `path` past the first: `path` ends with the destination, which is no relayer.
+    let later_relayers = |p: &PathWithMetrics| {
+        p.path
+            .iter()
+            .enumerate()
+            .skip(1)
+            .take(p.path.len().saturating_sub(2))
+            .map(|(pos, key)| (pos, *key))
+            .collect::<Vec<_>>()
+    };
+
+    let take = |i: usize,
+                p: &PathWithMetrics,
+                taken: &mut Vec<bool>,
+                per_position: &mut std::collections::HashMap<(usize, OffchainPublicKey), usize>| {
+        taken[i] = true;
+        for slot in later_relayers(p) {
+            *per_position.entry(slot).or_default() += 1;
+        }
+    };
+
+    // First pass: one path per distinct first relayer, best (lowest-latency) first, with every
+    // later relayer under its position's cap.
     for (i, p) in sorted.iter().enumerate() {
         if count == n {
             break;
         }
         let Some(first) = p.path.first() else { continue };
-        if !seen.contains(first) {
+        let under_cap = later_relayers(p)
+            .into_iter()
+            .all(|slot| per_position.get(&slot).copied().unwrap_or(0) < cap);
+        if !seen.contains(first) && under_cap {
             seen.push(*first);
-            taken[i] = true;
+            take(i, p, &mut taken, &mut per_position);
             count += 1;
         }
     }
 
-    // Second pass: fill any remaining slots with the best of the rest.
+    // Second pass: any path whose later relayers are still under the cap, best first.
+    for (i, p) in sorted.iter().enumerate() {
+        if count == n {
+            break;
+        }
+        if taken[i] {
+            continue;
+        }
+        let under_cap = later_relayers(p)
+            .into_iter()
+            .all(|slot| per_position.get(&slot).copied().unwrap_or(0) < cap);
+        if under_cap {
+            take(i, p, &mut taken, &mut per_position);
+            count += 1;
+        }
+    }
+
+    // Third pass: fill any remaining slots with the best of the rest.
     for slot in taken.iter_mut() {
         if count == n {
             break;
@@ -1123,6 +1183,66 @@ mod tests {
         // The best path per relayer is the one kept, so latency still drives the choice within
         // each relayer.
         assert_eq!(Some(10), result[0].total_latency_ms, "still latency-ordered");
+    }
+
+    /// A 2-hop candidate: first relayer `first_idx`, middle relayer `middle_idx`, then the destination.
+    fn make_path_through(first_idx: u8, middle_idx: u8, latency_ms: u32) -> PathWithMetrics {
+        let key = |tag: u8, idx: u8| {
+            let mut secret = [1u8; 32];
+            secret[0] = idx.max(1);
+            secret[2] = tag;
+            *OffchainKeypair::from_secret(&secret).expect("valid secret").public()
+        };
+        PathWithMetrics {
+            path: vec![key(1, first_idx), key(2, middle_idx), key(3, 1)],
+            cost: 1.0,
+            total_latency_ms: Some(latency_ms),
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            fundable_tickets_floor: Some(1000),
+        }
+    }
+
+    /// Eight first relayers, each with its fastest path through the same middle relayer and a
+    /// slower one through its own. Distinct first relayers alone would keep the eight fastest paths
+    /// and put the hub in the middle of every candidate; the cap lets it into at most a third.
+    #[test]
+    fn prune_should_bound_how_often_a_relayer_recurs_in_a_middle_position() {
+        let hub = 9u8;
+        let mut candidates = Vec::new();
+        for first in 1..=8u8 {
+            candidates.push(make_path_through(first, hub, 10 + u32::from(first)));
+            candidates.push(make_path_through(first, first, 50 + u32::from(first)));
+        }
+
+        let result = prune_for_consistency(candidates, 8, 2);
+        assert_eq!(8, result.len());
+
+        let hub_key = make_path_through(1, hub, 0).path[1];
+        let through_hub = result.iter().filter(|p| p.path[1] == hub_key).count();
+        assert_eq!(
+            3, through_hub,
+            "the hub sits in the middle of at most ceil(8 / 3) candidates"
+        );
+
+        let firsts: std::collections::HashSet<_> = result.iter().map(|p| p.path[0]).collect();
+        assert_eq!(8, firsts.len(), "every first relayer is still represented");
+        assert_eq!(
+            Some(11),
+            result[0].total_latency_ms,
+            "the fastest path is still kept, and the order is still by latency"
+        );
+    }
+
+    /// With the pool too thin to respect the cap, the floor is still filled: the cap bounds, it
+    /// never starves.
+    #[test]
+    fn prune_should_fill_the_floor_through_a_hub_when_nothing_else_is_left() {
+        let candidates = (1..=6u8)
+            .map(|first| make_path_through(first, 9, 10 + u32::from(first)))
+            .collect();
+        let result = prune_for_consistency(candidates, 4, 2);
+        assert_eq!(4, result.len(), "four of six through the only middle relayer there is");
     }
 
     #[test]
