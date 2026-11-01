@@ -434,7 +434,6 @@ pub struct SurbStoreConfig {
     ///
     /// Default is 50.
     #[default(default_admitted_headroom_percent())]
-    #[validate(range(min = 0, message = "admitted_headroom_percent must not be negative"))]
     #[cfg_attr(feature = "serde", serde(default = "default_admitted_headroom_percent"))]
     pub admitted_headroom_percent: u32,
 }
@@ -940,7 +939,8 @@ impl MemorySurbStore {
     /// SURBs held for `pseudonym` across both classes.
     ///
     /// Sums the two caches rather than asking one, so the brief dual-ring state around a promotion —
-    /// a batch that routed to the quarantine while `admit` was re-checking — cannot under-report what
+    /// a batch that routed to the quarantine just before `admit` installed the admitted entry, and
+    /// that sits there until its insert's post-push re-check folds it in — cannot under-report what
     /// the pseudonym holds.
     fn ring_len(&self, pseudonym: &HoprPseudonym) -> usize {
         let admitted = self
@@ -970,22 +970,63 @@ impl MemorySurbStore {
         );
     }
 
+    /// Removes `pseudonym`'s quarantine ring, if it has one, and refunds what it held to the budget.
+    ///
+    /// The removal is an `and_compute_with`, not a plain `remove`, because that is what serialises it
+    /// against [`push_into_quarantine`](Self::push_into_quarantine): moka runs computes on one key one
+    /// at a time, but a `remove` does not join that queue. With a plain `remove`, a push that had
+    /// already looked the ring up could land its batch *after* the removal had drained the ring — in a
+    /// ring no cache holds any more, where no lookup ever finds it. Serialised, a push either finishes
+    /// before the removal (and its batch leaves with the ring) or starts after it (and creates a fresh
+    /// ring, which its own post-push re-check then folds).
+    ///
+    /// `Op::Remove` is an explicit removal the quarantine listener skips, so the refund is made here.
+    fn take_quarantine_ring(&self, pseudonym: &HoprPseudonym) -> Option<SurbRingBuffer<HoprSurb>> {
+        let removed = self.quarantine_surbs.entry_by_ref(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, SurbRingBuffer<HoprSurb>>>| match entry {
+                Some(_) => moka::ops::compute::Op::Remove,
+                None => moka::ops::compute::Op::Nop,
+            },
+        );
+
+        match removed {
+            moka::ops::compute::CompResult::Removed(entry) => {
+                let ring = entry.into_value();
+                refund_quarantine_budget(&self.quarantine_budget, ring.len());
+                Some(ring)
+            }
+            _ => None,
+        }
+    }
+
+    /// Moves everything `pseudonym`'s quarantine ring holds into `admitted`, removing the quarantine
+    /// ring. Returns what the push into `admitted` did, or `None` if there was nothing to move.
+    ///
+    /// The ring is drained as it stands: a promoted SURB already earned its slot, and the push into
+    /// `admitted` is judged against the admitted ceiling, not the quarantine's.
+    fn fold_quarantine_into(
+        &self,
+        pseudonym: &HoprPseudonym,
+        admitted: &SurbRingBuffer<HoprSurb>,
+    ) -> Option<SurbInsertOutcome> {
+        let (generation, held) = self.take_quarantine_ring(pseudonym)?.take_all();
+        let outcome = admitted.push(held, generation?);
+        self.record_ring_overflow(&outcome);
+        Some(outcome)
+    }
+
     /// Pushes a batch into an admitted ring, after folding in whatever a quarantine ring for the same
     /// pseudonym still holds.
     ///
-    /// Shared by both admitted routes in [`SurbStore::insert_surbs`]: the straight one, where the
-    /// admission pre-dates the batch, and the admit-window one, where `admit` landed between the
-    /// routing check and the re-check. The fold-in is re-done there rather than left to `admit`,
-    /// because a concurrent insert for the same pseudonym can have created a quarantine ring *after*
-    /// `admit`'s own promotion — and because `admit` itself must not be called again: it would mint a
-    /// fresh admission number the manager's token no longer names, leaving the Session's deferred
-    /// retire matching nothing while the entry it stamped holds a number no retire will ever present.
+    /// The fold-in is re-done here rather than left to `admit`, because an insert that routed to the
+    /// quarantine just before `admit` installed this entry can leave a ring behind there — and
+    /// because `admit` itself must not be called again: it would mint a fresh admission number the
+    /// manager's token no longer names, leaving the Session's deferred retire matching nothing while
+    /// the entry it stamped holds a number no retire will ever present.
     ///
-    /// The fold-in is what keeps the two routes from diverging, and it is why only `admit` creates an
-    /// admitted entry: an insert that minted one itself would have no admission number to stamp, and a
-    /// ring stamped with the sentinel is one no retire ever removes.
-    /// `remove` is an explicit removal the listener skips, so the budget is decremented here at this
-    /// one mutation site.
+    /// It is also why only `admit` creates an admitted entry: an insert that minted one itself would
+    /// have no admission number to stamp, and a ring stamped with the sentinel is one no retire ever
+    /// removes.
     fn push_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
@@ -993,18 +1034,193 @@ impl MemorySurbStore {
         surbs: Vec<(HoprSurbId, HoprSurb)>,
         generation: u8,
     ) -> SurbInsertOutcome {
-        if let Some(qring) = self.quarantine_surbs.remove(pseudonym) {
-            refund_quarantine_budget(&self.quarantine_budget, qring.len());
-            let (qgeneration, held) = qring.take_all();
-            if let Some(qgeneration) = qgeneration {
-                let outcome = admitted.push(held, qgeneration);
-                self.record_ring_overflow(&outcome);
-            }
-        }
+        self.fold_quarantine_into(pseudonym, admitted);
 
         let outcome = admitted.push(surbs, generation);
         self.record_ring_overflow(&outcome);
         outcome
+    }
+
+    /// Pushes a batch into `pseudonym`'s quarantine ring, creating the ring if it has none, and books
+    /// the change in the quarantine budget.
+    ///
+    /// The push runs inside an `and_compute_with` so it is serialised against
+    /// [`take_quarantine_ring`](Self::take_quarantine_ring) — see there for the batch a plain lookup
+    /// would lose. The budget is booked inside the compute too: a promotion queued behind this push
+    /// refunds what the ring holds as soon as the compute ends, and an increment landing after that
+    /// refund would count SURBs the quarantine no longer holds. The delta is taken against this
+    /// ring's own length, read in the same compute, so a push that evicted and re-inserted nets out.
+    fn push_into_quarantine(
+        &self,
+        pseudonym: &HoprPseudonym,
+        surbs: Vec<(HoprSurbId, HoprSurb)>,
+        generation: u8,
+    ) -> SurbInsertOutcome {
+        let mut pushed = SurbInsertOutcome::default();
+        self.quarantine_surbs.entry_by_ref(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, SurbRingBuffer<HoprSurb>>>| {
+                // The entry's value shares its buffer with the cache's, so a push through it lands in
+                // the ring the cache holds and the entry is kept as it is. A new ring is pushed into
+                // before it is put: nothing can see it until the compute ends.
+                let (ring, op) = match entry {
+                    Some(entry) => (entry.into_value(), moka::ops::compute::Op::Nop),
+                    None => {
+                        let ring = SurbRingBuffer::new(self.cfg.quarantine_rb_capacity);
+                        (ring.clone(), moka::ops::compute::Op::Put(ring))
+                    }
+                };
+
+                let before = ring.len();
+                pushed = ring.push(surbs, generation);
+                match pushed.retained.checked_sub(before) {
+                    Some(grown) => {
+                        self.quarantine_budget
+                            .fetch_add(grown, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    None => refund_quarantine_budget(&self.quarantine_budget, before - pushed.retained),
+                }
+                op
+            },
+        );
+
+        self.record_ring_overflow(&pushed);
+        pushed
+    }
+
+    /// Sheds whole quarantine rings until `incoming` more SURBs fit under the quarantine budget, or no
+    /// ring that holds anything is left. Returns how many rings it shed.
+    ///
+    /// The victims are uniformly untrusted, so their order is arbitrary — moka's `iter` gives no order
+    /// to lean on. Rings a lookup has already emptied are skipped: they free no budget, and choosing
+    /// them would spend a pass on nothing while rings that do hold SURBs stay put. Each pass sheds a
+    /// bounded number of rings, so an insert at saturation frees room for several after it rather than
+    /// draining one ring per insert; passes repeat only while the batch still does not fit, and their
+    /// number is capped by what the cache can hold, so a counter that drifted above what the rings
+    /// actually hold costs one sweep of the quarantine, not a loop.
+    ///
+    /// The rings are collected before any is removed: moka holds the cache lock for a live `iter`, so
+    /// a removal inside it would deadlock against itself.
+    fn drain_quarantine_budget(&self, incoming: usize) -> usize {
+        const VICTIMS_PER_PASS: usize = 64;
+        let fits = || {
+            self.quarantine_budget.load(std::sync::atomic::Ordering::Relaxed) + incoming
+                <= self.cfg.quarantine_surb_budget
+        };
+        let max_passes = self
+            .cfg
+            .quarantine_max_pseudonyms
+            .max(MINIMUM_QUARANTINE_PSEUDONYMS)
+            .div_ceil(VICTIMS_PER_PASS);
+
+        let mut shed = 0;
+        for _ in 0..max_passes {
+            if fits() {
+                break;
+            }
+            let victims: Vec<HoprPseudonym> = self
+                .quarantine_surbs
+                .iter()
+                .filter(|(_, ring)| ring.len() > 0)
+                .take(VICTIMS_PER_PASS)
+                .map(|(key, _)| *key)
+                .collect();
+            if victims.is_empty() {
+                break;
+            }
+            // Removed through the same serialised path as a promotion, so a push racing the drain on a
+            // victim lands either in the ring being shed (and leaves with it, refunded) or in a fresh
+            // one — never in a ring the cache no longer holds while the budget still counts it.
+            for key in &victims {
+                if self.take_quarantine_ring(key).is_some() {
+                    shed += 1;
+                }
+            }
+        }
+        self.quarantine_surbs.run_pending_tasks();
+        shed
+    }
+
+    /// The quarantine arm of [`SurbStore::insert_surbs`], split out so a test can drive it directly:
+    /// it is reached when `insert_surbs`' admission lookup found no entry, and the interesting case —
+    /// `admit` landing between that lookup and the push here — cannot be forced from outside.
+    ///
+    /// That case is why the push is followed by a re-check. `admit` installs the admitted entry first
+    /// and promotes the quarantine ring second, so a batch pushed here either lands before the
+    /// promotion (and is promoted with the ring) or after it, when the entry is already in place and
+    /// the re-check below finds it and folds the batch in. Without the re-check the batch would sit in
+    /// a quarantine ring that `find_surb` no longer consults — it reads the admitted ring once one
+    /// exists — until a later admitted insert happened to fold it in, or the quarantine's TTI, cap or
+    /// budget drain discarded it.
+    fn insert_surbs_into_quarantine(
+        &self,
+        pseudonym: &HoprPseudonym,
+        surbs: Vec<(HoprSurbId, HoprSurb)>,
+        generation: u8,
+    ) -> SurbInsertOutcome {
+        // The quarantine is the only class an unauthenticated peer can write into, so the budget
+        // applies here and only here. Refusing an admitted batch to protect it would trade live
+        // PIX shares for untrusted ones.
+        if self.quarantine_budget.load(std::sync::atomic::Ordering::Relaxed) + surbs.len()
+            > self.cfg.quarantine_surb_budget
+        {
+            let evicted_rings = self.drain_quarantine_budget(surbs.len());
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_SURB_STORE_ADMISSIONS
+                .increment_by(&[SurbAdmissionEvent::QuarantineEvicted.into()], evicted_rings as u64);
+            #[cfg(not(all(feature = "telemetry", not(test))))]
+            let _ = evicted_rings;
+
+            // Still over? Then the cache's own bound is the wall and the batch is refused whole:
+            // it is unadmitted traffic, so turning it away costs return paths, not shares held for
+            // a Session. `retained` reports what the pseudonym still holds in either class, and
+            // `evicted_shares` the shares the refused batch actually carried — the caller above
+            // reads `evicted` as "SURBs that left or never entered the store", which a refusal is.
+            let over = self.quarantine_budget.load(std::sync::atomic::Ordering::Relaxed) + surbs.len()
+                > self.cfg.quarantine_surb_budget;
+            if over {
+                // Unless the pseudonym was admitted while the drain ran: an admitted batch is never
+                // refused, so it goes where it now belongs.
+                if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(pseudonym) {
+                    return self.insert_surbs_into_admitted(pseudonym, admitted, surbs, generation);
+                }
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SURB_STORE_ADMISSIONS.increment_by(&[SurbAdmissionEvent::QuarantineRefused.into()], 1);
+                tracing::debug!(
+                    %pseudonym,
+                    num_surbs = surbs.len(),
+                    budget = self.cfg.quarantine_surb_budget,
+                    "refusing unadmitted SURBs: the quarantine SURB budget is exhausted"
+                );
+                return SurbInsertOutcome {
+                    retained: self.ring_len(pseudonym),
+                    evicted: surbs.len(),
+                    evicted_shares: surbs.iter().filter(|(_, surb)| surb.ssa_index().is_some()).count(),
+                };
+            }
+        }
+
+        let pushed = self.push_into_quarantine(pseudonym, surbs, generation);
+
+        // The re-check. An `admit` that landed after `insert_surbs`' routing lookup either promoted
+        // after the push above, taking the batch with the ring, or before it — and then its entry,
+        // installed ahead of the promotion, is in place by now and the batch is folded in here.
+        let Some(admitted) = self.admitted_surbs_per_pseudonym.get(pseudonym) else {
+            return pushed;
+        };
+        match self.fold_quarantine_into(pseudonym, &admitted) {
+            Some(folded) => SurbInsertOutcome {
+                retained: folded.retained,
+                evicted: pushed.evicted + folded.evicted,
+                evicted_shares: pushed.evicted_shares + folded.evicted_shares,
+            },
+            // Nothing left to fold: `admit`'s own promotion, or a concurrent insert, already moved it.
+            None => SurbInsertOutcome {
+                retained: admitted.len(),
+                ..pushed
+            },
+        }
     }
 
     /// The admitted arm of [`SurbStore::insert_surbs`], split out so a test can drive it directly:
@@ -1015,8 +1231,8 @@ impl MemorySurbStore {
     /// SessionManager threads back to `retire`. It is used as it stands rather than `admit` being
     /// called again: a second `admit` would mint a fresh number the manager's token no longer names,
     /// and the deferred retire would then match nothing, leaking the Session's ring until its teardown
-    /// never comes. What is re-done here is only the fold-in of a quarantine ring, which a concurrent
-    /// insert for the same pseudonym can have created after `admit`'s own promotion.
+    /// never comes. What is re-done here is only the fold-in of a quarantine ring, which an insert
+    /// that routed there just before `admit` installed this entry can have left behind.
     fn insert_surbs_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
@@ -1176,95 +1392,13 @@ impl SurbStore for MemorySurbStore {
         // until size eviction. (A successor `admit` re-stamps the epoch and raises the capacity, but
         // the entry the retire never names is reason enough to keep an insert out of this cache.)
         // An absent entry therefore means the pseudonym is not admitted (or was just retired), and the
-        // batch belongs to the quarantine like any other unadmitted one.
+        // batch belongs to the quarantine like any other unadmitted one — whose arm re-checks this
+        // lookup after its push, for an `admit` that lands in between.
         if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
             return self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation);
         }
 
-        // The quarantine is the only class an unauthenticated peer can write into, so the budget
-        // applies here and only here. Refusing an admitted batch to protect it would trade live
-        // PIX shares for untrusted ones.
-        if self.quarantine_budget.load(std::sync::atomic::Ordering::Relaxed) + surbs.len()
-            > self.cfg.quarantine_surb_budget
-        {
-            // Evict whole quarantine rings to get back under the budget. The victims are uniformly
-            // untrusted, so eviction order is arbitrary — moka's `iter` gives no order to lean on.
-            // Never `invalidate` inside a live `iter`: moka holds the cache lock for the iteration,
-            // so the invalidation would deadlock against itself. The rings are collected with their
-            // keys so the budget can be decremented by what is actually removed: `invalidate` is an
-            // explicit removal, which the listener skips, so this drain is the only place that can
-            // account for the SURBs it sheds — missing it here pins the counter at the cap and
-            // refuses every later fresh SURB for good.
-            const VICTIMS: usize = 64;
-            let victims: Vec<(HoprPseudonym, SurbRingBuffer<HoprSurb>)> = self
-                .quarantine_surbs
-                .iter()
-                .take(VICTIMS)
-                .map(|(key, ring)| (*key, ring.clone()))
-                .collect();
-            let evicted_rings = victims.len();
-            let evicted_surbs: usize = victims.iter().map(|(_, ring)| ring.len()).sum();
-            for (key, _) in &victims {
-                self.quarantine_surbs.invalidate(key);
-            }
-            refund_quarantine_budget(&self.quarantine_budget, evicted_surbs);
-            self.quarantine_surbs.run_pending_tasks();
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_SURB_STORE_ADMISSIONS
-                .increment_by(&[SurbAdmissionEvent::QuarantineEvicted.into()], evicted_rings as u64);
-            #[cfg(not(all(feature = "telemetry", not(test))))]
-            let _ = evicted_rings;
-
-            // Still over? Then the cache's own bound is the wall and the batch is refused whole:
-            // it is unadmitted traffic, so turning it away costs return paths, not shares held for
-            // a Session. `retained` reports what the pseudonym still holds in either class, and
-            // `evicted_shares` the shares the refused batch actually carried — the caller above
-            // reads `evicted` as "SURBs that left or never entered the store", which a refusal is.
-            let over = self.quarantine_budget.load(std::sync::atomic::Ordering::Relaxed) + surbs.len()
-                > self.cfg.quarantine_surb_budget;
-            if over {
-                #[cfg(all(feature = "telemetry", not(test)))]
-                METRIC_SURB_STORE_ADMISSIONS.increment_by(&[SurbAdmissionEvent::QuarantineRefused.into()], 1);
-                tracing::debug!(
-                    %pseudonym,
-                    num_surbs = surbs.len(),
-                    budget = self.cfg.quarantine_surb_budget,
-                    "refusing unadmitted SURBs: the quarantine SURB budget is exhausted"
-                );
-                return SurbInsertOutcome {
-                    retained: self.ring_len(&pseudonym),
-                    evicted: surbs.len(),
-                    evicted_shares: surbs.iter().filter(|(_, surb)| surb.ssa_index().is_some()).count(),
-                };
-            }
-        }
-
-        // Captured *after* the drain above, not before it: the drain may have evicted this very
-        // pseudonym's ring, and the listener already subtracted that ring's SURBs, so the delta
-        // against a pre-drain `before` would subtract them a second time.
-        let before = self.ring_len(&pseudonym);
-
-        let outcome = self
-            .quarantine_surbs
-            .entry_by_ref(&pseudonym)
-            .or_insert_with(|| SurbRingBuffer::new(self.cfg.quarantine_rb_capacity))
-            .value()
-            .push(surbs, generation);
-
-        // The delta is exact at this one mutation site, so the budget needs no resync pass: a
-        // `push` that evicted and re-inserted in the same call nets out here, and the eviction
-        // listener above corrects for the cache's own removals.
-        let delta = outcome.retained as isize - before as isize;
-        if delta >= 0 {
-            self.quarantine_budget
-                .fetch_add(delta as usize, std::sync::atomic::Ordering::Relaxed);
-        } else {
-            refund_quarantine_budget(&self.quarantine_budget, (-delta) as usize);
-        }
-
-        self.record_ring_overflow(&outcome);
-        outcome
+        self.insert_surbs_into_quarantine(&pseudonym, surbs, generation)
     }
 
     fn tier_lens(&self, pseudonym: &HoprPseudonym) -> Option<(usize, usize)> {
@@ -1293,23 +1427,17 @@ impl SurbStore for MemorySurbStore {
     /// previous admission left behind — `insert_surbs` never creates one — and the promotion fills it
     /// rather than discarding what it holds.
     ///
-    /// The budget is accounted here, not by the listener: the promotion removes the quarantine entry
-    /// explicitly, which the listener skips, so the SURBs it carried are decremented at this one
-    /// mutation site.
+    /// The admitted entry is installed *before* the quarantine ring is promoted, not after. That order
+    /// is what lets an insert racing this admission re-check after its quarantine push: a push that
+    /// lands after the promotion can only do so once the entry is already in place, so the insert's
+    /// re-check finds it and folds the batch in. Promoting first would leave a window — promotion done,
+    /// entry not yet installed — in which a push and its re-check could both slip through, stranding
+    /// the batch in a quarantine ring `find_surb` no longer consults.
     fn admit(&self, pseudonym: &HoprPseudonym, expected_surbs: usize) -> u64 {
         let capacity = self.admitted_ring_capacity(expected_surbs);
         // Minted before anything is written, so a retire racing this admit always carries a number
         // strictly older than the one being installed here.
         let epoch = next_admission_epoch();
-
-        // Any quarantine ring is promoted rather than left behind to expire: the SURBs arrived for
-        // this very Session. Lifted out before the compute below so the compute stays a single
-        // decision about the admitted entry; the promoted SURBs are folded into whichever ring that
-        // decision leaves in place.
-        let promoted = self.quarantine_surbs.remove(pseudonym);
-        if let Some(qring) = &promoted {
-            refund_quarantine_budget(&self.quarantine_budget, qring.len());
-        }
 
         // One atomic compute over the key for both halves of the admission — the ring and its number.
         // Splitting them (install the ring, then stamp the number) would reopen the very window the
@@ -1350,16 +1478,10 @@ impl SurbStore for MemorySurbStore {
             }
         };
 
-        if let Some(qring) = promoted {
-            // `with_capacity` deep-copies the ring at the admitted ceiling — a plain clone shares
-            // the inner buffer and would keep the quarantine cap on what is now an admitted ring.
-            let promoted = qring.with_capacity(capacity);
-            let (generation, held) = promoted.take_all();
-            if let Some(generation) = generation {
-                let outcome = resident.push(held, generation);
-                self.record_ring_overflow(&outcome);
-            }
-
+        // Promoted only now that the entry is in place — see the method docs for why the order matters.
+        // The SURBs are folded into whichever ring the compute above left in place, at its admitted
+        // ceiling: the quarantine ring is drained, not carried over, so its cap goes with it.
+        if self.fold_quarantine_into(pseudonym, &resident).is_some() {
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SURB_STORE_ADMISSIONS.increment_by(&[SurbAdmissionEvent::Promoted.into()], 1);
         }
@@ -1657,9 +1779,9 @@ pub struct SurbRingBuffer<S> {
 #[derive(Clone, Debug)]
 struct AdmittedRing {
     ring: SurbRingBuffer<HoprSurb>,
-    /// The number [`next_admission_epoch`] minted for the admission that installed `ring`. Zero is
-    /// never minted, so an entry created by a racing [`SurbStore::insert_surbs`], whose Session has
-    /// not been admitted yet, matches no retire token at all.
+    /// The number [`next_admission_epoch`] minted for the admission that installed `ring`, or
+    /// re-stamped it on a re-admission. Never zero: zero is the token a teardown of a never-admitted
+    /// Session presents, and it must match no entry.
     epoch: Arc<std::sync::atomic::AtomicU64>,
 }
 
@@ -1796,32 +1918,6 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
-    /// A copy of this buffer holding at most `capacity` SURBs, everything else carried over.
-    ///
-    /// This is a deep copy of both tiers and the generation into a fresh buffer, not an `Arc` clone:
-    /// the copy is meant to carry its *own* ceiling, so a shared inner — and with it a shared
-    /// capacity — would leave the copy bound by the source's. It is how the store raises a quarantine
-    /// ring to its admitted capacity on promotion — rebuilding via `push` would re-run the eviction
-    /// order on SURBs that already earned their slots, and would lose the generation the batches were
-    /// minted at.
-    ///
-    /// Insertion order is preserved within each tier, so what pops first afterwards is what would
-    /// have popped first before.
-    pub fn with_capacity(&self, capacity: usize) -> Self
-    where
-        S: Clone,
-    {
-        let inner = self.inner.lock();
-        Self {
-            inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
-                shares: inner.shares.iter().cloned().collect(),
-                plain: inner.plain.iter().cloned().collect(),
-                generation: inner.generation,
-            })),
-            capacity: Arc::new(std::sync::atomic::AtomicUsize::new(capacity.max(1))),
-        }
-    }
-
     /// Raises this buffer's ceiling to at least `to` retained SURBs, never lowering it.
     ///
     /// Called when a pseudonym is re-admitted: [`SurbStore::admit`] keeps the resident ring rather than
@@ -1845,8 +1941,8 @@ impl<S> SurbRingBuffer<S> {
 /// A second handle on the same buffer, for the moka caches that require `Clone` on their values.
 ///
 /// Deliberately not a derived `Clone` and not a deep copy: it shares the inner lock and the capacity
-/// `Arc`, so a cloned handle and its original see the same SURBs and the same bound. A caller that
-/// wants an independent buffer at a chosen ceiling asks for [`SurbRingBuffer::with_capacity`].
+/// `Arc`, so a cloned handle and its original see the same SURBs and the same bound. Moving SURBs into
+/// a ring with a different ceiling is a [`take_all`](SurbRingBuffer::take_all) and a push.
 impl<S> Clone for SurbRingBuffer<S> {
     fn clone(&self) -> Self {
         Self {
@@ -4481,6 +4577,200 @@ mod tests {
         assert!(
             store.quarantine_surbs.get(&pseudonym).is_some(),
             "the unadmitted batch belongs to the quarantine"
+        );
+
+        Ok(())
+    }
+
+    /// An insert whose admission lookup ran just before `admit` installed the entry pushes its batch
+    /// into the quarantine — and must not leave it there. Once an admitted entry exists `find_surb`
+    /// reads only the admitted ring, so a batch stranded in the quarantine would be invisible to the
+    /// Session until a later admitted insert happened to fold it in, or the quarantine's TTI, cap or
+    /// budget drain discarded it.
+    ///
+    /// The test stands in for that race by admitting first and then driving the quarantine arm
+    /// directly, as the insert whose lookup came too early would.
+    #[test]
+    fn a_batch_routed_to_the_quarantine_just_before_admission_must_reach_the_admitted_ring() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+        let outcome = store.insert_surbs_into_quarantine(&pseudonym, vec![([1u8; 8], surb_via(relayer, DIRECT)?)], 0);
+
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 1,
+                evicted: 0,
+                evicted_shares: 0
+            },
+            outcome,
+            "the outcome must report what the admitted ring holds once the batch is folded in"
+        );
+        assert!(
+            store.quarantine_surbs.get(&pseudonym).is_none(),
+            "the re-check must have folded the quarantine ring into the admitted one"
+        );
+        let admitted = store
+            .admitted_surbs_per_pseudonym
+            .get(&pseudonym)
+            .context("the admitted entry must still exist")?;
+        assert_eq!(1, admitted.len(), "the batch must now be held in the admitted ring");
+        assert_eq!(
+            token,
+            admitted.epoch(),
+            "the fold must leave the admission number alone"
+        );
+        assert_eq!(
+            0,
+            store.quarantine_budget.load(Ordering::Relaxed),
+            "the folded SURB no longer counts against the quarantine budget"
+        );
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .context("the batch must be spendable by the admitted Session")?;
+        assert_eq!([1u8; 8], found.sender_id.surb_id());
+
+        Ok(())
+    }
+
+    /// The same race, run for real: an insert and the admission of its pseudonym on two threads. In
+    /// every interleaving the batch must end up in the admitted ring and nothing in the quarantine —
+    /// `admit` installs its entry before it promotes, and both the promotion and the quarantine push
+    /// are serialised per key, so a push either precedes the promotion or is followed by a re-check
+    /// that sees the entry.
+    #[test]
+    fn concurrent_insert_and_admission_must_never_strand_a_batch_in_the_quarantine() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT)?;
+
+        for round in 0..256u32 {
+            let pseudonym = HoprPseudonym::random();
+            let start = std::sync::Barrier::new(2);
+            std::thread::scope(|s| {
+                s.spawn(|| {
+                    start.wait();
+                    store.insert_surbs(pseudonym, vec![([round as u8; 8], surb.clone())]);
+                });
+                s.spawn(|| {
+                    start.wait();
+                    store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+                });
+            });
+
+            assert_eq!(
+                0,
+                store.quarantine_surbs.get(&pseudonym).map_or(0, |ring| ring.len()),
+                "round {round}: no SURB may be left behind in the quarantine"
+            );
+            assert_eq!(
+                1,
+                store
+                    .admitted_surbs_per_pseudonym
+                    .get(&pseudonym)
+                    .context("the admitted entry must exist")?
+                    .len(),
+                "round {round}: the batch must be held in the admitted ring"
+            );
+        }
+        assert_eq!(
+            0,
+            store.quarantine_budget.load(Ordering::Relaxed),
+            "every batch was promoted, so the quarantine budget must be back at zero"
+        );
+
+        Ok(())
+    }
+
+    /// A lookup can empty a quarantine ring without removing its cache entry, so the quarantine can
+    /// hold many rings that free no budget when shed. The drain must pass over those rather than spend
+    /// its victims on them and then refuse a batch that shedding a ring which does hold SURBs would
+    /// have made room for.
+    #[test]
+    fn the_budget_drain_must_not_spend_its_victims_on_emptied_rings() -> anyhow::Result<()> {
+        // One ring may hold the whole budget, so a single pseudonym can exhaust it while hundreds of
+        // others sit empty — several times the drain's 64 victims per pass.
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            quarantine_surb_budget: 4096,
+            quarantine_rb_capacity: 4096,
+            ..Default::default()
+        });
+        let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT)?;
+
+        for i in 0..512u64 {
+            let emptied = HoprPseudonym::random();
+            store.insert_surbs(emptied, vec![(i.to_be_bytes(), surb.clone())]);
+            store
+                .find_surb(SurbMatcher::Pseudonym(emptied))
+                .context("precondition: the SURB must resolve")?;
+        }
+        let full = HoprPseudonym::random();
+        store.insert_surbs(full, (0..4096u64).map(|i| (i.to_be_bytes(), surb.clone())).collect());
+        assert_eq!(
+            store.cfg.quarantine_surb_budget,
+            store.quarantine_budget.load(Ordering::Relaxed),
+            "precondition: the one full ring exhausts the budget"
+        );
+
+        let fresh = HoprPseudonym::random();
+        let outcome = store.insert_surbs(fresh, vec![([1u8; 8], surb.clone())]);
+
+        assert_eq!(
+            1, outcome.retained,
+            "the drain must have shed the one ring holding SURBs, not refused the batch"
+        );
+        assert!(
+            store.quarantine_surbs.get(&full).is_none(),
+            "the full ring is the one the drain had to shed"
+        );
+
+        Ok(())
+    }
+
+    /// One pass of the drain sheds a bounded number of rings. When that frees less than the batch
+    /// needs, the drain must keep going rather than refuse a batch it could still have made room for.
+    #[test]
+    fn the_budget_drain_must_keep_shedding_until_the_batch_fits() -> anyhow::Result<()> {
+        // One SURB per ring: a pass of 64 rings frees 64 SURBs, less than the batch below needs. The
+        // cache is sized well above the rings created, so only the drain sheds any.
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            quarantine_surb_budget: 4096,
+            quarantine_rb_capacity: 1,
+            quarantine_max_pseudonyms: 8192,
+            ..Default::default()
+        });
+        let surb = surb_via(HoprKeyIdent::from(1u32), DIRECT)?;
+
+        for i in 0..4096u64 {
+            store.insert_surbs(HoprPseudonym::random(), vec![(i.to_be_bytes(), surb.clone())]);
+        }
+        assert_eq!(
+            store.cfg.quarantine_surb_budget,
+            store.quarantine_budget.load(Ordering::Relaxed),
+            "precondition: the rings exhaust the budget"
+        );
+
+        let fresh = HoprPseudonym::random();
+        let batch: Vec<_> = (0..100u64).map(|i| (i.to_be_bytes(), surb.clone())).collect();
+        let outcome = store.insert_surbs(fresh, batch);
+
+        // A one-SURB ring keeps the newest of the batch and drops the rest; a refusal would have kept
+        // none of it.
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 1,
+                evicted: 99,
+                evicted_shares: 0
+            },
+            outcome,
+            "the drain must have freed room for the whole batch over several passes"
+        );
+        let resident: usize = store.quarantine_surbs.iter().map(|(_, ring)| ring.len()).sum();
+        assert_eq!(
+            resident,
+            store.quarantine_budget.load(Ordering::Relaxed),
+            "the budget counter must still track what the quarantine holds"
         );
 
         Ok(())
