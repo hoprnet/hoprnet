@@ -149,17 +149,57 @@
             cargoExtraArgs = "";
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
-          ticketInspectorSrc = pkgs.fetchCrate {
-            pname = "hopr-ticket-manager";
-            version = "0.7.0";
-            hash = "sha256-EwKWZ6U1pFNupnT/k9Wq//j8sg5k2tjNvM/W0Q/d9As=";
-          };
+          # `ticket-inspector` is a binary target of `hopr-ticket-manager`, which this
+          # workspace consumes as a plain crates.io dependency, so the workspace build
+          # (`cargo build -p hopr-ticket-manager`) cannot reach it and it needs a
+          # derivation of its own over the published crate.
+          #
+          # The version and tarball checksum are read out of the workspace `Cargo.lock`
+          # instead of being written down here, so the inspector is always built from the
+          # exact crate version the node links. A pinned literal drifts silently on the
+          # next `hopr-ticket-manager` bump, which is worse than failing: an inspector
+          # built against a different `hopr-ticket-manager` than the node writes with is
+          # reading someone else's on-disk schema.
+          #
+          # `fetchurl` rather than `fetchCrate`: the latter unpacks via `fetchzip`, whose
+          # hash covers the extracted tree instead of the tarball, and so cannot be checked
+          # against the `checksum` entry in `Cargo.lock`.
+          #
+          # Two lock entries would mean the dependency graph carries two majors; picking
+          # either one silently reintroduces the mismatch, so refuse instead.
+          ticketInspectorLockEntry =
+            let
+              lock = builtins.fromTOML (builtins.readFile ./Cargo.lock);
+              matches = lib.filter (package: package.name == "hopr-ticket-manager") lock.package;
+            in
+            if lib.length matches == 1 then
+              lib.head matches
+            else
+              throw "expected exactly one hopr-ticket-manager in Cargo.lock, found ${toString (lib.length matches)}";
+
+          ticketInspectorSrc =
+            pkgs.runCommand "hopr-ticket-manager-${ticketInspectorLockEntry.version}-src" { }
+              ''
+                mkdir -p "$out"
+                tar -xzf ${
+                  pkgs.fetchurl {
+                    name = "hopr-ticket-manager-${ticketInspectorLockEntry.version}.tar.gz";
+                    url = "https://static.crates.io/crates/hopr-ticket-manager/${ticketInspectorLockEntry.version}/download";
+                    sha256 = ticketInspectorLockEntry.checksum;
+                  }
+                } --strip-components=1 -C "$out"
+              '';
+
           ticketInspectorBuildArgs = {
             inherit rev;
             src = ticketInspectorSrc;
+            # The published tarball is a single self-contained package with its own
+            # `Cargo.lock`, so there is nothing to trim down for a dependencies-only source.
             depsSrc = ticketInspectorSrc;
+            cargoToml = "${ticketInspectorSrc}/Cargo.toml";
+            # `cli` and `redb` are the binary's `required-features`; `serde` enables the
+            # binary's JSON output, which the workspace itself never turns on.
             cargoExtraArgs = "--bin ticket-inspector -F redb,serde,cli";
-            cargoToml = ticketInspectorSrc + "/Cargo.toml";
           };
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs

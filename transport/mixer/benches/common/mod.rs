@@ -24,7 +24,13 @@ pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPc
 /// for.
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
-    let mut cfg = MixerConfig::default();
+    // The benches preload `bytes / RANDOM_GIBBERISH.len()` items before draining — ~19.5k at the
+    // largest size, which sits just under the 20k default capacity. The capacity is a hard bound
+    // on both engines now, so give the preload generous headroom instead of relying on that margin.
+    let mut cfg = MixerConfig {
+        capacity: 100_000,
+        mixer_type: MixerType::default(),
+    };
     match &mut cfg.mixer_type {
         #[cfg(feature = "poisson")]
         MixerType::Poisson(poisson) => poisson.max_delay = std::time::Duration::from_millis(1),

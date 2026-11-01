@@ -30,7 +30,20 @@ use crate::{
 struct Pool<T> {
     entries: Vec<Entry<T>>,
     waker: Option<Waker>,
+    /// Wakers for senders parked on the capacity bound — signalled by the receiver whenever a
+    /// sweep releases items, when it observes closure, and on drop.
+    sender_wakers: Vec<Waker>,
     clock: VirtualClock,
+}
+
+impl<T> Pool<T> {
+    /// Wake every sender parked on capacity and clear the list.
+    fn wake_sender_wakers(&mut self) {
+        for waker in &self.sender_wakers {
+            waker.wake_by_ref();
+        }
+        self.sender_wakers.clear();
+    }
 }
 
 struct Shared<T> {
@@ -101,22 +114,40 @@ impl<T> Sender<T> {
         // separate `&mut pool.field` expressions each re-invoke `DerefMut` on the guard itself and
         // the borrow checker can't see they're disjoint through that indirection.
         let pool: &mut Pool<T> = &mut pool;
-        pool::enqueue(&mut pool.entries, &mut pool.clock, &self.shared.params, now, now, item);
-        wake(pool);
-        Ok(())
+        match pool::enqueue(&mut pool.entries, &mut pool.clock, &self.shared.params, now, now, item) {
+            Ok(()) => {
+                wake(pool);
+                Ok(())
+            }
+            // Nothing entered the pool and no clock state advanced, so there is nothing to wake
+            // the receiver for.
+            Err(_) => Err(SenderError::Full),
+        }
     }
 }
 
 impl<T> futures::sink::Sink<T> for Sender<T> {
     type Error = SenderError;
 
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Unbounded pool: always ready while the receiver lives.
-        if self.shared.receiver_active.load(Ordering::Relaxed) {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(SenderError::Closed))
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if !self.shared.receiver_active.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(SenderError::Closed));
         }
+
+        let mut pool = self.shared.pool.lock();
+        // Re-check under the lock: `Receiver::drop` clears the flag while holding it, so a
+        // receiver dropped between the fast-path load above and this acquire is caught here —
+        // `Closed` must win over `Pending`, or a sender would wait on a sweep that never runs.
+        if !self.shared.receiver_active.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(SenderError::Closed));
+        }
+
+        if pool.entries.len() >= self.shared.params.capacity() {
+            pool.sender_wakers.push(cx.waker().clone());
+            return Poll::Pending;
+        }
+
+        Poll::Ready(Ok(()))
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
@@ -192,8 +223,16 @@ impl<T: Unpin> Stream for Receiver<T> {
                 }
 
                 if !this.scratch.is_empty() {
+                    // A release batch is the only event that frees slots, so wake any sender parked
+                    // on the capacity bound while the lock is still held.
+                    pool.wake_sender_wakers();
                     Next::Released
                 } else if pool.entries.is_empty() && no_senders {
+                    // Mark the channel closed under the lock, before waking, so a parked sender
+                    // re-polled by the wake below observes `Closed` rather than parking again on a
+                    // sweep that will never run.
+                    this.shared.receiver_active.store(false, Ordering::Relaxed);
+                    pool.wake_sender_wakers();
                     Next::Closed
                 } else {
                     match pool.waker.as_mut() {
@@ -223,7 +262,6 @@ impl<T: Unpin> Stream for Receiver<T> {
                     continue;
                 }
                 Next::Closed => {
-                    this.shared.receiver_active.store(false, Ordering::Relaxed);
                     return Poll::Ready(None);
                 }
                 Next::Sleep(sleep_for) => {
@@ -250,8 +288,10 @@ impl<T> Drop for Receiver<T> {
         // Set the flag under the pool lock so it orders against `Sender::send`'s re-check: a
         // sender either sees the pool still open (and its push will be swept before this drop
         // completes) or sees `false` and returns `Closed` — never a silently orphaned push.
-        let _guard = self.shared.pool.lock();
+        let mut pool = self.shared.pool.lock();
         self.shared.receiver_active.store(false, Ordering::Relaxed);
+        // Wake senders parked on capacity so they re-poll and observe `Closed`.
+        pool.wake_sender_wakers();
     }
 }
 
@@ -262,6 +302,7 @@ pub fn poisson_channel<T: Send>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
         pool: Arc::new(Mutex::new(Pool {
             entries: Vec::with_capacity(params.capacity()),
             waker: None,
+            sender_wakers: Vec::new(),
             clock: VirtualClock::new(Instant::now()),
         })),
         sender_count: Arc::new(AtomicUsize::new(1)),
@@ -281,13 +322,23 @@ pub fn poisson_channel<T: Send>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
 
 #[cfg(test)]
 mod tests {
-    use futures::StreamExt;
+    use anyhow::Context;
+    use futures::{SinkExt, StreamExt};
     use tokio::time::timeout;
 
     use super::*;
+    use crate::config::{MixerType, PoissonConfig};
 
     const CAP: Duration = Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS);
     const LEEWAY: Duration = Duration::from_millis(500);
+
+    /// A Poisson config bounded to `capacity` pool entries, for the backpressure tests.
+    fn cfg_with_capacity(capacity: usize) -> MixerConfig {
+        MixerConfig {
+            capacity,
+            mixer_type: MixerType::Poisson(PoissonConfig::default()),
+        }
+    }
 
     #[tokio::test]
     async fn should_pass_an_element() -> anyhow::Result<()> {
@@ -410,10 +461,96 @@ mod tests {
     async fn sender_should_deliver_through_the_sink_api() -> anyhow::Result<()> {
         // The transport wires the sender as a `Sink`, so exercise that path (not just the
         // inherent `send`): `SinkExt::send` drives poll_ready -> start_send -> poll_flush.
-        use futures::SinkExt;
         let (mut tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
         SinkExt::send(&mut tx, 7).await?;
         assert_eq!(timeout(CAP + LEEWAY, rx.recv()).await?, Some(7));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn send_should_return_full_when_the_pool_is_at_capacity() -> anyhow::Result<()> {
+        const CAPACITY: usize = 3;
+        // The receiver is never polled here, so no sweep can free a slot.
+        let (tx, _rx) = poisson_channel::<u32>(cfg_with_capacity(CAPACITY));
+        for item in 0..CAPACITY as u32 {
+            tx.send(item)?;
+        }
+
+        let result = tx.send(CAPACITY as u32);
+        assert!(
+            matches!(result, Err(SenderError::Full)),
+            "send should return Full once the pool holds capacity items, got {result:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sink_send_should_park_until_a_release_frees_a_slot() -> anyhow::Result<()> {
+        const CAPACITY: usize = 5;
+        let (tx, mut rx) = poisson_channel::<u32>(cfg_with_capacity(CAPACITY));
+        for item in 0..CAPACITY as u32 {
+            tx.send(item)?;
+        }
+
+        let mut blocked_tx = tx.clone();
+        let blocked = tokio::spawn(async move { SinkExt::send(&mut blocked_tx, 99).await });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(
+            !blocked.is_finished(),
+            "a send at capacity must not complete before a slot frees"
+        );
+
+        let released = timeout(CAP + LEEWAY, rx.recv()).await?;
+        assert!(released.is_some(), "the receiver should release a buffered item");
+
+        let sent = timeout(Duration::from_millis(200), blocked)
+            .await
+            .context("the parked send should complete once a slot frees")?
+            .context("the blocked send task should not panic")?;
+        assert!(sent.is_ok(), "the parked send should complete with Ok, got {sent:?}");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn dropping_the_receiver_should_wake_a_sender_parked_at_capacity() -> anyhow::Result<()> {
+        const CAPACITY: usize = 1;
+        let (tx, rx) = poisson_channel::<u32>(cfg_with_capacity(CAPACITY));
+        tx.send(1)?;
+
+        let mut blocked_tx = tx.clone();
+        let blocked = tokio::spawn(async move { SinkExt::send(&mut blocked_tx, 2).await });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(
+            !blocked.is_finished(),
+            "a send at capacity must park while the receiver lives"
+        );
+
+        drop(rx);
+
+        let result = timeout(Duration::from_millis(200), blocked)
+            .await
+            .context("dropping the receiver should wake the parked sender")?
+            .context("the blocked send task should not panic")?;
+        assert!(
+            matches!(result, Err(SenderError::Closed)),
+            "the parked send should wake into Closed once the receiver drops, got {result:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn sink_send_should_report_closed_when_the_receiver_is_gone_at_capacity() -> anyhow::Result<()> {
+        const CAPACITY: usize = 2;
+        let (mut tx, rx) = poisson_channel::<u32>(cfg_with_capacity(CAPACITY));
+        tx.send(1)?;
+        tx.send(2)?;
+        drop(rx);
+
+        let result = SinkExt::send(&mut tx, 3).await;
+        assert!(
+            matches!(result, Err(SenderError::Closed)),
+            "Closed should take precedence over Full, got {result:?}"
+        );
         Ok(())
     }
 }
