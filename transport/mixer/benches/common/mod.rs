@@ -6,44 +6,11 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::config::{MixerConfig, MixerType};
 
 pub const SAMPLE_SIZE: usize = 10;
 
 /// 512 characters long string of random gibberish.
 pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
-
-/// A near-passthrough config (1 ms bound) for whichever mixer engine is active, so a benchmark
-/// using it measures per-message overhead rather than the mixing delay itself. Not hardcoded to
-/// one engine: this module is compiled into every bench binary regardless of which functions a
-/// given bench actually calls, and `mixer_throughput_bench`'s `required-features` omits `poisson`
-/// — a minimum, not an exclusion: the crate's default features include `poisson`, so the bench
-/// still compiles it in under a normal `cargo bench` invocation; `required-features` only
-/// guarantees the bench also builds without it (e.g. `--no-default-features --features
-/// uniform-channel,uniform-adapter`), which is what this function needs to stay engine-agnostic
-/// for.
-#[inline]
-pub fn minimal_delay_mixer_cfg() -> MixerConfig {
-    // The benches preload `bytes / RANDOM_GIBBERISH.len()` items before draining — ~19.5k at the
-    // largest size, which sits just under the 20k default capacity. The capacity is a hard bound
-    // on both engines now, so give the preload generous headroom instead of relying on that margin.
-    let mut cfg = MixerConfig {
-        capacity: 100_000,
-        mixer_type: MixerType::default(),
-    };
-    match &mut cfg.mixer_type {
-        #[cfg(feature = "poisson")]
-        MixerType::Poisson(poisson) => poisson.max_delay = std::time::Duration::from_millis(1),
-        #[cfg(feature = "uniform-channel")]
-        MixerType::Uniform(uniform) => {
-            uniform.min_delay = std::time::Duration::ZERO;
-            uniform.delay_range = std::time::Duration::from_millis(1);
-        }
-        #[allow(unreachable_patterns)]
-        _ => {}
-    }
-    cfg
-}
 
 /// Workload volumes spanning the realistic 1–10 MB/s operating range. Each volume is one second
 /// of offered load at 1, 5 and 10 MB/s respectively, so the reported throughput shows how much

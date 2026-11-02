@@ -366,6 +366,49 @@ mod tests {
         Ok(())
     }
 
+    /// The decoder reports the shortest return path among the SURBs a packet carried, which is what
+    /// lets an Exit turn away a PIX offer whose shares could never be decrypted.
+    #[tokio::test]
+    async fn decode_should_report_the_shortest_return_path_of_the_carried_surbs() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let direct_return_path = ValidatedPath::direct(
+            *f.sender.offchain_key.public(),
+            f.sender.chain_key.public().to_address(),
+        );
+
+        for (return_paths, expected) in [
+            (vec![], None),
+            (vec![f.return_path.clone()], Some(1)),
+            (vec![f.return_path.clone(), direct_return_path], Some(0)),
+        ] {
+            let out_packet = f.sender_encoder.encode_packet(
+                b"some random message to encode and decode",
+                ResolvedTransportRouting::Forward {
+                    pseudonym: HoprPseudonym::random(),
+                    forward_path: f.forward_path.clone(),
+                    return_paths,
+                },
+                None,
+                None,
+            )?;
+
+            let fwd_packet = f
+                .relay_decoder
+                .decode(f.sender.offchain_key.public().into(), out_packet.data)?;
+            let fwd_packet = fwd_packet
+                .try_as_forwarded()
+                .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+
+            let in_packet = f
+                .receiver_decoder
+                .decode(f.relay.offchain_key.public().into(), fwd_packet.data)?;
+            let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+            assert_eq!(expected, in_packet.info.min_return_path_hops);
+        }
+
+        Ok(())
+    }
+
     /// Counts the events by level. `enabled` is always true, so the logging macros' bodies actually run.
     #[derive(Default)]
     struct LevelCounter {
