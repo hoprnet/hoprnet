@@ -181,7 +181,7 @@ pub struct BalancerStateValues {
     /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
     /// inactive. See `REFILL_PACING_SECS`.
     refill_pacing: AtomicU64,
-    /// This side's `produced` count as it was [`REPORT_LAG`] ago, published by every balancer update
+    /// This side's `produced` count as it was `REPORT_LAG` ago, published by every balancer update
     /// from [`ProducedHistory`]: what a counterparty report arriving now cannot have seen yet is the
     /// production since then. `0` until the first update.
     produced_before_lag: AtomicU64,
@@ -352,7 +352,7 @@ impl BalancerStateValues {
     /// signal. See [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
     ///
     /// `produced_now` is this side's `produced` count at the moment the report arrives. The report
-    /// was written [`REPORT_LAG`] or less ago, so the SURBs produced since then were still on their
+    /// was written `REPORT_LAG` or less ago, so the SURBs produced since then were still on their
     /// way when it was written and are added to it: adopting a report as it stands pulls the level
     /// below the truth by exactly that production. A report that still lowers the believed level marks
     /// the next balancer update so that its output is held to the pacing rate: a correction, not a
@@ -414,7 +414,7 @@ impl BalancerStateValues {
         self.buffer_level.store(level, Relaxed);
     }
 
-    /// Publishes this side's `produced` count as it was [`REPORT_LAG`] ago, for
+    /// Publishes this side's `produced` count as it was `REPORT_LAG` ago, for
     /// [`observe_reported_level`](Self::observe_reported_level). Called by every balancer update.
     pub(crate) fn publish_produced_before_lag(&self, produced: u64) {
         self.produced_before_lag
@@ -560,7 +560,7 @@ impl BalancerStateValues {
     }
 
     /// Holds the refill of an empty counterparty to `target / REFILL_PACING_SECS` SURBs per second for
-    /// [`REFILL_PACING_SECS`] (at least one per second), whatever the PID would command. A disabled
+    /// `REFILL_PACING_SECS` (at least one per second), whatever the PID would command. A disabled
     /// balancer arms nothing.
     ///
     /// The second half of [`on_counterparty_wiped`](Self::on_counterparty_wiped), and what the Entry
@@ -678,7 +678,7 @@ impl From<SurbBalancerConfig> for BalancerStateValues {
     }
 }
 
-/// This side's `produced` count over the last [`REPORT_LAG`], one sample per balancer update, so
+/// This side's `produced` count over the last `REPORT_LAG`, one sample per balancer update, so
 /// that a counterparty report can be read net of the production it cannot have seen yet.
 #[derive(Debug, Default)]
 struct ProducedHistory {
@@ -686,7 +686,7 @@ struct ProducedHistory {
 }
 
 impl ProducedHistory {
-    /// Records `produced` as of `now` and returns the count as it was [`REPORT_LAG`] ago: the newest
+    /// Records `produced` as of `now` and returns the count as it was `REPORT_LAG` ago: the newest
     /// sample at least that old, or the oldest one there is while the history is still shorter than
     /// the lag (so that the correction never exceeds what this history has seen).
     fn record(&mut self, now: Instant, produced: u64) -> u64 {
@@ -732,7 +732,7 @@ pub struct SurbBalancer<C, E, F> {
     was_pacing: bool,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
-    /// `produced` over the last [`REPORT_LAG`], published to the state at every update.
+    /// `produced` over the last `REPORT_LAG`, published to the state at every update.
     produced_history: ProducedHistory,
 }
 

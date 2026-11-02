@@ -169,7 +169,7 @@ pub struct SurbRoundTripRegistry {
     written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, u64>>>,
     /// When a dead verdict last made [`write_off_dead`](Self::write_off_dead) report a session for a
     /// relayer, so that the same pair is not reported again. Kept for as long as the relayer is known
-    /// dead, and for [`REBUMP_COOLDOWN`] after it is not, so a pair advanced in this death stays
+    /// dead, and for `REBUMP_COOLDOWN` after it is not, so a pair advanced in this death stays
     /// advanced, and a quick re-death after a revival is not advanced again either.
     bumped: Arc<DashMap<(HoprPseudonym, OffchainPublicKey), Instant>>,
     /// The return legs of SURBs written off, for as long as a SURB is remembered.
@@ -259,10 +259,10 @@ impl SurbRoundTripRegistry {
     /// for good. The SURBs through the relayer minted after the wipe are written off anew on later
     /// passes, and the count stays small and current.
     ///
-    /// A verdict is acted on only once it has held for [`VERDICT_CONFIRMATION`]: a relayer judged dead in
+    /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
     /// this flush is written off and bumped at the next one, if it is still dead then.
     /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
-    /// revives it once per [`REBUMP_COOLDOWN`] from the advance: a verdict reached again inside either
+    /// revives it once per `REBUMP_COOLDOWN` from the advance: a verdict reached again inside either
     /// is written off as usual but reports nothing.
     pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
         let health = &self.relayer_health;
@@ -421,10 +421,10 @@ pub struct RelayerHealth {
     neighbours_changed: AtomicBool,
     /// Relayers judged dead: black holes as of the last flush, published at `0`.
     dead: DashSet<OffchainPublicKey>,
-    /// When each relayer in `dead` was judged, for [`VERDICT_CONFIRMATION`]. Removed with the relayer.
+    /// When each relayer in `dead` was judged, for `VERDICT_CONFIRMATION`. Removed with the relayer.
     dead_since: DashMap<OffchainPublicKey, Instant>,
     /// Relayers whose dead verdict has lapsed without a reply coming home through them, published at
-    /// [`PROBATION_HEALTH`]. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
+    /// `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
     probation: DashSet<OffchainPublicKey>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
@@ -695,7 +695,7 @@ impl RelayerHealth {
     }
 
     /// Known dead and old enough to act on: on probation, or dead since at least
-    /// [`VERDICT_CONFIRMATION`] ago, so that the flush after the verdict found the relayer still dead.
+    /// `VERDICT_CONFIRMATION` ago, so that the flush after the verdict found the relayer still dead.
     fn is_confirmed_dead(&self, relayer: &OffchainPublicKey) -> bool {
         self.probation.contains(relayer)
             || (self.dead.contains(relayer)
@@ -741,13 +741,13 @@ impl RelayerHealth {
     }
 
     /// Re-judges every relayer once per flush; returns `(relayer, previous, current)` health changes for
-    /// the graph, dead being `0.0` and probation [`PROBATION_HEALTH`]. A race open longer than a SURB is
+    /// the graph, dead being `0.0` and probation `PROBATION_HEALTH`. A race open longer than a SURB is
     /// remembered counts as lost by that long. `memory`: margins a race is remembered for, `0` for dead,
     /// on probation or healthy.
     ///
     /// A relayer is alive until it is a black hole, which makes it dead. Its verdict does not end with the
     /// condition: once no overdue reply is out any more it goes on probation instead, and stays there
-    /// until a reply comes home through it ([`revive_by_reply`](Self::revive_by_reply)). One on probation
+    /// until a reply comes home through it (`revive_by_reply`). One on probation
     /// that is a black hole again is dead again.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
         let last_reply = self.last_reply();
