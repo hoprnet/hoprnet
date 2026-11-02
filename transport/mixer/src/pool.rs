@@ -20,7 +20,9 @@
 //!   enqueue, regardless of load.
 //! - **Catch-up**: a delayed sweep has a larger `dt`, so `V` jumps further and more entries clear at once.
 //! - **Self-limiting overload**: every arrival advances `V`, so a burst of arrivals is itself the drain signal — no
-//!   separate overload valve is needed.
+//!   separate overload valve is needed. The configured `capacity` stays the hard rail on top of it: an arrival at
+//!   capacity is rejected outright ([`enqueue`] hands the item back), so overload cannot grow the pool past the bound
+//!   and a rejected arrival advances nothing in the clock.
 
 use std::time::{Duration, Instant};
 
@@ -207,6 +209,12 @@ pub(crate) struct Entry<T> {
 /// packet's actual wait rather than the engine's batch-processing instant).
 ///
 /// Draws this entry's release tag once, here — the sweep never draws randomness.
+///
+/// Enforces the configured hard bound: at `params.capacity()` the item is handed straight back as
+/// the error. The check runs before the clock is advanced and before `g` is drawn, so a rejected
+/// arrival is a complete no-op — it contributes no arrival term, consumes no randomness, and
+/// leaves the release timing of the entries already buffered untouched. The bound applies in
+/// passthrough mode too, where entries still live between a send and the next full-drain sweep.
 pub(crate) fn enqueue<T>(
     pool: &mut Vec<Entry<T>>,
     clock: &mut VirtualClock,
@@ -214,7 +222,11 @@ pub(crate) fn enqueue<T>(
     now: Instant,
     sent_at: Instant,
     item: T,
-) {
+) -> Result<(), T> {
+    if pool.len() >= params.capacity() {
+        return Err(item);
+    }
+
     let v_release = if params.is_passthrough() {
         clock.next_sequence()
     } else {
@@ -226,6 +238,7 @@ pub(crate) fn enqueue<T>(
         enqueued_at: sent_at,
         item,
     });
+    Ok(())
 }
 
 /// Evaluate the whole pool at `now`, moving due items into `out` (cleared first) paired with
@@ -387,7 +400,8 @@ mod tests {
             let t_next_s = t_s + tick_s;
             while next_arrival_s <= t_next_s {
                 let arrival_now = t0 + Duration::from_secs_f64(next_arrival_s);
-                enqueue(&mut pool, &mut clock, params, arrival_now, arrival_now, seq);
+                enqueue(&mut pool, &mut clock, params, arrival_now, arrival_now, seq)
+                    .expect("simulated arrival must stay under the default capacity");
                 seq += 1;
                 next_arrival_s += exp_gap_s(lambda_per_s);
             }
@@ -491,23 +505,6 @@ mod tests {
         );
     }
 
-    #[rstest]
-    fn miss_probability_should_hold_at_the_configured_rate(
-        #[values(500.0, 2000.0, 8000.0)] lambda: f64,
-        #[values(0, 14)] target_occupancy: usize,
-    ) {
-        let max_delay_ms = if target_occupancy == 0 { 20 } else { 200 };
-        let params = privacy_params(max_delay_ms, 0.01, target_occupancy);
-        let sim = simulate(&params, lambda, 8.0, Duration::from_micros(200));
-        let exceeded = sim.delays_ms.iter().filter(|d| **d > max_delay_ms as f64).count();
-        let frac = exceeded as f64 / sim.delays_ms.len() as f64;
-        assert!(
-            frac < 0.03,
-            "[lambda={lambda}, target_occupancy={target_occupancy}] window-miss fraction {frac:.4} should track the \
-             1% miss_probability target (loose band for simulation noise)"
-        );
-    }
-
     #[test]
     fn a_delayed_sweep_should_release_a_larger_batch() {
         // A gap in sweeps is a larger `dt` on the next one, so V jumps further and more entries
@@ -524,7 +521,7 @@ mod tests {
             let mut clock = VirtualClock::new(t0);
             let mut out = Vec::new();
             for i in 0..2000u32 {
-                enqueue(&mut pool, &mut clock, &params, t0, t0, i);
+                enqueue(&mut pool, &mut clock, &params, t0, t0, i).expect("2000 entries fit the default capacity");
             }
             sweep(&mut pool, &mut clock, &params, t0 + gap, &mut out);
             out.len()
@@ -594,7 +591,7 @@ mod tests {
         let mut out = Vec::new();
 
         for i in 0..8u32 {
-            enqueue(&mut pool, &mut clock, &params, t0, t0, i);
+            enqueue(&mut pool, &mut clock, &params, t0, t0, i).expect("8 entries fit the default capacity");
         }
         sweep(&mut pool, &mut clock, &params, t0, &mut out);
 
@@ -620,7 +617,12 @@ mod tests {
         let params = bounded_params(20, 0.01);
         let means: Vec<f64> = [50.0, 200.0, 1000.0, 5000.0, 20000.0]
             .into_iter()
-            .map(|lambda| mean_of(&simulate(&params, lambda, 5.0, Duration::from_micros(200)).delays_ms))
+            .map(|lambda| {
+                // Keep at least 20,000 arrivals at every load so low-rate means are not
+                // dominated by the sampling noise of a few hundred exponential tags.
+                let duration_s = (20_000.0f64 / lambda).max(5.0);
+                mean_of(&simulate(&params, lambda, duration_s, Duration::from_micros(200)).delays_ms)
+            })
             .collect();
         let min = means.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = means.iter().cloned().fold(0.0, f64::max);
@@ -655,7 +657,8 @@ mod tests {
                 let t_next_s = t_s + tick_s;
                 while next_arrival_s <= t_next_s {
                     let now = t0 + Duration::from_secs_f64(next_arrival_s);
-                    enqueue(&mut pool, &mut clock, &params, now, now, seq);
+                    enqueue(&mut pool, &mut clock, &params, now, now, seq)
+                        .expect("the burst stays under the default capacity");
                     seq += 1;
                     next_arrival_s += exp_gap_s(lambda_per_s);
                 }
@@ -745,17 +748,93 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mean_for_the_bounded_mode_should_match_the_closed_form() {
+    #[rstest]
+    fn mean_for_the_bounded_mode_should_match_the_closed_form(#[values(0.001, 0.01, 0.1, 0.4)] miss_probability: f64) {
         // mean = mu_max * E[g], E[g] = 1 - g_max*e^-g_max/(1-e^-g_max) for g ~ truncated Exp(1).
-        let params = bounded_params(20, 0.01);
-        let g_max = (1.0f64 / 0.01).ln();
+        let params = bounded_params(20, miss_probability);
+        let g_max = (1.0 / miss_probability).ln();
         let e_g = 1.0 - g_max * (-g_max).exp() / (1.0 - (-g_max).exp());
         let expected_ms = params.mu_max_secs() * e_g * 1000.0;
         let observed = mean_of(&simulate(&params, 2000.0, 5.0, Duration::from_micros(200)).delays_ms);
         assert!(
             (observed - expected_ms).abs() / expected_ms < 0.1,
             "observed mean {observed:.3}ms should match the closed form {expected_ms:.3}ms"
+        );
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // (d) the configured capacity is a hard bound on the pool
+    // ---------------------------------------------------------------------------------------
+
+    fn bounded_poisson(max_delay_ms: u64) -> PoissonConfig {
+        PoissonConfig {
+            max_delay: Duration::from_millis(max_delay_ms),
+            miss_probability: 0.01,
+            target_occupancy: 0,
+        }
+    }
+
+    fn params_with_capacity(capacity: usize, poisson: PoissonConfig) -> PoissonParams {
+        PoissonParams::new(
+            &MixerConfig {
+                capacity,
+                mixer_type: crate::config::MixerType::Poisson(poisson),
+            },
+            &poisson,
+        )
+    }
+
+    /// Parameterized over both release modes: the timing wheel holds entries until their tag is
+    /// due, passthrough until the next full-drain sweep, and neither may exceed `capacity`.
+    #[rstest]
+    #[case::timing_wheel(bounded_poisson(20))]
+    #[case::passthrough(bounded_poisson(0))]
+    fn enqueue_should_return_the_item_when_the_pool_is_at_capacity(#[case] poisson: PoissonConfig) {
+        const CAPACITY: usize = 4;
+        let params = params_with_capacity(CAPACITY, poisson);
+        let t0 = Instant::now();
+        let mut pool: Vec<Entry<u32>> = Vec::new();
+        let mut clock = VirtualClock::new(t0);
+
+        for item in 0..CAPACITY as u32 {
+            enqueue(&mut pool, &mut clock, &params, t0, t0, item).expect("still below capacity");
+        }
+
+        assert_eq!(
+            enqueue(&mut pool, &mut clock, &params, t0, t0, 7),
+            Err(7),
+            "the item beyond capacity must come back to the caller"
+        );
+        assert_eq!(pool.len(), CAPACITY, "the rejected item must not enter the pool");
+    }
+
+    #[rstest]
+    #[case::timing_wheel(bounded_poisson(20))]
+    #[case::passthrough(bounded_poisson(0))]
+    fn rejected_enqueue_should_not_advance_the_clock(#[case] poisson: PoissonConfig) {
+        const CAPACITY: usize = 2;
+        let params = params_with_capacity(CAPACITY, poisson);
+        let t0 = Instant::now();
+        let mut pool: Vec<Entry<u32>> = Vec::new();
+        let mut clock = VirtualClock::new(t0);
+        for item in 0..CAPACITY as u32 {
+            enqueue(&mut pool, &mut clock, &params, t0, t0, item).expect("still below capacity");
+        }
+
+        let v_before = clock.v;
+        let synced_at_before = clock.synced_at;
+        assert!(
+            enqueue(&mut pool, &mut clock, &params, t0 + Duration::from_millis(5), t0, 9).is_err(),
+            "the pool is full, so this arrival must be rejected"
+        );
+
+        assert_eq!(
+            clock.v, v_before,
+            "a rejected arrival must contribute no arrival term and no time term"
+        );
+        assert_eq!(
+            clock.synced_at, synced_at_before,
+            "a rejected arrival must not move the clock's time sync point"
         );
     }
 }

@@ -36,12 +36,13 @@ lazy_static::lazy_static! {
             "Estimated effective anonymity set (2^H) of the mixer's current occupancy"
         )
         .unwrap();
-    /// EMA of `P(delay > max_delay)`, the live check that the configured `miss_probability`
-    /// actually holds in production.
+    /// Scheduling-overrun detector: releases cannot exceed the hard bound in virtual time,
+    /// but a delayed sweep can deliver them late. This does not measure `miss_probability`,
+    /// which controls the truncated release-tag distribution.
     pub static ref METRIC_MIXER_WINDOW_MISS_RATIO: hopr_types::telemetry::SimpleGauge =
         hopr_types::telemetry::SimpleGauge::new(
             "hopr_mixer_window_miss_ratio",
-            "EMA fraction of packets whose realized delay exceeded the configured hard bound"
+            "EMA fraction of packets delivered beyond the hard delay bound due to scheduling overruns"
         )
         .unwrap();
 }

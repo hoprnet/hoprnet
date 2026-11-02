@@ -626,8 +626,44 @@ mod tests {
         // One failed read followed by a successful one.
         assert_eq!(chain.call_count(), chain.fail_first + 1);
     }
+
+    /// Events sent while nobody is subscribed must not end a `forward` that drives the sink, so a
+    /// subscriber that arrives later still receives the events sent after it subscribed.
+    #[tokio::test]
+    async fn broadcast_sink_should_keep_forwarding_while_no_receiver_is_active() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use futures::{SinkExt, StreamExt};
+
+        let (mut tx, rx) = async_broadcast::broadcast::<u32>(8);
+        tx.set_await_active(false);
+        tx.set_overflow(true);
+        let inactive_rx = rx.deactivate();
+        let mut sink = super::BroadcastSenderSink(tx);
+
+        // Like `forward`, `send_all` stops at the first error, but it does not close the sink at the end
+        sink.send_all(&mut futures::stream::iter([1, 2]).map(Ok))
+            .await
+            .context("sending must not fail because no receiver was active")?;
+
+        let mut subscriber = inactive_rx.activate_cloned();
+        sink.send(3).await.context("the sink must keep accepting events")?;
+
+        let received = subscriber
+            .recv()
+            .await
+            .context("the subscriber should receive the event sent after it subscribed")?;
+        assert_eq!(3, received, "only the event sent after subscribing is delivered");
+
+        Ok(())
+    }
 }
 
+/// [`Sink`](futures::Sink) adapter over a broadcast [`Sender`](async_broadcast::Sender) that never
+/// waits for receivers.
+///
+/// An item sent while no receiver is active is dropped and reported as delivered: callers drive this
+/// sink with `StreamExt::forward`, which ends on the first error, so reporting the normal "nobody is
+/// subscribed" case as an error would stop all further events, including ones for later subscribers.
 #[derive(Clone)]
 pub struct BroadcastSenderSink<T>(pub async_broadcast::Sender<T>);
 
@@ -639,7 +675,10 @@ impl<T: Clone> futures::Sink<T> for BroadcastSenderSink<T> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.0.try_broadcast(item).map(|_| ())
+        match self.0.try_broadcast(item) {
+            Ok(_) | Err(async_broadcast::TrySendError::Inactive(_)) => Ok(()),
+            Err(error) => Err(error),
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

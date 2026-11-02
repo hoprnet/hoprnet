@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "5.0.0-rc.5"
+version = "5.0.0-rc.6"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -11,7 +11,7 @@ homepage.workspace = true
 categories = ["network-programming", "cryptography"]
 authors.workspace = true
 rust-version.workspace = true
-include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
+include = ["build.rs", "README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
@@ -39,6 +39,10 @@ required-features = ["testing"]
 
 [[test]]
 name = "transport_p2p-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_probe_delay-size3"
 required-features = ["testing"]
 
 [[test]]
@@ -200,6 +204,9 @@ hopr-transport-p2p = { workspace = true, optional = true }
 hopr-chain-connector = { workspace = true, optional = true }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
+
+[build-dependencies]
+toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
