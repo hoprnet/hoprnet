@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bytes::{BufMut, BytesMut};
 use hopr_api::{
     chain::*,
@@ -19,6 +21,54 @@ use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, errors::H
 pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
     (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
+/// Maximum number of decompressed packet keys kept by [`CachingKeyExpander`].
+///
+/// A sender only ever expands the keys of the relays on the paths it currently uses, which is a
+/// far smaller set than the peers it knows about.
+const EXPANDED_KEY_CACHE_CAPACITY: usize = 4_096;
+
+/// A [`KeyExpander`] that memoizes the decompressed form of a packet key.
+///
+/// Deriving shared secrets for an outgoing packet needs the expanded key of every hop, on both the
+/// forward path and each SURB return path - up to twelve per packet. Decompression is a field
+/// exponentiation, so paying it per packet would be a measurable share of packet construction,
+/// whereas the set of relays a sender uses turns over slowly.
+///
+/// This memoizes a pure function of public data, so it deliberately avoids an eviction-tracking
+/// cache: a plain map behind an `RwLock` costs nothing to construct and a read is a single hash,
+/// where a managed cache would charge per-entry bookkeeping on the packet path.
+#[derive(Debug, Default)]
+pub struct CachingKeyExpander(parking_lot::RwLock<HashMap<OffchainPublicKey, ExpandedOffchainPublicKey>>);
+
+impl KeyExpander for CachingKeyExpander {
+    fn expand(&self, key: &OffchainPublicKey) -> hopr_api::types::crypto::errors::Result<ExpandedOffchainPublicKey> {
+        if let Some(expanded) = self.0.read().get(key) {
+            return Ok(expanded.clone());
+        }
+
+        // Two senders racing on the same missing key will both decompress it. That is cheaper
+        // than holding the lock across the computation, and is not a correctness concern.
+        let expanded = DirectKeyExpander.expand(key)?;
+
+        let mut cache = self.0.write();
+        // Another thread may have inserted this key while the lock was not held; without this check it would be
+        // inserted again, and at capacity the insert would flush the whole map for a key that is already cached.
+        if let Some(existing) = cache.get(key) {
+            return Ok(existing.clone());
+        }
+
+        // The set of relays in use turns over slowly, so overflowing the bound means the node's
+        // routing has changed wholesale; dropping everything then is rarer and cheaper than
+        // tracking recency on every packet.
+        if cache.len() >= EXPANDED_KEY_CACHE_CAPACITY {
+            cache.clear();
+        }
+        cache.insert(*key, expanded.clone());
+
+        Ok(expanded)
+    }
+}
+
 /// Default [encoder](PacketEncoder) implementation for HOPR packets.
 pub struct HoprEncoder<Chain, G, S, T> {
     chain_api: Chain,
@@ -27,6 +77,7 @@ pub struct HoprEncoder<Chain, G, S, T> {
     chain_key: ChainKeypair,
     channels_dst: Hash,
     ssa_generator: G,
+    key_expander: CachingKeyExpander,
     cfg: HoprCodecConfig,
 }
 
@@ -48,6 +99,7 @@ impl<Chain, G, S, T> HoprEncoder<Chain, G, S, T> {
             chain_key,
             channels_dst,
             ssa_generator,
+            key_expander: CachingKeyExpander::default(),
             cfg,
         }
     }
@@ -108,6 +160,7 @@ where
             &self.chain_key,
             next_ticket,
             self.chain_api.key_id_mapper_ref(),
+            &self.key_expander,
             &self.channels_dst,
             &self.ssa_generator,
             signals,
@@ -218,5 +271,103 @@ where
             PacketRouting::NoAck(*destination),
             HoprPseudonym::random(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+    use hopr_api::types::crypto::keypairs::OffchainKeypair;
+
+    use super::*;
+
+    fn random_key() -> OffchainPublicKey {
+        *OffchainKeypair::random().public()
+    }
+
+    /// A key the compact parser accepts but that is not a point on the curve.
+    fn off_curve_key() -> anyhow::Result<OffchainPublicKey> {
+        (1..=u8::MAX)
+            .map(|b| OffchainPublicKey::try_from([b; OffchainPublicKey::SIZE].as_slice()))
+            .filter_map(Result::ok)
+            .find(|key| DirectKeyExpander.expand(key).is_err())
+            .context("no off-curve key among the candidates")
+    }
+
+    #[test]
+    fn expanding_a_key_gives_the_same_result_as_direct_expansion() -> anyhow::Result<()> {
+        let key = random_key();
+        let expander = CachingKeyExpander::default();
+
+        let cached = expander.expand(&key).context("caching expansion")?;
+        let direct = DirectKeyExpander.expand(&key).context("direct expansion")?;
+
+        assert_eq!(OffchainPublicKey::from(&cached), OffchainPublicKey::from(&direct));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_is_stored_on_the_first_expansion_and_served_from_the_cache_after() -> anyhow::Result<()> {
+        let key = random_key();
+        let expander = CachingKeyExpander::default();
+        assert!(expander.0.read().is_empty());
+
+        let first = expander.expand(&key).context("first expansion")?;
+        assert_eq!(expander.0.read().len(), 1);
+
+        let second = expander.expand(&key).context("second expansion")?;
+        assert_eq!(expander.0.read().len(), 1, "a hit must not add an entry");
+        assert_eq!(OffchainPublicKey::from(&first), OffchainPublicKey::from(&second));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_that_is_not_on_the_curve_is_rejected_and_not_cached() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+
+        assert!(expander.expand(&off_curve_key()?).is_err());
+        assert!(expander.0.read().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reaching_the_capacity_drops_the_cache_and_keeps_only_the_new_key() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+        let expanded = DirectKeyExpander
+            .expand(&random_key())
+            .context("expanding a filler key")?;
+        {
+            let mut cache = expander.0.write();
+            while cache.len() < EXPANDED_KEY_CACHE_CAPACITY {
+                cache.insert(random_key(), expanded.clone());
+            }
+        }
+        let newcomer = random_key();
+
+        expander.expand(&newcomer).context("expanding at capacity")?;
+
+        let cache = expander.0.read();
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains_key(&newcomer));
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_already_cached_at_capacity_does_not_flush_the_cache() -> anyhow::Result<()> {
+        let expander = CachingKeyExpander::default();
+        let cached = random_key();
+        let expanded = DirectKeyExpander.expand(&cached).context("expanding the cached key")?;
+        {
+            let mut cache = expander.0.write();
+            cache.insert(cached, expanded.clone());
+            while cache.len() < EXPANDED_KEY_CACHE_CAPACITY {
+                cache.insert(random_key(), expanded.clone());
+            }
+        }
+
+        expander.expand(&cached).context("expanding a cached key at capacity")?;
+
+        assert_eq!(expander.0.read().len(), EXPANDED_KEY_CACHE_CAPACITY);
+        Ok(())
     }
 }

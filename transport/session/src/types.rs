@@ -367,9 +367,8 @@ pub enum HoprSessionInPixEvent {
     UnverifiableShares {
         ssa_id: SsaId<HoprPseudonym>,
         observed_total: u64,
-        /// Relayer that carried the offending share, for attribution in the close log. Boxed
-        /// because an `OffchainPublicKey` is ~200 bytes and this variant is rare.
-        peer: Box<OffchainPublicKey>,
+        /// Relayer that carried the offending share, for attribution in the close log.
+        peer: OffchainPublicKey,
     },
     /// Reports how far an SSA has got towards recovery.
     ///

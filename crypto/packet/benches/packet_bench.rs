@@ -28,6 +28,13 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 const SAMPLE_SIZE: usize = 100_000;
 
+/// These benchmarks expand every packet key on every packet, via [`DirectKeyExpander`].
+///
+/// That is deliberately the pessimistic case: it prices the Ed25519 point decompressions that
+/// deriving shared secrets needs, without the memoization a sender actually has. A node reuses the
+/// same relays across packets and so goes through `CachingKeyExpander`; `hopr_encoder` in
+/// `hopr-protocol-hopr`'s `codec_bench` is the benchmark that measures that path.
+///
 /// Pairs of (hops, surb_count) to benchmark.
 #[cfg(feature = "all-benchmarks")]
 const PACKET_BENCHMARK: &[(usize, usize)] = &[
@@ -207,6 +214,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                                 sender_chain,
                                 tb,
                                 MAPPER.deref(),
+                                &DirectKeyExpander,
                                 &DST,
                                 pix_gen,
                                 None,
@@ -253,6 +261,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                 sender_chain,
                 tb,
                 MAPPER.deref(),
+                &DirectKeyExpander,
                 ssa_gen,
                 &DST,
             )
@@ -317,6 +326,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                                 sender_chain,
                                 tb,
                                 MAPPER.deref(),
+                                &DirectKeyExpander,
                                 pix_gen,
                                 &DST,
                             )
@@ -362,6 +372,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         sender_chain,
         tb,
         MAPPER.deref(),
+        &DirectKeyExpander,
         &DST,
         ssa_gen,
         None,
@@ -428,6 +439,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         sender_chain,
         tb,
         MAPPER.deref(),
+        &DirectKeyExpander,
         &DST,
         ssa_gen,
         None,
