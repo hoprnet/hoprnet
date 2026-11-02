@@ -56,6 +56,7 @@ mod messages;
 use asynchronous_codec::{Decoder, Encoder};
 use bytes::{BufMut, BytesMut};
 pub use frames::{Frame, FrameId, OrderedFrame, Segment, SegmentId, SeqIndicator, SeqNum};
+use futures::{Stream, StreamExt};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
 use crate::errors::SessionError;
@@ -141,6 +142,28 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 #[derive(Clone, Copy, Default)]
 pub struct SessionCodec<const C: usize>;
 
+/// End the incoming session stream after reporting an untrusted header once.
+///
+/// There is no synchronization marker to safely locate the next message after a wrong version
+/// or an impossible length. These errors are terminal; errors in a message with a known boundary
+/// remain recoverable because the decoder has already consumed that message.
+pub(crate) fn stop_on_invalid_header<const C: usize>(
+    messages: impl Stream<Item = Result<SessionMessage<C>, SessionError>>,
+) -> impl Stream<Item = Result<SessionMessage<C>, SessionError>> {
+    let (stop, registration) = futures::future::AbortHandle::new_pair();
+    futures::stream::Abortable::new(
+        messages.inspect(move |message| {
+            if matches!(
+                message,
+                Err(SessionError::WrongVersion | SessionError::IncorrectMessageLength)
+            ) {
+                stop.abort();
+            }
+        }),
+        registration,
+    )
+}
+
 impl<const C: usize> Encoder for SessionCodec<C> {
     type Error = SessionError;
     type Item<'a> = SessionMessage<C>;
@@ -179,9 +202,9 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
     /// Decodes one message from `src`.
     ///
-    /// On error, the bad bytes are always removed from `src`. The framed reader calls `decode`
-    /// again on the same buffer after an error, so bytes left in place would fail again on
-    /// every poll and the reader would never move on.
+    /// A malformed message with a trusted length is consumed so the next message can be read.
+    /// `WrongVersion` and an overlong header length are terminal errors: the buffer is left intact,
+    /// and the caller must stop decoding. Session readers enforce this with [`stop_on_invalid_header`].
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
 
@@ -192,8 +215,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Protocol version
         if src[0] != SessionMessage::<C>::VERSION {
-            // The header cannot be trusted, so the message length is unknown: drop everything.
-            src.clear();
+            // The next boundary is unknown; the session reader must terminate.
             return Err(SessionError::WrongVersion);
         }
 
@@ -205,8 +227,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Check the maximum message length for version 1
         if payload_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
-            // The length cannot be trusted either: drop everything.
-            src.clear();
+            // The next boundary is unknown; the session reader must terminate.
             return Err(SessionError::IncorrectMessageLength);
         }
 
@@ -368,25 +389,25 @@ mod tests {
     }
 
     #[test]
-    fn decode_should_drop_the_buffer_when_the_header_is_bad() {
+    fn malformed_header_should_leave_buffered_messages_for_connection_teardown() {
         const MTU: usize = 466;
-        let mut codec = SessionCodec::<MTU>;
+        let (_, valid_data) = valid_ack::<MTU>();
 
-        let mut wrong_version = BytesMut::from(&[0xee_u8; 16][..]);
-        assert!(matches!(
-            codec.decode(&mut wrong_version),
-            Err(SessionError::WrongVersion)
-        ));
-        assert!(wrong_version.is_empty());
-
-        // Header claims a payload longer than the protocol allows
-        let mut too_long = BytesMut::from(&[SessionMessage::<MTU>::VERSION, 0, 0xff, 0xff][..]);
-        too_long.extend_from_slice(&[0; 12]);
-        assert!(matches!(
-            codec.decode(&mut too_long),
-            Err(SessionError::IncorrectMessageLength)
-        ));
-        assert!(too_long.is_empty());
+        // Neither a wrong-version byte nor an impossible length gives a trustworthy boundary.
+        for prefix in [vec![0xee], vec![SessionMessage::<MTU>::VERSION, 0, 0xff, 0xff]] {
+            let mut src = BytesMut::from(prefix.as_slice());
+            src.extend_from_slice(&valid_data);
+            let original = src.clone();
+            let error = SessionCodec::<MTU>.decode(&mut src);
+            assert!(matches!(
+                error,
+                Err(SessionError::WrongVersion | SessionError::IncorrectMessageLength)
+            ));
+            assert_eq!(
+                src, original,
+                "fatal header errors must not silently discard buffered messages"
+            );
+        }
     }
 
     #[test]
@@ -401,14 +422,43 @@ mod tests {
 
         // Before the fix, the reader returned the same error forever; `take` keeps the test from hanging
         let items = futures::executor::block_on(
-            asynchronous_codec::FramedRead::new(futures::io::Cursor::new(data), SessionCodec::<MTU>)
-                .take(10)
-                .collect::<Vec<_>>(),
+            stop_on_invalid_header(asynchronous_codec::FramedRead::new(
+                futures::io::Cursor::new(data),
+                SessionCodec::<MTU>,
+            ))
+            .take(10)
+            .collect::<Vec<_>>(),
         );
 
         assert_eq!(items.len(), 2, "expected one error, then the valid message");
         assert!(matches!(items[0], Err(SessionError::UnknownMessageTag)));
         assert_eq!(items[1].as_ref().ok(), Some(&valid));
+    }
+
+    #[test]
+    fn framed_reader_should_report_fatal_header_once_then_end() {
+        const MTU: usize = 466;
+        let (_, valid_data) = valid_ack::<MTU>();
+        for prefix in [vec![0xee], vec![SessionMessage::<MTU>::VERSION, 0, 0xff, 0xff]] {
+            let wrong_version = prefix[0] != SessionMessage::<MTU>::VERSION;
+            let mut data = prefix;
+            data.extend_from_slice(&valid_data);
+            let messages = stop_on_invalid_header(asynchronous_codec::FramedRead::new(
+                futures::io::Cursor::new(data),
+                SessionCodec::<MTU>,
+            ));
+            futures::executor::block_on(async {
+                let mut messages = Box::pin(messages);
+                let first = messages.next().await;
+                if wrong_version {
+                    assert!(matches!(first, Some(Err(SessionError::WrongVersion))));
+                } else {
+                    assert!(matches!(first, Some(Err(SessionError::IncorrectMessageLength))));
+                }
+                assert!(messages.next().await.is_none());
+                assert!(messages.next().await.is_none(), "fatal termination must be permanent");
+            });
+        }
     }
 
     #[test]
