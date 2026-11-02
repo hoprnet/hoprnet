@@ -26,7 +26,7 @@ use hopr_utils::{
 };
 use tracing::Instrument;
 
-use crate::PeerProtocolCounterRegistry;
+use crate::{PeerProtocolCounterRegistry, trace_context::WithContext};
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
@@ -158,7 +158,8 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
     counters: PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
-    AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppOut: futures::Stream + Send + 'static,
+    AppOut::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
     E: PacketEncoder + Send + Sync + 'static,
     WOut: futures::Sink<(PeerId, Bytes), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
@@ -168,7 +169,11 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
         // so that encoded packets are emitted in submission order, preserving session frame sequence.
         // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
-        .map(|(routing, data)| {
+        .map(|message| {
+            let crate::trace_context::WithContext {
+                value: (routing, data),
+                span,
+            } = message.into();
             let encoder = encoder.clone();
             let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
@@ -249,6 +254,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                     }
                 }
             }
+            .instrument(tracing::debug_span!(parent: &span, "transport.encode"))
         })
         .buffered(concurrency)
         .filter_map(futures::future::ready)
@@ -1068,7 +1074,8 @@ where
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     let mut processes = AbortableList::default();
 
@@ -1225,8 +1232,94 @@ where
 mod tests {
     use futures::channel::mpsc;
     use hopr_api::types::crypto_random::Randomizable;
+    use hopr_crypto_packet::prelude::PacketSignals;
 
     use super::*;
+
+    /// Observe the span from inside the real encoding worker without requiring valid SPHINX packets.
+    struct ContextTestEncoder(tracing::Dispatch);
+
+    impl PacketEncoder for ContextTestEncoder {
+        type Error = std::io::Error;
+
+        fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+            &self,
+            data: T,
+            _: ResolvedTransportRouting<HoprSurb>,
+            _: S,
+            _: Option<u8>,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            // Production uses a global subscriber; install this test's scoped one on the worker.
+            tracing::dispatcher::with_default(&self.0, || {
+                let marker = data.as_ref().last().copied();
+                tracing::debug!(?marker, "actual encoder context");
+            });
+            Err(std::io::Error::other("context test stops after encoding entry"))
+        }
+
+        fn encode_acknowledgements(
+            &self,
+            _: &[VerifiedAcknowledgement],
+            _: &OffchainPublicKey,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            unreachable!("outgoing application pipeline does not encode acknowledgements")
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn outgoing_encoder_should_enter_each_queued_messages_session() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use tracing::instrument::WithSubscriber;
+
+        use crate::{path::test_support::Logs, trace_context::WithContext};
+
+        let logs = Logs::default();
+        let subscriber = logs.subscriber(tracing::Level::DEBUG);
+        async {
+            let mut input = Vec::new();
+            for marker in [11u8, 22] {
+                let span = tracing::debug_span!("session", session_id = marker);
+                let data = ApplicationDataOut::with_no_packet_info(ApplicationData::new(1234u64, vec![marker])?);
+                let path = hopr_api::types::internal::path::ValidatedPath::direct(
+                    *OffchainKeypair::random().public(),
+                    ChainKeypair::random().public().to_address(),
+                );
+                input.push(WithContext {
+                    value: (ResolvedTransportRouting::forward_only(path), data),
+                    span,
+                });
+            }
+            let encoder = std::sync::Arc::new(ContextTestEncoder(tracing::dispatcher::get_default(Clone::clone)));
+            start_outgoing_packet_pipeline(
+                futures::stream::iter(input),
+                encoder,
+                None::<NopExitAcknowledgementShareProcessor>,
+                futures::sink::drain().with_timeout(QUEUE_SEND_TIMEOUT),
+                PeerProtocolCounterRegistry::default(),
+                2,
+            )
+            .await;
+            let events = logs.records("actual encoder context");
+            assert_eq!(events.len(), 2);
+            for event in events {
+                assert_eq!(event.ancestry, ["session", "transport.encode"]);
+            }
+            let output = logs.output();
+            for marker in [11u8, 22] {
+                let line = output
+                    .lines()
+                    .find(|line| {
+                        line.contains("actual encoder context") && line.contains(&format!("marker=Some({marker})"))
+                    })
+                    .context("missing encoding record")?;
+                assert!(line.contains(&format!("session_id={marker}")), "wrong session: {line}");
+            }
+            anyhow::Ok(())
+        }
+        .with_subscriber(subscriber)
+        .await
+    }
 
     /// A ticket processor whose error type is the real [`HoprProtocolError`], so the metric-label
     /// mapping can be exercised on both branches. `NoopTicketProcessor` cannot serve here: its
