@@ -6,14 +6,13 @@ use hopr_transport_mixer::{MixerSink, channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 mod common;
-use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, minimal_delay_mixer_cfg, size_label, sizes};
+use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, size_label, sizes};
 
 pub fn mixer_throughput(
     c: &mut Criterion,
-    cfg: MixerConfig,
     description: &str,
     sizes: &[usize],
-    f: impl Fn(&'static str, usize, MixerConfig) -> BoxFuture<'static, ()>,
+    f: impl Fn(&'static str, usize) -> BoxFuture<'static, ()>,
 ) {
     let mut group = c.benchmark_group("mixer_throughput");
     group.sample_size(SAMPLE_SIZE);
@@ -30,31 +29,22 @@ pub fn mixer_throughput(
                 let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
 
                 b.to_async(runtime)
-                    .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len(), cfg));
+                    .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len()));
             },
         );
     }
     group.finish();
 }
 
-fn send_continuous_stream_load(item: &str, iterations: usize, _cfg: MixerConfig) -> BoxFuture<'_, ()> {
+fn send_continuous_stream_load(item: &str, iterations: usize) -> BoxFuture<'_, ()> {
     Box::pin(async move {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let (mut tx, rx) = futures::channel::mpsc::channel(iterations);
 
-        // Baseline floor: a raw `then_concurrent` stream with no artificial hold, so it measures
-        // the plumbing overhead alone — the counterpart of `minimal_delay_mixer_cfg`, whose
-        // near-passthrough config the real mixer variants run against.
-        let mut rx = rx.then_concurrent(
-            |v| async move {
-                tokio::time::sleep(std::time::Duration::ZERO).await;
-
-                v
-            },
-            None,
-        );
+        // Raw stream plumbing baseline; no mixer engine or timer is involved.
+        let mut rx = rx.then_concurrent(futures::future::ready, None);
 
         for _ in 0..iterations {
-            tx.unbounded_send(item).expect("send must succeed");
+            tx.try_send(item).expect("preallocated baseline channel must have room");
         }
 
         for _ in 0..iterations {
@@ -85,22 +75,25 @@ fn send_continuous_sink_load(item: &'static str, iterations: usize, cfg: MixerCo
 pub fn mixer_sink_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
-        // Zero-delay uniform config so the sink measures per-message overhead, not the delay.
-        MixerConfig::new_uniform(std::time::Duration::ZERO, std::time::Duration::ZERO),
         "mixer_sink",
         &[
             10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
             40 * 1024 * 2 * RANDOM_GIBBERISH.len(),
         ],
-        send_continuous_sink_load,
+        |item, iterations| {
+            send_continuous_sink_load(
+                item,
+                iterations,
+                MixerConfig::new_uniform(std::time::Duration::ZERO, std::time::Duration::ZERO),
+            )
+        },
     );
 }
 
-pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
+pub fn then_concurrent_baseline_throughput(c: &mut Criterion) {
     mixer_throughput(
         c,
-        minimal_delay_mixer_cfg(),
-        "mixer_stream",
+        "then_concurrent_baseline",
         &[40 * 1024 * 2 * RANDOM_GIBBERISH.len()],
         send_continuous_stream_load,
     );
@@ -177,7 +170,7 @@ pub fn mixer_channel_throughput_reused(c: &mut Criterion) {
 criterion_group!(
     benches,
     mixer_sink_throughput_minimal_mixing,
-    mixer_stream_throughput_minimal_mixing,
+    then_concurrent_baseline_throughput,
     mixer_channel_throughput_reused
 );
 criterion_main!(benches);

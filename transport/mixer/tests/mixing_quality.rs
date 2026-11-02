@@ -10,6 +10,7 @@
 
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
 use futures::StreamExt;
 use futures_timer::Delay;
 use hopr_transport_mixer::{MixerConfig, poisson_channel};
@@ -38,18 +39,27 @@ fn poisson_cfg(max_delay: Duration, miss_probability: f64, target_occupancy: usi
 struct Stats {
     delays_ms: Vec<f64>,
     out_of_order_frac: f64,
+    ingress_per_second: f64,
 }
 
-fn run_scenario(cfg: MixerConfig, count: usize, spacing: Duration) -> Stats {
-    let (mut delays_ms, out_of_order) = futures::executor::block_on(async move {
+fn run_scenario(cfg: MixerConfig, count: usize, spacing: Duration) -> anyhow::Result<Stats> {
+    let (mut delays_ms, out_of_order, ingress_per_second) = futures::executor::block_on(async move {
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         let sender = async move {
+            let mut first_sent_at = Instant::now();
+            let mut last_sent_at = first_sent_at;
             for seq in 0..count as u32 {
-                tx.send((seq, Instant::now())).expect("send must succeed");
+                let sent_at = Instant::now();
+                if seq == 0 {
+                    first_sent_at = sent_at;
+                }
+                last_sent_at = sent_at;
+                tx.send((seq, sent_at)).context("send packet through mixer")?;
                 Delay::new(spacing).await;
             }
             // Dropping `tx` here closes the ingress so the receiver eventually sees `None`.
+            anyhow::Ok((count - 1) as f64 / last_sent_at.duration_since(first_sent_at).as_secs_f64())
         };
 
         let receiver = async move {
@@ -66,27 +76,28 @@ fn run_scenario(cfg: MixerConfig, count: usize, spacing: Duration) -> Stats {
             (delays_ms, out_of_order)
         };
 
-        let ((), result) = futures::join!(sender, receiver);
-        result
-    });
+        let (rate, (delays_ms, out_of_order)) = futures::join!(sender, receiver);
+        anyhow::Ok((delays_ms, out_of_order, rate?))
+    })?;
 
     let n = delays_ms.len();
     assert_eq!(n, count, "every enqueued packet must be delivered before close");
-    delays_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    delays_ms.sort_by(f64::total_cmp);
 
-    Stats {
+    Ok(Stats {
         delays_ms,
         out_of_order_frac: out_of_order as f64 / n as f64,
-    }
+        ingress_per_second,
+    })
 }
 
 /// The hard bound holds end-to-end, and mixing (reordering) actually occurs, in bounded-latency
 /// mode (`target_occupancy = 0`, the shipped default).
 #[test]
-fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() {
+fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() -> anyhow::Result<()> {
     let max_delay = Duration::from_millis(20);
     let cfg = poisson_cfg(max_delay, 0.01, 0);
-    let stats = run_scenario(cfg, COUNT, SEND_SPACING);
+    let stats = run_scenario(cfg, COUNT, SEND_SPACING)?;
 
     assert!(
         stats.out_of_order_frac > 0.1,
@@ -96,7 +107,7 @@ fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() {
 
     let max_delay_ms = max_delay.as_secs_f64() * 1000.0;
     let max = stats.delays_ms.last().copied().unwrap_or(0.0);
-    // Generous scheduling slack: this is real wall-clock tokio scheduling, not the pure-function
+    // Generous scheduling slack: this is real wall-clock timer scheduling, not the pure-function
     // simulation in `pool.rs`, which asserts the bound far more tightly.
     assert!(
         max < max_delay_ms + 100.0,
@@ -108,33 +119,40 @@ fn bounded_latency_channel_should_respect_the_hard_bound_and_mix() {
         (2.0..=20.0).contains(&observed_mean),
         "bounded-latency mean {observed_mean:.2} ms outside the expected [2, 20] ms band"
     );
+    Ok(())
 }
 
-/// Constant-privacy mode (`target_occupancy > 0`) hits the design target end-to-end: ~10 ms mean
-/// at 1000 pkt/s with `target_occupancy = 14`, `max_delay = 200 ms`.
+/// Constant-privacy mode hits its design target with nominal 1000 pkt/s ingress. The measured
+/// rate must stay above 700 pkt/s, comfortably beyond the approximately 322 pkt/s crossover.
 #[test]
-fn constant_privacy_channel_should_hit_the_design_target_at_1000_pps() {
+fn constant_privacy_channel_should_hit_the_design_target_at_a_sustained_ingress_rate() -> anyhow::Result<()> {
     let cfg = poisson_cfg(Duration::from_millis(200), 0.01, 14);
     // 1000 pkt/s => 1ms spacing. Count kept just large enough to clear the occupancy-lock
-    // crossover (~322 pkt/s here) with room for the mean to converge, since spacing (not count)
-    // is what fixes the rate under test — 4,000 sends at 1ms spacing cost >=4s of real wall time
-    // for no added precision the wide assertion band below needs.
-    let stats = run_scenario(cfg, 1_500, Duration::from_millis(1));
+    // crossover (~322 pkt/s here). Timer overshoot can lower the realized ingress rate.
+    let stats = run_scenario(cfg, 1_500, Duration::from_millis(1))?;
+    assert!(
+        stats.ingress_per_second >= 700.0,
+        "requested 1000 pkt/s but measured {:.1} pkt/s; this test requires at least 700 pkt/s to stay above the \
+         occupancy-lock crossover (check host timer scheduling)",
+        stats.ingress_per_second
+    );
     let observed_mean = mean(&stats.delays_ms);
     assert!(
         (5.0..=17.0).contains(&observed_mean),
-        "constant-privacy mean at 1000 pkt/s should be near 10ms (target_occupancy=14, max_delay=200ms), got \
-         {observed_mean:.2}ms"
+        "constant-privacy mean at {:.1} pkt/s should be in [5, 17] ms (target_occupancy=14, max_delay=200ms), got \
+         {observed_mean:.2}ms",
+        stats.ingress_per_second
     );
+    Ok(())
 }
 
 /// A far looser bound truncates less than a tight one, at the same mean-anchoring approach used
 /// throughout the design — a sanity check that `max_delay`/`miss_probability` actually drive the
 /// observed tail rather than being ignored by the wiring.
 #[test]
-fn a_tighter_bound_should_truncate_the_tail_more_than_a_looser_one() {
-    let tight = run_scenario(poisson_cfg(Duration::from_millis(20), 0.01, 0), COUNT, SEND_SPACING);
-    let loose = run_scenario(poisson_cfg(Duration::from_millis(100), 0.01, 0), COUNT, SEND_SPACING);
+fn a_tighter_bound_should_truncate_the_tail_more_than_a_looser_one() -> anyhow::Result<()> {
+    let tight = run_scenario(poisson_cfg(Duration::from_millis(20), 0.01, 0), COUNT, SEND_SPACING)?;
+    let loose = run_scenario(poisson_cfg(Duration::from_millis(100), 0.01, 0), COUNT, SEND_SPACING)?;
 
     let tight_p99 = percentile(&tight.delays_ms, 0.99);
     let loose_p99 = percentile(&loose.delays_ms, 0.99);
@@ -149,12 +167,13 @@ fn a_tighter_bound_should_truncate_the_tail_more_than_a_looser_one() {
         tight_max <= 20.0 + 100.0,
         "p100 {tight_max:.2} ms should not exceed the 20ms bound by more than scheduling slack"
     );
+    Ok(())
 }
 
 /// Passthrough (`max_delay = Duration::ZERO`) preserves FIFO order end-to-end, the one case where
 /// reordering must NOT occur.
 #[test]
-fn passthrough_channel_should_preserve_order() {
+fn passthrough_channel_should_preserve_order() -> anyhow::Result<()> {
     const ITERATIONS: usize = 40;
     let cfg = poisson_cfg(Duration::ZERO, 0.01, 0);
 
@@ -162,10 +181,11 @@ fn passthrough_channel_should_preserve_order() {
         let (tx, rx) = poisson_channel(cfg);
         let input: Vec<u32> = (0..ITERATIONS as u32).collect();
         for i in &input {
-            tx.send(*i).expect("send must succeed");
+            tx.send(*i).context("send passthrough packet")?;
         }
         drop(tx);
         let output: Vec<u32> = rx.take(ITERATIONS).collect().await;
         assert_eq!(input, output, "pass-through must preserve FIFO order");
-    });
+        Ok(())
+    })
 }

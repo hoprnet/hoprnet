@@ -6,13 +6,20 @@
 use std::{cell::RefCell, rc::Rc};
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_transport_mixer::poisson_channel;
+use hopr_transport_mixer::{MixerConfig, MixerType, PoissonConfig, poisson_channel};
 
 mod common;
-use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, minimal_delay_mixer_cfg, size_label, sizes};
+use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, size_label, sizes};
 
 pub fn mixer_poisson_throughput_reused(c: &mut Criterion) {
-    let cfg = minimal_delay_mixer_cfg();
+    // Keep mixing near passthrough, with room for the largest untimed preload batch.
+    let cfg = MixerConfig {
+        capacity: 100_000,
+        mixer_type: MixerType::Poisson(PoissonConfig {
+            max_delay: std::time::Duration::from_millis(1),
+            ..PoissonConfig::default()
+        }),
+    };
     // Built once, before any timing: runtime + shared-pool channel, reused across sizes/samples.
     let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
     let (tx, rx) = poisson_channel::<&'static str>(cfg);
