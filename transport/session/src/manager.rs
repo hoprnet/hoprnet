@@ -2130,6 +2130,9 @@ pub struct SessionManager<S> {
     /// handlers that arrive before the slot insertion completes (e.g. SsaRequest vs
     /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
     /// Keyed by SessionId so that only waiters for the relevant session are woken.
+    ///
+    /// Holds at most one live waiter per SessionId: `handle_ssa_request` refuses a request that
+    /// finds another one already waiting, rather than parking a second shared Start handler.
     slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
     /// Pseudonyms of outgoing Session initiations currently in flight.
     ///
@@ -5785,7 +5788,22 @@ where
                         drop(map);
                         continue;
                     }
-                    map.entry(session_id).or_default().push(tx);
+
+                    // At most one request per Session waits here; any other is refused at once, for
+                    // the reason `ssa_request_locks` below is only `try_lock`ed. The dispatch filter
+                    // admits every request naming a pending initiation, and each one waiting here
+                    // parks a shared Start handler — so whoever holds SURBs for the pseudonym could
+                    // occupy all of them before the slot exists. A conforming Exit sends only its
+                    // opening request before then; a retransmission names commitments that only an
+                    // existing slot can have sent.
+                    let waiters = map.entry(session_id).or_default();
+                    if waiters.iter().any(|w| !w.is_canceled()) {
+                        return Err(SessionManagerError::Unacceptable(format!(
+                            "an SSA request for {session_id} is already waiting for its session slot"
+                        ))
+                        .into());
+                    }
+                    waiters.push(tx);
                 }
 
                 let timeout = futures_time::time::Duration::from(Duration::from_millis(1000));
@@ -13331,6 +13349,84 @@ mod tests {
         .await
         .context("the same request must be accepted once the lock is free")?;
         assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Before a Session's slot exists, at most one request for it waits for the slot; any other is
+    /// refused at once rather than parking a second shared Start handler.
+    ///
+    /// The dispatch filter admits every request naming a pending initiation, and the wait comes
+    /// before the request lock, so without this whoever holds SURBs for the pseudonym could occupy
+    /// every handler for the length of the wait — the symptom the request lock closes once the slot
+    /// exists.
+    ///
+    /// ## Steps
+    /// 1. A pseudonym is pending as an outgoing initiation, and has no slot yet.
+    /// 2. A first request waits for the slot.
+    /// 3. A second request for the same pseudonym is refused as `Unacceptable` without waiting.
+    /// 4. Control: the first was waiting, not refused — it gives up as `NonExistingSession` when no slot comes — and
+    ///    once it has left, the next request waits too rather than being refused.
+    #[test_log::test(tokio::test)]
+    async fn a_second_ssa_request_for_a_pending_session_is_refused_without_waiting_for_its_slot() -> anyhow::Result<()>
+    {
+        let params = wide_pix_params();
+        let (mgr, _generator, _pseudonym, _pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        let pending = HoprPseudonym::random();
+        mgr.pending_outgoing.insert(pending, PendingOutgoingToken::next());
+        let request = move || SsaServerCommitmentMessage::new(pending, params, ssa_request_for(1), []);
+        let is_waiting = || {
+            mgr.slot_allocated
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&pending)
+                .is_some_and(|waiters| waiters.iter().any(|w| !w.is_canceled()))
+        };
+
+        let first = tokio::spawn({
+            let mgr = mgr.clone();
+            async move { mgr.handle_ssa_request(pending, request()).await }
+        });
+        timeout(Duration::from_secs(1), async {
+            while !is_waiting() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .context("the first request must wait for the pending Session's slot")?;
+
+        let refused = timeout(Duration::from_millis(250), mgr.handle_ssa_request(pending, request()))
+            .await
+            .context("a second request must not wait for the slot as well")?;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "expected Unacceptable, got {refused:?}"
+        );
+
+        let first = first.await?;
+        assert!(
+            matches!(
+                first,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "the first request must have waited and given up on the slot, got {first:?}"
+        );
+
+        let next = mgr.handle_ssa_request(pending, request()).await;
+        assert!(
+            matches!(
+                next,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "once the first request has left, the next one must wait rather than be refused, got {next:?}"
+        );
 
         bob_sender.close_channel();
         bob_handle.await??;
