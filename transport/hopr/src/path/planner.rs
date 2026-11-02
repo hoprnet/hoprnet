@@ -260,6 +260,79 @@ fn pick_uniform_index(len: usize) -> Option<usize> {
     (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
 }
 
+/// The fraction of the best candidate's (tempered) weight below which a candidate is one the cost
+/// function all but rejects.
+///
+/// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
+/// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
+/// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
+const PLAUSIBLE_WEIGHT_FRACTION: f64 = 0.1;
+
+/// How often an exploring return draw may pick a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`],
+/// node-wide.
+///
+/// That draw is the probe a relayer on probation is revived by, so it cannot be ruled out, but every
+/// one through a relayer that is really gone is a SURB lost at the counterparty — its PIX share with
+/// it — and each one is written off and replaced. Uniform exploration made a tenth of all draws such
+/// a probe whenever one candidate was implausible: 26 per second at production dimensions, and with
+/// them a few percent of the counterparty's stock dead, enough for a single lost control message to
+/// close a PIX Session. One a second is enough to notice a revival.
+const IMPLAUSIBLE_PROBE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The node-wide allowance of [`IMPLAUSIBLE_PROBE_INTERVAL`].
+#[derive(Debug)]
+struct ProbeBudget {
+    epoch: std::time::Instant,
+    /// Milliseconds since `epoch` of the last probe granted, plus one so that `0` is "none yet".
+    last_ms_plus_one: std::sync::atomic::AtomicU64,
+}
+
+impl Default for ProbeBudget {
+    fn default() -> Self {
+        Self {
+            epoch: std::time::Instant::now(),
+            last_ms_plus_one: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+}
+
+impl ProbeBudget {
+    /// Grants a probe if none was granted within [`IMPLAUSIBLE_PROBE_INTERVAL`].
+    fn take(&self) -> bool {
+        let now = u64::try_from(self.epoch.elapsed().as_millis())
+            .unwrap_or(u64::MAX - 1)
+            .saturating_add(1);
+        let interval = u64::try_from(IMPLAUSIBLE_PROBE_INTERVAL.as_millis()).unwrap_or(u64::MAX);
+        self.last_ms_plus_one
+            .fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |last| (last == 0 || now.saturating_sub(last) >= interval).then_some(now),
+            )
+            .is_ok()
+    }
+}
+
+/// An exploring draw: uniform over the candidates whose weight is at least
+/// [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, and over the others only when `allow_implausible`
+/// grants it (it is asked only when the draw lands on one).
+///
+/// Uniform over the plausible ones whatever is granted: a draw that lands on an implausible candidate
+/// it may not take is redrawn among the plausible ones.
+fn pick_exploring_index(weights: &[f64], allow_implausible: impl FnOnce() -> bool) -> Option<usize> {
+    let best = weights.iter().copied().fold(0.0, f64::max);
+    if best <= 0.0 {
+        return None;
+    }
+    let floor = best * PLAUSIBLE_WEIGHT_FRACTION;
+    let drawn = pick_uniform_index(weights.len())?;
+    if weights[drawn] >= floor || allow_implausible() {
+        return Some(drawn);
+    }
+    let plausible: Vec<usize> = (0..weights.len()).filter(|&i| weights[i] >= floor).collect();
+    pick_uniform_index(plausible.len()).map(|i| plausible[i])
+}
+
 /// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
 /// candidates without reordering them.
 ///
@@ -582,6 +655,8 @@ pub struct PathPlanner<Surb, R, S> {
     paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
+    /// See [`IMPLAUSIBLE_PROBE_INTERVAL`]; shared by every clone of the planner.
+    probe_budget: Arc<ProbeBudget>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -628,6 +703,7 @@ where
             }),
             cache,
             refresh_period: config.refresh_period,
+            probe_budget: Arc::default(),
         }
     }
 
@@ -699,8 +775,14 @@ where
                 // Explored like a return draw (see `return_path_exploration`): weights exist only for
                 // paths that get drawn, so without it a forward candidate that fell out of favour is
                 // never measured again, and the stream settles on one path.
+                //
+                // Over plausible candidates only: a forward packet through a relayer on probation, or
+                // over an edge probes measured dead, is data lost, PIX shares and SURBs with it, and it
+                // probes nothing (a probation ends on a reply through the relayer, which only a return
+                // path carries).
                 let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
-                    pick_uniform_index(paths.len())
+                    let weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
+                    pick_exploring_index(&weights, || false)
                         .and_then(|i| paths.iter().nth(i))
                         .map(|(vp, _)| vp.clone())
                 } else {
@@ -910,10 +992,12 @@ where
             "drawing return paths from tempered weights"
         );
 
+        // An exploring draw may land on a candidate the weights all but reject only within the
+        // node-wide probe allowance: see `IMPLAUSIBLE_PROBE_INTERVAL`.
         let drawn = (0..count)
             .filter_map(|_| {
                 if should_explore(self.paths.weighting.return_path_exploration) {
-                    pick_uniform_index(items.len())
+                    pick_exploring_index(&weights, || self.probe_budget.take())
                 } else {
                     pick_weighted_index(&weights)
                 }
@@ -2440,6 +2524,75 @@ mod tests {
             "the weaker relayer keeps a tempered share of the forward draws, got {via_b} of 4000"
         );
         Ok(())
+    }
+
+    /// A forward draw never explores into a relayer the weights all but reject, such as one on
+    /// probation: only its tempered weight still draws it, a few percent, where exploration would add a
+    /// half of every tenth draw.
+    #[tokio::test]
+    async fn forward_draws_should_not_explore_into_a_relayer_on_probation() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+        graph.record_node_health(&b, 1e-3);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            }
+        }
+        // Tempered weight alone: 0.9 x 4000 x sqrt(1e-3) / (1 + sqrt(1e-3)) ~ 110. With uniform
+        // exploration over both candidates it would be ~310.
+        assert!(
+            via_b < 220,
+            "a relayer on probation keeps only its tempered share of the forward draws, got {via_b} of 4000"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn exploring_draws_should_skip_implausible_candidates_unless_granted() {
+        let weights = [1.0, 0.8, 0.01];
+        let denied = (0..2000)
+            .filter_map(|_| pick_exploring_index(&weights, || false))
+            .collect::<Vec<_>>();
+        assert!(
+            denied.iter().all(|&i| i != 2),
+            "never the implausible one without a grant"
+        );
+        let first = denied.iter().filter(|&&i| i == 0).count();
+        assert!(
+            (800..1200).contains(&first),
+            "uniform over the plausible two, got {first} of 2000 for the first"
+        );
+
+        let granted = (0..3000)
+            .filter_map(|_| pick_exploring_index(&weights, || true))
+            .filter(|&i| i == 2)
+            .count();
+        assert!(
+            (800..1200).contains(&granted),
+            "uniform over all three when granted, got {granted}"
+        );
+
+        assert_eq!(None, pick_exploring_index(&[0.0, 0.0], || true), "nothing to draw from");
+    }
+
+    #[test]
+    fn the_probe_budget_should_grant_one_probe_per_interval() {
+        let budget = ProbeBudget::default();
+        assert!(budget.take(), "the first probe is granted");
+        assert!((0..100).all(|_| !budget.take()), "none more within the interval");
     }
 
     /// From races to the draw: a relayer losing its races by seconds is judged, recorded in the graph,
