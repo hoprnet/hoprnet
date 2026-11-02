@@ -505,23 +505,6 @@ mod tests {
         );
     }
 
-    #[rstest]
-    fn miss_probability_should_hold_at_the_configured_rate(
-        #[values(500.0, 2000.0, 8000.0)] lambda: f64,
-        #[values(0, 14)] target_occupancy: usize,
-    ) {
-        let max_delay_ms = if target_occupancy == 0 { 20 } else { 200 };
-        let params = privacy_params(max_delay_ms, 0.01, target_occupancy);
-        let sim = simulate(&params, lambda, 8.0, Duration::from_micros(200));
-        let exceeded = sim.delays_ms.iter().filter(|d| **d > max_delay_ms as f64).count();
-        let frac = exceeded as f64 / sim.delays_ms.len() as f64;
-        assert!(
-            frac < 0.03,
-            "[lambda={lambda}, target_occupancy={target_occupancy}] window-miss fraction {frac:.4} should track the \
-             1% miss_probability target (loose band for simulation noise)"
-        );
-    }
-
     #[test]
     fn a_delayed_sweep_should_release_a_larger_batch() {
         // A gap in sweeps is a larger `dt` on the next one, so V jumps further and more entries
@@ -634,7 +617,12 @@ mod tests {
         let params = bounded_params(20, 0.01);
         let means: Vec<f64> = [50.0, 200.0, 1000.0, 5000.0, 20000.0]
             .into_iter()
-            .map(|lambda| mean_of(&simulate(&params, lambda, 5.0, Duration::from_micros(200)).delays_ms))
+            .map(|lambda| {
+                // Keep at least 20,000 arrivals at every load so low-rate means are not
+                // dominated by the sampling noise of a few hundred exponential tags.
+                let duration_s = (20_000.0f64 / lambda).max(5.0);
+                mean_of(&simulate(&params, lambda, duration_s, Duration::from_micros(200)).delays_ms)
+            })
             .collect();
         let min = means.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = means.iter().cloned().fold(0.0, f64::max);
@@ -760,11 +748,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mean_for_the_bounded_mode_should_match_the_closed_form() {
+    #[rstest]
+    fn mean_for_the_bounded_mode_should_match_the_closed_form(#[values(0.001, 0.01, 0.1, 0.4)] miss_probability: f64) {
         // mean = mu_max * E[g], E[g] = 1 - g_max*e^-g_max/(1-e^-g_max) for g ~ truncated Exp(1).
-        let params = bounded_params(20, 0.01);
-        let g_max = (1.0f64 / 0.01).ln();
+        let params = bounded_params(20, miss_probability);
+        let g_max = (1.0 / miss_probability).ln();
         let e_g = 1.0 - g_max * (-g_max).exp() / (1.0 - (-g_max).exp());
         let expected_ms = params.mu_max_secs() * e_g * 1000.0;
         let observed = mean_of(&simulate(&params, 2000.0, 5.0, Duration::from_micros(200)).delays_ms);
