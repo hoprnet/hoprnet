@@ -1239,7 +1239,7 @@ mod tests {
     }
 
     fn capture_logs(log: impl FnOnce()) -> anyhow::Result<String> {
-        let buffer = LogBuffer::default();
+        let mut buffer = LogBuffer::default();
         let writer = buffer.clone();
         let subscriber = test_log::tracing_subscriber::fmt()
             .without_time()
@@ -1248,6 +1248,7 @@ mod tests {
             .with_writer(move || writer.clone())
             .finish();
         tracing::subscriber::with_default(subscriber, log);
+        buffer.flush().context("flush captured logs")?;
         String::from_utf8(buffer.0.lock().clone()).context("logs should be UTF-8")
     }
 

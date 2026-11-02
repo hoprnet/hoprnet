@@ -468,6 +468,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn closing_a_sender_sink_should_preserve_queued_items_and_other_senders() -> anyhow::Result<()> {
+        let (mut tx, rx) = poisson_channel(MixerConfig::new_poisson(Duration::ZERO, 0.01));
+        let other = tx.clone();
+        tx.send(1u32)?;
+        SinkExt::close(&mut tx).await?;
+        drop(tx);
+        other.send(2u32)?;
+        drop(other);
+
+        let received = timeout(CAP + LEEWAY, rx.collect::<Vec<_>>()).await?;
+        assert_eq!(received, vec![1, 2]);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn send_should_return_full_when_the_pool_is_at_capacity() -> anyhow::Result<()> {
         const CAPACITY: usize = 3;
         // The receiver is never polled here, so no sweep can free a slot.
