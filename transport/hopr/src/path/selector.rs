@@ -1558,8 +1558,8 @@ mod tests {
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
 
-    #[test]
     #[serial_test::serial(routing_logs)]
+    #[test]
     fn search_diagnostics_should_cover_both_traversals_and_empty_results() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 

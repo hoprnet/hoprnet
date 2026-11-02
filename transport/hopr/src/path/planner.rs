@@ -2646,8 +2646,8 @@ mod tests {
         assert!(w_with <= w_without, "known capacity should not increase the weight");
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn routing_diagnostics_should_correlate_cached_draws_and_spawned_context() -> anyhow::Result<()> {
         use tracing::instrument::WithSubscriber;
 
@@ -2722,8 +2722,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn debug_diagnostics_should_report_searches_and_only_successful_installs() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2768,8 +2768,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn return_probability_diagnostics_should_include_zero_weight_exploration() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2863,8 +2863,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn diagnostics_should_distinguish_validation_failure_from_empty_search() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2902,8 +2902,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn background_diagnostics_should_start_a_root_outside_the_caller_session() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2950,8 +2950,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn fixed_route_diagnostics_should_identify_modes_without_candidate_sets() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -3014,8 +3014,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn unknown_chain_address_should_fail_before_graph_search() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -3041,8 +3041,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn relayer_recovery_should_install_new_candidates_and_log_once() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -3090,8 +3090,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
     #[serial_test::serial(routing_logs)]
+    #[tokio::test]
     async fn background_validation_failure_should_preserve_the_installed_snapshot() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
