@@ -236,13 +236,16 @@ pub enum PixAdmissionRejection {
     /// This node could not decide right now — the session server did not answer in time, or its
     /// request channel was full.
     Busy,
+    /// The initiation packet carried a SURB with a direct (0-hop) return path, over which no PIX
+    /// share can be delivered.
+    DirectReturnPath,
 }
 
 impl PixAdmissionRejection {
     /// Counts this refusal, if the peer was actually asking for a PIX Session.
     ///
-    /// The capability check is here rather than at the six call sites because it is the part that
-    /// can silently be wrong: every one of those sites also refuses ordinary non-PIX Sessions, and a
+    /// The capability check is here rather than at each call site because it is the part that
+    /// can silently be wrong: most of those sites also refuse ordinary non-PIX Sessions, and a
     /// `hopr_pix_admission_rejections_total` that counted those would report a PIX problem this node
     /// does not have. `hopr_session_sent_error_count{kind}` already counts refusals of every kind —
     /// this one exists precisely to be narrower.
@@ -1263,11 +1266,15 @@ mod tests {
             PixAdmissionRejection::LiveCycleCapacity.to_string()
         );
         assert_eq!("no_pix_support", PixAdmissionRejection::NoPixSupport.to_string());
+        assert_eq!(
+            "direct_return_path",
+            PixAdmissionRejection::DirectReturnPath.to_string()
+        );
     }
 
     /// A refusal is only a PIX admission refusal if the peer was asking for PIX.
     ///
-    /// The six call sites all sit on paths that refuse ordinary Sessions too, so without this gate
+    /// Most call sites sit on paths that refuse ordinary Sessions too, so without this gate
     /// `hopr_pix_admission_rejections_total` would report a PIX problem on a node serving no PIX at
     /// all. Exercised here rather than at the instruments because this is the part that is compiled
     /// — and therefore tested — whether or not the `telemetry` feature is on.
@@ -1283,6 +1290,7 @@ mod tests {
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
             PixAdmissionRejection::Busy,
+            PixAdmissionRejection::DirectReturnPath,
         ] {
             assert!(reason.record_if_pix(pix), "{reason} refused a PIX offer");
             assert!(

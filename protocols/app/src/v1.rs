@@ -159,6 +159,12 @@ pub struct IncomingPacketInfo {
     /// buffer just as a spent one has — so the level it reports tracks what the store actually holds.
     /// See `hopr-transport-session`'s `BalancerStateValues::counterparty_buffer_capacity`.
     pub num_evicted_surbs: usize,
+    /// Fewest intermediate hops on the return path of any SURB the HOPR packet was carrying, or
+    /// `None` if it carried none.
+    ///
+    /// Declared by the SURB creator, not verified. `Some(0)` means a direct return path, which has no
+    /// first relayer to acknowledge a reply and so cannot deliver PIX shares.
+    pub min_return_path_hops: Option<u8>,
 }
 
 /// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the
