@@ -1,4 +1,11 @@
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -15,7 +22,7 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use parking_lot::Mutex;
-use tracing::trace;
+use tracing::Instrument;
 use validator::{Validate, ValidationError};
 
 use super::{
@@ -309,6 +316,10 @@ fn apply_diversity_transition(
 /// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
 /// alone. `Err` is reserved for a selector that actually failed.
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(
+    name = "planner.rebuild_candidates", level = "debug", skip_all,
+    fields(source = %src_key, destination = %dest_key, hops, kind)
+)]
 async fn rebuild_candidates<R, S>(
     resolver: &R,
     selector: &S,
@@ -318,18 +329,14 @@ async fn rebuild_candidates<R, S>(
     dest_key: OffchainPublicKey,
     hops: usize,
     kind: &'static str,
-) -> Result<
-    Option<(
-        hopr_utils::statistics::WeightedCollection<ValidatedPath>,
-        Option<DiversityObservation>,
-    )>,
->
+) -> Result<Option<(CandidateSet, Option<DiversityObservation>)>>
 where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
     S: PathSelector,
 {
     let candidates = selector.select_path(src_key, dest_key, hops)?;
 
+    let discovered = candidates.len();
     let chain_resolver = ChainPathResolver::from(resolver);
     let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
     let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
@@ -344,7 +351,7 @@ where
                 valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
                 path_metrics.push(pwc);
             }
-            Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
+            Err(e) => tracing::trace!(path = ?pwc.path, error = %e, "path candidate failed validation"),
         }
     }
 
@@ -367,21 +374,37 @@ where
         }
     });
 
+    tracing::debug!(
+        discovered,
+        validated = valid_paths.len(),
+        rejected = discovered - valid_paths.len(),
+        outcome = if discovered == 0 {
+            "empty_search"
+        } else if valid_paths.is_empty() {
+            "validation_empty"
+        } else {
+            "completed"
+        },
+        "candidate validation completed"
+    );
     if valid_paths.is_empty() {
         return Ok(None);
     }
 
-    let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+    let weighted = CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(valid_paths));
     let total_wt = weighted.total_weight();
     for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-        tracing::debug!(
+        tracing::trace!(
+            set_id = weighted.id,
             kind,
             destination = %dest_key,
             hops,
             path = %vp,
             cost = pwm.cost,
             composite_weight = w,
-            sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+            base_weight_share = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+            latency_halflife_ms = weighting.latency_halflife.as_millis() as u64,
+            capacity_reference = weighting.capacity_reference,
             total_latency_ms = ?pwm.total_latency_ms,
             min_probe_success_rate = ?pwm.min_probe_success_rate,
             min_ack_rate = ?pwm.min_ack_rate,
@@ -445,7 +468,44 @@ fn weights_moved(
 /// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice. Resolving
 /// first makes lookup and insertion agree by construction.
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
-type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
+type PlannerCacheValue = Arc<CandidateSet>;
+
+/// Immutable sampling snapshot. Its process-local identity survives cache hits and is replaced
+/// together with the weights, so a choice cannot accidentally name a different rebuild.
+struct CandidateSet {
+    id: u64,
+    paths: hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+}
+
+impl CandidateSet {
+    fn new(paths: hopr_utils::statistics::WeightedCollection<ValidatedPath>) -> Self {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+        Self {
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            paths,
+        }
+    }
+
+    fn log_installed(&self, key: PlannerCacheKey, kind: &'static str) {
+        tracing::debug!(
+            set_id = self.id,
+            source = %key.0,
+            destination = %key.1,
+            hops = key.2,
+            candidates = self.paths.len(),
+            kind,
+            "candidate set installed"
+        );
+    }
+}
+
+impl std::ops::Deref for CandidateSet {
+    type Target = hopr_utils::statistics::WeightedCollection<ValidatedPath>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.paths
+    }
+}
 
 /// Writes `value` under `key` only if `swept` is still the entry cached there, returning whether it
 /// was.
@@ -471,7 +531,12 @@ async fn put_if_unchanged(
             })
         })
         .await;
-    matches!(written, moka::ops::compute::CompResult::ReplacedWith(_))
+    if let moka::ops::compute::CompResult::ReplacedWith(entry) = written {
+        entry.value().log_installed(key, "background-refresh");
+        true
+    } else {
+        false
+    }
 }
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
@@ -481,7 +546,7 @@ async fn put_if_unchanged(
 /// their traversal cost, keyed by `(source: NodeId, destination: NodeId, hops: u32)`.
 ///
 /// On a cache miss the planner calls the selector, validates every candidate against
-/// the chain resolver, and stores an `Arc<WeightedCollection<ValidatedPath>>` in the
+/// the chain resolver, and stores an identified, immutable weighted candidate set in the
 /// cache. On a cache hit a candidate is picked via weighted random selection (higher
 /// cost = higher quality = higher probability).
 ///
@@ -573,7 +638,10 @@ where
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(
+        name = "planner.resolve_path", level = "debug", skip_all,
+        fields(source = %source, destination = %destination, direction = if source == NodeId::Offchain(self.me) { "forward" } else { "return" })
+    )]
     async fn resolve_path(
         &self,
         source: NodeId,
@@ -582,8 +650,8 @@ where
     ) -> Result<ValidatedPath> {
         let path = match options {
             RoutingOptions::IntermediatePath(explicit_path) => {
-                tracing::debug!(
-                    direction = "loopback",
+                tracing::trace!(
+                    mode = "explicit",
                     ?source,
                     ?destination,
                     ?explicit_path,
@@ -598,13 +666,18 @@ where
                         .collect::<Vec<_>>(),
                     &resolver,
                 )
-                .await?
+                .await
+                .inspect(|path| {
+                    tracing::trace!(%path, mode = "explicit", "path selected");
+                })?
             }
 
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, "resolving zero-hop direct path");
+                tracing::trace!(hops = 0, "resolving zero-hop direct path");
                 let resolver = ChainPathResolver::from(&*self.resolver);
-                ValidatedPath::new(source, vec![destination], &resolver).await?
+                let path = ValidatedPath::new(source, vec![destination], &resolver).await?;
+                tracing::trace!(%path, mode = "direct", "path selected");
+                path
             }
 
             RoutingOptions::Hops(hops) => {
@@ -613,13 +686,21 @@ where
 
                 // Format from the `NodeId`s rather than re-resolving them: `cached_paths` has
                 // already done that, and for `NodeId::Chain` each resolution is a resolver lookup.
-                paths.pick_one().ok_or_else(|| {
+                let path = paths.pick_one().ok_or_else(|| {
+                    tracing::debug!(
+                        set_id = paths.id,
+                        stage = "sampling",
+                        outcome = "no_positive_weights",
+                        "path selection failed"
+                    );
                     PathPlannerError::Path(PathError::PathNotFound(
                         hops_usize,
                         source.to_string(),
                         destination.to_string(),
                     ))
-                })?
+                })?;
+                tracing::trace!(set_id = paths.id, %path, mode = "weighted", "path selected");
+                path
             }
         };
 
@@ -628,7 +709,6 @@ where
             hopr_api::types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
-        trace!(%path, "validated resolved path");
         Ok(path)
     }
 
@@ -638,7 +718,11 @@ where
     /// Single-path callers draw with `pick_one`; batch callers (see
     /// [`PathPlanner::resolve_diverse_return_paths`]) work over the collection directly, paying one
     /// cache lookup instead of one per path.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(
+        name = "planner.cached_paths", level = "debug", skip_all,
+        fields(source = tracing::field::Empty, destination = tracing::field::Empty,
+               hops = usize::from(hops), cache = tracing::field::Empty, set_id = tracing::field::Empty)
+    )]
     async fn cached_paths(
         &self,
         source: NodeId,
@@ -646,7 +730,7 @@ where
         hops: hopr_api::types::primitive::bounded::BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
     ) -> Result<PlannerCacheValue> {
         let hops_usize: usize = hops.into();
-        trace!(hops = hops_usize, "resolving path via planner cache");
+        tracing::trace!(hops = hops_usize, "resolving path via planner cache");
 
         let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
         let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
@@ -659,9 +743,14 @@ where
         let me = self.me;
         let collapsed_diversity = self.collapsed_diversity.clone();
 
-        self.cache
-            .try_get_with(cache_key, async move {
-                trace!(hops = hops_usize, "path cache miss, querying selector");
+        let span = tracing::Span::current();
+        span.record("source", tracing::field::display(src_key));
+        span.record("destination", tracing::field::display(dest_key));
+        let entry = self
+            .cache
+            .entry(cache_key)
+            .or_try_insert_with(async move {
+                tracing::trace!(hops = hops_usize, "path cache miss, querying selector");
                 rebuild_candidates(
                     &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
                 )
@@ -678,7 +767,16 @@ where
                 })
             })
             .await
-            .map_err(PathPlannerError::CacheError)
+            .map_err(PathPlannerError::CacheError)?;
+        span.record("cache", if entry.is_fresh() { "miss" } else { "hit" });
+        span.record("set_id", entry.value().id);
+        if entry.is_fresh() {
+            entry.value().log_installed(cache_key, "fill");
+        }
+        // An event makes the recorded hit/set fields visible even when span lifecycle events
+        // are disabled by the formatter. Keep this per-request record out of DEBUG output.
+        tracing::trace!("candidate set loaded");
+        Ok(entry.into_value())
     }
 
     /// Rebuilds every cached entry whose paths originate at `source`, replacing each in place.
@@ -696,6 +794,7 @@ where
     /// not how many were rebuilt. Callers use this to decide whether the re-plan achieved anything
     /// worth acting on, and on a healthy graph a rebuild always succeeds, so counting rebuilds
     /// would answer "something moved" every time.
+    #[tracing::instrument(name = "planner.recompute_paths", level = "debug", skip_all, fields(source = %source))]
     pub async fn recompute_paths_from(&self, source: &OffchainPublicKey) -> usize {
         // 0-hop entries name a direct route with nothing to re-weight, exactly as in the sweep.
         let keys = self
@@ -726,7 +825,8 @@ where
                 // Through `and_compute_with`, like the background refresh's `put_if_unchanged`: moka
                 // serialises only compute calls on a key, so a plain insert here could land between
                 // the refresh's read and write and be overwritten by the older entry it rebuilt.
-                self.cache
+                let installed = self
+                    .cache
                     .entry(key)
                     .and_compute_with(|previous| {
                         if let Some(previous) = previous {
@@ -735,6 +835,13 @@ where
                         futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
                     })
                     .await;
+                match installed {
+                    moka::ops::compute::CompResult::Inserted(entry)
+                    | moka::ops::compute::CompResult::ReplacedWith(entry) => {
+                        entry.value().log_installed(key, "recompute")
+                    }
+                    _ => unreachable!("recompute always puts a value"),
+                }
                 // The recompute always installs, so its diversity transition always applies.
                 if let Some(obs) = diversity {
                     apply_diversity_transition(&self.collapsed_diversity, &src_key, "recompute", &obs);
@@ -763,7 +870,11 @@ where
     ///
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(
+        name = "planner.resolve_diverse_return_paths", level = "debug", skip_all,
+        fields(source = %destination, destination = %self.me, direction = "return", requested = count,
+               returned = tracing::field::Empty, temper = self.return_path_weight_temper, exploration = self.return_path_exploration)
+    )]
     async fn resolve_diverse_return_paths(
         &self,
         destination: NodeId,
@@ -774,6 +885,8 @@ where
         // SURBs). Resolve nothing — querying the planner here would turn "none wanted" into a
         // `PathNotFound` error.
         if count == 0 {
+            tracing::Span::current().record("returned", 0);
+            tracing::trace!("return path batch selected");
             return Ok(Vec::new());
         }
 
@@ -783,11 +896,14 @@ where
             RoutingOptions::Hops(hops) if u32::from(hops) > 0 => hops,
             // A fixed path or a direct return has no alternatives to weight over.
             other => {
-                return (0..count)
+                let paths = (0..count)
                     .map(|_| self.resolve_path(destination, me, other.clone()))
                     .collect::<FuturesUnordered<_>>()
                     .try_collect::<Vec<_>>()
-                    .await;
+                    .await?;
+                tracing::Span::current().record("returned", paths.len());
+                tracing::trace!("return path batch selected");
+                return Ok(paths);
             }
         };
 
@@ -799,6 +915,12 @@ where
         );
 
         if weights.iter().all(|w| *w <= 0.0) {
+            tracing::debug!(
+                set_id = candidates.id,
+                stage = "sampling",
+                outcome = "no_positive_weights",
+                "path selection failed"
+            );
             return Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops.into(),
                 destination.to_string(),
@@ -806,56 +928,46 @@ where
             )));
         }
 
-        // Distinct first relayers in the candidate pool: the return-relayer diversity actually
-        // available for this destination. A value of 1 is the corroboration blind spot (a dead
-        // relayer cannot be told from a quiet peer) — the same condition `rebuild_candidates` WARNs
-        // on. This draw runs per-packet, so both sets below are built only when DEBUG is actually
-        // recorded -- not on every call.
-        let log_relayer_diversity = tracing::enabled!(tracing::Level::DEBUG);
-        let candidate_relayers = log_relayer_diversity.then(|| {
-            items
-                .iter()
-                .filter_map(|item| item.0.first())
-                .collect::<std::collections::HashSet<_>>()
-        });
-
-        tracing::debug!(
-            %destination,
-            count,
-            candidates = items.len(),
-            distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
-            temper = self.return_path_weight_temper,
-            exploration = self.return_path_exploration,
-            "drawing return paths from tempered weights"
-        );
+        if tracing::enabled!(tracing::Level::TRACE) {
+            let total: f64 = weights.iter().map(|w| w.max(0.0)).sum();
+            let uniform_share = 1.0 / items.len() as f64;
+            for ((path, _), weight) in items.iter().zip(&weights) {
+                let weighted_share = weight.max(0.0) / total;
+                tracing::trace!(
+                    set_id = candidates.id,
+                    %path,
+                    weighted_share,
+                    uniform_share,
+                    marginal_probability = self.return_path_exploration * uniform_share
+                        + (1.0 - self.return_path_exploration) * weighted_share,
+                    "return path sampling probability"
+                );
+            }
+        }
 
         let drawn = (0..count)
-            .filter_map(|_| {
-                if should_explore(self.return_path_exploration) {
+            .filter_map(|draw_index| {
+                let exploring = should_explore(self.return_path_exploration);
+                let selected = if exploring {
                     pick_uniform_index(items.len())
                 } else {
                     pick_weighted_index(&weights)
-                }
-                .map(|i| items[i].0.clone())
+                };
+                selected.map(|i| {
+                    let path = items[i].0.clone();
+                    tracing::trace!(
+                        set_id = candidates.id,
+                        draw_index,
+                        %path,
+                        mode = if exploring { "uniform_exploration" } else { "weighted" },
+                        "path selected"
+                    );
+                    path
+                })
             })
             .collect::<Vec<_>>();
-
-        // How many distinct relayers the actual SURBs went to. Fewer than the candidate pool means
-        // the weighting concentrated the stream — expected — but a persistent 1 here while
-        // `candidates` > 1 says the draw itself is starving the siblings the detector relies on.
-        let drawn_relayers = log_relayer_diversity.then(|| {
-            drawn
-                .iter()
-                .filter_map(|vp| vp.first())
-                .collect::<std::collections::HashSet<_>>()
-        });
-        tracing::debug!(
-            %destination,
-            drawn = drawn.len(),
-            distinct_relayers = drawn_relayers.as_ref().map_or(0, |r| r.len()),
-            of_candidates = candidate_relayers.as_ref().map_or(0, |r| r.len()),
-            "drew return paths"
-        );
+        tracing::Span::current().record("returned", drawn.len());
+        tracing::trace!("return path batch selected");
 
         Ok(drawn)
     }
@@ -863,7 +975,10 @@ where
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
     ///
     /// Returns the resolved routing and, for `Return` variants, the number of remaining SURBs.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(
+        name = "routing.resolve", level = "debug", skip_all,
+        fields(direction = tracing::field::Empty, destination = tracing::field::Empty)
+    )]
     pub async fn resolve_routing(
         &self,
         size_hint: usize,
@@ -877,12 +992,12 @@ where
                 forward_options,
                 return_options,
             } => {
-                tracing::debug!(direction = "forward", %destination, "resolving forward path");
+                tracing::Span::current().record("direction", "forward");
+                tracing::Span::current().record("destination", tracing::field::display(&destination));
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
                     .await?;
-                tracing::debug!(direction = "forward", %destination, path = %forward_path, "resolved path");
 
                 let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
 
@@ -905,7 +1020,7 @@ where
                     let generation = self.surb_store.current_generation(&resolved_pseudonym);
 
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
-                    trace!(
+                    tracing::trace!(
                         %destination,
                         %num_possible_surbs,
                         data_len = size_hint,
@@ -913,16 +1028,9 @@ where
                         "resolving packet return paths"
                     );
 
-                    let return_paths: Vec<_> = self
+                    let return_paths = self
                         .resolve_diverse_return_paths(*destination, return_options, num_possible_surbs)
-                        .await?
-                        .into_iter()
-                        .enumerate()
-                        .inspect(|(i, rp)| {
-                            tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
-                        })
-                        .map(|(_, rp)| rp)
-                        .collect();
+                        .await?;
 
                     // Only stamp a generation if return paths (hence SURBs) were actually produced.
                     let generation = (!return_paths.is_empty()).then_some(generation);
@@ -931,7 +1039,7 @@ where
                     (vec![], None)
                 };
 
-                trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+                tracing::trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
                 Ok((
                     ResolvedTransportRouting::Forward {
@@ -945,6 +1053,7 @@ where
             }
 
             DestinationRouting::Return(matcher) => {
+                tracing::Span::current().record("direction", "return");
                 let FoundSurb {
                     sender_id,
                     surb,
@@ -1029,6 +1138,7 @@ where
                     }
                 }
             }
+            .instrument(tracing::debug_span!(parent: None, "planner.background_refresh"))
         })
     }
 }
@@ -2188,9 +2298,9 @@ mod tests {
             .iter()
             .find(|(k, _)| **k == key)
             .context("the filled entry should be iterable")?;
-        let rebuilt = Arc::new(hopr_utils::statistics::WeightedCollection::new(
+        let rebuilt = Arc::new(CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
             swept.iter().cloned().collect(),
-        ));
+        )));
 
         let wrote = put_if_unchanged(&planner.cache, key, &swept, rebuilt.clone()).await;
         assert!(wrote, "the rebuild of an unchanged entry must be written");
@@ -2535,5 +2645,337 @@ mod tests {
         assert!((w_without - expected_without).abs() < 1e-9);
         // With capacity the factor adds further reduction (capacity_factor < 1.0 here).
         assert!(w_with <= w_without, "known capacity should not increase the weight");
+    }
+
+    #[tokio::test]
+    async fn routing_diagnostics_should_correlate_cached_draws_and_spawned_context() -> anyhow::Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        use crate::path::test_support::Logs;
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
+        let caller = tracing::debug_span!("test.session", session_id = 123);
+        tokio::spawn(
+            async move {
+                let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+                let destination = NodeId::Offchain(pubkey(&SECRET_ME));
+                for _ in 0..2 {
+                    planner
+                        .resolve_path(source, destination, RoutingOptions::Hops(1.try_into()?))
+                        .await?;
+                }
+                planner
+                    .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 3)
+                    .await?;
+                Ok::<_, anyhow::Error>(())
+            }
+            .instrument(caller)
+            .with_current_subscriber(),
+        )
+        .await??;
+
+        let installs = logs.records("candidate set installed");
+        assert_eq!(installs.len(), 1);
+        let set_id = &installs[0].fields["set_id"];
+        let choices = logs.records("path selected");
+        assert_eq!(choices.len(), 5);
+        assert!(choices.iter().all(|event| &event.fields["set_id"] == set_id));
+        assert_eq!(
+            logs.records("graph traversal completed").len(),
+            1,
+            "hits do not traverse again"
+        );
+        let traversal = logs.records("graph traversal completed");
+        assert_eq!(
+            traversal[0].ancestry,
+            vec![
+                "test.session",
+                "planner.resolve_path",
+                "planner.cached_paths",
+                "planner.rebuild_candidates",
+                "selector.select_paths",
+                "graph.simple_paths"
+            ]
+        );
+        let candidates = logs.records("weighted candidate path");
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates.iter().all(|event| &event.fields["set_id"] == set_id));
+        let probabilities = logs.records("return path sampling probability");
+        assert_eq!(probabilities.len(), 2);
+        let total: f64 = probabilities
+            .iter()
+            .map(|event| event.fields["marginal_probability"].parse::<f64>())
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .iter()
+            .sum();
+        assert!((total - 1.0).abs() < 1e-12);
+        let output = logs.output();
+        assert!(
+            output.contains("test.session{session_id=123}"),
+            "formatter exposes caller context"
+        );
+        assert!(output.contains("cache=\"hit\""), "{output}");
+        assert!(output.contains("graph.simple_paths"));
+        assert!(output.contains("returned=3"), "formatter exposes completed batch count");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn debug_diagnostics_should_report_searches_and_only_successful_installs() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+        let swept = fill_return_cache(&planner).await;
+        let hit = fill_return_cache(&planner).await;
+        assert_eq!(swept.id, hit.id);
+        planner.recompute_paths_from(&key.0).await;
+        let replacement = planner.cache.get(&key).await.context("recomputed entry")?;
+        assert_ne!(swept.id, replacement.id);
+        assert!(!put_if_unchanged(&planner.cache, key, &swept, swept.clone()).await);
+        assert_eq!(
+            logs.records("candidate set installed").len(),
+            2,
+            "losing refresh emits no install"
+        );
+        let rebuilt = Arc::new(CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
+            replacement.iter().cloned().collect(),
+        )));
+        assert!(put_if_unchanged(&planner.cache, key, &replacement, rebuilt.clone()).await);
+        let current = planner.cache.get(&key).await.context("refreshed entry")?;
+        assert_eq!(current.id, rebuilt.id);
+        let installs = logs.records("candidate set installed");
+        assert_eq!(installs.len(), 3);
+        assert_eq!(installs[2].fields["set_id"], rebuilt.id.to_string());
+        for _ in 0..3 {
+            graph.upsert_edge(&key.0, &pubkey(&SECRET_A), |_| {});
+            planner
+                .resolve_diverse_return_paths(NodeId::Offchain(key.0), RoutingOptions::Hops(1.try_into()?), 2)
+                .await?;
+        }
+        assert_eq!(logs.records("path search completed").len(), 2);
+        assert_eq!(logs.records("graph traversal completed").len(), 2);
+        assert!(logs.records("path selected").is_empty());
+        assert!(logs.records("weighted candidate path").is_empty());
+        assert!(logs.records("return path sampling probability").is_empty());
+        assert!(!logs.output().contains("path=["));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn return_probability_diagnostics_should_include_zero_weight_exploration() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (mut planner, _) = two_relayer_return_planner();
+        let cached = fill_return_cache(&planner).await;
+        let items = cached
+            .iter()
+            .enumerate()
+            .map(|(i, (path, _))| (path.clone(), if i == 0 { 0.0 } else { 4.0 }))
+            .collect();
+        let snapshot = Arc::new(CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
+            items,
+        )));
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+        planner.cache.insert(key, snapshot.clone()).await;
+        planner.return_path_exploration = 1.0;
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
+        planner
+            .resolve_diverse_return_paths(NodeId::Offchain(key.0), RoutingOptions::Hops(1.try_into()?), 4)
+            .await?;
+        let probabilities = logs.records("return path sampling probability");
+        assert_eq!(probabilities.len(), 2);
+        assert_eq!(probabilities[0].fields["weighted_share"], "0.0");
+        assert!(
+            probabilities
+                .iter()
+                .all(|event| event.fields["marginal_probability"] == "0.5")
+        );
+        assert!(
+            logs.records("path selected")
+                .iter()
+                .all(|event| event.fields["mode"] == "uniform_exploration")
+        );
+
+        // Unequal positive weights exercise both tempering and the exploration mixture:
+        // [1,4] -> [1,2] at t=0.5, then p = 0.1/2 + 0.9 * weighted_share.
+        let positive = CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
+            snapshot
+                .iter()
+                .enumerate()
+                .map(|(i, (path, _))| (path.clone(), if i == 0 { 1.0 } else { 4.0 }))
+                .collect(),
+        ));
+        planner.cache.insert(key, Arc::new(positive)).await;
+        planner.return_path_exploration = 0.1;
+        planner.return_path_weight_temper = 0.5;
+        planner
+            .resolve_diverse_return_paths(NodeId::Offchain(key.0), RoutingOptions::Hops(1.try_into()?), 1)
+            .await?;
+        let mixture = logs.records("return path sampling probability");
+        for (event, expected) in mixture[2..].iter().zip([0.35, 0.65]) {
+            let probability = event.fields["marginal_probability"].parse::<f64>()?;
+            assert!((probability - expected).abs() < 1e-12);
+        }
+
+        // Exploration preserves the existing all-zero failure behavior.
+        let zero = CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
+            snapshot.iter().map(|(path, _)| (path.clone(), 0.0)).collect(),
+        ));
+        planner.cache.insert(key, Arc::new(zero)).await;
+        assert!(
+            planner
+                .resolve_diverse_return_paths(NodeId::Offchain(key.0), RoutingOptions::Hops(1.try_into()?), 1)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            logs.records("path selection failed")[0].fields["outcome"],
+            "no_positive_weights"
+        );
+        assert_eq!(logs.records("path selected").len(), 5);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn diagnostics_should_distinguish_validation_failure_from_empty_search() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (mut planner, _) = two_relayer_return_planner_with_unresolvable_relayer(pubkey(&SECRET_A));
+        // Neither relay can now resolve to its chain address, while both remain graph candidates.
+        planner.resolver = Arc::new(TestChainApi::new(
+            pubkey(&SECRET_ME),
+            me_addr(),
+            vec![(pubkey(&SECRET_DEST), dest_addr())],
+        ));
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
+        assert!(
+            planner
+                .cached_paths(
+                    NodeId::Offchain(pubkey(&SECRET_DEST)),
+                    NodeId::Offchain(pubkey(&SECRET_ME)),
+                    1.try_into()?
+                )
+                .await
+                .is_err()
+        );
+        let validation = logs.records("candidate validation completed");
+        assert_eq!(validation[0].fields["discovered"], "2");
+        assert_eq!(validation[0].fields["validated"], "0");
+        assert_eq!(validation[0].fields["outcome"], "validation_empty");
+        let failures = logs.records("path candidate failed validation");
+        assert_eq!(failures.len(), 2);
+        assert!(
+            failures
+                .iter()
+                .all(|event| event.fields.contains_key("path") && !event.fields.contains_key("set_id"))
+        );
+        assert!(logs.records("candidate set installed").is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn background_diagnostics_should_start_a_root_outside_the_caller_session() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (mut planner, _) = two_relayer_return_planner();
+        fill_return_cache(&planner).await;
+        planner.refresh_period = Duration::from_millis(1);
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        tokio::time::timeout(
+            Duration::from_millis(30),
+            planner
+                .run_background_refresh()
+                .instrument(tracing::debug_span!("test.session", session_id = 456)),
+        )
+        .await
+        .err()
+        .context("refresh loop should run until timeout")?;
+        let installs = logs.records("candidate set installed");
+        assert!(!installs.is_empty());
+        assert!(
+            installs
+                .iter()
+                .all(|event| event.ancestry == vec!["planner.background_refresh"])
+        );
+        let traversals = logs.records("graph traversal completed");
+        assert!(
+            traversals
+                .iter()
+                .all(|event| event.ancestry.first() == Some(&"planner.background_refresh")
+                    && !event.ancestry.contains(&"test.session"))
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fixed_route_diagnostics_should_identify_modes_without_candidate_sets() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
+        for forward_options in [
+            RoutingOptions::Hops(0.try_into()?),
+            RoutingOptions::IntermediatePath(vec![].try_into()?),
+        ] {
+            planner
+                .resolve_routing(
+                    0,
+                    0,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options,
+                        return_options: None,
+                    },
+                )
+                .await?;
+        }
+        let choices = logs.records("path selected");
+        assert_eq!(choices.len(), 2);
+        assert_eq!(choices[0].fields["mode"], "direct");
+        assert_eq!(choices[1].fields["mode"], "explicit");
+        assert!(choices.iter().all(|event| !event.fields.contains_key("set_id")
+            && event.ancestry == vec!["routing.resolve", "planner.resolve_path"]));
+        assert!(logs.records("candidate set installed").is_empty());
+        Ok(())
+    }
+
+    /// Run explicitly to compare cache-hit hot-path overhead with formatting lifecycle events off.
+    #[tokio::test]
+    #[ignore = "manual diagnostic span overhead measurement"]
+    async fn measure_cached_routing_span_overhead() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, _) = two_relayer_return_planner();
+        fill_return_cache(&planner).await;
+        let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+        let options = RoutingOptions::Hops(1.try_into()?);
+        let measure = || async {
+            let start = std::time::Instant::now();
+            for _ in 0..10_000 {
+                std::hint::black_box(planner.resolve_diverse_return_paths(source, options.clone(), 2).await?);
+            }
+            Ok::<_, anyhow::Error>(start.elapsed().as_nanos() / 10_000)
+        };
+        let disabled_ns = {
+            let _subscriber = tracing::subscriber::set_default(tracing::subscriber::NoSubscriber::default());
+            measure().await?
+        };
+        let debug_ns = {
+            let logs = Logs::default();
+            let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+            measure().await?
+        };
+        println!("cache-hit return batch (2 draws), ns/call: spans disabled={disabled_ns}, DEBUG spans={debug_ns}");
+        Ok(())
     }
 }
