@@ -10,13 +10,14 @@ pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR: u64 = 5;
 
 /// Default hard latency bound. Bounded-latency mode (the default, `target_occupancy = 0`) holds
-/// mean delay to `max_delay / ln(1/miss_probability)` regardless of load; constant-privacy mode
+/// mean delay below `max_delay / ln(1/miss_probability)` regardless of load; constant-privacy mode
 /// (`target_occupancy > 0`) uses this only as an anti-starvation ceiling and typically releases
 /// well below it.
 pub const HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS: u64 = 20;
-/// Default target `P(delay > max_delay)`. Fixes `g_max = ln(1/miss_probability)`, the per-entry
-/// release-tag ceiling; at the default this gives `g_max ≈ 4.6` and, at the default `max_delay`,
-/// a mean delay of `max_delay/g_max · E[g] ≈ 4.14 ms`.
+/// Default mass discarded from an untruncated exponential release tag. Fixes
+/// `g_max = ln(1/miss_probability)`, the tag ceiling; the truncated distribution cannot exceed
+/// the hard delay bound. At the defaults, `g_max ≈ 4.6` and the bounded-mode mean delay is
+/// `max_delay/g_max · E[g] ≈ 4.14 ms`.
 pub const HOPR_MIXER_DEFAULT_MISS_PROBABILITY: f64 = 0.01;
 /// Default `target_occupancy`: `0` disables the arrival term entirely (bounded-latency mode).
 pub const HOPR_MIXER_DEFAULT_TARGET_OCCUPANCY: usize = 0;
@@ -176,7 +177,21 @@ impl validator::Validate for MixerType {
     fn validate(&self) -> Result<(), validator::ValidationErrors> {
         match self {
             #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
-            MixerType::Uniform(uniform) => uniform.validate(),
+            MixerType::Uniform(uniform) => {
+                #[cfg(all(feature = "poisson", not(feature = "uniform-channel")))]
+                {
+                    let _ = uniform;
+                    let mut errors = validator::ValidationErrors::new();
+                    errors.add(
+                        "mixer_type",
+                        ValidationError::new("uniform_channel_feature_required")
+                            .with_message("the Uniform runtime mixer requires the uniform-channel feature".into()),
+                    );
+                    Err(errors)
+                }
+                #[cfg(any(feature = "uniform-channel", not(feature = "poisson")))]
+                uniform.validate()
+            }
             #[cfg(feature = "poisson")]
             MixerType::Poisson(poisson) => poisson.validate(),
             #[allow(unreachable_patterns)]
@@ -242,10 +257,10 @@ pub struct PoissonConfig {
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_DELAY_IN_MS))]
     #[cfg_attr(feature = "serde", serde(default = "default_max_delay", with = "humantime_serde"))]
     pub max_delay: Duration,
-    /// Target `P(delay > max_delay)`. Must be in the open interval `(0, 0.5)`; fixes the
-    /// per-entry tag ceiling `g_max = ln(1/miss_probability)` and, with it,
-    /// `mu_max = max_delay / g_max` — the slowest the release clock ever holds an entry via
-    /// wall-clock time alone.
+    /// Mass discarded from an untruncated exponential release tag, in the open interval `(0, 0.5)`.
+    /// Fixes `g_max = ln(1/p)` and `mu_max = max_delay / g_max`. The bounded-mode mean delay is
+    /// `mu_max * (1 - p*g_max/(1-p))`; this is a shape parameter, not the probability of exceeding
+    /// `max_delay`. Tags are truncated at `g_max`, so overruns indicate delayed scheduling.
     #[default(HOPR_MIXER_DEFAULT_MISS_PROBABILITY)]
     #[cfg_attr(feature = "serde", serde(default = "default_miss_probability"))]
     #[validate(custom(function = "validate_miss_probability"))]
@@ -296,6 +311,37 @@ mod tests {
     #[test]
     fn default_config_should_pass_validation() -> anyhow::Result<()> {
         MixerConfig::default().validate()?;
+        Ok(())
+    }
+
+    #[cfg(all(feature = "poisson", feature = "uniform-adapter", not(feature = "uniform-channel")))]
+    #[test]
+    fn adapter_only_uniform_config_should_be_rejected_before_runtime_dispatch() -> anyhow::Result<()> {
+        let cfg = MixerConfig::new_uniform(Duration::ZERO, Duration::from_millis(20));
+        assert!(cfg.validate().is_err());
+        #[cfg(feature = "serde")]
+        {
+            let decoded: MixerConfig = serde_json::from_str(
+                r#"{"capacity":100,"mixer_type":{"Uniform":{"min_delay":"0ms","delay_range":"20ms"}}}"#,
+            )?;
+            assert!(decoded.validate().is_err());
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "uniform-channel")]
+    #[test]
+    fn uniform_config_should_validate_when_its_channel_is_available() -> anyhow::Result<()> {
+        let cfg = MixerConfig::new_uniform(Duration::ZERO, Duration::from_millis(20));
+        cfg.validate()?;
+        #[cfg(feature = "serde")]
+        {
+            let decoded: MixerConfig = serde_json::from_str(
+                r#"{"capacity":20000,"mixer_type":{"Uniform":{"min_delay":"0ms","delay_range":"20ms"}}}"#,
+            )?;
+            assert_eq!(decoded, cfg);
+            decoded.validate()?;
+        }
         Ok(())
     }
 
