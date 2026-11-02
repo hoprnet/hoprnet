@@ -433,6 +433,7 @@ async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
     }
 }
 
+#[inline]
 fn log_startup(ctx: &BuildCtx) {
     tracing::info!(
         version = constants::APP_VERSION,
@@ -444,6 +445,7 @@ fn log_startup(ctx: &BuildCtx) {
     tracing::debug!(config = ?ctx.cfg, "node configuration");
 }
 
+#[inline]
 fn log_network_information(
     chain_info: Result<ChainInfo, impl std::fmt::Display>,
     network_min_ticket_price: &HoprBalance,
