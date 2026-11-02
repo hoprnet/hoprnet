@@ -2184,9 +2184,8 @@ mod tests {
     /// first rebuild and a repeated rebuild of the same still-collapsed key does not re-record it, so
     /// the WARN is gated to the one transition.
     ///
-    /// The inverse `remove` that clears the key on recovery (re-arming the WARN) is not driven here:
-    /// the selector's candidate set is fixed for a given planner, so a live collapse->recovery
-    /// transition on one key cannot be produced through this harness.
+    /// Recovery after graph changes is covered separately by
+    /// `relayer_recovery_should_install_new_candidates_and_log_once`.
     #[tokio::test]
     async fn diversity_collapse_is_recorded_once_not_per_rebuild() {
         let dest = pubkey(&SECRET_DEST);
@@ -2648,6 +2647,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn routing_diagnostics_should_correlate_cached_draws_and_spawned_context() -> anyhow::Result<()> {
         use tracing::instrument::WithSubscriber;
 
@@ -2723,6 +2723,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn debug_diagnostics_should_report_searches_and_only_successful_installs() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2740,7 +2741,8 @@ mod tests {
         assert_eq!(
             logs.records("candidate set installed").len(),
             2,
-            "losing refresh emits no install"
+            "losing refresh emits no install: {}",
+            logs.output()
         );
         let rebuilt = Arc::new(CandidateSet::new(hopr_utils::statistics::WeightedCollection::new(
             replacement.iter().cloned().collect(),
@@ -2757,8 +2759,8 @@ mod tests {
                 .resolve_diverse_return_paths(NodeId::Offchain(key.0), RoutingOptions::Hops(1.try_into()?), 2)
                 .await?;
         }
-        assert_eq!(logs.records("path search completed").len(), 2);
-        assert_eq!(logs.records("graph traversal completed").len(), 2);
+        assert_eq!(logs.records("path search completed").len(), 2, "{}", logs.output());
+        assert_eq!(logs.records("graph traversal completed").len(), 2, "{}", logs.output());
         assert!(logs.records("path selected").is_empty());
         assert!(logs.records("weighted candidate path").is_empty());
         assert!(logs.records("return path sampling probability").is_empty());
@@ -2767,6 +2769,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn return_probability_diagnostics_should_include_zero_weight_exploration() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2839,10 +2842,29 @@ mod tests {
             "no_positive_weights"
         );
         assert_eq!(logs.records("path selected").len(), 5);
+
+        // Single-path callers use the base collection's pick_one rather than the batch policy.
+        // They must report the same sampling failure and must not log a successful choice.
+        assert!(
+            planner
+                .resolve_path(
+                    NodeId::Offchain(key.0),
+                    NodeId::Offchain(key.1),
+                    RoutingOptions::Hops(1.try_into()?)
+                )
+                .await
+                .is_err()
+        );
+        let failures = logs.records("path selection failed");
+        assert_eq!(failures.len(), 2);
+        assert_eq!(failures[1].fields["outcome"], "no_positive_weights");
+        assert_eq!(failures[1].ancestry, vec!["planner.resolve_path"]);
+        assert_eq!(logs.records("path selected").len(), 5);
         Ok(())
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn diagnostics_should_distinguish_validation_failure_from_empty_search() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2881,6 +2903,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn background_diagnostics_should_start_a_root_outside_the_caller_session() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2889,15 +2912,27 @@ mod tests {
         planner.refresh_period = Duration::from_millis(1);
         let logs = Logs::default();
         let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
-        tokio::time::timeout(
-            Duration::from_millis(30),
-            planner
-                .run_background_refresh()
-                .instrument(tracing::debug_span!("test.session", session_id = 456)),
+        let observed = async {
+            loop {
+                if !logs.records("candidate set installed").is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        };
+        let completed = futures::future::select(
+            Box::pin(
+                planner
+                    .run_background_refresh()
+                    .instrument(tracing::debug_span!("test.session", session_id = 456)),
+            ),
+            Box::pin(tokio::time::timeout(Duration::from_secs(2), observed)),
         )
-        .await
-        .err()
-        .context("refresh loop should run until timeout")?;
+        .await;
+        let futures::future::Either::Right((result, _refresh)) = completed else {
+            anyhow::bail!("background refresh must keep running");
+        };
+        result.context("refresh must install a candidate set")?;
         let installs = logs.records("candidate set installed");
         assert!(!installs.is_empty());
         assert!(
@@ -2916,6 +2951,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(routing_logs)]
     async fn fixed_route_diagnostics_should_identify_modes_without_candidate_sets() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -2949,33 +2985,155 @@ mod tests {
         Ok(())
     }
 
-    /// Run explicitly to compare cache-hit hot-path overhead with formatting lifecycle events off.
+    #[test]
+    fn routing_config_should_reject_non_finite_and_out_of_range_probabilities() -> anyhow::Result<()> {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.01, 1.01] {
+            let config = PathPlannerConfig {
+                edge_penalty: value,
+                min_ack_rate: value,
+                return_path_exploration: value,
+                ..PathPlannerConfig::default()
+            };
+            let errors = config
+                .validate()
+                .err()
+                .context("invalid probabilities should fail validation")?;
+            for field in ["edge_penalty", "min_ack_rate", "return_path_exploration"] {
+                assert!(errors.field_errors().contains_key(field), "{field} accepted {value}");
+            }
+        }
+        for value in [0.0, 1.0] {
+            PathPlannerConfig {
+                edge_penalty: value,
+                min_ack_rate: value,
+                return_path_exploration: value,
+                ..PathPlannerConfig::default()
+            }
+            .validate()?;
+        }
+        Ok(())
+    }
+
     #[tokio::test]
-    #[ignore = "manual diagnostic span overhead measurement"]
-    async fn measure_cached_routing_span_overhead() -> anyhow::Result<()> {
+    #[serial_test::serial(routing_logs)]
+    async fn unknown_chain_address_should_fail_before_graph_search() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
         let (planner, _) = two_relayer_return_planner();
-        fill_return_cache(&planner).await;
-        let source = NodeId::Offchain(pubkey(&SECRET_DEST));
-        let options = RoutingOptions::Hops(1.try_into()?);
-        let measure = || async {
-            let start = std::time::Instant::now();
-            for _ in 0..10_000 {
-                std::hint::black_box(planner.resolve_diverse_return_paths(source, options.clone(), 2).await?);
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let error = planner
+            .resolve_path(
+                NodeId::Offchain(pubkey(&SECRET_ME)),
+                NodeId::Chain(Address::default()),
+                RoutingOptions::Hops(1.try_into()?),
+            )
+            .await
+            .err()
+            .context("unmapped chain address must fail")?;
+        assert!(
+            error.to_string().contains("no offchain key found for chain address"),
+            "{error}"
+        );
+        assert!(logs.records("graph traversal completed").is_empty());
+        assert!(logs.records("candidate set installed").is_empty());
+        assert_eq!(planner.cache.entry_count(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn relayer_recovery_should_install_new_candidates_and_log_once() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, graph) = two_relayer_return_planner_with_floor(0);
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let original = fill_return_cache(&planner).await;
+        let dest = pubkey(&SECRET_DEST);
+        let b = pubkey(&SECRET_B);
+        graph.remove_node(&b);
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            1,
+            "losing a candidate changes traffic shares"
+        );
+        assert_eq!(planner.collapsed_diversity_len(), 1);
+        let collapsed = fill_return_cache(&planner).await;
+        assert_eq!(collapsed.len(), 1);
+        assert_ne!(collapsed.id, original.id);
+
+        mark_edge_full(&graph, &dest, &b);
+        mark_edge_full(&graph, &b, &pubkey(&SECRET_ME));
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            1,
+            "recovered relayer rejoins the distribution"
+        );
+        assert_eq!(planner.collapsed_diversity_len(), 0);
+        let recovered = fill_return_cache(&planner).await;
+        assert_eq!(recovered.len(), 2);
+        assert_ne!(recovered.id, collapsed.id);
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            0,
+            "unchanged weights do not move traffic"
+        );
+        assert_eq!(
+            logs.records("return-path relayer diversity recovered for this destination")
+                .len(),
+            1
+        );
+        let installs = logs.records("candidate set installed");
+        assert_eq!(installs.len(), 4);
+        assert_eq!(installs[2].fields["set_id"], recovered.id.to_string());
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn background_validation_failure_should_preserve_the_installed_snapshot() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (mut planner, _) = two_relayer_return_planner();
+        let installed = fill_return_cache(&planner).await;
+        planner.resolver = Arc::new(TestChainApi::new(
+            pubkey(&SECRET_ME),
+            me_addr(),
+            vec![(pubkey(&SECRET_DEST), dest_addr())],
+        ));
+        planner.refresh_period = Duration::from_millis(1);
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let observed = async {
+            loop {
+                if !logs.records("candidate validation completed").is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
-            Ok::<_, anyhow::Error>(start.elapsed().as_nanos() / 10_000)
         };
-        let disabled_ns = {
-            let _subscriber = tracing::subscriber::set_default(tracing::subscriber::NoSubscriber::default());
-            measure().await?
+        let completed = futures::future::select(
+            Box::pin(planner.run_background_refresh()),
+            Box::pin(tokio::time::timeout(Duration::from_secs(2), observed)),
+        )
+        .await;
+        let futures::future::Either::Right((result, _refresh)) = completed else {
+            anyhow::bail!("background refresh must keep running");
         };
-        let debug_ns = {
-            let logs = Logs::default();
-            let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
-            measure().await?
-        };
-        println!("cache-hit return batch (2 draws), ns/call: spans disabled={disabled_ns}, DEBUG spans={debug_ns}");
+        result.context("refresh must attempt validation")?;
+        let current = planner
+            .cache
+            .get(&(pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1))
+            .await
+            .context("failed refresh must retain its entry")?;
+        assert!(Arc::ptr_eq(&installed, &current));
+        assert!(logs.records("candidate set installed").is_empty());
+        assert!(
+            logs.records("candidate validation completed")
+                .iter()
+                .all(|event| event.fields["outcome"] == "validation_empty")
+        );
         Ok(())
     }
 }

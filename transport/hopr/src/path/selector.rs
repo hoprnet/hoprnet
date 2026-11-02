@@ -1559,6 +1559,7 @@ mod tests {
     // fundable_tickets_floor always Some for reachable paths.
 
     #[test]
+    #[serial_test::serial(routing_logs)]
     fn search_diagnostics_should_cover_both_traversals_and_empty_results() -> anyhow::Result<()> {
         use crate::path::test_support::Logs;
 
@@ -1591,6 +1592,61 @@ mod tests {
             logs.records("path search completed")[1].fields["outcome"],
             "empty_search"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn traversal_threshold_comparisons_should_depend_only_on_cost() {
+        let metrics = PathCostWithMetrics {
+            cost: 0.5,
+            total_latency_ms: Some(10),
+            min_probe_success_rate: Some(1.0),
+            min_ack_rate: Some(1.0),
+            fundable_tickets_floor: Some(100),
+        };
+        let different_quality = PathCostWithMetrics {
+            total_latency_ms: None,
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            fundable_tickets_floor: None,
+            ..metrics.clone()
+        };
+        assert_eq!(
+            metrics, different_quality,
+            "quality metadata must not change DFS equality"
+        );
+        assert_eq!(metrics.partial_cmp(&different_quality), Some(Ordering::Equal));
+        let higher = PathCostWithMetrics {
+            cost: 0.75,
+            ..different_quality
+        };
+        assert_ne!(metrics, higher);
+        assert_eq!(metrics.partial_cmp(&higher), Some(Ordering::Less));
+    }
+
+    #[test]
+    fn ticket_capacity_should_handle_zero_price_and_saturate_large_balances() -> anyhow::Result<()> {
+        use hopr_api::graph::traits::Balance;
+        use hopr_network_graph::Observations;
+
+        for (balance, price, expected) in [
+            (Balance::from(100u64), Some(Balance::zero()), Some(0)),
+            (Balance::max_value(), Some(Balance::one()), Some(u128::MAX)),
+            (Balance::from(100u64), None, None),
+        ] {
+            let mut observed = Observations::default();
+            observed.record(EdgeWeightType::Balance(Some(balance)));
+            let value_fn = MetricsValueFn {
+                inner: EdgeValueFn::forward(1.try_into()?, 0.5, 0.1, price),
+                ticket_face_value: price,
+            };
+            let initial = value_fn.initial_value();
+            let folded = value_fn.into_value_fn()(initial, &observed, 0);
+            assert_eq!(
+                folded.fundable_tickets_floor, expected,
+                "balance={balance}, price={price:?}"
+            );
+        }
         Ok(())
     }
 }
