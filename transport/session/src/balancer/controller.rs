@@ -178,7 +178,7 @@ pub struct BalancerStateValues {
     counterparty_wiped: AtomicBool,
     /// Paces the refill after a wipe: the rate in SURBs per second in the high 32 bits and the
     /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
-    /// inactive. See [`REFILL_PACING_SECS`].
+    /// inactive. See `REFILL_PACING_SECS`.
     refill_pacing: AtomicU64,
 }
 
@@ -383,7 +383,7 @@ impl BalancerStateValues {
     /// of the session advanced and the counterparty clears its store on the first batch of the new one.
     ///
     /// The level estimate restarts from empty at the next balancer update, and for
-    /// [`REFILL_PACING_SECS`] the refill is held to `target / REFILL_PACING_SECS` SURBs per second.
+    /// `REFILL_PACING_SECS` the refill is held to `target / REFILL_PACING_SECS` SURBs per second.
     /// The counterparty's own reports follow suit once the first SURBs of the new generation reach
     /// it. Until then it may still report the level it had before; for the paced window such a
     /// report, being above what is believed here, is dropped (see
