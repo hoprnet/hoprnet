@@ -564,6 +564,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             signals_from_sender: aux_info.packet_signals,
                             num_saved_surbs: aux_info.num_surbs,
                             num_evicted_surbs: aux_info.num_evicted_surbs,
+                            min_return_path_hops: aux_info.min_return_path_hops,
                         }
                     })))
         ))
@@ -1737,6 +1738,25 @@ mod tests {
         drain
             .await
             .expect("drain task must finish cleanly after sender is dropped");
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn drain_pipeline_consumes_nonempty_and_empty_batches_under_backpressure() -> anyhow::Result<()> {
+        let key = OffchainKeypair::random();
+        let (mut tx, rx) = mpsc::channel(0);
+        let drain = start_drain_incoming_ack_pipeline(rx);
+        let send = async move {
+            tx.send((*key.public(), vec![VerifiedAcknowledgement::random(&key).leak()]))
+                .await?;
+            tx.send((*key.public(), vec![])).await?;
+            drop(tx);
+            anyhow::Ok(())
+        };
+
+        let (sent, ()) =
+            tokio::time::timeout(std::time::Duration::from_secs(5), futures::future::join(send, drain)).await?;
+        sent?;
+        Ok(())
     }
 
     /// Regression: the drain must complete cleanly when the sender is dropped (no deadlock/panic).

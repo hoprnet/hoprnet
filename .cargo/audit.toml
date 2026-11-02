@@ -1,10 +1,10 @@
 [advisories]
 ignore = [
-  "RUSTSEC-2024-0436", # 'paste' dependency in 'libp2p' [unmaintained]
-  "RUSTSEC-2024-0388", # 'derivative' in 'alloy' [unmaintained],
-  "RUSTSEC-2026-0118", # `hickory-proto` 0.25.2 pulled by libp2p-dns 0.44.0 -> libp2p 0.56.0; no fix for 0.25.x; cannot remove without a major libp2p bump
+  "RUSTSEC-2024-0436", # 'paste' unmaintained, pulled by alloy-primitives/syn-solidity/ark-ff macros and netlink-packet-core (libp2p netlink); no patched release
+  "RUSTSEC-2024-0388", # 'derivative' unmaintained, pulled by ark-ff 0.3.0/0.4.2; no patched release
+  "RUSTSEC-2026-0118", # `hickory-proto` 0.25.2 pulled by libp2p-mdns 0.48.0 and hickory-resolver 0.25.2 (libp2p 0.56.0 stack); only 0.26.x is unaffected, so this needs a libp2p bump
   "RUSTSEC-2026-0119", # same root cause as 0118 (different advisory DB version); hickory-proto 0.26.x is fixed via hickory-proto 0.26.1
-  "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained; pulled by validator_derive -> validator -> hopr-transport-tag-allocator; drop once validator upgrades or is replaced
+  "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained, pulled by alloy-sol-macro 1.6.0 and aquamarine 0.6.0; validator_derive uses proc-macro-error3, not this crate
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
   "RUSTSEC-2026-0249", # `smartstring` unmaintained, requires `opentelemetry-prometheus-text-exporter` > 0.3.0
