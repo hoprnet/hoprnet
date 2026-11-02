@@ -677,6 +677,8 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn closing_the_socket_should_drain_outgoing_segments_and_close_the_transport() -> anyhow::Result<()> {
+        use crate::protocol::{Segment, SeqIndicator};
+
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
         let mut socket = SessionSocket::new(
             alice,
@@ -696,18 +698,19 @@ mod tests {
             futures::TryStreamExt::try_collect::<Vec<_>>(asynchronous_codec::FramedRead::new(bob, SessionCodec::<MTU>))
                 .timeout(futures_time::time::Duration::from_secs(5))
                 .await??;
-        let mut received = Vec::new();
-        let mut terminated = false;
-        for message in messages {
-            let SessionMessage::Segment(segment) = message else {
-                anyhow::bail!("stateless sender emitted a control message");
-            };
-            assert!(!terminated, "no segment may follow the terminating segment");
-            terminated = segment.is_terminating();
-            received.extend_from_slice(&segment.data);
-        }
-        assert!(terminated, "socket close must emit a terminating segment");
-        assert_eq!(received, expected);
+        assert_eq!(
+            messages,
+            vec![
+                SessionMessage::Segment(Segment {
+                    frame_id: 1,
+                    seq_idx: 0,
+                    seq_flags: SeqIndicator::new_with_flags(1, false),
+                    data: expected.to_vec().into_boxed_slice(),
+                }),
+                SessionMessage::Segment(Segment::terminating(2)),
+            ],
+            "all queued data must precede the terminating segment, with no control messages"
+        );
         Ok(())
     }
 

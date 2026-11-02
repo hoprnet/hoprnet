@@ -1277,6 +1277,47 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "testing")]
+    #[test]
+    fn startup_is_logged_before_invalid_configuration_is_rejected() -> anyhow::Result<()> {
+        type TestBuilder = HoprBuilderConfigured<
+            Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+            hopr_network_graph::SharedChannelGraph,
+            hopr_transport_p2p::HoprNetwork,
+            hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
+        >;
+
+        let builder = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig {
+                out_index_sync_period: Duration::ZERO,
+                ..Default::default()
+            });
+        // No component factory may be required or invoked before configuration validation.
+        let configured = TestBuilder {
+            ctx: builder.ctx,
+            safe_and_module: None,
+            chain_factory: None,
+            graph_factory: None,
+            network_factory: None,
+            ct_factory: None,
+            peer_discovery_tx: builder.peer_discovery_tx,
+        };
+        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
+        let logs = capture_logs(|| {
+            let result =
+                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()));
+            assert!(matches!(
+                result,
+                Err(HoprLibError::ConfigurationError(errors))
+                    if errors.field_errors().contains_key("out_index_sync_period")
+            ));
+        })?;
+        assert!(logs.contains("starting node"));
+        assert!(logs.contains("node configuration"));
+        Ok(())
+    }
+
     #[rstest::rstest]
     #[case::available(true)]
     #[case::unavailable(false)]
