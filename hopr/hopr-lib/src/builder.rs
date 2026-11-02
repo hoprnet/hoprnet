@@ -36,13 +36,17 @@ pub use hopr_api::types::crypto::{
     prelude::{ChainKeypair, OffchainKeypair},
 };
 use hopr_api::{
-    chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
+    chain::{AnnouncementError, ChainInfo, HoprChainApi, SafeRegistrationError, StateSyncOptions, WinningProbability},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, PixEvent, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
-    types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
+    types::{
+        chain::chain_events::ChainEvent,
+        internal::prelude::ChannelDirection,
+        primitive::prelude::{Address, HoprBalance},
+    },
 };
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
@@ -429,6 +433,40 @@ async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
     }
 }
 
+#[inline]
+fn log_startup(ctx: &BuildCtx) {
+    tracing::info!(
+        version = constants::APP_VERSION,
+        features = env!("ACTIVE_FEATURES"),
+        peer = %ctx.packet_key.public().to_peerid_str(),
+        chain_addr = %ctx.chain_key.public().to_address(),
+        "starting node"
+    );
+    tracing::debug!(config = ?ctx.cfg, "node configuration");
+}
+
+#[inline]
+fn log_network_information(
+    chain_info: Result<ChainInfo, impl std::fmt::Display>,
+    network_min_ticket_price: &HoprBalance,
+    network_min_win_prob: &WinningProbability,
+) {
+    let (network_name, network_chain_id) = match chain_info {
+        Ok(info) => (info.hopr_network_name, Some(info.chain_id)),
+        Err(error) => {
+            tracing::warn!(%error, "could not read the network information");
+            (String::new(), None)
+        }
+    };
+    tracing::info!(
+        network = network_name,
+        chain_id = network_chain_id,
+        %network_min_ticket_price,
+        %network_min_win_prob,
+        "network information"
+    );
+}
+
 async fn pre_build_inner<Chain, Graph, Net, Ct>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -446,6 +484,8 @@ where
 {
     let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
+    // First, so it is in the log even when the configuration or the chain fails below.
+    log_startup(&ctx);
     ctx.cfg.validate()?;
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
@@ -568,11 +608,12 @@ where
         )));
     }
 
-    tracing::info!(
-        peer_id = %transport_id.public().to_peerid_str(),
-        address = %me_onchain,
-        hopr_lib_version = constants::APP_VERSION,
-        "Node information"
+    // The network the node joined, with the minimums it enforces: what a log reader needs to judge
+    // ticket problems. Best effort, because the checks above have already passed.
+    log_network_information(
+        chain_api.chain_info().await,
+        &network_min_ticket_price,
+        &network_min_win_prob,
     );
 
     let safe_addr = ctx.cfg.safe_module.safe_address;
@@ -1172,5 +1213,147 @@ where
         let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
         let processes = AbortableList::<HoprLibProcess>::default();
         (self, tx, None, processes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use anyhow::Context;
+
+    use super::*;
+
+    #[derive(Clone, Default)]
+    struct LogBuffer(Arc<parking_lot::Mutex<Vec<u8>>>);
+
+    impl Write for LogBuffer {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn capture_logs(log: impl FnOnce()) -> anyhow::Result<String> {
+        let mut buffer = LogBuffer::default();
+        let writer = buffer.clone();
+        let subscriber = test_log::tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, log);
+        buffer.flush().context("flush captured logs")?;
+        String::from_utf8(buffer.0.lock().clone()).context("logs should be UTF-8")
+    }
+
+    #[test]
+    fn startup_logs_build_and_identity_separately_from_configuration() -> anyhow::Result<()> {
+        let chain_key = ChainKeypair::random();
+        let packet_key = OffchainKeypair::random();
+        let builder = HoprBuilder
+            .with_identity(&chain_key, &packet_key)
+            .with_config(HoprLibConfig::default());
+
+        let logs = capture_logs(|| log_startup(&builder.ctx))?;
+        let lines: Vec<_> = logs.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("INFO"));
+        assert!(lines[0].contains("starting node"));
+        assert!(lines[0].contains(&format!("version=\"{}\"", constants::APP_VERSION)));
+        assert!(lines[0].contains(&format!("features=\"{}\"", env!("ACTIVE_FEATURES"))));
+        assert!(lines[0].contains(&format!("peer={}", packet_key.public().to_peerid_str())));
+        assert!(lines[0].contains(&format!("chain_addr={}", chain_key.public().to_address())));
+        assert!(!lines[0].contains("config="));
+        assert!(!lines[0].contains("peer_addr="));
+        assert!(lines[1].contains("DEBUG"));
+        assert!(lines[1].contains("node configuration"));
+        assert!(lines[1].contains(&format!("config={:?}", builder.ctx.cfg)));
+        Ok(())
+    }
+
+    #[cfg(feature = "testing")]
+    #[test]
+    fn startup_is_logged_before_invalid_configuration_is_rejected() -> anyhow::Result<()> {
+        type TestBuilder = HoprBuilderConfigured<
+            Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+            hopr_network_graph::SharedChannelGraph,
+            hopr_transport_p2p::HoprNetwork,
+            hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
+        >;
+
+        let builder = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig {
+                out_index_sync_period: Duration::ZERO,
+                ..Default::default()
+            });
+        // No component factory may be required or invoked before configuration validation.
+        let configured = TestBuilder {
+            ctx: builder.ctx,
+            safe_and_module: None,
+            chain_factory: None,
+            graph_factory: None,
+            network_factory: None,
+            ct_factory: None,
+            peer_discovery_tx: builder.peer_discovery_tx,
+        };
+        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
+        let logs = capture_logs(|| {
+            let result =
+                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()));
+            assert!(matches!(
+                result,
+                Err(HoprLibError::ConfigurationError(errors))
+                    if errors.field_errors().contains_key("out_index_sync_period")
+            ));
+        })?;
+        assert!(logs.contains("starting node"));
+        assert!(logs.contains("node configuration"));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::available(true)]
+    #[case::unavailable(false)]
+    fn network_logs_preserve_ticket_minimums_when_chain_info_is_unavailable(
+        #[case] available: bool,
+    ) -> anyhow::Result<()> {
+        let chain_info = if available {
+            Ok(ChainInfo {
+                chain_id: 100,
+                hopr_network_name: "dufour".into(),
+                contract_addresses: Default::default(),
+            })
+        } else {
+            Err("RPC unavailable")
+        };
+        let price = HoprBalance::from(42u64);
+        let probability = WinningProbability::ALWAYS;
+        let logs = capture_logs(|| log_network_information(chain_info, &price, &probability))?;
+        let lines: Vec<_> = logs.lines().collect();
+        let information = lines.last().context("network information should always be logged")?;
+        assert!(information.contains("INFO"));
+        assert!(information.contains("network information"));
+        assert!(information.contains(&format!("network_min_ticket_price={price}")));
+        assert!(information.contains(&format!("network_min_win_prob={probability}")));
+        if available {
+            assert_eq!(lines.len(), 1);
+            assert!(information.contains("network=\"dufour\""));
+            assert!(information.contains("chain_id=100"));
+        } else {
+            assert_eq!(lines.len(), 2);
+            assert!(lines[0].contains("WARN"));
+            assert!(lines[0].contains("could not read the network information"));
+            assert!(lines[0].contains("error=RPC unavailable"));
+            assert!(information.contains("network=\"\""));
+            assert!(!information.contains("chain_id="));
+        }
+        Ok(())
     }
 }

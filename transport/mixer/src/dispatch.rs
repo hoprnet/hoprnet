@@ -86,6 +86,9 @@ impl<T: Unpin> Stream for AnyReceiver<T> {
 
 /// Instantiate the mixer engine selected by `cfg.mixer_type`, returning an engine-agnostic
 /// sender/receiver pair.
+///
+/// Validate the configuration before calling this function. In a build with runtime dispatch,
+/// selecting Uniform requires `uniform-channel`; `uniform-adapter` alone is insufficient.
 pub fn create<T: Send + Unpin + 'static>(cfg: MixerConfig) -> (AnySender<T>, AnyReceiver<T>) {
     match cfg.mixer_type {
         #[cfg(feature = "uniform-channel")]

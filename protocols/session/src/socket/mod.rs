@@ -654,6 +654,66 @@ mod tests {
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
 
+    #[test]
+    fn state_update_errors_are_debug_only_when_the_session_is_closing() {
+        use test_log::tracing_subscriber::{Layer, layer::SubscriberExt};
+
+        struct LogLevels(std::sync::Arc<parking_lot::Mutex<Vec<tracing::Level>>>);
+
+        impl<S: tracing::Subscriber> Layer<S> for LogLevels {
+            fn on_event(&self, event: &tracing::Event<'_>, _: test_log::tracing_subscriber::layer::Context<'_, S>) {
+                self.0.lock().push(*event.metadata().level());
+            }
+        }
+
+        let levels = std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let subscriber = test_log::tracing_subscriber::registry().with(LogLevels(levels.clone()));
+        tracing::subscriber::with_default(subscriber, || {
+            log_state_update_error(&SessionError::StateNotRunning, "frame complete state update failed");
+            log_state_update_error(&SessionError::InvalidFrameId, "frame complete state update failed");
+        });
+        assert_eq!(*levels.lock(), vec![tracing::Level::DEBUG, tracing::Level::ERROR]);
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn closing_the_socket_should_drain_outgoing_segments_and_close_the_transport() -> anyhow::Result<()> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let mut socket = SessionSocket::new(
+            alice,
+            Stateless::<MTU>::new("alice"),
+            SessionSocketConfig::default(),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let expected = b"queued before closing";
+        socket.write_all(expected).await?;
+        socket.flush().await?;
+        socket.close().await?;
+
+        // Wait for transport EOF, not just the terminating segment: the detached outgoing
+        // task must finish forwarding and close its sink before this test's runtime exits.
+        let messages =
+            futures::TryStreamExt::try_collect::<Vec<_>>(asynchronous_codec::FramedRead::new(bob, SessionCodec::<MTU>))
+                .timeout(futures_time::time::Duration::from_secs(5))
+                .await??;
+        assert_eq!(
+            messages,
+            vec![
+                SessionMessage::Segment(Segment {
+                    frame_id: 1,
+                    seq_idx: 0,
+                    seq_flags: SeqIndicator::new_with_flags(1, false),
+                    data: expected.to_vec().into_boxed_slice(),
+                }),
+                SessionMessage::Segment(Segment::terminating(2)),
+            ],
+            "all queued data must precede the terminating segment, with no control messages"
+        );
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn session_socket_should_preserve_datagram_frame_size() -> anyhow::Result<()> {
         for (frame_size, datagram_size) in [
