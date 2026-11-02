@@ -28,6 +28,11 @@ pub mod protocol;
 pub mod testing;
 
 mod multiaddrs;
+/// Context propagation for locally originated packets.
+pub mod trace_context;
+
+/// Outgoing application sender retaining the originating tracing context.
+pub type HoprMessageSender = trace_context::ContextSender<(DestinationRouting, ApplicationDataOut)>;
 
 #[cfg(feature = "capture")]
 mod capture;
@@ -210,7 +215,7 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<CrossfireSink<(DestinationRouting, ApplicationDataOut)>>;
+type HoprSessionManager = SessionManager<HoprMessageSender>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -475,10 +480,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -524,10 +526,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -563,10 +562,7 @@ where
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -608,10 +604,7 @@ where
         on_incoming_session: Option<Sender<IncomingSession>>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -624,8 +617,10 @@ where
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
-        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
-            bounded_sink_channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
         // -- transport medium
 
@@ -781,7 +776,10 @@ where
             let data = &RANDOM_DATA[start..start + 100];
 
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
-                Some((routing, ApplicationDataOut::with_no_packet_info(data)))
+                Some(trace_context::WithContext {
+                    value: (routing, ApplicationDataOut::with_no_packet_info(data)),
+                    span: tracing::debug_span!(parent: None, "cover_traffic"),
+                })
             } else {
                 tracing::error!("failed to construct cover traffic packet");
                 None
@@ -816,7 +814,7 @@ where
                 .filter(|&n| n > 0)
                 .unwrap_or(avail)
         };
-        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage(
+        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage_with_context(
             merged_unresolved_output_data,
             move |size_hint, max_surbs, unresolved| {
                 let path_planner = path_planner.clone();

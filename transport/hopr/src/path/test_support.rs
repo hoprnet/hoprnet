@@ -22,13 +22,13 @@ impl Visit for Fields {
     }
 }
 
-pub(super) struct Record {
+pub(crate) struct Record {
     pub fields: BTreeMap<String, String>,
     pub ancestry: Vec<&'static str>,
 }
 
 #[derive(Clone, Default)]
-pub(super) struct Logs {
+pub(crate) struct Logs {
     events: Arc<Mutex<Vec<Record>>>,
     output: Arc<Mutex<Vec<u8>>>,
 }

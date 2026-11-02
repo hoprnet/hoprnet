@@ -64,14 +64,14 @@ use hopr_api::{
         HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState, NodeOnchainIdentity, PixEvent,
     },
     tickets::TicketManagement,
-    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
+    types::crypto::prelude::OffchainKeypair,
 };
 /// Maximum user-data payload per HOPR session frame (bytes).
 ///
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
 pub use hopr_transport::SESSION_MTU;
-use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
+use hopr_transport::{ApplicationDataIn, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
     FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, LOCAL_PIX_SUITE, PixParams,
@@ -325,7 +325,7 @@ pub fn prepare_tokio_runtime(
 /// Type alias used to send and receive transport data via a running HOPR node.
 pub type HoprTransportIO = hopr_transport::socket::HoprSocket<
     futures::stream::BoxStream<'static, ApplicationDataIn>,
-    hopr_utils::network_types::crossfire_sink::CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
+    hopr_transport::HoprMessageSender,
 >;
 
 type TicketEvents = (

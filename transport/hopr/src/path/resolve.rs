@@ -63,20 +63,25 @@ pub(crate) fn surb_resolution_wait(configured: Option<std::time::Duration>) -> s
 /// discard frames that arrive after `frame_timeout`. It is also why an unbounded wait here is fatal
 /// rather than merely slow — [`buffered`](futures::StreamExt::buffered) withholds completed futures
 /// behind an unfinished one, so the stall is node-wide rather than confined to one packet.
-pub(crate) fn resolve_routing_stage<St, F, Fut>(
+pub(crate) fn resolve_routing_stage_with_context<St, F, Fut>(
     input: St,
     resolve: F,
     distress_threshold: usize,
     concurrency: usize,
     surb_wait: std::time::Duration,
-) -> impl Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>
+) -> impl Stream<Item = crate::trace_context::WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>>
 where
-    St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
+    St: Stream<Item = crate::trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>>,
     F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
     Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
 {
     input
-        .map(move |(unresolved, mut data)| {
+        .map(move |message| {
+            let crate::trace_context::WithContext {
+                value: (unresolved, mut data),
+                span,
+            } = message;
+            let output_span = span.clone();
             let resolve = resolve.clone();
             async move {
                 // Retry on SURB starvation: the SURB pool on the exit side refills asynchronously
@@ -126,7 +131,10 @@ where
                             // re-reading a possibly-newer one after a concurrent re-plan.
                             info.surb_generation = generation;
                             trace!(?resolved, "resolved routing for packet");
-                            return Some((resolved, data));
+                            return Some(crate::trace_context::WithContext {
+                                value: (resolved, data),
+                                span: output_span,
+                            });
                         }
                         Err(error) if error.is_surb() && std::time::Instant::now() >= deadline => {
                             hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
@@ -156,10 +164,33 @@ where
                     }
                 }
             }
-            .in_current_span()
+            .instrument(tracing::debug_span!(parent: &span, "routing.resolve"))
         })
         .buffered(concurrency)
         .filter_map(futures::future::ready)
+}
+
+#[cfg(test)]
+pub(crate) fn resolve_routing_stage<St, F, Fut>(
+    input: St,
+    resolve: F,
+    distress_threshold: usize,
+    concurrency: usize,
+    surb_wait: std::time::Duration,
+) -> impl Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>
+where
+    St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
+    F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
+    Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
+{
+    resolve_routing_stage_with_context(
+        input.map(Into::into),
+        resolve,
+        distress_threshold,
+        concurrency,
+        surb_wait,
+    )
+    .map(|message| message.value)
 }
 
 #[cfg(test)]
@@ -182,6 +213,100 @@ mod tests {
 
     use super::*;
     use crate::path::errors::PathPlannerError;
+
+    #[test_log::test(tokio::test)]
+    #[serial_test::serial(routing_logs)]
+    async fn queued_sessions_should_keep_their_context_through_routing_and_encoding() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use futures::AsyncWriteExt;
+        use tracing::instrument::WithSubscriber;
+
+        use crate::{path::test_support::Logs, trace_context::ContextSender};
+
+        let logs = Logs::default();
+        let subscriber = logs.subscriber(tracing::Level::DEBUG);
+        async {
+            let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(4);
+            let tx = ContextSender::new(tx);
+            let ids = [HoprPseudonym::random(), HoprPseudonym::random()];
+            for (index, id) in ids.iter().enumerate() {
+                // Construct under one context, then poll outside it, as the session manager does.
+                let mut session = hopr_transport_session::HoprSession::new(
+                    *id,
+                    forward_routing(),
+                    hopr_transport_session::HoprSessionConfig {
+                        capabilities: Default::default(),
+                        ..Default::default()
+                    },
+                    (tx.clone(), futures::stream::pending()),
+                    None,
+                )?;
+                session.write_all(&[index as u8]).await?;
+                session.flush().await?;
+            }
+            drop(tx);
+            let resolved_messages = resolve_routing_stage_with_context(
+                rx.take(2),
+                |_, _, _| async {
+                    // Yield so buffered futures for different sessions overlap.
+                    tokio::task::yield_now().await;
+                    tracing::debug!("session route resolved");
+                    Ok((resolved(), None, None))
+                },
+                TEST_DISTRESS_THRESHOLD,
+                2,
+                TEST_SURB_WAIT,
+            )
+            .collect::<Vec<_>>()
+            .await;
+            assert_eq!(resolved_messages.len(), 2);
+            // The encoder receives these envelopes after routing's instrumented future exits.
+            // Exercise the same CPU boundary used by the packet encoder.
+            for message in resolved_messages {
+                let marker = message.value.1.data.plain_text[0];
+                let dispatch = tracing::dispatcher::get_default(Clone::clone);
+                async move {
+                    hopr_utils::parallelize::cpu::spawn_encode_blocking(
+                        move || {
+                            // Scoped test subscribers must also be installed on the Rayon thread.
+                            tracing::dispatcher::with_default(&dispatch, || {
+                                tracing::debug!(marker, "session CPU encoding");
+                            });
+                        },
+                        "session_context_test",
+                    )
+                    .await?;
+                    anyhow::Ok(())
+                }
+                .instrument(message.span)
+                .await?;
+            }
+            for event in logs
+                .records("session route resolved")
+                .into_iter()
+                .chain(logs.records("session CPU encoding"))
+            {
+                assert!(event.ancestry.contains(&"session"), "missing session ancestor");
+            }
+            assert_eq!(logs.records("session route resolved").len(), 2);
+            assert_eq!(logs.records("session CPU encoding").len(), 2);
+            let output = logs.output();
+            for (marker, id) in ids.iter().enumerate() {
+                let line = output
+                    .lines()
+                    .find(|line| line.contains("session CPU encoding") && line.contains(&format!("marker={marker}")))
+                    .context("missing encoded session")?;
+                assert!(line.contains(&id.to_string()), "encoder lost its session: {line}");
+                assert!(
+                    !line.contains(&ids[1 - marker].to_string()),
+                    "session context leaked: {line}"
+                );
+            }
+            anyhow::Ok(())
+        }
+        .with_subscriber(subscriber)
+        .await
+    }
 
     /// Bound on every test in this module. The stall under test is unbounded, so a test that hits
     /// this limit has reproduced it rather than merely run slowly.

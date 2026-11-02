@@ -16,7 +16,7 @@ pub mod selector;
 pub mod traits;
 
 #[cfg(test)]
-mod test_support;
+pub(crate) mod test_support;
 
 pub use errors::{PathPlannerError, Result};
 pub use planner::{PathPlanner, PathPlannerConfig};
