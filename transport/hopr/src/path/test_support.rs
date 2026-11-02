@@ -100,8 +100,8 @@ mod tests {
     use super::*;
 
     // Keep subscriber registration stress isolated from tests asserting routing event counts.
-    #[test]
     #[serial_test::serial(routing_logs)]
+    #[test]
     fn concurrent_scoped_subscribers_should_capture_their_own_levels() {
         fn emit() {
             tracing::debug!("debug capture check");
