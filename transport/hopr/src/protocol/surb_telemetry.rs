@@ -131,7 +131,7 @@ pub struct SurbRoundTripRegistry {
     /// comes home, or the session is gone.
     written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, u64>>>,
     /// When a dead verdict last made [`write_off_dead`](Self::write_off_dead) report a session for a
-    /// relayer, so that the same pair is not reported again within [`REBUMP_COOLDOWN`].
+    /// relayer, so that the same pair is not reported again within `REBUMP_COOLDOWN`.
     bumped: Arc<DashMap<(HoprPseudonym, OffchainPublicKey), Instant>>,
     /// The order the counterparty is assumed to spend its SURBs in, which decides what a race between
     /// two SURBs of a packet says about their return paths; see [`judges`](Self::judges).
@@ -202,7 +202,7 @@ impl SurbRoundTripRegistry {
     /// which of the SURBs it holds run through the dead relayer, since it sees only their first hop,
     /// so the caller advances each such session's SURB generation and the counterparty drops its
     /// whole stock on the next push. A (session, relayer) pair is reported at most once per
-    /// [`REBUMP_COOLDOWN`]: a verdict that lapses and is reached again inside it is written off as
+    /// `REBUMP_COOLDOWN`: a verdict that lapses and is reached again inside it is written off as
     /// usual but reports nothing.
     pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
         let health = &self.relayer_health;
@@ -1859,7 +1859,13 @@ mod tests {
 
         registry.relayer_health.dead.remove(&dead);
         assert!(registry.write_off_dead().is_empty());
-        assert!(registry.invalid().is_empty(), "the write-off lapses with the verdict");
+        assert_eq!(
+            HashMap::from([(*SESSION, (2, 0.5))]),
+            registry.invalid(),
+            "a lapsed verdict does not end the write-off: the counterparty still holds them"
+        );
+        registry.end_write_off(&leg(&[dead]));
+        assert!(registry.invalid().is_empty(), "a reply through the relayer does");
     }
 
     /// Two relayers judged dead in the same flush make one bump for the session, not two.
@@ -1890,7 +1896,11 @@ mod tests {
 
         registry.relayer_health.dead.remove(&dead);
         assert!(registry.write_off_dead().is_empty());
-        assert!(registry.invalid().is_empty(), "the lapse drops the write-off");
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "a lapsed verdict keeps the write-off: the counterparty still holds the SURB"
+        );
 
         registry.relayer_health.dead.insert(dead);
         registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
@@ -1899,14 +1909,16 @@ mod tests {
             "the same pair, re-reached inside the cooldown, is not bumped again"
         );
         assert_eq!(
-            HashMap::from([(*SESSION, (1, 1.0))]),
+            HashMap::from([(*SESSION, (2, 1.0))]),
             registry.invalid(),
             "but the SURB through the relayer is written off all the same"
         );
 
-        // Lapse again, let the cooldown run out, and the next verdict bumps.
+        // A reply through the relayer ends the write-off; let the cooldown run out, and the next
+        // verdict bumps.
         registry.relayer_health.dead.remove(&dead);
-        registry.write_off_dead();
+        registry.end_write_off(&leg(&[dead]));
+        assert!(registry.invalid().is_empty(), "revived");
         for mut entry in registry.bumped.iter_mut() {
             *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
         }
