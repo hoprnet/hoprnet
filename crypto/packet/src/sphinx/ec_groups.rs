@@ -3,6 +3,8 @@ use hopr_types::crypto::errors::Result;
 use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
 use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity};
+#[cfg(any(feature = "x25519", feature = "ed25519"))]
+use hopr_types::crypto::types::{ExpandedOffchainPublicKey, OffchainPublicKey};
 #[cfg(feature = "secp256k1")]
 use hopr_types::crypto::{
     crypto_traits::elliptic_curve::{
@@ -209,9 +211,15 @@ pub struct Secp256k1Suite;
 #[cfg(feature = "secp256k1")]
 impl SphinxSuite for Secp256k1Suite {
     type E = Secp256k1Scalar;
+    // `ChainKeypair::Public` already carries the curve point, so expansion is the identity.
+    type ExpandedPublic = PublicKey;
     type G = Secp256k1Point;
     type P = hopr_types::crypto::keypairs::ChainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+
+    fn expand_public(public_key: &PublicKey) -> Result<Self::ExpandedPublic> {
+        Ok(*public_key)
+    }
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
@@ -223,9 +231,14 @@ pub struct Ed25519Suite;
 #[cfg(feature = "ed25519")]
 impl SphinxSuite for Ed25519Suite {
     type E = Curve25519Scalar;
+    type ExpandedPublic = ExpandedOffchainPublicKey;
     type G = Curve25519Point;
     type P = hopr_types::crypto::keypairs::OffchainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+
+    fn expand_public(public_key: &OffchainPublicKey) -> Result<Self::ExpandedPublic> {
+        Ok(ExpandedOffchainPublicKey::try_from(public_key)?)
+    }
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
@@ -237,9 +250,15 @@ pub struct X25519Suite;
 #[cfg(feature = "x25519")]
 impl SphinxSuite for X25519Suite {
     type E = Curve25519Scalar;
+    // Same expansion as `Ed25519Suite`, viewed as a Montgomery point instead.
+    type ExpandedPublic = ExpandedOffchainPublicKey;
     type G = Curve25519MontgomeryPoint;
     type P = hopr_types::crypto::keypairs::OffchainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
+
+    fn expand_public(public_key: &OffchainPublicKey) -> Result<Self::ExpandedPublic> {
+        Ok(ExpandedOffchainPublicKey::try_from(public_key)?)
+    }
 }
 
 #[cfg(test)]
