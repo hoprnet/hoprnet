@@ -21,7 +21,7 @@ permissions:
 jobs:
   build-library:
     name: Build & Publish Library
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@bfdfd56e110ee356595faac1424b74906ed50ac9 # build-library-v3
     permissions:
       contents: read
       id-token: write
