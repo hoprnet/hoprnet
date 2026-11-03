@@ -10,7 +10,8 @@ use hopr_utils::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError, tbf::TagBloomFilter,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError,
+    replay_filter::TagReplayFilter,
 };
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
@@ -22,7 +23,7 @@ pub struct HoprDecoder<Chain, S, T> {
     chain_key: ChainKeypair,
     channels_dst: Hash,
     cfg: HoprCodecConfig,
-    tbf: parking_lot::Mutex<TagBloomFilter>,
+    replay_filter: TagReplayFilter,
 }
 
 impl<Chain, S, T> HoprDecoder<Chain, S, T>
@@ -48,7 +49,7 @@ where
             channels_dst,
             cfg,
             ticket_factory,
-            tbf: parking_lot::Mutex::new(Default::default()),
+            replay_filter: TagReplayFilter::default(),
         }
     }
 
@@ -216,9 +217,7 @@ where
         // This is checked on both Final and Forwarded packets,
         // Outgoing packets are not allowed to pass and are later reported as invalid state.
         if let Some(tag) = packet.packet_tag() {
-            // This operation has run-time of ~10 nanoseconds,
-            // and therefore does not need to be invoked via spawn_blocking
-            if self.tbf.lock().check_and_set(tag) {
+            if self.replay_filter.commit(tag) {
                 return Err(IncomingPacketError::ProcessingError(
                     previous_hop.into(),
                     HoprProtocolError::Replay,
