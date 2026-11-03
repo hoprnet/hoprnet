@@ -42,7 +42,7 @@ use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
-    HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
+    HoprUnacknowledgedTicketProcessorConfig, MIN_TRACKED_PACKETS, MemorySurbStore, ReplayFilterConfig, SurbStoreConfig,
 };
 use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
@@ -356,6 +356,13 @@ async fn peer_setup_for_with_all(
             outgoing_ticket_price: Some(*DEFAULT_PRICE_PER_PACKET),
             min_incoming_ticket_price: None,
             outgoing_win_prob: Some(WinningProbability::ALWAYS),
+            // The default generation holds ten million tokens, i.e. tens of megabytes per decoder, and these
+            // harnesses build a decoder per peer. The smallest accepted size keeps a five-node cluster in the
+            // single-digit megabytes; no test needs a longer replay window than that.
+            replay_filter: ReplayFilterConfig {
+                max_tracked_packets: MIN_TRACKED_PACKETS,
+                shards: ReplayFilterConfig::default().shards,
+            },
         };
 
         let ticket_proc = HoprUnacknowledgedTicketProcessor::new(

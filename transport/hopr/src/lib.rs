@@ -62,7 +62,7 @@ use hopr_api::{
 };
 pub use hopr_crypto_packet::HoprPixSpec;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
+pub use hopr_protocol_hopr::{MIN_TRACKED_PACKETS, MemorySurbStore, SurbStore};
 /// Re-exported so a consumer can name `<HoprPixSpec as PixSpec>::DepositAddress` and assert at
 /// compile time that it is the variant it can actually settle. Which instantiation is in play is
 /// a feature-graph outcome rather than a local decision, and getting it wrong is otherwise silent

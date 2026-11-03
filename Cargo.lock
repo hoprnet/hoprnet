@@ -4388,6 +4388,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "rstest",
  "serde",
+ "serde-saphyr",
  "serde_with",
  "smart-default",
  "strum",

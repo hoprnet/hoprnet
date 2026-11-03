@@ -3,6 +3,7 @@ mod encoder;
 
 pub use decoder::HoprDecoder;
 pub use encoder::{HoprEncoder, MAX_ACKNOWLEDGEMENTS_BATCH_SIZE};
+use validator::Validate as _;
 
 /// Configuration of [`HoprEncoder`] and [`HoprDecoder`].
 #[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
@@ -45,12 +46,21 @@ pub struct HoprCodecConfig {
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
     pub outgoing_win_prob: Option<hopr_api::types::internal::prelude::WinningProbability>,
+    /// Configuration of the packet replay filter used by [`HoprDecoder`].
+    ///
+    /// The filter is global across previous hops: the replay token names the packet, not the sender, so a replay
+    /// injected through a different peer is still caught. See [`ReplayFilterConfig`] for the retention floor and
+    /// the memory consequences of the two knobs.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub replay_filter: crate::ReplayFilterConfig,
 }
 
 impl PartialEq for HoprCodecConfig {
     fn eq(&self, other: &Self) -> bool {
         self.outgoing_ticket_price.eq(&other.outgoing_ticket_price)
             && self.min_incoming_ticket_price.eq(&other.min_incoming_ticket_price)
+            && self.replay_filter.eq(&other.replay_filter)
             && match (self.outgoing_win_prob, other.outgoing_win_prob) {
                 (Some(a), Some(b)) => a.approx_eq(&b),
                 (None, None) => true,
@@ -109,6 +119,20 @@ mod tests {
         )
     }
 
+    /// A codec config for tests.
+    ///
+    /// The replay filter defaults to a 10-million-token generation, which allocates tens of megabytes per
+    /// decoder; the codec tests build several, so they use the smallest generation the config accepts.
+    pub fn test_codec_config() -> HoprCodecConfig {
+        HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                max_tracked_packets: crate::MIN_TRACKED_PACKETS,
+                ..Default::default()
+            },
+            ..HoprCodecConfig::default()
+        }
+    }
+
     pub fn create_decoder(receiver: &Node) -> TestDecoder {
         HoprDecoder::new(
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
@@ -116,7 +140,7 @@ mod tests {
             receiver.surb_store.clone(),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
-            HoprCodecConfig::default(),
+            test_codec_config(),
         )
     }
 
@@ -912,7 +936,10 @@ mod tests {
         // Second decode with same packet should fail (replay)
         let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_processing_error());
+        assert!(
+            result.unwrap_err().is_processing_error(),
+            "a duplicate must be reported as a replay"
+        );
 
         Ok(())
     }
@@ -947,5 +974,62 @@ mod tests {
         assert!(result.unwrap_err().is_undecodable());
 
         Ok(())
+    }
+
+    /// The manual `PartialEq` is what the transport compares configs with, so a field it forgets is a field that
+    /// silently stops participating in equality. This pins the replay-filter field into it.
+    #[test]
+    fn codec_config_equality_should_include_the_replay_filter() {
+        let base = HoprCodecConfig::default();
+        assert_eq!(base, HoprCodecConfig::default());
+
+        let other = HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                max_tracked_packets: base.replay_filter.max_tracked_packets * 2,
+                ..base.replay_filter
+            },
+            ..base
+        };
+        assert_ne!(base, other, "a different replay capacity must make the configs unequal");
+
+        let other = HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                shards: base.replay_filter.shards / 2,
+                ..base.replay_filter
+            },
+            ..base
+        };
+        assert_ne!(base, other, "a different shard count must make the configs unequal");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn the_replay_filter_config_should_round_trip_through_yaml() -> anyhow::Result<()> {
+        let doc = "replay_filter:\n  max_tracked_packets: 5000\n  shards: 8\n";
+        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc)?;
+
+        assert_eq!(5000, parsed.replay_filter.max_tracked_packets);
+        assert_eq!(8, parsed.replay_filter.shards);
+
+        let serialized = serde_saphyr::to_string(&parsed)?;
+        let reparsed: HoprCodecConfig = serde_saphyr::from_str(&serialized)?;
+        assert_eq!(parsed, reparsed);
+
+        // An omitted block must fall back to the defaults, not fail under `deny_unknown_fields`.
+        let omitted: HoprCodecConfig = serde_saphyr::from_str("outgoing_ticket_price: null\n")?;
+        assert_eq!(crate::ReplayFilterConfig::default(), omitted.replay_filter);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn an_invalid_replay_filter_config_should_be_rejected() {
+        let doc = "replay_filter:\n  max_tracked_packets: 10\n  shards: 3\n";
+        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc).expect("must deserialize");
+        assert!(
+            validator::Validate::validate(&parsed).is_err(),
+            "out-of-range capacity and a non-power-of-two shard count must fail validation"
+        );
     }
 }

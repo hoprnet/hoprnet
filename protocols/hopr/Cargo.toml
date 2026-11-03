@@ -71,6 +71,7 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+serde-saphyr = { workspace = true }
 
 
 [[bench]]
