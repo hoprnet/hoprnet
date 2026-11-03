@@ -23,3 +23,18 @@ the same tuple, and clones share the same bounded capacity. Existing packet pipe
 can continue supplying plain resolved-message tuples; context-aware streams can supply `WithContext`
 envelopes created in the producer's scope. The envelope remains local and does not change packet
 serialization. Cover traffic has its own root span.
+
+## Routing diagnostics
+
+DEBUG records summarize graph traversal, selector filtering, validation, and successful candidate-set
+installations. Counts describe the candidates returned within the search limit, not all possible paths.
+TRACE records add candidate weights, effective return-path probabilities, cache loads, and actual path
+choices. A process-local `set_id` connects those choices to the immutable candidate set installed in
+the cache, including choices made on later cache hits.
+
+Detailed routing diagnostics require a build that retains TRACE, such as a debug build. For that
+build, `RUST_LOG=debug,hopr_transport::path=trace,hopr_network_graph=trace` enables the detailed events
+and their parent context. The workspace intentionally retains `release_max_level_debug`: production
+release builds provide DEBUG summaries, while candidate and per-draw TRACE events are compiled out.
+Setting `RUST_LOG=trace` alone cannot restore those events in a release build. Changing the production
+compile-time ceiling is a separate logging-policy change.
