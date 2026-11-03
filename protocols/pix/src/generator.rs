@@ -182,8 +182,9 @@ impl EmissionProgress {
 /// [`MIN_EARLY_RECOVERY_THRESHOLD`](crate::MIN_EARLY_RECOVERY_THRESHOLD), not the caller's own
 /// `early_recovery_threshold`. The value that decides when the request actually goes out belongs to
 /// the *peer* and does not travel on the wire, and the direction of a mismatch is unforgiving: a peer
-/// configured lower asks earlier than a gate built on the local value admits, and its one-shot
-/// request is dropped with no retry path. Computing the gate at the protocol floor admits every
+/// configured lower asks earlier than a gate built on the local value admits, and its request is
+/// dropped silently; the Exit's supervisor re-sends it until emission catches up, but each of those is
+/// a refusal that did not have to happen. Computing the gate at the protocol floor admits every
 /// conforming peer, and the floor is what makes "conforming" checkable locally.
 pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64) -> u64 {
     let polys = params.polys_per_ssa() as u64;

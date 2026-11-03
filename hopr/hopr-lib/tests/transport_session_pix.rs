@@ -1303,8 +1303,9 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
 ///   round trip;
 /// * the *successor* is requested and funded, which is what proves the completion was not a dead end. This is the half
 ///   that the Entry-side `returned_packets` fix exists for: a successor asked for on the strength of keep-alives alone
-///   is refused as under-served by an Entry that does not credit them, and the Session then dies on
-///   `max_ssa_delivery_time` blaming a timer;
+///   is refused as under-served by an Entry that does not credit them. The Exit re-sends the request while the cycle is
+///   still being served, but an Entry that never credits them refuses every re-send, and once the cycle's emission is
+///   spent the Session dies on `max_ssa_delivery_time` blaming a timer;
 /// * an echo still round-trips afterwards, so the Session was kept alive rather than merely kept accounted for.
 ///
 /// Run over both Exit egress branches. `NoRateControl` is what every other test here uses, but it is

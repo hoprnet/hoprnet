@@ -28,6 +28,7 @@
 //! | `hopr_pix_cycle_bytes_reserved_total` | SimpleCounter | bytes | admission reservation | — |
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
+//! | `hopr_pix_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered successor `SsaRequest` | — |
 //! | `hopr_pix_admission_rejections_total` | MultiCounter | refusals | incoming Start path | `reason` — see [`PixAdmissionRejection`] |
 //! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
 //! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
@@ -106,6 +107,16 @@
 //! ```promql
 //! sum by (event) (rate(hopr_pix_cycles_total[10m]))
 //! rate(hopr_pix_cycles_total{event="failed"}[10m])
+//!   / rate(hopr_pix_cycles_total{event="requested"}[10m])
+//! ```
+//!
+//! *Successor requests the Entry is not answering.* Re-sends per successor requested: a ratio near zero is every
+//! successor admitted on its first request, and one that climbs is Entries whose gate is shut for longer than the
+//! Exit asks early — lossy multi-hop return paths, or Entries that never admit at all. It is deliberately its own
+//! counter rather than a `hopr_pix_cycles_total` event, whose `requested` term a re-send must not touch:
+//!
+//! ```promql
+//! rate(hopr_pix_ssa_requests_resent_total[10m])
 //!   / rate(hopr_pix_cycles_total{event="requested"}[10m])
 //! ```
 //!
@@ -253,6 +264,10 @@ lazy_static::lazy_static! {
         "SSA cycle lifecycle transitions observed by PIX supervisors, by event",
         &["event"]
     ).unwrap();
+    static ref METRIC_PIX_SSA_REQUESTS_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_ssa_requests_resent_total",
+        "Successor SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
+    ).unwrap();
     static ref METRIC_PIX_ADMISSION_REJECTIONS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_admission_rejections_total",
         "Incoming PIX sessions refused before establishment, by reason",
@@ -346,6 +361,14 @@ pub(crate) fn add_predeposit_exposure(delta: i128) {
 /// Counts `count` cycles undergoing one lifecycle transition.
 pub(crate) fn add_cycles_total(event: PixCycleEvent, count: u64) {
     METRIC_PIX_CYCLES_TOTAL.increment_by(&[event.to_string().as_str()], count);
+}
+
+/// Counts `count` re-sends of an unanswered successor `SsaRequest`.
+///
+/// Not a [`PixCycleEvent`]: those are lifecycle transitions with enumerated label values, and a
+/// re-send moves no cycle through any of them.
+pub(crate) fn add_ssa_requests_resent(count: u64) {
+    METRIC_PIX_SSA_REQUESTS_RESENT.increment_by(count);
 }
 
 /// Counts one incoming PIX Session refused before establishment.
@@ -538,6 +561,7 @@ mod tests {
         add_sessions_active(PixGateMode::Funded, 3);
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
+        add_ssa_requests_resent(2);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
         add_egress_packets(PixGateMode::Predeposit, 7);
@@ -561,6 +585,7 @@ mod tests {
             "hopr_pix_sessions_active{gate_mode=\"funded\"}",
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
+            "hopr_pix_ssa_requests_resent_total",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
             "hopr_pix_cycle_bytes_reserved_total",
