@@ -242,9 +242,9 @@ pub struct SurbInsertOutcome {
     /// - on a **newer** generation, everything the buffer held (both tiers), cleared before the batch went in;
     /// - on an **older** generation, the batch itself, refused as a late or reordered leftover.
     ///
-    /// The Entry advances the generation when it re-plans a session's return paths, or when a relayer
-    /// is judged dead, precisely so that the Exit stops spending the SURBs it holds. Those SURBs are
-    /// gone from the Exit's buffer all the same, and the Exit's flow estimate has to say so.
+    /// The Entry advances the generation when a relayer is judged dead, precisely so that the Exit
+    /// stops spending the SURBs it holds. Those SURBs are gone from the Exit's buffer all the same, and
+    /// the Exit's flow estimate has to say so.
     pub superseded: usize,
 }
 
