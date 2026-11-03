@@ -182,6 +182,10 @@ pub struct OutgoingPacketInfo {
     /// captured when those return paths were resolved. `None` when the packet carries no return
     /// paths, or when the generation is left to the encoder to resolve.
     pub surb_generation: Option<u8>,
+    /// Set by a sender that has already counted the SURB this return packet will take as consumed in
+    /// its own SURB estimate. Routing resolution may still drop the packet for want of a SURB; it then
+    /// reports the packet back, so that the count can be given back. `false` by default.
+    pub surb_consumption_counted: bool,
 }
 
 impl Default for OutgoingPacketInfo {
@@ -190,6 +194,7 @@ impl Default for OutgoingPacketInfo {
             signals_to_destination: PacketSignals::empty(),
             max_surbs_in_packet: usize::MAX,
             surb_generation: None,
+            surb_consumption_counted: false,
         }
     }
 }

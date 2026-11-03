@@ -1205,6 +1205,19 @@ impl SessionSlot {
     }
 }
 
+/// Counts the SURB a return packet will take as consumed in `estimator`, and marks the packet as
+/// counted.
+///
+/// The Exit counts as it hands a packet on, because its reserve and admission decisions need the count
+/// at once. Routing resolution may still find no SURB within its wait and drop the packet; the mark is
+/// what lets it report that back, so that [`SessionManager::on_return_packet_starved`] gives the SURB
+/// back to the estimate.
+fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: ApplicationDataOut) -> ApplicationDataOut {
+    estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    data.packet_info.get_or_insert_default().surb_consumption_counted = true;
+    data
+}
+
 /// The Exit's control over the single Exit → Entry keep-alive stream a Session runs.
 ///
 /// One stream, two producers with different jobs, and this is what reconciles them:
@@ -4893,9 +4906,7 @@ where
             // counting it would walk the Exit's own level estimate down until it starved itself of
             // the very reserve that dropped it.
             msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                surb_estimator
-                    .consumed
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let data = count_return_packet_surb(&surb_estimator, data);
                 #[cfg(feature = "telemetry")]
                 telemetry::record_session_surb_consumed(&session_id, 1);
                 futures::future::ok::<_, S::Error>((routing, data))
@@ -5406,6 +5417,25 @@ where
             Ok(())
         } else {
             Err(SessionManagerError::other(anyhow!("session does not use SURB balancing")).into())
+        }
+    }
+
+    /// Gives back the SURB the Session `id` counted as consumed for a return packet that routing
+    /// resolution then dropped for want of one.
+    ///
+    /// The packet spent nothing. Left counted, it would keep the Session's estimate one below the stock
+    /// for good, and the Entry, which reads the Exit's level reports, would mint one SURB more to make
+    /// up for it. The drop that matters is a level report: it goes out whatever the estimate says, so
+    /// that it can ask for SURBs, and finds none when the stock is empty. A Session that is gone is
+    /// ignored, and the count never goes below zero.
+    pub fn on_return_packet_starved(&self, id: &SessionId) {
+        if let Some(slot) = self.sessions.get(id) {
+            let _ = slot.surb_estimator.consumed.fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |consumed| consumed.checked_sub(1),
+            );
+            trace!(session_id = %id, "gave back the SURB counted for a return packet dropped for want of one");
         }
     }
 
@@ -6356,9 +6386,7 @@ where
                         .sink_map_err(std::io::Error::other)
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let data = count_return_packet_surb(&surb_estimator_tx, data);
                             #[cfg(feature = "telemetry")]
                             telemetry::record_session_surb_consumed(&session_id, 1);
                             acquire_egress_permit(egress_gate.clone(), routing, data)
@@ -6443,9 +6471,7 @@ where
                             // reserve that either never binds or never releases. `NoRateControl` is
                             // also the branch that can drain SURBs fastest, so it is the one where
                             // that matters most.
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let data = count_return_packet_surb(&surb_estimator_tx, data);
                             #[cfg(feature = "telemetry")]
                             telemetry::record_session_surb_consumed(&session_id, 1);
                             acquire_egress_permit(egress_gate.clone(), routing, data)
@@ -8037,6 +8063,7 @@ mod tests {
             signals_to_destination: PacketSignal::SurbDistress.into(),
             max_surbs_in_packet: usize::MAX,
             surb_generation: Some(7),
+            surb_consumption_counted: false,
         });
 
         cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
@@ -8165,6 +8192,55 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
         admission.retired(pseudonym)
+    }
+
+    /// A return packet the Exit counted as consumed, and routing resolution then dropped for want of a
+    /// SURB, spent nothing: its count is given back, once per packet and never below zero, and a
+    /// Session that is gone is left alone.
+    #[test_log::test(tokio::test)]
+    async fn a_starved_return_packet_should_give_back_the_surb_it_was_counted_for() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let surb_estimator = AtomicSurbFlowEstimator::default();
+        let consumed = || surb_estimator.consumed.load(std::sync::atomic::Ordering::Relaxed);
+
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        mgr.sessions.insert(
+            pseudonym,
+            SessionSlot {
+                session_tx: dummy_tx,
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
+                abort_handles: Default::default(),
+                surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
+                surb_estimator: surb_estimator.clone(),
+                current_ssa_state: Default::default(),
+                pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
+                returned_packets: Default::default(),
+                cycle_budget: None,
+                admission_token: Default::default(),
+            },
+        );
+
+        for _ in 0..2 {
+            let data = count_return_packet_surb(&surb_estimator, small_outgoing_packet()?);
+            assert!(
+                data.packet_info.is_some_and(|info| info.surb_consumption_counted),
+                "a counted packet is marked, so that resolution can report it back"
+            );
+        }
+        assert_eq!(2, consumed());
+
+        mgr.on_return_packet_starved(&pseudonym);
+        assert_eq!(1, consumed(), "one packet starved, one SURB given back");
+
+        mgr.on_return_packet_starved(&pseudonym);
+        mgr.on_return_packet_starved(&pseudonym);
+        assert_eq!(0, consumed(), "never below zero");
+
+        mgr.on_return_packet_starved(&HoprPseudonym::random());
+        Ok(())
     }
 
     /// Verifies that a session's SURB balancer config can be retrieved and updated via the manager API.

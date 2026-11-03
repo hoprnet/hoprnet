@@ -10,7 +10,10 @@
 //! node-wide while forwarding, acking and receiving carry on looking perfectly healthy.
 
 use futures::{Stream, StreamExt};
-use hopr_api::types::internal::routing::{DestinationRouting, ResolvedTransportRouting};
+use hopr_api::types::internal::{
+    prelude::HoprPseudonym,
+    routing::{DestinationRouting, ResolvedTransportRouting},
+};
 use hopr_crypto_packet::prelude::{HoprSurb, PacketSignal};
 use hopr_protocol_app::prelude::ApplicationDataOut;
 use tracing::{Instrument, error, trace, warn};
@@ -59,25 +62,33 @@ pub(crate) fn surb_resolution_wait(configured: Option<std::time::Duration>) -> s
 /// finds no SURB is retried for up to `surb_wait` before being dropped the same way; see
 /// [`DEFAULT_SURB_RESOLUTION_WAIT`] for why that bound has to exist.
 ///
+/// `on_starved` is called with the pseudonym of a return packet dropped for want of a SURB whose
+/// sender had already counted that SURB as consumed
+/// ([`surb_consumption_counted`](hopr_protocol_app::prelude::OutgoingPacketInfo::surb_consumption_counted)),
+/// so that the count can be given back.
+///
 /// Ordering is deliberate: out-of-order delivery to the entry's reassembler makes the sequencer
 /// discard frames that arrive after `frame_timeout`. It is also why an unbounded wait here is fatal
 /// rather than merely slow — [`buffered`](futures::StreamExt::buffered) withholds completed futures
 /// behind an unfinished one, so the stall is node-wide rather than confined to one packet.
-pub(crate) fn resolve_routing_stage<St, F, Fut>(
+pub(crate) fn resolve_routing_stage<St, F, Fut, G>(
     input: St,
     resolve: F,
     distress_threshold: usize,
     concurrency: usize,
     surb_wait: std::time::Duration,
+    on_starved: G,
 ) -> impl Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>
 where
     St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
     F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
     Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
+    G: Fn(&HoprPseudonym) + Clone,
 {
     input
         .map(move |(unresolved, mut data)| {
             let resolve = resolve.clone();
+            let on_starved = on_starved.clone();
             async move {
                 // Retry on SURB starvation: the SURB pool on the exit side refills asynchronously
                 // (target 600, ~300/sec via keep-alive). Silently dropping return-path packets when
@@ -140,6 +151,13 @@ where
                                 %error,
                                 "dropping an outgoing packet: no SURB for its return path within the wait"
                             );
+                            // Its sender may have counted the SURB as consumed already, and the
+                            // packet leaves without one.
+                            if data.packet_info.is_some_and(|info| info.surb_consumption_counted)
+                                && let DestinationRouting::Return(matcher) = &unresolved
+                            {
+                                on_starved(&matcher.pseudonym());
+                            }
                             return None;
                         }
                         Err(error) if error.is_surb() => {
@@ -218,6 +236,7 @@ mod tests {
             TEST_DISTRESS_THRESHOLD,
             TEST_CONCURRENCY,
             TEST_SURB_WAIT,
+            |_: &HoprPseudonym| {},
         )
     }
 
@@ -379,6 +398,7 @@ mod tests {
                 TEST_DISTRESS_THRESHOLD,
                 TEST_CONCURRENCY,
                 surb_resolution_wait(Some(std::time::Duration::ZERO)),
+                |_: &HoprPseudonym| {},
             )
             .collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
@@ -391,6 +411,50 @@ mod tests {
             1,
             attempts.load(Ordering::Relaxed),
             "a zero wait must resolve once and give up, not retry"
+        );
+
+        Ok(())
+    }
+
+    /// A starved return packet whose sender counted its SURB as consumed is reported back, so that the
+    /// count can be given back; one whose sender counted nothing is not.
+    #[test_log::test(tokio::test)]
+    async fn a_starved_return_packet_should_report_back_only_a_counted_surb() -> anyhow::Result<()> {
+        let (counted, uncounted) = (HoprPseudonym::random(), HoprPseudonym::random());
+        let mut counted_packet = packet(0);
+        counted_packet
+            .packet_info
+            .get_or_insert_default()
+            .surb_consumption_counted = true;
+        let input = futures::stream::iter(vec![
+            (return_routing(counted), counted_packet),
+            (return_routing(uncounted), packet(1)),
+        ]);
+
+        let reported = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let emitted = {
+            let reported = reported.clone();
+            resolve_routing_stage(
+                input,
+                |_size_hint, _max_surbs, routing: DestinationRouting| async move { Err(no_surb(&routing)) },
+                TEST_DISTRESS_THRESHOLD,
+                TEST_CONCURRENCY,
+                surb_resolution_wait(Some(std::time::Duration::ZERO)),
+                move |pseudonym: &HoprPseudonym| {
+                    reported.lock().expect("the lock is not poisoned").push(*pseudonym);
+                },
+            )
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+            .await
+            .map_err(|_| anyhow::anyhow!("the stage stalled instead of dropping the starved packets"))?
+        };
+
+        assert!(emitted.is_empty(), "neither packet finds a SURB");
+        assert_eq!(
+            vec![counted],
+            *reported.lock().expect("the lock is not poisoned"),
+            "only the packet whose SURB was counted is reported back"
         );
 
         Ok(())
