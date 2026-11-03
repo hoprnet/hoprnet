@@ -2444,7 +2444,8 @@ impl SurbsStored {
 // The inner OnceLock is set once in `start()` and read in `dispatch_message`.
 // The packet info travels along because a Start message cannot always be judged by its content alone:
 // see `refuse_pix_over_direct_return_path`. What the packet did to the SURB store travels too, taken
-// before the conversion into a `HoprStartProtocol` consumes the data it is counted from.
+// before the conversion into a `HoprStartProtocol` consumes the data it is counted from: the part
+// dispatch could not book itself, which is all of it only for an opening that creates its Session.
 type StartProtocolMsgSink = Arc<
     OnceLock<
         crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored)>>,
@@ -3022,14 +3023,18 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
 /// What the packet carried is booked, not a message's `max_surbs()`: that is how many fit beside it,
 /// what the sender was allowed to send rather than what the store took. And the evictions, which are
 /// how a SURB generation wipe, and any overflow, reaches the Exit's level.
-fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: SurbsStored) {
-    if matches!(slot.routing_opts, DestinationRouting::Return(_)) {
-        account_incoming_surbs(&slot.surb_estimator, stored.saved, stored.evicted);
-        #[cfg(feature = "telemetry")]
-        telemetry::record_session_surb_produced(session_id, stored.saved);
-        #[cfg(not(feature = "telemetry"))]
-        let _ = session_id;
+///
+/// Returns whether it booked anything, i.e. whether `slot` is an incoming Session.
+fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: SurbsStored) -> bool {
+    if !matches!(slot.routing_opts, DestinationRouting::Return(_)) {
+        return false;
     }
+    account_incoming_surbs(&slot.surb_estimator, stored.saved, stored.evicted);
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_produced(session_id, stored.saved);
+    #[cfg(not(feature = "telemetry"))]
+    let _ = session_id;
+    true
 }
 
 /// Books an incoming packet's SURBs into the Exit's flow estimator.
@@ -3841,7 +3846,7 @@ where
                                         if opened.is_ok()
                                             && let Some(slot) = myself.sessions.get(&pseudonym)
                                         {
-                                            book_start_message_surbs(&slot, &pseudonym, stored);
+                                            let _ = book_start_message_surbs(&slot, &pseudonym, stored);
                                         }
                                         opened
                                     }
@@ -5783,11 +5788,15 @@ where
             // kind of Start message passes, and before the decode and the admission filter below can drop
             // the message: the pipeline stored the SURBs before this ran, so they are in the ring whether
             // or not the message is handled. The opening `StartSession` finds no Session yet; the Start
-            // protocol task books it once the Session exists.
+            // protocol task books it once the Session exists, and only what was not booked here goes
+            // along: an opening repeated for a Session that already exists is booked here, and must not
+            // be booked again when the task refuses it, or a wipe it reports is subtracted twice.
             let stored = SurbsStored::of(&in_data);
-            if let Some(session_slot) = self.sessions.get(&pseudonym) {
-                book_start_message_surbs(&session_slot, &pseudonym, stored);
-            }
+            let booked = self
+                .sessions
+                .get(&pseudonym)
+                .is_some_and(|session_slot| book_start_message_surbs(&session_slot, &pseudonym, stored));
+            let unbooked = if booked { SurbsStored::default() } else { stored };
 
             // Decode once, then decide locally whether anything on this node could handle it.
             // Without this check a peer spraying Start messages for pseudonyms it invented occupies
@@ -5811,7 +5820,7 @@ where
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 start_protocol_tx
-                    .try_send((pseudonym, msg, in_data.packet_info, stored))
+                    .try_send((pseudonym, msg, in_data.packet_info, unbooked))
                     .map_err(|error| {
                         crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         error!(%error, "failed to send Start protocol message to processing task");
@@ -13797,6 +13806,33 @@ mod tests {
         .await
         .context("the opening's SURBs were never booked")?;
         assert_eq!(carried, produced, "the SURBs the opening's packet carried");
+        Ok(())
+    }
+
+    /// An opening repeated for a Session that already exists is booked once, in dispatch. The Start
+    /// task refuses it, and must not book it again: a wipe it reported would be subtracted twice.
+    #[test_log::test(tokio::test)]
+    async fn a_repeated_opening_should_be_booked_once() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, estimator) = exit_slot_for_keep_alives(pseudonym);
+        let (new_session_tx, _new_sessions) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _sent) = futures::channel::mpsc::unbounded();
+        let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
+
+        let mut packet = start_packet(HoprStartProtocol::StartSession(no_pix_offer()))?;
+        packet.packet_info.num_saved_surbs = 2;
+        packet.packet_info.num_evicted_surbs = 1;
+        let carried = packet.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the opening must leave room for a SURB");
+
+        mgr.dispatch_message(pseudonym, packet)?;
+        // Let the Start task refuse the duplicate before looking.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert_eq!(carried, estimator.produced.load(Relaxed), "booked once");
+        assert_eq!(1, estimator.evicted.load(Relaxed), "and its eviction once");
         Ok(())
     }
 
