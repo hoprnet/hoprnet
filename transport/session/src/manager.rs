@@ -8399,14 +8399,16 @@ mod tests {
     /// Exit that cannot be heard cannot be seen draining, and a report ends it.
     #[test]
     fn silence_with_data_flowing_should_keep_one_organic_surb_per_packet() -> anyhow::Result<()> {
-        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+        let state = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(4))
+            .sending_since_ago(Duration::from_millis(3_500));
 
         let mut data = small_outgoing_packet()?;
         cap_organic_surbs(&mut data, 1, &state);
         assert_eq!(
             Some(1),
             data.packet_info.map(|info| info.max_surbs_in_packet),
-            "level at its target, nothing heard for 4 s, a packet now"
+            "level at its target, nothing heard for 4 s, data going out for 3.5 s of them"
         );
         assert_eq!(1, data.estimate_surbs_with_msg(), "the cap reaches the SURB accounting");
 
@@ -8445,7 +8447,9 @@ mod tests {
     #[test]
     fn the_sustain_should_send_one_surb_even_when_the_client_asks_for_more() -> anyhow::Result<()> {
         for (asked, expected) in [(8, 1), (2, 1), (0, 0)] {
-            let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(4));
+            let state = gate_state(100, 200)
+                .last_heard_ago(Duration::from_secs(4))
+                .sending_since_ago(Duration::from_millis(3_500));
             let mut data = small_outgoing_packet()?;
             cap_organic_surbs(&mut data, asked, &state);
             assert_eq!(

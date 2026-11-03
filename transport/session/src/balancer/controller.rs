@@ -200,6 +200,10 @@ pub struct BalancerStateValues {
     last_heard: AtomicU64,
     /// When a Session data packet last went out, in the same unit as [`last_heard`](Self::last_heard).
     last_sent: AtomicU64,
+    /// When the current run of unanswered data began, in the same unit as [`last_heard`](Self::last_heard):
+    /// the first packet sent after the counterparty was last heard. See
+    /// [`silence_sustain`](Self::silence_sustain).
+    sending_since: AtomicU64,
     /// When a reply the estimator counted as consumed last came home, in the same unit as
     /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
     last_reply_heard: AtomicU64,
@@ -528,9 +532,16 @@ impl BalancerStateValues {
         self.stamp(&self.last_heard, std::time::Instant::now());
     }
 
-    /// Records that a Session data packet is going out now.
+    /// Records that a Session data packet is going out now. The first one since the counterparty was
+    /// last heard starts a new run of unanswered data.
     pub(crate) fn note_sent(&self) {
-        self.stamp(&self.last_sent, std::time::Instant::now());
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let now = std::time::Instant::now();
+        if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.stamp(&self.sending_since, now);
+        }
+        self.stamp(&self.last_sent, now);
     }
 
     /// Records that a reply the estimator counted as consumed came home now.
@@ -569,6 +580,18 @@ impl BalancerStateValues {
         self
     }
 
+    /// Test hook: as if data had been going out unanswered since `ago` ago, the first packet of the run
+    /// sent then. Takes the epoch [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
+    #[cfg(test)]
+    pub(crate) fn sending_since_ago(self, ago: Duration) -> Self {
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
+        self.stamp(&self.sending_since, at);
+        self.stamp(&self.last_sent, at);
+        self
+    }
+
     /// Stamps `slot` with `at`, never moving it back.
     fn stamp(&self, slot: &AtomicU64, at: std::time::Instant) {
         let ms = u64::try_from(at.saturating_duration_since(self.epoch.0).as_millis()).unwrap_or(u64::MAX - 1);
@@ -576,8 +599,10 @@ impl BalancerStateValues {
     }
 
     /// Whether data is going out into silence: the balancer is enabled, the counterparty was heard from
-    /// at least once, and the latest data packet went out more than [`SILENCE_SUSTAIN_AFTER`] after the
-    /// last time it was.
+    /// at least once, and data has been going out for more than [`SILENCE_SUSTAIN_AFTER`] since the first
+    /// packet sent after the last time it was. The window starts at that first unanswered packet, not at
+    /// the last word heard: an idle stretch leaves nothing unanswered, and the Exit gets the grace to
+    /// answer the data that ends it.
     ///
     /// The Entry then keeps one SURB in each data packet it sends even though its level estimate is at
     /// or above the target (see `cap_organic_surbs` in the session manager). The estimate is fed by the
@@ -610,8 +635,12 @@ impl BalancerStateValues {
             (heard, replied) => {
                 let after = u64::try_from(SILENCE_SUSTAIN_AFTER.as_millis()).unwrap_or(u64::MAX);
                 let window = u64::try_from(REPLY_STREAM_WINDOW.as_millis()).unwrap_or(u64::MAX);
-                // A reply stream that stopped, not a Session the counterparty does not answer.
-                replied.saturating_add(window) >= heard && self.last_sent.load(Relaxed) > heard.saturating_add(after)
+                let since = self.sending_since.load(Relaxed);
+                // A reply stream that stopped, not a Session the counterparty does not answer, and data
+                // going out unanswered for longer than the grace, not the first packet after a pause.
+                replied.saturating_add(window) >= heard
+                    && since > heard
+                    && self.last_sent.load(Relaxed) > since.saturating_add(after)
             }
         }
     }
@@ -2483,9 +2512,9 @@ mod tests {
     // Sustaining the counterparty's SURBs through a silence
     // -----------------------------------------------------------------------
 
-    /// The sustain is about data going out into a silence. Without a packet sent after the last time the
-    /// counterparty was heard, more than the grace later, there is nothing to sustain, and neither is
-    /// there before it was heard at all, or while there is no balancer.
+    /// The sustain is about data going out into a silence. Without data going out for more than the grace
+    /// since the first packet after the last time the counterparty was heard, there is nothing to sustain,
+    /// and neither is there before it was heard at all, or while there is no balancer.
     #[test]
     fn silence_without_outgoing_data_should_not_sustain() {
         let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
@@ -2495,7 +2524,7 @@ mod tests {
         );
 
         // A packet that goes out inside the grace after the last time it was heard is not a silence yet.
-        state.stamp(&state.last_sent, std::time::Instant::now() - Duration::from_secs(8));
+        let state = state.sending_since_ago(Duration::from_secs(8));
         assert!(!state.silence_sustain(), "sent 2 s after it was heard");
 
         let never_heard = gate_state(100, 200);
@@ -2509,11 +2538,13 @@ mod tests {
         disabled.note_sent();
         assert!(!disabled.silence_sustain(), "no balancer, no sustain");
 
-        let silent = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        let silent = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(10))
+            .sending_since_ago(Duration::from_secs(8));
         silent.note_sent();
         assert!(
             silent.silence_sustain(),
-            "a packet 10 s after the last word is a silence"
+            "data going out since 8 s ago, 2 s after the last word, is a silence"
         );
 
         let unanswered = gate_state(100, 200).last_heard_only_ago(Duration::from_secs(10));
@@ -2522,6 +2553,31 @@ mod tests {
             !unanswered.silence_sustain(),
             "a Session the counterparty never answered has no reply stream to lose: heard only by its reports, it is \
              quiet by design"
+        );
+    }
+
+    /// An idle stretch is no silence: nothing went out, so nothing was left unanswered. The window starts at
+    /// the first packet after the counterparty was last heard, and the Exit gets the grace to answer it.
+    #[test]
+    fn the_first_packet_after_an_idle_stretch_should_not_sustain() {
+        let idle = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        idle.note_sent();
+        assert!(
+            !idle.silence_sustain(),
+            "the first packet after 10 s with nothing sent and nothing heard"
+        );
+
+        let sending = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(10))
+            .sending_since_ago(Duration::from_secs(8));
+        sending.note_sent();
+        assert!(sending.silence_sustain(), "8 s of data going out, nothing coming back");
+
+        sending.note_heard();
+        sending.note_sent();
+        assert!(
+            !sending.silence_sustain(),
+            "heard again, and the packet after it starts a new run"
         );
     }
 
