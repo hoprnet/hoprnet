@@ -4986,6 +4986,11 @@ where
                     }
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
+                        // The retired cycle's shares are gone, and nothing else refreshes the gauge
+                        // until another notification comes due, which a node with no other PIX
+                        // Session may never send. Retirement is once per cycle, so unthrottled.
+                        #[cfg(feature = "telemetry")]
+                        crate::telemetry::pix::set_held_shares(share_processor.held_shares());
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
                         forget_request_of(&mut last_request, &ssa_id);
                         if let Some(slot) = myself.sessions.get(&session_id) {
@@ -4998,7 +5003,13 @@ where
                 }
             };
 
-            let Some(reason) = close_reason else { return };
+            let Some(reason) = close_reason else {
+                // The cycles this driver holds go with it; see the refresh after the teardown below.
+                owned_ssas.clear();
+                #[cfg(feature = "telemetry")]
+                crate::telemetry::pix::set_held_shares(share_processor.held_shares());
+                return;
+            };
 
             // Read before `stop_pix_fill`, which silences the stream either way. Keyed on the drain
             // rather than on the reason, which is a strict superset of it: a *stalled* drain closes
@@ -5021,6 +5032,10 @@ where
             myself.stop_pix_fill(&session_id);
             gate.poison();
             owned_ssas.clear();
+            // Releasing the guards removed the Session's cycles from the reconstructor; refresh the
+            // gauge now rather than leave their shares counted until another Session's notification.
+            #[cfg(feature = "telemetry")]
+            crate::telemetry::pix::set_held_shares(share_processor.held_shares());
 
             #[cfg(feature = "telemetry")]
             crate::telemetry::pix::record_pix_closure(reason);
