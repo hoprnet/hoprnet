@@ -286,7 +286,18 @@ fn keep_alive_surb_reserve(target: u64) -> u64 {
     (target / 100).max(32).min(target / 4)
 }
 
-/// Holds an outgoing data packet back while the Exit's SURB stock is down to `reserve`.
+/// The keep-alive reserve of a Session whose Entry currently asks for the target `balancer` holds.
+///
+/// Read at every check rather than fixed when the Session opens: the Entry may lower its target while
+/// the Session runs (a `BalancerTarget` keep-alive updates it), and its balancer then keeps the stock
+/// near the new one. A reserve fixed at the opening target could sit above every stock the Entry now
+/// keeps, and data would be held for good.
+fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
+    keep_alive_surb_reserve(balancer.target_surb_buffer_size.load(Ordering::Relaxed))
+}
+
+/// Holds an outgoing data packet back while the Exit's SURB stock is down to its keep-alive reserve
+/// (see [`current_keep_alive_surb_reserve`]).
 ///
 /// Returns `None`, with nothing allocated, in the common case of a stock above the reserve. Otherwise
 /// the future resolves once the stock has risen above it, polling the estimate every
@@ -299,32 +310,34 @@ fn keep_alive_surb_reserve(target: u64) -> u64 {
 fn hold_for_surb_reserve(
     session_id: SessionId,
     estimator: &AtomicSurbFlowEstimator,
-    reserve: u64,
+    balancer: &Arc<BalancerStateValues>,
 ) -> Option<futures::future::BoxFuture<'static, ()>> {
     let stock = estimator.saturating_diff();
+    let reserve = current_keep_alive_surb_reserve(balancer);
     if stock > reserve {
         return None;
     }
 
     debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
-    let estimator = estimator.clone();
+    let (estimator, balancer) = (estimator.clone(), balancer.clone());
     Some(Box::pin(async move {
         let held_since = Instant::now();
-        while estimator.saturating_diff() <= reserve {
+        while estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) {
             hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
         }
-        debug!(
+        tracing::debug!(
             %session_id,
             held_for = ?held_since.elapsed(),
             stock = estimator.saturating_diff(),
-            reserve,
+            reserve = current_keep_alive_surb_reserve(&balancer),
             "releasing held data: the SURB stock is above its keep-alive reserve again"
         );
     }))
 }
 
 /// The Exit's data egress for a rate-controlled Session: holds each packet back while the SURB stock
-/// is down to `reserve`, books the SURB it consumes, and passes it through the PIX egress gate.
+/// is down to the keep-alive reserve of the target `balancer` holds, books the SURB it consumes, and
+/// passes it through the PIX egress gate.
 ///
 /// Built as one piece, and not inline where the Session is set up, so that the order of its three
 /// steps can be tested: the SURB is booked only when the packet goes on, so a packet that is held is
@@ -333,7 +346,7 @@ fn exit_data_egress<Si>(
     sink: Si,
     session_id: SessionId,
     estimator: AtomicSurbFlowEstimator,
-    reserve: u64,
+    balancer: Arc<BalancerStateValues>,
     gate: Option<Arc<ServiceGate>>,
 ) -> impl Sink<EgressItem, Error = std::io::Error>
 where
@@ -346,7 +359,7 @@ where
             #[cfg(feature = "telemetry")]
             telemetry::record_session_surb_consumed(&session_id, 1);
         };
-        match hold_for_surb_reserve(session_id, &estimator, reserve) {
+        match hold_for_surb_reserve(session_id, &estimator, &balancer) {
             None => {
                 book_consumed(&estimator);
                 acquire_egress_permit(gate.clone(), routing, data)
@@ -4383,6 +4396,9 @@ where
                     // is set from the configuration here, so this is the point it first is non-zero;
                     // the `BalancerTarget` keep-alive path is the Exit receiving the Entry's target,
                     // and does not arm anything.
+                    // At least one keep-alive a second, so that a small target is not filled a SURB or
+                    // two at a time and the Session left waiting for its first keep-alive.
+                    surb_mgmt.set_pacing_floor(u64::from(surbs_per_keep_alive));
                     surb_mgmt.arm_refill_pacing();
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
@@ -6644,7 +6660,7 @@ where
                         msg_sender.clone().sink_map_err(std::io::Error::other),
                         session_id,
                         surb_estimator_tx,
-                        keep_alive_surb_reserve(target_surb_buffer_size),
+                        slot.surb_mgmt.clone(),
                         egress_gate,
                     )
                     .rate_limit_with_controller(&egress_rate_control)
@@ -20991,14 +21007,16 @@ mod tests {
     async fn data_should_be_held_back_while_the_surb_stock_sits_at_the_keep_alive_reserve() -> anyhow::Result<()> {
         let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
         let estimator = AtomicSurbFlowEstimator::default();
-        let reserve = 32;
+        let balancer = balancer_with_target(3_200);
+        let reserve = current_keep_alive_surb_reserve(&balancer);
+        assert_eq!(32, reserve);
         estimator.produced.store(reserve, Ordering::Relaxed);
 
         let mut sink = Box::pin(exit_data_egress(
             tx.sink_map_err(std::io::Error::other),
             HoprPseudonym::random(),
             estimator.clone(),
-            reserve,
+            balancer,
             None,
         ));
         let item = data_packet()?;
@@ -21035,8 +21053,9 @@ mod tests {
         estimator.produced.store(33, Ordering::Relaxed);
 
         let session_id = HoprPseudonym::random();
+        let balancer = balancer_with_target(3_200);
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, 32).is_none(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer).is_none(),
             "no hold, no allocation"
         );
 
@@ -21044,7 +21063,7 @@ mod tests {
             tx.sink_map_err(std::io::Error::other),
             session_id,
             estimator.clone(),
-            32,
+            balancer,
             None,
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
@@ -21052,6 +21071,53 @@ mod tests {
             .context("above the reserve the packet must not wait")??;
         assert!(forwarded.try_recv().is_ok(), "forwarded");
         assert_eq!(1, estimator.estimate_surbs_consumed());
+        Ok(())
+    }
+
+    fn balancer_with_target(target: u64) -> Arc<BalancerStateValues> {
+        Arc::new(BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: target,
+            ..Default::default()
+        }))
+    }
+
+    /// The reserve follows the target the Entry asks for now, not the one the Session opened with: an
+    /// Entry that lowers its target keeps the stock below the old reserve, and with the old reserve the
+    /// data would be held for good.
+    #[tokio::test]
+    async fn a_lowered_target_should_lower_the_reserve_and_release_held_data() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(7_000);
+        assert_eq!(70, current_keep_alive_surb_reserve(&balancer));
+        estimator.produced.store(40, Ordering::Relaxed);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer.clone(),
+            None,
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { sink.send(item).await });
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                forwarded.next()
+            )
+            .await
+            .is_err(),
+            "40 SURBs are below the reserve of a 7000 target"
+        );
+
+        // The Entry lowers its target: the reserve of 160 is 32, and 40 SURBs are above it.
+        balancer.target_surb_buffer_size.store(160, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), forwarded.next())
+            .await
+            .context("the packet must go once the lowered reserve is below the stock")?
+            .context("the sink must have forwarded it")?;
+        timeout(Duration::from_secs(5), sending).await???;
         Ok(())
     }
 }

@@ -196,6 +196,12 @@ pub struct BalancerStateValues {
     last_heard: AtomicU64,
     /// When a Session data packet last went out, in the same unit as [`last_heard`](Self::last_heard).
     last_sent: AtomicU64,
+    /// When a reply the estimator counted as consumed last came home, in the same unit as
+    /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
+    last_reply_heard: AtomicU64,
+    /// The fewest SURBs per second the paced fill and refill may be held to: one keep-alive's worth,
+    /// set by the Session that owns the balancer. `0` until set. See [`pacing_cap`](Self::pacing_cap).
+    pacing_floor: AtomicU64,
 }
 
 /// The instant the activity stamps of a [`BalancerStateValues`] count from: when it was made.
@@ -211,14 +217,21 @@ impl Default for ActivityEpoch {
 /// How long data can go out with nothing at all coming back before the Entry sustains the
 /// counterparty's SURBs on its own: three seconds.
 ///
-/// The Exit reports its SURB level once per `surb_balance_notify_period` (15 s in the node's default
-/// configuration, at least a second when set) and replies at the rate of the data it receives, so
-/// three seconds of data going out and nothing coming back, neither a report, nor any other packet,
-/// nor a reply home, means that the Exit's consumption is invisible: its stock may be draining into a
-/// return path that delivers nothing, and the balancer, which learns the level from those reports and
-/// replies, cannot see it and would mint nothing. See
+/// A counterparty that was replying replies at the rate of the data it receives, so three seconds of
+/// data going out and nothing coming back, neither a reply, nor a report, nor any other packet, means
+/// that its consumption is invisible: its stock may be draining into a return path that delivers
+/// nothing, and the balancer, which learns the level from those replies and reports, cannot see it
+/// and would mint nothing. Reports alone do not tell that: the Exit sends one every
+/// `surb_balance_notify_period`, 15 s by default, so a Session the Exit does not answer (an upload)
+/// is quiet for most of every period without anything being wrong. Hence the sustain needs a reply
+/// stream that stopped; see [`REPLY_STREAM_WINDOW`] and
 /// [`silence_sustain`](BalancerStateValues::silence_sustain).
 pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
+
+/// How recent the last reply must be, relative to the last time the counterparty was heard at all, for
+/// a silence to be a reply stream that stopped rather than a Session that gets no replies: one default
+/// notify period.
+pub const REPLY_STREAM_WINDOW: Duration = Duration::from_secs(15);
 
 /// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
 /// one fifth of the target per second, so the refill takes about as many seconds.
@@ -427,11 +440,30 @@ impl BalancerStateValues {
         self.correction_cap.swap(false, std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// The rate the refill after a wipe is held to, `target / REFILL_PACING_SECS` SURBs per second
-    /// and at least one.
+    /// The rate the fill and the refill after a wipe are held to: `target / REFILL_PACING_SECS` SURBs
+    /// per second, at least one keep-alive's worth ([`set_pacing_floor`](Self::set_pacing_floor)) and
+    /// at least one, and never above `max_surbs_per_sec`.
+    ///
+    /// The floor matters at small targets only: a keep-alive carries a fixed number of SURBs, so a
+    /// fifth of a target of 11 is two SURBs a second, a keep-alive every four seconds, and a Session
+    /// that waited for a quarter of its target opened after four seconds instead of under one. The
+    /// ceiling is the bound the PID output had: the pacing replaces that output for its window, and
+    /// must not exceed what the client configured the balancer to mint.
     pub(crate) fn pacing_cap(&self) -> u64 {
-        (self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed) / REFILL_PACING_SECS)
-            .clamp(1, u64::from(u32::MAX))
+        use std::sync::atomic::Ordering::Relaxed;
+
+        (self.target_surb_buffer_size.load(Relaxed) / REFILL_PACING_SECS)
+            .max(self.pacing_floor.load(Relaxed))
+            .max(1)
+            .min(self.max_surbs_per_sec.load(Relaxed))
+            .min(u64::from(u32::MAX))
+    }
+
+    /// Sets the fewest SURBs per second the pacing may be held to: one keep-alive's worth of SURBs, so
+    /// that a paced fill sends at least one keep-alive a second. See `pacing_cap`.
+    pub fn set_pacing_floor(&self, surbs_per_sec: u64) {
+        self.pacing_floor
+            .store(surbs_per_sec, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// How many SURBs an outgoing Session data packet should carry along with its payload.
@@ -489,12 +521,30 @@ impl BalancerStateValues {
         self.stamp(&self.last_sent, std::time::Instant::now());
     }
 
+    /// Records that a reply the estimator counted as consumed came home now.
+    pub(crate) fn note_reply_heard(&self) {
+        self.stamp(&self.last_reply_heard, std::time::Instant::now());
+    }
+
     /// Test hook: as if the counterparty had last been heard from `ago` ago.
     ///
     /// The stamps count from the instant the state was made, so for one to lie in the past the epoch
     /// has to be moved back before it.
     #[cfg(test)]
-    pub(crate) fn last_heard_ago(mut self, ago: Duration) -> Self {
+    pub(crate) fn last_heard_ago(self, ago: Duration) -> Self {
+        let state = self.last_heard_only_ago(ago);
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
+        // What it was heard on was a reply: a reply stream that stopped `ago` ago.
+        state.stamp(&state.last_reply_heard, at);
+        state
+    }
+
+    /// Test hook: as if the counterparty had last been heard from `ago` ago, by a report or a packet that
+    /// was no reply, and had never replied.
+    #[cfg(test)]
+    pub(crate) fn last_heard_only_ago(mut self, ago: Duration) -> Self {
         let now = std::time::Instant::now();
         self.epoch = ActivityEpoch(
             now.checked_sub(ago + Duration::from_secs(60))
@@ -530,7 +580,12 @@ impl BalancerStateValues {
     /// of the data, makes no burst, and wipes nothing. It ends at the first packet or reply from the
     /// Exit.
     ///
-    /// Judged between the two stamps, not against the clock, so that the answer is about the packet being
+    /// Only a reply stream that stopped counts: the last reply must be within [`REPLY_STREAM_WINDOW`] of
+    /// the last time the counterparty was heard at all. A Session the Exit does not answer hears only its
+    /// reports, one per notify period, and sustaining it would put one SURB in every data packet into a
+    /// stock nothing spends, up to the store's capacity.
+    ///
+    /// Judged between the stamps, not against the clock, so that the answer is about the packet being
     /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.
     pub(crate) fn silence_sustain(&self) -> bool {
         use std::sync::atomic::Ordering::Relaxed;
@@ -538,11 +593,13 @@ impl BalancerStateValues {
         if self.is_disabled() {
             return false;
         }
-        match self.last_heard.load(Relaxed) {
-            0 => false,
-            heard => {
+        match (self.last_heard.load(Relaxed), self.last_reply_heard.load(Relaxed)) {
+            (0, _) | (_, 0) => false,
+            (heard, replied) => {
                 let after = u64::try_from(SILENCE_SUSTAIN_AFTER.as_millis()).unwrap_or(u64::MAX);
-                self.last_sent.load(Relaxed) > heard.saturating_add(after)
+                let window = u64::try_from(REPLY_STREAM_WINDOW.as_millis()).unwrap_or(u64::MAX);
+                // A reply stream that stopped, not a Session the counterparty does not answer.
+                replied.saturating_add(window) >= heard && self.last_sent.load(Relaxed) > heard.saturating_add(after)
             }
         }
     }
@@ -809,6 +866,7 @@ where
         // packets reached the hooks that record it.
         if snapshot.consumed > self.last_estimator_state.consumed {
             self.state.note_heard();
+            self.state.note_reply_heard();
         }
 
         self.last_estimator_state = snapshot;
@@ -2404,6 +2462,14 @@ mod tests {
             silent.silence_sustain(),
             "a packet 10 s after the last word is a silence"
         );
+
+        let unanswered = gate_state(100, 200).last_heard_only_ago(Duration::from_secs(10));
+        unanswered.note_sent();
+        assert!(
+            !unanswered.silence_sustain(),
+            "a Session the counterparty never answered has no reply stream to lose: heard only by its reports, it is \
+             quiet by design"
+        );
     }
 
     /// Whatever the Exit says is heard: a report of its level, and any packet at all, whose signals are
@@ -2443,5 +2509,54 @@ mod tests {
 
         tick(&mut balancer, &estimator, &output, 3);
         assert!(heard() > 0, "three replies came home in that tick");
+    }
+
+    /// A fifth of a small target is a SURB or two a second, and a keep-alive carries several: the fill
+    /// would send one keep-alive every few seconds and the Session wait for it. One keep-alive's worth a
+    /// second is the floor.
+    #[test]
+    fn the_pacing_should_carry_at_least_one_keep_alive_a_second() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 11,
+            ..Default::default()
+        });
+        assert_eq!(2, state.pacing_cap(), "a fifth of the target, without a floor");
+        state.set_pacing_floor(8);
+        assert_eq!(8, state.pacing_cap(), "one keep-alive of 8 SURBs a second");
+
+        let large = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 6_887,
+            ..Default::default()
+        });
+        large.set_pacing_floor(8);
+        assert_eq!(
+            1_377,
+            large.pacing_cap(),
+            "a large target is paced at a fifth, as before"
+        );
+    }
+
+    /// The pacing replaces the PID output for its window, and must not mint more than the client
+    /// configured the balancer to.
+    #[test]
+    fn the_pacing_should_never_exceed_the_configured_ceiling() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 30_000,
+            max_surbs_per_sec: 5_000,
+            ..Default::default()
+        });
+        assert_eq!(
+            5_000,
+            state.pacing_cap(),
+            "a fifth of 30 000 is 6 000, above the ceiling"
+        );
+
+        let organic_only = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 7_000,
+            max_surbs_per_sec: 0,
+            ..Default::default()
+        });
+        organic_only.set_pacing_floor(8);
+        assert_eq!(0, organic_only.pacing_cap(), "a ceiling of nothing paces nothing");
     }
 }
