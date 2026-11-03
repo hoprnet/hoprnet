@@ -71,8 +71,10 @@ pub struct ReplayFilterConfig {
     /// least `max_tracked_packets` insertions. Must be at least `shards`, so that every shard gets a slot.
     ///
     /// At the default false-positive rate the bitmap costs roughly three bytes per token per generation, so a
-    /// decoder holds about this many megabytes at rest and twice that once the second generation exists. The
-    /// default is therefore a little under 32 MB per decoder, rising to about 63 MB after the first rotation.
+    /// decoder ultimately holds about this many megabytes, twice over once a shard has rotated. Generations are
+    /// allocated on first insertion, so the footprint grows with traffic rather than being paid at construction;
+    /// at the default it reaches a little under 32 MB per decoder, rising to about 63 MB after every shard has
+    /// rotated once.
     ///
     /// Default is 10 000 000.
     #[default(default_max_tracked_packets())]
@@ -152,11 +154,14 @@ fn validate_shards(shards: usize) -> Result<(), validator::ValidationError> {
 #[derive(Debug)]
 struct ReplayShard {
     /// The generation currently accepting insertions.
-    current: bloomfilter::Bloom<ReplayToken>,
+    ///
+    /// Allocated on the first insertion, not when the filter is built: at the default configuration a generation
+    /// is tens of megabytes, and a node that has not yet received a packet should not have paid for every shard of
+    /// it - nor should every `HoprDecoder` construction in a test or a bench.
+    current: Option<bloomfilter::Bloom<ReplayToken>>,
     /// The generation that was current until the last rotation, if any.
     ///
-    /// Allocated lazily: the first generation's rotation is what creates it, so a node that never fills a
-    /// generation never pays for the second bitmap.
+    /// Allocated lazily too: a shard that never fills its first generation never pays for a second bitmap.
     previous: Option<bloomfilter::Bloom<ReplayToken>>,
     /// Number of tokens inserted into [`Self::current`].
     count: usize,
@@ -167,7 +172,7 @@ struct ReplayShard {
 impl ReplayShard {
     fn new(capacity: usize) -> Self {
         Self {
-            current: Self::generation(capacity),
+            current: None,
             previous: None,
             count: 0,
             capacity,
@@ -180,25 +185,36 @@ impl ReplayShard {
     }
 
     fn contains(&self, token: &ReplayToken) -> bool {
-        self.current.check(token) || self.previous.as_ref().is_some_and(|previous| previous.check(token))
+        self.current.as_ref().is_some_and(|current| current.check(token))
+            || self.previous.as_ref().is_some_and(|previous| previous.check(token))
     }
 
     /// Inserts `token` unless it is already known. Returns `true` if it was already known.
     fn check_and_set(&mut self, token: &ReplayToken) -> bool {
-        // A member of either generation must not rotate the shard: that would cost a generation of history to
-        // record nothing new.
-        if self.contains(token) {
+        // The retired generation is read-only, so it is checked here; the current one is checked as part of the
+        // insertion below, which needs a single hash pass where a separate `check` plus `set` would need two.
+        if self.previous.as_ref().is_some_and(|previous| previous.check(token)) {
             return true;
         }
 
         if self.count == self.capacity {
             // The current generation is full. The oldest one goes, the current one becomes the previous one, and
             // the token is recorded in a fresh generation.
-            self.previous = Some(std::mem::replace(&mut self.current, Self::generation(self.capacity)));
+            self.previous = Some(std::mem::replace(
+                self.current.get_or_insert_with(|| Self::generation(self.capacity)),
+                Self::generation(self.capacity),
+            ));
             self.count = 0;
         }
 
-        self.current.set(token);
+        let current = self.current.get_or_insert_with(|| Self::generation(self.capacity));
+
+        // A member of the current generation must not rotate the shard, and `check_and_set` reports it without
+        // recording a second time.
+        if current.check_and_set(token) {
+            return true;
+        }
+
         self.count += 1;
         false
     }
