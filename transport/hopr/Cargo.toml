@@ -208,6 +208,11 @@ name = "protocol_throughput_emulated_bench"
 harness = false
 required-features = ["testing"]
 
+[[bench]]
+name = "routing_tracing_bench"
+harness = false
+required-features = ["testing"]
+
 [[test]]
 name = "protocol_backpressure_flow_control"
 path = "tests/protocol/backpressure_flow_control.rs"
