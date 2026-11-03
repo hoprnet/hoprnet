@@ -49,8 +49,13 @@ where
             channels_dst,
             cfg,
             ticket_factory,
-            replay_filter: TagReplayFilter::default(),
+            replay_filter: TagReplayFilter::new(&cfg.replay_filter),
         }
+    }
+
+    /// The replay filter, for tests and telemetry.
+    pub fn replay_filter(&self) -> &TagReplayFilter {
+        &self.replay_filter
     }
 
     #[tracing::instrument(skip(self, fwd), level = "debug", fields(path_pos = fwd.path_pos))]
@@ -189,7 +194,17 @@ where
             })
         })?;
 
-        // Phase 2: Sphinx packet decoding
+        // Phase 2: Sphinx decoding, with the replay filter consulted on the packet tag.
+        //
+        // The tag is derived from the shared secret, so it becomes available right after the elliptic-curve
+        // multiplication - before the header MAC, the payload permutation and the message parse. The filter is
+        // asked from inside the decode, which is what lets a replay skip that remaining work. It both checks and
+        // inserts: a duplicate is reported as `PacketReplay` and the tag is recorded when the packet passes.
+        //
+        // The tag is authenticated by construction: it is derived from a secret only the sender and this node
+        // share, so a third party cannot choose it. A packet whose header MAC subsequently fails still had its tag
+        // recorded, which costs the filter one slot - a bounded consequence, not a way to suppress arbitrary
+        // traffic.
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
@@ -198,7 +213,7 @@ where
         // id is gone.
         let replied_on_surb = std::cell::Cell::new(None);
         let packet = trace_timed!("sphinx_decode complete", {
-            HoprPacket::from_incoming(
+            HoprPacket::from_incoming_checked(
                 &data,
                 &self.packet_key,
                 previous_hop,
@@ -210,20 +225,19 @@ where
                     }
                     opener
                 },
+                |tag| {
+                    let is_replay = self.replay_filter.commit(tag);
+                    if is_replay {
+                        tracing::debug!(%sender, "dropping packet - replay detected after the shared secret");
+                    }
+                    is_replay
+                },
             )
         })
-        .map_err(IncomingPacketError::undecodable)?;
-
-        // This is checked on both Final and Forwarded packets,
-        // Outgoing packets are not allowed to pass and are later reported as invalid state.
-        if let Some(tag) = packet.packet_tag() {
-            if self.replay_filter.commit(tag) {
-                return Err(IncomingPacketError::ProcessingError(
-                    previous_hop.into(),
-                    HoprProtocolError::Replay,
-                ));
-            }
-        }
+        .map_err(|error| match error {
+            hopr_crypto_packet::errors::PacketError::PacketReplay => IncomingPacketError::Replay(previous_hop.into()),
+            error => IncomingPacketError::undecodable(HoprProtocolError::from(error)),
+        })?;
 
         match packet {
             HoprPacket::Final(incoming) => {
