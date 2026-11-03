@@ -177,36 +177,39 @@ fn default_admitted_headroom_percent() -> u32 {
 
 /// Which end of the per-pseudonym buffer a pop consumes from. Replying side only.
 ///
-/// SURBs that carry a PIX share are always consumed before share-less ones (see "Share-bearing SURBs
-/// first" on the internal `SurbRingBuffer`); the order applies within each of the two tiers. Overflow
-/// evicts the oldest in either order.
+/// FIFO, oldest first, is the only order. SURBs that carry a PIX share are always consumed before
+/// share-less ones (see "Share-bearing SURBs first" on the internal `SurbRingBuffer`), and within each
+/// of those two tiers the oldest goes first, whether it is popped or evicted on overflow. The order is
+/// independent of the per-SURB generation tag (`SurbReceiverInfo::generation`), which handles an
+/// explicit return-path re-plan by clearing superseded SURBs wholesale on the next push.
 ///
-/// FIFO is the default. A PIX share reaches the reconstructor only when its SURB is spent, so the
-/// oldest shares of a cycle have to go first. LIFO buries them under the newer ones: an overflow then
-/// evicts exactly those, and a dip in the level surfaces them out of order, so polynomials are left
-/// short and cycles complete late or not at all (hoprnet#8473 dropped LIFO for that reason; with only
-/// the pop order varied, the PIX scenarios passed 8 of 8 on FIFO and 6 of 8 on LIFO).
+/// There used to be a `Lifo` variant (hoprnet#8328), consuming newest first so that a return-path
+/// change would apply before the buffered SURBs drained. It was removed because PIX cannot work with
+/// it: a share reaches the reconstructor only when its SURB is *used*, so a LIFO store buries the
+/// oldest shares of the current cycle, and an overflow then evicts exactly those, which loses them for
+/// good. Every node may act as a PIX Exit and nothing in the configuration turns that off
+/// (`enforce_pix` only makes it mandatory), so the option had no safe use — and what it was for is
+/// what the generation tag does.
 ///
 /// What FIFO gives up is that SURBs the sender replaced, because their return path broke, are spent
 /// before their replacements, so a dead relayer's SURBs are spent into the void until the buffer turns
 /// over. The sender makes up for it: when a relayer is judged dead it advances the session's SURB
 /// generation, and this side drops everything it holds on the next push (see "Generations" on the
-/// internal `SurbRingBuffer`). That is the same invalidation LIFO achieves by sinking the old SURBs, at
-/// the price of the stock rather than of the shares.
+/// internal `SurbRingBuffer`). The sender's judgement of its relayers counts on this order as well: it
+/// reads a race between two SURBs minted together by the one a FIFO replier spends first.
 ///
-/// [`Lifo`](Self::Lifo) stays selectable for deployments without PIX Exits, where there are no shares
-/// to bury.
+/// This enum, and the [`SurbStoreConfig::pop_order`] field carrying it, remain only so that existing
+/// configurations (`pop_order: fifo`) and code naming [`SurbPopOrder::Fifo`] keep working; they are
+/// candidates for removal in a later major version. `pop_order: lifo` is rejected as an unknown
+/// variant.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumString, strum::Display)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[strum(serialize_all = "lowercase")]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum SurbPopOrder {
-    /// Oldest first.
+    /// Oldest first. The only order, and the default.
     #[default]
     Fifo,
-    /// Newest first, so SURBs minted after a return-path change are spent before the ones they
-    /// replace. Buries the oldest shares of a PIX cycle; see the enum.
-    Lifo,
 }
 
 /// Configuration for the SURB cache.
@@ -251,6 +254,11 @@ pub struct SurbStoreConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
     pub rb_capacity: usize,
     /// Pop order of the per-pseudonym buffer; see [`SurbPopOrder`].
+    ///
+    /// FIFO is the only order, so this setting changes nothing. It is retained for configuration
+    /// compatibility — a file that spells out `pop_order: fifo` keeps loading — and is a candidate for
+    /// removal in a later major version. `pop_order: lifo` is no longer accepted and fails to load as an
+    /// unknown variant: PIX cannot work with LIFO, see [`SurbPopOrder`] for why.
     ///
     /// Affects only the replying side. Default is [`SurbPopOrder::Fifo`].
     #[cfg_attr(feature = "serde", serde(default))]
@@ -1064,7 +1072,7 @@ impl MemorySurbStore {
                 let (ring, op) = match entry {
                     Some(entry) => (entry.into_value(), moka::ops::compute::Op::Nop),
                     None => {
-                        let ring = SurbRingBuffer::with_pop_order(self.cfg.quarantine_rb_capacity, self.cfg.pop_order);
+                        let ring = SurbRingBuffer::new(self.cfg.quarantine_rb_capacity);
                         (ring.clone(), moka::ops::compute::Op::Put(ring))
                     }
                 };
@@ -1471,10 +1479,7 @@ impl SurbStore for MemorySurbStore {
                 }
                 // No ring to keep: admit an empty one, so standing is knowable before the first SURB
                 // arrives, or `insert_surbs` would route the Session's early batches to quarantine.
-                None => moka::ops::compute::Op::Put(AdmittedRing::new(
-                    SurbRingBuffer::with_pop_order(capacity, self.cfg.pop_order),
-                    epoch,
-                )),
+                None => moka::ops::compute::Op::Put(AdmittedRing::new(SurbRingBuffer::new(capacity), epoch)),
             });
 
         let resident = match stamped.into_entry() {
@@ -1690,10 +1695,9 @@ impl SurbShareInfo for HoprSurb {
 /// by [`HoprSurbId`].
 ///
 /// Backed by two [`VecDeque`] tiers that together are never allowed to exceed `capacity`: a push into
-/// a full buffer evicts first (see below for which SURB goes). Each tier is first in, first out by
-/// default: a pop consumes the oldest SURB of the tier it draws from (the newest under
-/// [`SurbPopOrder::Lifo`]), and an eviction always takes the oldest. See [`SurbPopOrder`] for why FIFO
-/// is the default.
+/// a full buffer evicts first (see below for which SURB goes). Each tier is first in, first out: a pop
+/// consumes the oldest SURB of the tier it draws from, and so does an eviction. See [`SurbPopOrder`]
+/// for why that is the only order.
 ///
 /// ## Share-bearing SURBs first
 ///
@@ -1835,8 +1839,6 @@ struct GenerationalBuffer<S> {
     shares: VecDeque<(HoprSurbId, S)>,
     /// SURBs carrying no share: pure return paths.
     plain: VecDeque<(HoprSurbId, S)>,
-    /// Which end of a tier a pop takes from.
-    pop_order: SurbPopOrder,
     /// Highest generation seen; `None` until the first push.
     generation: Option<u8>,
 }
@@ -1873,23 +1875,15 @@ impl<S> GenerationalBuffer<S> {
         }
     }
 
-    /// The SURB the next pop would take from the next tier, by the pop order. Peeking and popping
-    /// both go through [`next_tier`](Self::next_tier), so they stay in step.
+    /// The SURB the next pop would take: the oldest of the next tier. Peeking and popping both go
+    /// through [`next_tier`](Self::next_tier), so they stay in step.
     fn peek_next(&self) -> Option<&(HoprSurbId, S)> {
-        match self.pop_order {
-            SurbPopOrder::Fifo => self.next_tier().front(),
-            SurbPopOrder::Lifo => self.next_tier().back(),
-        }
+        self.next_tier().front()
     }
 
-    /// Removes and returns the SURB [`peek_next`](Self::peek_next) names.
+    /// Removes and returns the oldest SURB of the next tier.
     fn pop_next(&mut self) -> Option<(HoprSurbId, S)> {
-        let pop_order = self.pop_order;
-        let tier = self.next_tier_mut();
-        match pop_order {
-            SurbPopOrder::Fifo => tier.pop_front(),
-            SurbPopOrder::Lifo => tier.pop_back(),
-        }
+        self.next_tier_mut().pop_front()
     }
 
     /// Makes room in a full buffer for one more SURB by evicting the oldest share-less one.
@@ -1927,18 +1921,11 @@ enum MadeRoom {
 impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs, popped
     /// oldest first within each tier.
-    #[cfg(test)]
     pub fn new(capacity: usize) -> Self {
-        Self::with_pop_order(capacity, SurbPopOrder::Fifo)
-    }
-
-    /// Creates a buffer holding at most `capacity` (min 1) SURBs, popped within each tier by `pop_order`.
-    pub fn with_pop_order(capacity: usize, pop_order: SurbPopOrder) -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
                 shares: VecDeque::new(),
                 plain: VecDeque::new(),
-                pop_order,
                 generation: None,
             })),
             // A zero capacity would make the eviction below pop from an empty buffer and then push
@@ -2293,34 +2280,29 @@ mod tests {
         std::iter::from_fn(|| rb.pop_any().map(|popped| popped.id[0])).collect()
     }
 
-    /// Two SURBs return via the dead relay, one via a healthy one, inserted so that either pop order
-    /// reaches the invalidated ones first.
-    #[rstest::rstest]
-    #[case::fifo(SurbPopOrder::Fifo, [true, true, false])]
-    #[case::lifo(SurbPopOrder::Lifo, [false, true, true])]
-    fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated(
-        #[case] pop_order: SurbPopOrder,
-        #[case] via_dead: [bool; 3],
-    ) -> anyhow::Result<()> {
+    #[test]
+    fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated() -> anyhow::Result<()> {
         let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
-        let store = MemorySurbStore::new(SurbStoreConfig {
-            pop_order,
-            ..Default::default()
-        });
+
+        let store = MemorySurbStore::default();
         let pseudonym = HoprPseudonym::random();
-        let surbs = (1u8..)
-            .zip(via_dead)
-            .map(|(seed, dead_relayer)| Ok(([seed; 8], surb_via(if dead_relayer { dead } else { alive }, TWO_HOP)?)))
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        let alive_id = surbs[via_dead.iter().position(|d| !d).unwrap_or_default()].0;
-        store.insert_surbs(pseudonym, surbs);
+
+        // Two SURBs return via the dead relay, one via a healthy one; all are two-hop.
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(dead, TWO_HOP)?),
+                ([3u8; 8], surb_via(alive, TWO_HOP)?),
+            ],
+        );
 
         store.invalidate_relayer(&dead);
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
             .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
-        assert_eq!(alive_id, found.sender_id.surb_id(), "must skip past the dead relayer");
+        assert_eq!([3u8; 8], found.sender_id.surb_id(), "must skip past the dead relayer");
         assert_eq!(
             0, found.remaining,
             "the invalidated SURBs must be discarded, not left behind"
@@ -2397,24 +2379,52 @@ mod tests {
         assert_eq!(SurbPopOrder::Fifo, SurbPopOrder::default());
     }
 
+    /// LIFO was removed because PIX cannot work with it, so asking for it must be an error rather than
+    /// a quiet fall back to FIFO.
     #[test]
-    fn surb_pop_order_should_parse_both_orders() -> anyhow::Result<()> {
+    fn surb_pop_order_should_reject_lifo() -> anyhow::Result<()> {
         use std::str::FromStr;
 
-        assert_eq!(SurbPopOrder::Fifo, SurbPopOrder::from_str("fifo")?);
-        assert_eq!(SurbPopOrder::Lifo, SurbPopOrder::from_str("lifo")?);
+        assert_eq!(
+            SurbPopOrder::Fifo,
+            SurbPopOrder::from_str("fifo").context("fifo must still parse")?
+        );
+        assert!(
+            SurbPopOrder::from_str("lifo").is_err(),
+            "LIFO was removed, so it must no longer parse"
+        );
+
         Ok(())
     }
 
-    /// Newest first within a tier; overflow still evicts the oldest.
+    /// The configuration path: `pop_order: lifo` fails to load as an unknown variant, while `fifo`,
+    /// which existing configurations spell out, still loads. The config is deserialized from a map,
+    /// which is all a configuration file is to serde, so no data-format crate is needed.
+    #[cfg(feature = "serde")]
     #[test]
-    fn a_lifo_ring_buffer_should_pop_newest_first_and_evict_oldest() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::with_pop_order(3, SurbPopOrder::Lifo);
-        for n in 1u8..=4 {
-            rb.push([([n; 8], 0u64)], 0);
-        }
-        let popped: Vec<u8> = std::iter::from_fn(|| rb.pop_any().map(|popped| popped.id[0])).collect();
-        assert_eq!(vec![4, 3, 2], popped, "1 was evicted, the rest pop newest first");
+    fn surb_store_config_should_reject_a_lifo_pop_order() -> anyhow::Result<()> {
+        use serde::{
+            Deserialize,
+            de::value::{Error, MapDeserializer},
+        };
+
+        let load = |pop_order: &'static str| {
+            SurbStoreConfig::deserialize(MapDeserializer::<_, Error>::new([("pop_order", pop_order)].into_iter()))
+        };
+
+        assert_eq!(
+            SurbPopOrder::Fifo,
+            load("fifo").context("fifo must still load")?.pop_order
+        );
+
+        let Err(error) = load("lifo") else {
+            anyhow::bail!("LIFO was removed, so a config asking for it must not load");
+        };
+        assert!(
+            error.to_string().contains("unknown variant `lifo`"),
+            "unexpected error: {error}"
+        );
+
         Ok(())
     }
 
@@ -2441,7 +2451,7 @@ mod tests {
     }
 
     /// Two SURBs pushed as {1, 2} are handed out 1 then 2 — and the same order holds for a fresh
-    /// batch pushed after the buffer drains. (That the store itself defaults to FIFO is asserted
+    /// batch pushed after the buffer drains. (That the configuration still reports FIFO is asserted
     /// separately by `surb_store_config_should_default_to_fifo`.)
     #[test]
     fn surb_ring_buffer_should_consume_oldest_first() -> anyhow::Result<()> {
@@ -2748,14 +2758,12 @@ mod tests {
     fn undecryptable_replies_after_upload_flood(
         max_openers: usize,
         rb_capacity: usize,
-        order: SurbPopOrder,
         flood: usize,
         replies: usize,
     ) -> usize {
         let (client, pseudonym) = flooded_client(max_openers, flood as u64);
         let exit = MemorySurbStore::new(SurbStoreConfig {
             rb_capacity,
-            pop_order: order,
             ..Default::default()
         });
         // The exit's ring only reaches `rb_capacity` for an admitted pseudonym; unadmitted SURBs land
@@ -2788,8 +2796,7 @@ mod tests {
     fn replies_stay_decryptable_while_the_opener_cache_has_not_overflowed() {
         const MAX_OPENERS: usize = 7000;
         // Flood == capacity: nothing is evicted.
-        let undecryptable =
-            undecryptable_replies_after_upload_flood(MAX_OPENERS, 1050, SurbPopOrder::Fifo, MAX_OPENERS, 200);
+        let undecryptable = undecryptable_replies_after_upload_flood(MAX_OPENERS, 1050, MAX_OPENERS, 200);
         assert_eq!(
             0, undecryptable,
             "no reply should be undecryptable before the cache overflows"
@@ -2825,10 +2832,9 @@ mod tests {
 
     /// End-to-end at the store level: with the opener cache keeping its newest entries, a sustained
     /// upload no longer strands the return path at the deployed configuration. At production
-    /// proportions (opener cache larger than the exit's SURB ring) every reply opens under both pop
-    /// orders, and under LIFO, the default, it opens at any proportion.
+    /// proportions (opener cache larger than the exit's SURB ring) every reply opens.
     ///
-    /// The one case that still strands replies is a misconfiguration: a FIFO exit whose SURB ring is
+    /// The one case that still strands replies is a misconfiguration: an exit whose SURB ring is
     /// *larger* than the opener cache, so it pops the oldest SURBs whose openers fall outside the
     /// smaller opener window. It is neither deployed nor sane, and is asserted here to document the
     /// boundary of the fix rather than to endorse it. (Before the fix, every one of these cases
@@ -2836,26 +2842,23 @@ mod tests {
     ///
     /// In the inverted case the exit retains the newest `rb_capacity` SURBs and the client the newest
     /// `max_openers` openers (`flood` overflows both), so the two ranges overlap only on the newest
-    /// `max_openers` ids. FIFO pops from the oldest end, so the first `rb_capacity - max_openers` pops
-    /// fall outside that opener window; since `REPLIES <= rb_capacity - max_openers` (200 ≤ 14 000),
-    /// every tested FIFO reply is undecryptable.
+    /// `max_openers` ids. The exit pops from the oldest end, so the first `rb_capacity - max_openers`
+    /// pops fall outside that opener window; since `REPLIES <= rb_capacity - max_openers`
+    /// (200 ≤ 14 000), every tested reply is undecryptable.
     #[rstest]
-    #[case::production_fifo(7000, 1050, 21_000, SurbPopOrder::Fifo, 0)]
-    #[case::production_lifo(7000, 1050, 21_000, SurbPopOrder::Lifo, 0)]
-    #[case::inverted_lifo(1000, 15_000, 20_000, SurbPopOrder::Lifo, 0)]
-    #[case::inverted_fifo(1000, 15_000, 20_000, SurbPopOrder::Fifo, 200)]
+    #[case::production_fifo(7000, 1050, 21_000, 0)]
+    #[case::inverted_fifo(1000, 15_000, 20_000, 200)]
     fn a_sustained_upload_keeps_the_return_path_alive_at_the_deployed_config(
         #[case] max_openers: usize,
         #[case] rb_capacity: usize,
         #[case] flood: usize,
-        #[case] order: SurbPopOrder,
         #[case] expected_undecryptable: usize,
     ) {
         const REPLIES: usize = 200;
-        let undecryptable = undecryptable_replies_after_upload_flood(max_openers, rb_capacity, order, flood, REPLIES);
+        let undecryptable = undecryptable_replies_after_upload_flood(max_openers, rb_capacity, flood, REPLIES);
         assert_eq!(
             expected_undecryptable, undecryptable,
-            "unexpected undecryptable-reply count for {order:?} at openers={max_openers}, rb={rb_capacity}"
+            "unexpected undecryptable-reply count at openers={max_openers}, rb={rb_capacity}"
         );
     }
 
@@ -3423,7 +3426,7 @@ mod tests {
         while let Some(found) = store.find_surb(SurbMatcher::Pseudonym(pseudonym)) {
             order_seen.push(found.sender_id.surb_id()[0]);
         }
-        assert_eq!(vec![2, 1, 3], order_seen, "shares first, then plain SURBs oldest first");
+        assert_eq!(vec![2, 1, 3], order_seen);
 
         Ok(())
     }

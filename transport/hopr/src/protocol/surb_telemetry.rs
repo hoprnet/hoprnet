@@ -74,9 +74,7 @@ use hopr_api::{
     },
 };
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
-use hopr_protocol_hopr::{
-    IncomingPacket, IncomingPacketError, OutgoingPacket, PacketDecoder, PacketEncoder, SurbPopOrder,
-};
+use hopr_protocol_hopr::{IncomingPacket, IncomingPacketError, OutgoingPacket, PacketDecoder, PacketEncoder};
 
 /// Slots in a [`PathId`], and therefore the longest leg that can be reported.
 pub(crate) const PATH_ID_SLOTS: usize = 5;
@@ -207,9 +205,6 @@ pub struct SurbRoundTripRegistry {
     /// it: the reply of a probe through a relayer on probation arrives after the write-off. Recognising
     /// it here is what lets a reply home lift the verdict or the probation of the relayers on its leg.
     written_off_legs: moka::sync::Cache<HoprSurbId, ReturnRelayers>,
-    /// The order the counterparty is assumed to spend its SURBs in, which decides what a race between
-    /// two SURBs of a packet says about their return paths; see [`judges`](Self::judges).
-    pop_order: SurbPopOrder,
 }
 
 /// Memory bound only. An entry leaves the map when its reply comes home, so what the map holds is
@@ -219,16 +214,6 @@ const MAX_PENDING_SURBS: u64 = 100_000;
 
 impl Default for SurbRoundTripRegistry {
     fn default() -> Self {
-        Self::new(SurbPopOrder::default())
-    }
-}
-
-impl SurbRoundTripRegistry {
-    /// A registry for a counterparty that spends its SURBs in `pop_order`.
-    ///
-    /// That is our own configuration, assumed to be the network's: the order is the replier's, and
-    /// nothing tells us what the replier runs.
-    pub fn new(pop_order: SurbPopOrder) -> Self {
         Self {
             inner: Default::default(),
             relayer_health: Default::default(),
@@ -239,13 +224,14 @@ impl SurbRoundTripRegistry {
                 .max_capacity(MAX_PENDING_SURBS)
                 .time_to_live(PENDING_SURB_HORIZON)
                 .build(),
-            pop_order,
         }
     }
+}
 
+impl SurbRoundTripRegistry {
     /// Whether the reply of the SURB at `pair_index` in its packet says anything about its return path
     /// when it races its partner's: only the SURB the replier spends first does, see
-    /// [`first_spent_index`].
+    /// [`FIRST_SPENT_INDEX`].
     ///
     /// The other one is spent after it, so its reply trails the first's by however long the replier
     /// took to get to it, a pause in its reply stream included, and that says nothing about a relayer.
@@ -254,7 +240,7 @@ impl SurbRoundTripRegistry {
     /// both would settle every pair in the normal order, and the largest inter-reply gap the replier
     /// ever had would become the bar a reply must stay out longer than to count as overdue.
     fn judges(&self, pair_index: usize) -> bool {
-        pair_index == first_spent_index(self.pop_order)
+        pair_index == FIRST_SPENT_INDEX
     }
 
     fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
@@ -539,23 +525,17 @@ impl Default for LastReply {
     }
 }
 
-/// The position, in a pair of SURBs minted together, of the one the replier spends first: the second
-/// under LIFO, which spends the newest first, the first under FIFO.
+/// The position, in a pair of SURBs minted together, of the one the replier spends first: the first,
+/// as a replier spends its SURBs oldest first (FIFO is the only pop order, see
+/// `hopr_protocol_hopr::SurbPopOrder`).
 ///
-/// Only that SURB's lateness is down to its return path. The other is spent after it, so it may wait
-/// in the replier's store behind it (LIFO) or be spent right after it (FIFO), and in both cases it
+/// Only that SURB's lateness is down to its return path. The other is spent right after it, so it
 /// trails the first-spent one by the replier's pace rather than by a relayer's fault. A race opens
 /// only when the later-spent SURB is home while the first-spent one is still out.
 ///
-/// That holds for the pop order configured here, which is assumed to be the replier's. Share-first
-/// tiers can separate a pair even so: a SURB carrying a PIX share is spent before share-less ones,
-/// whatever their ages. See [`SurbRoundTripRegistry::judges`].
-const fn first_spent_index(pop_order: SurbPopOrder) -> usize {
-    match pop_order {
-        SurbPopOrder::Lifo => 1,
-        SurbPopOrder::Fifo => 0,
-    }
-}
+/// Share-first tiers can separate a pair even so: a SURB carrying a PIX share is spent before
+/// share-less ones, whatever their ages. See [`SurbRoundTripRegistry::judges`].
+const FIRST_SPENT_INDEX: usize = 0;
 
 /// One race as one of its relayers saw it.
 #[derive(Debug, Clone, Copy)]
@@ -1483,12 +1463,8 @@ mod tests {
 
     /// The trait impls are pass-throughs, so the tests drive the attribution logic directly.
     fn recorder(graph: ChannelGraph) -> SurbTelemetryCodec<()> {
-        recorder_with(graph, SurbPopOrder::default())
-    }
-
-    fn recorder_with(graph: ChannelGraph, pop_order: SurbPopOrder) -> SurbTelemetryCodec<()> {
         let me = *graph.identity();
-        SurbTelemetryCodec::new((), me, path_slots_of(graph), SurbRoundTripRegistry::new(pop_order))
+        SurbTelemetryCodec::new((), me, path_slots_of(graph), SurbRoundTripRegistry::default())
     }
 
     fn surb_id(seed: u8) -> HoprSurbId {
@@ -2234,7 +2210,10 @@ mod tests {
         for mut entry in registry.bumped.iter_mut() {
             *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
         }
-        assert!(registry.write_off_dead().is_empty(), "still dead, nothing more is bumped");
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "still dead, nothing more is bumped"
+        );
 
         registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
         recorder.on_replied(&surb_id(2));
@@ -2343,17 +2322,13 @@ mod tests {
     /// Whatever two SURBs of one packet spent in the replier's store, they spent together, so only
     /// the gap between their replies counts against the later one. The SURB that loses is the one the
     /// replier spent first: it is home second, which is the abnormal order a race opens in.
-    #[rstest::rstest]
-    #[case::lifo(SurbPopOrder::Lifo)]
-    #[case::fifo(SurbPopOrder::Fifo)]
-    fn a_race_should_be_settled_by_the_gap_between_the_two_replies(
-        #[case] pop_order: SurbPopOrder,
-    ) -> anyhow::Result<()> {
+    #[test]
+    fn a_race_should_be_settled_by_the_gap_between_the_two_replies() -> anyhow::Result<()> {
         let (graph, _me, _peers) = graph_with(0);
-        let recorder = recorder_with(graph, pop_order);
+        let recorder = recorder(graph);
         let [early, late] = [(); 2].map(|_| key());
         let minted_at = Instant::now();
-        let first_spent = first_spent_index(pop_order);
+        let first_spent = FIRST_SPENT_INDEX;
         let pending_via = |relayer, partner| PendingSurb {
             minted_at,
             ..pending_to(
@@ -2778,46 +2753,36 @@ mod tests {
         Ok(())
     }
 
-    /// The second SURB of a pair is home and the first is not. A LIFO replier spends the second
-    /// first, so the first may simply have waited behind newer SURBs in its store, and its relayer
-    /// must not be blamed for it. A FIFO replier spends the first first, so a first that is out
-    /// while the second is home is a race its relayer is losing.
-    #[rstest::rstest]
-    #[case::lifo(SurbPopOrder::Lifo, false)]
-    #[case::fifo(SurbPopOrder::Fifo, true)]
-    fn a_first_surb_still_out_should_not_count_against_its_relayer_unless_the_replier_pops_fifo(
-        #[case] pop_order: SurbPopOrder,
-        #[case] counts: bool,
-    ) {
+    /// The second SURB of a pair is home and the first is not. The replier spends the first first, so a
+    /// first that is out while the second is home is a race its relayer is losing, and the late reply
+    /// settles it against that relayer.
+    #[test]
+    fn a_first_surb_still_out_while_the_second_is_home_should_count_against_its_relayer() {
         let (graph, _me, _peers) = graph_with(0);
-        let recorder = recorder_with(graph, pop_order);
-        let [buried, home] = [(); 2].map(|_| key());
+        let recorder = recorder(graph);
+        let [late, home] = [(); 2].map(|_| key());
         let pending_via = |relayer, partner, pair_index| pending_to(&[relayer], Some(partner), pair_index);
         recorder
             .registry
             .pending
-            .insert(surb_id(1), pending_via(buried, surb_id(2), 0));
+            .insert(surb_id(1), pending_via(late, surb_id(2), 0));
         recorder
             .registry
             .pending
             .insert(surb_id(2), pending_via(home, surb_id(1), 1));
 
         recorder.on_replied(&surb_id(2));
-        assert_eq!(
-            usize::from(counts),
-            open_races_of(&recorder.registry.relayer_health, &buried)
-        );
+        assert_eq!(1, open_races_of(&recorder.registry.relayer_health, &late));
 
         recorder.on_replied(&surb_id(1));
-        assert_eq!(
-            counts,
+        assert!(
             recorder
                 .registry
                 .relayer_health
                 .relayers
-                .get(&buried)
+                .get(&late)
                 .is_some_and(|history| !history.races.is_empty()),
-            "a late reply settles a race against its relayer only if the pop order makes it attributable"
+            "a late reply settles a race against its relayer"
         );
     }
 
@@ -2828,7 +2793,7 @@ mod tests {
     #[test]
     fn under_fifo_the_first_surb_home_opens_no_race_and_the_second_home_first_does() {
         let (graph, _me, _peers) = graph_with(0);
-        let recorder = recorder_with(graph, SurbPopOrder::Fifo);
+        let recorder = recorder(graph);
         let health = &recorder.registry.relayer_health;
         let pending_via = |relayer, partner, pair_index| pending_to(&[relayer], Some(partner), pair_index);
 
@@ -2887,7 +2852,7 @@ mod tests {
     #[test]
     fn a_pause_in_the_repliers_stream_must_not_inflate_the_overdue_bar_under_fifo() -> anyhow::Result<()> {
         let (graph, _me, _peers) = graph_with(0);
-        let recorder = recorder_with(graph, SurbPopOrder::Fifo);
+        let recorder = recorder(graph);
         let health = &recorder.registry.relayer_health;
         let [slow, other] = [(); 2].map(|_| key());
         let pause = Duration::from_secs(10);
