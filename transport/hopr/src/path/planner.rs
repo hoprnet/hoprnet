@@ -136,8 +136,8 @@ pub struct PathPlannerConfig {
     /// never recover and it is never chosen again. Spending a small share of draws uniformly keeps
     /// every candidate under observation, which is what lets a recovered one climb back.
     ///
-    /// Costs throughput in proportion: this share of return paths deliberately ignores which
-    /// candidate looks best. Candidates have already passed the selector's gates (open channels,
+    /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
+    /// which candidate looks best. Candidates have already passed the selector's gates (open channels,
     /// `min_ack_rate`, and so on) before reaching here, so an exploratory draw is random only with
     /// respect to *quality*, never a route the cost function rejected. `0.0` disables it.
     /// Defaults to 0.1.

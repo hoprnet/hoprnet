@@ -1205,7 +1205,7 @@ mod tests {
 
     /// Eight first relayers, each with its fastest path through the same middle relayer and a
     /// slower one through its own. Distinct first relayers alone would keep the eight fastest paths
-    /// and put the hub in the middle of every candidate; the cap lets it into at most a third.
+    /// and put the hub in the middle of every candidate; the cap lets it into at most 3 of the 8.
     #[test]
     fn prune_should_bound_how_often_a_relayer_recurs_in_a_middle_position() {
         let hub = 9u8;
