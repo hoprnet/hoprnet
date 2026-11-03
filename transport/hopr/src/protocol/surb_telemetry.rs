@@ -26,11 +26,11 @@
 //!   settled, none home since, and a reply home through some relayer after the first of them fell due. A reply is
 //!   overdue only while others are delivering: a pause in the replier's stream, or an outage of every return relayer,
 //!   leaves nothing arriving and so nothing overdue, however long the replies stay out. A relayer that has settled too
-//!   few races to have a margin of its own borrows the bar of the best-measured relayer, and none is judged while no
-//!   relayer has one; its own races that expired open are booked as lost and are not replies that came home, so they do
-//!   not reset the clock. Effect: health `0`, the walk prunes it. Lapses once no reply through it is out (about
-//!   `PENDING_SURB_TTL`); its lost races keep its health near zero. Must not fight: common-mode outages, where no
-//!   partner gets home and nothing is judged.
+//!   few races to have a margin of its own borrows the bar of the best-measured relayer, raised to whatever its own
+//!   settled races measure, and none is judged while no relayer has one; its own races that expired open are booked as
+//!   lost and are not replies that came home, so they do not reset the clock. Effect: health `0`, the walk prunes it.
+//!   Lapses once no reply through it is out (about `PENDING_SURB_TTL`); its lost races keep its health near zero. Must
+//!   not fight: common-mode outages, where no partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict. Effect: each session is told how many SURBs in its counterparty's
 //!   store run through that relayer; the balancer subtracts them from its level and sends replacements. Lasts until a
 //!   reply through the relayer comes home or the session ends, not just the verdict: the counterparty still holds them.
@@ -453,8 +453,9 @@ impl RaceHistory {
             .then(|| self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max))
     }
 
-    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than any race it
-    /// finished took, and none has come home since the oldest was due.
+    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than its bar, and
+    /// none has come home since the oldest was due. The bar is the largest margin of the races it
+    /// finished, or, while it has finished too few, the borrowed one below.
     ///
     /// A reply is overdue only if a reply came home, through any relayer, after its grace ran out
     /// (`last_reply`): the network was delivering while this relayer was not. Without that, nothing
@@ -466,9 +467,10 @@ impl RaceHistory {
     ///
     /// A relayer that has settled fewer than [`MIN_RACES`] races has no margin of its own to go by,
     /// and races settle only in the abnormal order, so a clean history is common. It borrows
-    /// `fallback_usual`, the bar of the best-measured relayer, and is not judged at all while no relayer
-    /// has one. "Home since" counts settled races only: the relayer's own races that expired open and
-    /// were booked as lost are not replies that came home, and must not reset the clock.
+    /// `fallback_usual`, the bar of the best-measured relayer, raised to whatever its own settled races
+    /// measure (`own.max(fallback)`), and is not judged at all while no relayer has one. "Home since" counts settled
+    /// races only: the relayer's own races that expired open and were booked as lost are not replies that came
+    /// home, and must not reset the clock.
     fn is_black_hole(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> bool {
         let own = self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max);
         // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
