@@ -4736,11 +4736,15 @@ where
                     // Gate control is applied synchronously by the supervisor worker. The action
                     // reaches this I/O driver only to preserve observability and ordering, which
                     // makes it the one periodic point with the reconstructor in hand: refresh the
-                    // node-wide occupancy gauge here. One walk over the live cycles' parts per
-                    // notification, so a reading per supervisor turn per Session, not per share.
-                    SessionPixAction::ProgressNotification => {
+                    // node-wide occupancy gauge here. The walk covers every live cycle on the node and
+                    // notifications come per acknowledgement batch per Session, so it runs at most once
+                    // a second node-wide (`HELD_SHARES_REFRESH_PERIOD`), not on every notification.
+                    SessionPixAction::ProgressNotification =>
+                    {
                         #[cfg(feature = "telemetry")]
-                        crate::telemetry::pix::set_held_shares(share_processor.held_shares());
+                        if crate::telemetry::pix::held_shares_refresh_due() {
+                            crate::telemetry::pix::set_held_shares(share_processor.held_shares());
+                        }
                     }
                     SessionPixAction::SetFillRate(rate) => {
                         // Looked up per action rather than captured, because the Session may already
