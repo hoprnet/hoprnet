@@ -211,11 +211,12 @@ impl Default for ActivityEpoch {
 /// How long data can go out with nothing at all coming back before the Entry sustains the
 /// counterparty's SURBs on its own: three seconds.
 ///
-/// The Exit reports its SURB level at least every second and replies at the rate of the data it
-/// receives, so three seconds of data going out and nothing coming back, neither a report, nor any
-/// other packet, nor a reply home, means that the Exit's consumption is invisible: its stock may be
-/// draining into a return path that delivers nothing, and the balancer, which learns the level from
-/// those reports and replies, cannot see it and would mint nothing. See
+/// The Exit reports its SURB level once per `surb_balance_notify_period` (15 s in the node's default
+/// configuration, at least a second when set) and replies at the rate of the data it receives, so
+/// three seconds of data going out and nothing coming back, neither a report, nor any other packet,
+/// nor a reply home, means that the Exit's consumption is invisible: its stock may be draining into a
+/// return path that delivers nothing, and the balancer, which learns the level from those reports and
+/// replies, cannot see it and would mint nothing. See
 /// [`silence_sustain`](BalancerStateValues::silence_sustain).
 pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 
@@ -521,9 +522,13 @@ impl BalancerStateValues {
     /// Exit's reports and replies; with none arriving it stays where it was, while the Exit goes on
     /// answering the data it gets, one SURB for each reply, into a return path that may be delivering
     /// nothing. The estimate then never falls below the target and the Entry mints nothing, until the
-    /// Exit's stock is empty. One SURB per data packet is what the Exit can be expected to spend and no
-    /// more: the sustain is bounded by the rate of the data, makes no burst, and wipes nothing. It ends
-    /// at the first packet or reply from the Exit.
+    /// Exit's stock is empty. The balancer's own `surb_decay` is the exception: on by default (5 % of
+    /// the target per 60 s) it erodes the estimate each window, so at a data rate low enough that the
+    /// sustain's one-SURB-per-packet production does not outpace it, the estimate falls below the
+    /// target within a decay window or two and the gate reopens without the sustain. One SURB per data
+    /// packet is what the Exit can be expected to spend and no more: the sustain is bounded by the rate
+    /// of the data, makes no burst, and wipes nothing. It ends at the first packet or reply from the
+    /// Exit.
     ///
     /// Judged between the two stamps, not against the clock, so that the answer is about the packet being
     /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.

@@ -274,9 +274,10 @@ const SURB_RESERVE_POLL: Duration = Duration::from_millis(50);
 ///
 /// The Exit's SURB-level reports and its distress signals each need a SURB, and nothing else the Exit
 /// sends is as important to the Entry: a report is how a balancer that cannot see the Exit's stock
-/// learns it is running dry. One percent of the Entry's buffer target, at least 32, covers about that
-/// many seconds of a total outage at the one-second notification cadence, which is long enough for
-/// the Entry to hear it and refill.
+/// learns it is running dry. One percent of the Entry's buffer target, at least 32, keeps that many
+/// reports and distress signals sendable: at one report per `surb_balance_notify_period` (15 s in the
+/// node's default configuration) that outlasts minutes of a total outage, long enough for the Entry to
+/// hear it and refill.
 ///
 /// Never more than a quarter of the target, as for the PIX fill reserve
 /// ([`effective_surb_reserve`]): an Entry that asks for a buffer shallower than the floor must not
