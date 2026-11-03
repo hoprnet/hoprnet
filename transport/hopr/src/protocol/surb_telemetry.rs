@@ -353,6 +353,27 @@ impl SurbRoundTripRegistry {
             self.written_off.remove(pseudonym);
         }
         if !reached.is_empty() {
+            // The wipe takes the session's whole stock, so it settles every relayer known dead now,
+            // not only the one each pending SURB was found under: a SURB names the first confirmed dead
+            // relayer on its path, and one judged in this same flush is not confirmed yet. Left out,
+            // such a relayer turns the first SURB through it after the wipe into a pair no wipe has
+            // covered, and that SURB is an exploring probe once the relayer is on probation: the
+            // generation advanced again for it, and the counterparty dropped a fresh stock of thousands
+            // over one SURB. SURBs through these relayers from now on are written off, as through any
+            // relayer already bumped for; a relayer that dies after this wipe still gets its own.
+            let now = Instant::now();
+            let known_dead: Vec<OffchainPublicKey> = health
+                .dead
+                .iter()
+                .map(|relayer| *relayer)
+                .chain(health.probation.iter().map(|relayer| *relayer))
+                .collect();
+            for pseudonym in &reached {
+                for relayer in &known_dead {
+                    self.bumped.entry((*pseudonym, *relayer)).or_insert(now);
+                }
+            }
+
             // The counterparty drops its whole stock on the first batch of the new generation, so the
             // SURBs these sessions hold out now will never be spent. Forgotten here, they cannot make a
             // second relayer confirmed at a later flush look as if it still had a stock to wipe.
@@ -3510,10 +3531,46 @@ mod tests {
         );
 
         registry.pending.insert(surb_id(3), pending_to(&[second], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the wipe settled the second relayer too: a SURB through it minted since is written off, not a reason to \
+             drop the counterparty's fresh stock again"
+        );
+        assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), registry.invalid());
+    }
+
+    /// What a cluster run showed: three relayers judged dead around one flush, the session bumped once
+    /// the first verdict held, all three lapsing into probation a minute later, and then one exploring
+    /// probe through a relayer the first wipe had not recorded. That probe advanced the generation a
+    /// second time, the Exit dropped a stock of about 6900 SURBs it had just refilled, and the Entry's
+    /// believed level overshot to 3.6 x its target. A probe through a relayer the wipe already covered
+    /// is written off; it does not wipe the stock again.
+    #[test]
+    fn a_probe_through_a_relayer_the_wipe_covered_should_not_bump_again_after_it_lapses() {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [first, second, third] = [(); 3].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[first], None, 0));
+        judge_dead(&health, first);
+        health.mark_dead(second);
+        health.mark_dead(third);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the one bump");
+
+        confirm_verdicts(&health);
+        // The verdicts lapse into probation.
+        for relayer in [first, second, third] {
+            health.dead.remove(&relayer);
+            health.probation.insert(relayer);
+        }
+        registry.pending.insert(surb_id(2), pending_to(&[third], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a probe through a relayer the wipe covered must not advance the generation again"
+        );
         assert_eq!(
-            vec![*SESSION],
-            registry.write_off_dead(),
-            "a SURB through it minted since the wipe is held by the counterparty, and is a reason to advance"
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "it is written off"
         );
     }
 
