@@ -639,7 +639,7 @@ where
     }
 
     #[tracing::instrument(
-        name = "planner.resolve_path", level = "debug", skip_all,
+        name = "planner.resolve_path", level = "trace", skip_all,
         fields(source = %source, destination = %destination, direction = if source == NodeId::Offchain(self.me) { "forward" } else { "return" })
     )]
     async fn resolve_path(
@@ -719,7 +719,7 @@ where
     /// [`PathPlanner::resolve_diverse_return_paths`]) work over the collection directly, paying one
     /// cache lookup instead of one per path.
     #[tracing::instrument(
-        name = "planner.cached_paths", level = "debug", skip_all,
+        name = "planner.cached_paths", level = "trace", skip_all,
         fields(source = tracing::field::Empty, destination = tracing::field::Empty,
                hops = usize::from(hops), cache = tracing::field::Empty, set_id = tracing::field::Empty)
     )]
@@ -743,9 +743,13 @@ where
         let me = self.me;
         let collapsed_diversity = self.collapsed_diversity.clone();
 
-        let span = tracing::Span::current();
-        span.record("source", tracing::field::display(src_key));
-        span.record("destination", tracing::field::display(dest_key));
+        // This per-request span is TRACE-only. Avoid looking up and recording into the
+        // current span when it is disabled (which could otherwise be a caller's span).
+        let span = tracing::enabled!(tracing::Level::TRACE).then(tracing::Span::current);
+        if let Some(span) = &span {
+            span.record("source", tracing::field::display(src_key));
+            span.record("destination", tracing::field::display(dest_key));
+        }
         let entry = self
             .cache
             .entry(cache_key)
@@ -768,8 +772,10 @@ where
             })
             .await
             .map_err(PathPlannerError::CacheError)?;
-        span.record("cache", if entry.is_fresh() { "miss" } else { "hit" });
-        span.record("set_id", entry.value().id);
+        if let Some(span) = &span {
+            span.record("cache", if entry.is_fresh() { "miss" } else { "hit" });
+            span.record("set_id", entry.value().id);
+        }
         if entry.is_fresh() {
             entry.value().log_installed(cache_key, "fill");
         }
@@ -869,7 +875,7 @@ where
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
     #[tracing::instrument(
-        name = "planner.resolve_diverse_return_paths", level = "debug", skip_all,
+        name = "planner.resolve_diverse_return_paths", level = "trace", skip_all,
         fields(source = %destination, destination = %self.me, direction = "return", requested = count,
                returned = tracing::field::Empty, temper = self.return_path_weight_temper, exploration = self.return_path_exploration)
     )]
@@ -883,7 +889,9 @@ where
         // SURBs). Resolve nothing — querying the planner here would turn "none wanted" into a
         // `PathNotFound` error.
         if count == 0 {
-            tracing::Span::current().record("returned", 0);
+            if tracing::enabled!(tracing::Level::TRACE) {
+                tracing::Span::current().record("returned", 0);
+            }
             tracing::trace!("return path batch selected");
             return Ok(Vec::new());
         }
@@ -899,7 +907,9 @@ where
                     .collect::<FuturesUnordered<_>>()
                     .try_collect::<Vec<_>>()
                     .await?;
-                tracing::Span::current().record("returned", paths.len());
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    tracing::Span::current().record("returned", paths.len());
+                }
                 tracing::trace!("return path batch selected");
                 return Ok(paths);
             }
@@ -964,7 +974,9 @@ where
                 })
             })
             .collect::<Vec<_>>();
-        tracing::Span::current().record("returned", drawn.len());
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::Span::current().record("returned", drawn.len());
+        }
         tracing::trace!("return path batch selected");
 
         Ok(drawn)
@@ -990,8 +1002,11 @@ where
                 forward_options,
                 return_options,
             } => {
-                tracing::Span::current().record("direction", "forward");
-                tracing::Span::current().record("destination", tracing::field::display(&destination));
+                if tracing::enabled!(tracing::Level::DEBUG) {
+                    let span = tracing::Span::current();
+                    span.record("direction", "forward");
+                    span.record("destination", tracing::field::display(&destination));
+                }
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
@@ -1051,7 +1066,9 @@ where
             }
 
             DestinationRouting::Return(matcher) => {
-                tracing::Span::current().record("direction", "return");
+                if tracing::enabled!(tracing::Level::DEBUG) {
+                    tracing::Span::current().record("direction", "return");
+                }
                 let FoundSurb {
                     sender_id,
                     surb,
@@ -2717,6 +2734,123 @@ mod tests {
         assert!(output.contains("cache=\"hit\""), "{output}");
         assert!(output.contains("graph.simple_paths"));
         assert!(output.contains("returned=3"), "formatter exposes completed batch count");
+        Ok(())
+    }
+
+    #[serial_test::serial(routing_logs)]
+    #[tokio::test]
+    async fn info_routing_should_preserve_caller_fields_when_debug_spans_are_disabled() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::INFO));
+        async {
+            planner
+                .resolve_routing(
+                    0,
+                    0,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(0.try_into()?),
+                        return_options: None,
+                    },
+                )
+                .await?;
+            tracing::info!("caller context preserved");
+            Ok::<_, anyhow::Error>(())
+        }
+        .instrument(tracing::info_span!(
+            "test.caller",
+            direction = "caller",
+            destination = "caller"
+        ))
+        .await?;
+        let output = logs.output();
+        assert!(
+            output.contains("direction=\"caller\" destination=\"caller\""),
+            "{output}"
+        );
+        assert_eq!(
+            logs.records("caller context preserved")[0].ancestry,
+            vec!["test.caller"]
+        );
+        Ok(())
+    }
+
+    #[serial_test::serial(routing_logs)]
+    #[tokio::test]
+    async fn debug_routing_should_skip_helper_spans_and_preserve_caller_fields() -> anyhow::Result<()> {
+        use crate::path::test_support::Logs;
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let caller = tracing::debug_span!(
+            "test.session",
+            source = "caller",
+            destination = "caller",
+            cache = "caller",
+            set_id = 999,
+            returned = 999
+        );
+        async {
+            let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+            planner
+                .resolve_path(
+                    source,
+                    NodeId::Offchain(planner.me),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            planner
+                .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 2)
+                .await?;
+            tracing::debug!("caller context preserved");
+            planner
+                .resolve_routing(
+                    0,
+                    2,
+                    DestinationRouting::Forward {
+                        destination: Box::new(source),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(0.try_into()?),
+                        return_options: Some(RoutingOptions::Hops(1.try_into()?)),
+                    },
+                )
+                .await?;
+            Ok::<_, anyhow::Error>(())
+        }
+        .instrument(caller)
+        .await?;
+
+        let installs = logs.records("candidate set installed");
+        assert_eq!(installs.len(), 1);
+        assert_eq!(installs[0].ancestry, vec!["test.session"]);
+        let searches = logs.records("path search completed");
+        assert_eq!(searches.len(), 1, "cached requests must not search again");
+        assert_eq!(
+            searches[0].ancestry,
+            vec!["test.session", "planner.rebuild_candidates", "selector.select_paths"]
+        );
+        let output = logs.output();
+        let marker = output
+            .lines()
+            .find(|line| line.contains("caller context preserved"))
+            .context("caller marker")?;
+        for field in [
+            "source=\"caller\"",
+            "destination=\"caller\"",
+            "cache=\"caller\"",
+            "set_id=999",
+            "returned=999",
+        ] {
+            assert!(marker.contains(field), "caller field changed: {marker}");
+        }
+        assert!(!output.contains("planner.resolve_path"));
+        assert!(!output.contains("planner.cached_paths"));
+        assert!(!output.contains("planner.resolve_diverse_return_paths"));
         Ok(())
     }
 
