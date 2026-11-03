@@ -113,13 +113,15 @@ const _: () = assert!(PENDING_SURB_HORIZON.as_secs() >= 10 * PENDING_SURB_TTL.as
 const WRITE_OFF_HORIZON: Duration = Duration::from_secs(2 * 60);
 
 /// How long after a relayer is revived, and no longer known dead, the session that was advanced for its
-/// verdict is not advanced again for it: twice [`PENDING_SURB_TTL`], counted from the advance.
+/// verdict is not advanced again for it: twice [`PENDING_SURB_TTL`], counted from the revival.
 ///
 /// While the relayer is known dead, dead or on probation, the pair is never advanced twice, however
-/// long that lasts: the mark of the advance stays until the relayer is revived by a reply. This is
-/// the guard for what follows a revival: a reply that came home through the relayer ends the
-/// verdict, and a relayer that is still dead after all is judged dead anew, which must not cost the
-/// counterparty its whole stock a second time within a minute or two of the first.
+/// long that lasts: the mark of the advance stays until the relayer is revived by a reply, and every
+/// pass that still finds the relayer known dead moves its time on, so that the cooldown starts at the
+/// revival and not at the advance. This is the guard for what follows a revival: a reply that came
+/// home through the relayer ends the verdict, and a relayer that is still dead after all is judged
+/// dead anew, which must not cost the counterparty its whole stock a second time right after the
+/// revival, however long the death before it lasted.
 const REBUMP_COOLDOWN: Duration = Duration::from_secs(2 * 60);
 const _: () = assert!(REBUMP_COOLDOWN.as_secs() == 2 * PENDING_SURB_TTL.as_secs());
 
@@ -291,7 +293,7 @@ impl SurbRoundTripRegistry {
     /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
     /// this flush is written off and bumped at the next one, if it is still dead then.
     /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
-    /// revives it once per `REBUMP_COOLDOWN` from the advance: a verdict reached again inside either
+    /// revives it once per `REBUMP_COOLDOWN` from the revival: a verdict reached again inside either
     /// is written off as usual but reports nothing.
     pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
         let health = &self.relayer_health;
@@ -308,8 +310,17 @@ impl SurbRoundTripRegistry {
             });
         }
         self.written_off.retain(|_, session| !session.is_empty());
-        self.bumped
-            .retain(|(_, relayer), at| health.is_known_dead(relayer) || at.elapsed() < REBUMP_COOLDOWN);
+        // A mark stays while its relayer is known dead, its time moved on by every such pass, so that
+        // `REBUMP_COOLDOWN` runs from the revival however long the death lasted.
+        let pass = Instant::now();
+        self.bumped.retain(|(_, relayer), at| {
+            if health.is_known_dead(relayer) {
+                *at = pass;
+                true
+            } else {
+                at.elapsed() < REBUMP_COOLDOWN
+            }
+        });
         if health.dead.is_empty() && health.probation.is_empty() {
             return Vec::new();
         }
@@ -2202,6 +2213,44 @@ mod tests {
             vec![*SESSION],
             registry.write_off_dead(),
             "a death after the cooldown is a new verdict"
+        );
+        Ok(())
+    }
+
+    /// Dead for longer than the cooldown, then revived: the cooldown runs from the revival and not from
+    /// the advance, so a quick re-death right after a long death costs the session nothing more.
+    #[test]
+    fn a_relayer_revived_after_a_long_death_should_be_guarded_from_its_revival() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let dead = key();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the verdict bumps");
+
+        // Dead for longer than the cooldown, with the flushes going on all along.
+        for mut entry in registry.bumped.iter_mut() {
+            *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
+        }
+        assert!(registry.write_off_dead().is_empty(), "still dead, nothing more is bumped");
+
+        registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
+        recorder.on_replied(&surb_id(2));
+        assert!(!health.is_known_dead(&dead), "revived by a reply");
+        registry.write_off_dead();
+        assert_eq!(
+            1,
+            registry.bumped.len(),
+            "the mark is kept for the cooldown after the revival, however long the death before it"
+        );
+
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a quick re-death after a long death is inside the cooldown"
         );
         Ok(())
     }
