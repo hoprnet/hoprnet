@@ -6948,13 +6948,7 @@ where
                         // the last value -- a level that stops rising while we are still minting is
                         // exactly the plateau signal, so this must not dedup equal reports.
                         let changed = session_slot.surb_mgmt.buffer_level() != msg.additional_data;
-                        let produced_now = session_slot
-                            .surb_estimator
-                            .produced
-                            .load(std::sync::atomic::Ordering::Relaxed);
-                        session_slot
-                            .surb_mgmt
-                            .observe_reported_level(msg.additional_data, produced_now);
+                        session_slot.surb_mgmt.observe_reported_level(msg.additional_data);
                         if changed {
                             debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
                         }
@@ -8417,7 +8411,7 @@ mod tests {
         assert_eq!(1, data.estimate_surbs_with_msg(), "the cap reaches the SURB accounting");
 
         // The Exit reports a full stock: no longer a silence.
-        state.observe_reported_level(100, 0);
+        state.observe_reported_level(100);
         let mut data = small_outgoing_packet()?;
         cap_organic_surbs(&mut data, 1, &state);
         assert_eq!(

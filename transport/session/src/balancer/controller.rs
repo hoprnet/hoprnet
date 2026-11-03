@@ -181,10 +181,14 @@ pub struct BalancerStateValues {
     /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
     /// inactive. See `REFILL_PACING_SECS`.
     refill_pacing: AtomicU64,
-    /// This side's `produced` count as it was `REPORT_LAG` ago, published by every balancer update
-    /// from [`ProducedHistory`]: what a counterparty report arriving now cannot have seen yet is the
-    /// production since then. `0` until the first update.
+    /// This side's `produced` count as it was `REPORT_LAG` before the last balancer update, published by
+    /// every update from [`ProducedHistory`]: what a counterparty report arriving now cannot have seen
+    /// yet is the production since then. `0` until the first update.
     produced_before_lag: AtomicU64,
+    /// This side's `produced` count at the last balancer update, published with
+    /// [`produced_before_lag`](Self::produced_before_lag). What is produced after it is the next update's
+    /// to add, so a report adopted in between takes as in flight only the production up to it.
+    produced_at_update: AtomicU64,
     /// Set when a report lowered the believed level, consumed by the next balancer update: that
     /// update's output is held to the pacing rate, so that a correction never turns into a burst.
     correction_cap: AtomicBool,
@@ -366,19 +370,20 @@ impl BalancerStateValues {
     /// level that stops rising while the Entry is still minting toward the target is the plateau
     /// signal. See [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
     ///
-    /// `produced_now` is this side's `produced` count at the moment the report arrives. The report
-    /// was written `REPORT_LAG` or less ago, so the SURBs produced since then were still on their
-    /// way when it was written and are added to it: adopting a report as it stands pulls the level
-    /// below the truth by exactly that production. A report that still lowers the believed level marks
-    /// the next balancer update so that its output is held to the pacing rate: a correction, not a
-    /// deficit to burst for.
+    /// The report was written `REPORT_LAG` or less ago, so the SURBs produced since then were still on
+    /// their way when it was written and are added to it: adopting a report as it stands pulls the
+    /// level below the truth by exactly that production. Only the production up to the last balancer
+    /// update is added here, though: the next update adds everything produced after that one to the
+    /// level in any case, and adding it here as well would count it twice. A report that still lowers
+    /// the believed level marks the next balancer update so that its output is held to the pacing
+    /// rate: a correction, not a deficit to burst for.
     ///
     /// While the refill after a wipe is paced, every report is dropped, stored by neither the level
     /// nor the plateau bookkeeping: a report above the believed level is the counterparty reporting
     /// the stock it had before it saw the new SURB generation, and one below it is the stock it had
     /// before the refill in flight reached it, thousands short at the pacing rate. The level believed
     /// here during the window is the production since the reset, which is the truth by construction.
-    pub fn observe_reported_level(&self, new_level: u64, produced_now: u64) {
+    pub fn observe_reported_level(&self, new_level: u64) {
         use std::sync::atomic::Ordering::Relaxed;
 
         // Heard even when the report is dropped below: it is the Exit speaking.
@@ -392,7 +397,10 @@ impl BalancerStateValues {
             );
             return;
         }
-        let in_flight = produced_now.saturating_sub(self.produced_before_lag.load(Relaxed));
+        let in_flight = self
+            .produced_at_update
+            .load(Relaxed)
+            .saturating_sub(self.produced_before_lag.load(Relaxed));
         let level = new_level.saturating_add(in_flight);
         let target = self.target_surb_buffer_size.load(Relaxed);
         let distress = self.counterparty_in_surb_distress.load(Relaxed);
@@ -429,11 +437,14 @@ impl BalancerStateValues {
         self.buffer_level.store(level, Relaxed);
     }
 
-    /// Publishes this side's `produced` count as it was `REPORT_LAG` ago, for
-    /// [`observe_reported_level`](Self::observe_reported_level). Called by every balancer update.
-    pub(crate) fn publish_produced_before_lag(&self, produced: u64) {
+    /// Publishes this side's `produced` count as it was `REPORT_LAG` before this update and as it is at
+    /// this update, for [`observe_reported_level`](Self::observe_reported_level). Called by every
+    /// balancer update.
+    pub(crate) fn publish_production(&self, before_lag: u64, at_update: u64) {
         self.produced_before_lag
-            .store(produced, std::sync::atomic::Ordering::Relaxed);
+            .store(before_lag, std::sync::atomic::Ordering::Relaxed);
+        self.produced_at_update
+            .store(at_update, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Takes the one-shot request to hold the next output to the pacing rate, if there is one.
@@ -860,9 +871,10 @@ where
             return current;
         };
 
-        // What a counterparty report arriving now cannot have seen yet: the production since REPORT_LAG ago.
+        // What a counterparty report arriving before the next update cannot have seen yet: the production
+        // from REPORT_LAG before this update up to it. What comes after it, the next update adds.
         let produced_before_lag = self.produced_history.record(self.last_update, snapshot.produced);
-        self.state.publish_produced_before_lag(produced_before_lag);
+        self.state.publish_production(produced_before_lag, snapshot.produced);
 
         // A reply came home since the last tick: the counterparty answered, whether or not any of its
         // packets reached the hooks that record it.
@@ -1685,7 +1697,7 @@ mod tests {
 
         // Fill up to the store's ceiling.
         for level in [100, 300, CAPACITY] {
-            state.observe_reported_level(level, 0);
+            state.observe_reported_level(level);
             assert_eq!(
                 1,
                 state.organic_surbs_per_packet(),
@@ -1695,7 +1707,7 @@ mod tests {
 
         // The level now plateaus at the ceiling: the store is full below the target.
         for _ in 0..CAPACITY_PLATEAU_THRESHOLD {
-            state.observe_reported_level(CAPACITY, 0);
+            state.observe_reported_level(CAPACITY);
         }
 
         assert_eq!(
@@ -1716,8 +1728,8 @@ mod tests {
         use std::sync::atomic::Ordering;
 
         let state = capacity_probe_state(2_000);
-        state.observe_reported_level(500, 0);
-        state.observe_reported_level(500, 0);
+        state.observe_reported_level(500);
+        state.observe_reported_level(500);
 
         assert_eq!(0, state.observed_counterparty_capacity.load(Ordering::Relaxed));
         assert_eq!(
@@ -1733,11 +1745,11 @@ mod tests {
         use std::sync::atomic::Ordering;
 
         let state = capacity_probe_state(2_000);
-        state.observe_reported_level(500, 0);
-        state.observe_reported_level(500, 0);
+        state.observe_reported_level(500);
+        state.observe_reported_level(500);
         // A rise before the threshold clears the count.
-        state.observe_reported_level(600, 0);
-        state.observe_reported_level(600, 0);
+        state.observe_reported_level(600);
+        state.observe_reported_level(600);
 
         assert_eq!(
             0,
@@ -1755,7 +1767,7 @@ mod tests {
         const CAPACITY: u64 = 500;
         let state = capacity_probe_state(2_000);
         for _ in 0..CAPACITY_PLATEAU_THRESHOLD + 1 {
-            state.observe_reported_level(CAPACITY, 0);
+            state.observe_reported_level(CAPACITY);
         }
         assert_eq!(CAPACITY, state.observed_counterparty_capacity.load(Ordering::Relaxed));
 
@@ -1778,13 +1790,13 @@ mod tests {
         const CAPACITY: u64 = 500;
         let state = capacity_probe_state(2_000);
         for _ in 0..CAPACITY_PLATEAU_THRESHOLD + 1 {
-            state.observe_reported_level(CAPACITY, 0);
+            state.observe_reported_level(CAPACITY);
         }
         assert_eq!(CAPACITY, state.observed_counterparty_capacity.load(Ordering::Relaxed));
 
         // Drain and refill toward the cap: the inference stands.
-        state.observe_reported_level(300, 0);
-        state.observe_reported_level(450, 0);
+        state.observe_reported_level(300);
+        state.observe_reported_level(450);
         assert_eq!(
             CAPACITY,
             state.observed_counterparty_capacity.load(Ordering::Relaxed),
@@ -1792,7 +1804,7 @@ mod tests {
         );
 
         // A level above the inferred capacity means the store grew: re-probe.
-        state.observe_reported_level(CAPACITY + 200, 0);
+        state.observe_reported_level(CAPACITY + 200);
         assert_eq!(
             0,
             state.observed_counterparty_capacity.load(Ordering::Relaxed),
@@ -2014,7 +2026,7 @@ mod tests {
         let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
         let step = Duration::from_millis(50);
 
-        state.observe_reported_level(7_000, 0);
+        state.observe_reported_level(7_000);
         tick_for(&mut balancer, step);
         assert_eq!(
             7_000,
@@ -2028,7 +2040,7 @@ mod tests {
         assert_eq!(0, state.buffer_level(), "the level is reset at once");
 
         // The counterparty reports what it held until its first SURB of the new generation lands.
-        state.observe_reported_level(7_000, 0);
+        state.observe_reported_level(7_000);
         assert_eq!(0, state.buffer_level(), "a report above the believed level is dropped");
 
         // An update that was already running writes back the level it loaded before the reset.
@@ -2062,7 +2074,7 @@ mod tests {
         let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
         let step = Duration::from_millis(50);
 
-        state.observe_reported_level(7_000, 0);
+        state.observe_reported_level(7_000);
         tick_for(&mut balancer, step);
         state.on_counterparty_wiped();
         tick_for(&mut balancer, step);
@@ -2076,7 +2088,7 @@ mod tests {
             "precondition: 200 SURBs of the new generation sent"
         );
 
-        state.observe_reported_level(7_000, 0);
+        state.observe_reported_level(7_000);
         assert_eq!(
             200,
             state.buffer_level(),
@@ -2088,20 +2100,22 @@ mod tests {
             "the organic gate stays open while the counterparty holds almost nothing"
         );
 
-        state.observe_reported_level(150, 0);
+        state.observe_reported_level(150);
         assert_eq!(
             200,
             state.buffer_level(),
             "a report below the belief is the stock before the refill in flight landed, and is dropped too"
         );
 
-        // Past the window (5 s of 50 ms ticks, and then some) a report is taken as it comes.
+        // Past the window (5 s of 50 ms ticks, and then some) a report is taken as it comes, net of
+        // the production it cannot have seen yet.
         for _ in 0..110 {
             tick_for(&mut balancer, step);
         }
-        state.observe_reported_level(7_000, 0);
+        let in_flight = state.produced_at_update.load(Relaxed) - state.produced_before_lag.load(Relaxed);
+        state.observe_reported_level(7_000);
         assert_eq!(
-            7_000,
+            7_000 + in_flight,
             state.buffer_level(),
             "after the window the counterparty is believed again"
         );
@@ -2120,20 +2134,57 @@ mod tests {
     #[test]
     fn a_report_is_adopted_net_of_the_production_it_cannot_have_seen() {
         let state = capacity_probe_state(7_000);
-        state.publish_produced_before_lag(1_000);
+        state.publish_production(1_000, 1_600);
 
-        state.observe_reported_level(5_000, 1_600);
+        state.observe_reported_level(5_000);
         assert_eq!(
             5_600,
             state.buffer_level(),
             "600 SURBs were in flight when the report was written"
         );
 
-        state.observe_reported_level(5_000, 900);
+        state.publish_production(1_000, 1_000);
+        state.observe_reported_level(5_000);
         assert_eq!(
             5_000,
             state.buffer_level(),
-            "a produced count below the lagged one (a fresh session) corrects nothing"
+            "nothing produced between the lag and the update, nothing in flight"
+        );
+    }
+
+    /// A report adopted between two updates takes as in flight only what was produced up to the first
+    /// of them: the second adds what came after, and that must not be counted twice.
+    #[test]
+    fn production_after_an_update_should_be_counted_once_when_a_report_lands_before_the_next() {
+        use std::sync::atomic::Ordering;
+
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 5_000,
+            max_surbs_per_sec: 2_000,
+            surb_decay: None,
+        };
+        let (mut balancer, est, state, _output) = balancer_with_feedback(cfg);
+
+        est.produced.store(1_000, Ordering::Relaxed);
+        std::thread::sleep(Duration::from_millis(15));
+        balancer.update();
+        assert_eq!(1_000, state.buffer_level.load(Ordering::Relaxed), "the first update");
+
+        // Produced after that update, then a report written before any of it reached the counterparty.
+        est.produced.fetch_add(300, Ordering::Relaxed);
+        state.observe_reported_level(800);
+        assert_eq!(
+            800,
+            state.buffer_level.load(Ordering::Relaxed),
+            "nothing was in flight up to the update"
+        );
+
+        std::thread::sleep(Duration::from_millis(15));
+        balancer.update();
+        assert_eq!(
+            1_100,
+            state.buffer_level.load(Ordering::Relaxed),
+            "the 300 produced after the first update are counted once, by the second"
         );
     }
 
@@ -2179,12 +2230,12 @@ mod tests {
         let step = Duration::from_millis(50);
         let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
 
-        state.observe_reported_level(7_000, 0);
+        state.observe_reported_level(7_000);
         tick_for(&mut balancer, step);
         assert_eq!(0, output.load(Relaxed), "precondition: at target, nothing to mint");
 
         // A lagging report, 1 800 below what is believed.
-        state.observe_reported_level(5_200, 0);
+        state.observe_reported_level(5_200);
         assert_eq!(5_200, state.buffer_level());
         tick_for(&mut balancer, step);
         let held = output.load(Relaxed);
@@ -2490,7 +2541,7 @@ mod tests {
         assert!(after_a_packet > 0, "a packet from the Exit");
 
         let state = gate_state(100, 200);
-        state.observe_reported_level(50, 0);
+        state.observe_reported_level(50);
         assert!(
             state.last_heard.load(std::sync::atomic::Ordering::Relaxed) > 0,
             "a level report"
