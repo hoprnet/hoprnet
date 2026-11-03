@@ -3009,6 +3009,29 @@ fn cap_organic_surbs(data: &mut ApplicationDataOut, max_surbs: usize, surb_mgmt:
     data.packet_info.get_or_insert_default().max_surbs_in_packet = cap;
 }
 
+/// Books what a Start-protocol packet did to an incoming Session's SURB store: the SURBs it carried and
+/// the ones the store lost to it. A no-op for an outgoing Session, whose counterparty stores no SURBs of
+/// ours.
+///
+/// Every Start message from the Entry delivers SURBs into the Session's ring exactly as a data packet
+/// does, whatever the message is: a keep-alive, an `SsaCommit`, the opening `StartSession`. Booking only
+/// the keep-alives left the others' SURBs out of the Exit's level while the evictions they caused later
+/// were booked, so once a ring sized off the announced target ran full, the estimate sank below the
+/// target for good and the Exit's egress controller, which follows it, sent nothing at all.
+///
+/// What the packet carried is booked, not a message's `max_surbs()`: that is how many fit beside it,
+/// what the sender was allowed to send rather than what the store took. And the evictions, which are
+/// how a SURB generation wipe, and any overflow, reaches the Exit's level.
+fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: SurbsStored) {
+    if matches!(slot.routing_opts, DestinationRouting::Return(_)) {
+        account_incoming_surbs(&slot.surb_estimator, stored.saved, stored.evicted);
+        #[cfg(feature = "telemetry")]
+        telemetry::record_session_surb_produced(session_id, stored.saved);
+        #[cfg(not(feature = "telemetry"))]
+        let _ = session_id;
+    }
+}
+
 /// Books an incoming packet's SURBs into the Exit's flow estimator.
 ///
 /// `saved` SURBs entered the store and `evicted` older ones were dropped to make room for them. Both
@@ -3809,7 +3832,18 @@ where
                                     .await
                                 {
                                     Ok(false) => {
-                                        myself.handle_incoming_session_initiation(pseudonym, session_req).await
+                                        let opened =
+                                            myself.handle_incoming_session_initiation(pseudonym, session_req).await;
+                                        // The opening's SURBs are in the pseudonym's ring already, promoted
+                                        // into the admitted class with it, but arrived before the Session
+                                        // existed, so dispatch could not book them. Without them the Exit's
+                                        // estimate starts, and stays, below what the ring holds.
+                                        if opened.is_ok()
+                                            && let Some(slot) = myself.sessions.get(&pseudonym)
+                                        {
+                                            book_start_message_surbs(&slot, &pseudonym, stored);
+                                        }
+                                        opened
                                     }
                                     refused => refused.map(|_| ()),
                                 }
@@ -3818,7 +3852,7 @@ where
                             HoprStartProtocol::SessionError(error_type) => {
                                 myself.handle_session_error(pseudonym, error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg, stored).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
                                 myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
@@ -5745,8 +5779,15 @@ where
             }
 
             // What the packet did to the SURB store, taken before the decode below consumes the data
-            // it is counted from. Booked by the keep-alive handler; see [`SurbsStored`].
+            // it is counted from; see [`SurbsStored`]. An incoming Session books it here, where every
+            // kind of Start message passes, and before the decode and the admission filter below can drop
+            // the message: the pipeline stored the SURBs before this ran, so they are in the ring whether
+            // or not the message is handled. The opening `StartSession` finds no Session yet; the Start
+            // protocol task books it once the Session exists.
             let stored = SurbsStored::of(&in_data);
+            if let Some(session_slot) = self.sessions.get(&pseudonym) {
+                book_start_message_surbs(&session_slot, &pseudonym, stored);
+            }
 
             // Decode once, then decide locally whether anything on this node could handle it.
             // Without this check a peer spraying Start messages for pseudonyms it invented occupies
@@ -6728,16 +6769,16 @@ where
         Ok(())
     }
 
-    /// Handles a keep-alive. `stored` is what the packet that carried it did to the SURB store.
+    /// Handles a keep-alive.
     ///
-    /// On an incoming Session (the Exit) a keep-alive from the Entry is also a delivery of SURBs, one
-    /// of the two kinds the Exit books into its flow estimator; see [`account_incoming_surbs`].
+    /// On an incoming Session (the Exit) a keep-alive from the Entry is also a delivery of SURBs, booked
+    /// with those of every other Start message in [`dispatch_message`](Self::dispatch_message); see
+    /// [`book_start_message_surbs`].
     #[tracing::instrument(level = "trace", skip(self, msg))]
     async fn handle_keep_alive(
         &self,
         pseudonym: HoprPseudonym,
         msg: KeepAliveMessage<SessionId>,
-        stored: SurbsStored,
     ) -> errors::Result<()> {
         // The pseudonym a Start message arrives under is the Session's own pseudonym on both sides,
         // so a mismatch means the sender is naming someone else's Session. Pseudonyms are 80 random
@@ -6793,18 +6834,6 @@ where
                         );
                         debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
                     }
-
-                    // Book the SURBs the packet delivered, and the ones the store lost to it. What the
-                    // packet carried, not `msg.max_surbs()`: that is how many fit beside the message,
-                    // what the sender was allowed to send rather than what the store took. And the
-                    // evictions, which this branch used not to book at all: they are how a SURB
-                    // generation wipe, and any overflow, reaches the Exit's level. The Entry mints its
-                    // SURBs as keep-alives about as often as in data, so the first batch of a newer
-                    // generation after a bump arrives in one about half the time, and a wipe booked only
-                    // for data packets left the Exit reporting its pre-wipe level.
-                    account_incoming_surbs(&session_slot.surb_estimator, stored.saved, stored.evicted);
-                    #[cfg(feature = "telemetry")]
-                    telemetry::record_session_surb_produced(&session_id, stored.saved);
                 }
             }
         } else {
@@ -13071,7 +13100,7 @@ mod tests {
 
         // Point 4: the handler refuses it again even when reached directly, so the property does not
         // rest on the dispatch filter alone.
-        mgr.handle_keep_alive(a, cross_keep_alive.clone(), SurbsStored::default())
+        mgr.handle_keep_alive(a, cross_keep_alive.clone())
             .await
             .context("the keep-alive handler must refuse quietly, not error")?;
         assert_eq!(
@@ -13656,6 +13685,118 @@ mod tests {
         .context("the keep-alive was never booked")?;
         assert_eq!(2, estimator.produced.load(Relaxed));
         assert_eq!(0, estimator.evicted.load(Relaxed));
+        Ok(())
+    }
+
+    /// An `SsaCommit` from the Entry delivers SURBs into the Exit's ring just as a keep-alive does, and
+    /// is booked the same way. Booking only the keep-alives left these out of the Exit's level while
+    /// the evictions they caused later were booked.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_commit_should_book_the_surbs_its_packet_stored() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, estimator) = exit_slot_for_keep_alives(pseudonym);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _) = futures::channel::mpsc::unbounded();
+        let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
+
+        let identity = HoprPixGroupElement::try_from(
+            hopr_protocol_pix::PixGroup::<HoprPixSpec>::default()
+                .to_bytes()
+                .as_ref(),
+        )
+        .ok()
+        .context("identity element must be valid")?;
+        let mut packet = start_packet(HoprStartProtocol::SsaCommit(SsaClientCommitmentMessage {
+            session_id: pseudonym,
+            ssa_index: SsaIndex::new(1).context("non-zero")?,
+            coefficient_index: 1,
+            commitment_proof: None,
+            coefficient_commitments: [(0, identity)].into(),
+        }))?;
+        packet.packet_info.num_saved_surbs = 2;
+        packet.packet_info.num_evicted_surbs = 1;
+        let carried = packet.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the commitment must leave room for a SURB");
+
+        mgr.dispatch_message(pseudonym, packet)?;
+
+        assert_eq!(
+            carried,
+            estimator.produced.load(Relaxed),
+            "the SURBs the commitment's packet carried"
+        );
+        assert_eq!(1, estimator.evicted.load(Relaxed), "and the one the store lost to them");
+        Ok(())
+    }
+
+    /// The SURBs are in the ring before the message is looked at, so a Start message the admission
+    /// filter turns away is booked all the same: here a keep-alive that names another Session.
+    #[test_log::test(tokio::test)]
+    async fn a_start_message_the_admission_filter_drops_should_still_book_its_surbs() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, estimator) = exit_slot_for_keep_alives(pseudonym);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _) = futures::channel::mpsc::unbounded();
+        let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
+
+        let mut packet = start_packet(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            session_id: HoprPseudonym::random(),
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: 0,
+        }))?;
+        packet.packet_info.num_saved_surbs = 2;
+        let carried = packet.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the keep-alive must leave room for a SURB");
+
+        let dispatched = mgr.dispatch_message(pseudonym, packet);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "the filter must drop a keep-alive naming another session, got {dispatched:?}"
+        );
+        assert_eq!(
+            carried,
+            estimator.produced.load(Relaxed),
+            "dropped, but its SURBs are in the ring"
+        );
+        Ok(())
+    }
+
+    /// The opening `StartSession` carries SURBs too. They reach the pseudonym's ring before the Session
+    /// exists, and admission promotes them with it, so the new Session's estimate starts with them:
+    /// without them it would start, and stay, below what the ring holds.
+    #[test_log::test(tokio::test)]
+    async fn the_opening_message_should_seed_the_exit_estimate() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mgr, _sender, _transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        let mut packet = start_packet(HoprStartProtocol::StartSession(pix_offer()))?;
+        packet.packet_info.num_saved_surbs = 2;
+        let carried = packet.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the opening must leave room for a SURB");
+
+        mgr.dispatch_message(pseudonym, packet)?;
+
+        let produced = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Some(slot) = mgr.sessions.get(&pseudonym) {
+                    let produced = slot.surb_estimator.produced.load(Relaxed);
+                    if produced > 0 {
+                        return produced;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the opening's SURBs were never booked")?;
+        assert_eq!(carried, produced, "the SURBs the opening's packet carried");
         Ok(())
     }
 
