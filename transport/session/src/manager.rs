@@ -16494,10 +16494,12 @@ mod tests {
             );
         }
 
+        // The boundaries of the 512-polynomial emission window, pinned in the tests above. (At a
+        // window of 256: 377 498 → 186 431, 346 522 → 48 057 and 303 565 → 150 641.)
         for (polys, threshold, surplus, target, required) in [
-            (4096, 32, 79, 377_498, 186_431),
-            (4096, 2, 102, 346_522, 48_057),
-            (2048, 64, 123, 303_565, 150_641),
+            (4096, 32, 79, 357_274, 176_411),
+            (4096, 2, 102, 320_410, 44_405),
+            (2048, 64, 123, 319_693, 158_674),
         ] {
             let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
             assert_eq!(

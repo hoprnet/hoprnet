@@ -25,7 +25,7 @@
 //! | `hopr_pix_cycles_active` | MultiGauge | cycles | supervisor turn (census delta) | `phase` = `awaiting_commitment\|awaiting_deposit\|recovering\|paid_tail` |
 //! | `hopr_pix_predeposit_exposure_packets` | SimpleGauge | packets | supervisor turn (census delta) | — |
 //! | `hopr_pix_live_cycle_bytes` | SimpleGauge | bytes | admission reservation / release | — |
-//! | `hopr_pix_held_shares` | SimpleGauge | shares | resolution drain (recomputed) | — |
+//! | `hopr_pix_held_shares` | SimpleGauge | shares | progress notification delivery (recomputed) | — |
 //! | `hopr_pix_cycle_bytes_reserved_total` | SimpleCounter | bytes | admission reservation | — |
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |

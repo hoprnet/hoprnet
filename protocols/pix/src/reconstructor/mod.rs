@@ -881,11 +881,14 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
     /// Shares currently held by the part builders of every live cycle on this node: the memory the
     /// emission window bounds in practice, as opposed to [`peak_cycle_bytes`], which prices the
-    /// adversarial case. A conforming Entry keeps at most `SHARE_EMISSION_WINDOW × (threshold − 1)`
-    /// of them per cycle; the figure is what `hopr_pix_held_shares` exports.
+    /// adversarial case. On lossless, in-order delivery a conforming Entry keeps at most
+    /// `SHARE_EMISSION_WINDOW × (threshold − 1)` of them per cycle. Losses or reordering can leave more:
+    /// a polynomial short of its threshold keeps up to `threshold − 1` shares after the Entry has moved
+    /// on, so capacity is planned with [`peak_cycle_bytes`]. The figure is what `hopr_pix_held_shares`
+    /// exports.
     ///
     /// Walks every live cycle and takes each part's lock briefly, so it is for an occasional reading
-    /// (once per supervisor turn, a resolution drain), not for the share path.
+    /// (the PIX action driver's progress notifications), not for the share path.
     pub fn held_shares(&self) -> usize {
         self.ssa_cycles.iter().map(|(_, cycle)| cycle.held_shares()).sum()
     }
