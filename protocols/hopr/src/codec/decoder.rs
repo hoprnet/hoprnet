@@ -225,10 +225,22 @@ where
                     }
                     opener
                 },
+                // Checked once the secret exists, so a replay skips the header MAC, the payload permutation and
+                // the message parse.
+                |tag| {
+                    let is_replay = self.replay_filter.contains(tag);
+                    if is_replay {
+                        tracing::debug!(%sender, "dropping packet - replay detected after the shared secret");
+                    }
+                    is_replay
+                },
+                // Committed only once the header MAC, payload permutation and SURB lookup have succeeded, so a
+                // forged alpha costs a well-formed packet rather than just the node's public key. Reporting
+                // whether the tag was already present closes the race with a concurrent decode of the same packet.
                 |tag| {
                     let is_replay = self.replay_filter.commit(tag);
                     if is_replay {
-                        tracing::debug!(%sender, "dropping packet - replay detected after the shared secret");
+                        tracing::debug!(%sender, "dropping packet - replay detected while committing");
                     }
                     is_replay
                 },

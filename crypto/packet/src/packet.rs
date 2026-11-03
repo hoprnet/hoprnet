@@ -597,27 +597,31 @@ impl HoprPacket {
     /// or parsed. This constructor therefore lets a caller reject a replayed packet after the multiplication and
     /// before that remaining work.
     ///
-    /// `is_replay` is called at most once, and only for packets whose tag could be derived. It must also perform
-    /// the insertion, not merely the lookup: `from_incoming` reports the duplicate through
-    /// [`PacketError::PacketReplay`], and the caller cannot insert on its behalf because the secret never leaves
-    /// this function. A tag that passes `is_replay` is therefore already recorded when this returns.
+    /// `is_replay` is called at most once, after the secret is derived and before the header MAC is verified; it
+    /// should only *check*. `commit` is called at most once, after the header MAC, the payload permutation and the
+    /// SURB reply-opener lookup have all succeeded, and it should insert. Returning `true` from either reports
+    /// [`PacketReplay`].
     ///
-    /// The tag only authenticates a packet whose header MAC verifies afterwards - an attacker can construct an
-    /// alpha that yields any tag, but not one that also makes the rest of the packet decode. A forged tag can
-    /// therefore suppress a packet the caller was going to see (a false positive, bounded by the filter), not
-    /// change what is delivered.
-    pub fn from_incoming_checked<M, F, R>(
+    /// Splitting them this way is what makes a token cost a well-formed packet: the secret is derived from the
+    /// node's *public* key and the packet's alpha, so anybody can make this function derive a tag - but only a
+    /// packet whose header MAC verifies reaches `commit`, and the MAC cannot be forged without the real secret.
+    ///
+    /// A tag that passes `is_replay` but whose packet then fails to transform is not committed, so a forged packet
+    /// neither advances the filter nor consumes a SURB reply opener.
+    pub fn from_incoming_checked<M, F, R, C>(
         data: &[u8],
         node_keypair: &OffchainKeypair,
         previous_hop: OffchainPublicKey,
         mapper: &M,
         reply_openers: F,
         is_replay: R,
+        commit: C,
     ) -> Result<Self>
     where
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         F: FnMut(&HoprSenderId) -> Option<ReplyOpener>,
         R: FnOnce(&PacketTag) -> bool,
+        C: FnOnce(&PacketTag) -> bool,
     {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
@@ -632,7 +636,16 @@ impl HoprPacket {
                 return Err(PacketReplay);
             }
 
+            // Only a packet whose header MAC verifies gets this far, so recording the tag from here on means a
+            // forged alpha costs the sender a well-formed packet rather than the public key alone.
             let forwarded = mp.into_forwarded_with_secret(alpha, secret, mapper, reply_openers)?;
+
+            // Closes the race between `is_replay` above and this insertion: of two concurrent decodes of the
+            // same packet, exactly one commits and the other is told it is the duplicate.
+            if commit(&tag) {
+                return Err(PacketReplay);
+            }
+
             Self::from_forwarded_meta_packet(forwarded, pre_ticket, previous_hop)
         } else {
             Err(PacketDecodingError("packet has invalid size".into()))
@@ -1254,13 +1267,14 @@ mod tests {
         Ok(())
     }
 
-    /// The checked constructor must report a replay through its own error, after having called the predicate
-    /// exactly once, and before returning a packet.
+    /// The checked constructor must report a replay through its own error, after having called the check exactly
+    /// once, and before returning a packet.
     #[test]
     fn a_rejected_tag_should_stop_the_decode() -> anyhow::Result<()> {
         let (packet, _) = create_packet(1, SimplePseudonym::random(), vec![], b"replay checked")?;
         let wire = packet.to_bytes();
         let mut calls = 0;
+        let mut commits = 0;
 
         let result = HoprPacket::from_incoming_checked(
             &wire,
@@ -1272,23 +1286,29 @@ mod tests {
                 calls += 1;
                 true
             },
+            |_| {
+                commits += 1;
+                false
+            },
         );
 
         assert!(
             matches!(result, Err(crate::errors::PacketError::PacketReplay)),
             "must report a replay"
         );
-        assert_eq!(1, calls, "the predicate must be asked exactly once");
+        assert_eq!(1, calls, "the check must be asked exactly once");
+        assert_eq!(0, commits, "a packet rejected by the check must not be committed");
         Ok(())
     }
 
-    /// A tag that the predicate accepts must let the packet through unchanged, and the predicate must have seen the
-    /// same tag the decoded packet carries - the invariant the decoder's replay filter relies on.
+    /// A tag that the check accepts must let the packet through unchanged, and both callbacks must have seen the
+    /// tag the decoded packet carries - the invariant the decoder's replay filter relies on.
     #[test]
     fn an_accepted_tag_should_decode_to_the_same_packet() -> anyhow::Result<()> {
         let (packet, _) = create_packet(2, SimplePseudonym::random(), vec![], b"replay checked")?;
         let wire = packet.to_bytes();
         let mut seen = None;
+        let mut committed = None;
 
         let checked = HoprPacket::from_incoming_checked(
             &wire,
@@ -1300,19 +1320,64 @@ mod tests {
                 seen = Some(*tag);
                 false
             },
+            |tag| {
+                committed = Some(*tag);
+                false
+            },
         )?;
         let unchecked = HoprPacket::from_incoming(&wire, &PEERS[1].1, *PEERS[0].1.public(), &*MAPPER, |_| None)?;
 
         assert_eq!(
             seen.as_ref(),
             checked.packet_tag(),
-            "the predicate must see the tag the packet carries"
+            "the check must see the tag the packet carries"
+        );
+        assert_eq!(
+            committed.as_ref(),
+            checked.packet_tag(),
+            "the commit must see the tag the packet carries"
         );
         assert_eq!(
             checked.packet_tag(),
             unchecked.packet_tag(),
             "the checked and unchecked constructors must derive the same tag"
         );
+        Ok(())
+    }
+
+    /// A packet whose header MAC does not verify must not be committed, even though its tag was derivable and the
+    /// check let it through. This is what makes a committed token cost a well-formed packet rather than the node's
+    /// public key.
+    #[test]
+    fn a_packet_failing_the_header_mac_should_not_be_committed() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(1, SimplePseudonym::random(), vec![], b"replay checked")?;
+        let mut wire = packet.to_bytes().to_vec();
+
+        // Keep the alpha, so the secret - and hence the tag - is derivable, but corrupt the header after it.
+        const ALPHA_LEN: usize = 32;
+        wire[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+
+        let mut checked = 0;
+        let mut committed = 0;
+        let result = HoprPacket::from_incoming_checked(
+            &wire,
+            &PEERS[1].1,
+            *PEERS[0].1.public(),
+            &*MAPPER,
+            |_| None,
+            |_| {
+                checked += 1;
+                false
+            },
+            |_| {
+                committed += 1;
+                false
+            },
+        );
+
+        assert!(result.is_err(), "a corrupted header must not decode");
+        assert_eq!(1, checked, "the tag is derivable, so the check runs");
+        assert_eq!(0, committed, "a packet failing the header MAC must not be committed");
         Ok(())
     }
 
@@ -1334,8 +1399,9 @@ mod tests {
                     seen = Some(*tag);
                     false
                 },
+                |_| false,
             )?;
-            seen.expect("the predicate must have been called")
+            seen.expect("the check must have been called")
         };
 
         let forwarded = process_packet_at_node(3, 1, false, packet, |_| None)?;
@@ -1351,19 +1417,21 @@ mod tests {
                     seen = Some(*tag);
                     false
                 },
+                |_| false,
             )?;
-            seen.expect("the predicate must have been called")
+            seen.expect("the check must have been called")
         };
 
         assert_ne!(first_tag, second_tag, "the shared secret must change at every hop");
         Ok(())
     }
 
-    /// A packet whose size is wrong must be rejected before the predicate runs, so a caller whose filter is keyed on
-    /// the tag is never asked about a buffer that has none.
+    /// A packet whose size is wrong must be rejected before either callback runs, so a caller whose filter is keyed
+    /// on the tag is never asked about a buffer that has none.
     #[test]
     fn a_wrong_size_packet_should_not_reach_the_replay_predicate() {
-        let mut calls = 0;
+        let checked = std::cell::Cell::new(0);
+        let committed = std::cell::Cell::new(0);
         let result = HoprPacket::from_incoming_checked(
             &[0u8; 100],
             &PEERS[1].1,
@@ -1371,12 +1439,21 @@ mod tests {
             &*MAPPER,
             |_| None,
             |_| {
-                calls += 1;
+                checked.set(checked.get() + 1);
+                false
+            },
+            |_| {
+                committed.set(committed.get() + 1);
                 false
             },
         );
 
         assert!(result.is_err(), "a short buffer must not decode");
-        assert_eq!(0, calls, "the predicate must not be called for a wrong-size buffer");
+        assert_eq!(0, checked.get(), "the check must not be called for a wrong-size buffer");
+        assert_eq!(
+            0,
+            committed.get(),
+            "the commit must not be called for a wrong-size buffer"
+        );
     }
 }

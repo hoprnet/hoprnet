@@ -1130,32 +1130,47 @@ mod tests {
         Ok(())
     }
 
-    /// A packet can present a valid tag and still fail the header MAC - an attacker chooses the alpha, so it
-    /// chooses the secret, and therefore the tag. The tag is recorded before the MAC is checked, so this costs the
-    /// filter one slot per forged packet. What must not happen is that the packet is delivered, or that its tag
-    /// blocks the genuine packet it was forged to imitate.
+    /// A packet that fails its header MAC must not enter the filter. The tag is derivable from the node's public
+    /// key and the wire alpha alone, so were it committed before the MAC, any stranger could rotate the filter at
+    /// one elliptic-curve multiplication per token.
     #[tokio::test]
-    async fn a_forged_tag_should_cost_a_slot_without_delivering() -> anyhow::Result<()> {
+    async fn a_packet_failing_the_header_mac_should_not_enter_the_filter() -> anyhow::Result<()> {
         let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
         let receiver = create_node(1, &blokli_client).await?;
-        let decoder = create_decoder(&receiver);
 
-        // Random bytes with the right length: derivable secret, tag committed, MAC then fails.
-        let forged = Bytes::from(vec![0x11u8; hopr_crypto_packet::prelude::HoprPacket::SIZE]);
+        let encoder = create_encoder(&sender);
+        let out_packet = encoder.encode_packet(
+            b"a packet whose header will be damaged",
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+            None,
+        )?;
+
+        let decoder = create_decoder(&receiver);
         let sender_peer_id: PeerId = OffchainKeypair::random().public().into();
 
-        let result = decoder.decode(sender_peer_id, forged.clone());
-        assert!(result.is_err(), "a forged packet must not be delivered");
-        assert_eq!(
-            1,
-            decoder.replay_filter().count(),
-            "its tag is recorded before the MAC check"
-        );
+        // Keep the alpha, so the secret and the tag are derivable, but damage the header after it.
+        const ALPHA_LEN: usize = 32;
+        let mut forged = out_packet.data.to_vec();
+        forged[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+        let forged = Bytes::from(forged);
 
-        // The same forged bytes are now a replay.
         assert!(
-            decoder.decode(sender_peer_id, forged).unwrap_err().is_replay(),
-            "a repeated forged packet is caught by its tag"
+            decoder.decode(sender_peer_id, forged).unwrap_err().is_undecodable(),
+            "a damaged header must be undecodable, not a replay"
+        );
+        assert_eq!(
+            0,
+            decoder.replay_filter().count(),
+            "a packet that fails the header MAC must not be recorded"
         );
 
         Ok(())
