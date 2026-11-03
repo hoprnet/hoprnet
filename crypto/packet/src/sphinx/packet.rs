@@ -328,6 +328,14 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
     }
 }
 
+/// The blinded alpha for the next hop together with the shared secret the current one derived.
+///
+/// Produced by [`MetaPacket::forward_secret`] and consumed by [`MetaPacket::into_forwarded_with_secret`].
+pub type ForwardSecret<S> = (
+    Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>,
+    SharedSecret,
+);
+
 /// Represent a [`MetaPacket`] with one layer of encryption removed, exposing the details
 /// about the next hop.
 ///
@@ -422,27 +430,54 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         &mut self.packet[base..base + PaddedPayload::<P>::SIZE]
     }
 
+    /// Derives the shared secret this packet was built for `node_keypair`, together with the blinded alpha the
+    /// next hop will see.
+    ///
+    /// This is the first and most expensive step of [`MetaPacket::into_forwarded`] - an elliptic-curve scalar
+    /// multiplication - and it is also the only step needed to derive the packet's [`PacketTag`]. Splitting it out
+    /// lets a caller that wants to look at the tag before paying for the rest of the decode (a replay filter, for
+    /// one) do so without repeating the multiplication: pass the secret to
+    /// [`MetaPacket::into_forwarded_with_secret`].
+    pub fn forward_secret<'a>(&self, node_keypair: &'a S::P) -> Result<ForwardSecret<S>, SphinxError>
+    where
+        &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
+    {
+        let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
+            .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
+        SharedKeys::<S::E, S::G>::forward_transform(&alpha_arr, &(node_keypair.into()), node_keypair.public().into())
+            .map_err(SphinxError::from)
+    }
+
     /// Attempts to remove the layer of encryption in this packet by using the given `node_keypair`.
     /// This will transform this packet into the [`ForwardedMetaPacket`].
     pub fn into_forwarded<'a, K, F>(
-        mut self,
+        self,
         node_keypair: &'a S::P,
         key_mapper: &K,
-        mut reply_openers: F,
+        reply_openers: F,
     ) -> Result<ForwardedMetaPacket<S, H, P>, SphinxError>
     where
         K: ProtocolKeyIdMapper<S, H>,
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
-        let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
-            .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
-        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
-            &alpha_arr,
-            &(node_keypair.into()),
-            node_keypair.public().into(),
-        )?;
+        let (alpha, secret) = self.forward_secret(node_keypair)?;
+        self.into_forwarded_with_secret(alpha, secret, key_mapper, reply_openers)
+    }
 
+    /// As [`MetaPacket::into_forwarded`], but for a caller that has already derived the shared secret with
+    /// [`MetaPacket::forward_secret`].
+    pub fn into_forwarded_with_secret<K, F>(
+        mut self,
+        alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+        secret: SharedSecret,
+        key_mapper: &K,
+        mut reply_openers: F,
+    ) -> Result<ForwardedMetaPacket<S, H, P>, SphinxError>
+    where
+        K: ProtocolKeyIdMapper<S, H>,
+        F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
+    {
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
 
