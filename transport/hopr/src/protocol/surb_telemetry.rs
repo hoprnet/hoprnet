@@ -38,11 +38,12 @@
 //!   judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict, or probation. Effect: each session is told how many SURBs in its
 //!   counterparty's store run through that relayer; the balancer subtracts them from its level and sends replacements.
-//!   Lasts as long as the verdict or the probation, probe SURBs included: a lapsed verdict is only a timeout and the
-//!   counterparty still holds them, so only a reply through the relayer (which ends the probation) or the end of the
-//!   session ends the write-off. A session's count is dropped when its SURB generation is advanced, though: the wipe
-//!   takes the SURBs it counted, and from then on it counts only the probes minted since. Must not fight: flow control,
-//!   which keeps the raw level so the replacements are not throttled.
+//!   A lapsed verdict is only a timeout and the counterparty still holds the SURBs, probe SURBs included, so the
+//!   write-off outlives it; each written-off SURB counts as held only until `WRITE_OFF_HORIZON`, the time the
+//!   counterparty needs to spend it, and a reply through the relayer (which ends the probation) or the end of the
+//!   session ends the write-off sooner. A session's count is dropped when its SURB generation is advanced, though: the
+//!   wipe takes the SURBs it counted, and from then on it counts only the probes minted since. Must not fight: flow
+//!   control, which keeps the raw level so the replacements are not throttled.
 //! - **Fresh SURB generation.** Trigger: a dead verdict that held for a second flush (`VERDICT_CONFIRMATION`) reaching
 //!   a session for the first time, at most once per (session, relayer) while the relayer is known dead, and per
 //!   `REBUMP_COOLDOWN` after it is revived. Effect: the session's SURB generation advances, so the counterparty drops

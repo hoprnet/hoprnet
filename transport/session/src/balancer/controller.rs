@@ -234,7 +234,8 @@ pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 pub const REPLY_STREAM_WINDOW: Duration = Duration::from_secs(15);
 
 /// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
-/// one fifth of the target per second, so the refill takes about as many seconds.
+/// one fifth of the target per second (at least one keep-alive's worth, never above
+/// `max_surbs_per_sec`; see `pacing_cap`), so the refill takes about as many seconds.
 ///
 /// After a wipe the level is zero against the target, and left alone the PID commands its output
 /// limit (`max_surbs_per_sec`; the prototype hit 4975 per second against a ceiling of 5000 per
@@ -608,7 +609,8 @@ impl BalancerStateValues {
     /// of the session advanced and the counterparty clears its store on the first batch of the new one.
     ///
     /// The level estimate restarts from empty at the next balancer update, and for
-    /// `REFILL_PACING_SECS` the refill is held to `target / REFILL_PACING_SECS` SURBs per second.
+    /// `REFILL_PACING_SECS` the refill is held to the pacing rate: a fifth of the target a second, at
+    /// least one keep-alive's worth and never above `max_surbs_per_sec` (see `pacing_cap`).
     /// The counterparty's own reports follow suit once the first SURBs of the new generation reach
     /// it. Until then it may still report the level it had before, and then the level before the
     /// refill in flight reached it; for the paced window every report is dropped (see
@@ -621,9 +623,9 @@ impl BalancerStateValues {
         self.arm_refill_pacing();
     }
 
-    /// Holds the refill of an empty counterparty to `target / REFILL_PACING_SECS` SURBs per second for
-    /// `REFILL_PACING_SECS` (at least one per second), whatever the PID would command. A disabled
-    /// balancer arms nothing.
+    /// Holds the refill of an empty counterparty to the pacing rate (`pacing_cap`: a fifth of the target
+    /// a second, at least one keep-alive's worth, never above `max_surbs_per_sec`) for
+    /// `REFILL_PACING_SECS`, whatever the PID would command. A disabled balancer arms nothing.
     ///
     /// The second half of [`on_counterparty_wiped`](Self::on_counterparty_wiped), and what the Entry
     /// calls when its balancer starts: a session that has just been opened is in the same state as one
