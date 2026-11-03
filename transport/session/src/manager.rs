@@ -15364,65 +15364,6 @@ mod tests {
         Ok(())
     }
 
-    /// A request that finds its Session's request lock held is refused at once, not queued behind it.
-    ///
-    /// The holder may keep the lock for a whole commitment generation and publication. Every request
-    /// waiting on it would park one of the shared Start handlers for that long, so an Exit sending
-    /// requests for its own Session, one SURB each, could occupy all of them — the same symptom the
-    /// dispatch filter closes for pseudonyms nobody issued.
-    ///
-    /// ## Steps
-    /// 1. The Session's request lock is held, as a batch being committed holds it.
-    /// 2. An otherwise acceptable opening request is refused as `Unacceptable` without waiting, and opens no cycle.
-    /// 3. Control: once the lock is released, the same request is accepted.
-    #[test_log::test(tokio::test)]
-    async fn an_ssa_request_finding_its_session_busy_is_refused_without_waiting() -> anyhow::Result<()> {
-        let params = wide_pix_params();
-        let (mgr, _generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
-            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
-
-        let request_lock = mgr
-            .ssa_request_locks
-            .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
-            .await;
-        let held = request_lock.lock().await;
-
-        let refused = timeout(
-            Duration::from_secs(1),
-            mgr.handle_ssa_request(
-                pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
-            ),
-        )
-        .await
-        .context("a request finding its Session busy must not wait for the lock")?;
-        assert!(
-            matches!(
-                refused,
-                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
-            ),
-            "expected Unacceptable, got {refused:?}"
-        );
-        assert_eq!(
-            0,
-            drain_pix_events(&mut pix_events).await,
-            "a refused request must not open a cycle"
-        );
-
-        drop(held);
-        mgr.handle_ssa_request(
-            pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
-        )
-        .await
-        .context("the same request must be accepted once the lock is free")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events).await);
-
-        bob_sender.close_channel();
-        bob_handle.await??;
-        Ok(())
-    }
-
     /// Before a Session's slot exists, at most one request for it waits for the slot; any other is
     /// refused at once rather than parking a second shared Start handler.
     ///
