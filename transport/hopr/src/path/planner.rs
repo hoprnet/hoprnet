@@ -737,12 +737,6 @@ where
 
         let cache_key: PlannerCacheKey = (src_key, dest_key, u32::from(hops));
 
-        let resolver = self.resolver.clone();
-        let selector = self.selector.clone();
-        let weighting = self.weighting;
-        let me = self.me;
-        let collapsed_diversity = self.collapsed_diversity.clone();
-
         // This per-request span is TRACE-only. Avoid looking up and recording into the
         // current span when it is disabled (which could otherwise be a caller's span).
         let span = tracing::enabled!(tracing::Level::TRACE).then(tracing::Span::current);
@@ -750,19 +744,28 @@ where
             span.record("source", tracing::field::display(src_key));
             span.record("destination", tracing::field::display(dest_key));
         }
+        // Borrow the key and initializer dependencies to avoid allocating a key and cloning
+        // those dependencies on hits. Moka still coalesces misses and reports the winning fill.
         let entry = self
             .cache
-            .entry(cache_key)
-            .or_try_insert_with(async move {
+            .entry_by_ref(&cache_key)
+            .or_try_insert_with(async {
                 tracing::trace!(hops = hops_usize, "path cache miss, querying selector");
                 rebuild_candidates(
-                    &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
+                    &*self.resolver,
+                    &*self.selector,
+                    self.weighting,
+                    self.me,
+                    src_key,
+                    dest_key,
+                    hops_usize,
+                    "fill",
                 )
                 .await?
                 // A fill always becomes the cache entry, so its transition can be applied here.
                 .map(|(weighted, diversity)| {
                     if let Some(obs) = diversity {
-                        apply_diversity_transition(&collapsed_diversity, &src_key, "fill", &obs);
+                        apply_diversity_transition(&self.collapsed_diversity, &src_key, "fill", &obs);
                     }
                     Arc::new(weighted)
                 })
@@ -2851,6 +2854,57 @@ mod tests {
         assert!(!output.contains("planner.resolve_path"));
         assert!(!output.contains("planner.cached_paths"));
         assert!(!output.contains("planner.resolve_diverse_return_paths"));
+        Ok(())
+    }
+
+    #[serial_test::serial(routing_logs)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_cache_misses_should_share_one_install_even_after_invalidation() -> anyhow::Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        use crate::path::test_support::Logs;
+
+        const CALLERS: usize = 16;
+        let (planner, _) = two_relayer_return_planner();
+        let planner = Arc::new(planner);
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+        let hops = 1.try_into()?;
+        let logs = Logs::default();
+        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
+        let mut previous_id = None;
+        for round in 1..=2 {
+            let barrier = Arc::new(tokio::sync::Barrier::new(CALLERS));
+            let mut callers = Vec::with_capacity(CALLERS);
+            for _ in 0..CALLERS {
+                let planner = planner.clone();
+                let barrier = barrier.clone();
+                callers.push(tokio::spawn(
+                    async move {
+                        barrier.wait().await;
+                        planner
+                            .cached_paths(NodeId::Offchain(key.0), NodeId::Offchain(key.1), hops)
+                            .await
+                    }
+                    .with_current_subscriber(),
+                ));
+            }
+            let mut snapshots = Vec::with_capacity(CALLERS);
+            for caller in callers {
+                snapshots.push(caller.await??);
+            }
+            assert!(snapshots.iter().all(|snapshot| Arc::ptr_eq(snapshot, &snapshots[0])));
+            assert_ne!(previous_id, Some(snapshots[0].id));
+            previous_id = Some(snapshots[0].id);
+            assert_eq!(logs.records("path search completed").len(), round);
+            assert_eq!(logs.records("candidate set installed").len(), round);
+            // A warm hit must return the same snapshot without searching or installing again.
+            let hit = planner
+                .cached_paths(NodeId::Offchain(key.0), NodeId::Offchain(key.1), hops)
+                .await?;
+            assert!(Arc::ptr_eq(&hit, &snapshots[0]));
+            assert_eq!(logs.records("candidate set installed").len(), round);
+            planner.cache.invalidate(&key).await;
+        }
         Ok(())
     }
 
