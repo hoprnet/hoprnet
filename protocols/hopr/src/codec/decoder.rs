@@ -202,9 +202,9 @@ where
         // inserts: a duplicate is reported as `PacketReplay` and the tag is recorded when the packet passes.
         //
         // The tag is authenticated by construction: it is derived from a secret only the sender and this node
-        // share, so a third party cannot choose it. A packet whose header MAC subsequently fails still had its tag
-        // recorded, which costs the filter one slot - a bounded consequence, not a way to suppress arbitrary
-        // traffic.
+        // share, so a third party cannot choose it. A packet is recorded only once its header MAC has verified,
+        // so producing a token costs a well-formed packet; a packet that authenticates and then fails on our side
+        // is recorded too, which costs one slot and makes its retry a replay.
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
@@ -234,9 +234,10 @@ where
                     }
                     is_replay
                 },
-                // Committed only once the header MAC, payload permutation and SURB lookup have succeeded, so a
-                // forged alpha costs a well-formed packet rather than just the node's public key. Reporting
-                // whether the tag was already present closes the race with a concurrent decode of the same packet.
+                // Committed once the header MAC and payload permutation have succeeded - the message/ticket parse
+                // follows - so a forged alpha costs a well-formed packet rather than just the node's public key.
+                // Reporting whether the tag was already present closes the race with a concurrent decode of the
+                // same packet.
                 |tag| {
                     let is_replay = self.replay_filter.commit(tag);
                     if is_replay {

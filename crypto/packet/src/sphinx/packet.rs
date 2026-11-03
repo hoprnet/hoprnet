@@ -462,24 +462,31 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let (alpha, secret) = self.forward_secret(node_keypair)?;
-        self.into_forwarded_with_secret(alpha, secret, key_mapper, reply_openers)
+        self.into_forwarded_with_secret(alpha, secret, key_mapper, reply_openers, || {})
     }
 
     /// As [`MetaPacket::into_forwarded`], but for a caller that has already derived the shared secret with
     /// [`MetaPacket::forward_secret`].
-    pub fn into_forwarded_with_secret<K, F>(
+    /// `on_authenticated` runs once the header MAC has verified, i.e. once the sender has proven knowledge of the
+    /// shared secret, and before anything on this hop's side is consumed. A caller that records a packet's
+    /// [`PacketTag`](super::prelude::derive_packet_tag) can use it to distinguish "this packet was well-formed and
+    /// then failed on our side" from "this packet never authenticated".
+    pub fn into_forwarded_with_secret<K, F, A>(
         mut self,
         alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
         secret: SharedSecret,
         key_mapper: &K,
         mut reply_openers: F,
+        on_authenticated: A,
     ) -> Result<ForwardedMetaPacket<S, H, P>, SphinxError>
     where
         K: ProtocolKeyIdMapper<S, H>,
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
+        A: FnOnce(),
     {
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
+        on_authenticated();
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();

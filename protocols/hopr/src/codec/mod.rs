@@ -424,12 +424,32 @@ mod tests {
         let second = f.surb_reply(pseudonym, b"second reply")?;
 
         // The relay sees each reply, so its filter is where a legitimate reply must not look like a replay.
-        f.relay_decoder
+        let forwarded_first = f
+            .relay_decoder
             .decode(f.receiver.offchain_key.public().into(), first.data.clone())?;
         f.relay_decoder
             .decode(f.receiver.offchain_key.public().into(), second.data)?;
 
-        // Replaying the first reply is caught.
+        let forwarded_first = forwarded_first
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+
+        // Delivering the reply consumes its opener at the destination.
+        f.sender_assert_reply(forwarded_first.clone(), b"first reply")?;
+
+        // A duplicate must still be recognised as a replay there, rather than reported undecodable because the
+        // opener it needs is already gone.
+        let replayed_at_destination = f
+            .sender_decoder
+            .decode(f.relay.offchain_key.public().into(), forwarded_first);
+        assert!(
+            replayed_at_destination.unwrap_err().is_replay(),
+            "a duplicate reply must be a replay even though its opener was consumed"
+        );
+
+        // And the wire copy is caught at the relay as well.
         let replayed = f
             .relay_decoder
             .decode(f.receiver.offchain_key.public().into(), first.data);

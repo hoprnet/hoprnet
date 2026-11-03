@@ -598,16 +598,17 @@ impl HoprPacket {
     /// before that remaining work.
     ///
     /// `is_replay` is called at most once, after the secret is derived and before the header MAC is verified; it
-    /// should only *check*. `commit` is called at most once, after the header MAC, the payload permutation and the
-    /// SURB reply-opener lookup have all succeeded, and it should insert. Returning `true` from either reports
-    /// [`PacketReplay`].
+    /// should only *check*. `commit` is called at most once, once the header MAC and the payload permutation have
+    /// succeeded, and it should insert. Returning `true` from either reports [`PacketReplay`].
     ///
     /// Splitting them this way is what makes a token cost a well-formed packet: the secret is derived from the
     /// node's *public* key and the packet's alpha, so anybody can make this function derive a tag - but only a
     /// packet whose header MAC verifies reaches `commit`, and the MAC cannot be forged without the real secret.
     ///
-    /// A tag that passes `is_replay` but whose packet then fails to transform is not committed, so a forged packet
-    /// neither advances the filter nor consumes a SURB reply opener.
+    /// A tag that passes `is_replay` but whose packet then fails to transform is committed only if the header MAC
+    /// had already verified - the "we consumed the SURB opener, then could not finish" case, so its retry is
+    /// recognised. A packet that never authenticated is not committed, so a forged alpha neither advances the
+    /// filter nor can be retried for free.
     pub fn from_incoming_checked<M, F, R, C>(
         data: &[u8],
         node_keypair: &OffchainKeypair,
@@ -638,7 +639,26 @@ impl HoprPacket {
 
             // Only a packet whose header MAC verifies gets this far, so recording the tag from here on means a
             // forged alpha costs the sender a well-formed packet rather than the public key alone.
-            let forwarded = mp.into_forwarded_with_secret(alpha, secret, mapper, reply_openers)?;
+            //
+            // A reply whose opener has already been consumed fails this step, because the lookup removes the
+            // opener. An ordinary duplicate does not reach here - `is_replay` above answers first, since the first
+            // delivery recorded the tag - but a delivery that consumed the opener and then failed inside this
+            // step did not record it. Committing on that path means a retry is recognised as a replay instead of
+            // paying a second decode that cannot succeed either.
+            let mut authenticated = false;
+            let forwarded =
+                match mp.into_forwarded_with_secret(alpha, secret, mapper, reply_openers, || authenticated = true) {
+                    Ok(forwarded) => forwarded,
+                    Err(error) => {
+                        // The sender proved the secret but the packet failed on our side. Record it, so a retry is
+                        // a replay rather than a second decode that cannot succeed either. A packet that never
+                        // authenticated is not recorded - that is what keeps a token costing a well-formed packet.
+                        if authenticated {
+                            commit(&tag);
+                        }
+                        return Err(error.into());
+                    }
+                };
 
             // Closes the race between `is_replay` above and this insertion: of two concurrent decodes of the
             // same packet, exactly one commits and the other is told it is the duplicate.
