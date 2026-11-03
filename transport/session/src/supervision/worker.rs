@@ -407,10 +407,10 @@ fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, ga
 /// can fail-close.
 ///
 /// On `Full`:
-/// - **Coalescible** actions (`ProgressNotification`, `ResendSsaRequest`) are logged + skipped. They are idempotent and
-///   safe to drop — the next notification will replace them, and dropping here prevents transient load from killing a
-///   healthy session. A dropped re-send costs the batch nothing: the supervisor pushed its commitment deadline when it
-///   emitted the action, and its next tick emits another.
+/// - **Coalescible** actions (`ProgressNotification`, `RefreshHeldShares`, `ResendSsaRequest`) are logged + skipped.
+///   They are idempotent and safe to drop — the next notification will replace them, and dropping here prevents
+///   transient load from killing a healthy session. A dropped re-send costs the batch nothing: the supervisor pushed
+///   its commitment deadline when it emitted the action, and its next tick emits another.
 /// - **Non-coalescible** actions (every other variant) are treated as fatal. If these cannot be delivered the channel
 ///   is genuinely wedged.
 fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
@@ -439,7 +439,9 @@ fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
 fn is_coalescible(action: &SessionPixAction) -> bool {
     matches!(
         action,
-        SessionPixAction::ProgressNotification | SessionPixAction::ResendSsaRequest { .. }
+        SessionPixAction::ProgressNotification
+            | SessionPixAction::RefreshHeldShares
+            | SessionPixAction::ResendSsaRequest { .. }
     )
 }
 
@@ -1037,6 +1039,10 @@ mod tests {
         // returns true (session survives).
         let progress: Vec<_> = (0..100).map(|_| SessionPixAction::ProgressNotification).collect();
         assert!(send_actions(&progress, &action_tx));
+
+        // A held-shares refresh is telemetry only, and the next one replaces it.
+        let refreshes: Vec<_> = (0..100).map(|_| SessionPixAction::RefreshHeldShares).collect();
+        assert!(send_actions(&refreshes, &action_tx));
 
         // A re-send of an unanswered successor request is just as droppable: its deadline was
         // pushed when it was emitted and the next tick emits another, so a full channel costs the

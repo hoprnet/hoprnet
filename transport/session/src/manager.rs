@@ -4739,7 +4739,8 @@ where
                     // node-wide occupancy gauge here. The walk covers every live cycle on the node and
                     // notifications come per acknowledgement batch per Session, so it runs at most once
                     // a second node-wide (`HELD_SHARES_REFRESH_PERIOD`), not on every notification.
-                    SessionPixAction::ProgressNotification =>
+                    // Progress behind the front asks for the same refresh, with nothing for the gate.
+                    SessionPixAction::ProgressNotification | SessionPixAction::RefreshHeldShares =>
                     {
                         #[cfg(feature = "telemetry")]
                         if crate::telemetry::pix::held_shares_refresh_due() {

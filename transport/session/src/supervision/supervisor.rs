@@ -1828,7 +1828,9 @@ impl SessionPixSupervisor {
         if self.ssas[idx].phase == SsaPhase::Recovering && is_front {
             vec![SessionPixAction::ProgressNotification]
         } else {
-            Vec::new()
+            // Nothing for the gate, but the reconstructor took the shares all the same: without this the
+            // occupancy gauge would wait for the front's next progress, a retirement or the close.
+            vec![SessionPixAction::RefreshHeldShares]
         }
     }
 
@@ -3426,8 +3428,8 @@ mod tests {
         );
 
         assert!(
-            actions.is_empty(),
-            "off-front progress must not reopen the gate, got {actions:?}"
+            matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+            "off-front progress must not reopen the gate, only refresh the occupancy gauge, got {actions:?}"
         );
     }
 
@@ -4391,8 +4393,8 @@ mod tests {
             850,
         );
         assert!(
-            actions.is_empty(),
-            "off-front progress must neither convict nor reopen the gate"
+            matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+            "off-front progress must neither convict nor reopen the gate, got {actions:?}"
         );
         assert!(!sup.closed);
     }
@@ -4502,7 +4504,10 @@ mod tests {
                 now,
                 useful,
             );
-            assert!(actions.is_empty(), "{useful} shares is below the floor and off-front");
+            assert!(
+                matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+                "{useful} shares is below the floor and off-front, got {actions:?}"
+            );
         }
 
         let actions = sup.handle_event(

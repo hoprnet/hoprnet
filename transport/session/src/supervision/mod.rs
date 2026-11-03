@@ -441,12 +441,12 @@
 //! A Session with no funded cycle to fill for schedules no tick at all, so the loop's behaviour is
 //! byte-for-byte what it was before fill existed until the first deposit confirms.
 //!
-//! **Coalescing** — `ProgressNotification` and `ResendSsaRequest` actions are coalescible: when
-//! the action channel is transiently full, they are dropped rather than
+//! **Coalescing** — `ProgressNotification`, `RefreshHeldShares` and `ResendSsaRequest` actions are
+//! coalescible: when the action channel is transiently full, they are dropped rather than
 //! blocking or failing the worker. The gate has already consumed the notification locally, and the
-//! next forwarded notification replaces it for observers. A dropped re-send is equally harmless: the
-//! supervisor pushed the batch's commitment deadline when it emitted the action, and the next tick
-//! emits another.
+//! next forwarded notification replaces it for observers; a dropped refresh leaves the held-shares
+//! gauge to the next one. A dropped re-send is equally harmless: the supervisor pushed the batch's
+//! commitment deadline when it emitted the action, and the next tick emits another.
 //!
 //! All other actions (`RequestSsa`, `RequestCommitmentRetransmission`, `ReleaseService`,
 //! `WithholdService`, `RetireSsa`, `SetFillRate`, `Close`) are non-coalescible — if they cannot be
@@ -479,6 +479,7 @@
 //!    | `ReleaseService` | Worker calls `gate.release_service()`; driver records funded telemetry. |
 //!    | `WithholdService` | Worker calls `gate.withhold_service()`; driver records unfunded telemetry. |
 //!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; the driver refreshes the `hopr_pix_held_shares` gauge from the reconstructor, and does no other I/O. |
+//!    | `RefreshHeldShares` | Telemetry only: the driver refreshes the `hopr_pix_held_shares` gauge as for `ProgressNotification`; the worker leaves the gate alone. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
 //!    | `SetFillRate` | Applies the rate to the Session's shared keep-alive controller and records the gauge. |
 //!    | `Close` | Silences fill, poisons gate, retires all SSAs, publishes close metric, removes session slot. A close that ends a *drain* is an ordinary outcome rather than a failure: it is logged as information and the Entry is sent no failure notice, since the notice is return-routed and the Session it would report on is already gone — sending it would only spend a SURB out of a buffer that may be empty. |
@@ -1547,6 +1548,11 @@ pub enum SessionPixAction {
     /// Notifies the gate that the funded front made recovery progress, resetting its
     /// served-without-progress ceiling.
     ProgressNotification,
+    /// Shares were taken on a cycle whose progress tells the gate nothing: one behind the front, or one
+    /// not recovering. Telemetry only: the driver refreshes the `hopr_pix_held_shares` gauge as it does
+    /// on a [`ProgressNotification`](Self::ProgressNotification), and the gate is not touched.
+    /// Coalescible.
+    RefreshHeldShares,
     /// Close the session with the given reason.
     Close(SessionPixCloseReason),
     /// Retire a previously-used SSA from the reconstructor (idempotent).
