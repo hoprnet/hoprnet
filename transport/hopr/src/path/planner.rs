@@ -835,12 +835,10 @@ where
                         futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
                     })
                     .await;
-                match installed {
-                    moka::ops::compute::CompResult::Inserted(entry)
-                    | moka::ops::compute::CompResult::ReplacedWith(entry) => {
-                        entry.value().log_installed(key, "recompute")
-                    }
-                    _ => unreachable!("recompute always puts a value"),
+                if let moka::ops::compute::CompResult::Inserted(entry)
+                | moka::ops::compute::CompResult::ReplacedWith(entry) = installed
+                {
+                    entry.value().log_installed(key, "recompute");
                 }
                 // The recompute always installs, so its diversity transition always applies.
                 if let Some(obs) = diversity {
