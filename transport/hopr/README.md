@@ -28,6 +28,8 @@ serialization. Cover traffic has its own root span.
 
 DEBUG records summarize graph traversal, selector filtering, validation, and successful candidate-set
 installations. Counts describe the candidates returned within the search limit, not all possible paths.
+Each request retains its `routing.resolve` span at DEBUG; the nested path-resolution, cache-lookup,
+and return-batch spans are TRACE-only to limit per-packet overhead.
 TRACE records add candidate weights, effective return-path probabilities, cache loads, and actual path
 choices. A process-local `set_id` connects those choices to the immutable candidate set installed in
 the cache, including choices made on later cache hits.
