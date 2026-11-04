@@ -1210,12 +1210,17 @@ impl SessionSlot {
 ///
 /// The Exit counts as it hands a packet on, because its reserve and admission decisions need the count
 /// at once. Routing resolution may still find no SURB within its wait and drop the packet; the refund
-/// then books the SURB back into this estimator's stock (see [`SurbRefund`]). It points at the
+/// then counts the SURB as given back in this estimator (see [`SurbRefund`]). It points at the
 /// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
 /// Session's slot since, and it never touches the slot.
+///
+/// The refund restores the held count the fill reserve and the drain budget read, and nothing else:
+/// the balancer's level, which the egress rate and the level reports follow, saturates at zero and
+/// has already absorbed a count made while it was empty (see
+/// [`SurbFlowEstimator::estimate_surbs_refunded`]).
 fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: ApplicationDataOut) -> ApplicationDataOut {
     estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    data.surb_refund = SurbRefund::to(estimator.produced.clone());
+    data.surb_refund = SurbRefund::to(estimator.refunded.clone());
     data
 }
 
@@ -8176,9 +8181,10 @@ mod tests {
     }
 
     /// A return packet the Exit counted as consumed, and routing resolution then dropped for want of a
-    /// SURB, spent nothing. Its refund books the SURB back into the stock of the estimator that counted
-    /// it, as one more SURB produced rather than one fewer consumed: the balancer reads the counters as
-    /// deltas between samples and rejects a snapshot in which one of them went down.
+    /// SURB, spent nothing. Its refund counts the SURB as given back in the estimator that counted it,
+    /// on a counter of its own rather than one fewer consumed: the balancer reads the counters as deltas
+    /// between samples and rejects a snapshot in which one of them went down. The held count takes the
+    /// SURB back; the balancer's delta does not (see `a_refund_should_not_raise_the_balancer_level`).
     #[test]
     fn a_counted_return_packet_should_give_its_surb_back_to_the_estimator_that_counted_it() -> anyhow::Result<()> {
         use crate::balancer::{SimpleSurbFlowEstimator, SurbFlowEstimator};
@@ -8194,12 +8200,12 @@ mod tests {
         assert_eq!(
             10,
             estimator.saturating_diff(),
-            "the starved packet's SURB is back in stock"
+            "the starved packet's SURB is back in the held count"
         );
         assert_eq!(
-            Some(1),
+            Some(0),
             SimpleSurbFlowEstimator::from(&estimator).estimated_surb_buffer_change(&before),
-            "every counter still grows, so the balancer takes the next sample as +1 instead of rejecting it"
+            "every counter still grows, and the balancer's delta leaves the refund out"
         );
         Ok(())
     }

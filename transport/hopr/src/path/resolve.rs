@@ -403,10 +403,10 @@ mod tests {
     /// nothing gives nothing back, and a packet that finds its SURB keeps the count.
     #[test_log::test(tokio::test)]
     async fn a_starved_return_packet_should_give_back_the_surb_its_sender_counted() -> anyhow::Result<()> {
-        let stock = Arc::new(AtomicU64::new(0));
+        let refunds = Arc::new(AtomicU64::new(0));
         let counted = |marker| {
             let mut data = packet(marker);
-            data.surb_refund = SurbRefund::to(stock.clone());
+            data.surb_refund = SurbRefund::to(refunds.clone());
             data
         };
         let (starved, served) = (HoprPseudonym::random(), HoprPseudonym::random());
@@ -442,7 +442,7 @@ mod tests {
         );
         assert_eq!(
             1,
-            stock.load(Ordering::Relaxed),
+            refunds.load(Ordering::Relaxed),
             "only the counted packet that starved gives its SURB back"
         );
 

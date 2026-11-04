@@ -226,17 +226,17 @@ impl ApplicationDataIn {
 /// sender: by the time the packet is dropped, the Session that counted it may be gone, or its
 /// identifier taken by another one.
 ///
-/// It books the SURB back as one more SURB in stock rather than one fewer consumed: the readers of
-/// these counters take deltas between samples, so every counter has to keep growing. Empty by
-/// default: a packet nobody counted gives nothing back.
+/// It counts the SURB onto a counter of the sender's own rather than taking one off the consumed
+/// count: the readers of these counters take deltas between samples, so every counter has to keep
+/// growing, and which of them add the refunds back is the sender's choice. Empty by default: a packet
+/// nobody counted gives nothing back.
 #[derive(Clone, Default)]
 pub struct SurbRefund(Option<std::sync::Arc<std::sync::atomic::AtomicU64>>);
 
 impl SurbRefund {
-    /// A refund that books the SURB back onto `stock`, the sender's count of SURBs that entered its
-    /// stock.
-    pub fn to(stock: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
-        Self(Some(stock))
+    /// A refund that counts the SURB onto `refunds`, the sender's count of SURBs given back.
+    pub fn to(refunds: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
+        Self(Some(refunds))
     }
 
     /// Whether the sender counted a SURB for this packet.
@@ -246,8 +246,8 @@ impl SurbRefund {
 
     /// Gives the counted SURB back. Does nothing for a packet whose sender counted none.
     pub fn give_back(&self) {
-        if let Some(stock) = &self.0 {
-            stock.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if let Some(refunds) = &self.0 {
+            refunds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }
@@ -485,24 +485,24 @@ mod tests {
 
     #[test]
     fn a_surb_refund_should_give_back_once_per_call_and_only_when_counted() {
-        let stock = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5));
+        let refunds = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5));
         SurbRefund::default().give_back();
         assert_eq!(
             5,
-            stock.load(std::sync::atomic::Ordering::Relaxed),
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
             "nothing counted, nothing given back"
         );
 
-        let refund = SurbRefund::to(stock.clone());
+        let refund = SurbRefund::to(refunds.clone());
         assert!(refund.is_counted());
         refund.give_back();
         assert_eq!(
             6,
-            stock.load(std::sync::atomic::Ordering::Relaxed),
-            "the SURB is back in stock"
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
+            "the SURB is counted as given back"
         );
 
-        assert_eq!(refund, SurbRefund::to(stock.clone()), "the same counter");
+        assert_eq!(refund, SurbRefund::to(refunds.clone()), "the same counter");
         assert_ne!(
             refund,
             SurbRefund::to(std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5)))
