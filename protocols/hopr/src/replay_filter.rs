@@ -54,9 +54,10 @@ pub type ReplayToken = hopr_api::types::crypto::types::PacketTag;
 /// Configuration of the [`TagReplayFilter`].
 ///
 /// The two fields are validated together: `shards` must be a power of two in range, `max_tracked_packets` must be
-/// at least [`MIN_TRACKED_PACKETS`], and the capacity must be at least one token per shard. That last condition is
-/// what the field-wise ranges cannot express on their own - `(1024, 4096)` satisfies both of them yet leaves a
-/// shard with zero slots, whose Bloom filter could not be constructed.
+/// at least [`MIN_TRACKED_PACKETS`], and the capacity must leave every shard at least [`MIN_CAPACITY_PER_SHARD`]
+/// slots, i.e. `max_tracked_packets >= shards * MIN_CAPACITY_PER_SHARD`. That last condition is what the field-wise
+/// ranges cannot express on their own - the floor capacity together with the shard ceiling satisfies both of them
+/// yet leaves a shard with a single slot, which rotates on every distinct token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(
     feature = "serde",
@@ -68,7 +69,8 @@ pub struct ReplayFilterConfig {
     /// Number of tokens the filter remembers per generation, across all shards.
     ///
     /// This is the retention floor: a token stays known for at least one full generation, so it stays known for at
-    /// least `max_tracked_packets` insertions. Must be at least `shards`, so that every shard gets a slot.
+    /// least `max_tracked_packets` insertions. Must leave every shard at least [`MIN_CAPACITY_PER_SHARD`] slots,
+    /// i.e. be at least `shards * MIN_CAPACITY_PER_SHARD` (and at least [`MIN_TRACKED_PACKETS`]).
     ///
     /// At the default false-positive rate the bitmap costs roughly three bytes per token per generation, so a
     /// decoder ultimately holds about this many megabytes, twice over once a shard has rotated. Generations are
@@ -78,7 +80,7 @@ pub struct ReplayFilterConfig {
     ///
     /// Default is 10 000 000.
     #[default(default_max_tracked_packets())]
-    #[validate(range(min = 1024, message = "max_tracked_packets must be at least 1024"))]
+    #[validate(range(min = MIN_TRACKED_PACKETS, message = "max_tracked_packets must be at least MIN_TRACKED_PACKETS"))]
     #[cfg_attr(feature = "serde", serde(default = "default_max_tracked_packets"))]
     pub max_tracked_packets: usize,
     /// Number of independent shards.
@@ -146,12 +148,12 @@ fn validate_capacity_per_shard(cfg: &ReplayFilterConfig) -> Result<(), validator
 
     let per_shard = cfg.max_tracked_packets / cfg.shards;
     if per_shard < MIN_CAPACITY_PER_SHARD {
+        let required = cfg.shards * MIN_CAPACITY_PER_SHARD;
         let mut err = validator::ValidationError::new("max_tracked_packets");
         err.message = Some(
             format!(
-                "max_tracked_packets must be at least {MIN_TRACKED_PACKETS} and at least {MIN_CAPACITY_PER_SHARD} per \
-                 shard ({} shards leave {per_shard})",
-                cfg.shards
+                "max_tracked_packets must be at least {required} for {} shards ({} per shard), got {}",
+                cfg.shards, MIN_CAPACITY_PER_SHARD, cfg.max_tracked_packets
             )
             .into(),
         );
@@ -210,9 +212,11 @@ impl ReplayShard {
 
     /// Inserts `token` unless it is already known. Returns `true` if it was already known.
     fn check_and_set(&mut self, token: &ReplayToken) -> bool {
-        // The retired generation is read-only, so it is checked here; the current one is checked as part of the
-        // insertion below, which needs a single hash pass where a separate `check` plus `set` would need two.
-        if self.previous.as_ref().is_some_and(|previous| previous.check(token)) {
+        // Both generations are consulted *before* any rotation. Checking them after would mis-handle the exact
+        // case where it matters most: a duplicate that is the token which filled the generation is in the
+        // outgoing `current`, which the rotation is about to move into `previous` - so a check made before the
+        // rotation would miss it and re-admit it into the fresh generation as a brand-new packet.
+        if self.contains(token) {
             return true;
         }
 
@@ -226,14 +230,9 @@ impl ReplayShard {
             self.count = 0;
         }
 
-        let current = self.current.get_or_insert_with(|| Self::generation(self.capacity));
-
-        // A member of the current generation must not rotate the shard, and `check_and_set` reports it without
-        // recording a second time.
-        if current.check_and_set(token) {
-            return true;
-        }
-
+        self.current
+            .get_or_insert_with(|| Self::generation(self.capacity))
+            .set(token);
         self.count += 1;
         false
     }
@@ -251,9 +250,10 @@ pub struct TagReplayFilter {
 impl TagReplayFilter {
     /// Creates a filter holding `cfg.max_tracked_packets` tokens per generation, split evenly across `cfg.shards`.
     ///
-    /// A validated configuration gives every shard at least one slot, and the total is then `capacity / shards *
-    /// shards`, i.e. within `shards - 1` of the configured value. Only an unvalidated configuration can land here
-    /// with a smaller share, which the `.max(1)` below keeps from producing a zero-sized Bloom filter.
+    /// A validated configuration gives every shard at least [`MIN_CAPACITY_PER_SHARD`] slots, and the total is then
+    /// `capacity / shards * shards`, i.e. within `shards - 1` of the configured value. Only an unvalidated
+    /// configuration can land here with a smaller share, which the `.max(1)` below keeps from producing a
+    /// zero-sized Bloom filter.
     pub fn new(cfg: &ReplayFilterConfig) -> Self {
         let shards = cfg.shards.max(MIN_SHARDS);
         let capacity_per_shard = (cfg.max_tracked_packets / shards).max(1);
@@ -324,6 +324,29 @@ mod tests {
             max_tracked_packets,
             shards,
         }
+    }
+
+    /// Commits exactly `inserts` distinct fresh tokens into a single-shard filter, skipping Bloom false positives.
+    ///
+    /// A false positive makes `commit` report a fresh token as known, which would leave the generation short of
+    /// full and silently skip the rotation a test depends on. Skipping such tokens keeps the arithmetic exact.
+    /// Returns the token of the final successful insert.
+    fn commit_exactly(filter: &TagReplayFilter, inserts: usize) -> ReplayToken {
+        let mut candidate = 0u64;
+        let mut inserted = 0;
+        let mut last = token(0);
+
+        while inserted < inserts {
+            let t = token(candidate);
+            candidate += 1;
+            if filter.commit(&t) {
+                continue; // false positive: already "known", so it did not take a slot
+            }
+            last = t;
+            inserted += 1;
+        }
+
+        last
     }
 
     fn token(value: u64) -> ReplayToken {
@@ -423,6 +446,29 @@ mod tests {
         );
     }
 
+    /// The token that fills a generation must be reported by the next `commit`, not re-admitted.
+    ///
+    /// It sits in the outgoing `current` at that moment, so a check made only against `previous` - or made after
+    /// the rotation using a stale view - misses it, rotates it into the retired generation, and inserts it into the
+    /// fresh one as a new packet. That is the boundary at which two concurrent decodes of one packet could both
+    /// succeed with a single rotation.
+    #[test]
+    fn a_token_that_filled_the_generation_must_not_be_readmitted() {
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
+        let filling = commit_exactly(&filter, filter.capacity());
+        assert_eq!(filter.capacity(), filter.count(), "the generation is exactly full");
+
+        assert!(
+            filter.commit(&filling),
+            "the token that filled the generation must be reported, not re-admitted"
+        );
+        assert_eq!(
+            filter.capacity(),
+            filter.count(),
+            "a duplicate must neither rotate the shard nor add to it"
+        );
+    }
+
     /// A token that lives only in the retired generation must still be reported by `commit`, not just by
     /// `contains`. The decoder calls `commit` directly, so this is the path a duplicate takes there.
     #[test]
@@ -433,9 +479,7 @@ mod tests {
         filter.commit(&ours);
 
         // Fill the generation so that `ours` is retired into `previous`.
-        for i in 1..=filter.capacity() as u64 {
-            filter.commit(&token(i));
-        }
+        commit_exactly(&filter, filter.capacity());
         assert!(filter.contains(&ours), "the retired generation still knows it");
 
         assert!(
@@ -456,9 +500,7 @@ mod tests {
         assert_eq!(0, filter.count(), "a new filter has inserted nothing");
 
         let capacity = filter.capacity();
-        for i in 0..capacity as u64 {
-            filter.commit(&token(i));
-        }
+        commit_exactly(&filter, capacity);
         assert_eq!(capacity, filter.count(), "a full generation is counted");
 
         // One more distinct token rotates the shard and starts a fresh generation.
