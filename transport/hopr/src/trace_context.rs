@@ -95,4 +95,48 @@ mod tests {
         clone.try_send(3)?;
         Ok(())
     }
+
+    #[test]
+    fn disconnected_sender_should_return_the_owned_message() {
+        let (tx, rx) = bounded_sink_channel(1);
+        let tx = ContextSender::new(tx);
+        drop(rx);
+        let message = vec![1u8, 2, 3];
+        match tx.try_send(message.clone()) {
+            Err(crossfire::TrySendError::Disconnected(returned)) => assert_eq!(returned, message),
+            result => panic!("expected disconnected sender to return the message, got {result:?}"),
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn sink_should_capture_the_producer_span_and_close_after_delivery() -> anyhow::Result<()> {
+        use futures::SinkExt;
+        use tracing::{Instrument, instrument::WithSubscriber};
+
+        let logs = crate::path::test_support::Logs::default();
+        async {
+            let (tx, rx) = bounded_sink_channel(1);
+            let mut tx = ContextSender::new(tx);
+            let producer = tracing::debug_span!("producer");
+            let expected = producer.id();
+            tx.send(vec![42u8]).instrument(producer).await?;
+            futures::pin_mut!(rx);
+            let message = rx
+                .next()
+                .await
+                .ok_or_else(|| anyhow::anyhow!("missing queued message"))?;
+            assert_eq!(message.value, [42]);
+            assert_eq!(message.span.id(), expected);
+            tx.close().await?;
+            drop(tx);
+            assert!(
+                rx.next().await.is_none(),
+                "closing must preserve delivery and then terminate"
+            );
+            anyhow::Ok(())
+        }
+        .with_subscriber(logs.subscriber(tracing::Level::DEBUG))
+        .await
+    }
 }

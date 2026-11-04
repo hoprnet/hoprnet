@@ -1237,7 +1237,10 @@ mod tests {
     use super::*;
 
     /// Observe the span from inside the real encoding worker without requiring valid SPHINX packets.
-    struct ContextTestEncoder(tracing::Dispatch);
+    struct ContextTestEncoder {
+        dispatch: tracing::Dispatch,
+        next_hop: Option<OffchainPublicKey>,
+    }
 
     impl PacketEncoder for ContextTestEncoder {
         type Error = std::io::Error;
@@ -1250,11 +1253,21 @@ mod tests {
             _: Option<u8>,
         ) -> Result<OutgoingPacket, Self::Error> {
             // Production uses a global subscriber; install this test's scoped one on the worker.
-            tracing::dispatcher::with_default(&self.0, || {
+            tracing::dispatcher::with_default(&self.dispatch, || {
                 let marker = data.as_ref().last().copied();
                 tracing::debug!(?marker, "actual encoder context");
             });
-            Err(std::io::Error::other("context test stops after encoding entry"))
+            if let Some(next_hop) = self.next_hop {
+                Ok(OutgoingPacket {
+                    next_hop,
+                    ack_challenge: HalfKeyChallenge::default(),
+                    encrypted_pix_share: None,
+                    data: Bytes::copy_from_slice(data.as_ref()),
+                    minted_surbs: Vec::new(),
+                })
+            } else {
+                Err(std::io::Error::other("context test stops after encoding entry"))
+            }
         }
 
         fn encode_acknowledgements(
@@ -1266,9 +1279,16 @@ mod tests {
         }
     }
 
+    #[rstest::rstest]
+    #[case(true, false)]
+    #[case(false, false)]
+    #[case(true, true)]
     #[tokio::test]
     #[serial_test::serial(routing_logs)]
-    async fn outgoing_encoder_should_enter_each_queued_messages_session() -> anyhow::Result<()> {
+    async fn outgoing_encoder_should_enter_each_queued_messages_session(
+        #[case] succeeds: bool,
+        #[case] wire_closed: bool,
+    ) -> anyhow::Result<()> {
         use anyhow::Context as _;
         use tracing::instrument::WithSubscriber;
 
@@ -1278,7 +1298,9 @@ mod tests {
         let subscriber = logs.subscriber(tracing::Level::DEBUG);
         async {
             let mut input = Vec::new();
-            for marker in [11u8, 22] {
+            // A single packet makes cancellation after a wire error deterministic.
+            let markers: &[u8] = if wire_closed { &[11] } else { &[11, 22] };
+            for &marker in markers {
                 let span = tracing::debug_span!("session", session_id = marker);
                 let data = ApplicationDataOut::with_no_packet_info(ApplicationData::new(1234u64, vec![marker])?);
                 let path = hopr_api::types::internal::path::ValidatedPath::direct(
@@ -1290,23 +1312,51 @@ mod tests {
                     span,
                 });
             }
-            let encoder = std::sync::Arc::new(ContextTestEncoder(tracing::dispatcher::get_default(Clone::clone)));
+            let next_hop = *OffchainKeypair::random().public();
+            let encoder = std::sync::Arc::new(ContextTestEncoder {
+                dispatch: tracing::dispatcher::get_default(Clone::clone),
+                next_hop: succeeds.then_some(next_hop),
+            });
+            let counters = PeerProtocolCounterRegistry::default();
+            let (wire_tx, wire_rx) = mpsc::channel(2);
+            let wire_rx = (!wire_closed).then_some(wire_rx);
             start_outgoing_packet_pipeline(
                 futures::stream::iter(input),
                 encoder,
                 None::<NopExitAcknowledgementShareProcessor>,
-                futures::sink::drain().with_timeout(QUEUE_SEND_TIMEOUT),
-                PeerProtocolCounterRegistry::default(),
+                wire_tx.with_timeout(QUEUE_SEND_TIMEOUT),
+                counters.clone(),
                 2,
             )
             .await;
+            let delivered = if let Some(wire_rx) = wire_rx {
+                wire_rx.collect::<Vec<_>>().await
+            } else {
+                Vec::new()
+            };
+            assert_eq!(
+                delivered.len(),
+                if succeeds && !wire_closed { markers.len() } else { 0 }
+            );
+            assert_eq!(
+                counters.get_or_create(&next_hop).take_sent(),
+                if succeeds { markers.len() as u64 } else { 0 }
+            );
+            for ((peer, data), marker) in delivered.iter().zip([11u8, 22]) {
+                assert_eq!(*peer, PeerId::from(next_hop));
+                assert_eq!(
+                    data.last(),
+                    Some(&marker),
+                    "encoded messages must retain submission order"
+                );
+            }
             let events = logs.records("actual encoder context");
-            assert_eq!(events.len(), 2);
+            assert_eq!(events.len(), markers.len());
             for event in events {
                 assert_eq!(event.ancestry, ["session", "transport.encode"]);
             }
             let output = logs.output();
-            for marker in [11u8, 22] {
+            for marker in markers {
                 let line = output
                     .lines()
                     .find(|line| {
@@ -1315,6 +1365,11 @@ mod tests {
                     .context("missing encoding record")?;
                 assert!(line.contains(&format!("session_id={marker}")), "wrong session: {line}");
             }
+            assert_eq!(
+                logs.records("long-running background task finished with error").len(),
+                usize::from(wire_closed),
+                "wire failures must terminate the pipeline with an error: {output}"
+            );
             anyhow::Ok(())
         }
         .with_subscriber(subscriber)
