@@ -26,6 +26,13 @@ use tokio::time::sleep;
 /// tickets per channel via multi-hop loopback probes.
 const PROBING_OVERHEAD: u64 = 30;
 
+/// Idle timeout for the tests that pause between writes.
+///
+/// The default is 2.5 s, which leaves too little room for a settle-and-redeem pause
+/// followed by two chain queries before the next write: the Session could be evicted
+/// mid-test. Generous enough that the pause is never the binding constraint.
+const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
@@ -282,9 +289,20 @@ async fn neglect_ticket_on_closing(
 /// winning tickets by comparing statistics before and after traffic relay.
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     #[with(vec![
-        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
-        TestNodeConfig::default(),
-        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB),
+        TestNodeConfig {
+            win_prob: MINIMUM_INCOMING_WIN_PROB,
+            idle_timeout_ms: SESSION_IDLE_TIMEOUT.as_millis() as u64,
+            ..Default::default()
+        },
+        TestNodeConfig {
+            idle_timeout_ms: SESSION_IDLE_TIMEOUT.as_millis() as u64,
+            ..Default::default()
+        },
+        TestNodeConfig {
+            win_prob: MINIMUM_INCOMING_WIN_PROB,
+            idle_timeout_ms: SESSION_IDLE_TIMEOUT.as_millis() as u64,
+            ..Default::default()
+        },
     ])]
     cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
