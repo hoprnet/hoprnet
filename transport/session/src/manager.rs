@@ -127,10 +127,15 @@ type EgressPermit = futures::future::Either<
 /// supervisor turn by [`PixSessionTelemetry`](crate::supervision::telemetry::PixSessionTelemetry).
 /// Only the refused arm, which is about to allocate a boxed future and block, does any telemetry
 /// work of its own.
+///
+/// A packet the gate never admits gives back the SURB its sender counted for it (see
+/// [`count_return_packet_surb`]), since it never reaches the routing resolution that would have taken
+/// one. That covers a packet a closed gate refuses, a park the gate's poisoning fails, and a parked
+/// future dropped with the Session's sink.
 fn acquire_egress_permit(
     gate: Option<Arc<ServiceGate>>,
     routing: DestinationRouting,
-    data: ApplicationDataOut,
+    mut data: ApplicationDataOut,
 ) -> EgressPermit {
     let Some(gate) = gate else {
         return futures::future::Either::Left(std::future::ready(Ok((routing, data))));
@@ -142,6 +147,7 @@ fn acquire_egress_permit(
         // entry points report the same one and neither caller has to know what a refusal means.
         Err(closed) => {
             record_gate_closed();
+            data.surb_refund.give_back();
             futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed))))
         }
         // Budget exhausted: park until the supervisor funds the front, restores a successor's
@@ -157,16 +163,47 @@ fn acquire_egress_permit(
         // One episode per park rather than per refused packet: this sink is serial, so the next
         // packet is not offered until this future resolves, and a caller cannot open a second
         // episode by retrying harder.
+        //
+        // The packet's refund is taken off it here and moved in with the episode, for the same
+        // reason: only `Drop` sees every way a park can end without an admission.
         Ok(GateVerdict::Blocked(reason)) => {
             let episode = PixGateBlockEpisode::begin(reason);
+            let refund = ParkedSurbRefund(std::mem::take(&mut data.surb_refund));
             futures::future::Either::Right(Box::pin(async move {
                 let _episode = episode;
-                gate.acquire()
-                    .await
-                    .map(|_| (routing, data))
-                    .map_err(std::io::Error::other)
+                match gate.acquire().await {
+                    Ok(()) => {
+                        data.surb_refund = refund.admit();
+                        Ok((routing, data))
+                    }
+                    // `refund` gives the SURB back as the future ends.
+                    Err(closed) => Err(std::io::Error::other(closed)),
+                }
             }))
         }
+    }
+}
+
+/// The SURB refund of a packet parked at the PIX egress gate, given back unless the gate admits the
+/// packet.
+///
+/// A park ends without an admission in two ways, and `Drop` sees both: the gate is poisoned, which
+/// fails the park, or the Session's sink is dropped with the parked future in it, polled or not. An
+/// admitted packet takes its refund back with [`admit`](Self::admit), for routing resolution to give
+/// back if the packet starves there.
+struct ParkedSurbRefund(SurbRefund);
+
+impl ParkedSurbRefund {
+    /// The gate admitted the packet: hands its refund back to go on with it.
+    fn admit(mut self) -> SurbRefund {
+        std::mem::take(&mut self.0)
+    }
+}
+
+impl Drop for ParkedSurbRefund {
+    fn drop(&mut self) {
+        // A no-op after `admit`, which leaves an empty refund behind.
+        self.0.give_back();
     }
 }
 
@@ -1209,8 +1246,9 @@ impl SessionSlot {
 /// gives it back.
 ///
 /// The Exit counts as it hands a packet on, because its reserve and admission decisions need the count
-/// at once. Routing resolution may still find no SURB within its wait and drop the packet; the refund
-/// then counts the SURB as given back in this estimator (see [`SurbRefund`]). It points at the
+/// at once. The packet can still be dropped before it takes a SURB: the PIX egress gate may never admit
+/// it (see [`acquire_egress_permit`]), and routing resolution may find no SURB within its wait. The
+/// refund then counts the SURB as given back in this estimator (see [`SurbRefund`]). It points at the
 /// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
 /// Session's slot since, and it never touches the slot.
 ///
@@ -19852,6 +19890,119 @@ mod tests {
             probe::non_zero(),
             "a Session that negotiated no PIX must contribute to no PIX aggregate"
         );
+        Ok(())
+    }
+
+    /// Offers `gate` one return packet, counted against `estimator` the way a data sink counts it.
+    fn offer_counted_packet(
+        gate: &Arc<ServiceGate>,
+        estimator: &AtomicSurbFlowEstimator,
+    ) -> anyhow::Result<EgressPermit> {
+        Ok(acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            count_return_packet_surb(estimator, small_outgoing_packet()?),
+        ))
+    }
+
+    /// A counted packet the gate fails never reaches routing resolution, so it gives its SURB back,
+    /// whether the gate was closed before it came or was poisoned while it was parked.
+    #[tokio::test]
+    async fn a_counted_packet_the_gate_fails_should_give_its_surb_back() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+
+        let closed = ServiceGate::new(10, 10);
+        closed.poison();
+        assert!(
+            offer_counted_packet(&closed, &estimator)?.await.is_err(),
+            "a poisoned gate must refuse"
+        );
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "the refused packet's SURB is back in the held count"
+        );
+
+        // Strict prepay: the packet parks, and poisoning fails the park.
+        let gate = ServiceGate::new(0, 10);
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        assert_eq!(9, estimator.saturating_diff(), "a parked packet stays counted");
+
+        gate.poison();
+        assert!(parked.await.is_err(), "poisoning must fail the park");
+        assert_eq!(10, estimator.saturating_diff(), "the failed packet's SURB is back too");
+        Ok(())
+    }
+
+    /// A parked packet dropped with its Session's sink gives its SURB back too, whether or not the sink
+    /// had polled it yet.
+    #[tokio::test]
+    async fn a_counted_packet_dropped_while_parked_should_give_its_surb_back() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let gate = ServiceGate::new(0, 10);
+
+        drop(offer_counted_packet(&gate, &estimator)?);
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "a park dropped before its first poll gives its SURB back"
+        );
+
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        drop(parked);
+        assert_eq!(10, estimator.saturating_diff(), "and so does one dropped mid-park");
+        Ok(())
+    }
+
+    /// An admitted packet stays counted. It goes on with its refund, for routing resolution to give back
+    /// if it starves there, whether the gate admits it at once or once the supervisor funds the park.
+    #[tokio::test]
+    async fn a_counted_packet_the_gate_admits_should_keep_its_surb_counted() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let refund = SurbRefund::to(estimator.refunded.clone());
+
+        let (_, data) = offer_counted_packet(&ServiceGate::new(10, 10), &estimator)?
+            .await
+            .context("a gate with budget must admit at once")?;
+        assert_eq!(
+            refund, data.surb_refund,
+            "admitted at once, the packet keeps its refund"
+        );
+
+        let gate = ServiceGate::new(0, 10);
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        gate.release_service();
+        let (_, data) = timeout(Duration::from_secs(5), parked)
+            .await
+            .context("funding must wake the parked packet")?
+            .context("a funded gate must admit it")?;
+        assert_eq!(
+            refund, data.surb_refund,
+            "admitted after a park, the packet gets its refund back"
+        );
+
+        assert_eq!(8, estimator.saturating_diff(), "both admitted packets stay counted");
         Ok(())
     }
 
