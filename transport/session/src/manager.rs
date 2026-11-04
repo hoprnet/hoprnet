@@ -3964,11 +3964,19 @@ where
                                         // The opening's SURBs are in the pseudonym's ring already, promoted
                                         // into the admitted class with it, but arrived before the Session
                                         // existed, so dispatch could not book them. Without them the Exit's
-                                        // estimate starts, and stays, below what the ring holds.
+                                        // estimate starts, and stays, below what the ring holds. What the
+                                        // ring lost as they arrived is not this Session's to book: its
+                                        // estimate never counted that stock, which a newer generation
+                                        // superseded from an earlier Session under the pseudonym, and an
+                                        // opening's few SURBs do not overflow a ring on their own.
                                         if opened.is_ok()
                                             && let Some(slot) = myself.sessions.get(&pseudonym)
                                         {
-                                            let _ = book_start_message_surbs(&slot, &pseudonym, stored);
+                                            let _ = book_start_message_surbs(
+                                                &slot,
+                                                &pseudonym,
+                                                SurbsStored { evicted: 0, ..stored },
+                                            );
                                         }
                                         opened
                                     }
@@ -14093,6 +14101,44 @@ mod tests {
         .await
         .context("the opening's SURBs were never booked")?;
         assert_eq!(carried, produced, "the SURBs the opening's packet carried");
+        Ok(())
+    }
+
+    /// What the ring lost when the opening arrived is not the new Session's to book: its estimate never
+    /// counted that stock, which a newer generation superseded from an earlier Session under the same
+    /// pseudonym. Booked, it would start the estimate below the SURBs the opening brought, and the
+    /// keep-alive reserve would hold data back with the ring holding them.
+    #[test_log::test(tokio::test)]
+    async fn an_opening_should_not_book_the_stock_it_superseded() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mgr, _sender, _transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        let mut packet = start_packet(HoprStartProtocol::StartSession(pix_offer()))?;
+        packet.packet_info.num_saved_surbs = 2;
+        packet.packet_info.num_evicted_surbs = 40;
+        let carried = packet.num_surbs_with_msg() as u64;
+        assert!(carried > 0, "fixture: the opening must leave room for a SURB");
+
+        mgr.dispatch_message(pseudonym, packet)?;
+
+        let (produced, evicted) = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Some(slot) = mgr.sessions.get(&pseudonym) {
+                    let produced = slot.surb_estimator.produced.load(Relaxed);
+                    if produced > 0 {
+                        return (produced, slot.surb_estimator.evicted.load(Relaxed));
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the opening's SURBs were never booked")?;
+        assert_eq!(carried, produced, "the SURBs the opening's packet carried");
+        assert_eq!(0, evicted, "the superseded stock belonged to an earlier Session");
         Ok(())
     }
 
