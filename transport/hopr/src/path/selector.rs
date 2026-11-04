@@ -216,8 +216,10 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
     result
 }
 
-/// A relayer may sit in the same position past the first in at most `n.div_ceil(MIDDLE_HOP_SHARE)`
-/// of the `n` candidates `take_relayer_diverse` keeps, while the pool allows it.
+/// A relayer may sit past the first position in at most `n.div_ceil(MIDDLE_HOP_SHARE)` of the `n`
+/// candidates `take_relayer_diverse` keeps, while the pool allows it, counted over every position past
+/// the first together: a relayer in the second position of some paths and the third of others costs
+/// as many paths when it dies as one in either alone.
 ///
 /// Distinct first relayers alone leave every other position free to collapse: the best path from
 /// each first relayer often runs through the same second hop, so one relayer sat in the middle of
@@ -228,14 +230,15 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
 const MIDDLE_HOP_SHARE: usize = 3;
 
 /// Takes `n` candidates from `sorted`, preferring not-yet-represented first relayers and bounding
-/// how often any relayer recurs in each later position.
+/// how often any relayer recurs past the first position.
 ///
 /// Plain truncation keeps the `n` lowest-latency paths, which in a well-connected network are often
 /// the *same* few relayers reached by different routes; every downstream draw then inherits that
-/// concentration. Relative order is preserved, so each pass stays latency-ordered. Three passes:
-/// paths with a new first relayer whose later relayers are all under the `MIDDLE_HOP_SHARE` cap
-/// for their position; then any path under the cap; then the best of the rest, so a thin pool still
-/// fills the floor.
+/// concentration. Relative order is preserved, so each pass stays latency-ordered. Four passes:
+/// paths with a new first relayer whose later relayers are all under the `MIDDLE_HOP_SHARE` cap;
+/// then any path under the cap; then, over the cap, paths with a new first relayer, so a pool whose
+/// every path shares a later relayer still keeps as many first relayers as it offers; then the best
+/// of the rest, so a thin pool still fills the floor.
 fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithMetrics> {
     if sorted.len() <= n {
         return sorted;
@@ -243,7 +246,7 @@ fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithM
 
     let cap = n.div_ceil(MIDDLE_HOP_SHARE).max(1);
     let mut seen: Vec<OffchainPublicKey> = Vec::with_capacity(n);
-    let mut per_position: std::collections::HashMap<(usize, OffchainPublicKey), usize> = Default::default();
+    let mut per_relayer: std::collections::HashMap<OffchainPublicKey, usize> = Default::default();
     let mut taken = vec![false; sorted.len()];
     let mut count = 0;
 
@@ -251,25 +254,24 @@ fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithM
     let later_relayers = |p: &PathWithMetrics| {
         p.path
             .iter()
-            .enumerate()
             .skip(1)
             .take(p.path.len().saturating_sub(2))
-            .map(|(pos, key)| (pos, *key))
+            .copied()
             .collect::<Vec<_>>()
     };
 
     let take = |i: usize,
                 p: &PathWithMetrics,
                 taken: &mut Vec<bool>,
-                per_position: &mut std::collections::HashMap<(usize, OffchainPublicKey), usize>| {
+                per_relayer: &mut std::collections::HashMap<OffchainPublicKey, usize>| {
         taken[i] = true;
-        for slot in later_relayers(p) {
-            *per_position.entry(slot).or_default() += 1;
+        for relayer in later_relayers(p) {
+            *per_relayer.entry(relayer).or_default() += 1;
         }
     };
 
     // First pass: one path per distinct first relayer, best (lowest-latency) first, with every
-    // later relayer under its position's cap.
+    // later relayer under the cap.
     for (i, p) in sorted.iter().enumerate() {
         if count == n {
             break;
@@ -277,10 +279,10 @@ fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithM
         let Some(first) = p.path.first() else { continue };
         let under_cap = later_relayers(p)
             .into_iter()
-            .all(|slot| per_position.get(&slot).copied().unwrap_or(0) < cap);
+            .all(|relayer| per_relayer.get(&relayer).copied().unwrap_or(0) < cap);
         if !seen.contains(first) && under_cap {
             seen.push(*first);
-            take(i, p, &mut taken, &mut per_position);
+            take(i, p, &mut taken, &mut per_relayer);
             count += 1;
         }
     }
@@ -295,14 +297,37 @@ fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithM
         }
         let under_cap = later_relayers(p)
             .into_iter()
-            .all(|slot| per_position.get(&slot).copied().unwrap_or(0) < cap);
+            .all(|relayer| per_relayer.get(&relayer).copied().unwrap_or(0) < cap);
         if under_cap {
-            take(i, p, &mut taken, &mut per_position);
+            if let Some(first) = p.path.first()
+                && !seen.contains(first)
+            {
+                seen.push(*first);
+            }
+            take(i, p, &mut taken, &mut per_relayer);
             count += 1;
         }
     }
 
-    // Third pass: fill any remaining slots with the best of the rest.
+    // Third pass: over the cap, a first relayer not yet represented still comes before a second path
+    // from one that is. Losing a later relayer then costs what the cap could not bound, but losing a
+    // first relayer costs no more than its own share.
+    for (i, p) in sorted.iter().enumerate() {
+        if count == n {
+            break;
+        }
+        if taken[i] {
+            continue;
+        }
+        let Some(first) = p.path.first() else { continue };
+        if !seen.contains(first) {
+            seen.push(*first);
+            take(i, p, &mut taken, &mut per_relayer);
+            count += 1;
+        }
+    }
+
+    // Fourth pass: fill any remaining slots with the best of the rest.
     for slot in taken.iter_mut() {
         if count == n {
             break;
@@ -1232,6 +1257,89 @@ mod tests {
             result[0].total_latency_ms,
             "the fastest path is still kept, and the order is still by latency"
         );
+    }
+
+    /// Over the cap, a new first relayer still comes before a second path from one already kept:
+    /// every path runs through the same middle relayer, the first pass keeps two, and the floor of
+    /// four is filled from the two first relayers not yet represented, not from the next-fastest
+    /// paths of the two that are.
+    #[test]
+    fn prune_should_keep_distinct_first_relayers_when_the_cap_runs_out() {
+        let hub = 9u8;
+        let candidates = vec![
+            make_path_through(1, hub, 10),
+            make_path_through(1, hub, 11),
+            make_path_through(2, hub, 12),
+            make_path_through(2, hub, 13),
+            make_path_through(3, hub, 14),
+            make_path_through(4, hub, 15),
+        ];
+        let result = prune_for_consistency(candidates, 4, 2);
+        assert_eq!(4, result.len());
+        let firsts: std::collections::HashSet<_> = result.iter().map(|p| p.path[0]).collect();
+        assert_eq!(4, firsts.len(), "four first relayers, not two kept twice each");
+    }
+
+    /// A 3-hop candidate over relayers named by index whatever their position, so that one relayer can
+    /// sit second in some paths and third in others.
+    fn make_three_hop_path(first: u8, second: u8, third: u8, latency_ms: u32) -> PathWithMetrics {
+        let relayer = |idx: u8| {
+            let mut secret = [1u8; 32];
+            secret[0] = idx.max(1);
+            secret[2] = 7;
+            *OffchainKeypair::from_secret(&secret).expect("valid secret").public()
+        };
+        let mut destination = [1u8; 32];
+        destination[2] = 3;
+        PathWithMetrics {
+            path: vec![
+                relayer(first),
+                relayer(second),
+                relayer(third),
+                *OffchainKeypair::from_secret(&destination)
+                    .expect("valid secret")
+                    .public(),
+            ],
+            cost: 1.0,
+            total_latency_ms: Some(latency_ms),
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            fundable_tickets_floor: Some(1000),
+        }
+    }
+
+    /// The cap counts a relayer over every position past the first together. Six first relayers whose
+    /// fastest paths put the same relayer second in three of them and third in the other three: counted
+    /// per position, it could sit in four of the six candidates; counted together, it sits in two.
+    #[test]
+    fn prune_should_bound_a_relayer_over_all_later_positions_together() {
+        let hub = 30u8;
+        let mut candidates = Vec::new();
+        for first in 1..=3u8 {
+            candidates.push(make_three_hop_path(first, hub, 10 + first, u32::from(first)));
+        }
+        for first in 4..=6u8 {
+            candidates.push(make_three_hop_path(first, 10 + first, hub, u32::from(first)));
+        }
+        for first in 1..=6u8 {
+            candidates.push(make_three_hop_path(
+                first,
+                20 + first,
+                40 + first,
+                100 + u32::from(first),
+            ));
+        }
+
+        let result = prune_for_consistency(candidates, 6, 3);
+        assert_eq!(6, result.len());
+        let hub_key = make_three_hop_path(1, hub, 2, 0).path[1];
+        let through_hub = result.iter().filter(|p| p.path[1..3].contains(&hub_key)).count();
+        assert_eq!(
+            2, through_hub,
+            "the hub sits past the first position in at most ceil(6 / 3) candidates"
+        );
+        let firsts: std::collections::HashSet<_> = result.iter().map(|p| p.path[0]).collect();
+        assert_eq!(6, firsts.len(), "every first relayer is still represented");
     }
 
     /// With the pool too thin to respect the cap, the floor is still filled: the cap bounds, it
