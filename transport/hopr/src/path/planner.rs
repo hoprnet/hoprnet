@@ -62,6 +62,7 @@ fn validate_weight_temper(temper: f64) -> std::result::Result<(), ValidationErro
     derive(serde::Serialize, serde::Deserialize),
     serde(default, deny_unknown_fields)
 )]
+#[validate(schema(function = "validate_refresh_within_ttl", skip_on_field_errors = false))]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
@@ -169,6 +170,24 @@ fn validate_refresh_period(period: &Duration) -> std::result::Result<(), Validat
     }
     let mut err = ValidationError::new("refresh_period_too_short");
     err.message = Some(format!("refresh_period ({period:?}) must be at least {MIN_REFRESH_PERIOD:?}").into());
+    Err(err)
+}
+
+/// A sweep that runs less often than entries expire never reaches them: the sweep walks live entries
+/// only, so an expired one is refilled on demand, and a refill that finds no paths is `PathNotFound`
+/// where a refreshed entry would have kept its previous weights.
+fn validate_refresh_within_ttl(cfg: &PathPlannerConfig) -> std::result::Result<(), ValidationError> {
+    if cfg.refresh_period < cfg.cache_ttl {
+        return Ok(());
+    }
+    let mut err = ValidationError::new("refresh_period_not_below_cache_ttl");
+    err.message = Some(
+        format!(
+            "refresh_period ({:?}) must be shorter than cache_ttl ({:?})",
+            cfg.refresh_period, cfg.cache_ttl
+        )
+        .into(),
+    );
     Err(err)
 }
 
@@ -1284,6 +1303,21 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn a_refresh_period_not_shorter_than_the_cache_ttl_should_fail_validation() {
+        let cfg = |cache_ttl, refresh_period| PathPlannerConfig {
+            cache_ttl,
+            refresh_period,
+            ..Default::default()
+        };
+        assert!(cfg(Duration::from_secs(1), Duration::from_secs(5)).validate().is_err());
+        assert!(
+            cfg(Duration::from_secs(5), Duration::from_secs(5)).validate().is_err(),
+            "an entry must not expire at the moment the sweep reaches it"
+        );
+        assert!(cfg(Duration::from_secs(10), Duration::from_secs(5)).validate().is_ok());
     }
 
     /// Cached candidate weights are frozen at fill time, so the TTL bounds how stale the numbers a
