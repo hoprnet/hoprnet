@@ -6,6 +6,7 @@ use futures_time::future::FutureExt as _;
 use hopr_api::{
     chain::ChainValues,
     node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
+    tickets::{RedemptionResult, TicketManagement},
 };
 use hopr_lib::{
     api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
@@ -304,11 +305,16 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .mul(message_count + PROBING_OVERHEAD)
         .div_f64(MINIMUM_INCOMING_WIN_PROB)?;
 
-    let [_fw_channel, _bw_channel, _telemetry_channels]: [ChannelGuard; 3] = cluster_fixture
+    // The first path is `src -> mid -> dst`, so its channel guard holds the `src -> mid`
+    // channel: the one the measured messages pay on. `mid` also relays loopback probes over
+    // `dst -> mid`, so aggregate stats are not attributable to this traffic; the per-channel
+    // ones are.
+    let [fw_channel, _bw_channel, _telemetry_channels]: [ChannelGuard; 3] = cluster_fixture
         .open_channels(&[&[src, mid, dst], &[dst, mid, src], &[src, dst]], funding_amount)
         .await?
         .try_into()
         .map_err(|_| anyhow::anyhow!("expected 3 channel guards"))?;
+    let measured_channel = *fw_channel.channel_id(0);
 
     // Disable the SURB balancer: its initial fill sends hundreds of keep-alive
     // packets through `mid` before the measured messages, each drawing a ticket
@@ -327,10 +333,11 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("write failed")??;
 
-    let stats_before = mid
+    let channel_stats_before = mid
         .inner()
-        .ticket_statistics()
-        .context("failed to get ticket statistics")?;
+        .ticket_management()
+        .ticket_stats(Some(&measured_channel))
+        .map_err(HoprLibError::other)?;
 
     let chain_stats_before = mid
         .connector
@@ -345,31 +352,53 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 
     sleep(Duration::from_secs(2)).await;
 
-    mid.inner()
+    // Attribute the redemption to the measured channel from the results themselves instead
+    // of the per-safe `redeemed_value` aggregate: a loopback probe winning on `dst -> mid`
+    // would grow that aggregate without any measured ticket being redeemed.
+    let redeemed_on_measured_channel = mid
+        .inner()
         .redeem_all_tickets(0)
         .await
-        .context("failed to redeem tickets")?;
+        .context("failed to redeem tickets")?
+        .iter()
+        .filter_map(|result| match result {
+            RedemptionResult::Redeemed(ticket) => Some(*ticket.channel_id()),
+            _ => None,
+        })
+        .any(|channel| channel == measured_channel);
 
+    assert!(
+        redeemed_on_measured_channel,
+        "expected a winning ticket from the measured `src -> mid` channel to be redeemed, so the measured traffic \
+         demonstrably reached `mid` (channel {measured_channel})"
+    );
+
+    // The chain-side value is what moves asynchronously; poll it as before.
     let mid_connector = mid.connector.clone();
     wait_until(
         || async {
-            let stats_after = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             let chain_stats_after = mid_connector
                 .redemption_stats(mid.inner().identity().safe_address)
                 .await
                 .map_err(HoprLibError::chain)?;
-            Ok::<_, HoprLibError>(
-                stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
-                    && chain_stats_after.redeemed_value > chain_stats_before.redeemed_value,
-            )
+            Ok::<_, HoprLibError>(chain_stats_after.redeemed_value > chain_stats_before.redeemed_value)
         },
         Duration::from_secs(5),
     )
     .await
-    .context(
-        "failed to wait for: `stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128 && \
-         stats_after.redeemed_value() > stats_before.redeemed_value()`",
-    )?;
+    .context("failed to wait for: `chain_stats_after.redeemed_value() > chain_stats_before.redeemed_value()`")?;
+
+    let channel_stats_after = mid
+        .inner()
+        .ticket_management()
+        .ticket_stats(Some(&measured_channel))
+        .map_err(HoprLibError::other)?;
+    assert!(
+        channel_stats_after.winning_tickets < channel_stats_before.winning_tickets + message_count as u128,
+        "expected fewer than {message_count} winning tickets on the measured channel, got {} (before: {})",
+        channel_stats_after.winning_tickets,
+        channel_stats_before.winning_tickets
+    );
 
     Ok(())
 }
