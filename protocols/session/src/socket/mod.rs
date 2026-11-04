@@ -30,7 +30,7 @@ use crate::{
     MAX_SESSION_MTU,
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
+    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, stop_on_invalid_header},
     session_frame_size,
 };
 
@@ -190,6 +190,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
+        let packets_in = stop_on_invalid_header(packets_in);
 
         // If needed, add also stats to individual stages.
         #[cfg(feature = "telemetry")]
@@ -244,7 +245,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         })
                     }
                     Err(error) => {
-                        tracing::error!(%error, "unparseable packet");
+                        match error {
+                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
+                                tracing::error!(%error, "invalid session header; terminating session reader");
+                            }
+                            _ => tracing::error!(%error, "unparseable packet"),
+                        }
                         #[cfg(feature = "telemetry")]
                         s1.error();
                         None
@@ -354,6 +360,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
+        let packets_in = stop_on_invalid_header(packets_in);
 
         let inspector = FrameInspector::new(cfg.capacity);
 
@@ -458,7 +465,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         })
                     }
                     Err(error) => {
-                        tracing::error!(%error, "unparseable packet");
+                        match error {
+                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
+                                tracing::error!(%error, "invalid session header; terminating session reader");
+                            }
+                            _ => tracing::error!(%error, "unparseable packet"),
+                        }
                         #[cfg(feature = "telemetry")]
                         s1.error();
                         None
@@ -673,6 +685,68 @@ mod tests {
             log_state_update_error(&SessionError::InvalidFrameId, "frame complete state update failed");
         });
         assert_eq!(*levels.lock(), vec![tracing::Level::DEBUG, tracing::Level::ERROR]);
+    }
+
+    #[tokio::test]
+    async fn malformed_messages_should_close_only_when_the_boundary_is_unknown() -> anyhow::Result<()> {
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        use crate::protocol::{Segment, SeqIndicator};
+
+        let acknowledgement = Vec::from(SessionMessage::<MTU>::Acknowledge(vec![1].try_into()?));
+        let expected = b"next valid segment";
+        let segment = Vec::from(SessionMessage::<MTU>::Segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new_with_flags(1, false),
+            data: expected.to_vec().into_boxed_slice(),
+        }));
+        for stateless in [false, true] {
+            for (prefix, terminal) in [
+                (vec![0xee], true),
+                (vec![SessionMessage::<MTU>::VERSION, 0, 0xff, 0xff], true),
+                (vec![SessionMessage::<MTU>::VERSION, 0xff, 0, 2, 0xaa, 0xbb], false),
+                (vec![SessionMessage::<MTU>::VERSION, 0, 0, 1, 0xaa], false),
+            ] {
+                let (transport, mut remote) = tokio::io::duplex(8192);
+                let mut socket = if stateless {
+                    SessionSocket::new_stateless(
+                        "malformed",
+                        transport.compat(),
+                        SessionSocketConfig::default(),
+                        #[cfg(feature = "telemetry")]
+                        NoopTracker,
+                    )?
+                } else {
+                    SessionSocket::new(
+                        transport.compat(),
+                        Stateless::<MTU>::new("malformed"),
+                        SessionSocketConfig::default(),
+                        #[cfg(feature = "telemetry")]
+                        NoopTracker,
+                    )?
+                };
+                let mut data = prefix;
+                data.extend_from_slice(&acknowledgement);
+                data.extend_from_slice(&segment);
+                tokio::io::AsyncWriteExt::write_all(&mut remote, &data).await?;
+                let mut output = [0; 64];
+                let read = tokio::time::timeout(Duration::from_secs(2), socket.read(&mut output)).await??;
+                if terminal {
+                    assert_eq!(read, 0, "fatal header must terminate the session read direction");
+                    assert_eq!(socket.read(&mut output).await?, 0, "termination is permanent");
+                } else {
+                    assert_eq!(
+                        &output[..read],
+                        expected,
+                        "a known boundary must preserve the next message"
+                    );
+                }
+                // Keep `remote` alive until after the reads: transport EOF must not be required.
+                drop(remote);
+            }
+        }
+        Ok(())
     }
 
     #[test_log::test(tokio::test)]
