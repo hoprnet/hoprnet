@@ -11,7 +11,7 @@ use hopr_lib::{
         chain::{ChainReadChannelOperations, ChannelSelector},
         node::HasChainApi,
     },
-    testing::fixtures::{TestNodeConfig, cluster_fixture},
+    testing::fixtures::{TestNodeConfig, build_role_cluster, cluster_fixture},
 };
 use parking_lot::Mutex;
 use serde_json::Value;
@@ -71,7 +71,7 @@ impl tracing::Subscriber for Capture {
 #[test]
 fn node_emits_bounded_info_state_with_real_producers_and_supports_disabling() -> anyhow::Result<()> {
     let Some(mode) = std::env::var_os("HOPR_STATE_DUMP_TEST_CHILD") else {
-        for (mode, interval) in [("enabled", "5"), ("disabled", "0")] {
+        for (mode, interval) in [("enabled", "5"), ("disabled", "0"), ("roles", "5")] {
             let mut child = std::process::Command::new(std::env::current_exe()?)
                 .arg("--exact")
                 .arg("node_emits_bounded_info_state_with_real_producers_and_supports_disabling")
@@ -97,6 +97,44 @@ fn node_emits_bounded_info_state_with_real_producers_and_supports_disabling() ->
     };
     let capture = Capture::default();
     tracing::subscriber::set_global_default(capture.clone()).context("install INFO-only subscriber")?;
+    if mode == "roles" {
+        return tokio::runtime::Runtime::new()?.block_on(async {
+            let cluster = build_role_cluster(
+                TestNodeConfig::default(),
+                vec![TestNodeConfig::default()],
+                TestNodeConfig::default(),
+            )
+            .await?;
+            let addresses = [
+                cluster.entry.address(),
+                cluster.relays[0].address(),
+                cluster.exit.address(),
+            ]
+            .map(serde_json::to_value)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+            tokio::time::timeout(Duration::from_secs(20), async {
+                loop {
+                    let all_reported = {
+                        let records = capture.0.lock();
+                        addresses.iter().all(|address| {
+                            records.iter().any(|record| {
+                                &record["node_address"] == address
+                                    && record["sequence"].as_u64().is_some_and(|sequence| sequence > 0)
+                            })
+                        })
+                    };
+                    if all_reported {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            })
+            .await
+            .context("entry, relay and exit must each run their reporter")?;
+            Ok(())
+        });
+    }
     let disabled = mode == "disabled";
     eprintln!("starting {mode:?} state-dump cluster");
     let cluster = cluster_fixture(vec![

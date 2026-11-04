@@ -612,6 +612,8 @@ mod tests {
                         Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
+                MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(_)))
+                | MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(_))) => {}
                 _ => panic!("unexpected telemetry type, unimplemented"),
             }
         }
@@ -1171,9 +1173,12 @@ mod tests {
     async fn probe_should_emit_with_expected_surb_count(
         #[case] strategy: TestProbeStrategy,
         #[case] expected_max_surbs: usize,
+        #[values(true, false)] reply: bool,
     ) -> anyhow::Result<()> {
+        use anyhow::Context;
+
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_secs(1),
+            timeout: std::time::Duration::from_millis(200),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1194,7 +1199,9 @@ mod tests {
             .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
             .expect("probing allocator should exist");
 
-        let probe = Probe::new(cfg, probing_allocator);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let observed = events.clone();
+        let probe = Probe::new(cfg, probing_allocator).with_observer(move |event| observed.lock().push(event));
 
         let (from_probing_to_network_tx, mut from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
@@ -1210,7 +1217,7 @@ mod tests {
         // Kick off the probing process before triggering — the strategy's stream drives
         // the loopback case, and we push to `manual_probe_tx` below for the neighbor case.
         let is_manual = matches!(strategy, TestProbeStrategy::ManualNeighbor);
-        let (jhs, _probe_classifier) = probe
+        let (jhs, classifier) = probe
             .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store)
             .await;
 
@@ -1219,12 +1226,10 @@ mod tests {
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
         }
 
-        let (_routing, data_out) =
+        let (routing, data_out) =
             tokio::time::timeout(std::time::Duration::from_secs(1), from_probing_to_network_rx.next())
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("no probe emitted"))?;
-
-        jhs.abort_all();
 
         let packet_info = data_out
             .packet_info
@@ -1234,6 +1239,73 @@ mod tests {
             "probe must request exactly {expected_max_surbs} SURB(s)"
         );
 
+        let pseudonym = match routing {
+            DestinationRouting::Forward { pseudonym, .. } => pseudonym.context("probe pseudonym")?,
+            _ => anyhow::bail!("probe must have forward routing"),
+        };
+        let tag = data_out.data.application_tag;
+        let nonce = if is_manual {
+            match Message::try_from(data_out.data.clone())? {
+                Message::Probe(NeighborProbe::Ping(nonce)) => Some(nonce),
+                _ => anyhow::bail!("neighbor probe must be a ping"),
+            }
+        } else {
+            None
+        };
+        // The receiver can wake before the producer finishes registering the outbound probe.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let registered = if let Some(nonce) = nonce {
+                    classifier
+                        .active_neighbor_probes
+                        .get(&(pseudonym, NeighborProbe::Ping(nonce)))
+                        .await
+                        .is_some()
+                } else {
+                    classifier.active_path_probes.get(&tag).await.is_some()
+                };
+                if registered {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await?;
+        if reply {
+            let data = if let Some(nonce) = nonce {
+                Message::Probe(NeighborProbe::Pong(nonce)).try_into()?
+            } else {
+                data_out.data.clone()
+            };
+            for _ in 0..2 {
+                classifier
+                    .classify(
+                        futures::sink::drain(),
+                        pseudonym,
+                        ApplicationDataIn {
+                            data: data.clone(),
+                            packet_info: Default::default(),
+                        },
+                    )
+                    .await;
+            }
+        }
+        tokio::time::sleep(cfg.timeout * 2).await;
+        classifier.active_neighbor_probes.run_pending_tasks().await;
+        classifier.active_path_probes.run_pending_tasks().await;
+        jhs.abort_all();
+        let events = events.lock();
+        assert_eq!(
+            events.len(),
+            1,
+            "a duplicate reply or eviction after success must not count another outcome"
+        );
+        if is_manual {
+            assert!(matches!(&events[0], ProbeOutcome::Neighbor { peer, succeeded }
+                if *peer == NodeId::Offchain(NEIGHBOURS[0]) && *succeeded == reply));
+        } else {
+            assert!(matches!(&events[0], ProbeOutcome::Loopback { succeeded } if *succeeded == reply));
+        }
         Ok(())
     }
     #[tokio::test]

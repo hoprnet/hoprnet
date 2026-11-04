@@ -2596,6 +2596,42 @@ mod tests {
         assert!(w_with <= w_without, "known capacity should not increase the weight");
     }
     #[tokio::test]
+    async fn observer_canonicalizes_chain_addresses_and_retains_unresolvable_destinations() -> anyhow::Result<()> {
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let (planner, _) = two_relayer_return_planner();
+        let planner = planner.with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
+        let me = NodeId::Offchain(planner.me);
+        planner
+            .resolve_path(me, NodeId::Chain(dest_addr()), RoutingOptions::Hops(0.try_into()?))
+            .await?;
+        planner
+            .resolve_path(NodeId::Chain(dest_addr()), me, RoutingOptions::Hops(1.try_into()?))
+            .await?;
+        let unknown = NodeId::Chain(Address::from([99; 20]));
+        assert!(
+            planner
+                .resolve_path(me, unknown, RoutingOptions::Hops(1.try_into()?))
+                .await
+                .is_err()
+        );
+        let events = events.lock();
+        assert_eq!(events.len(), 3);
+        assert!(matches!(&events[0], TransportEvent::PathResolved {
+            direction: PathDirection::Forward, destination, succeeded: true,
+        } if *destination == NodeId::Offchain(pubkey(&SECRET_DEST))));
+        assert!(matches!(&events[1], TransportEvent::PathResolved {
+            direction: PathDirection::Return, destination, succeeded: true,
+        } if *destination == NodeId::Offchain(pubkey(&SECRET_DEST))));
+        assert!(matches!(&events[2], TransportEvent::PathResolved {
+            direction: PathDirection::Forward, destination, succeeded: false,
+        } if *destination == unknown));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn observer_sees_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();

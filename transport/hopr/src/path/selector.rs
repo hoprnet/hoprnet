@@ -1600,6 +1600,42 @@ mod tests {
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
     #[test]
+    fn path_cost_equality_ignores_quality_metadata() {
+        let cost = PathCostWithMetrics {
+            cost: 0.5,
+            total_latency_ms: None,
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            fundable_tickets_floor: None,
+        };
+        let measured = PathCostWithMetrics {
+            total_latency_ms: Some(100),
+            min_probe_success_rate: Some(0.9),
+            min_ack_rate: Some(0.8),
+            fundable_tickets_floor: Some(3),
+            ..cost.clone()
+        };
+        assert_eq!(cost, measured);
+        assert_ne!(cost, PathCostWithMetrics { cost: 0.6, ..measured });
+    }
+
+    #[test]
+    fn trace_diagnostics_preserve_the_selected_candidates() -> anyhow::Result<()> {
+        let (me, _, dest, graph) = two_hop_graph();
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let expected = selector.select_path(me, dest, 1)?;
+        let subscriber = test_log::tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(std::io::sink)
+            .finish();
+        let actual = tracing::subscriber::with_default(subscriber, || selector.select_path(me, dest, 1))?;
+        assert_eq!(actual.len(), expected.len());
+        assert_eq!(actual[0].path, expected[0].path);
+        assert_eq!(actual[0].cost, expected[0].cost);
+        Ok(())
+    }
+
+    #[test]
     fn observer_sees_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
         let (me, _, dest, graph) = two_hop_graph();
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
@@ -1626,7 +1662,7 @@ mod tests {
             .collect();
         assert_eq!(searches.len(), 2);
         assert_eq!(1, searches.iter().filter(|(_, _, retained)| *retained == 0).count());
-        assert!(searches.iter().any(|(phase1, _, _)| phase1.returned > 0));
+        assert!(searches.iter().any(|(phase1, ..)| phase1.returned > 0));
         assert!(searches.iter().any(|(_, phase2, _)| phase2.is_some()));
         Ok(())
     }

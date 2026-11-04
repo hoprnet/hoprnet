@@ -1298,6 +1298,38 @@ mod tests {
     }
 
     #[test]
+    fn state_dump_sections_are_lazy_and_keep_their_names_and_shared_state() -> anyhow::Result<()> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        let builder = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default())
+            .with_state_dump_section(
+                "strategies",
+                move || serde_json::json!({ "calls": observed.fetch_add(1, Ordering::Relaxed) }),
+            )
+            .with_state_dump_section("health", || serde_json::json!({ "ready": true }));
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            0,
+            "registering a section must not collect it"
+        );
+        let sections = &builder.ctx.state_dump_sections;
+        assert_eq!(
+            sections.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            ["strategies", "health"]
+        );
+        let section = sections[0].1.clone();
+        assert_eq!(section(), serde_json::json!({ "calls": 0 }));
+        assert_eq!(sections[0].1(), serde_json::json!({ "calls": 1 }));
+        assert_eq!(sections[1].1(), serde_json::json!({ "ready": true }));
+        assert_eq!(calls.load(Ordering::Relaxed), 2);
+        Ok(())
+    }
+
+    #[test]
     fn startup_logs_build_and_identity_separately_from_configuration() -> anyhow::Result<()> {
         let chain_key = ChainKeypair::random();
         let packet_key = OffchainKeypair::random();
@@ -1363,6 +1395,58 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "testing")]
+    #[rstest::rstest]
+    #[serial_test::serial(state_dump_env)]
+    #[case::disabled("0", true)]
+    #[case::enabled("5", true)]
+    #[case::too_short("4", false)]
+    #[case::too_long("86401", false)]
+    #[case::malformed("invalid", false)]
+    fn state_dump_interval_is_validated_before_component_factories(
+        #[case] interval: &str,
+        #[case] valid: bool,
+    ) -> anyhow::Result<()> {
+        type TestBuilder = HoprBuilderConfigured<
+            Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+            hopr_network_graph::SharedChannelGraph,
+            hopr_transport_p2p::HoprNetwork,
+            hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
+        >;
+        temp_env::with_var("HOPR_STATE_DUMP_INTERVAL", Some(interval), || {
+            let builder = HoprBuilder
+                .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+                .with_config(HoprLibConfig::default());
+            let configured = TestBuilder {
+                ctx: builder.ctx,
+                safe_and_module: None,
+                chain_factory: None,
+                graph_factory: None,
+                network_factory: None,
+                ct_factory: None,
+                peer_discovery_tx: builder.peer_discovery_tx,
+            };
+            let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
+            let error =
+                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
+                    .err()
+                    .context("startup should stop before constructing components")?;
+            if valid {
+                assert!(
+                    matches!(error, HoprLibError::BuilderError("missing chain factory")),
+                    "{error}"
+                );
+            } else {
+                assert!(matches!(error, HoprLibError::GeneralError(_)), "{error}");
+                assert!(
+                    error.to_string().contains("interval") || error.to_string().contains("HOPR_STATE_DUMP_INTERVAL"),
+                    "{error}"
+                );
+            }
+            Ok(())
+        })
+    }
+
     #[rstest::rstest]
     #[case::available(true)]
     #[case::unavailable(false)]
@@ -1400,5 +1484,22 @@ mod tests {
             assert!(!information.contains("chain_id="));
         }
         Ok(())
+    }
+    #[test]
+    fn state_dump_sections_survive_component_factory_changes() {
+        let configured = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default())
+            .with_state_dump_section("before", || serde_json::json!("first"))
+            .with_chain_api(|_| 1_u8)
+            .with_graph(|_| "graph")
+            .with_cover_traffic(|_| ())
+            .with_state_dump_section("after", || serde_json::json!("second"));
+        let sections = configured.ctx.state_dump_sections;
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0, "before");
+        assert_eq!(sections[1].0, "after");
+        assert_eq!(sections[0].1(), serde_json::json!("first"));
+        assert_eq!(sections[1].1(), serde_json::json!("second"));
     }
 }

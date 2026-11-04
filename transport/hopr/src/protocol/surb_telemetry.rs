@@ -942,6 +942,53 @@ mod tests {
     }
 
     #[test]
+    fn uncorroborated_silence_emits_one_bounded_debug_summary_without_replanning() -> anyhow::Result<()> {
+        let count = MAX_DEBUG_DESTINATIONS + 3;
+        let (_graph, _me, peers) = graph_with(count);
+        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {})));
+        let logs = Arc::new(InfoCounter::default());
+        tracing::subscriber::with_default(logs.clone(), || {
+            for (index, destination) in peers.iter().enumerate() {
+                let slot = (index + 1) as u64;
+                let paths = ForwardAndReturnPath {
+                    forward: [0, slot, 0, 0, 0],
+                    reply: [slot, 0, 0, 0, 0],
+                };
+                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
+                registry.record_observed(paths, 1);
+            }
+            assert!(flush(&registry).is_empty());
+            for (index, destination) in peers.iter().enumerate() {
+                let slot = (index + 1) as u64;
+                let paths = ForwardAndReturnPath {
+                    forward: [0, slot, 0, 0, 0],
+                    reply: [slot, 0, 0, 0, 0],
+                };
+                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
+            }
+            assert!(
+                flush(&registry).is_empty(),
+                "silence without a delivering sibling cannot identify a dead path"
+            );
+        });
+        assert_eq!(logs.debugs.load(Ordering::Relaxed), 1);
+        let fields = logs.debug_fields.lock();
+        assert_eq!(fields.get("blind_spot"), Some(&count.to_string()));
+        assert_eq!(fields.get("blind_spot_omitted").map(String::as_str), Some("3"));
+        let destinations = fields
+            .get("blind_spot_destinations")
+            .context("bounded destination list")?;
+        assert_eq!(destinations.matches(", ").count() + 1, MAX_DEBUG_DESTINATIONS);
+        let debug = format!("{registry:?}");
+        assert!(debug.contains(&format!("pairs: {count}")));
+        assert!(
+            !debug.contains(&peers[0].to_string()),
+            "registry Debug output must stay bounded"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn routine_surb_traffic_should_not_emit_debug_per_mint_or_pair() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);
         let recorder = recorder(graph.clone());
@@ -970,6 +1017,18 @@ mod tests {
     struct InfoCounter {
         infos: AtomicU64,
         debugs: AtomicU64,
+        debug_fields: parking_lot::Mutex<std::collections::BTreeMap<String, String>>,
+    }
+
+    struct DebugFields<'a>(&'a InfoCounter);
+
+    impl tracing::field::Visit for DebugFields<'_> {
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            self.0
+                .debug_fields
+                .lock()
+                .insert(field.name().into(), format!("{value:?}"));
+        }
     }
 
     impl tracing::Subscriber for InfoCounter {
@@ -993,6 +1052,7 @@ mod tests {
                 && event.metadata().target() == "hopr_transport::protocol::surb_telemetry"
             {
                 self.debugs.fetch_add(1, Ordering::Relaxed);
+                event.record(&mut DebugFields(self));
             }
         }
 

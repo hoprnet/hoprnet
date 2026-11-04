@@ -215,6 +215,7 @@ insta = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
+temp-env = { workspace = true }
 serde-saphyr = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
