@@ -333,6 +333,17 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .await
         .context("write failed")??;
 
+    // The warm-up write above pays a ticket on this channel too. Let it settle and drain
+    // whatever it won before taking the baseline, so that the redemption collected after the
+    // measured batch can only be reporting measured-batch tickets. Otherwise a warm-up winner
+    // would still sit unredeemed at baseline and satisfy the checks below on its own, even if
+    // none of the measured messages reached `mid`.
+    sleep(Duration::from_secs(2)).await;
+    mid.inner()
+        .redeem_all_tickets(0)
+        .await
+        .context("failed to redeem warm-up tickets")?;
+
     let channel_stats_before = mid
         .inner()
         .ticket_management()
@@ -354,23 +365,20 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 
     // Attribute the redemption to the measured channel from the results themselves instead
     // of the per-safe `redeemed_value` aggregate: a loopback probe winning on `dst -> mid`
-    // would grow that aggregate without any measured ticket being redeemed.
-    let redeemed_on_measured_channel = mid
+    // would grow that aggregate without any measured ticket being redeemed. The warm-up's own
+    // winner was already drained above, so anything redeemed here comes from the measured batch.
+    let redeemed_from_measured_batch = mid
         .inner()
         .redeem_all_tickets(0)
         .await
         .context("failed to redeem tickets")?
         .iter()
-        .filter_map(|result| match result {
-            RedemptionResult::Redeemed(ticket) => Some(*ticket.channel_id()),
-            _ => None,
-        })
-        .any(|channel| channel == measured_channel);
+        .any(|result| matches!(result, RedemptionResult::Redeemed(ticket) if *ticket.channel_id() == measured_channel));
 
     assert!(
-        redeemed_on_measured_channel,
-        "expected a winning ticket from the measured `src -> mid` channel to be redeemed, so the measured traffic \
-         demonstrably reached `mid` (channel {measured_channel})"
+        redeemed_from_measured_batch,
+        "expected a winning ticket from the measured batch on the `src -> mid` channel to be redeemed, so the \
+         measured traffic demonstrably reached `mid` (channel {measured_channel})"
     );
 
     // The chain-side value is what moves asynchronously; poll it as before.
@@ -393,6 +401,13 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .ticket_management()
         .ticket_stats(Some(&measured_channel))
         .map_err(HoprLibError::other)?;
+    assert!(
+        channel_stats_after.winning_tickets > channel_stats_before.winning_tickets,
+        "expected at least one new winning ticket on the measured channel, so the measured batch was processed \
+         (before: {}, after: {})",
+        channel_stats_before.winning_tickets,
+        channel_stats_after.winning_tickets
+    );
     assert!(
         channel_stats_after.winning_tickets < channel_stats_before.winning_tickets + message_count as u128,
         "expected fewer than {message_count} winning tickets on the measured channel, got {} (before: {})",
