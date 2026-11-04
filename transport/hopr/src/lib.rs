@@ -60,6 +60,7 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
+use hopr_chain_connector::state_dump::IntervalCounters;
 pub use hopr_crypto_packet::HoprPixSpec;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
@@ -312,6 +313,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     chain_api: Chain,
+    state_dump_counters: Option<IntervalCounters>,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
@@ -357,6 +359,18 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
+        Self::new_with_state_dump(identity, resolver, graph, my_multiaddresses, cfg, None)
+    }
+
+    /// Build transport with counters shared by the node's periodic state reporter.
+    pub fn new_with_state_dump(
+        identity: (&ChainKeypair, &OffchainKeypair),
+        resolver: Chain,
+        graph: Graph,
+        my_multiaddresses: Vec<Multiaddr>,
+        cfg: HoprProtocolConfig,
+        state_dump_counters: Option<IntervalCounters>,
+    ) -> errors::Result<Self> {
         // Validated at the constructor boundary, because this is the boundary. The shared node
         // builder does validate before all four of its build methods reach here, but this function is
         // `pub`, and a direct caller then skips every relational check on the way in — including
@@ -378,7 +392,8 @@ where
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
             planner_config.min_paths_anonymity_floor,
-        );
+        )
+        .with_state_dump_counters(state_dump_counters.clone());
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
@@ -424,7 +439,8 @@ where
             resolver.clone(),
             selector,
             planner_config,
-        );
+        )
+        .with_state_dump_counters(state_dump_counters.clone());
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -501,6 +517,7 @@ where
             my_multiaddresses,
             smgr,
             chain_api: resolver,
+            state_dump_counters,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
@@ -919,7 +936,8 @@ where
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default()
+            .with_state_dump_counters(self.state_dump_counters.clone());
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
@@ -1194,7 +1212,16 @@ where
             crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
         let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
-        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        let mut probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        if let Some(counters) = self.state_dump_counters.clone() {
+            counters.enable_probes();
+            probe = probe.with_observer(move |outcome| match outcome {
+                hopr_transport_probe::ProbeOutcome::Neighbor { peer, succeeded } => {
+                    counters.neighbor_probe(peer, succeeded)
+                }
+                hopr_transport_probe::ProbeOutcome::Loopback { succeeded } => counters.loopback_probe(succeeded),
+            });
+        }
 
         let (probing_processes, probe_classifier) = probe
             .continuously_scan(

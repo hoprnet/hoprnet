@@ -48,6 +48,7 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
+use hopr_chain_connector::state_dump::{Collector, Config as StateDumpConfig, IntervalCounters, StateRead};
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{
@@ -474,7 +475,7 @@ async fn pre_build_inner<Chain, Graph, Net, Ct>(
     mut processes: AbortableList<HoprLibProcess>,
 ) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -487,6 +488,8 @@ where
     // First, so it is in the log even when the configuration or the chain fails below.
     log_startup(&ctx);
     ctx.cfg.validate()?;
+    let state_dump_config = StateDumpConfig::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
+    let state_dump_counters = state_dump_config.interval().map(|_| IntervalCounters::default());
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
     tracing::info!(?network_tuning, "OS network tuning specs");
@@ -511,12 +514,13 @@ where
 
     let (chain_id, transport_id) = (ctx.chain_key.clone(), ctx.packet_key.clone());
 
-    let transport_api = HoprTransport::new(
+    let transport_api = HoprTransport::new_with_state_dump(
         (&chain_id, &transport_id),
         chain_api.clone(),
         graph.clone(),
         vec![(&ctx.cfg.host).try_into().map_err(HoprLibError::TransportError)?],
         ctx.cfg.protocol.clone(),
+        state_dump_counters.clone(),
     )
     .map_err(HoprLibError::TransportError)?;
 
@@ -805,6 +809,22 @@ where
             )
         });
         processes.insert(HoprLibProcess::ChannelEvents, hopr_utils::spawn_as_abortable!(proc));
+    }
+
+    if state_dump_config.interval().is_some() {
+        let collector = Collector::new(
+            chain_api.clone(),
+            graph.clone(),
+            network.clone(),
+            safe_addr,
+            state_dump_config,
+        );
+        processes.insert(
+            HoprLibProcess::StateDump,
+            hopr_utils::spawn_as_abortable!(async move {
+                collector.run(state_dump_counters).await;
+            }),
+        );
     }
 
     Ok(PreHopr {
@@ -1177,7 +1197,7 @@ macro_rules! impl_build_methods {
 #[cfg(feature = "session-server")]
 impl<Chain, Graph, Net, Ct> HoprBuilderWithSession<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1199,7 +1219,7 @@ where
 #[cfg(not(feature = "session-server"))]
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,

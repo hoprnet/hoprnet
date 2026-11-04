@@ -12,10 +12,10 @@ use hopr_api::{
         primitive::traits::ToHex,
     },
 };
+use hopr_chain_connector::state_dump::{Direction, IntervalCounters};
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use parking_lot::Mutex;
-use tracing::trace;
 use validator::{Validate, ValidationError};
 
 use super::{
@@ -344,7 +344,7 @@ where
                 valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
                 path_metrics.push(pwc);
             }
-            Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
+            Err(e) => tracing::trace!(kind, error = %e, "path candidate failed validation"),
         }
     }
 
@@ -374,7 +374,7 @@ where
     let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
     let total_wt = weighted.total_weight();
     for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-        tracing::debug!(
+        tracing::trace!(
             kind,
             destination = %dest_key,
             hops,
@@ -503,6 +503,7 @@ pub struct PathPlanner<Surb, R, S> {
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
+    diagnostics: Option<IntervalCounters>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -546,6 +547,34 @@ where
             },
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
+            diagnostics: None,
+        }
+    }
+
+    /// Attach counters before the planner is shared with packet processing.
+    pub fn with_state_dump_counters(mut self, counters: Option<IntervalCounters>) -> Self {
+        self.diagnostics = counters;
+        self
+    }
+
+    fn record_resolution(&self, source: NodeId, destination: NodeId, succeeded: bool) {
+        if let Some(counters) = &self.diagnostics {
+            let (direction, peer) = if source == NodeId::Offchain(self.me) {
+                (Direction::Forward, destination)
+            } else {
+                (Direction::Return, source)
+            };
+            let peer = match peer {
+                NodeId::Chain(address) => self
+                    .resolver
+                    .chain_key_to_packet_key(&address)
+                    .ok()
+                    .flatten()
+                    .map(NodeId::Offchain)
+                    .unwrap_or(peer),
+                _ => peer,
+            };
+            counters.resolution(direction, peer, succeeded);
         }
     }
 
@@ -580,9 +609,20 @@ where
         destination: NodeId,
         options: RoutingOptions,
     ) -> Result<ValidatedPath> {
+        let result = self.resolve_path_inner(source, destination, options).await;
+        self.record_resolution(source, destination, result.is_ok());
+        result
+    }
+
+    async fn resolve_path_inner(
+        &self,
+        source: NodeId,
+        destination: NodeId,
+        options: RoutingOptions,
+    ) -> Result<ValidatedPath> {
         let path = match options {
             RoutingOptions::IntermediatePath(explicit_path) => {
-                tracing::debug!(
+                tracing::trace!(
                     direction = "loopback",
                     ?source,
                     ?destination,
@@ -602,7 +642,7 @@ where
             }
 
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, "resolving zero-hop direct path");
+                tracing::trace!(hops = 0, "resolving zero-hop direct path");
                 let resolver = ChainPathResolver::from(&*self.resolver);
                 ValidatedPath::new(source, vec![destination], &resolver).await?
             }
@@ -628,7 +668,7 @@ where
             hopr_api::types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
-        trace!(%path, "validated resolved path");
+        tracing::trace!(%path, "validated resolved path");
         Ok(path)
     }
 
@@ -646,7 +686,7 @@ where
         hops: hopr_api::types::primitive::bounded::BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
     ) -> Result<PlannerCacheValue> {
         let hops_usize: usize = hops.into();
-        trace!(hops = hops_usize, "resolving path via planner cache");
+        tracing::trace!(hops = hops_usize, "resolving path via planner cache");
 
         let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
         let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
@@ -661,7 +701,7 @@ where
 
         self.cache
             .try_get_with(cache_key, async move {
-                trace!(hops = hops_usize, "path cache miss, querying selector");
+                tracing::trace!(hops = hops_usize, "path cache miss, querying selector");
                 rebuild_candidates(
                     &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
                 )
@@ -770,6 +810,21 @@ where
         options: RoutingOptions,
         count: usize,
     ) -> Result<Vec<ValidatedPath>> {
+        let result = self
+            .resolve_diverse_return_paths_inner(destination, options, count)
+            .await;
+        if count > 0 {
+            self.record_resolution(destination, NodeId::Offchain(self.me), result.is_ok());
+        }
+        result
+    }
+
+    async fn resolve_diverse_return_paths_inner(
+        &self,
+        destination: NodeId,
+        options: RoutingOptions,
+        count: usize,
+    ) -> Result<Vec<ValidatedPath>> {
         // No return paths requested (e.g. the message fills the payload, leaving no room for
         // SURBs). Resolve nothing — querying the planner here would turn "none wanted" into a
         // `PathNotFound` error.
@@ -784,7 +839,7 @@ where
             // A fixed path or a direct return has no alternatives to weight over.
             other => {
                 return (0..count)
-                    .map(|_| self.resolve_path(destination, me, other.clone()))
+                    .map(|_| self.resolve_path_inner(destination, me, other.clone()))
                     .collect::<FuturesUnordered<_>>()
                     .try_collect::<Vec<_>>()
                     .await;
@@ -809,9 +864,9 @@ where
         // Distinct first relayers in the candidate pool: the return-relayer diversity actually
         // available for this destination. A value of 1 is the corroboration blind spot (a dead
         // relayer cannot be told from a quiet peer) — the same condition `rebuild_candidates` WARNs
-        // on. This draw runs per-packet, so both sets below are built only when DEBUG is actually
+        // on. This draw runs per-packet, so both sets below are built only when TRACE is actually
         // recorded -- not on every call.
-        let log_relayer_diversity = tracing::enabled!(tracing::Level::DEBUG);
+        let log_relayer_diversity = tracing::enabled!(tracing::Level::TRACE);
         let candidate_relayers = log_relayer_diversity.then(|| {
             items
                 .iter()
@@ -819,7 +874,7 @@ where
                 .collect::<std::collections::HashSet<_>>()
         });
 
-        tracing::debug!(
+        tracing::trace!(
             %destination,
             count,
             candidates = items.len(),
@@ -849,7 +904,7 @@ where
                 .filter_map(|vp| vp.first())
                 .collect::<std::collections::HashSet<_>>()
         });
-        tracing::debug!(
+        tracing::trace!(
             %destination,
             drawn = drawn.len(),
             distinct_relayers = drawn_relayers.as_ref().map_or(0, |r| r.len()),
@@ -877,12 +932,12 @@ where
                 forward_options,
                 return_options,
             } => {
-                tracing::debug!(direction = "forward", %destination, "resolving forward path");
+                tracing::trace!(direction = "forward", %destination, "resolving forward path");
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
                     .await?;
-                tracing::debug!(direction = "forward", %destination, path = %forward_path, "resolved path");
+                tracing::trace!(direction = "forward", %destination, path = %forward_path, "resolved path");
 
                 let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
 
@@ -905,7 +960,7 @@ where
                     let generation = self.surb_store.current_generation(&resolved_pseudonym);
 
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
-                    trace!(
+                    tracing::trace!(
                         %destination,
                         %num_possible_surbs,
                         data_len = size_hint,
@@ -919,7 +974,7 @@ where
                         .into_iter()
                         .enumerate()
                         .inspect(|(i, rp)| {
-                            tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
+                            tracing::trace!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
                         })
                         .map(|(_, rp)| rp)
                         .collect();
@@ -931,7 +986,7 @@ where
                     (vec![], None)
                 };
 
-                trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+                tracing::trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
                 Ok((
                     ResolvedTransportRouting::Forward {
@@ -2535,5 +2590,38 @@ mod tests {
         assert!((w_without - expected_without).abs() < 1e-9);
         // With capacity the factor adds further reduction (capacity_factor < 1.0 here).
         assert!(w_with <= w_without, "known capacity should not increase the weight");
+    }
+    #[tokio::test]
+    async fn state_dump_counts_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
+        let counters = IntervalCounters::default();
+        let (planner, _) = two_relayer_return_planner();
+        let planner = planner.with_state_dump_counters(Some(counters.clone()));
+        let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+        for _ in 0..2 {
+            planner
+                .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 2)
+                .await?;
+        }
+        assert!(
+            planner
+                .resolve_path(
+                    NodeId::Offchain(planner.me),
+                    NodeId::Offchain(pubkey(&[99; 32])),
+                    RoutingOptions::Hops(1.try_into()?)
+                )
+                .await
+                .is_err()
+        );
+        let state = counters.take_snapshot();
+        assert_eq!(state.totals.succeeded, 2);
+        assert_eq!(state.totals.failed, 1);
+        assert_eq!(state.totals.searches, 0, "this test enables resolver counters only");
+        assert!(
+            state
+                .destinations()
+                .iter()
+                .any(|r| r.direction == Direction::Return && r.destination == source && r.counts.succeeded == 2)
+        );
+        Ok(())
     }
 }

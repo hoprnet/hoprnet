@@ -55,7 +55,8 @@ capture = ["dep:pcap-file"]
 testing = [
   "dep:bimap",
   "dep:hex-literal",
-  "dep:hopr-chain-connector",
+  "hopr-chain-connector/testing",
+  "hopr-chain-connector/runtime-tokio",
   "dep:hopr-ticket-manager",
   "dep:tokio",
   "hopr-utils/runtime-tokio",
@@ -156,10 +157,7 @@ hopr-transport-tag-allocator = { workspace = true }
 # `ConcurrentStreamExt::merge` is used on the PIX event path in `src/lib.rs`.
 bimap = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true, features = [
-  "testing",
-  "runtime-tokio",
-], optional = true }
+hopr-chain-connector = { workspace = true }
 hopr-ticket-manager = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 

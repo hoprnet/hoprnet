@@ -280,6 +280,8 @@ pub(crate) enum HoprLibProcess {
     TicketEvents,
     #[strum(to_string = "neglecting tickets on closed channels")]
     ChannelClosureNeglect,
+    #[strum(to_string = "periodic operational state dump")]
+    StateDump,
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.

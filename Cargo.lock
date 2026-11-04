@@ -4205,9 +4205,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fb6f363700957a383f5be7c6fcda692206e468e1a2b38bb0d4e9921a286754f"
+version = "0.31.1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#cb8c3721972728225576bf2258e4dd8ae4a13983"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4227,6 +4226,7 @@ dependencies = [
  "petgraph",
  "postcard",
  "redb",
+ "serde",
  "serde_json",
  "smart-default",
  "tempfile",
@@ -4315,6 +4315,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "serde_with",
  "serial_test",
  "smart-default",
@@ -4331,9 +4332,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5521c74b022c255d71df222a319506606910d0edc2611c972606b540368056d"
+version = "0.10.1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#cb8c3721972728225576bf2258e4dd8ae4a13983"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4641,6 +4641,7 @@ dependencies = [
  "lazy_static",
  "moka",
  "more-asserts",
+ "parking_lot 0.12.5",
  "rand 0.10.3",
  "rstest",
  "serde",
