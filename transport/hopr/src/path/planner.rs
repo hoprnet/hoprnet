@@ -134,13 +134,19 @@ pub struct PathPlannerConfig {
     /// Weights come from observations, and observations only exist for paths that get selected — a
     /// closed loop in which a path that falls out of favour stops being measured, so its score can
     /// never recover and it is never chosen again. Spending a small share of draws uniformly keeps
-    /// every candidate under observation, which is what lets a recovered one climb back.
+    /// the plausible candidates under observation, which is what lets a recovered one climb back.
+    ///
+    /// Plausible means a tempered weight of at least a tenth of the best candidate's. That leaves out
+    /// a relayer on probation and an edge probes measured dead, and also a healthy path slow or thin
+    /// enough to weigh less than a tenth. An exploring return draw takes one of those only within a
+    /// node-wide allowance of one a second, while an ordinary return draw keeps it at its tempered
+    /// weight: a reply through a relayer on probation is what revives it. A forward draw, exploring or
+    /// not, never takes one, as a forward packet probes nothing.
     ///
     /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
-    /// which candidate looks best. Candidates have already passed the selector's gates (open channels,
-    /// `min_ack_rate`, and so on) before reaching here, so an exploratory draw is random only with
-    /// respect to *quality*, never a route the cost function rejected. `0.0` disables it.
-    /// Defaults to 0.1.
+    /// which plausible candidate looks best. Candidates have already passed the selector's gates
+    /// (open channels, `min_ack_rate`, and so on) before reaching here, so an exploratory draw never
+    /// takes a route the cost function rejected. `0.0` disables it. Defaults to 0.1.
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
@@ -245,12 +251,15 @@ fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
     weights.iter().rposition(|w| *w > 0.0)
 }
 
-/// Whether this draw should explore — ignore the weights and pick uniformly.
+/// Whether this draw should explore — ignore the weights and pick uniformly among the plausible
+/// candidates (see [`pick_exploring_index`]).
 ///
 /// Weights are derived from observations, and observations only exist for paths that were selected.
 /// Left alone that is a closed loop: a path that falls out of favour stops being measured, so its
 /// score can never recover and it is never chosen again. Spending a small share of draws uniformly
-/// keeps every candidate under observation, which is what lets one that has recovered climb back.
+/// keeps the plausible candidates under observation, which is what lets one that has recovered climb
+/// back. An exploring draw takes a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`] only as a return draw
+/// the [`ProbeBudget`] grants.
 fn should_explore(exploration: f64) -> bool {
     exploration > 0.0 && hopr_api::types::crypto_random::random_float_in_range(0.0..1.0) < exploration
 }
