@@ -61,7 +61,10 @@ use validator::Validate;
 
 use crate::{
     Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
-    config::HoprLibConfig, constants, helpers::BroadcastSenderSink,
+    config::HoprLibConfig,
+    constants,
+    helpers::BroadcastSenderSink,
+    state_dump::{SectionValue, StateDumpSection},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -111,6 +114,7 @@ pub struct BuildCtx {
     /// Node configuration.
     pub cfg: HoprLibConfig,
     peer_discovery_rx: PeerDiscoveryRx,
+    state_dump_sections: Vec<(&'static str, StateDumpSection)>,
 }
 
 impl BuildCtx {
@@ -157,6 +161,7 @@ impl HoprBuilderWithIdentity {
                 packet_key: self.packet_key,
                 cfg,
                 peer_discovery_rx: Arc::new(parking_lot::Mutex::new(Some(peer_discovery_rx))),
+                state_dump_sections: Vec::new(),
             },
             safe_and_module: None,
             chain_factory: None,
@@ -190,6 +195,19 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
+    /// Adds a named section to every periodic state dump record, for example the states of the
+    /// strategies the embedding node runs. `section` is called once per record and must not block.
+    ///
+    /// Sections are ignored when the state dump is disabled (`HOPR_STATE_DUMP_INTERVAL=0`).
+    pub fn with_state_dump_section(
+        mut self,
+        name: &'static str,
+        section: impl Fn() -> SectionValue + Send + Sync + 'static,
+    ) -> Self {
+        self.ctx.state_dump_sections.push((name, Arc::new(section)));
+        self
+    }
+
     /// Sets the node Safe and module addresses.
     pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
         self.safe_and_module = Some((*safe, *module));
@@ -813,12 +831,18 @@ where
     }
 
     if state_dump_config.interval().is_some() {
-        let collector = Collector::new(
-            chain_api.clone(),
-            graph.clone(),
-            network.clone(),
-            safe_addr,
-            state_dump_config,
+        let collector = ctx.state_dump_sections.iter().fold(
+            Collector::new(
+                chain_api.clone(),
+                graph.clone(),
+                network.clone(),
+                safe_addr,
+                state_dump_config,
+            ),
+            |collector, (name, section)| {
+                let section = section.clone();
+                collector.with_section(name, move || section())
+            },
         );
         processes.insert(
             HoprLibProcess::StateDump,

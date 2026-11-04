@@ -4,11 +4,17 @@
 //! place that knows both sides.
 use std::sync::Arc;
 
+pub use hopr_chain_connector::state_dump::SectionValue;
 use hopr_chain_connector::state_dump::{Direction, IntervalCounters, PhaseOutcome, SearchOutcome, SurbCounts};
 use hopr_transport::{
     TransportEvent, TransportObserver,
     observer::{PathDirection, PhaseCounts, ProbeOutcome},
 };
+
+/// Produces one extra section of the state dump, such as the states of the node's strategies.
+///
+/// Called once per record from the reporter task: it must be cheap and must not block.
+pub type StateDumpSection = Arc<dyn Fn() -> SectionValue + Send + Sync>;
 
 /// An observer that records the transport's events in `counters`.
 pub(crate) fn transport_observer(counters: IntervalCounters) -> TransportObserver {

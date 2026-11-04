@@ -23,7 +23,7 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
-/// Periodic operational state dump: the bridge from transport events to its counters.
+/// Periodic operational state dump: extra sections and the bridge from transport events.
 pub mod state_dump;
 /// Testing utilities: cluster fixtures, node wiring helpers, echo server.
 #[cfg(feature = "testing")]
