@@ -4206,7 +4206,7 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.31.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#6fc59c04ac1f81caaf6fdbc8059aa806aab7d8ea"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4320,6 +4320,7 @@ dependencies = [
  "serial_test",
  "smart-default",
  "strum",
+ "temp-env",
  "tempfile",
  "test-log",
  "thiserror 2.0.21",
@@ -4333,7 +4334,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.10.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#6fc59c04ac1f81caaf6fdbc8059aa806aab7d8ea"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
 dependencies = [
  "anyhow",
  "bimap",

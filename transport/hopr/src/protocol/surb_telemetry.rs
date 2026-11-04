@@ -371,15 +371,16 @@ impl SurbRoundTripRegistry {
     /// Records that `count` replies arrived over these legs.
     pub fn record_observed(&self, paths: ForwardAndReturnPath, count: u64) {
         self.counters(paths).record_observed(count);
-        if let Some(observer) = &self.observer
-            && let Some(destination) = self.destinations.get(&paths)
-        {
-            observer(TransportEvent::Surb {
-                destination: *destination,
-                paths,
-                minted: 0,
-                returned: count,
-            });
+        if let Some(observer) = &self.observer {
+            let destination = self.destinations.get(&paths).map(|destination| *destination);
+            if let Some(destination) = destination {
+                observer(TransportEvent::Surb {
+                    destination,
+                    paths,
+                    minted: 0,
+                    returned: count,
+                });
+            }
         }
     }
 
@@ -1628,6 +1629,49 @@ mod tests {
 
         assert!(recorder.registry.drain().is_empty());
     }
+    #[test]
+    fn observed_callback_can_access_the_destination_without_a_held_guard() {
+        let (_, _, peers) = graph_with(1);
+        let destination = peers[0];
+        let paths = legs();
+        let registry = registry_at_slot_zero();
+        registry.record_expected(paths, 3, destination);
+        let destinations = registry.destinations.clone();
+        let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let registry = registry.with_observer(Some(Arc::new({
+            let calls = calls.clone();
+            move |event| {
+                // A nonblocking write detects the regression without hanging the test runner.
+                assert!(matches!(
+                    destinations.try_get_mut(&paths),
+                    dashmap::try_result::TryResult::Present(_)
+                ));
+                assert!(matches!(
+                    event,
+                    TransportEvent::Surb {
+                        minted: 0,
+                        returned: 2,
+                        ..
+                    }
+                ));
+                calls.fetch_add(1, Ordering::Relaxed);
+            }
+        })));
+        registry.record_observed(paths, 2);
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        assert_eq!(registry.drain(), vec![(paths, 3, 2)]);
+    }
+
+    #[test]
+    fn observing_an_unknown_destination_keeps_counts_without_notifying() {
+        let paths = legs();
+        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {
+            panic!("unknown destinations must not notify the observer");
+        })));
+        registry.record_observed(paths, 2);
+        assert_eq!(registry.drain(), vec![(paths, 0, 2)]);
+    }
+
     #[test]
     fn observed_surb_counts_are_independent_of_graph_drains_and_duplicate_replies() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);

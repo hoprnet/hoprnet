@@ -129,4 +129,48 @@ mod tests {
         assert_eq!((probes.neighbor.timed_out, probes.loopback.succeeded), (1, 1));
         Ok(())
     }
+
+    #[test]
+    fn successful_events_and_idle_windows_preserve_probe_registration() -> anyhow::Result<()> {
+        let counters = IntervalCounters::default();
+        let observer = transport_observer(counters.clone());
+        let destination = NodeId::Chain(Address::from([2; 20]));
+        observer(TransportEvent::PathResolved {
+            direction: PathDirection::Return,
+            destination,
+            succeeded: true,
+        });
+        observer(TransportEvent::PathSearched {
+            direction: PathDirection::Forward,
+            destination,
+            phase1: PhaseCounts {
+                returned: 2,
+                eligible: 1,
+            },
+            phase2: None,
+            retained: 1,
+        });
+        observer(TransportEvent::Probe(ProbeOutcome::Neighbor {
+            peer: destination,
+            succeeded: true,
+        }));
+        observer(TransportEvent::Probe(ProbeOutcome::Loopback { succeeded: false }));
+        let snapshot = counters.take_snapshot();
+        assert_eq!(snapshot.totals.succeeded, 1);
+        assert_eq!(snapshot.totals.failed, 0);
+        assert_eq!(snapshot.totals.searches, 1);
+        assert_eq!(snapshot.totals.empty_searches, 0);
+        assert_eq!(snapshot.totals.phase2_runs, 0);
+        let probes = snapshot.probes.context("registered probes")?;
+        assert_eq!(probes.neighbor.succeeded, 1);
+        assert_eq!(probes.loopback.timed_out, 1);
+
+        let idle = counters.take_snapshot();
+        assert_eq!(idle.totals.succeeded, 0);
+        assert_eq!(idle.totals.searches, 0);
+        let probes = idle.probes.context("registration survives the interval reset")?;
+        assert_eq!(probes.neighbor.succeeded, 0);
+        assert_eq!(probes.loopback.timed_out, 0);
+        Ok(())
+    }
 }

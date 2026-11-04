@@ -57,7 +57,11 @@ are capped at eight destinations, with an omitted count. TRACE requires a build 
 retains that static level.
 
 Connector and graph crates are sourced from the hopr-impls CORE-1168 Git branch;
-Cargo.lock pins the resolved revision. No sibling checkout is needed.
+Cargo.lock pins the resolved revision. No sibling checkout is needed. The connector's
+`state_dump` module is always compiled; reporting is controlled at runtime by
+`HOPR_STATE_DUMP_INTERVAL`, with `0` disabling it. No `state-dump` Cargo feature is needed.
+When the companion crates are released, remove both `[patch.crates-io]` overrides
+(or pin a fixed `rev` after the companion PR merges) and update this source description.
 
 The `state_dump` integration test runs enabled/disabled configurations in isolated
 processes. It verifies real INFO records from an emulated node cluster with channel
