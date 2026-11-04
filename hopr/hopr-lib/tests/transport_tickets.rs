@@ -289,7 +289,11 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
-    let message_count = 20;
+    // Use enough messages that P(zero wins at 20% win prob) is negligible (0.8^51 ≈ 1.2e-5).
+    // With the SURB balancer off these are the only tickets the channel sees, so a short
+    // run could draw no winner at all; the redemption assertion below needs at least one
+    // to be non-vacuous, which is also what proves the measured traffic reached `mid`.
+    let message_count = 50;
 
     let ticket_price = src
         .inner()
@@ -341,18 +345,6 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 
     sleep(Duration::from_secs(2)).await;
 
-    // With the balancer off only the ~21 tickets drawn in the measured window (the warm-up
-    // write plus `message_count`) reach this channel, so at the 20% win probability all of
-    // them can lose (P ~ 0.8^21). There is then nothing to redeem and `redeemed_value`
-    // cannot grow, so the redemption clause is skipped for that run while the
-    // winning-ticket bound below still carries the assertion.
-    let seen_winning_ticket = mid
-        .inner()
-        .ticket_statistics()
-        .context("failed to get ticket statistics")?
-        .winning_tickets
-        > stats_before.winning_tickets;
-
     mid.inner()
         .redeem_all_tickets(0)
         .await
@@ -368,7 +360,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
                 .map_err(HoprLibError::chain)?;
             Ok::<_, HoprLibError>(
                 stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128
-                    && (!seen_winning_ticket || chain_stats_after.redeemed_value > chain_stats_before.redeemed_value),
+                    && chain_stats_after.redeemed_value > chain_stats_before.redeemed_value,
             )
         },
         Duration::from_secs(5),
@@ -376,7 +368,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     .await
     .context(
         "failed to wait for: `stats_after.winning_tickets < stats_before.winning_tickets + message_count as u128 && \
-         (no winning ticket || stats_after.redeemed_value() > stats_before.redeemed_value())`",
+         stats_after.redeemed_value() > stats_before.redeemed_value()`",
     )?;
 
     Ok(())
