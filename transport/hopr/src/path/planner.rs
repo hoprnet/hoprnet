@@ -57,6 +57,11 @@ fn validate_weight_temper(temper: f64) -> std::result::Result<(), ValidationErro
 
 /// Configuration for [`PathPlanner`]'s internal path cache.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default, deny_unknown_fields)
+)]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
@@ -70,12 +75,14 @@ pub struct PathPlannerConfig {
     /// 60 s a relay that stopped delivering kept its full share of return-path draws for a minute
     /// after the graph had already scored it down.
     #[default(Duration::from_secs(10))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub cache_ttl: Duration,
     /// Period between proactive background cache-refresh sweeps.
     ///
     /// Held at half the TTL so a steady-state session is normally served from an entry that was
     /// re-weighted rather than one that expired under it.
     #[default(Duration::from_secs(5))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
@@ -103,6 +110,7 @@ pub struct PathPlannerConfig {
     /// Total path latency at which the latency factor in the composite weight equals 0.5.
     /// Higher values make the weight less sensitive to latency differences.
     #[default(Duration::from_millis(100))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub latency_halflife: Duration,
     /// Reference channel balance used to scale the capacity factor in the composite weight.
     /// `capacity_factor` saturates at 1.0 near this value.
@@ -144,6 +152,7 @@ pub struct PathPlannerConfig {
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
     #[default(Duration::from_secs(30))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
 }
 
