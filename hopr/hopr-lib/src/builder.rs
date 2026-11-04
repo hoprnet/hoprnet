@@ -490,6 +490,7 @@ where
     ctx.cfg.validate()?;
     let state_dump_config = StateDumpConfig::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
     let state_dump_counters = state_dump_config.interval().map(|_| IntervalCounters::default());
+    let transport_observer = state_dump_counters.clone().map(crate::state_dump::transport_observer);
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
     tracing::info!(?network_tuning, "OS network tuning specs");
@@ -514,13 +515,13 @@ where
 
     let (chain_id, transport_id) = (ctx.chain_key.clone(), ctx.packet_key.clone());
 
-    let transport_api = HoprTransport::new_with_state_dump(
+    let transport_api = HoprTransport::new_with_observer(
         (&chain_id, &transport_id),
         chain_api.clone(),
         graph.clone(),
         vec![(&ctx.cfg.host).try_into().map_err(HoprLibError::TransportError)?],
         ctx.cfg.protocol.clone(),
-        state_dump_counters.clone(),
+        transport_observer,
     )
     .map_err(HoprLibError::TransportError)?;
 

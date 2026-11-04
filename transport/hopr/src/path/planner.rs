@@ -12,7 +12,6 @@ use hopr_api::{
         primitive::traits::ToHex,
     },
 };
-use hopr_chain_connector::state_dump::{Direction, IntervalCounters};
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use parking_lot::Mutex;
@@ -22,6 +21,7 @@ use super::{
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
+use crate::observer::{PathDirection, TransportEvent, TransportObserver};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -503,7 +503,7 @@ pub struct PathPlanner<Surb, R, S> {
     weighting: WeightingParams,
     return_path_weight_temper: f64,
     return_path_exploration: f64,
-    diagnostics: Option<IntervalCounters>,
+    observer: Option<TransportObserver>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -547,22 +547,22 @@ where
             },
             return_path_weight_temper: config.return_path_weight_temper,
             return_path_exploration: config.return_path_exploration,
-            diagnostics: None,
+            observer: None,
         }
     }
 
-    /// Attach counters before the planner is shared with packet processing.
-    pub fn with_state_dump_counters(mut self, counters: Option<IntervalCounters>) -> Self {
-        self.diagnostics = counters;
+    /// Report path resolves to `observer`. Attach it before the planner is shared.
+    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
+        self.observer = observer;
         self
     }
 
     fn record_resolution(&self, source: NodeId, destination: NodeId, succeeded: bool) {
-        if let Some(counters) = &self.diagnostics {
+        if let Some(observer) = &self.observer {
             let (direction, peer) = if source == NodeId::Offchain(self.me) {
-                (Direction::Forward, destination)
+                (PathDirection::Forward, destination)
             } else {
-                (Direction::Return, source)
+                (PathDirection::Return, source)
             };
             let peer = match peer {
                 NodeId::Chain(address) => self
@@ -574,7 +574,11 @@ where
                     .unwrap_or(peer),
                 _ => peer,
             };
-            counters.resolution(direction, peer, succeeded);
+            observer(TransportEvent::PathResolved {
+                direction,
+                destination: peer,
+                succeeded,
+            });
         }
     }
 
@@ -2592,10 +2596,13 @@ mod tests {
         assert!(w_with <= w_without, "known capacity should not increase the weight");
     }
     #[tokio::test]
-    async fn state_dump_counts_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
-        let counters = IntervalCounters::default();
+    async fn observer_sees_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();
-        let planner = planner.with_state_dump_counters(Some(counters.clone()));
+        let planner = planner.with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
         let source = NodeId::Offchain(pubkey(&SECRET_DEST));
         for _ in 0..2 {
             planner
@@ -2612,16 +2619,28 @@ mod tests {
                 .await
                 .is_err()
         );
-        let state = counters.take_snapshot();
-        assert_eq!(state.totals.succeeded, 2);
-        assert_eq!(state.totals.failed, 1);
-        assert_eq!(state.totals.searches, 0, "this test enables resolver counters only");
-        assert!(
-            state
-                .destinations()
+        let resolved: Vec<_> = events
+            .lock()
+            .iter()
+            .filter_map(|event| match event {
+                TransportEvent::PathResolved {
+                    direction,
+                    destination,
+                    succeeded,
+                } => Some((*direction, *destination, *succeeded)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            2,
+            resolved
                 .iter()
-                .any(|r| r.direction == Direction::Return && r.destination == source && r.counts.succeeded == 2)
+                .filter(|r| **r == (PathDirection::Return, source, true))
+                .count(),
+            "each cached return batch is one resolve"
         );
+        assert_eq!(1, resolved.iter().filter(|(_, _, succeeded)| !succeeded).count());
+        assert_eq!(3, resolved.len(), "the planner reports resolves only, no searches");
         Ok(())
     }
 }

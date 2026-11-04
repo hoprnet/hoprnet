@@ -30,9 +30,10 @@ use hopr_api::{
         internal::prelude::*,
     },
 };
-use hopr_chain_connector::state_dump::{IntervalCounters, SurbCounts};
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_protocol_hopr::{IncomingPacket, IncomingPacketError, OutgoingPacket, PacketDecoder, PacketEncoder};
+
+use crate::observer::{TransportEvent, TransportObserver};
 
 /// Slots in a [`PathId`], and therefore the longest leg that can be reported.
 const PATH_ID_SLOTS: usize = 5;
@@ -102,7 +103,7 @@ pub struct SurbRoundTripRegistry {
     /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
     /// reply leg terminates here. [`ME_SLOT_UNKNOWN`] means not yet known.
     me_slot: Arc<AtomicU64>,
-    diagnostics: Option<IntervalCounters>,
+    observer: Option<TransportObserver>,
 }
 
 /// `me_slot` value meaning "this node's slot has not been learned yet".
@@ -120,7 +121,7 @@ impl Default for SurbRoundTripRegistry {
             silence: Default::default(),
             replanned: Default::default(),
             me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
-            diagnostics: None,
+            observer: None,
         }
     }
 }
@@ -178,9 +179,9 @@ impl std::fmt::Debug for SurbRoundTripRegistry {
     }
 }
 impl SurbRoundTripRegistry {
-    /// Attach the independent bounded state reporter before cloning this registry.
-    pub fn with_state_dump_counters(mut self, counters: Option<IntervalCounters>) -> Self {
-        self.diagnostics = counters;
+    /// Report minted and returned SURBs to `observer`. Attach it before cloning this registry.
+    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
+        self.observer = observer;
         self
     }
 
@@ -197,15 +198,13 @@ impl SurbRoundTripRegistry {
     pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
         self.counters(paths).record_expected(count);
-        if let Some(counters) = &self.diagnostics {
-            counters.surb(
+        if let Some(observer) = &self.observer {
+            observer(TransportEvent::Surb {
                 destination,
                 paths,
-                SurbCounts {
-                    minted: count,
-                    returned: 0,
-                },
-            );
+                minted: count,
+                returned: 0,
+            });
         }
     }
 
@@ -372,17 +371,15 @@ impl SurbRoundTripRegistry {
     /// Records that `count` replies arrived over these legs.
     pub fn record_observed(&self, paths: ForwardAndReturnPath, count: u64) {
         self.counters(paths).record_observed(count);
-        if let Some(counters) = &self.diagnostics
+        if let Some(observer) = &self.observer
             && let Some(destination) = self.destinations.get(&paths)
         {
-            counters.surb(
-                *destination,
+            observer(TransportEvent::Surb {
+                destination: *destination,
                 paths,
-                SurbCounts {
-                    minted: 0,
-                    returned: count,
-                },
-            );
+                minted: 0,
+                returned: count,
+            });
         }
     }
 
@@ -1572,11 +1569,30 @@ mod tests {
         assert!(recorder.registry.drain().is_empty());
     }
     #[test]
-    fn state_dump_surb_counts_are_independent_of_graph_drains_and_duplicate_replies() -> anyhow::Result<()> {
+    fn observed_surb_counts_are_independent_of_graph_drains_and_duplicate_replies() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);
-        let counters = IntervalCounters::default();
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let mut recorder = recorder(graph);
-        recorder.registry = recorder.registry.with_state_dump_counters(Some(counters.clone()));
+        recorder.registry = recorder.registry.with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
+        let surbs = |events: &mut Vec<TransportEvent>| -> (u64, u64, Vec<OffchainPublicKey>) {
+            events
+                .drain(..)
+                .fold((0, 0, Vec::new()), |(m, r, mut d), event| match event {
+                    TransportEvent::Surb {
+                        destination,
+                        minted,
+                        returned,
+                        ..
+                    } => {
+                        d.push(destination);
+                        (m + minted, r + returned, d)
+                    }
+                    _ => (m, r, d),
+                })
+        };
         recorder.on_minted(
             &ResolvedTransportRouting::Forward {
                 pseudonym: HoprPseudonym::random(),
@@ -1585,17 +1601,15 @@ mod tests {
             },
             &[surb_id(1)],
         );
-        let first = counters.take_snapshot();
-        assert_eq!(first.surb_totals.minted, 1);
-        assert_eq!(first.surb_totals.returned, 0);
+        let (minted, returned, _) = surbs(&mut events.lock());
+        assert_eq!((minted, returned), (1, 0));
         assert_eq!(recorder.registry.drain().len(), 1);
         recorder.on_replied(&surb_id(1));
         recorder.on_replied(&surb_id(1));
         assert_eq!(recorder.registry.drain().len(), 1);
-        let second = counters.take_snapshot();
-        assert_eq!(second.surb_totals.minted, 0);
-        assert_eq!(second.surb_totals.returned, 1);
-        assert_eq!(second.surbs()[0].destination, peers[0]);
+        let (minted, returned, destinations) = surbs(&mut events.lock());
+        assert_eq!((minted, returned), (0, 1), "a duplicate reply is not counted twice");
+        assert_eq!(destinations, vec![peers[0]]);
         Ok(())
     }
 }

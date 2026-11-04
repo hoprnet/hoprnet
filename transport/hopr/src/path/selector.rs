@@ -11,12 +11,12 @@ use hopr_api::{
     },
     types::internal::errors::PathError,
 };
-use hopr_chain_connector::state_dump::{Direction, IntervalCounters, PhaseOutcome, SearchOutcome};
 
 use super::{
     errors::{PathPlannerError, Result},
     traits::{PathSelector, PathWithMetrics},
 };
+use crate::observer::{PathDirection, PhaseCounts, TransportEvent, TransportObserver};
 
 /// Accumulated path cost and quality aggregates, folded edge-by-edge during DFS.
 ///
@@ -331,7 +331,7 @@ pub struct HoprGraphPathSelector<G> {
     edge_penalty: f64,
     min_ack_rate: f64,
     anonymity_floor: usize,
-    diagnostics: Option<IntervalCounters>,
+    observer: Option<TransportObserver>,
 }
 
 impl<G> HoprGraphPathSelector<G>
@@ -367,13 +367,13 @@ where
             edge_penalty,
             min_ack_rate,
             anonymity_floor,
-            diagnostics: None,
+            observer: None,
         }
     }
 
-    /// Attach bounded state-dump counters before sharing the selector.
-    pub fn with_state_dump_counters(mut self, counters: Option<IntervalCounters>) -> Self {
-        self.diagnostics = counters;
+    /// Report graph searches to `observer`. Attach it before the selector is shared.
+    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
+        self.observer = observer;
         self
     }
 
@@ -500,7 +500,7 @@ where
                     ticket_face_value,
                 },
             );
-            phase1 = PhaseOutcome {
+            phase1 = PhaseCounts {
                 returned: returned as u64,
                 eligible: found.len() as u64,
             };
@@ -519,7 +519,7 @@ where
                 let remaining = self.max_paths - found.len();
                 let (extended, returned) =
                     self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found, ticket_face_value);
-                phase2 = Some(PhaseOutcome {
+                phase2 = Some(PhaseCounts {
                     returned: returned as u64,
                     eligible: extended.len() as u64,
                 });
@@ -545,7 +545,7 @@ where
                     ticket_face_value,
                 },
             );
-            phase1 = PhaseOutcome {
+            phase1 = PhaseCounts {
                 returned: returned as u64,
                 eligible: found.len() as u64,
             };
@@ -565,21 +565,19 @@ where
         }
 
         let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
-        if let Some(counters) = &self.diagnostics {
+        if let Some(observer) = &self.observer {
             let (direction, destination) = if src == self.me {
-                (Direction::Forward, dest)
+                (PathDirection::Forward, dest)
             } else {
-                (Direction::Return, src)
+                (PathDirection::Return, src)
             };
-            counters.search(
+            observer(TransportEvent::PathSearched {
                 direction,
-                hopr_api::types::internal::NodeId::Offchain(destination),
-                SearchOutcome {
-                    phase1,
-                    phase2,
-                    retained: pruned.len() as u64,
-                },
-            );
+                destination: hopr_api::types::internal::NodeId::Offchain(destination),
+                phase1,
+                phase2,
+                retained: pruned.len() as u64,
+            });
         }
         if pruned.is_empty() {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -1602,20 +1600,34 @@ mod tests {
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
     #[test]
-    fn state_dump_records_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
+    fn observer_sees_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
         let (me, _, dest, graph) = two_hop_graph();
-        let counters = IntervalCounters::default();
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS, 0.5, 0.5, 0)
-            .with_state_dump_counters(Some(counters.clone()));
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS, 0.5, 0.5, 0).with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
         selector.select_path(me, dest, 1)?;
         assert!(selector.select_path(pubkey(&SECRET_4), me, 1).is_err());
-        let state = counters.take_snapshot();
-        assert_eq!(state.totals.searches, 2);
-        assert_eq!(state.totals.empty_searches, 1);
-        assert!(state.totals.phase1_returned > 0);
-        assert!(state.totals.phase2_runs > 0);
-        assert_eq!(state.totals.succeeded, 0, "a search must not invent a resolution");
-        assert_eq!(state.totals.failed, 0);
+
+        let events = events.lock();
+        assert_eq!(events.len(), 2, "one event per search, and no resolve is invented");
+        let searches: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                TransportEvent::PathSearched {
+                    phase1,
+                    phase2,
+                    retained,
+                    ..
+                } => Some((*phase1, *phase2, *retained)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(searches.len(), 2);
+        assert_eq!(1, searches.iter().filter(|(_, _, retained)| *retained == 0).count());
+        assert!(searches.iter().any(|(phase1, _, _)| phase1.returned > 0));
+        assert!(searches.iter().any(|(_, phase2, _)| phase2.is_some()));
         Ok(())
     }
 }

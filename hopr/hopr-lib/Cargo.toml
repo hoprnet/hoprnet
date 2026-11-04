@@ -200,7 +200,7 @@ hopr-transport = { workspace = true }
 
 hopr-ticket-manager = { workspace = true, optional = true }
 hopr-transport-p2p = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true }
+hopr-chain-connector = { workspace = true, features = ["state-dump"] }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
 
