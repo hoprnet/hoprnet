@@ -50,8 +50,10 @@
 //!   its whole stock on its next push, the dead SURBs it cannot recognise along with the rest, and the balancer refills
 //!   from empty, paced; the session's write-off goes with the stock it counted. Probation is not a new verdict: a pair
 //!   bumped in this death is not bumped again until a reply revives the relayer, so one that dies again on probation
-//!   costs the session nothing more. Must not fight: the cooldown, since each advance costs the counterparty everything
-//!   it holds, and a PIX cycle can absorb only so many such losses.
+//!   costs the session nothing more. Only stock advances a generation: a SURB minted after its relayer was already
+//!   known dead is a probe, written off without one, also in a session the wipe never reached. Must not fight: the
+//!   cooldown, since each advance costs the counterparty everything it holds, and a PIX cycle can absorb only so many
+//!   such losses.
 //! - **Lost neighbour.** Trigger: our own connection drops. Effect: re-plan only; the graph's connection status already
 //!   rejects that edge, so its SURBs are not invalidated.
 
@@ -278,6 +280,12 @@ impl SurbRoundTripRegistry {
     ///
     /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
     /// this flush is written off and bumped at the next one, if it is still dead then.
+    ///
+    /// Only stock reports a session: a SURB minted through the relayer before it was judged dead, which
+    /// the counterparty may hold. One minted after is a probe the planner's exploration sent through a
+    /// relayer published at zero or on probation, and is written off without a report. That holds in
+    /// a session the wipe never reached too, one opened since or with nothing through the relayer at
+    /// the time, which has no mark for the pair: its first probe must not cost it its stock.
     /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
     /// revives it once per `REBUMP_COOLDOWN` from the revival: a verdict reached again inside either
     /// is written off as usual but reports nothing.
@@ -311,17 +319,18 @@ impl SurbRoundTripRegistry {
             return Vec::new();
         }
         // Only verdicts that held for a second flush act on the stock; see `VERDICT_CONFIRMATION`.
-        let through_dead: Vec<(HoprSurbId, HoprPseudonym, OffchainPublicKey, ReturnRelayers)> = self
+        #[allow(clippy::type_complexity)]
+        let through_dead: Vec<(HoprSurbId, HoprPseudonym, OffchainPublicKey, ReturnRelayers, Instant)> = self
             .pending
             .iter()
             .filter_map(|(id, pending)| {
                 relayers_of(&pending.return_relayers)
                     .find(|relayer| health.is_confirmed_dead(relayer))
-                    .map(|dead| (*id, pending.pseudonym, dead, pending.return_relayers))
+                    .map(|dead| (*id, pending.pseudonym, dead, pending.return_relayers, pending.minted_at))
             })
             .collect();
         let mut reached: Vec<HoprPseudonym> = Vec::new();
-        for (id, pseudonym, dead, return_relayers) in through_dead {
+        for (id, pseudonym, dead, return_relayers, minted_at) in through_dead {
             // Remembered before it leaves `pending`, so that a reply decoded in between finds it in
             // one of the two.
             self.written_off_legs.insert(id, return_relayers);
@@ -330,20 +339,29 @@ impl SurbRoundTripRegistry {
             let first_for_pair = !session.contains_key(&dead);
             session.entry(dead).or_default().push_back(Instant::now());
             drop(session);
-            if !first_for_pair {
+            // A probe, not stock: see the docs above. Judged per SURB, and before the mark, so that a
+            // probe written off first leaves the stock SURBs of the same pass free to report the pair.
+            if health.known_dead_since(&dead).is_some_and(|since| minted_at >= since) {
+                tracing::trace!(
+                    %pseudonym,
+                    relayer = %dead,
+                    "probe through a relayer known dead, written off without a new SURB generation"
+                );
                 continue;
             }
             if self.bumped.contains_key(&(pseudonym, dead)) {
-                tracing::debug!(
-                    %pseudonym,
-                    relayer = %dead,
-                    "SURB through a relayer already bumped for, written off without a new SURB generation"
-                );
-            } else {
-                self.bumped.insert((pseudonym, dead), Instant::now());
-                if !reached.contains(&pseudonym) {
-                    reached.push(pseudonym);
+                if first_for_pair {
+                    tracing::debug!(
+                        %pseudonym,
+                        relayer = %dead,
+                        "SURB through a relayer already bumped for, written off without a new SURB generation"
+                    );
                 }
+                continue;
+            }
+            self.bumped.insert((pseudonym, dead), Instant::now());
+            if !reached.contains(&pseudonym) {
+                reached.push(pseudonym);
             }
         }
         // The wipe takes what was counted, whatever else was counted for the session in this pass.
@@ -501,6 +519,11 @@ pub struct RelayerHealth {
     /// Relayers whose dead verdict has lapsed without a reply coming home through them, published at
     /// `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
     probation: DashSet<OffchainPublicKey>,
+    /// When each relayer known dead was first judged dead in its current death, kept through probation
+    /// and any later verdict until a reply revives it. A SURB minted through it after that is a probe the
+    /// planner's exploration sent, not stock the counterparty held when it died; see
+    /// [`SurbRoundTripRegistry::write_off_dead`].
+    known_dead_since: DashMap<OffchainPublicKey, Instant>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
     /// When a reply last came home, through any relayer, for any session.
@@ -788,10 +811,17 @@ impl RelayerHealth {
         }
     }
 
-    /// Records a relayer entering `dead` now.
+    /// Records a relayer entering `dead` now, which starts its death.
     fn mark_dead(&self, relayer: OffchainPublicKey) {
+        let now = Instant::now();
         self.dead.insert(relayer);
-        self.dead_since.insert(relayer, Instant::now());
+        self.dead_since.insert(relayer, now);
+        self.known_dead_since.insert(relayer, now);
+    }
+
+    /// When the relayer's current death began, while it is known dead.
+    fn known_dead_since(&self, relayer: &OffchainPublicKey) -> Option<Instant> {
+        self.known_dead_since.get(relayer).map(|since| *since)
     }
 
     /// A reply came home over `leg`, so every relayer on it is delivering: any that was judged dead or
@@ -806,6 +836,7 @@ impl RelayerHealth {
             }
             let was_dead = self.dead.remove(&relayer).is_some();
             self.dead_since.remove(&relayer);
+            self.known_dead_since.remove(&relayer);
             self.confirmed.remove(&relayer);
             let was_on_probation = self.probation.remove(&relayer).is_some();
             if was_dead || was_on_probation {
@@ -882,6 +913,7 @@ impl RelayerHealth {
                 // advanced for it, so there is nothing to probe either.
                 tracing::info!(%relayer, "dead verdict withdrawn before it was confirmed");
                 self.dead_since.remove(relayer);
+                self.known_dead_since.remove(relayer);
             }
             still
         });
@@ -2230,6 +2262,61 @@ mod tests {
         assert!(
             registry.write_off_dead().is_empty(),
             "a quick re-death after a long death is inside the cooldown"
+        );
+        Ok(())
+    }
+
+    /// Only stock advances a generation. A session the wipe never reached has no mark for the dead
+    /// relayer, one opened since or one with nothing through it at the time, and its probes through the
+    /// relayer, while it is dead, on probation or dead again, are written off without costing it its
+    /// stock. Stock minted before the death still reports its session in the same pass as a probe.
+    #[test]
+    fn a_probe_should_not_bump_a_session_the_wipe_never_reached() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let dead = key();
+        let unreached = HoprPseudonym::random();
+        let probe_for = |pseudonym| PendingSurb {
+            pseudonym,
+            ..pending_to(&[dead], None, 0)
+        };
+
+        judge_dead(&health, dead);
+        health.known_dead_since.insert(dead, ago(Duration::from_secs(2))?);
+        registry.pending.insert(
+            surb_id(1),
+            PendingSurb {
+                minted_at: ago(Duration::from_secs(5))?,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        registry.pending.insert(surb_id(2), probe_for(*SESSION));
+        registry.pending.insert(surb_id(3), probe_for(unreached));
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the stock minted before the death bumps its session; the probes bump nothing"
+        );
+        assert!(
+            registry.invalid().contains_key(&unreached),
+            "the probe is written off all the same"
+        );
+
+        health.dead.remove(&dead);
+        health.confirmed.remove(&dead);
+        health.probation.insert(dead);
+        registry.pending.insert(surb_id(4), probe_for(unreached));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a probe through a relayer on probation"
+        );
+
+        health.probation.remove(&dead);
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(5), probe_for(unreached));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "nor once the relayer is dead again: the death began before the probe"
         );
         Ok(())
     }
