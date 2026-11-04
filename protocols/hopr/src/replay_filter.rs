@@ -94,8 +94,17 @@ pub struct ReplayFilterConfig {
     pub shards: usize,
 }
 
+/// Lower bound on the number of tokens a single shard holds per generation, enforced by the validator.
+///
+/// The check and the insertion are two separate lock acquisitions with the whole decode between them, so a token
+/// committed by one decode can be lost to a second one only if the shard rotates *twice* in that window - that is,
+/// if two full generations are inserted into one shard while a single packet is being decoded. One slot per shard
+/// would make that two packets; this floor keeps the window at the same order as the default configuration's.
+pub const MIN_CAPACITY_PER_SHARD: usize = 64;
 /// Lower bound on [`ReplayFilterConfig::max_tracked_packets`], enforced by the validator.
-pub const MIN_TRACKED_PACKETS: usize = 1024;
+///
+/// Sized so that the default shard count gets [`MIN_CAPACITY_PER_SHARD`] slots each.
+pub const MIN_TRACKED_PACKETS: usize = MIN_CAPACITY_PER_SHARD * DEFAULT_SHARDS;
 /// Lower bound on [`ReplayFilterConfig::shards`], enforced by the validator.
 pub const MIN_SHARDS: usize = 1;
 /// Upper bound on [`ReplayFilterConfig::shards`], enforced by the validator.
@@ -121,17 +130,27 @@ fn default_shards() -> usize {
     DEFAULT_SHARDS
 }
 
-/// Rejects a configuration whose capacity does not give every shard at least one slot.
+/// Rejects a configuration whose capacity does not give every shard [`MIN_CAPACITY_PER_SHARD`] slots.
 ///
 /// The field-wise ranges cannot express this: `max_tracked_packets` has a floor and `shards` has a ceiling, but
 /// nothing stops the ceiling from exceeding the floor divided by the shard count. [`TagReplayFilter::new`] would
 /// otherwise have to clamp, silently remembering fewer tokens than the configuration asked for.
+///
+/// The per-shard floor is more than "at least one": a shard with a single slot rotates on every distinct token, and
+/// since the check and the commit are separate lock acquisitions, two rotations during one decode would let the
+/// same packet through twice. See [`MIN_CAPACITY_PER_SHARD`].
 fn validate_capacity_per_shard(cfg: &ReplayFilterConfig) -> Result<(), validator::ValidationError> {
-    if cfg.shards > 0 && cfg.max_tracked_packets / cfg.shards == 0 {
+    if cfg.shards == 0 {
+        return Ok(());
+    }
+
+    let per_shard = cfg.max_tracked_packets / cfg.shards;
+    if per_shard < MIN_CAPACITY_PER_SHARD {
         let mut err = validator::ValidationError::new("max_tracked_packets");
         err.message = Some(
             format!(
-                "max_tracked_packets must be at least {MIN_TRACKED_PACKETS} and at least one per shard ({})",
+                "max_tracked_packets must be at least {MIN_TRACKED_PACKETS} and at least {MIN_CAPACITY_PER_SHARD} per \
+                 shard ({} shards leave {per_shard})",
                 cfg.shards
             )
             .into(),
@@ -404,6 +423,50 @@ mod tests {
         );
     }
 
+    /// A token that lives only in the retired generation must still be reported by `commit`, not just by
+    /// `contains`. The decoder calls `commit` directly, so this is the path a duplicate takes there.
+    #[test]
+    fn commit_should_report_a_token_from_the_retired_generation() {
+        // One shard, so every token lands in it and the rotation is deterministic.
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
+        let ours = token(0);
+        filter.commit(&ours);
+
+        // Fill the generation so that `ours` is retired into `previous`.
+        for i in 1..=filter.capacity() as u64 {
+            filter.commit(&token(i));
+        }
+        assert!(filter.contains(&ours), "the retired generation still knows it");
+
+        assert!(
+            filter.commit(&ours),
+            "commit must report a token only the retired generation knows"
+        );
+        assert_eq!(
+            filter.count(),
+            1,
+            "a commit that found the token in the retired generation must not also insert it"
+        );
+    }
+
+    /// `count` reports the current generations only: it is reset by a rotation and never includes the retired one.
+    #[test]
+    fn count_should_track_the_current_generation_only() {
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
+        assert_eq!(0, filter.count(), "a new filter has inserted nothing");
+
+        let capacity = filter.capacity();
+        for i in 0..capacity as u64 {
+            filter.commit(&token(i));
+        }
+        assert_eq!(capacity, filter.count(), "a full generation is counted");
+
+        // One more distinct token rotates the shard and starts a fresh generation.
+        filter.commit(&token(u64::MAX));
+        assert_eq!(1, filter.count(), "the count restarts with the new generation");
+        assert_eq!(capacity, filter.capacity(), "capacity is unaffected by rotation");
+    }
+
     #[test]
     fn shard_selection_spreads_tokens() {
         let filter = TagReplayFilter::new(&config(1024, 64));
@@ -427,28 +490,38 @@ mod tests {
         );
     }
 
-    /// The field-wise ranges accept `(1024, 4096)` - the floor and the shard ceiling - yet that leaves every shard
-    /// with zero slots. The config-level check is what rejects it, and it must not reject a configuration whose
-    /// capacity merely does not divide evenly.
+    /// The field-wise ranges accept the floor capacity together with the shard ceiling, yet that leaves far fewer
+    /// slots per shard than [`MIN_CAPACITY_PER_SHARD`]. The config-level check is what rejects it - and it must not
+    /// reject a configuration whose capacity merely does not divide evenly.
     #[test]
-    fn a_capacity_smaller_than_the_shard_count_must_be_rejected() {
+    fn a_configuration_with_too_little_capacity_per_shard_must_be_rejected() {
         assert!(
             validator::Validate::validate(&config(MIN_TRACKED_PACKETS, MAX_SHARDS)).is_err(),
-            "a capacity below one per shard must be rejected"
+            "the floor capacity split across the shard ceiling leaves too few slots per shard"
         );
         assert!(
-            validator::Validate::validate(&config(MIN_TRACKED_PACKETS, MIN_TRACKED_PACKETS / 2)).is_ok(),
-            "one slot per shard is enough"
+            validator::Validate::validate(&config(MIN_CAPACITY_PER_SHARD * 63, 64)).is_err(),
+            "one below the per-shard floor must be rejected"
         );
-        validator::Validate::validate(&config(MIN_TRACKED_PACKETS + 1, 64))
-            .expect("an uneven split must still be accepted");
+        assert!(
+            validator::Validate::validate(&config(MIN_CAPACITY_PER_SHARD * 64, 64)).is_ok(),
+            "exactly the per-shard floor must be accepted"
+        );
+        assert!(
+            validator::Validate::validate(&config(MIN_CAPACITY_PER_SHARD * 64 + 1, 64)).is_ok(),
+            "an uneven split must still be accepted"
+        );
     }
 
-    /// Every accepted configuration gives each shard a slot, so the filter's capacity is the configured value up to
-    /// the shard count, and never larger than it.
+    /// Every accepted configuration gives each shard the per-shard floor, so the filter's capacity is the configured
+    /// value up to the shard count, and never larger than it.
     #[test]
     fn an_accepted_configuration_never_widens_the_capacity() {
-        for (packets, shards) in [(MIN_TRACKED_PACKETS, 64), (MIN_TRACKED_PACKETS + 1, 64), (4096, 4096)] {
+        for (packets, shards) in [
+            (MIN_TRACKED_PACKETS, 64),
+            (MIN_TRACKED_PACKETS + 1, 64),
+            (MIN_CAPACITY_PER_SHARD * MAX_SHARDS, MAX_SHARDS),
+        ] {
             let cfg = config(packets, shards);
             validator::Validate::validate(&cfg).expect("must be a valid configuration");
             let filter = TagReplayFilter::new(&cfg);
@@ -462,9 +535,10 @@ mod tests {
 
     #[test]
     fn shard_count_must_be_a_power_of_two() {
-        let err = validator::Validate::validate(&config(1024, 3)).expect_err("3 shards must be rejected");
+        // The capacity is generous in both cases, so only the shard rule can decide.
+        let err = validator::Validate::validate(&config(65_536, 3)).expect_err("3 shards must be rejected");
         assert!(err.field_errors().contains_key("shards"));
-        validator::Validate::validate(&config(1024, 64)).expect("64 shards must be accepted");
+        validator::Validate::validate(&config(65_536, 64)).expect("64 shards must be accepted");
     }
 
     #[test]

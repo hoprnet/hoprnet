@@ -76,6 +76,7 @@ mod tests {
         atomic::{AtomicU64, Ordering},
     };
 
+    use anyhow::Context;
     use bytes::Bytes;
     use hopr_api::types::{
         crypto::prelude::*,
@@ -454,6 +455,68 @@ mod tests {
             .relay_decoder
             .decode(f.receiver.offchain_key.public().into(), first.data);
         assert!(replayed.unwrap_err().is_replay(), "a replayed reply must be caught");
+
+        Ok(())
+    }
+
+    /// A packet that never authenticates must not consume the SURB reply opener it names. The opener lookup is a
+    /// removing read, so if it ran for a forged packet the genuine reply would find nothing and be lost.
+    #[tokio::test]
+    async fn a_forged_packet_should_not_consume_a_reply_opener() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let pseudonym = HoprPseudonym::random();
+
+        // One SURB out to the receiver, so the sender holds the opener that will decrypt the reply.
+        let out_packet = f.sender_encoder.encode_packet(
+            b"a message carrying a surb",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)
+            .context("relay must forward the packet carrying the surb")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+        f.receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet)
+            .context("receiver must accept the packet and store the surb")?;
+
+        // The reply leaves the receiver and is relayed back towards the sender, which is where its opener lives.
+        let reply = f.surb_reply(pseudonym, b"the genuine reply")?;
+        let reply_to_sender = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), reply.data)
+            .context("relay must forward the reply")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("reply is not forwarded"))?
+            .data
+            .clone();
+
+        // A forged copy of what the sender will receive: a valid alpha, so the tag is derivable and `is_replay`
+        // runs, but a corrupted header, so it never authenticates - and so must never reach the opener lookup.
+        const ALPHA_LEN: usize = 32;
+        let mut forged = reply_to_sender.to_vec();
+        forged[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+        let forged = Bytes::from(forged);
+
+        assert!(
+            f.sender_decoder
+                .decode(f.relay.offchain_key.public().into(), forged)
+                .unwrap_err()
+                .is_undecodable(),
+            "a forged reply must not decode"
+        );
+
+        // The genuine reply must still decrypt at the sender, which it can only do if its opener survived.
+        f.sender_assert_reply(reply_to_sender, b"the genuine reply")?;
 
         Ok(())
     }
