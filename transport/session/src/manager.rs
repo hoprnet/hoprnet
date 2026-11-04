@@ -1205,16 +1205,17 @@ impl SessionSlot {
     }
 }
 
-/// Counts the SURB a return packet will take as consumed in `estimator`, and marks the packet as
-/// counted.
+/// Counts the SURB a return packet will take as consumed in `estimator`, and attaches the refund that
+/// gives it back.
 ///
 /// The Exit counts as it hands a packet on, because its reserve and admission decisions need the count
-/// at once. Routing resolution may still find no SURB within its wait and drop the packet; the mark is
-/// what lets it report that back, so that [`SessionManager::on_return_packet_starved`] gives the SURB
-/// back to the estimate.
+/// at once. Routing resolution may still find no SURB within its wait and drop the packet; the refund
+/// then books the SURB back into this estimator's stock (see [`SurbRefund`]). It points at the
+/// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
+/// Session's slot since, and it never touches the slot.
 fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: ApplicationDataOut) -> ApplicationDataOut {
     estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    data.packet_info.get_or_insert_default().surb_consumption_counted = true;
+    data.surb_refund = SurbRefund::to(estimator.produced.clone());
     data
 }
 
@@ -5420,25 +5421,6 @@ where
         }
     }
 
-    /// Gives back the SURB the Session `id` counted as consumed for a return packet that routing
-    /// resolution then dropped for want of one.
-    ///
-    /// The packet spent nothing. Left counted, it would keep the Session's estimate one below the stock
-    /// for good, and the Entry, which reads the Exit's level reports, would mint one SURB more to make
-    /// up for it. The drop that matters is a level report: it goes out whatever the estimate says, so
-    /// that it can ask for SURBs, and finds none when the stock is empty. A Session that is gone is
-    /// ignored, and the count never goes below zero.
-    pub fn on_return_packet_starved(&self, id: &SessionId) {
-        if let Some(slot) = self.sessions.get(id) {
-            let _ = slot.surb_estimator.consumed.fetch_update(
-                std::sync::atomic::Ordering::Relaxed,
-                std::sync::atomic::Ordering::Relaxed,
-                |consumed| consumed.checked_sub(1),
-            );
-            trace!(session_id = %id, "gave back the SURB counted for a return packet dropped for want of one");
-        }
-    }
-
     /// Retrieves the configuration of SURB balancing for the given Session.
     ///
     /// Returns an error if the Session with the given `id` does not exist.
@@ -8063,7 +8045,6 @@ mod tests {
             signals_to_destination: PacketSignal::SurbDistress.into(),
             max_surbs_in_packet: usize::MAX,
             surb_generation: Some(7),
-            surb_consumption_counted: false,
         });
 
         cap_organic_surbs(&mut data, 1, &gate_state(100, 200));
@@ -8195,51 +8176,31 @@ mod tests {
     }
 
     /// A return packet the Exit counted as consumed, and routing resolution then dropped for want of a
-    /// SURB, spent nothing: its count is given back, once per packet and never below zero, and a
-    /// Session that is gone is left alone.
-    #[test_log::test(tokio::test)]
-    async fn a_starved_return_packet_should_give_back_the_surb_it_was_counted_for() -> anyhow::Result<()> {
-        let pseudonym = HoprPseudonym::random();
-        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
-        let surb_estimator = AtomicSurbFlowEstimator::default();
-        let consumed = || surb_estimator.consumed.load(std::sync::atomic::Ordering::Relaxed);
+    /// SURB, spent nothing. Its refund books the SURB back into the stock of the estimator that counted
+    /// it, as one more SURB produced rather than one fewer consumed: the balancer reads the counters as
+    /// deltas between samples and rejects a snapshot in which one of them went down.
+    #[test]
+    fn a_counted_return_packet_should_give_its_surb_back_to_the_estimator_that_counted_it() -> anyhow::Result<()> {
+        use crate::balancer::{SimpleSurbFlowEstimator, SurbFlowEstimator};
 
-        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
-        mgr.sessions.insert(
-            pseudonym,
-            SessionSlot {
-                session_tx: dummy_tx,
-                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
-                abort_handles: Default::default(),
-                surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
-                surb_estimator: surb_estimator.clone(),
-                current_ssa_state: Default::default(),
-                pix_supervisor: Default::default(),
-                pix_egress_gate: Default::default(),
-                pix_fill: Default::default(),
-                returned_packets: Default::default(),
-                cycle_budget: None,
-                admission_token: Default::default(),
-            },
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let data = count_return_packet_surb(&estimator, small_outgoing_packet()?);
+        assert!(data.surb_refund.is_counted(), "a counted packet carries its refund");
+        assert_eq!(9, estimator.saturating_diff(), "counted as it was handed on");
+
+        let before = SimpleSurbFlowEstimator::from(&estimator);
+        data.surb_refund.give_back();
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "the starved packet's SURB is back in stock"
         );
-
-        for _ in 0..2 {
-            let data = count_return_packet_surb(&surb_estimator, small_outgoing_packet()?);
-            assert!(
-                data.packet_info.is_some_and(|info| info.surb_consumption_counted),
-                "a counted packet is marked, so that resolution can report it back"
-            );
-        }
-        assert_eq!(2, consumed());
-
-        mgr.on_return_packet_starved(&pseudonym);
-        assert_eq!(1, consumed(), "one packet starved, one SURB given back");
-
-        mgr.on_return_packet_starved(&pseudonym);
-        mgr.on_return_packet_starved(&pseudonym);
-        assert_eq!(0, consumed(), "never below zero");
-
-        mgr.on_return_packet_starved(&HoprPseudonym::random());
+        assert_eq!(
+            Some(1),
+            SimpleSurbFlowEstimator::from(&estimator).estimated_surb_buffer_change(&before),
+            "every counter still grows, so the balancer takes the next sample as +1 instead of rejecting it"
+        );
         Ok(())
     }
 

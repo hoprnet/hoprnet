@@ -878,16 +878,6 @@ where
             distress_threshold,
             routing_concurrency,
             crate::path::resolve::surb_resolution_wait(self.cfg.packet.pipeline.surb_resolution_wait),
-            // A return packet dropped for want of a SURB spent none: give back the SURB its Session
-            // counted for it. Weak, so the pipeline does not keep the session manager alive.
-            {
-                let smgr = Arc::downgrade(&self.smgr);
-                move |pseudonym: &HoprPseudonym| {
-                    if let Some(smgr) = smgr.upgrade() {
-                        smgr.on_return_packet_starved(pseudonym);
-                    }
-                }
-            },
         );
 
         let channels_dst = self
