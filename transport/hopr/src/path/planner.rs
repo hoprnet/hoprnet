@@ -339,6 +339,19 @@ fn pick_exploring_index(weights: &[f64], allow_implausible: impl FnOnce() -> boo
     pick_uniform_index(plausible.len()).map(|i| plausible[i])
 }
 
+/// Zeroes every weight below [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, so that a weighted draw over
+/// `weights` never lands on a candidate the weights all but reject.
+///
+/// For ordinary forward draws. A return draw keeps such a candidate at its tempered weight, because a
+/// reply through it is what can end a relayer's probation. A forward packet probes nothing, so on such
+/// a candidate all it can do is be lost.
+fn gate_implausible(weights: &mut [f64]) {
+    let floor = weights.iter().copied().fold(0.0, f64::max) * PLAUSIBLE_WEIGHT_FRACTION;
+    for weight in weights.iter_mut().filter(|weight| **weight < floor) {
+        *weight = 0.0;
+    }
+}
+
 /// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
 /// candidates without reordering them.
 ///
@@ -782,18 +795,20 @@ where
                 // paths that get drawn, so without it a forward candidate that fell out of favour is
                 // never measured again, and the stream settles on one path.
                 //
-                // Over plausible candidates only: a forward packet through a relayer on probation, or
-                // over an edge probes measured dead, is data lost, PIX shares and SURBs with it, and it
-                // probes nothing (a probation ends on a reply through the relayer, which only a return
-                // path carries).
+                // Over plausible candidates only, exploring or not: a forward packet through a relayer
+                // on probation, or over an edge probes measured dead, is data lost, PIX shares and
+                // SURBs with it, and it probes nothing (a probation ends on a reply through the
+                // relayer, which only a return path carries). Tempered, a relayer on probation keeps
+                // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
+                let mut weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
                 let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
-                    let weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
                     pick_exploring_index(&weights, || false)
-                        .and_then(|i| paths.iter().nth(i))
-                        .map(|(vp, _)| vp.clone())
                 } else {
-                    paths.pick_one()
-                };
+                    gate_implausible(&mut weights);
+                    pick_weighted_index(&weights)
+                }
+                .and_then(|i| paths.iter().nth(i))
+                .map(|(vp, _)| vp.clone());
                 drawn.ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(
                         hops_usize,
@@ -2532,11 +2547,11 @@ mod tests {
         Ok(())
     }
 
-    /// A forward draw never explores into a relayer the weights all but reject, such as one on
-    /// probation: only its tempered weight still draws it, a few percent, where exploration would add a
-    /// half of every tenth draw.
+    /// A forward draw never goes through a relayer the weights all but reject, such as one on
+    /// probation, exploring or not. Ungated, its tempered weight alone drew it a few percent of the
+    /// time, and uniform exploration added half of every tenth draw.
     #[tokio::test]
-    async fn forward_draws_should_not_explore_into_a_relayer_on_probation() -> anyhow::Result<()> {
+    async fn forward_draws_should_never_go_through_a_relayer_on_probation() -> anyhow::Result<()> {
         use hopr_api::graph::NetworkGraphUpdate;
 
         let (planner, graph) = two_relayer_forward_planner();
@@ -2557,13 +2572,32 @@ mod tests {
                 via_b += 1;
             }
         }
-        // Tempered weight alone: 0.9 x 4000 x sqrt(1e-3) / (1 + sqrt(1e-3)) ~ 110. With uniform
-        // exploration over both candidates it would be ~310.
-        assert!(
-            via_b < 220,
-            "a relayer on probation keeps only its tempered share of the forward draws, got {via_b} of 4000"
+        // Ungated, the tempered weight alone drew about 0.9 x 4000 x sqrt(1e-3) / (1 + sqrt(1e-3)) ~ 110,
+        // and uniform exploration over both candidates about 310.
+        assert_eq!(
+            0, via_b,
+            "a relayer on probation draws no forward packet, got {via_b} of 4000"
         );
         Ok(())
+    }
+
+    #[test]
+    fn gating_should_zero_only_the_implausible_weights() {
+        let mut weights = [1.0, 0.8, 0.1, 0.03, 0.0];
+        gate_implausible(&mut weights);
+        assert_eq!(
+            [1.0, 0.8, 0.1, 0.0, 0.0],
+            weights,
+            "a tenth of the best stays plausible, anything less is zeroed"
+        );
+        assert!(
+            (0..2000).filter_map(|_| pick_weighted_index(&weights)).all(|i| i < 3),
+            "a weighted draw over the gated weights never lands on an implausible candidate"
+        );
+
+        let mut nothing = [0.0, 0.0];
+        gate_implausible(&mut nothing);
+        assert_eq!(None, pick_weighted_index(&nothing), "nothing to draw from");
     }
 
     #[test]
