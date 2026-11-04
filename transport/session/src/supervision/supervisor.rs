@@ -1828,7 +1828,9 @@ impl SessionPixSupervisor {
         if self.ssas[idx].phase == SsaPhase::Recovering && is_front {
             vec![SessionPixAction::ProgressNotification]
         } else {
-            Vec::new()
+            // Nothing for the gate, but the reconstructor took the shares all the same: without this the
+            // occupancy gauge would wait for the front's next progress, a retirement or the close.
+            vec![SessionPixAction::RefreshHeldShares]
         }
     }
 
@@ -3426,8 +3428,8 @@ mod tests {
         );
 
         assert!(
-            actions.is_empty(),
-            "off-front progress must not reopen the gate, got {actions:?}"
+            matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+            "off-front progress must not reopen the gate, only refresh the occupancy gauge, got {actions:?}"
         );
     }
 
@@ -4004,7 +4006,7 @@ mod tests {
     /// A snapshot carrying only surplus must keep the cycle alive without paying it anything.
     ///
     /// This is the whole of C1 at the supervisor. A conforming Entry drains an emission window's
-    /// surplus in one contiguous run — `surplus × min(polys, 256)` packets, 20 224 at the shipped
+    /// surplus in one contiguous run — `surplus × min(polys, 512)` packets, 40 448 at the shipped
     /// dimensions — during which `useful_shares` does not move at all. Every one of those packets is
     /// service the Exit is consuming, so a supervisor that keyed liveness on `useful_shares` would
     /// let the run exhaust `max_served_without_progress`, park the writer, and then close an honest
@@ -4391,8 +4393,8 @@ mod tests {
             850,
         );
         assert!(
-            actions.is_empty(),
-            "off-front progress must neither convict nor reopen the gate"
+            matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+            "off-front progress must neither convict nor reopen the gate, got {actions:?}"
         );
         assert!(!sup.closed);
     }
@@ -4502,7 +4504,10 @@ mod tests {
                 now,
                 useful,
             );
-            assert!(actions.is_empty(), "{useful} shares is below the floor and off-front");
+            assert!(
+                matches!(actions.as_slice(), [SessionPixAction::RefreshHeldShares]),
+                "{useful} shares is below the floor and off-front, got {actions:?}"
+            );
         }
 
         let actions = sup.handle_event(
