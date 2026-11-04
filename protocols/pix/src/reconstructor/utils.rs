@@ -376,6 +376,13 @@ impl<S: PixSpec> SsaCycle<S> {
     }
 
     /// The accumulator that sums recovered parts into the SSA scalar.
+    /// Shares held by this cycle's part builders, i.e. by the polynomials still short of their
+    /// threshold. Takes each part's lock in turn, briefly; meant for an occasional reading, not the
+    /// share path.
+    pub fn held_shares(&self) -> usize {
+        self.parts.iter().map(|part| part.lock().verification_state_len()).sum()
+    }
+
     pub fn builder(&self) -> &parking_lot::Mutex<SsaBuilder<S>> {
         &self.builder
     }
@@ -581,8 +588,8 @@ impl<S: PixSpec> SsaPartBuilder<S> {
 
     /// Number of collected shares still held.
     ///
-    /// Drops to zero once the part is reconstructed, or once it has failed its commitment.
-    #[cfg(test)]
+    /// Drops to zero once the part is reconstructed, or once it has failed its commitment. This is
+    /// the occupancy `hopr_pix_held_shares` reports, summed over every live part of every cycle.
     pub(crate) fn verification_state_len(&self) -> usize {
         self.shares.len()
     }

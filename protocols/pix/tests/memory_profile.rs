@@ -30,8 +30,9 @@ use common::TestSpec;
 use hopr_protocol_pix::{
     AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixScalar,
-    PolynomialIndex, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig,
-    SsaShareGenerator, TaggedEncryptedPartialSsaShare, peak_cycle_bytes, peak_share_buffer_bytes,
+    PolynomialIndex, SHARE_EMISSION_WINDOW, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor,
+    SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare, peak_cycle_bytes,
+    peak_share_buffer_bytes,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
@@ -539,10 +540,34 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
          to baseline a meaningful leak check.\n"
     );
 
+    // The conforming peak against the adversarial bound the Session layer budgets by. Emission is
+    // windowed, so only `SHARE_EMISSION_WINDOW` polynomials hold a share buffer at once and this
+    // peak sits well under `peak_cycle_bytes`, which prices every polynomial one share short; the
+    // window is the knob that moves this reading (measured 5.0 MiB at 256, 5.7 MiB at 512 for the
+    // deployed dimensions), the bound does not move with it.
+    let window = SHARE_EMISSION_WINDOW.min(polys);
+    let window_buffers = window * peak_share_buffer_bytes::<TestSpec>(&params) as usize;
+    println!(
+        "  emission window                  {window} polynomials; their share buffers at capacity {:>9.1} MiB",
+        mib(window_buffers)
+    );
+    println!(
+        "  peak_cycle_bytes(params)         {:>9.1} MiB  (conforming peak uses {:.0}% of it)",
+        mib(peak_cycle_bytes::<TestSpec>(&params) as usize),
+        100.0 * peak_over_baseline as f64 / peak_cycle_bytes::<TestSpec>(&params) as f64
+    );
+
     assert!(recovered, "a production-width cycle must recover the SSA");
     assert!(
         peak_over_baseline >= install_over_baseline,
         "the peak cannot be below the commitment-install figure"
+    );
+    assert!(
+        peak_over_baseline <= peak_cycle_bytes::<TestSpec>(&params) as usize,
+        "a conforming cycle's peak ({:.1} MiB) must stay under the adversarial bound the Session layer budgets by \
+         ({:.1} MiB); widening SHARE_EMISSION_WINDOW moves the former, not the latter",
+        mib(peak_over_baseline),
+        mib(peak_cycle_bytes::<TestSpec>(&params) as usize)
     );
     // No share has been consumed at install, so this reading is the per-polynomial cost with an
     // empty share buffer — exactly the term `peak_cycle_bytes` adds for every polynomial before any
