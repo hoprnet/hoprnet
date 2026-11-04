@@ -16,13 +16,17 @@ jq 'select(.fields.event == "node_state") | .fields.state | fromjson' node.jsonl
 The record contains exact Safe balance/allowance, source-visible local channel and
 funding summaries, connected/announced/open-channel peer counts, destination and
 search-phase health, sibling forward/reply SURB counts, and neighbor/loopback probe
-outcomes. The connector caps the JSON payload at 24 KiB, excluding the logger
+outcomes. The connector caps the JSON payload at 32 KiB, excluding the logger
 wrapper. It reads adjacent local channels in batches and preserves partial results,
 read errors, timeouts, omitted detail and counter overflow. It is not an atomic or
 freshness-verified chain snapshot. Identities use the connector's JSON serialization;
 compare serialized identities rather than assuming a particular display format.
 
-The builder supplies one shared `IntervalCounters` handle to transport. Resolver
+The transport does not depend on the state dump. It reports `TransportEvent`s (path
+resolves, graph searches, SURB mints and returns, probe outcomes) to an optional
+`TransportObserver`, and `hopr_lib::state_dump` records them in the connector's
+`IntervalCounters`. Successful resolves and SURB counts never wait for the counters'
+lock; when it is busy they are counted in the totals and overflow only. Resolver
 calls include cache hits; selector counters count actual queries and their phase
 results. Return-path batches count once per batch. Known destinations normalize to
 offchain keys; an unresolved chain address remains a chain identity. SURB producers
@@ -34,8 +38,15 @@ distinct from genuine zero activity.
 
 Custom chain implementations used with the node builder must implement the
 connector's error-preserving `StateRead` diagnostic interface. Custom transport
-embedders can use `HoprTransport::new_with_state_dump` with their reporter's shared
-handle; `HoprTransport::new` leaves diagnostics unconfigured.
+embedders can pass their own observer to `HoprTransport::new_with_observer`;
+`HoprTransport::new` reports nothing.
+
+The embedding node can add up to four named sections to every record with
+`HoprBuilderConfigured::with_state_dump_section`, for example the states of its
+strategies (`MultiStrategy::state_observer` in hopr-strategy). Each section is read
+once per record and capped at 2 KiB. Underfunded outgoing channels are listed by name
+(up to sixteen, lowest balance first); incoming channels are funded by their
+counterparty and are not counted as underfunded.
 
 Routine probe ping/pong, expiry, path resolution, selector candidates/search failures,
 return-path draws, SURB mint/decode and per-pair round-trip details use TRACE. Relayer
