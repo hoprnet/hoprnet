@@ -266,6 +266,12 @@ fn pick_uniform_index(len: usize) -> Option<usize> {
 /// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
 /// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
 /// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
+///
+/// Those figures are for the default `return_path_weight_temper` of 0.5. A weight tempered by `t`
+/// puts a relayer on probation at `0.001^t` of a healthy one, so a temper of 1/3 or less lifts it to
+/// this fraction or above: exploration then counts it as plausible, forward draws among them, and
+/// the probe budget no longer holds it back. Whoever lowers the temper that far trades this gate for
+/// the wider spread.
 const PLAUSIBLE_WEIGHT_FRACTION: f64 = 0.1;
 
 /// How often an exploring return draw may pick a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`],
