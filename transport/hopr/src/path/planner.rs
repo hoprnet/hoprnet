@@ -83,10 +83,13 @@ pub struct PathPlannerConfig {
     /// re-weighted rather than one that expired under it.
     #[default(Duration::from_secs(5))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    #[validate(custom(function = "validate_refresh_period"))]
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
+    /// Must be at least 1: a zero limit leaves the selector unable to return any multi-hop path.
     #[default = 50]
+    #[validate(range(min = 1))]
     pub max_cached_paths: usize,
     /// Penalty multiplier for edges lacking probe-based quality observations.
     /// Applied during path cost evaluation to down-weight unprobed edges.
@@ -154,6 +157,19 @@ pub struct PathPlannerConfig {
     #[default(Duration::from_secs(30))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
+}
+
+/// Shortest accepted `refresh_period`. A zero period makes the sweep loop rebuild every cached
+/// multi-hop path back to back, keeping the selector and resolver continuously busy.
+const MIN_REFRESH_PERIOD: Duration = Duration::from_secs(1);
+
+fn validate_refresh_period(period: &Duration) -> std::result::Result<(), ValidationError> {
+    if *period >= MIN_REFRESH_PERIOD {
+        return Ok(());
+    }
+    let mut err = ValidationError::new("refresh_period_too_short");
+    err.message = Some(format!("refresh_period ({period:?}) must be at least {MIN_REFRESH_PERIOD:?}").into());
+    Err(err)
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -1242,6 +1258,32 @@ mod tests {
             (0..1_000).any(|_| pick_uniform_index(weights.len()) == Some(1)),
             "an exploratory draw must be able to reach it"
         );
+    }
+
+    #[test]
+    fn a_zero_candidate_limit_should_fail_validation() {
+        let cfg = PathPlannerConfig {
+            max_cached_paths: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+        assert!(PathPlannerConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn a_refresh_period_below_the_minimum_should_fail_validation() {
+        for period in [Duration::ZERO, MIN_REFRESH_PERIOD - Duration::from_millis(1)] {
+            let cfg = PathPlannerConfig {
+                refresh_period: period,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "{period:?} must be rejected");
+        }
+        let cfg = PathPlannerConfig {
+            refresh_period: MIN_REFRESH_PERIOD,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
     }
 
     /// Cached candidate weights are frozen at fill time, so the TTL bounds how stale the numbers a
