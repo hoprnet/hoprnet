@@ -2065,7 +2065,8 @@ mod tests {
     /// a raised target widens the ring the token names, and a stale token (a successor Session's
     /// admission) leaves the resident ring at the size its own admission gave it.
     #[test]
-    fn surb_admission_raise_target_delegates_to_the_store() {
+    fn surb_admission_raise_target_delegates_to_the_store() -> anyhow::Result<()> {
+        use anyhow::Context;
         use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
         use hopr_protocol_hopr::SurbStoreConfig;
 
@@ -2081,7 +2082,7 @@ mod tests {
         let ping_ceiling = admission
             .store
             .admitted_ring_ceiling(&pseudonym)
-            .expect("the admission must have installed a ring");
+            .context("the admission must have installed a ring")?;
         assert_eq!(1_032, ping_ceiling, "fixture: 688 with 50% headroom");
 
         admission.raise_target(&pseudonym, token, 6_887);
@@ -2107,5 +2108,7 @@ mod tests {
             admission.store.admitted_ring_ceiling(&pseudonym).is_none(),
             "the retire must release the ring"
         );
+
+        Ok(())
     }
 }
