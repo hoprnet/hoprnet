@@ -36,14 +36,29 @@ pub trait SurbFlowEstimator {
         0
     }
 
-    /// Subtracts SURBs consumed and evicted from SURBs produced, saturating at zero.
+    /// Estimates the number of SURBs counted as consumed for a packet that then found none and was
+    /// dropped, and given back.
     ///
-    /// Consumed and evicted SURBs have both left the buffer, so what remains is
-    /// `produced - consumed - evicted` -- the count the buffer actually holds. Read by the Exit's
-    /// keep-alive level report and by the PIX fill-reserve gate, both of which otherwise saw a count
-    /// inflated by every SURB the full store ever evicted.
+    /// Only [`saturating_diff`](Self::saturating_diff) adds these back, where a count that was never
+    /// undone would hold the result one low for good. The balancer's
+    /// [`estimated_surb_buffer_change`](Self::estimated_surb_buffer_change) leaves them out: its
+    /// accumulated level saturates at zero, so a count made while it was empty took nothing off it,
+    /// and the refund added back would be a SURB nobody holds. Defaults to `0` for estimators whose
+    /// sender gives nothing back. Value returned on each call must be equal or greater to a previous
+    /// call.
+    fn estimate_surbs_refunded(&self) -> u64 {
+        0
+    }
+
+    /// Subtracts SURBs consumed and evicted from SURBs produced and given back, saturating at zero.
+    ///
+    /// Consumed and evicted SURBs have both left the buffer, and a SURB given back never did, so what
+    /// remains is `produced + refunded - consumed - evicted` -- the count the buffer actually holds.
+    /// Read by the PIX fill-reserve gate and the drain budget, which otherwise saw a count inflated by
+    /// every SURB the full store ever evicted.
     fn saturating_diff(&self) -> u64 {
         self.estimate_surbs_produced()
+            .saturating_add(self.estimate_surbs_refunded())
             .saturating_sub(self.estimate_surbs_consumed())
             .saturating_sub(self.estimate_surbs_evicted())
     }
@@ -59,6 +74,7 @@ pub trait SurbFlowEstimator {
     /// Evictions count as SURBs leaving the buffer alongside consumption: a tick that receives some
     /// SURBs while the full store drops others nets only what it actually retained. Without this the
     /// accumulated level drifts above the real occupancy by every SURB the store ever evicted.
+    /// SURBs given back are left out; see [`estimate_surbs_refunded`](Self::estimate_surbs_refunded).
     /// Returns `None` if `earlier` had more SURBs produced/consumed/evicted than this instance (overflow).
     fn estimated_surb_buffer_change<E: SurbFlowEstimator>(&self, earlier: &E) -> Option<i64> {
         match (
@@ -143,6 +159,8 @@ pub struct SimpleSurbFlowEstimator {
     pub consumed: u64,
     /// Number of SURBs evicted from the buffer on overflow.
     pub evicted: u64,
+    /// Number of SURBs counted as consumed for packets that then found none, and given back.
+    pub refunded: u64,
 }
 
 impl<T: SurbFlowEstimator> From<&T> for SimpleSurbFlowEstimator {
@@ -151,6 +169,7 @@ impl<T: SurbFlowEstimator> From<&T> for SimpleSurbFlowEstimator {
             produced: value.estimate_surbs_produced(),
             consumed: value.estimate_surbs_consumed(),
             evicted: value.estimate_surbs_evicted(),
+            refunded: value.estimate_surbs_refunded(),
         }
     }
 }
@@ -167,6 +186,10 @@ impl SurbFlowEstimator for SimpleSurbFlowEstimator {
     fn estimate_surbs_evicted(&self) -> u64 {
         self.evicted
     }
+
+    fn estimate_surbs_refunded(&self) -> u64 {
+        self.refunded
+    }
 }
 
 /// An implementation of `SurbFlowEstimator` that tracks the number of produced
@@ -179,6 +202,8 @@ pub struct AtomicSurbFlowEstimator {
     pub produced: std::sync::Arc<std::sync::atomic::AtomicU64>,
     /// Number of received SURBs the buffer evicted on overflow.
     pub evicted: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Number of SURBs counted as consumed for packets that then found none, and given back.
+    pub refunded: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl SurbFlowEstimator for AtomicSurbFlowEstimator {
@@ -192,6 +217,10 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
 
     fn estimate_surbs_evicted(&self) -> u64 {
         self.evicted.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn estimate_surbs_refunded(&self) -> u64 {
+        self.refunded.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -223,16 +252,19 @@ mod tests {
             produced: 10,
             consumed: 5,
             evicted: 0,
+            refunded: 0,
         };
         let estimator_2 = SimpleSurbFlowEstimator {
             produced: 15,
             consumed: 11,
             evicted: 0,
+            refunded: 0,
         };
         let estimator_3 = SimpleSurbFlowEstimator {
             produced: 25,
             consumed: 16,
             evicted: 0,
+            refunded: 0,
         };
         assert_eq!(estimator_1.estimated_surb_buffer_change(&estimator_1), Some(0));
         assert_eq!(estimator_2.estimated_surb_buffer_change(&estimator_1), Some(-1));
@@ -249,6 +281,7 @@ mod tests {
             produced: 100,
             consumed: 20,
             evicted: 50,
+            refunded: 0,
         };
         assert_eq!(estimator.saturating_diff(), 30);
 
@@ -267,6 +300,7 @@ mod tests {
             produced: 40,
             consumed: 25,
             evicted: 25,
+            refunded: 0,
         };
         assert_eq!(estimator.saturating_diff(), 0);
     }
@@ -280,11 +314,13 @@ mod tests {
             produced: 100,
             consumed: 50,
             evicted: 30,
+            refunded: 0,
         };
         let later = SimpleSurbFlowEstimator {
             produced: 110,
             consumed: 50,
             evicted: 38,
+            refunded: 0,
         };
         assert_eq!(later.estimated_surb_buffer_change(&earlier), Some(2));
 
@@ -293,6 +329,7 @@ mod tests {
             produced: 120,
             consumed: 50,
             evicted: 48,
+            refunded: 0,
         };
         assert_eq!(full_store.estimated_surb_buffer_change(&later), Some(0));
     }
