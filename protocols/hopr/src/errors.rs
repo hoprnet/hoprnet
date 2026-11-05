@@ -27,10 +27,12 @@ pub enum IncomingPacketError<E: std::error::Error> {
     InvalidTicket(Box<OffchainPublicKey>, TicketValidationError),
     /// Packet is a replay of one already seen.
     ///
-    /// Unlike [`IncomingPacketError::ProcessingError`], this is detected from the packet's replay token before the
-    /// header MAC is verified, so the packet has not been authenticated. It therefore must not be acknowledged:
-    /// acknowledging it would pay for a packet nobody has proved, and would hide from the sender the fact that its
-    /// retransmission - which carries a fresh token - is the one that must be delivered.
+    /// Unlike [`IncomingPacketError::ProcessingError`], this comes from the replay token: usually detected before
+    /// the header MAC is verified, so the packet is unauthenticated, but also when a concurrent decode of the same
+    /// packet recorded the token first - and in that case the packet *has* authenticated. Either way it must not be
+    /// acknowledged: acknowledging an unauthenticated copy pays for a packet nobody has proved, and acknowledging
+    /// the authenticated loser re-pays for one whose original delivery was already acknowledged. Both would also
+    /// hide from the sender that its retransmission - which carries a fresh token - is the one to deliver.
     #[error("packet from {0} is a replay")]
     Replay(Box<OffchainPublicKey>),
 }

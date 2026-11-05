@@ -9,10 +9,12 @@
 //! is why the tag is handed to the filter from inside the Sphinx decode rather than after it (see
 //! [`HoprPacket::from_incoming_checked`](hopr_crypto_packet::prelude::HoprPacket::from_incoming_checked)).
 //!
-//! Keying on the derived tag rather than on the wire `alpha` is what makes the token *authenticated*: an attacker
-//! can put any bytes at the start of a packet, but cannot produce a tag for a secret it has not derived. Inserting
-//! tokens to age the filter out therefore costs the attacker the same per-packet work as sending a legitimate
-//! packet.
+//! Keying on the derived tag rather than on the wire `alpha` matters because the tag depends on the node's
+//! private key. Anybody can *compute* a tag from a chosen alpha and the node's public key, so the early
+//! [`TagReplayFilter::contains`] check is not a proof of anything; what costs an attacker a well-formed packet is
+//! getting a token *recorded*, which [`TagReplayFilter::commit`] does only after the header MAC has verified.
+//! Rotating the filter out therefore needs packets the sender could actually authenticate, not merely bytes whose
+//! first field the attacker chose.
 //!
 //! # Why a rolling filter rather than one Bloom filter that resets
 //!
@@ -26,10 +28,10 @@
 //! pattern can take away, where the old design had none.
 //!
 //! Aging out is proportional to insert volume (a packet count, not wall time). The cost of shortening the window is
-//! *decodable* packets, not paid ones: the decoder commits a token as soon as the Sphinx layer derives it, which
-//! precedes ticket validation, and a final-hop packet carries no verifiable ticket at all. A direct neighbour can
-//! therefore rotate generations with packets it does not pay for - but it must still present a valid tag for each,
-//! so it pays the same elliptic-curve work per packet that a legitimate sender does, and the window it shortens is
+//! *authenticated* packets, not paid ones: a token is committed once the header MAC verifies, which still precedes
+//! ticket validation, and a final-hop packet carries no verifiable ticket at all. A direct neighbour can therefore
+//! rotate generations with packets it does not pay for - but each must authenticate under the shared secret, so it
+//! costs the same elliptic-curve work per packet that a legitimate sender pays, and the window it shortens is
 //! bounded below by one full generation.
 //!
 //! # Why sharded
@@ -317,6 +319,8 @@ impl Default for TagReplayFilter {
 mod tests {
     use std::collections::HashSet;
 
+    use anyhow::Context;
+
     use super::*;
 
     fn config(max_tracked_packets: usize, shards: usize) -> ReplayFilterConfig {
@@ -522,14 +526,15 @@ mod tests {
     /// The floor is spelled as a literal in the `range` validator, matching the other configs in this crate; this
     /// keeps the exported constant and the enforced bound from drifting apart.
     #[test]
-    fn the_tracked_packet_floor_agrees_with_the_validator() {
+    fn the_tracked_packet_floor_agrees_with_the_validator() -> anyhow::Result<()> {
         let mut cfg = config(MIN_TRACKED_PACKETS, 64);
-        validator::Validate::validate(&cfg).expect("the floor itself must be accepted");
+        validator::Validate::validate(&cfg).context("the floor itself must be accepted")?;
         cfg.max_tracked_packets = MIN_TRACKED_PACKETS - 1;
         assert!(
             validator::Validate::validate(&cfg).is_err(),
             "one below the exported floor must be rejected"
         );
+        Ok(())
     }
 
     /// The field-wise ranges accept the floor capacity together with the shard ceiling, yet that leaves far fewer
@@ -558,14 +563,14 @@ mod tests {
     /// Every accepted configuration gives each shard the per-shard floor, so the filter's capacity is the configured
     /// value up to the shard count, and never larger than it.
     #[test]
-    fn an_accepted_configuration_never_widens_the_capacity() {
+    fn an_accepted_configuration_never_widens_the_capacity() -> anyhow::Result<()> {
         for (packets, shards) in [
             (MIN_TRACKED_PACKETS, 64),
             (MIN_TRACKED_PACKETS + 1, 64),
             (MIN_CAPACITY_PER_SHARD * MAX_SHARDS, MAX_SHARDS),
         ] {
             let cfg = config(packets, shards);
-            validator::Validate::validate(&cfg).expect("must be a valid configuration");
+            validator::Validate::validate(&cfg).context("must be a valid configuration")?;
             let filter = TagReplayFilter::new(&cfg);
             assert_eq!(
                 packets / shards * shards,
@@ -573,14 +578,18 @@ mod tests {
                 "unexpected capacity for {cfg:?}"
             );
         }
+        Ok(())
     }
 
     #[test]
-    fn shard_count_must_be_a_power_of_two() {
+    fn shard_count_must_be_a_power_of_two() -> anyhow::Result<()> {
         // The capacity is generous in both cases, so only the shard rule can decide.
-        let err = validator::Validate::validate(&config(65_536, 3)).expect_err("3 shards must be rejected");
+        let err = validator::Validate::validate(&config(65_536, 3))
+            .err()
+            .context("3 shards must be rejected")?;
         assert!(err.field_errors().contains_key("shards"));
-        validator::Validate::validate(&config(65_536, 64)).expect("64 shards must be accepted");
+        validator::Validate::validate(&config(65_536, 64)).context("64 shards must be accepted")?;
+        Ok(())
     }
 
     #[test]

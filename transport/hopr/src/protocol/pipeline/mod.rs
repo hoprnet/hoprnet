@@ -80,18 +80,6 @@ fn default_pipeline_concurrency(available_parallelism: usize) -> usize {
 ///
 /// Gated to the builds that actually use it (the telemetry counter, or tests): without this, a
 /// plain `--lib` build without `telemetry` would emit a dead-code warning, which is an error in CI.
-/// Metric label a replayed packet is rejected under.
-///
-/// A replay is dropped before the packet is authenticated, and unlike `duplicate_ticket_index` it is not a ticket
-/// failure, so it gets a label of its own rather than sharing `processing_error`.
-///
-/// A named function rather than a literal at the increment site, so the test can pin the label while the counter
-/// increment itself stays behind `#[cfg(all(feature = "telemetry", not(test)))]`.
-#[cfg(any(feature = "telemetry", test))]
-fn replay_rejection_metric_label() -> &'static str {
-    "replay"
-}
-
 #[cfg(any(feature = "telemetry", test))]
 fn unack_rejection_metric_label<T: UnacknowledgedTicketProcessor>(error: &T::Error) -> &'static str {
     if T::is_duplicate_ticket_index_error(error) {
@@ -99,6 +87,18 @@ fn unack_rejection_metric_label<T: UnacknowledgedTicketProcessor>(error: &T::Err
     } else {
         "unack_processing_error"
     }
+}
+
+/// Metric label a replayed packet is rejected under.
+///
+/// Unlike `duplicate_ticket_index` this is not a ticket failure, so it gets a label of its own rather than sharing
+/// `processing_error`.
+///
+/// A named function rather than a literal at the increment site, so the test can pin the label while the counter
+/// increment itself stays behind `#[cfg(all(feature = "telemetry", not(test)))]`.
+#[cfg(any(feature = "telemetry", test))]
+fn replay_rejection_metric_label() -> &'static str {
+    "replay"
 }
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -110,7 +110,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
-        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts packets dropped before forwarding because their ticket index was already accepted on the same channel and epoch (replayed index attack); reason=replay counts packets dropped before decoding because their replay token had already been seen (these are not acknowledged)",
+        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts packets dropped before forwarding because their ticket index was already accepted on the same channel and epoch (replayed index attack); reason=replay counts packets dropped during decoding, as soon as their replay token is derived, because it had already been seen (these are not acknowledged)",
         &["reason"]
     ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
@@ -351,10 +351,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         None
                     },
                     Ok(Ok(Err(IncomingPacketError::Replay(sender)))) => {
-                        // A replay is detected from the packet's token before the header MAC is verified, so the
-                        // packet is unauthenticated. Do not acknowledge it: an ack would pay for a packet nobody
-                        // has proved, and would hide from the sender that its retransmission carries the token
-                        // that must be delivered.
+                        // A replay comes from the packet's token: usually before the header MAC is verified, so
+                        // the copy is unauthenticated, but also when a concurrent decode recorded the token
+                        // first, in which case this copy authenticated. Do not acknowledge either: an ack would
+                        // pay for a packet nobody has proved, or re-pay for one already acknowledged, and would
+                        // hide from the sender that its retransmission carries the token that must be delivered.
                         tracing::debug!(%peer, sender = sender.to_peerid_str(), "not sending ack back on replayed packet");
 
                         #[cfg(all(feature = "telemetry", not(test)))]

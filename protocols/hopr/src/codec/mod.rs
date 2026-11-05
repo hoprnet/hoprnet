@@ -1161,11 +1161,11 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new()?;
         let blokli_client = create_blokli_client()?;
         let (sender, receiver) = runtime.block_on(async {
-            (
-                create_node(0, &blokli_client).await.unwrap(),
-                create_node(1, &blokli_client).await.unwrap(),
-            )
-        });
+            Ok::<_, anyhow::Error>((
+                create_node(0, &blokli_client).await.context("sender node")?,
+                create_node(1, &blokli_client).await.context("receiver node")?,
+            ))
+        })?;
 
         let encoder = create_encoder(&sender);
         let decoder = std::sync::Arc::new(create_decoder(&receiver));
@@ -1376,12 +1376,13 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn an_invalid_replay_filter_config_should_be_rejected() {
+    fn an_invalid_replay_filter_config_should_be_rejected() -> anyhow::Result<()> {
         let doc = "replay_filter:\n  max_tracked_packets: 10\n  shards: 3\n";
-        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc).expect("must deserialize");
+        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc).context("must deserialize")?;
         assert!(
             validator::Validate::validate(&parsed).is_err(),
             "out-of-range capacity and a non-power-of-two shard count must fail validation"
         );
+        Ok(())
     }
 }

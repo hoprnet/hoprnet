@@ -1421,7 +1421,7 @@ mod tests {
                 },
                 |_| false,
             )?;
-            seen.expect("the check must have been called")
+            seen.context("the check must have been called")?
         };
 
         let forwarded = process_packet_at_node(3, 1, false, packet, |_| None)?;
@@ -1439,7 +1439,7 @@ mod tests {
                 },
                 |_| false,
             )?;
-            seen.expect("the check must have been called")
+            seen.context("the check must have been called")?
         };
 
         assert_ne!(first_tag, second_tag, "the shared secret must change at every hop");
