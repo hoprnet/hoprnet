@@ -879,6 +879,20 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.ssa_cycles.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
+    /// Shares currently held by the part builders of every live cycle on this node: the memory the
+    /// emission window bounds in practice, as opposed to [`peak_cycle_bytes`], which prices the
+    /// adversarial case. On lossless, in-order delivery a conforming Entry keeps at most
+    /// `SHARE_EMISSION_WINDOW × (threshold − 1)` of them per cycle. Losses or reordering can leave more:
+    /// a polynomial short of its threshold keeps up to `threshold − 1` shares after the Entry has moved
+    /// on, so capacity is planned with [`peak_cycle_bytes`]. The figure is what `hopr_pix_held_shares`
+    /// exports.
+    ///
+    /// Walks every live cycle and takes each part's lock briefly, so it is for an occasional reading
+    /// (the PIX action driver's progress notifications), not for the share path.
+    pub fn held_shares(&self) -> usize {
+        self.ssa_cycles.iter().map(|(_, cycle)| cycle.held_shares()).sum()
+    }
+
     /// Polynomial-index runs of `ssa_id` whose constant-term commitment never arrived, so the caller
     /// can ask the peer to re-send exactly those.
     ///
@@ -896,6 +910,14 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     ///
     /// `max_runs` is the asking message's capacity, which this crate cannot know, so the caller
     /// supplies it; `SsaCommitmentBuilder::missing_runs` documents how the runs are chosen.
+    ///
+    /// **Reading is not free of side effects.** The lookup refreshes the registration's idle timer,
+    /// which is what keeps a pending registration from being reclaimed after
+    /// [`incomplete_commitment_lifetime`](SsaReconstructorConfig::incomplete_commitment_lifetime)
+    /// while its peer is silent. The Exit's re-send of an unanswered successor `SsaRequest` relies on
+    /// that: nothing else touches a registration nobody has yet delivered a part for, and an
+    /// interval shorter than the lifetime is what keeps it alive across a long wait. A caller that
+    /// only wants to *ask* whether a registration exists therefore also postpones its expiry.
     // That name is deliberately unlinked: `SsaCommitmentBuilder` is crate-private, so an intra-doc
     // link from this public method trips `rustdoc::private_intra_doc_links`, which the
     // `nix build .#docs` job builds as an error.
@@ -1084,7 +1106,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             //
             // Reported rather than swallowed, even though it advances nothing. Polynomials in an
             // emission window run in lockstep, so they reach `threshold` together and then take their
-            // surplus together — `surplus × window` consecutive shares, 20 224 at the deployed
+            // surplus together — `surplus × window` consecutive shares, 40 448 at the deployed
             // dimensions, none of them useful. A consumer that only ever hears about useful shares
             // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
             // moves, `useful_shares` does not.
@@ -2731,6 +2753,53 @@ mod tests {
         Ok(())
     }
 
+    /// Reading a pending registration through `missing_commitment_runs` keeps it from idling out.
+    ///
+    /// The Exit re-sends an unanswered successor request from this very read, and the registration
+    /// it asks about is one nothing else touches while the Entry is silent. Its idle timer is
+    /// `incomplete_commitment_lifetime`; a read inside that interval has to postpone it, or the
+    /// registration is gone before the Entry's answer can reach it and every re-sent request after
+    /// that is refused.
+    ///
+    /// The unread sibling is the control: it was registered at the same instant and idles out on
+    /// schedule, so the survival of the first is the read's doing and not a slow clock.
+    #[test]
+    fn reading_a_pending_commitment_keeps_it_from_idling_out() -> anyhow::Result<()> {
+        const LIFETIME: std::time::Duration = std::time::Duration::from_millis(400);
+        const POLYS: u16 = 8;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            incomplete_commitment_lifetime: LIFETIME,
+            ..Default::default()
+        });
+        let pseudonym = SimplePseudonym::random();
+        let read = SsaId::new(pseudonym, 1.try_into()?);
+        let unread = SsaId::new(pseudonym, 2.try_into()?);
+        reconstructor.new_exit_commitment(read, test_params(POLYS, 2))?;
+        reconstructor.new_exit_commitment(unread, test_params(POLYS, 2))?;
+
+        // Three lifetimes, read four times per lifetime: far past when an untouched registration is
+        // gone, and a tick far inside it.
+        let started = std::time::Instant::now();
+        while started.elapsed() < LIFETIME * 3 {
+            assert_eq!(
+                Some(vec![(0, POLYS as PolynomialIndex - 1)]),
+                reconstructor.missing_commitment_runs(&read, 1),
+                "a registration read every {:?} must outlive {LIFETIME:?}, at {:?}",
+                LIFETIME / 4,
+                started.elapsed()
+            );
+            std::thread::sleep(LIFETIME / 4);
+        }
+
+        assert_eq!(
+            None,
+            reconstructor.missing_commitment_runs(&unread, 1),
+            "the control, registered with it and never read, must have idled out"
+        );
+        Ok(())
+    }
+
     /// The whole point of the feature: a commitment burst that lost a slice still completes, because
     /// the Exit can name the slice and the Entry can re-send exactly it.
     ///
@@ -3380,7 +3449,7 @@ mod tests {
     ///
     /// This is the distinction the Exit's egress gate and recovery-idle deadline turn on. A conforming
     /// Entry emits `threshold + surplus` shares per polynomial, and a whole emission window reaches its
-    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 20 224 packets
+    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 40 448 packets
     /// at the deployed dimensions. A consumer told only about *useful* shares reads that run as the
     /// Entry having gone quiet, and if it answers by withholding service it removes the only thing that
     /// could have produced the next useful share.

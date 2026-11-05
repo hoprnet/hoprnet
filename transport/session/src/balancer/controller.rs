@@ -1763,4 +1763,61 @@ mod tests {
         state.mark_return_path_degraded(Duration::from_secs(10));
         assert!(state.return_path_estimate_is_stale());
     }
+
+    /// The Exit counts a return packet's SURB as it hands the packet on, and gives it back when routing
+    /// resolution drops the packet for want of one, a sample or more later. While the level is at zero
+    /// the count saturates away, so a refund the balancer added back would be a SURB nobody holds,
+    /// carried into the egress rate and the level reports. The held count, which saturates only when it
+    /// is read, takes the refund; the level does not.
+    #[test]
+    fn a_refund_should_not_raise_the_balancer_level() {
+        use hopr_protocol_app::prelude::SurbRefund;
+
+        use crate::balancer::{SurbFlowEstimator, simple::SimpleBalancerController};
+
+        let mut controller = MockSurbFlowController::new();
+        controller.expect_adjust_surb_flow().return_const(());
+        let surb_estimator = AtomicSurbFlowEstimator::default();
+        let state = Arc::new(BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 100,
+            surb_decay: None,
+            ..Default::default()
+        }));
+        let mut balancer = SurbBalancer::new(
+            HoprPseudonym::random(),
+            SimpleBalancerController::default(),
+            surb_estimator.clone(),
+            controller,
+            state.clone(),
+        );
+        let sample = |balancer: &mut SurbBalancer<_, _, _>| {
+            std::thread::sleep(Duration::from_millis(20));
+            balancer.update()
+        };
+
+        // The Exit holds nothing; a level report goes out regardless and is counted.
+        surb_estimator
+            .consumed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let refund = SurbRefund::to(surb_estimator.refunded.clone());
+        assert_eq!(0, sample(&mut balancer), "the count saturates at an empty level");
+
+        refund.give_back();
+        assert_eq!(
+            0,
+            sample(&mut balancer),
+            "the refund adds no SURB the Exit does not hold"
+        );
+        assert_eq!(0, surb_estimator.saturating_diff());
+
+        surb_estimator
+            .produced
+            .fetch_add(3, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(3, sample(&mut balancer), "SURBs that do arrive count as before");
+        assert_eq!(
+            3,
+            surb_estimator.saturating_diff(),
+            "and the starved count no longer holds the held count one low"
+        );
+    }
 }

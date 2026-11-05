@@ -398,8 +398,11 @@ pub const MAX_POLY_THRESHOLD: u8 = u8::MAX;
 /// change, and it is sound in the only direction that matters — an Exit at or above the floor asks at
 /// or after the point the Entry admits, so no conforming pair can fail to communicate. Deriving the
 /// gate from the Entry's own setting instead left two individually valid configurations that could
-/// not talk: an Exit configured lower sent its one-shot request early, the Entry silently dropped it,
-/// and the Session died waiting for a commitment that was deliberately refused.
+/// not talk: an Exit configured lower sent its request early and the Entry silently dropped it. The
+/// Exit's supervisor re-sends an unanswered successor request while the predecessor is still being
+/// served, so that is no longer fatal on its own — but a gate on the local value would keep refusing
+/// a conforming Exit for longer than the floor needs to, and every refusal is a request the Exit pays
+/// a SURB for.
 ///
 /// Equal to the shipped default today, but a separate constant on purpose. The default is a policy
 /// choice an operator may raise; this is a compatibility bound, and *lowering* it is a protocol

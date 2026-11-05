@@ -140,6 +140,9 @@ where
                                 %error,
                                 "dropping an outgoing packet: no SURB for its return path within the wait"
                             );
+                            // Its sender may have counted the SURB as consumed already, and the packet
+                            // leaves without one.
+                            data.surb_refund.give_back();
                             return None;
                         }
                         Err(error) if error.is_surb() => {
@@ -166,7 +169,7 @@ where
 mod tests {
     use std::sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     };
 
     use futures_time::future::FutureExt as _;
@@ -178,7 +181,7 @@ mod tests {
             routing::{RoutingOptions, SurbMatcher},
         },
     };
-    use hopr_protocol_app::prelude::{ApplicationData, Tag};
+    use hopr_protocol_app::prelude::{ApplicationData, SurbRefund, Tag};
 
     use super::*;
     use crate::path::errors::PathPlannerError;
@@ -391,6 +394,56 @@ mod tests {
             1,
             attempts.load(Ordering::Relaxed),
             "a zero wait must resolve once and give up, not retry"
+        );
+
+        Ok(())
+    }
+
+    /// A starved return packet gives back the SURB its sender counted for it. One whose sender counted
+    /// nothing gives nothing back, and a packet that finds its SURB keeps the count.
+    #[test_log::test(tokio::test)]
+    async fn a_starved_return_packet_should_give_back_the_surb_its_sender_counted() -> anyhow::Result<()> {
+        let refunds = Arc::new(AtomicU64::new(0));
+        let counted = |marker| {
+            let mut data = packet(marker);
+            data.surb_refund = SurbRefund::to(refunds.clone());
+            data
+        };
+        let (starved, served) = (HoprPseudonym::random(), HoprPseudonym::random());
+        let input = futures::stream::iter(vec![
+            (return_routing(starved), counted(0)),
+            (return_routing(starved), packet(1)),
+            (return_routing(served), counted(2)),
+        ]);
+
+        let emitted = resolve_routing_stage(
+            input,
+            move |_size_hint, _max_surbs, routing: DestinationRouting| async move {
+                match &routing {
+                    DestinationRouting::Return(matcher) if matcher.pseudonym() == served => {
+                        Ok((resolved(), Some(5), None))
+                    }
+                    _ => Err(no_surb(&routing)),
+                }
+            },
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            surb_resolution_wait(Some(std::time::Duration::ZERO)),
+        )
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the stage stalled instead of dropping the starved packets"))?;
+
+        assert_eq!(
+            vec![2],
+            emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
+            "only the packet that found its SURB goes on"
+        );
+        assert_eq!(
+            1,
+            refunds.load(Ordering::Relaxed),
+            "only the counted packet that starved gives its SURB back"
         );
 
         Ok(())

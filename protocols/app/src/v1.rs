@@ -216,6 +216,65 @@ impl ApplicationDataIn {
     }
 }
 
+/// The SURB a sender has already counted as consumed for an outgoing return packet, given back if
+/// the packet is dropped before it takes one.
+///
+/// A return packet takes its SURB only when its routing is resolved, but a sender whose reserve and
+/// admission decisions need the count at once counts it as it hands the packet on. Resolution may
+/// still find no SURB in time and drop the packet; it then calls [`give_back`](Self::give_back), so
+/// that the count is undone. The refund points at the sender's own counter rather than naming the
+/// sender: by the time the packet is dropped, the Session that counted it may be gone, or its
+/// identifier taken by another one.
+///
+/// It counts the SURB onto a counter of the sender's own rather than taking one off the consumed
+/// count: the readers of these counters take deltas between samples, so every counter has to keep
+/// growing, and which of them add the refunds back is the sender's choice. Empty by default: a packet
+/// nobody counted gives nothing back.
+#[derive(Clone, Default)]
+pub struct SurbRefund(Option<std::sync::Arc<std::sync::atomic::AtomicU64>>);
+
+impl SurbRefund {
+    /// A refund that counts the SURB onto `refunds`, the sender's count of SURBs given back.
+    pub fn to(refunds: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
+        Self(Some(refunds))
+    }
+
+    /// Whether the sender counted a SURB for this packet.
+    pub fn is_counted(&self) -> bool {
+        self.0.is_some()
+    }
+
+    /// Gives the counted SURB back. Does nothing for a packet whose sender counted none.
+    pub fn give_back(&self) {
+        if let Some(refunds) = &self.0 {
+            refunds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+}
+
+impl std::fmt::Debug for SurbRefund {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "SurbRefund(counted)"
+        } else {
+            "SurbRefund(none)"
+        })
+    }
+}
+
+/// Two refunds are equal when they give back to the same counter, or when neither gives anything back.
+impl PartialEq for SurbRefund {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for SurbRefund {}
+
 /// Wrapper for outgoing [`ApplicationData`] with optional [`IncomingPacketInfo`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -228,6 +287,9 @@ pub struct ApplicationDataOut {
     /// as it may choose to completely ignore it, based on its configuration.
     #[cfg_attr(feature = "serde", serde(skip))]
     pub packet_info: Option<OutgoingPacketInfo>,
+    /// The SURB its sender counted as consumed for this packet, if any; see [`SurbRefund`].
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub surb_refund: SurbRefund,
 }
 
 impl ApplicationDataOut {
@@ -236,6 +298,7 @@ impl ApplicationDataOut {
         Self {
             data,
             packet_info: None,
+            surb_refund: SurbRefund::default(),
         }
     }
 
@@ -418,5 +481,33 @@ mod tests {
     #[test]
     fn application_data_should_not_allow_payload_larger_than_hopr_packet_payload_size() {
         assert!(ApplicationData::new(10u64, [0_u8; HoprPacket::PAYLOAD_SIZE + 1].as_ref()).is_err());
+    }
+
+    #[test]
+    fn a_surb_refund_should_give_back_once_per_call_and_only_when_counted() {
+        let refunds = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5));
+        SurbRefund::default().give_back();
+        assert_eq!(
+            5,
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
+            "nothing counted, nothing given back"
+        );
+
+        let refund = SurbRefund::to(refunds.clone());
+        assert!(refund.is_counted());
+        refund.give_back();
+        assert_eq!(
+            6,
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
+            "the SURB is counted as given back"
+        );
+
+        assert_eq!(refund, SurbRefund::to(refunds.clone()), "the same counter");
+        assert_ne!(
+            refund,
+            SurbRefund::to(std::sync::Arc::new(std::sync::atomic::AtomicU64::new(5)))
+        );
+        assert_ne!(refund, SurbRefund::default());
+        assert_eq!(SurbRefund::default(), SurbRefund::default());
     }
 }

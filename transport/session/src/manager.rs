@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, BTreeSet, HashMap},
     pin::Pin,
     sync::{Arc, Mutex, OnceLock, atomic::Ordering},
     time::{Duration, Instant},
@@ -127,10 +127,15 @@ type EgressPermit = futures::future::Either<
 /// supervisor turn by [`PixSessionTelemetry`](crate::supervision::telemetry::PixSessionTelemetry).
 /// Only the refused arm, which is about to allocate a boxed future and block, does any telemetry
 /// work of its own.
+///
+/// A packet the gate never admits gives back the SURB its sender counted for it (see
+/// [`count_return_packet_surb`]), since it never reaches the routing resolution that would have taken
+/// one. That covers a packet a closed gate refuses, a park the gate's poisoning fails, and a parked
+/// future dropped with the Session's sink.
 fn acquire_egress_permit(
     gate: Option<Arc<ServiceGate>>,
     routing: DestinationRouting,
-    data: ApplicationDataOut,
+    mut data: ApplicationDataOut,
 ) -> EgressPermit {
     let Some(gate) = gate else {
         return futures::future::Either::Left(std::future::ready(Ok((routing, data))));
@@ -142,6 +147,7 @@ fn acquire_egress_permit(
         // entry points report the same one and neither caller has to know what a refusal means.
         Err(closed) => {
             record_gate_closed();
+            data.surb_refund.give_back();
             futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed))))
         }
         // Budget exhausted: park until the supervisor funds the front, restores a successor's
@@ -157,16 +163,47 @@ fn acquire_egress_permit(
         // One episode per park rather than per refused packet: this sink is serial, so the next
         // packet is not offered until this future resolves, and a caller cannot open a second
         // episode by retrying harder.
+        //
+        // The packet's refund is taken off it here and moved in with the episode, for the same
+        // reason: only `Drop` sees every way a park can end without an admission.
         Ok(GateVerdict::Blocked(reason)) => {
             let episode = PixGateBlockEpisode::begin(reason);
+            let refund = ParkedSurbRefund(std::mem::take(&mut data.surb_refund));
             futures::future::Either::Right(Box::pin(async move {
                 let _episode = episode;
-                gate.acquire()
-                    .await
-                    .map(|_| (routing, data))
-                    .map_err(std::io::Error::other)
+                match gate.acquire().await {
+                    Ok(()) => {
+                        data.surb_refund = refund.admit();
+                        Ok((routing, data))
+                    }
+                    // `refund` gives the SURB back as the future ends.
+                    Err(closed) => Err(std::io::Error::other(closed)),
+                }
             }))
         }
+    }
+}
+
+/// The SURB refund of a packet parked at the PIX egress gate, given back unless the gate admits the
+/// packet.
+///
+/// A park ends without an admission in two ways, and `Drop` sees both: the gate is poisoned, which
+/// fails the park, or the Session's sink is dropped with the parked future in it, polled or not. An
+/// admitted packet takes its refund back with [`admit`](Self::admit), for routing resolution to give
+/// back if the packet starves there.
+struct ParkedSurbRefund(SurbRefund);
+
+impl ParkedSurbRefund {
+    /// The gate admitted the packet: hands its refund back to go on with it.
+    fn admit(mut self) -> SurbRefund {
+        std::mem::take(&mut self.0)
+    }
+}
+
+impl Drop for ParkedSurbRefund {
+    fn drop(&mut self) {
+        // A no-op after `admit`, which leaves an empty refund behind.
+        self.0.give_back();
     }
 }
 
@@ -487,6 +524,22 @@ const SSA_SUCCESSOR_SERVICE_WAIT: Duration = Duration::from_secs(2);
 /// which would put a branch on every inbound packet to serve a case that arises once per SSA cycle.
 const SSA_SUCCESSOR_SERVICE_POLL: Duration = Duration::from_millis(250);
 
+/// How long after a batch's commitments last went out the Entry takes a repeat of its request to
+/// mean that they were lost on the way, rather than that the repeat crossed them.
+///
+/// The Exit repeats a successor request while some member of it has received no part of its
+/// commitment. A repeat it sent before the burst reached it can still be arriving up to a round trip
+/// after the burst went out, and answering that one would spend a retransmission on a burst that is
+/// not lost. A repeat that arrives later says the burst went out and none of it arrived. Publishing
+/// a burst only means the local transport took it, and a relayer that dies on the forward path loses
+/// all of it. The Exit then has no part it could name in a scoped re-request, so the repeat is the
+/// only prompt there is. See [`SessionSsaState::unpublished`].
+///
+/// Well over a round trip, and equal to the Exit's default re-send interval. A path slower than this
+/// costs at most one needless re-send per grace, and each re-send spends one of the cycle's
+/// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS).
+const SSA_REPEAT_RESEND_GRACE: Duration = Duration::from_secs(3);
+
 /// Standard deviations below an honest Exit's expected returned packets at which the successor gate
 /// sets its bar — see [`successor_required_packets`].
 ///
@@ -719,9 +772,172 @@ struct SessionSsaState {
     /// any deposit exists. Crediting that prefix would let the Exit bank unpaid service against the
     /// first cycle it *is* paid for. Everything after this point rides a share.
     returned_at_first_commit: std::sync::atomic::AtomicU64,
+    /// Lowest SSA index of the request this Session most recently committed to, `0` before the first.
+    ///
+    /// What lets the Entry tell a *repeat* of a request it already served from a *stale* one. Both
+    /// ask for an index at or below [`committed_ssa_watermark`](Self::committed_ssa_watermark); only
+    /// a repeat names the batch that was last committed. The Exit re-sends an unanswered successor
+    /// request until it hears back, so a repeat is the ordinary case once a request is admitted and
+    /// the first burst is still on its way, and answering it with a second commitment would fund the
+    /// same cycle twice.
+    ///
+    /// Stored once phase two has staged the whole request rather than after the burst is published.
+    /// A burst that fails to send has still moved the generator, so its re-sends must read as repeats —
+    /// read as stale instead, each of them would be logged as a fault. Not stored any earlier, though:
+    /// a batch that fails *during* phase two after moving the generator can never be committed, and
+    /// that failure closes the Session rather than leaving its re-sends to be told apart. And a repeat
+    /// is not always a no-op: while [`unpublished`](Self::unpublished) still holds members of that
+    /// batch, the repeat is the Exit's prompt to finish publishing them, and once it has been published
+    /// a repeat that comes too late to have crossed the bursts is the prompt to send them again.
+    last_committed_first: std::sync::atomic::AtomicU32,
+    /// Members of the batch last staged whose commitment burst and `ReadyToDeposit` have not both gone
+    /// out, with exactly the announcement that is still owed for each.
+    ///
+    /// Phase three sends a member's whole burst and only then announces its deposit address, and the
+    /// transport can fail between any two messages (it gives up on a send after
+    /// [`EXTERNAL_SEND_TIMEOUT`]). Without this record the generator has moved on and the failure is
+    /// final: the Exit's re-sends read as repeats of a batch the Entry believes it served, and a
+    /// scoped re-request completes the commitment it names without ever announcing the deposit, so the
+    /// Exit holds a complete commitment for a cycle nobody was told to fund.
+    ///
+    /// Filled at the end of phase two for every staged member, before anything is sent. **A member is
+    /// published by whoever removes it from here, under this mutex**, and by nobody else: phase three
+    /// claims each member just before its burst, and the resumption that finishes an interrupted batch
+    /// ([`resume_publication`]) claims the same way. Whoever holds the claim announces the deposit once
+    /// its whole burst is out, so the announcement happens at most once per member however many
+    /// resumers there are — which matters, because the scoped re-request path does not take the
+    /// per-pseudonym request lock. A claimant that fails puts its member back, and a member that was
+    /// never claimed was never touched.
+    ///
+    /// A newer batch replaces whatever is left of an older one: the Exit asks for a successor only
+    /// after the commitment and the deposit of its predecessor, so an older member still here has been
+    /// given up on. That, and the batch size the Entry accepts, bound the map. A claimant of an older
+    /// batch that fails after it was replaced finds its member not wanted back (see [`OwedPublications`]).
+    ///
+    /// **What this recovers, and what it does not.** Only the Exit can prompt a resumption: by a repeat
+    /// of the request, or by a scoped re-request that names an owed cycle. The Exit re-requests the
+    /// parts of a commitment that has started to arrive and gone quiet, so a member cut part-way
+    /// through its burst is finished by the re-request wherever its batch stands — and that resumption
+    /// publishes every member still owed, not only the one named. A member with *no message of it out*
+    /// has nothing to re-request, and only a repeat can reach it. The Exit repeats a successor batch,
+    /// whole, for as long as any member of it has reported nothing, **but only while the batch is behind
+    /// the front**: a batch at the front is never re-sent (the opening batch is at the front from the
+    /// start, and a successor admitted just before the front moved joins it). So, per member, nothing
+    /// prompts a resumption in two cases, and a third is given up on:
+    ///
+    /// * a member with no message of it out whose batch holds the front: the opening batch always, or any member after
+    ///   a cut that lands exactly on a member boundary there, when no earlier member of the batch is itself still owed
+    ///   (its own burst cut part-way), whose re-request would resume it too. The member times out on its commitment
+    ///   deadline;
+    /// * a burst that went out whole whose `ReadyToDeposit` could not be queued because the PIX event channel was
+    ///   full. The Exit then holds a complete commitment and never asks again. The member is kept owed, in case
+    ///   something does;
+    /// * a cycle whose retransmissions are spent, which can never be published again. It is dropped from here with one
+    ///   warning (see [`resume_publication`]).
+    ///
+    /// A member that has been published is out of the owed set, but publishing only means the local
+    /// transport took the burst. If a relayer on the forward path dies, the whole burst can still be
+    /// lost. The Exit then has no part it could re-request, so only a repeat reaches the member. A
+    /// repeat that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch last went out has the
+    /// whole burst of every announced member sent again, and nothing announced (see
+    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a batch at the
+    /// front is never repeated, so a lost opening burst is not recovered, and each re-send spends one
+    /// of the cycle's retransmissions.
+    ///
+    /// None of these strands a deposit, because nothing was announced for the member concerned: the
+    /// Exit's own deadline ends the cycle. The opposite hazard exists, though. A resumed burst answers a
+    /// re-request, and the Exit's re-request timer asks until just before the cycle's commitment
+    /// deadline without moving it, so the resumption — or a repeat delayed on the way — can arrive after
+    /// the Exit has retired the cycle. A re-send is a second source of the same thing: re-sends go on
+    /// up to the deadline of a member that has reported a part, which the tick does not push, so the
+    /// last one — sent up to one interval before the Exit retires that member — can resume and announce
+    /// it afterwards. The Entry then announces a deposit for an address nobody can reconstruct.
+    unpublished: parking_lot::Mutex<OwedPublications>,
+    /// The refusal this Session last logged, as `(lowest index asked for, SsaRefusal)`, `0` for none.
+    ///
+    /// Only to keep the log honest. The Exit re-sends a refused request every few seconds, so the
+    /// same refusal repeats for as long as the gate stays shut, and a line per re-send would bury the
+    /// one that matters: the first.
+    last_refusal: std::sync::atomic::AtomicU64,
     /// What this Exit sent as deposit data, per SSA index, for cycles whose deposit address it has
     /// not learned yet.
     sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprPixDepositPayload>>>,
+}
+
+/// The members of the batch last staged that are still owed their publication, and the ones that
+/// have had it.
+///
+/// The members are what is owed; the `batch` counter is there for one reason. A member that was
+/// claimed is out of the map while its publication is attempted, and if that attempt fails it is put
+/// back — but not if a newer batch has been staged meanwhile, whose members have replaced the older
+/// ones. Which batch a returning member belongs to cannot be read off its index, since a member
+/// returning to its own batch can sit below the ones still in the map just as an old one does, so each
+/// staging gets a number and each claim carries it.
+#[derive(Debug, Default)]
+struct OwedPublications {
+    /// Which staging the members belong to. Incremented every time a batch is staged.
+    batch: u64,
+    members: BTreeMap<SsaIndex, AgreedSsaQuota>,
+    /// Members of the same batch whose publication completed: their whole burst went out and their
+    /// `ReadyToDeposit` was queued.
+    ///
+    /// The only members a late repeat may have sent again
+    /// ([`SessionSsaState::claim_republication`]). Sending the burst of a member that is owed, or
+    /// that someone is publishing right now, would hand the Exit a complete commitment for a cycle
+    /// nobody has yet been told to fund.
+    announced: BTreeSet<SsaIndex>,
+    /// When a burst of this batch last went out in full, `None` before the first.
+    last_sent: Option<Instant>,
+}
+
+/// A member taken out of [`OwedPublications`] by whoever is publishing it.
+///
+/// Holding one is the right to publish the member and announce its deposit. It is either spent by
+/// completing the publication ([`SessionSsaState::complete_publication`]) or handed back to
+/// [`SessionSsaState::restore_unpublished`].
+#[derive(Debug)]
+struct ClaimedPublication {
+    /// The staging the member was claimed from.
+    batch: u64,
+    /// What `ReadyToDeposit` is to say once the member's burst is out.
+    quota: AgreedSsaQuota,
+}
+
+/// Why `handle_ssa_request` dropped a request without committing to it, short of refusing the Session.
+///
+/// Part of the key `SessionSsaState::note_refusal` deduplicates the log on, and the discriminant is
+/// what goes into it, so the values are never `0`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SsaRefusal {
+    /// The batch committed up to now has not been emitted far enough for any conforming Exit to ask.
+    Early = 1,
+    /// Emission is far enough, but the packets that came back are fewer than the batch has earned.
+    /// Expected on a multi-hop path, where the Entry sees the packets that survive the whole return
+    /// path and the Exit counts the ones its first relayer acknowledged.
+    UnderServed = 2,
+    /// The request names indices at or below what was committed, and not the batch committed last.
+    Stale = 3,
+}
+
+impl SsaRefusal {
+    /// Logs one refusal at the level its kind and novelty call for.
+    ///
+    /// An under-served request is the expected way a transient shortfall looks, so its first
+    /// occurrence is information; an early one comes from an Exit that is not conforming, and a stale
+    /// one from an Exit that has lost track of the Session, so theirs are warnings. Every repeat is a
+    /// debug line — the first already said it.
+    fn log(self, first_time: bool, session_id: &SessionId, error: &SessionManagerError) {
+        let what = match self {
+            Self::Early => "refused an early SSA request",
+            Self::UnderServed => "refused an under-served SSA request",
+            Self::Stale => "refused a stale SSA request",
+        };
+        match (first_time, self) {
+            (false, _) => tracing::debug!(%session_id, %error, "{what} (repeated)"),
+            (true, Self::UnderServed) => tracing::info!(%session_id, %error, "{what}"),
+            (true, Self::Early | Self::Stale) => tracing::warn!(%session_id, %error, "{what}"),
+        }
+    }
 }
 
 impl SessionSsaState {
@@ -730,6 +946,9 @@ impl SessionSsaState {
             params,
             committed_ssa_watermark: std::sync::atomic::AtomicU32::new(0),
             returned_at_first_commit: std::sync::atomic::AtomicU64::new(0),
+            last_committed_first: std::sync::atomic::AtomicU32::new(0),
+            unpublished: Default::default(),
+            last_refusal: std::sync::atomic::AtomicU64::new(0),
             sent_deposit_data: Default::default(),
         }
     }
@@ -775,6 +994,112 @@ impl SessionSsaState {
         if self.committed_ssa_watermark.fetch_max(index.get(), Ordering::Relaxed) == 0 {
             self.returned_at_first_commit.store(returned_packets, Ordering::Relaxed);
         }
+    }
+
+    /// Lowest index of the request last committed to, `None` before the first.
+    #[inline]
+    pub fn last_committed_first(&self) -> Option<SsaIndex> {
+        SsaIndex::new(self.last_committed_first.load(Ordering::Relaxed))
+    }
+
+    /// Records `index` as the lowest index of the request just committed to.
+    ///
+    /// A plain store: requests are serialised per pseudonym by the request lock, so there is no
+    /// concurrent writer to order against, unlike the watermark's `fetch_max`.
+    #[inline]
+    pub fn note_committed_first(&self, index: SsaIndex) {
+        self.last_committed_first.store(index.get(), Ordering::Relaxed);
+    }
+
+    /// Records `members` as staged and not yet published, replacing whatever an older batch left.
+    ///
+    /// Called once phase two has staged the whole request and before phase three sends anything, so
+    /// that a failure at any point of publication finds the whole batch still owed.
+    pub fn stage_unpublished(&self, members: impl IntoIterator<Item = AgreedSsaQuota>) {
+        let mut unpublished = self.unpublished.lock();
+        unpublished.batch += 1;
+        unpublished.members = members
+            .into_iter()
+            .map(|quota| (quota.ssa_id.ssa_index(), quota))
+            .collect();
+        unpublished.announced.clear();
+        unpublished.last_sent = None;
+    }
+
+    /// Takes the right to publish `index`, or `None` if nothing is owed for it or someone else holds it.
+    ///
+    /// The caller owns the announcement from here: it must either complete the publication or hand the
+    /// member back through [`restore_unpublished`](Self::restore_unpublished).
+    pub fn claim_unpublished(&self, index: SsaIndex) -> Option<ClaimedPublication> {
+        let mut unpublished = self.unpublished.lock();
+        let batch = unpublished.batch;
+        unpublished
+            .members
+            .remove(&index)
+            .map(|quota| ClaimedPublication { batch, quota })
+    }
+
+    /// Hands back a claimed member whose publication did not complete, so that it is owed again.
+    ///
+    /// Dropped instead when a newer batch has been staged since the claim, which has replaced the one
+    /// this member belonged to; there is nothing left for it to be owed to.
+    pub fn restore_unpublished(&self, claim: ClaimedPublication) {
+        let mut unpublished = self.unpublished.lock();
+        if claim.batch == unpublished.batch {
+            unpublished.members.insert(claim.quota.ssa_id.ssa_index(), claim.quota);
+        }
+    }
+
+    /// Spends a claim whose publication completed at `now`: the member's whole burst is out and its
+    /// `ReadyToDeposit` queued.
+    ///
+    /// Recorded only while the claim's batch is the current one. A newer batch has replaced it
+    /// otherwise, and the Exit no longer repeats the request this member belonged to.
+    pub fn complete_publication(&self, claim: ClaimedPublication, now: Instant) {
+        let mut unpublished = self.unpublished.lock();
+        if claim.batch == unpublished.batch {
+            unpublished.announced.insert(claim.quota.ssa_id.ssa_index());
+            unpublished.last_sent = Some(now);
+        }
+    }
+
+    /// The announced members whose bursts a repeat arriving at `now` should have sent again, or
+    /// nothing if the batch last went out less than `grace` ago.
+    ///
+    /// When it returns members, the batch counts as sent at `now`. The repeats that follow therefore
+    /// wait out a whole `grace` again, and so do the ones that were already on their way. Whether
+    /// the re-send then gets out does not matter: one that fails is retried no sooner than one that
+    /// succeeded, which keeps a congested transport from being handed a burst on every repeat.
+    pub fn claim_republication(&self, now: Instant, grace: Duration) -> Vec<SsaIndex> {
+        let mut unpublished = self.unpublished.lock();
+        let recently_sent = unpublished
+            .last_sent
+            .is_some_and(|sent| now.saturating_duration_since(sent) < grace);
+        if recently_sent || unpublished.announced.is_empty() {
+            return Vec::new();
+        }
+        unpublished.last_sent = Some(now);
+        unpublished.announced.iter().copied().collect()
+    }
+
+    /// Stops counting `index` as announced once the generator will not rebuild its burst, so later
+    /// repeats do not ask for it again.
+    pub fn forget_announced(&self, index: SsaIndex) {
+        self.unpublished.lock().announced.remove(&index);
+    }
+
+    /// Indices still owed a publication, ascending.
+    pub fn unpublished_indices(&self) -> Vec<SsaIndex> {
+        self.unpublished.lock().members.keys().copied().collect()
+    }
+
+    /// Records a refusal, returning whether it differs from the one recorded before it.
+    ///
+    /// `first` is the lowest index the request asked for. A refusal repeated for the same index and
+    /// the same reason returns `false`, so only its first occurrence is logged loudly.
+    pub fn note_refusal(&self, first: Option<SsaIndex>, refusal: SsaRefusal) -> bool {
+        let key = (u64::from(first.map_or(0, SsaIndex::get)) << 8) | refusal as u64;
+        self.last_refusal.swap(key, Ordering::Relaxed) != key
     }
 
     /// Exit → Entry packets received since this Session's first commitment.
@@ -954,6 +1279,26 @@ impl SessionSlot {
             target => Some(target),
         }
     }
+}
+
+/// Counts the SURB a return packet will take as consumed in `estimator`, and attaches the refund that
+/// gives it back.
+///
+/// The Exit counts as it hands a packet on, because its reserve and admission decisions need the count
+/// at once. The packet can still be dropped before it takes a SURB: the PIX egress gate may never admit
+/// it (see [`acquire_egress_permit`]), and routing resolution may find no SURB within its wait. The
+/// refund then counts the SURB as given back in this estimator (see [`SurbRefund`]). It points at the
+/// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
+/// Session's slot since, and it never touches the slot.
+///
+/// The refund restores the held count the fill reserve and the drain budget read, and nothing else:
+/// the balancer's level, which the egress rate and the level reports follow, saturates at zero and
+/// has already absorbed a count made while it was empty (see
+/// [`SurbFlowEstimator::estimate_surbs_refunded`]).
+fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: ApplicationDataOut) -> ApplicationDataOut {
+    estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    data.surb_refund = SurbRefund::to(estimator.refunded.clone());
+    data
 }
 
 /// The Exit's control over the single Exit → Entry keep-alive stream a Session runs.
@@ -1566,6 +1911,12 @@ pub enum DropReason {
     /// No slot for this session id is registered (formerly the `UnknownData` error): the session
     /// was fully deregistered before this packet arrived.
     Unregistered,
+    /// A Start-protocol message that names no state on this node it could ever be handled by:
+    /// neither a Session slot nor a pending initiation under the pseudonym it arrives under. That
+    /// includes one naming a *registered* Session under a mismatched sender pseudonym, which speaks
+    /// about someone else's Session. Rejected at dispatch, before it can occupy a shared handler;
+    /// benign, and quiet for the same reason the others are.
+    StaleStartMessage,
 }
 
 /// Indicates the result of processing a message.
@@ -2374,6 +2725,23 @@ impl PixToolbox {
 /// size, because a batch asks the Entry for that many commitment sets and that many deposits before
 /// any of them can fairly be called late.
 ///
+/// The opening request is sent once. A *successor* request is not: the Entry's successor gate drops
+/// one that comes before its predecessor's returned packets have earned it, and says nothing, and a
+/// request can equally be lost on the return path. So while a successor batch is unanswered — none
+/// of its commitment has arrived — and an earlier generation is still being served, the supervisor
+/// emits `ResendSsaRequest` every
+/// [`ssa_request_resend_interval`](crate::SupervisorConfig::ssa_request_resend_interval), which has
+/// the action driver send the stored message again, byte for byte, and pushes the batch's
+/// `max_ssa_delivery_time` deadline with it. The Entry answers a repeat of a request it already
+/// committed to with a no-op once it has published the batch in full. The exception is a repeat
+/// that arrives more than `SSA_REPEAT_RESEND_GRACE` after the batch went out, which says the
+/// bursts were lost after the transport took them; they are sent again, without a second
+/// `ReadyToDeposit`. A batch whose publication the transport cut short is finished instead, with
+/// whole bursts and the `ReadyToDeposit`s still owed, whenever the Exit asks again. A request that
+/// arrives while the Entry is still processing another one is dropped rather than queued. The
+/// re-sends end once every member of the batch has reported a part of its commitment, and once the
+/// batch reaches the front nothing is sent and the deadline runs out as it always did.
+///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
 /// Upon receiving the [`SsaServerCommitmentMessage`], the Entry's `handle_ssa_request`
@@ -2484,7 +2852,25 @@ pub struct SessionManager<S> {
     /// handlers that arrive before the slot insertion completes (e.g. SsaRequest vs
     /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
     /// Keyed by SessionId so that only waiters for the relevant session are woken.
+    ///
+    /// Holds at most one live waiter per SessionId: `handle_ssa_request` refuses a request that
+    /// finds another one already waiting, rather than parking a second shared Start handler.
     slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
+    /// Pseudonyms of outgoing Session initiations currently in flight.
+    ///
+    /// `session_initiations` is keyed by challenge, but a Start message arriving from the peer
+    /// names the Session by its pseudonym. This is the pseudonym-keyed half, so `dispatch_message`
+    /// can tell in one lookup whether an inbound `SsaRequest` belongs to an initiation this node is
+    /// still making — the only case in which waiting for a slot is legitimate. Entries are removed
+    /// by [`PendingOutgoingGuard`] on every failure path and once the slot exists; the TTL is a
+    /// backstop matching `session_initiations`'.
+    ///
+    /// An initiation claims its entry atomically (see `new_session`), so a marker is owned by at
+    /// most one attempt at a time: a second initiation for a pseudonym that is still pending is
+    /// refused rather than allowed to overwrite the first one's reservation. The value is a
+    /// per-claim token, which lets [`PendingOutgoingGuard`] tell its own claim from a newer one
+    /// that reused the name after the TTL backstop expired the older marker.
+    pending_outgoing: moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -2496,7 +2882,9 @@ pub struct SessionManager<S> {
     /// upwards races past it.
     ///
     /// An async lock rather than a blocking one because the guarded region awaits — commitment
-    /// generation goes to a blocking pool, and publication awaits the transport.
+    /// generation goes to a blocking pool, and publication awaits the transport. It is only ever
+    /// `try_lock`ed, though: a request that finds it held is refused rather than parked on a shared
+    /// Start handler behind the holder (see `handle_ssa_request`).
     ///
     /// A `moka` cache rather than a map, for its idle eviction: a `HashMap` keyed by pseudonym would
     /// otherwise retain one entry per Session for the life of the process.
@@ -2544,6 +2932,7 @@ impl<S> Clone for SessionManager<S> {
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
+            pending_outgoing: self.pending_outgoing.clone(),
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
             surb_admission: self.surb_admission.clone(),
@@ -2649,6 +3038,67 @@ fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evict
         .fetch_add(evicted, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Removes an outgoing Session's pseudonym from the manager's pending index when dropped.
+///
+/// The index is keyed by the pseudonym the initiation is made under, but the paths that would
+/// otherwise clear it key on the peer-supplied `session_id`, which arrives in the establishment
+/// reply and is never checked against the pseudonym — a mismatched one would clear someone else's
+/// marker, and every early return and a dropped future would clear no one's. The guard ties the
+/// cleanup to the pseudonym actually inserted, so no path has to remember it.
+///
+/// The removal is ownership-checked rather than a plain `remove`, because the marker's TTL is only
+/// a backstop and the guard can outlive it: an initiation that times out runs almost to the TTL,
+/// so a few ticks of clock skew — or a task descheduled between the await resolving and the future
+/// being polled to completion — put the drop past expiry. Once expired, moka reports the key as
+/// absent, so a newer initiation for the same pseudonym can claim the name again; when this guard
+/// then drops, an unconditional `remove` would tear down the newer attempt's marker and leave its
+/// in-flight initiation invisible to the dispatch filter, which would drop that Session's
+/// `SsaRequest`s as `StaleStartMessage`. Comparing the entry's generation token restricts the
+/// removal to the marker this guard's own claim created.
+struct PendingOutgoingGuard<'a> {
+    pending: &'a moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
+    pseudonym: HoprPseudonym,
+    token: PendingOutgoingToken,
+}
+
+impl Drop for PendingOutgoingGuard<'_> {
+    fn drop(&mut self) {
+        // `and_compute_with` reads under moka's per-key compute lock and reports an expired entry
+        // as absent, so an expired marker of ours falls through to `Op::Nop` and nothing is left
+        // to clean up; a marker another attempt claimed after our expiry is likewise left to that
+        // attempt's own guard.
+        self.pending.entry(self.pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                match entry {
+                    // Still ours.
+                    Some(entry) if entry.value() == &self.token => moka::ops::compute::Op::Remove,
+                    // Absent (expired, or already removed by the success path), or a newer
+                    // attempt's claim: nothing to do.
+                    _ => moka::ops::compute::Op::Nop,
+                }
+            },
+        );
+    }
+}
+
+/// Per-claim token distinguishing one initiation's marker from another attempt's under the same
+/// pseudonym.
+///
+/// Uniqueness only has to hold for the lifetime of one claim, which the atomic claim in
+/// `new_session` serialises: two guards for the same pseudonym never overlap on a live marker.
+/// A per-process counter is enough for that, and `Copy` keeps the token cheap to move into and
+/// compare inside the compute closure.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct PendingOutgoingToken(u64);
+
+impl PendingOutgoingToken {
+    fn next() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 async fn send_via_msg_sender<S, D>(
     msg_sender: &mut S,
     routing: DestinationRouting,
@@ -2674,6 +3124,353 @@ where
             error!(%error, "failed to send {error_context}");
             SessionManagerError::other(error)
         })?;
+    Ok(())
+}
+
+/// The batch most recently put on the wire by the PIX action driver, with the message that carried it.
+///
+/// The one thing [`SessionPixAction::ResendSsaRequest`] can send again. See
+/// [`SessionManager::spawn_pix_action_driver`].
+type LastSsaRequest = (Vec<SsaId<HoprPseudonym>>, HoprStartProtocol);
+
+/// What the action driver does with a [`SessionPixAction::ResendSsaRequest`].
+///
+/// The decision is separate from the driver so that each refusal is observable on its own: all of them
+/// look the same from outside — nothing goes on the wire and the supervisor is told the batch can no
+/// longer be sent — and the driver's I/O loop is the wrong place to pin which of the three it was.
+#[derive(Debug)]
+enum ResendDecision<'a> {
+    /// Send this message, which is the stored request itself and so goes out byte for byte as before.
+    Send(&'a HoprStartProtocol),
+    /// The ids are not the batch last sent: a report about an earlier batch, or the batch has been
+    /// retired since. Another tick would meet the same answer.
+    NotLastRequest,
+    /// A member's Exit registration no longer exists — retired, or idled out past
+    /// `incomplete_commitment_lifetime` — so the Entry's answer would find nothing to match
+    /// (`MissingSsaCommitment`).
+    RegistrationGone,
+    /// Every member's commitment is already complete. The Entry has answered in full; what is left is
+    /// not a request to send again.
+    CommitmentComplete,
+}
+
+/// Decides whether `ssa_ids` can be re-sent, and with what.
+///
+/// Sent only if `ssa_ids` is exactly the batch of `last_request`, every member still has a
+/// registration, and at least one of them is still waiting for its commitment (a non-empty
+/// `missing_commitment_runs`). A member whose commitment is complete is no reason to refuse: the
+/// supervisor re-sends the whole batch until *every* member has heard from the Entry, because the
+/// Entry publishes a batch one member after another and may have been cut short before the later ones,
+/// and the Entry's repeat branch publishes only the members it still owes. It sends the bursts of the
+/// others again only when the repeat comes long enough after the batch went out to mean they were lost.
+///
+/// Every member is read, with no early exit, because reading a registration refreshes its idle timer —
+/// see [`SsaReconstructor::missing_commitment_runs`] — which is what keeps a registration alive across
+/// the Entry's silence. A mismatch is decided before any registration is read, since the batch is not
+/// one this driver can send anyway; a missing registration decides before completeness does.
+fn resend_payload<'a>(
+    last_request: Option<&'a LastSsaRequest>,
+    ssa_ids: &[SsaId<HoprPseudonym>],
+    processor: &SsaReconstructor<HoprPixSpec>,
+) -> ResendDecision<'a> {
+    let Some((_, message)) = last_request.filter(|(sent_ids, _)| sent_ids.as_slice() == ssa_ids) else {
+        return ResendDecision::NotLastRequest;
+    };
+
+    let (mut gone, mut pending) = (false, false);
+    for ssa_id in ssa_ids {
+        match processor.missing_commitment_runs(ssa_id, 1) {
+            None => gone = true,
+            Some(runs) => pending |= !runs.is_empty(),
+        }
+    }
+    match (gone, pending) {
+        (true, _) => ResendDecision::RegistrationGone,
+        (false, false) => ResendDecision::CommitmentComplete,
+        (false, true) => ResendDecision::Send(message),
+    }
+}
+
+/// Forgets `last_request` when `retired` is one of its members.
+///
+/// A batch with a retired member is not one the Entry can still be asked to commit to as a whole, and
+/// the supervisor ends its re-sends. The stored message goes with it, so a `ResendSsaRequest` that was
+/// already queued finds nothing to send. Left to the registration check in [`resend_payload`] alone,
+/// that refusal would depend on the reconstructor having dropped the retired member's registration.
+fn forget_request_of(last_request: &mut Option<LastSsaRequest>, retired: &SsaId<HoprPseudonym>) {
+    if last_request
+        .as_ref()
+        .is_some_and(|(sent_ids, _)| sent_ids.contains(retired))
+    {
+        *last_request = None;
+    }
+}
+
+/// The messages of one cycle's client commitment, as [`SsaClientCommitmentMessage::new_multiple`] splits it.
+type CommitmentBurst = Vec<SsaClientCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixCommitmentProof>>;
+
+/// Puts one cycle's commitment burst on the wire and, only once all of it is out, announces its deposit
+/// address.
+///
+/// The order is the point: the deposit must not begin before the Exit holds the complete commitment it
+/// derives the deposit key from. If a send fails the burst stops where it is and nothing is announced;
+/// the caller still owes the cycle its publication and decides what to do about that. The same goes
+/// for an announcement that cannot be queued: the Exit then holds the whole commitment, but the
+/// upper layer was never told to fund it.
+async fn publish_commitment<S>(
+    pix_toolbox: &PixToolbox,
+    msg_sender: &mut S,
+    routing: &DestinationRouting,
+    burst: CommitmentBurst,
+    quota: &AgreedSsaQuota,
+    error_context: &'static str,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+{
+    let ssa_index = quota.ssa_id.ssa_index();
+    for commitment_msg in burst {
+        send_via_msg_sender(
+            msg_sender,
+            routing.clone(),
+            HoprStartProtocol::SsaCommit(commitment_msg),
+            error_context,
+        )
+        .await?;
+    }
+
+    tracing::debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
+
+    // Notify the new SSA deposit address *after* all commitment messages have been sent out
+    // successfully, so the deposit cannot begin before the Exit has the complete commitment to
+    // reconstruct the deposit key.
+    pix_toolbox
+        .pix_events
+        .try_send(HoprSessionOutPixEvent::ReadyToDeposit(quota.clone()))
+        .map_err(|_| SessionManagerError::other(anyhow!("failed to notify new deposit ssa")))?;
+    tracing::info!(
+        %ssa_index, deposit_address = %quota.deposit_address, quota_per_ssa = quota.quota_per_ssa,
+        "generated client SSA commitment and deposit address"
+    );
+    Ok(())
+}
+
+/// Puts a claimed member back after its publication failed, and reports the cut.
+///
+/// The single place a cut-short publication is logged — once, at `warn!`, with the member and how many
+/// are still owed — and turned into an error: the non-fatal [`SessionManagerError::NotAdmitted`], whichever
+/// path was publishing. The Session is untouched and the Exit is told nothing; whether it asks again is
+/// its own business (see [`SessionSsaState::unpublished`]).
+fn publication_cut_short(
+    session_id: SessionId,
+    ssa_state: &SessionSsaState,
+    claim: ClaimedPublication,
+    cause: &TransportSessionError,
+) -> TransportSessionError {
+    let ssa_index = claim.quota.ssa_id.ssa_index();
+    ssa_state.restore_unpublished(claim);
+    let still_owed = ssa_state.unpublished_indices().len();
+    tracing::warn!(
+        %session_id, %ssa_index, still_owed, error = %cause,
+        "publishing the SSA commitment was cut short; it stays owed until the Exit asks again"
+    );
+    SessionManagerError::NotAdmitted(format!(
+        "publication of the SSA commitment for {ssa_index} was cut short ({cause}); {still_owed} member(s) still owed"
+    ))
+    .into()
+}
+
+/// Finishes publishing the batch an interrupted publication left behind, member by member in ascending
+/// order, stopping at the first transport failure.
+///
+/// Each member still owed is *claimed* first — removed from [`SessionSsaState`]'s unpublished set,
+/// which is what makes it this call's alone — and then published in full: its whole burst, rebuilt
+/// from the material the generator retains for the cycle, and only then the `ReadyToDeposit` that was
+/// owed. Every member that is published here is published whole, and by exactly one caller, so a
+/// resumption can neither announce a deposit twice nor race the original publication or another
+/// resumption into doing so. A member whose publication fails goes back, the failure is reported
+/// through [`publication_cut_short`], and the members after it were never claimed, so all of them stay
+/// owed for the next attempt.
+///
+/// The whole burst is re-sent rather than only what went missing, because what went missing is not
+/// known: the Entry's send failed at some message and says nothing about the ones the transport
+/// accepted before it, and the Exit's request names parts of a commitment it may not even have started
+/// to receive. That costs one of the cycle's
+/// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS) answers, and
+/// that cap is what bounds how often a cycle can be re-published. Once it is spent the generator
+/// refuses (`PixError::InvalidInput`), and so it does when nothing is retained for the cycle any more
+/// (`PixError::MissingSsaCommitment`): either way the cycle can never be published again, so it is
+/// dropped from the owed set with a single warning rather than kept to cost a blocking `recommit` and
+/// a log line on every re-send. It is never announced, and nothing is stranded by that. Dropping one
+/// member does not stop the others, and the call is successful if the rest were published.
+///
+/// A resumption is reached only through a repeat of the request or a scoped re-request that names an
+/// owed cycle, so it covers what the Exit asks about. See [`SessionSsaState::unpublished`] for what
+/// nothing prompts.
+async fn resume_publication<S>(
+    session_id: SessionId,
+    pseudonym: HoprPseudonym,
+    routing: &DestinationRouting,
+    ssa_state: &SessionSsaState,
+    pix_toolbox: &PixToolbox,
+    msg_sender: &mut S,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+{
+    /// How resuming one member ended, short of a transport failure.
+    enum Resumed {
+        Published,
+        /// The generator will never produce this cycle's burst again.
+        Unpublishable(hopr_protocol_pix::errors::PixError<HoprPseudonym>),
+    }
+
+    let whole_cycle = [(
+        0,
+        ssa_state.params.polys_per_ssa() as hopr_protocol_pix::PolynomialIndex - 1,
+    )];
+
+    for ssa_index in ssa_state.unpublished_indices() {
+        let Some(claim) = ssa_state.claim_unpublished(ssa_index) else {
+            // Published, or being published, by someone else since the list was read.
+            continue;
+        };
+
+        let generator = pix_toolbox.share_generator.clone();
+        let outcome: errors::Result<Resumed> = async {
+            let recommitted = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || generator.recommit(&pseudonym, ssa_index, whole_cycle),
+                "client_ssa_recommitment",
+            )
+            .await
+            .map_err(SessionManagerError::other)?;
+            let commitment = match recommitted {
+                Ok(commitment) => commitment,
+                Err(
+                    error @ (hopr_protocol_pix::errors::PixError::InvalidInput
+                    | hopr_protocol_pix::errors::PixError::MissingSsaCommitment),
+                ) => return Ok(Resumed::Unpublishable(error)),
+                Err(error) => return Err(SessionManagerError::PixError(error).into()),
+            };
+            let burst =
+                SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
+            publish_commitment(
+                pix_toolbox,
+                msg_sender,
+                routing,
+                burst,
+                &claim.quota,
+                "re-published client SSA commitment message",
+            )
+            .await?;
+            Ok(Resumed::Published)
+        }
+        .await;
+
+        match outcome {
+            Ok(Resumed::Published) => {
+                ssa_state.complete_publication(claim, Instant::now());
+                tracing::info!(%session_id, %ssa_index, "finished publishing an interrupted SSA commitment");
+            }
+            Ok(Resumed::Unpublishable(cause)) => {
+                // Not put back: it can never be published, so owing it would only repeat this.
+                tracing::warn!(
+                    %session_id, %ssa_index, error = %cause,
+                    "the SSA commitment can no longer be published and is dropped; its deposit is never announced"
+                );
+                drop(claim);
+            }
+            Err(error) => return Err(publication_cut_short(session_id, ssa_state, claim, &error)),
+        }
+    }
+    Ok(())
+}
+
+/// Sends the whole burst of each of `members` again, rebuilt from the material the generator
+/// retains, and announces nothing.
+///
+/// This answers a repeat that arrives too late to have crossed the batch's bursts (see
+/// [`SSA_REPEAT_RESEND_GRACE`]): some member's burst went out and none of it reached the Exit. The
+/// repeat names the whole batch, not the member that is missing, so every announced member is sent
+/// again, and a member the Exit already holds absorbs the copy. There is no `ReadyToDeposit`,
+/// because each of `members` was announced when its publication completed (see
+/// [`OwedPublications::announced`]).
+///
+/// Each re-send spends one of the cycle's
+/// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), the same
+/// budget a scoped re-request draws on. Once the generator refuses to rebuild a cycle, because that
+/// budget is spent or its material is gone, the cycle is no longer counted as announced, so later
+/// repeats do not ask again. A transport failure stops the re-send where it is and is the non-fatal
+/// [`SessionManagerError::NotAdmitted`]. The Exit's next repeat after the grace tries again.
+async fn republish_commitments<S>(
+    session_id: SessionId,
+    pseudonym: HoprPseudonym,
+    routing: &DestinationRouting,
+    ssa_state: &SessionSsaState,
+    pix_toolbox: &PixToolbox,
+    msg_sender: &mut S,
+    members: Vec<SsaIndex>,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+{
+    let whole_cycle = [(
+        0,
+        ssa_state.params.polys_per_ssa() as hopr_protocol_pix::PolynomialIndex - 1,
+    )];
+
+    for ssa_index in members {
+        let generator = pix_toolbox.share_generator.clone();
+        let recommitted = hopr_utils::parallelize::cpu::spawn_blocking(
+            move || generator.recommit(&pseudonym, ssa_index, whole_cycle),
+            "client_ssa_recommitment",
+        )
+        .await
+        .map_err(SessionManagerError::other)?;
+        let commitment = match recommitted {
+            Ok(commitment) => commitment,
+            Err(
+                error @ (hopr_protocol_pix::errors::PixError::InvalidInput
+                | hopr_protocol_pix::errors::PixError::MissingSsaCommitment),
+            ) => {
+                ssa_state.forget_announced(ssa_index);
+                tracing::warn!(
+                    %session_id, %ssa_index, error = %error,
+                    "a lost SSA commitment can no longer be re-sent"
+                );
+                continue;
+            }
+            Err(error) => return Err(SessionManagerError::PixError(error).into()),
+        };
+
+        let burst =
+            SsaClientCommitmentMessage::new_multiple(session_id, commitment).map_err(SessionManagerError::other)?;
+        let num_messages = burst.len();
+        for commitment_msg in burst {
+            if let Err(error) = send_via_msg_sender(
+                msg_sender,
+                routing.clone(),
+                HoprStartProtocol::SsaCommit(commitment_msg),
+                "re-sent client SSA commitment message",
+            )
+            .await
+            {
+                tracing::warn!(
+                    %session_id, %ssa_index, %error,
+                    "re-sending a lost SSA commitment was cut short; the Exit's next repeat tries again"
+                );
+                return Err(SessionManagerError::NotAdmitted(format!(
+                    "re-sending the SSA commitment for {ssa_index} was cut short ({error})"
+                ))
+                .into());
+            }
+        }
+
+        tracing::info!(%session_id, %ssa_index, num_messages, "re-sent the whole commitment of a published SSA");
+    }
     Ok(())
 }
 
@@ -2840,6 +3637,10 @@ where
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
+            pending_outgoing: moka::sync::Cache::builder()
+                .max_capacity(maximum_sessions as u64)
+                .time_to_live(initiation_timeout)
+                .build(),
             // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
             // race for it, and one evicted between two cycles is simply recreated by the next request.
             // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
@@ -3021,9 +3822,11 @@ where
                             }
                             HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
                             HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(error_type).await
+                                myself.handle_session_error(pseudonym, error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg, packet_info).await,
+                            HoprStartProtocol::KeepAlive(msg) => {
+                                myself.handle_keep_alive(pseudonym, msg, packet_info).await
+                            }
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
                                 myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
@@ -3032,8 +3835,18 @@ where
                             }
                         };
 
-                        if let Err(error) = result {
-                            error!(%error, "failed to process Start protocol message");
+                        match result {
+                            Ok(()) => {}
+                            // Dropped on purpose and not a fault: the request lock, the successor
+                            // gate (early or under-served), the stale-index check and a repeat whose
+                            // interrupted publication could not be finished all refuse this way. The
+                            // handler has already logged the first occurrence of a gate or stale
+                            // refusal at the level it deserves, and the peer re-asks — which can
+                            // succeed for all of them but a stale request.
+                            Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
+                                tracing::debug!(%reason, "Start protocol message not admitted");
+                            }
+                            Err(error) => tracing::error!(%error, "failed to process Start protocol message"),
                         }
                     }
                 }
@@ -3260,6 +4073,46 @@ where
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
+        // Atomically claim the pseudonym in `pending_outgoing` before the initiation is sent so
+        // that a fast Exit's `SsaRequest` — which names the Session by this pseudonym, not by the
+        // challenge — finds it at dispatch. The guard removes it on every path below that does not
+        // reach `drop(_pending_guard)`: each early return, a dropped future, and the two
+        // `allocate_session_slot` failures, which are keyed by the peer-supplied `session_id` and
+        // so cannot clear it themselves.
+        //
+        // The claim, not a plain `insert`, because `moka`'s `insert` would silently overwrite an
+        // existing reservation: two concurrent `new_session` calls under the same explicit
+        // pseudonym would both hold a guard over one shared marker, and the first one to finish
+        // would clear it while the other is still in flight — an `SsaRequest` for that initiation
+        // would then fail the dispatch filter and be dropped as `StaleStartMessage`. Refusing the
+        // overlapping initiation instead keeps each marker owned by exactly one attempt.
+        //
+        // The claim happens AFTER the challenge reservation above, so a failed claim must also
+        // release that reservation: it was taken for an initiation that never starts, and leaving
+        // it would shrink the initiation window for every later attempt.
+        let token = PendingOutgoingToken::next();
+        let claim_result = self.pending_outgoing.entry(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, PendingOutgoingToken>>| {
+                if entry.is_none() {
+                    moka::ops::compute::Op::Put(token)
+                } else {
+                    // Another initiation already holds this pseudonym.
+                    moka::ops::compute::Op::Nop
+                }
+            },
+        );
+        if !matches!(claim_result, moka::ops::compute::CompResult::Inserted(_)) {
+            self.session_initiations.remove(&challenge);
+            return Err(SessionManagerError::Unacceptable(format!(
+                "an outgoing Session initiation under pseudonym {pseudonym} is already in flight"
+            ))
+            .into());
+        }
+        let _pending_guard = PendingOutgoingGuard {
+            pending: &self.pending_outgoing,
+            pseudonym,
+            token,
+        };
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
@@ -3432,8 +4285,19 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose. Cleared here, before the SURB readiness wait below, which can take
+                    // seconds, rather than after it.
+                    drop(_pending_guard);
 
                     // Prevent the slot from being evicted by time_to_idle while SURBs are
                     // pre-loading. Each `get()` call resets the idle timer; the task is
@@ -3567,8 +4431,18 @@ where
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
+                            // The slot will never exist for this pseudonym, so the pending-initiation
+                            // marker must not outlive this attempt: leaving it would let later
+                            // `SsaRequest`s for it pass the dispatch filter and park a handler waiting
+                            // on a slot that never arrives. Dropped on the way out of the closure, the
+                            // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+
+                    // The slot now exists, so inbound traffic for this Session passes the dispatch
+                    // filter on the session registry alone; the pending-initiation marker has served
+                    // its purpose.
+                    drop(_pending_guard);
 
                     #[cfg(all(feature = "telemetry", not(test)))]
                     METRIC_NUM_INITIATED_SESSIONS.increment();
@@ -3633,6 +4507,10 @@ where
                     %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
+                // A rejected initiation can never become a Session, so nothing legitimate can name
+                // its pseudonym any more. `handle_session_error` removes the *challenge*, but only
+                // this call knows the pseudonym the rejection was made under — which the guard
+                // removes here.
                 Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
@@ -3764,12 +4642,24 @@ where
             .share_processor
             .clone();
         let retirement_scope = share_processor.begin_retirement_scope(session_id);
+        // Captured rather than looked up per report: the lookup that finds a slot refreshes its idle
+        // timer, and the one arm that must not do that is the re-send of an unanswered request.
+        let supervisor = slot.pix_supervisor.get().cloned();
 
         hopr_utils::spawn_as_abortable!(async move {
             let _retirement_scope = retirement_scope;
             // The vector owns each registration until a terminal action explicitly retires it or
             // dropping this future releases it during whole-Session teardown.
             let mut owned_ssas: Vec<SsaCommitmentGuard<HoprPixSpec>> = Vec::new();
+            // The batch most recently put on the wire, with the exact message that carried it.
+            //
+            // What `ResendSsaRequest` sends again. Kept rather than rebuilt because a rebuilt request is
+            // not the same request: its Exit secrets are random, so it would commit the Exit to a
+            // different set than the one registered, and the deposit pool answers a batch once. Only the
+            // latest batch is kept — the supervisor re-sends only an unanswered one, and a batch is
+            // requested only after the one before it has been answered. Dropped when a member is
+            // retired, since a request for a registration that no longer exists can only be refused.
+            let mut last_request: Option<LastSsaRequest> = None;
 
             let close_reason = loop {
                 let Ok(action) = action_rx.recv().await else {
@@ -3794,8 +4684,9 @@ where
                             continue;
                         };
                         match myself.send_ssa_request(session_id, &slot, &ssa_ids, params).await {
-                            Ok(guards) => {
+                            Ok((guards, request)) => {
                                 owned_ssas.extend(guards);
+                                last_request = Some((ssa_ids.clone(), request));
                                 // One confirmation per index: the supervisor arms each cycle's
                                 // commitment deadline on its own `SsaRequestSent`, and they were all
                                 // put on the wire by the one send that just succeeded.
@@ -3883,6 +4774,66 @@ where
                             error!(%session_id, %ssa_id, %error, "failed to re-request ssa commitment parts");
                         }
                     }
+                    SessionPixAction::ResendSsaRequest { ssa_ids } => {
+                        // `contains_key` rather than `get`, which would refresh the Session's idle
+                        // timer: a Session that is otherwise dead would then be kept alive by its own
+                        // re-sends for as long as the predecessor's clocks run. The routing needs no
+                        // slot — it is the reply routing this driver was spawned with.
+                        if !myself.sessions.contains_key(&session_id) {
+                            continue;
+                        }
+
+                        // Never `send_ssa_request`: it registers a fresh Exit commitment, which the
+                        // reconstructor refuses as a duplicate of the pending one, and its failure
+                        // path closes the Session as `SupervisorUnavailable`. A re-send is allowed to
+                        // fail without costing the Session anything.
+                        //
+                        // Deciding also reads each member's registration, which is what keeps it from
+                        // idling out after `incomplete_commitment_lifetime`: a pending registration
+                        // is not refreshed by anything else while the Entry is silent. A batch that
+                        // is not the last one sent, or whose registration is gone or complete, can
+                        // only be refused, so it is not sent.
+                        let message = match resend_payload(last_request.as_ref(), &ssa_ids, &share_processor) {
+                            ResendDecision::Send(message) => message,
+                            refusal => {
+                                tracing::debug!(
+                                    %session_id, batch_size = ssa_ids.len(), ?refusal,
+                                    "cannot re-send the SSA request"
+                                );
+                                if let Some(supervisor) = supervisor.as_ref()
+                                    && supervisor
+                                        .send_action_result(SessionPixAction::ResendSsaRequest { ssa_ids }, false)
+                                        .await
+                                        .is_err()
+                                {
+                                    tracing::error!(%session_id, "pix supervisor stopped accepting results");
+                                }
+                                continue;
+                            }
+                        };
+
+                        // Failure is logged and dropped, as for the re-request above, and nothing is
+                        // reported back: the supervisor pushed the batch's deadline when it emitted
+                        // this and will emit another on its next tick. `SsaRequestSent` is not sent
+                        // either — the batch was confirmed when it was first requested.
+                        match myself.msg_sender.get().cloned() {
+                            Some(mut msg_sender) => {
+                                if let Err(error) = send_via_msg_sender(
+                                    &mut msg_sender,
+                                    reply_routing.clone(),
+                                    message.clone(),
+                                    "re-sent session SSA commitment request message",
+                                )
+                                .await
+                                {
+                                    tracing::error!(%session_id, %error, "failed to re-send the ssa request");
+                                }
+                            }
+                            None => {
+                                tracing::error!(%session_id, "cannot re-send the ssa request - manager not started")
+                            }
+                        }
+                    }
                     SessionPixAction::ReleaseService => {
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::set_pix_gate_mode(&session_id, true);
@@ -3892,8 +4843,19 @@ where
                         crate::telemetry::set_pix_gate_mode(&session_id, false);
                     }
                     // Gate control is applied synchronously by the supervisor worker. The action
-                    // reaches this I/O driver only to preserve observability and ordering.
-                    SessionPixAction::ProgressNotification => {}
+                    // reaches this I/O driver only to preserve observability and ordering, which
+                    // makes it the one periodic point with the reconstructor in hand: refresh the
+                    // node-wide occupancy gauge here. The walk covers every live cycle on the node and
+                    // notifications come per acknowledgement batch per Session, so it runs at most once
+                    // a second node-wide (`HELD_SHARES_REFRESH_PERIOD`), not on every notification.
+                    // Progress behind the front asks for the same refresh, with nothing for the gate.
+                    SessionPixAction::ProgressNotification | SessionPixAction::RefreshHeldShares =>
+                    {
+                        #[cfg(feature = "telemetry")]
+                        if crate::telemetry::pix::held_shares_refresh_due() {
+                            crate::telemetry::pix::set_held_shares(share_processor.held_shares());
+                        }
+                    }
                     SessionPixAction::SetFillRate(rate) => {
                         // Looked up per action rather than captured, because the Session may already
                         // be gone: the supervisor plans against state it holds itself, and the slot
@@ -3914,7 +4876,13 @@ where
                     }
                     SessionPixAction::RetireSsa(ssa_id) => {
                         share_processor.retire_ssa(ssa_id);
+                        // The retired cycle's shares are gone, and nothing else refreshes the gauge
+                        // until another notification comes due, which a node with no other PIX
+                        // Session may never send. Retirement is once per cycle, so unthrottled.
+                        #[cfg(feature = "telemetry")]
+                        crate::telemetry::pix::set_held_shares(share_processor.held_shares());
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
+                        forget_request_of(&mut last_request, &ssa_id);
                         if let Some(slot) = myself.sessions.get(&session_id) {
                             slot.abort_handles
                                 .lock()
@@ -3925,7 +4893,13 @@ where
                 }
             };
 
-            let Some(reason) = close_reason else { return };
+            let Some(reason) = close_reason else {
+                // The cycles this driver holds go with it; see the refresh after the teardown below.
+                owned_ssas.clear();
+                #[cfg(feature = "telemetry")]
+                crate::telemetry::pix::set_held_shares(share_processor.held_shares());
+                return;
+            };
 
             // Read before `stop_pix_fill`, which silences the stream either way. Keyed on the drain
             // rather than on the reason, which is a strict superset of it: a *stalled* drain closes
@@ -3948,6 +4922,10 @@ where
             myself.stop_pix_fill(&session_id);
             gate.poison();
             owned_ssas.clear();
+            // Releasing the guards removed the Session's cycles from the reconstructor; refresh the
+            // gauge now rather than leave their shares counted until another Session's notification.
+            #[cfg(feature = "telemetry")]
+            crate::telemetry::pix::set_held_shares(share_processor.held_shares());
 
             #[cfg(feature = "telemetry")]
             crate::telemetry::pix::record_pix_closure(reason);
@@ -4050,9 +5028,7 @@ where
             // counting it would walk the Exit's own level estimate down until it starved itself of
             // the very reserve that dropped it.
             msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                surb_estimator
-                    .consumed
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let data = count_return_packet_surb(&surb_estimator, data);
                 #[cfg(feature = "telemetry")]
                 telemetry::record_session_surb_consumed(&session_id, 1);
                 futures::future::ok::<_, S::Error>((routing, data))
@@ -4215,6 +5191,12 @@ where
     /// Installs no deadline of its own: every timeout that used to be armed here now belongs to the
     /// supervisor, which can see the whole cycle rather than just this one step.
     ///
+    /// Returns the exact [`HoprStartProtocol`] message that went on the wire alongside the guards, so the
+    /// caller can send *that* again for [`ResendSsaRequest`](SessionPixAction::ResendSsaRequest). A
+    /// rebuilt request would not be the same one: the Exit secrets behind its commitments are random,
+    /// and the deposit data is whatever the pool answered the first time. The message is cloned before
+    /// it is sent, and its encoding is deterministic, so a repeat is byte-identical.
+    ///
     /// The returned [`SsaCommitmentGuard`]s own their registrations until the caller transfers or drops
     /// them. Handing them out rather than retaining them here is what makes the failure path safe:
     /// this function has fallible steps after the registrations exist — including partway through the
@@ -4227,7 +5209,7 @@ where
         slot: &SessionSlot,
         ssa_ids: &[SsaId<HoprPseudonym>],
         params: PixParams,
-    ) -> errors::Result<Vec<SsaCommitmentGuard<HoprPixSpec>>> {
+    ) -> errors::Result<(Vec<SsaCommitmentGuard<HoprPixSpec>>, HoprStartProtocol)> {
         let Some(first_ssa_id) = ssa_ids.first().copied() else {
             return Err(SessionManagerError::Other(anyhow!("ssa request with no indices")).into());
         };
@@ -4298,13 +5280,13 @@ where
         send_via_msg_sender(
             &mut msg_sender,
             slot.routing_opts.clone(),
-            data,
+            data.clone(),
             "session SSA commitment request message",
         )
         .await
         .map_err(TransportSessionError::packet_sending)?;
 
-        Ok(guards)
+        Ok((guards, data))
     }
 
     /// Asks the Entry to re-send the parts of one SSA's commitment that never arrived.
@@ -4701,6 +5683,58 @@ where
             .collect()
     }
 
+    /// Whether an `SsaRequest` for `session_id` names SSA state this node holds or is making.
+    ///
+    /// Only the Exit asks for SSA commitments, and only of its own Entry: a Session this node holds
+    /// as an outgoing (`Forward`) slot, or one this node is still initiating (`pending_outgoing`).
+    /// An Exit-side (`Return`) slot never legitimately receives one, so a request naming one is
+    /// refused.
+    ///
+    /// Lives on [`Self::start_message_is_for_local_state`] only. [`Self::handle_ssa_request`]
+    /// re-checks the two cheap halves of it (slot present, or initiation pending) as a backstop, but
+    /// deliberately not the variant — see there.
+    fn ssa_request_names_local_state(&self, session_id: &SessionId) -> bool {
+        self.pending_outgoing.contains_key(session_id)
+            || self
+                .sessions
+                .get(session_id)
+                .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+    }
+
+    /// Whether a Start-protocol message names Session state this node actually holds.
+    ///
+    /// Start messages share one bounded worker pool, and several handlers park a worker on state a
+    /// bogus message will never have — `handle_ssa_request` waits up to a second for a Session slot
+    /// a random pseudonym never gets. Deciding admission here, where the session lookup is already
+    /// being done, keeps those messages off the pool entirely.
+    fn start_message_is_for_local_state(&self, pseudonym: &HoprPseudonym, msg: &HoprStartProtocol) -> bool {
+        match msg {
+            // Creates the state the other arms are checked against.
+            HoprStartProtocol::StartSession(_) => true,
+
+            // Per-Session control traffic. The pseudonym a Start message arrives under is the
+            // Session's own pseudonym on both sides, so a mismatch names someone else's Session.
+            HoprStartProtocol::KeepAlive(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+            HoprStartProtocol::SsaCommit(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
+
+            // Only the Exit asks for SSA commitments, and only of its own Entry: an outgoing
+            // (Forward) Session, or one this node is still initiating. An Exit-side (Return) slot
+            // never legitimately receives one.
+            HoprStartProtocol::SsaRequest(m) => {
+                m.session_id == *pseudonym && self.ssa_request_names_local_state(&m.session_id)
+            }
+
+            // Both are replies to something this node sent: an initiation named by challenge, or —
+            // for `SessionError` only — a post-establishment error naming a registered Session by
+            // its id.
+            HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
+            HoprStartProtocol::SessionError(err) => match err.identifier {
+                ErrorIdentifier::Challenge(challenge) => self.session_initiations.contains_key(&challenge),
+                ErrorIdentifier::SessionId(id) => id == *pseudonym && self.sessions.contains_key(&id),
+            },
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -4715,8 +5749,10 @@ where
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
             // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
-            // before handing it to the protocol worker; incoming Sessions receive this traffic from
-            // the Entry over the forward path and must not be credited.
+            // before anything else: the decode and the admission filter below can both drop the
+            // message, and a packet that is dropped here has already spent its return SURB, so the
+            // credit must not depend on it being decodable or admitted. Incoming Sessions receive
+            // this traffic from the Entry over the forward path and must not be credited.
             if let Some(session_slot) = self.sessions.get(&pseudonym)
                 && matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. })
             {
@@ -4733,16 +5769,30 @@ where
                     .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
             }
 
+            // Decode once, then decide locally whether anything on this node could handle it.
+            // Without this check a peer spraying Start messages for pseudonyms it invented occupies
+            // the shared Start-protocol worker pool — several handlers park a worker on state such
+            // a message never has — and the bounded queue then fills, dropping every message behind
+            // it.
+            let msg = HoprStartProtocol::try_from(in_data.data)?;
+
+            if !self.start_message_is_for_local_state(&pseudonym, &msg) {
+                // Quiet on purpose: a peer spraying Start messages for pseudonyms we never issued
+                // must not be able to fill the log any more than it can fill the handler pool.
+                trace!(%pseudonym, "dropping Start protocol message that names no local session");
+                crate::counters::SESSION_STALE_START_MESSAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_DISPATCHED_MSGS.increment_by(&["dropped_stale_start"], 1);
+                return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
+            }
+
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 start_protocol_tx
-                    .try_send((
-                        pseudonym,
-                        HoprStartProtocol::try_from(in_data.data)?,
-                        in_data.packet_info,
-                    ))
+                    .try_send((pseudonym, msg, in_data.packet_info))
                     .map_err(|error| {
+                        crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         error!(%error, "failed to send Start protocol message to processing task");
                         SessionManagerError::other(error)
                     })?;
@@ -5442,9 +6492,7 @@ where
                         .sink_map_err(std::io::Error::other)
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Each outgoing packet consumes one SURB
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let data = count_return_packet_surb(&surb_estimator_tx, data);
                             #[cfg(feature = "telemetry")]
                             telemetry::record_session_surb_consumed(&session_id, 1);
                             acquire_egress_permit(egress_gate.clone(), routing, data)
@@ -5529,9 +6577,7 @@ where
                             // reserve that either never binds or never releases. `NoRateControl` is
                             // also the branch that can drain SURBs fastest, so it is the one where
                             // that matters most.
-                            surb_estimator_tx
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let data = count_return_packet_surb(&surb_estimator_tx, data);
                             #[cfg(feature = "telemetry")]
                             telemetry::record_session_surb_consumed(&session_id, 1);
                             acquire_egress_permit(egress_gate.clone(), routing, data)
@@ -5663,7 +6709,11 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+    async fn handle_session_error(
+        &self,
+        pseudonym: HoprPseudonym,
+        error_type: StartErrorType<SessionId>,
+    ) -> errors::Result<()> {
         let reason = error_type.reason;
         match error_type.identifier {
             ErrorIdentifier::Challenge(challenge) => {
@@ -5682,6 +6732,10 @@ where
                 }
             }
             ErrorIdentifier::SessionId(session_id) => {
+                if session_id != pseudonym {
+                    debug!(%pseudonym, %session_id, "dropping session error naming a different session");
+                    return Ok(());
+                }
                 error!(
                     %session_id, %reason,
                     "received post-establishment session error — closing session"
@@ -5700,9 +6754,18 @@ where
     #[tracing::instrument(level = "trace", skip(self, msg, in_packet_info))]
     async fn handle_keep_alive(
         &self,
+        pseudonym: HoprPseudonym,
         msg: KeepAliveMessage<SessionId>,
         in_packet_info: IncomingPacketInfo,
     ) -> errors::Result<()> {
+        // The pseudonym a Start message arrives under is the Session's own pseudonym on both sides,
+        // so a mismatch means the sender is naming someone else's Session. Pseudonyms are 80 random
+        // bits, so this only matters on a leak — which is exactly when it matters.
+        if msg.session_id != pseudonym {
+            debug!(%pseudonym, session_id = %msg.session_id, "dropping keep-alive naming a different session");
+            return Ok(());
+        }
+
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -5963,6 +7026,14 @@ where
     /// that cannot drift within a Session, so a later one would be refused identically. Left alone the
     /// slot would survive until the idle timeout.
     ///
+    /// That holds for the refusals that come through here — parameters, the batch cap, an undecodable
+    /// commitment and lost generator state. It does *not* hold for the successor gate, whose two
+    /// refusals (early, under-served) and the stale-index drop are `NotAdmitted` and never reach this
+    /// function: they depend on how far the predecessor has been served, which changes, and the
+    /// Exit's supervisor re-sends its unanswered successor request while that generation is still
+    /// being served. Closing on one of those would end a Session over a shortfall that the next
+    /// re-send repairs.
+    ///
     /// No new capability is handed to an attacker by closing on a refusal: an `SsaRequest` only reaches
     /// here with `pseudonym == session_id`, and relayers never see that pseudonym — a relayer can garble
     /// a packet in transit but not forge one for this Session — so only the Exit can produce one, and
@@ -5988,6 +7059,19 @@ where
     /// [`ReadyToDeposit`](HoprSessionOutPixEvent::ReadyToDeposit): the deposit address of a cycle is
     /// fixed when it is first committed, and the caller was told it then, so announcing it again
     /// would invite a second deposit against one quota.
+    ///
+    /// That holds for a cycle whose publication completed. For one whose publication was cut short —
+    /// the transport failed part-way through its burst, or between its burst and the announcement — the
+    /// caller was *not* told, and the scoped parts would hand the Exit a complete commitment for a
+    /// cycle nobody was asked to fund. Such a cycle is answered instead by resuming the publication of
+    /// the batch it belongs to: whole bursts and the owed `ReadyToDeposit`s, in ascending order, each
+    /// published by whoever claims it (see [`SessionSsaState::unpublished`]) so that a deposit is
+    /// announced once however many requests arrive. The cycles of the request that were not cut short
+    /// are answered with their scoped parts as before. This is reached only when the Exit asks, so it
+    /// is the answer for a burst that got part of the way out: a cycle with no message out, or one
+    /// whose burst was whole and only its announcement failed, prompts no request and is not covered
+    /// (see [`SessionSsaState::unpublished`]). A resumption the transport cuts short again is the
+    /// non-fatal `NotAdmitted`.
     ///
     /// A failure here is reported to the caller of the Start-message dispatcher and otherwise
     /// dropped. It is deliberately not [`refuse_ssa_request`](Self::refuse_ssa_request), which closes
@@ -6032,7 +7116,48 @@ where
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         let session_id = msg.session_id;
 
+        // Cycles named here whose publication never completed. Decided before anything is sent, and
+        // answered once for all of them: resuming publishes every member that is owed, not only the
+        // ones this request names, and the ones it names are then not also answered with a scoped
+        // re-send — their whole burst has just gone out, and a second answer would spend another of
+        // the cycle's retransmissions on parts the Exit now has.
+        let cut_short: Vec<SsaIndex> = session_slot
+            .current_ssa_state
+            .get()
+            .map(|state| {
+                state
+                    .unpublished_indices()
+                    .into_iter()
+                    .filter(|ssa_index| msg.missing.contains_key(ssa_index))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // A resumption's failure is kept rather than returned at once. The cycles of this request
+        // that were published in full are repairs of their own, and a resumption the transport cut
+        // short is no reason to make them wait a whole re-request interval. It is reported once they
+        // have been sent.
+        let resumed = match session_slot.current_ssa_state.get() {
+            Some(ssa_state) if !cut_short.is_empty() => {
+                tracing::info!(%session_id, ?cut_short, "a re-request names cycles whose publication was cut short — resuming it");
+                resume_publication(
+                    session_id,
+                    pseudonym,
+                    &session_slot.routing_opts,
+                    ssa_state,
+                    &pix_toolbox,
+                    &mut msg_sender,
+                )
+                .await
+            }
+            _ => Ok(()),
+        };
+
         for (ssa_index, runs) in msg.missing {
+            if cut_short.contains(&ssa_index) {
+                continue;
+            }
+
             // Rebuilt from the bytes that went out the first time, so the peer's already-filled slots
             // see a re-delivery rather than a contradiction.
             let pix_toolbox_clone = pix_toolbox.clone();
@@ -6061,7 +7186,7 @@ where
             info!(%session_id, %ssa_index, num_messages, "re-sent the requested SSA commitment parts");
         }
 
-        Ok(())
+        resumed
     }
 
     /// Handled by the Entry, when the Exit sends PIX initiation request
@@ -6080,6 +7205,20 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
+        // Deliberately narrower than the dispatch filter's `SsaRequest` arm
+        // (`ssa_request_names_local_state`), which additionally requires the slot to be an outgoing
+        // (`Forward`) one: a compliant peer never sends an `SsaRequest` to an Exit-side (Return)
+        // slot, so dispatch drops that case outright, and re-checking the variant here would only
+        // re-decide what dispatch already decided on the same in-memory state. This guard is the
+        // backstop for the state changing between the two — a message that sat queued long enough
+        // for the session it names to close, or for a `pending_outgoing` initiation to be removed —
+        // and for callers that bypass dispatch entirely. Refusing here rather than after the wait
+        // below is what kept a flood of bogus requests from parking the shared handler pool.
+        if self.sessions.get(&msg.session_id).is_none() && !self.pending_outgoing.contains_key(&msg.session_id) {
+            trace!(session_id = %msg.session_id, "refusing an SSA request for a session this node does not hold");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
         // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
         // has finished allocating the session slot, since both SessionEstablished and SsaRequest
         // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
@@ -6090,7 +7229,7 @@ where
             let waiter_deadline = Instant::now() + Duration::from_secs(30);
             loop {
                 if Instant::now() >= waiter_deadline {
-                    error!(%session_id, "session slot waiter deadline exceeded");
+                    debug!(%session_id, "session slot waiter deadline exceeded");
                     return Err(SessionManagerError::NonExistingSession.into());
                 }
                 // Optimistic cache check
@@ -6109,7 +7248,22 @@ where
                         drop(map);
                         continue;
                     }
-                    map.entry(session_id).or_default().push(tx);
+
+                    // At most one request per Session waits here; any other is refused at once, for
+                    // the reason `ssa_request_locks` below is only `try_lock`ed. The dispatch filter
+                    // admits every request naming a pending initiation, and each one waiting here
+                    // parks a shared Start handler — so whoever holds SURBs for the pseudonym could
+                    // occupy all of them before the slot exists. A conforming Exit sends only its
+                    // opening request before then; a retransmission names commitments that only an
+                    // existing slot can have sent.
+                    let waiters = map.entry(session_id).or_default();
+                    if waiters.iter().any(|w| !w.is_canceled()) {
+                        return Err(SessionManagerError::Unacceptable(format!(
+                            "an SSA request for {session_id} is already waiting for its session slot"
+                        ))
+                        .into());
+                    }
+                    waiters.push(tx);
                 }
 
                 let timeout = futures_time::time::Duration::from(Duration::from_millis(1000));
@@ -6136,7 +7290,7 @@ where
                             break slot;
                         }
 
-                        error!(%session_id, "session slot not found after awaiting allocation");
+                        debug!(%session_id, "session slot not found after awaiting allocation");
                         return Err(SessionManagerError::NonExistingSession.into());
                     }
                 }
@@ -6171,11 +7325,12 @@ where
             return Err(error.into());
         }
 
-        let Some(our_params) = session_slot.current_ssa_state.get().map(|s| s.params) else {
+        let Some(ssa_state) = session_slot.current_ssa_state.get() else {
             return Err(
                 SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {}", msg.session_id)).into(),
             );
         };
+        let our_params = ssa_state.params;
 
         // The Entry enforces that the Exit's SSA parameters match exactly the ones we offered in the
         // Session Initiation message.  Negotiation (accepting an Exit-chosen quota within our
@@ -6232,11 +7387,114 @@ where
         // Everything from here to the end of the batch is serialised per pseudonym. Start messages run
         // under `for_each_concurrent`, so the successor gate below would otherwise be read by several
         // requests before any of them advanced it, and every one would pass. See `ssa_request_locks`.
+        //
+        // Taken without waiting. A request that finds the lock held is one the Exit is going to send
+        // again — a repeat of the batch being committed right now, or a request racing it — and
+        // queueing behind the holder would park a `for_each_concurrent` slot for as long as that
+        // holder runs: the near-miss wait below, or generating a commitment (a fraction of a second per
+        // cycle at the deployed dimensions, longer for wide dimensions or a full batch). The
+        // Exit re-sends an unanswered request every few seconds, so a queue of them would be a lever
+        // on exactly those slots. Dropping it costs nothing: either the holder admits the batch and the
+        // repeat is moot, or it does not and the repeat is the next attempt.
+        //
+        // Kept after the recommit branch, which needs no serialisation and must stay reachable while
+        // the commitment it repairs is still being published. And kept after the slot waiter above:
+        // `ssa_request_locks` is uncapped, so taking it any earlier would let a request naming a
+        // pseudonym with no Session create an entry, for as long as the cache's idle timer holds it.
         let request_lock = self
             .ssa_request_locks
             .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
             .await;
-        let _request_guard = request_lock.lock().await;
+        let Some(_request_guard) = request_lock.try_lock_owned() else {
+            let error =
+                SessionManagerError::NotAdmitted(format!("another SSA request for {pseudonym} is being processed"));
+            tracing::debug!(session_id = %msg.session_id, %error, "dropped an SSA request that found the request lock held");
+            return Err(error.into());
+        };
+
+        // A request that asks for what has already been committed to. It comes first under the lock,
+        // before either half of the successor gate, because neither half has anything to say about it.
+        //
+        // Two things look the same from the watermark and are not. A *repeat* names the batch this
+        // Session committed to last: the Exit re-sends an unanswered successor request until a part of
+        // every member's commitment reaches it, so once one is admitted the re-sends already in flight
+        // arrive at an Entry that has nothing left to do for them. For a batch that was published in
+        // full they succeed without effect — no second burst, no second `ReadyToDeposit`, and above all
+        // no second deposit. That holds while they arrive within `SSA_REPEAT_RESEND_GRACE` of the batch
+        // last going out. A repeat that arrives later was sent after the bursts should have reached the
+        // Exit, so one of them was lost after the transport took it. Every announced member's burst
+        // then goes out again, still with no `ReadyToDeposit`. A batch whose publication was cut short
+        // is the other exception: members still owed are published now, whole, and the repeat succeeds
+        // only if that did (see `SessionSsaState::unpublished`); otherwise it is a non-fatal refusal
+        // and the Exit's next re-send tries again. A *stale* request names indices at or below the
+        // watermark that are not that batch; it is dropped, and is not `refuse_ssa_request`, since it
+        // can be nothing worse than an Exit that lost track of what it asked for, which its own
+        // deadlines already end. The one other way to have committed past the batch last recorded is
+        // a batch that moved the generator and then failed to stage, and that failure ends the
+        // Session instead (see phase two below).
+        //
+        // The opening batch has no watermark and passes this untouched.
+        let first_asked = msg.commitments.keys().next().copied();
+        if let Some(first) = first_asked
+            && let Some(watermark) = ssa_state.committed_watermark()
+            && first <= watermark
+        {
+            if ssa_state.last_committed_first() == Some(first) {
+                if !ssa_state.unpublished_indices().is_empty() {
+                    tracing::info!(
+                        session_id = %msg.session_id, %first, %watermark,
+                        "a repeat of an SSA request whose publication was cut short — resuming it"
+                    );
+                    let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+                    return resume_publication(
+                        msg.session_id,
+                        pseudonym,
+                        &session_slot.routing_opts,
+                        ssa_state,
+                        &pix_toolbox,
+                        &mut msg_sender,
+                    )
+                    .await;
+                }
+
+                let lost = ssa_state.claim_republication(Instant::now(), SSA_REPEAT_RESEND_GRACE);
+                if lost.is_empty() {
+                    tracing::debug!(
+                        session_id = %msg.session_id, %first, %watermark,
+                        "ignored a repeat of an SSA request this Session already committed to"
+                    );
+                    return Ok(());
+                }
+
+                tracing::info!(
+                    session_id = %msg.session_id, %first, %watermark, members = ?lost,
+                    "a repeat of an SSA request long after it was published — re-sending its commitments"
+                );
+                let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+                return republish_commitments(
+                    msg.session_id,
+                    pseudonym,
+                    &session_slot.routing_opts,
+                    ssa_state,
+                    &pix_toolbox,
+                    &mut msg_sender,
+                    lost,
+                )
+                .await;
+            }
+
+            let error = SessionManagerError::NotAdmitted(format!(
+                "Exit asked for SSAs from {first}, at or below the committed {watermark}, and the batch last \
+                 committed to starts at {:?}",
+                ssa_state.last_committed_first()
+            ));
+            SsaRefusal::Stale.log(
+                ssa_state.note_refusal(first_asked, SsaRefusal::Stale),
+                &msg.session_id,
+                &error,
+            );
+            return Err(error.into());
+        }
 
         // Successor gate, the Entry's half of the one in `SessionPixSupervisor`. A correct Exit asks
         // for the next batch when the *last* cycle of the current one is nearly recovered, by which
@@ -6247,20 +7505,24 @@ where
         // reached the last committed cycle — which, with the window clamped to one cycle, means every
         // earlier one is exhausted — *and* it must be far enough into that cycle. Checking only the
         // index admitted a successor batch on the last cycle's very first share, i.e. ~0 % of the way
-        // through the batch rather than the ~83 % at which a conforming Exit asks. That is nearly a
+        // through the batch rather than the ~79 % at which a conforming Exit asks. That is nearly a
         // whole cycle of unearned deposits, on a gate whose entire purpose is to prevent them.
         //
         // The boundary is derived rather than guessed — see `min_emission_for_early_recovery`, which
         // accounts for the Exit counting *polynomials* and for emission running in lockstep windows
         // that spend their whole surplus before the next window starts. A flat fraction of the cycle
         // gets this badly wrong in the unsafe direction: 0.85 over the 3.47× surplus factor is 24.5 %,
-        // against a true boundary of 83.0 % at the deployed dimensions.
+        // against a true boundary of 78.6 % at the deployed dimensions.
         //
         // Being early is refused rather than fatal, and deliberately not via `refuse_ssa_request`,
-        // which closes the Session: that message is dropped and the Session left running. A correct
-        // Exit never lands there; one that does has its own deadline for the cycles it already
-        // allocated, and it can reach them without us having paid for anything. Lost generator state
-        // is the one arm that *is* fatal, for the reason given at it.
+        // which closes the Session: that message is dropped as `NotAdmitted` and the Session left
+        // running. A correct Exit never lands there. One that does is not told, but it is not lost
+        // either: the Exit's supervisor sends an unanswered successor request again every
+        // `ssa_request_resend_interval` while the batch before it is still being served, so the same
+        // request is admitted as soon as emission has caught up, and an Exit that never sends it again
+        // has its own deadline for the cycles it already allocated. Either way nothing is paid for
+        // before it is earned. Lost generator state is the one arm that *is* fatal, for the reason
+        // given at it.
         //
         // First index rather than each: `commitments` is a `BTreeMap`, so the lowest index leads, and
         // checking it before the loop is also what stops a batch that fails partway from having
@@ -6268,23 +7530,26 @@ where
         //
         // Computed at the protocol floor rather than at our own reconstructor's threshold. The value
         // that decides when a correct Exit asks is *its* setting, which does not travel on the wire;
-        // gating on ours refused a peer configured lower, silently, with no retry path — two valid
-        // configurations that could not talk. See `MIN_EARLY_RECOVERY_THRESHOLD`, which every Exit is
-        // held to by `validate_pix_supervision` and which is therefore the earliest any conforming
-        // peer can ask.
+        // gating on ours refused a peer configured lower, silently — two valid configurations that
+        // could not talk, and which the Exit's re-sends only turn from fatal into a stream of refusals
+        // until emission catches up. See `MIN_EARLY_RECOVERY_THRESHOLD`, which every Exit is held to by
+        // `validate_pix_supervision` and which is therefore the earliest any conforming peer can ask.
         let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
             &our_params,
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
         match pix_toolbox.share_generator.emission_progress(&pseudonym) {
             Some(progress) if !progress.is_serving_last_committed() || progress.front_emitted < min_emitted => {
-                let asked_first = msg.commitments.keys().next().copied();
-                let error = SessionManagerError::Unacceptable(format!(
-                    "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({} of {min_emitted} \
+                let error = SessionManagerError::NotAdmitted(format!(
+                    "Exit asked for SSAs from {first_asked:?} while emission has reached {:?} ({} of {min_emitted} \
                      shares needed for an early-recovery signal) of the batch committed up to {}",
                     progress.highest_emitted, progress.front_emitted, progress.last_committed
                 ));
-                warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
+                SsaRefusal::Early.log(
+                    ssa_state.note_refusal(first_asked, SsaRefusal::Early),
+                    &msg.session_id,
+                    &error,
+                );
                 return Err(error.into());
             }
             // No generator state, but this Session has committed before: the entry was discarded
@@ -6374,11 +7639,12 @@ where
             // losing exactly the tolerance downstream of its first return relayer still unlocks every
             // share and asks at the lossless boundary, and the packets of it that reach us are
             // `Binomial(target, 1 − L)`: short of their mean half the time, and at the deployed split
-            // one time in five by more than the near-miss window below — refused at once and, with
-            // `RequestSsa` never retried, the Session with it. `SUCCESSOR_GATE_ARRIVAL_SIGMAS`
-            // standard deviations under the mean make that negligible for a fraction of a percent
-            // more that an Exit can withhold. The deviation is the same binomial's, so the bound still
-            // follows the split the Entry chose; a split without surplus is demanded its whole target.
+            // one time in five by more than the near-miss window below — refused at once, and left to
+            // the Exit's next re-send to retry rather than to the Session's deadline.
+            // `SUCCESSOR_GATE_ARRIVAL_SIGMAS` standard deviations under the mean make that negligible
+            // for a fraction of a percent more that an Exit can withhold. The deviation is the same
+            // binomial's, so the bound still follows the split the Entry chose; a split without
+            // surplus is demanded its whole target.
             let required = successor_required_packets(target, our_params.tolerated_share_loss());
 
             let served = |slot: &SessionSlot| {
@@ -6389,10 +7655,11 @@ where
             if observed < required {
                 // A conforming Exit asks the instant its reconstructor crosses the threshold, and the
                 // request travels the same mixed path as the packets that earned it — so it can
-                // overtake the last few of them. Refusing that is not a refusal at all: `RequestSsa`
-                // is emitted once per index and never retried, so the Exit sits in
-                // `AwaitingCommitment` until `max_ssa_delivery_time` and then closes the Session.
-                // A short wait costs nothing and saves the Session.
+                // overtake the last few of them. Refusing that is not free even though the Exit
+                // re-sends: the next one is an interval away (`ssa_request_resend_interval`, the
+                // Exit's setting, 3 s by default), and on a path that is merely a few packets behind
+                // it would have been admitted at once. A short wait costs nothing and saves the
+                // interval.
                 //
                 // Entered only for a near miss, and that is what keeps the wait from being a lever:
                 // this handler runs under a bounded `for_each_concurrent` and holds the
@@ -6414,11 +7681,15 @@ where
             }
 
             if observed < required {
-                let error = SessionManagerError::Unacceptable(format!(
+                let error = SessionManagerError::NotAdmitted(format!(
                     "Exit asked for SSAs having returned {observed} of the {required} packets its batch committed up \
                      to {watermark} has been paid for"
                 ));
-                warn!(session_id = %msg.session_id, %error, "refused an under-served SSA request");
+                SsaRefusal::UnderServed.log(
+                    ssa_state.note_refusal(first_asked, SsaRefusal::UnderServed),
+                    &msg.session_id,
+                    &error,
+                );
                 return Err(error.into());
             }
         }
@@ -6479,80 +7750,61 @@ where
         // `new_ssa_commitment` appends to the per-pseudonym polynomial queue. Failing here therefore
         // leaves queued polynomials the Exit never learns of — wasted work rather than a leaked
         // deposit instruction, and the generator's own monotonic index keeps them from being mistaken
-        // for a later cycle's.
-        let mut staged = Vec::with_capacity(validated.len());
-        for (ssa_index, exit_point) in validated {
-            // Use the global `pix_toolbox.share_generator` to generate the client
-            // commitment. The generator is shared with the packet pipeline's
-            // `next_share`, so polynomials created here will be used when the
-            // pipeline embeds PIX shares into return-path SURBs.
-            //
-            // The generator dimension (polys × threshold) must match what the
-            // Exit's reconstructor expects — both are set from the session's
-            // negotiated PIX params (pix_global_config on Entry → SsaRequest
-            // params on Exit).  If the client sends commitments that exceed the
-            // Exit's expected dimensions, the Exit rejects them as InvalidInput.
-            let pix_toolbox_clone = pix_toolbox.clone();
-            let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
-                move || {
-                    pix_toolbox_clone
-                        .share_generator
-                        .new_ssa_commitment(&pseudonym, ssa_index)
-                },
-                "client_ssa_commitment",
-            )
-            .await
-            .map_err(SessionManagerError::other)?
-            .map_err(SessionManagerError::PixError)?;
-
-            // The generator has been advanced for this index, so the Session records it now rather
-            // than after the publish phase. Recording it early is the safe direction: the watermark
-            // only ever makes the successor gate stricter, and a batch abandoned between here and
-            // publication has still moved the generator.
-            if let Some(state) = session_slot.current_ssa_state.get() {
-                state.note_committed(
-                    ssa_index,
-                    session_slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed),
-                );
-            }
-
-            // Construct the full SSA by adding the client and exit commitments, getting the deposit address
-            let full_ssa = client_commitment.ssa_commitment + exit_point;
-            let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
-                anyhow::anyhow!("failed to convert SSA to deposit address"),
-            ))?;
-
-            // Split the SSA client commitment into Start protocol commitment messages
-            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(session_id, client_commitment)
-                .map_err(SessionManagerError::other)?;
-            debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
-
-            staged.push((ssa_index, deposit_address, commitment_msgs));
-        }
-
-        // Phase 3 — publish. Nothing below can fail on the *content* of the request; only the
-        // transport can, and a transport that has stopped accepting messages fails the Session
-        // regardless of where in the batch it happens.
-        for (ssa_index, deposit_address, commitment_msgs) in staged {
-            // Send each commitment message into the message sender
-            for commitment_msg in commitment_msgs {
-                send_via_msg_sender(
-                    &mut msg_sender,
-                    session_slot.routing_opts.clone(),
-                    HoprStartProtocol::SsaCommit(commitment_msg),
-                    "client SSA commitment message",
+        // for a later cycle's. That same index makes a failure after the first member was generated
+        // the end of the Session, below.
+        let watermark_before = ssa_state.committed_watermark();
+        let mut staged: Vec<(AgreedSsaQuota, CommitmentBurst)> = Vec::with_capacity(validated.len());
+        let staging: errors::Result<()> = async {
+            for (ssa_index, exit_point) in validated {
+                // Use the global `pix_toolbox.share_generator` to generate the client
+                // commitment. The generator is shared with the packet pipeline's
+                // `next_share`, so polynomials created here will be used when the
+                // pipeline embeds PIX shares into return-path SURBs.
+                //
+                // The generator dimension (polys × threshold) must match what the
+                // Exit's reconstructor expects — both are set from the session's
+                // negotiated PIX params (pix_global_config on Entry → SsaRequest
+                // params on Exit).  If the client sends commitments that exceed the
+                // Exit's expected dimensions, the Exit rejects them as InvalidInput.
+                let pix_toolbox_clone = pix_toolbox.clone();
+                let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                    move || {
+                        pix_toolbox_clone
+                            .share_generator
+                            .new_ssa_commitment(&pseudonym, ssa_index)
+                    },
+                    "client_ssa_commitment",
                 )
-                .await?;
-            }
+                .await
+                .map_err(SessionManagerError::other)?
+                .map_err(SessionManagerError::PixError)?;
 
-            debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
+                // The generator has been advanced for this index, so the Session records it now rather
+                // than after the publish phase. Recording it early is the safe direction: the watermark
+                // only ever makes the successor gate stricter, and a batch abandoned between here and
+                // publication has still moved the generator.
+                if let Some(state) = session_slot.current_ssa_state.get() {
+                    state.note_committed(
+                        ssa_index,
+                        session_slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed),
+                    );
+                }
 
-            // Notify the new SSA deposit address *after* all commitment messages have been
-            // sent out successfully, so the deposit cannot begin before the Exit has the
-            // complete commitment to reconstruct the deposit key.
-            pix_toolbox
-                .pix_events
-                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                // Construct the full SSA by adding the client and exit commitments, getting the deposit address
+                let full_ssa = client_commitment.ssa_commitment + exit_point;
+                let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(
+                    SessionManagerError::other(anyhow::anyhow!("failed to convert SSA to deposit address")),
+                )?;
+
+                // Split the SSA client commitment into Start protocol commitment messages
+                let commitment_msgs = SsaClientCommitmentMessage::new_multiple(session_id, client_commitment)
+                    .map_err(SessionManagerError::other)?;
+                debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
+
+                // What `ReadyToDeposit` will say, fixed here with the address. Kept whole so that a
+                // publication that is cut short can still announce it later: nothing about it can be
+                // derived again once this request is gone, the deposit data least of all.
+                let quota = AgreedSsaQuota {
                     ssa_id: SsaId::new(pseudonym, ssa_index),
                     deposit_address,
                     quota_per_ssa,
@@ -6565,9 +7817,80 @@ where
                             .map(|payload| payload.0)
                             .unwrap_or_default(),
                     },
-                }))
-                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
-            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
+                };
+                staged.push((quota, commitment_msgs));
+            }
+            Ok(())
+        }
+        .await;
+        if let Err(error) = staging {
+            // Nothing generated yet means nothing moved, and the Exit's next re-send tries the whole
+            // batch again. Once a member has been generated, though, the batch can never be committed.
+            // The generator refuses that member's index for good, so every re-send of this request
+            // would be dropped as stale until the Exit's deadline closed the Session,
+            // and meanwhile the polynomials it queued would go on to be emitted for a cycle whose
+            // commitment the Exit never receives. Terminal, like lost generator state, and for the
+            // same reason: this half of the Session can make no further PIX progress.
+            if ssa_state.committed_watermark() != watermark_before {
+                tracing::error!(
+                    %session_id, %error,
+                    "staging an admitted SSA batch failed after part of it was generated; it can never be committed"
+                );
+                self.refuse_ssa_request(session_id, session_slot.routing_opts.clone())
+                    .await;
+            }
+            return Err(error);
+        }
+
+        // Recorded once phase two has staged the whole request, and before anything is published: a
+        // burst that then fails to send has still moved the generator, and the re-sends of this request
+        // must be recognised as repeats of it. See `SessionSsaState::last_committed_first`. The same
+        // moment records every member as owed its publication, which is what lets a repeat finish the
+        // job when phase three is cut short.
+        ssa_state.stage_unpublished(staged.iter().map(|(quota, _)| quota.clone()));
+        if let Some((quota, _)) = staged.first() {
+            ssa_state.note_committed_first(quota.ssa_id.ssa_index());
+        }
+
+        // Phase 3 — publish. Nothing below can fail on the *content* of the request; only the
+        // transport can, and under ordinary backpressure it does: a send gives up after
+        // `EXTERNAL_SEND_TIMEOUT`. A failed send does not fail the Session. The member being published
+        // goes back to the owed set and a non-fatal `NotAdmitted` is returned, logged once at `warn!`;
+        // members after it were never claimed and stay owed too. What happens next is up to the Exit,
+        // which has two ways to ask again: its automatic repeat of this request, sent only while some
+        // member of the batch has reported nothing and the batch is behind the front, and its scoped
+        // re-request for a member whose commitment began to arrive, which works wherever the batch
+        // stands and resumes every owed member, not only the one named, but only when the member it
+        // names is itself still owed, because its own burst was cut part-way. Two cases are therefore
+        // not recovered. A member of which no message went out, whose batch holds the front (the
+        // opening batch always does), is resumed only as a side effect of a re-request for an earlier
+        // member of the same batch that is itself still owed. And a member whose whole burst went out
+        // but whose `ReadyToDeposit` could not be queued prompts no request at all, since the Exit
+        // already holds its complete commitment. In both the Exit's own deadline ends the cycle, and
+        // nothing is stranded for that member because nothing was announced for it. See
+        // `SessionSsaState::unpublished` and `resume_publication`.
+        for (staged_quota, burst) in staged {
+            // Claimed just before its burst, so that nobody else can publish this member while this
+            // call is doing so, and so that only the claimant announces it.
+            let ssa_index = staged_quota.ssa_id.ssa_index();
+            let Some(claim) = ssa_state.claim_unpublished(ssa_index) else {
+                tracing::debug!(%ssa_index, "another task is already publishing this SSA's commitment");
+                continue;
+            };
+
+            match publish_commitment(
+                &pix_toolbox,
+                &mut msg_sender,
+                &session_slot.routing_opts,
+                burst,
+                &claim.quota,
+                "client SSA commitment message",
+            )
+            .await
+            {
+                Ok(()) => ssa_state.complete_publication(claim, Instant::now()),
+                Err(error) => return Err(publication_cut_short(session_id, ssa_state, claim, &error)),
+            }
         }
 
         trace!(quota_per_ssa, "Exit commitment message has been fully processed");
@@ -7007,6 +8330,36 @@ mod tests {
         admission.retired(pseudonym)
     }
 
+    /// A return packet the Exit counted as consumed, and routing resolution then dropped for want of a
+    /// SURB, spent nothing. Its refund counts the SURB as given back in the estimator that counted it,
+    /// on a counter of its own rather than one fewer consumed: the balancer reads the counters as deltas
+    /// between samples and rejects a snapshot in which one of them went down. The held count takes the
+    /// SURB back; the balancer's delta does not (see `a_refund_should_not_raise_the_balancer_level`).
+    #[test]
+    fn a_counted_return_packet_should_give_its_surb_back_to_the_estimator_that_counted_it() -> anyhow::Result<()> {
+        use crate::balancer::{SimpleSurbFlowEstimator, SurbFlowEstimator};
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let data = count_return_packet_surb(&estimator, small_outgoing_packet()?);
+        assert!(data.surb_refund.is_counted(), "a counted packet carries its refund");
+        assert_eq!(9, estimator.saturating_diff(), "counted as it was handed on");
+
+        let before = SimpleSurbFlowEstimator::from(&estimator);
+        data.surb_refund.give_back();
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "the starved packet's SURB is back in the held count"
+        );
+        assert_eq!(
+            Some(0),
+            SimpleSurbFlowEstimator::from(&estimator).estimated_surb_buffer_change(&before),
+            "every counter still grows, and the balancer's delta leaves the refund out"
+        );
+        Ok(())
+    }
+
     /// Verifies that a session's SURB balancer config can be retrieved and updated via the manager API.
     ///
     /// ## Steps
@@ -7174,6 +8527,232 @@ mod tests {
         // Cleanup: close sender and await handle
         alice_sender.close_channel();
         alice_handle.await??;
+
+        Ok(())
+    }
+
+    /// A failed initiation must leave no `pending_outgoing` marker behind: the marker is what lets
+    /// an `SsaRequest` for the pseudonym wait for a slot at dispatch, and a marker outliving its
+    /// attempt would park a handler on a Session that never arrives — one per leaked attempt, for
+    /// as long as the entry's TTL. The marker was once cleared by hand on each failure path and
+    /// keyed by the peer-supplied `session_id`; the guard that replaces it removes it keyed by the
+    /// pseudonym it was inserted under, on every path.
+    ///
+    /// ## Steps
+    /// 1. The transport swallows the `StartSession` message, so the initiation is never answered and times out (the
+    ///    deterministic failure path; a loopback needs a live manager for it to bounce off).
+    /// 2. `new_session` under a fixed pseudonym fails with `Timeout`.
+    /// 3. An `SsaRequest` naming that pseudonym must be dropped as stale at dispatch — no marker left to admit it.
+    #[test_log::test(tokio::test)]
+    async fn a_failed_session_initiation_must_leave_no_pending_outgoing_marker() -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the StartSession: the initiation times out.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let result = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+        assert!(
+            matches!(result, Err(TransportSessionError::Timeout)),
+            "the fixture must actually fail the initiation, got {result:?}"
+        );
+
+        // With no marker left, the same request a fast Exit could have raced ahead of is refused at
+        // dispatch instead of parking a handler on a slot that will never exist.
+        let refused = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(refused, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "an SsaRequest for a failed initiation's pseudonym must be stale, got {refused:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A second initiation for a pseudonym already claimed by one in flight must be refused, not
+    /// silently overwrite the first one's `pending_outgoing` reservation.
+    ///
+    /// `moka`'s `insert` overwrites an existing entry, so the claim the first initiation holds used
+    /// to be a single shared marker: whichever attempt finished first removed it while the other
+    /// was still awaiting establishment, and an `SsaRequest` for that Session then failed the
+    /// dispatch filter and was dropped as `StaleStartMessage` — a false negative, the exact class
+    /// of miss the filter must not have. `new_session` therefore claims the name atomically and
+    /// refuses the overlap.
+    ///
+    /// ## Steps
+    /// 1. Alice's transport swallows the first `StartSession` (expectation `.once()`), so that initiation stays in
+    ///    flight; its `pending_outgoing` marker is held by its guard.
+    /// 2. A second `new_session` under the SAME pseudonym must fail with `Unacceptable` — and must not have sent
+    ///    anything (the refusal happens before the send).
+    /// 3. The refusal must not have consumed a challenge slot: `session_initiations.entry_count()` stays at 1, the
+    ///    first attempt's reservation.
+    /// 4. The first initiation still owns the marker (its `SsaRequest` dispatches as in flight), and then times out
+    ///    cleanly, leaving no marker and no challenge reservation behind.
+    ///
+    /// Sequential rather than `tokio::join!`-concurrent: the property pinned is that the *second*
+    /// call sees the first one's live claim, which is what the atomic compute serialises — running
+    /// them concurrently would only randomise which call is "first" without strengthening the
+    /// assertion, while the in-flight fixture (swallowed send) requires the first call to be
+    /// parked in its await for the second to observe the claim.
+    #[test_log::test(tokio::test)]
+    async fn a_second_initiation_for_a_pending_pseudonym_must_be_refused_without_consuming_a_challenge_slot()
+    -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let alice_mgr = SessionManager::new(cfg);
+
+        let mut alice_transport = MockMsgSender::new();
+        // Swallow the FIRST StartSession only: that initiation stays in flight holding its claim.
+        // The refused attempt must never reach the transport, so `.once()` also pins that.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+        assert!(alice_mgr.is_started());
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let client_cfg = SessionClientConfig {
+            capabilities: None.into(),
+            pseudonym: alice_pseudonym.into(),
+            surb_management: None,
+            ..Default::default()
+        };
+
+        // Park the first initiation in flight: the transport swallowed its StartSession, so it
+        // holds both its challenge reservation and its pending-outgoing claim for the whole of
+        // this call's initiation timeout.
+        let in_flight = alice_mgr.new_session(
+            bob_peer,
+            SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            client_cfg.clone(),
+        );
+        futures::pin_mut!(in_flight);
+
+        // Poll the in-flight attempt exactly once, which runs it up to its first await: the claim
+        // (and the challenge reservation) are taken before the send, so a single pending poll is
+        // enough to make the overlap observable — no sleeps, and no runtime-dependent ordering.
+        assert!(
+            futures::poll!(in_flight.as_mut()).is_pending(),
+            "fixture: the swallowed StartSession must leave the initiation pending"
+        );
+
+        // The first attempt's claim is live: an SsaRequest naming the pseudonym is admitted at
+        // dispatch as belonging to an initiation this node is still making (it goes to the handler
+        // pool rather than being dropped as stale).
+        let admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(admitted, DispatchResult::Processed),
+            "an SsaRequest for the in-flight initiation must be admitted, got {admitted:?}"
+        );
+
+        let before = {
+            // moka defers the write op: without this the count is read before the insertion lands.
+            alice_mgr.session_initiations.run_pending_tasks();
+            alice_mgr.session_initiations.entry_count()
+        };
+        assert_eq!(
+            before, 1,
+            "fixture: the in-flight initiation must hold exactly one challenge reservation"
+        );
+
+        // The overlap: the same pseudonym, still pending. Must be refused, not allowed to
+        // overwrite the first attempt's reservation.
+        let refused = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                client_cfg,
+            )
+            .await;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "a second initiation under a pending pseudonym must be refused as Unacceptable, got {refused:?}"
+        );
+
+        // The refusal happened after the challenge reservation but before the send, and released
+        // its own reservation: exactly the in-flight one remains, none consumed by the refusal.
+        alice_mgr.session_initiations.run_pending_tasks();
+        let after = alice_mgr.session_initiations.entry_count();
+        assert_eq!(
+            after, before,
+            "the refused attempt must not consume a challenge slot (before: {before}, after: {after})"
+        );
+        assert_eq!(
+            alice_mgr.num_active_sessions(),
+            0,
+            "neither attempt may have allocated a session slot"
+        );
+
+        // The first initiation is unaffected by the refusal and still owns the claim.
+        let still_admitted = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(still_admitted, DispatchResult::Processed),
+            "the refusal must not have cleared the in-flight initiation's claim, got {still_admitted:?}"
+        );
+
+        // The in-flight initiation then times out cleanly: no marker, no challenge reservation.
+        let timed_out = in_flight.await;
+        assert!(
+            matches!(timed_out, Err(TransportSessionError::Timeout)),
+            "the first initiation must still fail on its own timeout, got {timed_out:?}"
+        );
+        assert_eq!(
+            {
+                alice_mgr.session_initiations.run_pending_tasks();
+                alice_mgr.session_initiations.entry_count()
+            },
+            0,
+            "the timed-out initiation must release its challenge reservation"
+        );
+        let stale = alice_mgr.dispatch_message(alice_pseudonym, ssa_request_packet(alice_pseudonym)?)?;
+        assert!(
+            matches!(stale, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "after the timeout, the pseudonym's marker must be gone, got {stale:?}"
+        );
 
         Ok(())
     }
@@ -9459,7 +11038,9 @@ mod tests {
             identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
-        mgr.handle_session_error(error_type).await?;
+        // The error is challenge-identified, so the handler ignores the sender's pseudonym on this
+        // arm; `new_session` picks a random one, and none is captured here.
+        mgr.handle_session_error(HoprPseudonym::random(), error_type).await?;
 
         // new_session must propagate the error as Rejected.
         let result = handle.await?;
@@ -11008,6 +12589,16 @@ mod tests {
             .map(|slot| slot.surb_mgmt.organic_surbs_per_packet())
     }
 
+    /// The Exit → Entry return-SURB credit the slot has accumulated, which the successor gate is
+    /// denominated in.
+    fn returned_packets_of(mgr: &TestManager, pseudonym: HoprPseudonym) -> u64 {
+        mgr.sessions
+            .get(&pseudonym)
+            .expect("slot must exist")
+            .returned_packets
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     fn session_packet_signalling(signals: PacketSignals) -> anyhow::Result<ApplicationDataIn> {
         let mut data = session_data_packet(b"reply")?;
         data.packet_info.signals_from_sender = signals;
@@ -11084,6 +12675,70 @@ mod tests {
         Ok(())
     }
 
+    /// An Exit → Entry Start packet consumes a return SURB whatever it decodes to and wherever it
+    /// is admitted, so the credit that denominates the successor gate must be paid before the
+    /// decode and the admission filter, not after them. A packet the filter rejects has already
+    /// spent the SURB — under-crediting it can make the gate refuse the next `RequestSsa` and the
+    /// Session close with `CommitmentTimeout`.
+    ///
+    /// ## Steps
+    /// 1. An Entry-side (`Forward`) slot is pre-populated with its gate closed.
+    /// 2. A `KeepAlive` naming another Session — the filter's mismatched-pseudonym drop — must still credit
+    ///    `returned_packets` by one.
+    /// 3. A Start-tagged packet that fails to decode must credit it by one too.
+    #[test_log::test(tokio::test)]
+    async fn a_start_packet_the_filter_drops_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // The manager is not started, but that only matters past the filter; this one is dropped at
+        // the filter itself, for naming a Session the pseudonym it arrives under does not own.
+        let dropped = mgr.dispatch_message(
+            pseudonym,
+            keep_alive_packet_signalling(HoprPseudonym::random(), PacketSignals::default())?,
+        )?;
+        assert!(
+            matches!(dropped, DispatchResult::Dropped(DropReason::StaleStartMessage)),
+            "the fixture must actually drop this packet at the filter, got {dropped:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet the filter drops has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
+    /// The undecodable half of the same regression: the decode runs after the credit, so a
+    /// Start-tagged packet that fails to parse must still have credited the return SURB it spent.
+    #[test_log::test(tokio::test)]
+    async fn an_undecodable_start_packet_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let pseudonym = HoprPseudonym::random();
+        let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
+        let before = returned_packets_of(&mgr, pseudonym);
+
+        // Start-protocol tag, but a payload that parses to no Start-protocol message.
+        let mut undecodable = session_data_packet(b"not a start message")?;
+        undecodable.data.application_tag = HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG;
+
+        let result = mgr.dispatch_message(pseudonym, undecodable);
+        assert!(
+            result.is_err(),
+            "the fixture must actually fail to decode this packet, got {result:?}"
+        );
+        assert_eq!(
+            before + 1,
+            returned_packets_of(&mgr, pseudonym),
+            "a packet that cannot be decoded has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
     /// Distress is a running state, not a latch: the counterparty recomputes it per packet and stops
     /// setting it once its pool recovers, so a clean packet has to close the gate again.
     #[test_log::test(tokio::test)]
@@ -11130,6 +12785,444 @@ mod tests {
             "an incoming Session must not take the signal as licence to mint"
         );
 
+        Ok(())
+    }
+
+    /// Encodes a [`HoprStartProtocol`] message into the packet form `dispatch_message` takes.
+    ///
+    /// The Start tag is what `dispatch_message` routes on, exactly as
+    /// [`keep_alive_packet_signalling`] builds its packet.
+    fn start_packet(msg: HoprStartProtocol) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::try_from(msg)?,
+            packet_info: Default::default(),
+        })
+    }
+
+    /// An `SsaRequest` for `session_id` with a single identity-element commitment.
+    ///
+    /// The Exit-side point is not checked in dispatch, so the identity element
+    /// ([`ssa_request_for`]) is enough for the message to be decodable and well-formed.
+    fn ssa_request_packet(session_id: SessionId) -> anyhow::Result<ApplicationDataIn> {
+        start_packet(HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            small_pix_params(),
+            ssa_request_for(1),
+            [],
+        )))
+    }
+
+    /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
+    ///
+    /// Before the admission filter, every one of these reached the shared Start-protocol worker
+    /// pool, where `handle_ssa_request` parked its handler for up to a second on a Session slot a
+    /// random pseudonym never gets; ~110 concurrent requests occupied every handler and the bounded
+    /// Start queue then dropped all traffic behind them — including the KeepAlives of live Sessions.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one live (pre-populated Forward) Session.
+    /// 2. ~300 `SsaRequest`s are dispatched, each for a fresh random pseudonym.
+    /// 3. Every one must come back `Dropped(StaleStartMessage)`, counted, and nothing may reach the bounded queue — the
+    ///    send-drop counter must not move.
+    /// 4. A `KeepAlive` for the live Session's own pseudonym must still be dispatched, proving the flood cannot have
+    ///    starved real control traffic.
+    #[test_log::test(tokio::test)]
+    async fn a_flood_of_ssa_requests_for_unknown_pseudonyms_must_not_starve_a_live_session() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let live_pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(
+            live_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(live_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+
+        let stale_before = crate::counters::session_stale_start_message_count();
+        let send_drops_before = crate::counters::start_protocol_send_drop_count();
+
+        const FLOOD: usize = 300;
+        for _ in 0..FLOOD {
+            let stranger = HoprPseudonym::random();
+            let result = mgr.dispatch_message(stranger, ssa_request_packet(stranger)?);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+                "an SSA request for a pseudonym this node never issued must be dropped as stale, got {result:?}"
+            );
+        }
+
+        assert!(
+            crate::counters::session_stale_start_message_count() >= stale_before + FLOOD,
+            "every flooded request must be counted as a stale Start message"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "nothing may reach the bounded queue: the filter must run before try_send"
+        );
+
+        // The live Session's control traffic must still be dispatched — the property the flood used
+        // to destroy by filling the queue.
+        let kept_alive = mgr.dispatch_message(
+            live_pseudonym,
+            keep_alive_packet_signalling(live_pseudonym, PacketSignals::default())?,
+        );
+        assert!(
+            matches!(kept_alive, Ok(DispatchResult::Processed)),
+            "the live Session's keep-alive must still get through, got {kept_alive:?}"
+        );
+        assert_eq!(
+            send_drops_before,
+            crate::counters::start_protocol_send_drop_count(),
+            "the keep-alive must not have been dropped at try_send either"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The filter must not be broader than the attack: an `SsaRequest` an Exit legitimately sends to
+    /// its Entry is admitted, while the same request arriving on an Exit-side (Return) slot — which
+    /// no compliant peer ever sends — is dropped as stale.
+    ///
+    /// ## Steps
+    /// 1. A manager holds one Forward (outgoing/Entry-side) slot.
+    /// 2. An `SsaRequest` naming it is admitted to the queue.
+    /// 3. A second Return (incoming/Exit-side) slot; the same request naming it is dropped.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_request_for_an_outgoing_session_is_admitted_and_one_for_an_exit_slot_is_not() -> anyhow::Result<()>
+    {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        // Outgoing (Entry-side) slot: the Entry receives SSA commitments for it, so the request is
+        // legitimate and must be admitted.
+        let entry_pseudonym = HoprPseudonym::random();
+        let _entry_rx = mgr.pre_populate_session_with_receiver(
+            entry_pseudonym,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(entry_pseudonym),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let admitted = mgr.dispatch_message(entry_pseudonym, ssa_request_packet(entry_pseudonym)?);
+        assert!(
+            matches!(admitted, Ok(DispatchResult::Processed)),
+            "an SSA request for an outgoing Session must be admitted, got {admitted:?}"
+        );
+
+        // Incoming (Exit-side) slot: nothing here ever receives an SSA commitment for one.
+        let exit_pseudonym = HoprPseudonym::random();
+        let _exit_rx =
+            mgr.pre_populate_session_with_receiver(exit_pseudonym, DestinationRouting::Return(exit_pseudonym.into()));
+        let refused = mgr.dispatch_message(exit_pseudonym, ssa_request_packet(exit_pseudonym)?);
+        assert!(
+            matches!(refused, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "an SSA request for an incoming Session must be dropped as stale, got {refused:?}"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The filter's remaining arms: an `SsaCommit` is admitted only for a registered Session named
+    /// under its own pseudonym, and a `SessionEstablished` or `SessionError(Challenge)` only for a
+    /// challenge this node is still waiting on.
+    ///
+    /// ## Steps
+    /// 1. A started manager holds one Return (Exit-side) slot, which is where `SsaCommit`s go, and two pending
+    ///    initiation challenges — one per reply, so the handler consuming one cannot race the other's dispatch.
+    /// 2. Each message naming state the node lacks is dropped as stale: an `SsaCommit` for an unregistered Session or
+    ///    naming the slot under another pseudonym, and a `SessionEstablished` and a `SessionError` for a challenge
+    ///    nobody issued.
+    /// 3. Each message naming that state is admitted.
+    #[test_log::test(tokio::test)]
+    async fn ssa_commits_and_initiation_replies_are_admitted_only_for_local_state() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let exit_pseudonym = HoprPseudonym::random();
+        let _exit_rx =
+            mgr.pre_populate_session_with_receiver(exit_pseudonym, DestinationRouting::Return(exit_pseudonym.into()));
+
+        // Reserved the way `new_session` reserves them. The receivers are kept so that a reply the
+        // handler forwards has somewhere to go.
+        let established_challenge = MIN_CHALLENGE;
+        let error_challenge = MIN_CHALLENGE + 1;
+        let unknown_challenge = MIN_CHALLENGE + 2;
+        let _receivers = [established_challenge, error_challenge]
+            .into_iter()
+            .map(|challenge| {
+                let (tx, rx): (
+                    crossfire::MTx<crossfire::mpsc::One<_>>,
+                    crossfire::AsyncRx<crossfire::mpsc::One<_>>,
+                ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
+                mgr.session_initiations.insert(challenge, tx);
+                rx
+            })
+            .collect::<Vec<_>>();
+
+        let identity = HoprPixGroupElement::try_from(
+            hopr_protocol_pix::PixGroup::<HoprPixSpec>::default()
+                .to_bytes()
+                .as_ref(),
+        )
+        .ok()
+        .context("identity element must be valid")?;
+        // A non-constant term, so it is well-formed without a commitment proof.
+        let ssa_commit = |session_id: SessionId| {
+            start_packet(HoprStartProtocol::SsaCommit(SsaClientCommitmentMessage {
+                session_id,
+                ssa_index: SsaIndex::new(1).context("non-zero")?,
+                coefficient_index: 1,
+                commitment_proof: None,
+                coefficient_commitments: [(0, identity)].into(),
+            }))
+        };
+        // The filter keys both replies on the challenge alone, not on the pseudonym they arrive under.
+        let replier = HoprPseudonym::random();
+        let established = |orig_challenge: StartChallenge| {
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge,
+                session_id: replier,
+            }))
+        };
+        let error = |challenge: StartChallenge| {
+            start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(challenge),
+                reason: StartErrorReason::Unknown,
+            }))
+        };
+
+        let stranger = HoprPseudonym::random();
+        for (case, pseudonym, packet) in [
+            (
+                "an SsaCommit for an unregistered Session",
+                stranger,
+                ssa_commit(stranger)?,
+            ),
+            (
+                "an SsaCommit naming a registered Session under another pseudonym",
+                stranger,
+                ssa_commit(exit_pseudonym)?,
+            ),
+            (
+                "a SessionEstablished for a challenge nobody issued",
+                replier,
+                established(unknown_challenge)?,
+            ),
+            (
+                "a SessionError for a challenge nobody issued",
+                replier,
+                error(unknown_challenge)?,
+            ),
+        ] {
+            let result = mgr.dispatch_message(pseudonym, packet);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+                "{case} must be dropped as stale, got {result:?}"
+            );
+        }
+
+        for (case, pseudonym, packet) in [
+            (
+                "an SsaCommit for a registered Session",
+                exit_pseudonym,
+                ssa_commit(exit_pseudonym)?,
+            ),
+            (
+                "a SessionEstablished for a pending challenge",
+                replier,
+                established(established_challenge)?,
+            ),
+            (
+                "a SessionError for a pending challenge",
+                replier,
+                error(error_challenge)?,
+            ),
+        ] {
+            let result = mgr.dispatch_message(pseudonym, packet);
+            assert!(
+                matches!(result, Ok(DispatchResult::Processed)),
+                "{case} must be admitted, got {result:?}"
+            );
+        }
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// Keep-alives and post-establishment session errors naming another Session must be ignored.
+    ///
+    /// A sender names a Session both by the pseudonym it sends under and by the Session id inside
+    /// the message; the two are the same on both sides of a real Session, so a mismatch means the
+    /// sender is speaking about someone else's Session — only reachable if that id leaked. The
+    /// dispatch filter rejects such a message outright, and the handlers refuse it again (point 4 of
+    /// the fix) so the property does not rest on dispatch alone.
+    ///
+    /// ## Steps
+    /// 1. Two Return slots A and B are pre-populated with known balancer targets.
+    /// 2. A `KeepAlive { session_id: B }` arriving under A is refused — at dispatch, and again by the handler when
+    ///    reached directly — and B's balancer target is untouched.
+    /// 3. A `SessionError { identifier: SessionId(B) }` arriving under A is refused the same way, and B stays active.
+    /// 4. Control: the same messages under B's own pseudonym do take effect.
+    #[test_log::test(tokio::test)]
+    async fn keep_alives_and_session_errors_naming_another_session_are_ignored() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let a = HoprPseudonym::random();
+        let b = HoprPseudonym::random();
+        for pseudonym in [a, b] {
+            let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+            let slot = mgr
+                .sessions
+                .get(&pseudonym)
+                .ok_or_else(|| anyhow::anyhow!("slot for {pseudonym} must exist"))?;
+            // Non-disabled balancer with a known target, so the KeepAlive branch is reachable.
+            slot.surb_mgmt.update(&SurbBalancerConfig {
+                target_surb_buffer_size: 100,
+                ..Default::default()
+            });
+        }
+
+        let b_target_before = mgr
+            .sessions
+            .get(&b)
+            .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+            .surb_mgmt
+            .controller_bounds()
+            .target();
+
+        let cross_keep_alive = KeepAliveMessage {
+            session_id: b,
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: b_target_before + 1,
+        };
+
+        // Through dispatch, the admission filter refuses it before any handler runs.
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::KeepAlive(cross_keep_alive.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a keep-alive naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+
+        // Point 4: the handler refuses it again even when reached directly, so the property does not
+        // rest on the dispatch filter alone.
+        mgr.handle_keep_alive(a, cross_keep_alive.clone(), Default::default())
+            .await
+            .context("the keep-alive handler must refuse quietly, not error")?;
+        assert_eq!(
+            b_target_before,
+            mgr.sessions
+                .get(&b)
+                .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                .surb_mgmt
+                .controller_bounds()
+                .target(),
+            "a keep-alive naming another session must not move its balancer target"
+        );
+
+        // The same for a post-establishment session error naming B.
+        let cross_error = StartErrorType {
+            identifier: ErrorIdentifier::SessionId(b),
+            reason: StartErrorReason::Unknown,
+        };
+        let dispatched = mgr.dispatch_message(a, start_packet(HoprStartProtocol::SessionError(cross_error.clone()))?);
+        assert!(
+            matches!(dispatched, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "a session error naming another session must be dropped at dispatch, got {dispatched:?}"
+        );
+        mgr.handle_session_error(a, cross_error)
+            .await
+            .context("the session-error handler must refuse quietly, not error")?;
+        assert!(
+            mgr.active_sessions().contains(&b),
+            "a session error naming another session must not close it"
+        );
+
+        // Control: the same messages under B's own pseudonym do take effect. Dispatch hands the
+        // message to the Start-protocol worker, so the effect is asynchronous and polled for.
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                session_id: b,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: b_target_before + 2,
+            }))?,
+        )?;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let target = mgr
+                    .sessions
+                    .get(&b)
+                    .ok_or_else(|| anyhow::anyhow!("slot for B must exist"))?
+                    .surb_mgmt
+                    .controller_bounds()
+                    .target();
+                if target == b_target_before + 2 {
+                    return Ok::<(), anyhow::Error>(());
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed keep-alive must still update the target")??;
+
+        mgr.dispatch_message(
+            b,
+            start_packet(HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::SessionId(b),
+                reason: StartErrorReason::Unknown,
+            }))?,
+        )?;
+        let closed = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if !mgr.active_sessions().contains(&b) {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("a correctly addressed session error must close the session");
+        closed?;
+
+        sender.close_channel();
         Ok(())
     }
 
@@ -13400,6 +15493,19 @@ mod tests {
         PixParams::try_new(8, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE).expect("test dimensions must be valid")
     }
 
+    /// What a fixture's transport has been asked to put on the wire.
+    #[derive(Default)]
+    struct WireRecord {
+        sent: parking_lot::Mutex<Vec<StartProtocolDiscriminants>>,
+    }
+
+    impl WireRecord {
+        /// How many Start messages of `kind` have been sent so far.
+        fn count(&self, kind: StartProtocolDiscriminants) -> usize {
+            self.sent.lock().iter().filter(|sent| **sent == kind).count()
+        }
+    }
+
     /// Builds an Entry-side manager serving `params`, with the reconstructor at `early_threshold`.
     ///
     /// Returns the manager, its generator, and the PIX event stream, with one PIX Session already
@@ -13416,6 +15522,54 @@ mod tests {
         UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
         tokio::task::JoinHandle<anyhow::Result<()>>,
     )> {
+        entry_with_recorded_pix_session(params, early_threshold, Arc::new(WireRecord::default())).await
+    }
+
+    /// [`entry_with_pix_session`], whose transport also records what it is asked to send.
+    ///
+    /// For the tests whose subject is what the Entry did *not* put on the wire: a repeated request
+    /// must emit neither a `ReadyToDeposit` nor a second `SsaCommit` burst, and only the transport
+    /// can say the second part of that.
+    #[allow(clippy::type_complexity)]
+    async fn entry_with_recorded_pix_session(
+        params: PixParams,
+        early_threshold: f64,
+        wire: Arc<WireRecord>,
+    ) -> anyhow::Result<(
+        SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        Arc<SsaShareGenerator<HoprPixSpec>>,
+        HoprPseudonym,
+        impl futures::Stream<Item = HoprSessionOutPixEvent> + Unpin,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
+    )> {
+        entry_with_wrapped_sender(params, early_threshold, wire, |sender| sender).await
+    }
+
+    /// [`entry_with_recorded_pix_session`], whose manager sends through `wrap(sender)` instead of the
+    /// plain channel sender.
+    ///
+    /// For the tests that need the Entry's transport to fail *selectively*: a channel sender can only
+    /// fail by being closed, and it never recovers. The returned sender is the unwrapped one, so
+    /// the test can still close the channel and join the forwarding task.
+    #[allow(clippy::type_complexity)]
+    async fn entry_with_wrapped_sender<S>(
+        params: PixParams,
+        early_threshold: f64,
+        wire: Arc<WireRecord>,
+        wrap: impl FnOnce(UnboundedSender<(DestinationRouting, ApplicationDataOut)>) -> S,
+    ) -> anyhow::Result<(
+        SessionManager<S>,
+        Arc<SsaShareGenerator<HoprPixSpec>>,
+        HoprPseudonym,
+        impl futures::Stream<Item = HoprSessionOutPixEvent> + Unpin,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
+    )>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    {
         use hopr_protocol_start::StartInitiation;
 
         let generator = Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
@@ -13445,16 +15599,23 @@ mod tests {
         });
 
         let mut bob_transport = MockMsgSender::new();
-        bob_transport
-            .expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let wire = wire.clone();
+            Box::pin(async move {
+                let Ok(message) = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text) else {
+                    return Ok(());
+                };
+                wire.sent.lock().push(StartProtocolDiscriminants::from(message));
+                Ok(())
+            })
+        });
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         tokio::spawn(async move {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox), None)?;
+        mgr.start(wrap(bob_sender.clone()), new_session_tx, Some(pix_toolbox), None)?;
 
         let pseudonym = HoprPseudonym::random();
         mgr.handle_incoming_session_initiation(
@@ -13540,9 +15701,12 @@ mod tests {
     /// The value that decides when a correct Exit asks for its next batch is the *peer's*
     /// `early_recovery_threshold`, and it does not travel on the wire. Deriving the boundary from the
     /// Entry's own copy meant two individually valid configurations could not communicate: an Exit
-    /// configured lower sent its one-shot request before the gate opened, the Entry dropped it
-    /// silently, and the Session died on `max_ssa_delivery_time` waiting for a commitment that had
-    /// been deliberately refused — a failure visible on neither node as a configuration error.
+    /// configured lower sent its request before the gate opened and the Entry dropped it silently.
+    /// Before the Exit re-sent an unanswered successor request that was fatal — the Session died on
+    /// `max_ssa_delivery_time` waiting for a commitment that had been deliberately refused, visible on
+    /// neither node as a configuration error. It is now a stream of refusals until emission catches
+    /// up, which is why the boundary still has to be the floor's: a gate on the local value would
+    /// refuse a conforming Exit for longer than it needs to.
     ///
     /// So the gate is computed at [`hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD`], which
     /// `validate_pix_supervision` holds every Exit to. This fixture puts the local reconstructor at
@@ -13587,11 +15751,8 @@ mod tests {
             .await
             .expect_err("a request one share below the boundary must be refused");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
@@ -13734,11 +15895,8 @@ mod tests {
             .await
             .expect_err("a successor must not be funded before the Exit has returned anything");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(
             0,
@@ -13802,11 +15960,8 @@ mod tests {
         let elapsed = started.elapsed();
 
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert!(
             elapsed * 4 < SSA_SUCCESSOR_SERVICE_WAIT,
@@ -13819,14 +15974,92 @@ mod tests {
         Ok(())
     }
 
+    /// Before a Session's slot exists, at most one request for it waits for the slot; any other is
+    /// refused at once rather than parking a second shared Start handler.
+    ///
+    /// The dispatch filter admits every request naming a pending initiation, and the wait comes
+    /// before the request lock, so without this whoever holds SURBs for the pseudonym could occupy
+    /// every handler for the length of the wait — the symptom the request lock closes once the slot
+    /// exists.
+    ///
+    /// ## Steps
+    /// 1. A pseudonym is pending as an outgoing initiation, and has no slot yet.
+    /// 2. A first request waits for the slot.
+    /// 3. A second request for the same pseudonym is refused as `Unacceptable` without waiting.
+    /// 4. Control: the first was waiting, not refused — it gives up as `NonExistingSession` when no slot comes — and
+    ///    once it has left, the next request waits too rather than being refused.
+    #[test_log::test(tokio::test)]
+    async fn a_second_ssa_request_for_a_pending_session_is_refused_without_waiting_for_its_slot() -> anyhow::Result<()>
+    {
+        let params = wide_pix_params();
+        let (mgr, _generator, _pseudonym, _pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        let pending = HoprPseudonym::random();
+        mgr.pending_outgoing.insert(pending, PendingOutgoingToken::next());
+        let request = move || SsaServerCommitmentMessage::new(pending, params, ssa_request_for(1), []);
+        let is_waiting = || {
+            mgr.slot_allocated
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&pending)
+                .is_some_and(|waiters| waiters.iter().any(|w| !w.is_canceled()))
+        };
+
+        let first = tokio::spawn({
+            let mgr = mgr.clone();
+            async move { mgr.handle_ssa_request(pending, request()).await }
+        });
+        timeout(Duration::from_secs(1), async {
+            while !is_waiting() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .context("the first request must wait for the pending Session's slot")?;
+
+        let refused = timeout(Duration::from_millis(250), mgr.handle_ssa_request(pending, request()))
+            .await
+            .context("a second request must not wait for the slot as well")?;
+        assert!(
+            matches!(
+                refused,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "expected Unacceptable, got {refused:?}"
+        );
+
+        let first = first.await?;
+        assert!(
+            matches!(
+                first,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "the first request must have waited and given up on the slot, got {first:?}"
+        );
+
+        let next = mgr.handle_ssa_request(pending, request()).await;
+        assert!(
+            matches!(
+                next,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "once the first request has left, the next one must wait rather than be refused, got {next:?}"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     /// A request that arrives just ahead of the packets that earned it is waited for, not refused.
     ///
     /// A conforming Exit asks the instant its reconstructor crosses the threshold, and that request
     /// travels the same mixed path as the returned packets which unlocked the shares — so it can
-    /// overtake the last few of them. Refusing it is not a mild outcome: `RequestSsa` is emitted once
-    /// per index and never retried, so the Exit sits in `AwaitingCommitment` until
-    /// `max_ssa_delivery_time` and then closes the Session as `CommitmentTimeout`. The gate must
-    /// therefore absorb the reordering rather than treat it as under-service.
+    /// overtake the last few of them. Refusing it is not free, although the Exit re-sends: the next
+    /// re-send is a whole `ssa_request_resend_interval` away, and a request that is only a few packets
+    /// behind would have been admitted at once. The gate therefore absorbs the reordering rather than
+    /// treating it as under-service.
     #[test_log::test(tokio::test)]
     async fn a_near_miss_successor_waits_for_the_packets_still_in_flight() -> anyhow::Result<()> {
         let params = wide_pix_params();
@@ -13908,11 +16141,8 @@ mod tests {
             .await
             .expect_err("pre-commitment service must not pay for the first successor");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
@@ -13956,12 +16186,13 @@ mod tests {
             &params,
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
-        assert_eq!(377_498, undiscounted);
+        assert_eq!(357_274, undiscounted);
 
-        // floor(μ − 4σ) for μ = 377 498 × (1 − L) = 187 660.58 and σ = √(377 498 · L · (1 − L)) =
-        // 307.20, at L = 0.502 883 257 4… computed independently at 60 significant digits.
+        // floor(μ − 4σ) for μ = 357 274 × (1 − L) = 177 606.89 and σ = √(357 274 · L · (1 − L)) =
+        // 298.86, at L = 0.502 883 257 4… computed independently at 90 significant digits. (At a
+        // window of 256 the boundary was 377 498 and the bar 186 431.)
         let required = required_returned_packets(&params, 1);
-        assert_eq!(186_431, required);
+        assert_eq!(176_411, required);
 
         let tolerated = params.tolerated_share_loss();
         let mean = undiscounted as f64 * (1.0 - tolerated);
@@ -13975,8 +16206,8 @@ mod tests {
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.409..0.411).contains(&fraction),
-            "the deployed successor boundary must sit at ~41.0% of a cycle's returned packets, got {fraction}"
+            (0.387..0.389).contains(&fraction),
+            "the deployed successor boundary must sit at ~38.8% of a cycle's returned packets, got {fraction}"
         );
 
         // A lossless conforming Exit asks no earlier than `ceil(0.85 × 4096)` recovered polynomials,
@@ -14014,8 +16245,8 @@ mod tests {
     /// The discount is the tolerance of the *negotiated* split, so an Entry that expects unreliable
     /// return relayers and buys more surplus loosens its own gate by exactly that much: how strict the
     /// gate is follows from the Entry's insurance choice rather than being a knob of its own. At
-    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~11.3 % of a cycle's
-    /// packets against the deployed split's ~41.0 %.
+    /// `4096 × (2 + 102)` a cycle tolerates ~86 % share loss, and the bar falls to ~10.4 % of a cycle's
+    /// packets against the deployed split's ~38.8 %.
     ///
     /// Driven through `handle_ssa_request` at the real dimensions rather than only through
     /// [`required_returned_packets`], because the property is that the gate reads the Session's own
@@ -14030,15 +16261,15 @@ mod tests {
         );
 
         let required = required_returned_packets(&params, 1);
-        // floor(μ − 4σ) for μ = 346 522 × (1 − L) = 48 876.87 and σ = 204.90, at L = 0.858 950 169 2…
-        // computed independently at 80 significant digits.
-        assert_eq!(346_522, undiscounted);
-        assert_eq!(48_057, required);
+        // floor(μ − 4σ) for μ = 320 410 × (1 − L) = 45 193.78 and σ = 197.03, at L = 0.858 950 169 2…
+        // computed independently at 90 significant digits. (At a window of 256: 346 522 and 48 057.)
+        assert_eq!(320_410, undiscounted);
+        assert_eq!(44_405, required);
 
         let fraction = required as f64 / cycle as f64;
         assert!(
-            (0.112..0.114).contains(&fraction),
-            "the successor boundary of 4096 x (2 + 102) must sit at ~11.3% of a cycle's returned packets, got \
+            (0.103..0.105).contains(&fraction),
+            "the successor boundary of 4096 x (2 + 102) must sit at ~10.4% of a cycle's returned packets, got \
              {fraction}"
         );
 
@@ -14069,11 +16300,8 @@ mod tests {
             .await
             .expect_err("a successor short of the bought tolerance's boundary must be refused");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
@@ -14138,11 +16366,8 @@ mod tests {
             .await
             .expect_err("a successor with no returned packet must be refused");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
@@ -14189,10 +16414,12 @@ mod tests {
             );
         }
 
+        // The boundaries of the 512-polynomial emission window, pinned in the tests above. (At a
+        // window of 256: 377 498 → 186 431, 346 522 → 48 057 and 303 565 → 150 641.)
         for (polys, threshold, surplus, target, required) in [
-            (4096, 32, 79, 377_498, 186_431),
-            (4096, 2, 102, 346_522, 48_057),
-            (2048, 64, 123, 303_565, 150_641),
+            (4096, 32, 79, 357_274, 176_411),
+            (4096, 2, 102, 320_410, 44_405),
+            (2048, 64, 123, 319_693, 158_674),
         ] {
             let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
             assert_eq!(
@@ -14211,17 +16438,21 @@ mod tests {
     /// Losses past the first return relayer cost the Exit nothing — the relayer has acknowledged, so
     /// the share is unlocked — and it asks at the lossless boundary with `Binomial(target, 1 − L)` of
     /// its packets having reached the Entry. A bar at their mean refused it about half the time, and
-    /// at this split ~18 % of the time by more than the near-miss window, at once; `RequestSsa` is
-    /// never retried, so the Session then died on `max_ssa_delivery_time`.
+    /// at this split ~18 % of the time by more than the near-miss window, at once. The Exit's re-sends
+    /// would since have caught the next one, but a bar that refuses a conforming Exit one time in five
+    /// still costs it an interval of delay and a request per interval until its packets arrive.
     ///
-    /// The draw is the one an independent review reproduced that with, at the surplus derived for
-    /// `2048 × 64`: 151 352 of 303 565 packets arrived, 391 short of the mean.
+    /// The draw is a reproduction of that at the surplus derived for `2048 × 64`: 159 028 of 319 693
+    /// packets arrived, 777 short of the mean (an independent review's draw at the window of 256 was
+    /// 391 short; the window is now twice as wide, so the fixture has to fall further short to be more
+    /// than one window short).
     #[test_log::test(tokio::test)]
     async fn an_honest_exit_at_the_tolerated_loss_is_not_refused_for_its_variance() -> anyhow::Result<()> {
         use hopr_protocol_pix::{MIN_EARLY_RECOVERY_THRESHOLD, SHARE_EMISSION_WINDOW, default_surplus_for};
 
-        // 303 565 independent fair bits (Python `random.Random(3)`).
-        const ARRIVED: u64 = 151_352;
+        // 319 693 independent fair bits: `sum(r.getrandbits(1) for _ in range(319_693))` with
+        // `r = random.Random(60)`. (Seed 3 and 303 565 bits, 151 352 arrivals, at a window of 256.)
+        const ARRIVED: u64 = 159_028;
 
         let params = PixParams::try_new(2048, 64, default_surplus_for(2048, 64), LOCAL_PIX_SUITE)?;
         assert_eq!(123, params.surplus_shares());
@@ -14233,17 +16464,17 @@ mod tests {
         );
 
         let boundary = hopr_protocol_pix::min_emission_for_early_recovery(&params, MIN_EARLY_RECOVERY_THRESHOLD);
-        assert_eq!(303_565, boundary);
+        assert_eq!(319_693, boundary);
 
-        // floor(μ − 4σ) for μ = 303 565 × (1 − L) = 151 743.28 and σ = 275.48, at
+        // floor(μ − 4σ) for μ = 319 693 × (1 − L) = 159 805.20 and σ = 282.71, at
         // L = 0.500 129 201 488 385 6.
         let required = required_returned_packets(&params, 1);
-        assert_eq!(150_641, required);
+        assert_eq!(158_674, required);
 
         // What this pins: a bar at the mean would have refused the draw outright, never reaching the
         // near-miss wait, where the confidence bound admits it.
         let at_the_mean = (boundary as f64 * (1.0 - params.tolerated_share_loss())) as u64;
-        assert_eq!(151_743, at_the_mean);
+        assert_eq!(159_805, at_the_mean);
         assert!(
             ARRIVED + (SHARE_EMISSION_WINDOW as u64) < at_the_mean,
             "the draw must fall more than one emission window short of the mean, or a mean bar would have waited"
@@ -14446,10 +16677,10 @@ mod tests {
     /// This is the property that lets the Exit finish a funded cycle whose application has fallen
     /// silent: it sends its own Exit → Entry keep-alives, each one consuming a return SURB and
     /// therefore unlocking one share, and the cycle completes on those alone. If they earned nothing
-    /// at this gate the Session would die at exactly the moment it succeeded — the Exit's `RequestSsa`
-    /// for the successor is emitted once and never retried, so a refusal here leaves it in
-    /// `AwaitingCommitment` until `max_ssa_delivery_time` and then closes the Session as
-    /// `CommitmentTimeout`, naming a timer rather than the rule that fired.
+    /// at this gate the successor would be refused for as long as the Exit relied on them: the Exit's
+    /// re-sends would be dropped as under-served until the cycle's emission ended, at which point the
+    /// successor reaches the front, the re-sends stop, and the Session closes on `CommitmentTimeout`,
+    /// naming a timer rather than the rule that fired.
     ///
     /// Driven through [`dispatch_message`](SessionManager::dispatch_message) with real encoded
     /// keep-alives rather than by touching the counter, because the credit lives on that path and
@@ -14632,11 +16863,8 @@ mod tests {
             .await
             .expect_err("a batch asked for before any share was emitted must be refused");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(
             drain_pix_events(&mut pix_events).await,
@@ -14687,11 +16915,8 @@ mod tests {
             .await
             .expect_err("reaching the last cycle must not by itself admit the next batch");
         assert!(
-            matches!(
-                err,
-                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
-            ),
-            "expected Unacceptable, got {err:?}"
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
         );
         assert_eq!(
             drain_pix_events(&mut pix_events).await,
@@ -14711,6 +16936,1430 @@ mod tests {
         bob_sender.close_channel();
         bob_handle.await??;
         Ok(())
+    }
+
+    /// How many `SsaCommit` messages the fixture's transport has been given, once that has stopped
+    /// changing.
+    ///
+    /// The count lags the handler by a channel hop to the forwarding task, so a read straight after a
+    /// call can miss the burst that call sent. Waiting for it to hold still is the cheap way to know
+    /// the read is the whole of it.
+    async fn settled_commit_count(wire: &WireRecord) -> usize {
+        let mut last = wire.count(StartProtocolDiscriminants::SsaCommit);
+        for _ in 0..80 {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+            let now = wire.count(StartProtocolDiscriminants::SsaCommit);
+            if now == last {
+                return now;
+            }
+            last = now;
+        }
+        last
+    }
+
+    /// Gets a fixture's Exit-side bookkeeping out of the way: the whole of cycle one emitted, and the
+    /// Exit credited with the service the successor gate asks of it.
+    fn serve_the_opening_cycle<S>(
+        mgr: &SessionManager<S>,
+        generator: &SsaShareGenerator<HoprPixSpec>,
+        pseudonym: &HoprPseudonym,
+        params: &PixParams,
+    ) -> anyhow::Result<()>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+    {
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(pseudonym, &sent.to_be_bytes())?;
+        }
+        credit_returned_packets(mgr, pseudonym, required_returned_packets(params, 1));
+        Ok(())
+    }
+
+    /// The Exit re-sends an unanswered successor request, so the Entry has to answer the re-sends of
+    /// one it has already admitted with nothing at all.
+    ///
+    /// Once the first copy is admitted the Entry spends a fraction of a second per cycle at the
+    /// deployed dimensions (longer for wide dimensions or a full batch) generating its commitment, and
+    /// then publishing it, and every re-send already in flight lands on a watermark that is at or above
+    /// the index it names. Answering one of them with a second commitment would announce a second
+    /// deposit address for the same quota and burst the same polynomials again; answering it with a
+    /// refusal would log a fault, per re-send, for a request that was served. A repeat names the batch
+    /// committed last, which is what tells it apart from a stale one.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_of_the_committed_successor_is_a_no_op() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) = entry_with_recorded_pix_session(
+            params,
+            SsaReconstructorConfig::default().early_recovery_threshold,
+            wire.clone(),
+        )
+        .await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        let after_opening = settled_commit_count(&wire).await;
+        assert!(
+            after_opening > 0,
+            "the opening batch must have sent its commitment burst"
+        );
+
+        // The opening batch is a repeat of itself too: nothing special-cases it.
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("a repeat of the opening batch must be accepted without effect")?;
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(after_opening, settled_commit_count(&wire).await);
+
+        serve_the_opening_cycle(&mgr, &generator, &pseudonym, &params)?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("the successor must be admitted once it has been earned")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        let after_successor = settled_commit_count(&wire).await;
+        assert!(
+            after_successor > after_opening,
+            "the successor must have sent a burst of its own"
+        );
+
+        for resend in 1..=3 {
+            mgr.handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+            )
+            .await
+            .with_context(|| format!("re-send {resend} of the admitted successor must succeed"))?;
+        }
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "a repeat must not announce a second deposit for the same cycle"
+        );
+        assert_eq!(
+            after_successor,
+            settled_commit_count(&wire).await,
+            "a repeat must not burst the same commitment again"
+        );
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and must not cost the Session");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A request for indices the Session has already committed past, and that are not the batch it
+    /// committed last, is dropped — quietly, and without costing the Session or committing anything.
+    ///
+    /// It is not `refuse_ssa_request`, which closes both halves: the worst such a request can be is an
+    /// Exit that lost track of what it asked for, and the Exit's own deadlines already end that. The
+    /// repeat of the batch actually committed to must still be recognised afterwards.
+    #[test_log::test(tokio::test)]
+    async fn a_stale_request_is_dropped_without_effect() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) = entry_with_recorded_pix_session(
+            params,
+            SsaReconstructorConfig::default().early_recovery_threshold,
+            wire.clone(),
+        )
+        .await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        serve_the_opening_cycle(&mgr, &generator, &pseudonym, &params)?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("the successor must be admitted once it has been earned")?;
+        assert_eq!(2, drain_pix_events(&mut pix_events).await);
+        let committed = settled_commit_count(&wire).await;
+
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            )
+            .await
+            .expect_err("a request for an index below the last committed batch must not be served");
+        assert!(
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "a stale request must not announce a deposit"
+        );
+        assert_eq!(committed, settled_commit_count(&wire).await, "or send a commitment");
+        assert_eq!(
+            vec![pseudonym],
+            mgr.active_sessions(),
+            "a stale request is dropped, not fatal"
+        );
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
+        )
+        .await
+        .context("the batch actually committed to is still recognised as a repeat after a stale request")?;
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Dimensions whose commitment burst is several messages long, so that a transport can fail
+    /// part-way through it. At [`wide_pix_params`]' eight polynomials the whole burst is one message.
+    fn multi_message_pix_params() -> PixParams {
+        PixParams::try_new(256, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE).expect("test dimensions must be valid")
+    }
+
+    /// How many `SsaCommit` messages one cycle's commitment burst is.
+    fn burst_len(pseudonym: &HoprPseudonym, params: &PixParams) -> anyhow::Result<usize> {
+        let chunking = HoprStartProtocol::ssa_commit_chunking(pseudonym)?;
+        Ok((params.polys_per_ssa() as usize).div_ceil(chunking.max_constant_terms_per_message))
+    }
+
+    /// What `ReadyToDeposit` events a fixture's PIX stream has ready.
+    ///
+    /// [`drain_pix_events`], keeping the deposits rather than counting them, for the tests whose
+    /// subject is *which* announcement was made and not only how many.
+    async fn drain_deposits(
+        events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin),
+    ) -> Vec<AgreedSsaQuota> {
+        let mut seen = Vec::new();
+        while let Ok(Some(event)) = timeout(Duration::from_millis(50), events.next()).await {
+            if let HoprSessionOutPixEvent::ReadyToDeposit(quota) = event {
+                seen.push(quota);
+            }
+        }
+        seen
+    }
+
+    /// Why [`FlakySender`] refused a message.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct InjectedSendFailure;
+
+    impl std::fmt::Display for InjectedSendFailure {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("injected send failure")
+        }
+    }
+
+    impl std::error::Error for InjectedSendFailure {}
+
+    /// How many more `SsaCommit` messages a [`FlakySender`] lets through before it refuses the rest.
+    ///
+    /// Only commitment messages are counted: the Exit half of the same manager sends other traffic
+    /// through the same sender, and a keep-alive spending the budget would move the point at which a
+    /// burst is cut.
+    #[derive(Clone)]
+    struct SendBudget {
+        allowed: Arc<std::sync::atomic::AtomicU64>,
+        /// Commitment messages refused before `allowed` is consulted at all.
+        refusals: Arc<std::sync::atomic::AtomicU64>,
+    }
+
+    impl SendBudget {
+        fn unlimited() -> Self {
+            Self {
+                allowed: Arc::new(std::sync::atomic::AtomicU64::new(u64::MAX)),
+                refusals: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            }
+        }
+
+        /// Lets `sends` more commitment messages through, then refuses every one.
+        fn allow(&self, sends: u64) {
+            self.allowed.store(sends, Ordering::SeqCst);
+        }
+
+        /// Ends the failure: every send is let through again.
+        fn restore(&self) {
+            self.allow(u64::MAX);
+        }
+
+        /// Refuses the next `sends` commitment messages, and goes back to [`allow`](Self::allow)'s
+        /// budget after them: a transport that gives up once and then recovers.
+        fn refuse_next(&self, sends: u64) {
+            self.refusals.store(sends, Ordering::SeqCst);
+        }
+
+        fn take(&self) -> bool {
+            if self
+                .refusals
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| left.checked_sub(1))
+                .is_ok()
+            {
+                return false;
+            }
+            self.allowed
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                    if left == u64::MAX {
+                        Some(left)
+                    } else {
+                        left.checked_sub(1)
+                    }
+                })
+                .is_ok()
+        }
+    }
+
+    /// A transport that fails on demand and recovers.
+    ///
+    /// A channel sender can only fail by being closed, for good. The failure the Entry's publication
+    /// has to survive is a send that gives up under backpressure — and the next one succeeds.
+    #[derive(Clone)]
+    struct FlakySender {
+        inner: UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        budget: SendBudget,
+    }
+
+    impl futures::Sink<(DestinationRouting, ApplicationDataOut)> for FlakySender {
+        type Error = InjectedSendFailure;
+
+        fn poll_ready(
+            mut self: Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner)
+                .poll_ready(cx)
+                .map_err(|_| InjectedSendFailure)
+        }
+
+        fn start_send(
+            mut self: Pin<&mut Self>,
+            item: (DestinationRouting, ApplicationDataOut),
+        ) -> Result<(), Self::Error> {
+            if crate::testing::msg_type(&item.1, StartProtocolDiscriminants::SsaCommit) && !self.budget.take() {
+                return Err(InjectedSendFailure);
+            }
+            Pin::new(&mut self.inner)
+                .start_send(item)
+                .map_err(|_| InjectedSendFailure)
+        }
+
+        fn poll_flush(
+            mut self: Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner)
+                .poll_flush(cx)
+                .map_err(|_| InjectedSendFailure)
+        }
+
+        fn poll_close(
+            mut self: Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            Pin::new(&mut self.inner)
+                .poll_close(cx)
+                .map_err(|_| InjectedSendFailure)
+        }
+    }
+
+    /// [`entry_with_recorded_pix_session`], over a [`FlakySender`] whose failures the test controls.
+    #[allow(clippy::type_complexity)]
+    async fn flaky_entry(
+        params: PixParams,
+        wire: Arc<WireRecord>,
+    ) -> anyhow::Result<(
+        SessionManager<FlakySender>,
+        Arc<SsaShareGenerator<HoprPixSpec>>,
+        HoprPseudonym,
+        impl futures::Stream<Item = HoprSessionOutPixEvent> + Unpin,
+        SendBudget,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
+    )> {
+        let budget = SendBudget::unlimited();
+        let wrapped = budget.clone();
+        let (mgr, generator, pseudonym, events, sender, handle) = entry_with_wrapped_sender(
+            params,
+            SsaReconstructorConfig::default().early_recovery_threshold,
+            wire,
+            move |inner| FlakySender { inner, budget: wrapped },
+        )
+        .await?;
+        Ok((mgr, generator, pseudonym, events, budget, sender, handle))
+    }
+
+    /// The members the Session still owes a publication, ascending.
+    fn owed<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym) -> anyhow::Result<Vec<SsaIndex>>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    {
+        let slot = mgr.sessions.get(pseudonym).context("session must exist")?;
+        Ok(slot
+            .current_ssa_state
+            .get()
+            .context("a PIX session has SSA state")?
+            .unpublished_indices())
+    }
+
+    /// What `ReadyToDeposit` is still owed for `index`, as it was fixed when the cycle was staged.
+    fn owed_announcement<S>(
+        mgr: &SessionManager<S>,
+        pseudonym: &HoprPseudonym,
+        index: u32,
+    ) -> anyhow::Result<AgreedSsaQuota>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    {
+        let slot = mgr.sessions.get(pseudonym).context("session must exist")?;
+        slot.current_ssa_state
+            .get()
+            .context("a PIX session has SSA state")?
+            .unpublished
+            .lock()
+            .members
+            .get(&SsaIndex::new(index).context("non-zero")?)
+            .cloned()
+            .context("the cycle must be owed its announcement")
+    }
+
+    /// A scoped re-request for the first `polys` polynomials of cycle `index`, as the Exit's own
+    /// commitment timer would send it.
+    fn rerequest(
+        pseudonym: HoprPseudonym,
+        params: PixParams,
+        index: u32,
+        polys: u16,
+    ) -> SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositPayload> {
+        SsaServerCommitmentMessage::recommit(
+            pseudonym,
+            params,
+            [(SsaIndex::new(index).expect("non-zero"), vec![(0u16, polys - 1)])],
+        )
+    }
+
+    /// The publication of a batch can be cut short by the transport, and a repeat of the request
+    /// finishes it: one full burst and one announcement, then nothing more.
+    ///
+    /// The generator has moved by the time a commitment is published, and a transport that fails then
+    /// leaves a watermark and a polynomial queue behind a request that reported an error. The Exit
+    /// re-sends it all the same. Read as stale, every re-send would be logged as a fault; answered with
+    /// a silent success, the cycle would never be announced — the Entry's upper layer would never be
+    /// told to fund an address the Exit is waiting on — and the Exit would close on its deposit
+    /// timeout. So the batch is recorded as the last one committed once it is staged, not once it is
+    /// published, and what is still owed is kept until it has been.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_resumes_a_publication_whose_first_send_failed() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        assert!(burst >= 3, "the fixture needs a burst of several messages, got {burst}");
+        let before = settled_commit_count(&wire).await;
+
+        // The transport refuses the very first message of the burst.
+        sends.allow(0);
+        let failure = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            )
+            .await
+            .expect_err("a burst that cannot be sent must fail the request");
+        assert!(
+            is_a_cut_short_publication(&failure),
+            "the gate admitted this request, so the failure is the transport's — reported as the non-fatal refusal, \
+             not as a fault the dispatcher logs at `error!`, got {failure:?}"
+        );
+        assert_eq!(
+            Some(SsaIndex::new(1).context("non-zero")?),
+            mgr.sessions
+                .get(&pseudonym)
+                .context("session must exist")?
+                .current_ssa_state
+                .get()
+                .and_then(SessionSsaState::committed_watermark),
+            "the generator moved, so the watermark did too"
+        );
+        assert_eq!(vec![SsaIndex::new(1).context("non-zero")?], owed(&mgr, &pseudonym)?);
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "nothing was announced");
+        assert_eq!(before, settled_commit_count(&wire).await, "and nothing was sent");
+        let staged = owed_announcement(&mgr, &pseudonym, 1)?;
+
+        // The transport recovers, and the Exit's re-send of the same request lands.
+        sends.restore();
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("a repeat of a request whose publication was cut short must finish it")?;
+        assert_eq!(
+            vec![staged],
+            drain_deposits(&mut pix_events).await,
+            "exactly one announcement, carrying what was fixed when the cycle was staged"
+        );
+        assert_eq!(
+            before + burst,
+            settled_commit_count(&wire).await,
+            "and exactly one full burst"
+        );
+        assert!(owed(&mgr, &pseudonym)?.is_empty());
+
+        // Now it is published, so a further repeat is the no-op it always was.
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("a repeat of a published batch must succeed")?;
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(before + burst, settled_commit_count(&wire).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A batch cut short part-way is finished from where it stopped: members already published are
+    /// left alone, and the one that was cut is re-published whole.
+    ///
+    /// The request repeated here is the whole batch, as a conforming Exit sends it: it re-sends the
+    /// batch, whole and unchanged, for as long as any member has reported nothing, including the ones
+    /// whose commitment it already has.
+    #[test_log::test(tokio::test)]
+    async fn a_resumed_batch_publishes_only_the_members_still_owed() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let batch = |first: u32| -> std::collections::BTreeMap<SsaIndex, HoprPixGroupElement> {
+            let mut members = ssa_request_for(first);
+            members.extend(ssa_request_for(first + 1));
+            members
+        };
+
+        // The first member goes out whole; the second is cut after one message.
+        sends.allow(burst as u64 + 1);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, batch(1), []),
+        )
+        .await
+        .expect_err("a batch whose second burst is cut must fail the request");
+        assert_eq!(
+            vec![SsaIndex::new(2).context("non-zero")?],
+            owed(&mgr, &pseudonym)?,
+            "the first member is published, the second is owed"
+        );
+        assert_eq!(
+            vec![1],
+            drain_deposits(&mut pix_events)
+                .await
+                .iter()
+                .map(|quota| quota.ssa_id.ssa_index().get())
+                .collect::<Vec<_>>(),
+            "only the member whose burst completed was announced"
+        );
+        assert_eq!(burst + 1, settled_commit_count(&wire).await);
+
+        sends.restore();
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, batch(1), []),
+        )
+        .await
+        .context("the repeat must finish the batch")?;
+        assert_eq!(
+            vec![2],
+            drain_deposits(&mut pix_events)
+                .await
+                .iter()
+                .map(|quota| quota.ssa_id.ssa_index().get())
+                .collect::<Vec<_>>(),
+            "the resumption announces the member that was owed, and not the one already published"
+        );
+        assert_eq!(
+            burst + 1 + burst,
+            settled_commit_count(&wire).await,
+            "one full burst more, for that member alone"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A batch cut at its first member stays owed in full, and a resumption publishes it in order.
+    ///
+    /// The member that failed is put back and the ones after it were never claimed, so all of them
+    /// are still there. Handing the first back must not depend on the second being absent.
+    #[test_log::test(tokio::test)]
+    async fn a_batch_cut_at_its_first_member_stays_owed_in_full() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let mut batch = ssa_request_for(1);
+        batch.extend(ssa_request_for(2));
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, batch.clone(), []);
+
+        sends.allow(0);
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .expect_err("a batch whose first burst is refused must fail the request");
+        assert_eq!(
+            vec![
+                SsaIndex::new(1).context("non-zero")?,
+                SsaIndex::new(2).context("non-zero")?
+            ],
+            owed(&mgr, &pseudonym)?,
+            "the member that failed was put back and the one after it was never claimed"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        let staged = [
+            owed_announcement(&mgr, &pseudonym, 1)?,
+            owed_announcement(&mgr, &pseudonym, 2)?,
+        ];
+
+        sends.restore();
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the repeat must finish the whole batch")?;
+        assert_eq!(
+            staged.to_vec(),
+            drain_deposits(&mut pix_events).await,
+            "both members are announced, in ascending order, each once"
+        );
+        assert_eq!(2 * burst, settled_commit_count(&wire).await, "one full burst each");
+        assert!(owed(&mgr, &pseudonym)?.is_empty());
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A scoped re-request for a cycle whose publication was cut short resumes it instead.
+    ///
+    /// The Exit that received part of a burst stops re-sending its request and repairs the commitment
+    /// with a scoped re-request. That repair completes the commitment it names but never announces the
+    /// deposit, so for a cycle nobody was told to fund the answer has to be the whole publication.
+    #[test_log::test(tokio::test)]
+    async fn a_scoped_rerequest_resumes_a_publication_cut_short_mid_burst() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let before = settled_commit_count(&wire).await;
+
+        sends.allow(1);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .expect_err("a burst cut after one message must fail the request");
+        assert_eq!(before + 1, settled_commit_count(&wire).await, "one message got out");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        let staged = owed_announcement(&mgr, &pseudonym, 1)?;
+        sends.restore();
+
+        mgr.handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .context("a re-request for a cycle cut short must be answered")?;
+        assert_eq!(
+            vec![staged],
+            drain_deposits(&mut pix_events).await,
+            "exactly one announcement for the cycle nobody had been told to fund"
+        );
+        assert_eq!(
+            before + 1 + burst,
+            settled_commit_count(&wire).await,
+            "answered with the whole burst, not with the ten polynomials the Exit named"
+        );
+        assert!(owed(&mgr, &pseudonym)?.is_empty());
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A re-request for a cycle that was published in full stays scoped, and announces nothing.
+    ///
+    /// The deposit address was fixed and announced when the cycle was first committed, so announcing
+    /// it again would invite a second deposit against one quota.
+    #[test_log::test(tokio::test)]
+    async fn a_rerequest_for_a_published_cycle_stays_scoped() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, _sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(burst, settled_commit_count(&wire).await);
+        assert!(owed(&mgr, &pseudonym)?.is_empty());
+
+        mgr.handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .context("a re-request for a published cycle must be answered")?;
+        assert_eq!(
+            burst + 1,
+            settled_commit_count(&wire).await,
+            "the ten polynomials the Exit named fit one message, and that is all that is sent"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "and nothing is announced");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A resumption the transport cuts short does not hold up the rest of the re-request that
+    /// prompted it.
+    ///
+    /// A re-request can name a cycle whose publication was cut short beside one that was published in
+    /// full. The first is answered by resuming the batch and the second by its scoped parts, and the
+    /// two are separate repairs. Returning on the resumption's failure left the second one waiting a
+    /// whole re-request interval on the first.
+    #[test_log::test(tokio::test)]
+    async fn a_cut_short_resumption_does_not_hold_up_the_rest_of_a_rerequest() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let mut batch = ssa_request_for(1);
+        batch.extend(ssa_request_for(2));
+        let (first, second) = (
+            SsaIndex::new(1).context("non-zero")?,
+            SsaIndex::new(2).context("non-zero")?,
+        );
+
+        // The first member goes out whole; the second is cut after one message.
+        sends.allow(burst as u64 + 1);
+        mgr.handle_ssa_request(pseudonym, SsaServerCommitmentMessage::new(pseudonym, params, batch, []))
+            .await
+            .expect_err("a batch whose second burst is cut must fail the request");
+        assert_eq!(vec![second], owed(&mgr, &pseudonym)?);
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        let before = settled_commit_count(&wire).await;
+        sends.restore();
+
+        // The Exit asks for ten polynomials of each. The transport gives up on the first message of
+        // the resumption and recovers straight after.
+        sends.refuse_next(1);
+        let failure = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::recommit(
+                    pseudonym,
+                    params,
+                    [(first, vec![(0u16, 9)]), (second, vec![(0u16, 9)])],
+                ),
+            )
+            .await
+            .expect_err("the resumption that was cut short is still reported");
+        assert!(
+            is_a_cut_short_publication(&failure),
+            "reported as the non-fatal refusal, got {failure:?}"
+        );
+        assert_eq!(
+            before + 1,
+            settled_commit_count(&wire).await,
+            "the published cycle's ten polynomials went out all the same, in one message"
+        );
+        assert_eq!(vec![second], owed(&mgr, &pseudonym)?, "and the cut cycle stays owed");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "nothing was announced");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Moves the moment the Session's last batch went out back by a whole
+    /// [`SSA_REPEAT_RESEND_GRACE`], as if the repeat about to be handled were arriving that much later.
+    fn backdate_last_sent<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym) -> anyhow::Result<()>
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    {
+        let slot = mgr.sessions.get(pseudonym).context("session must exist")?;
+        let state = slot.current_ssa_state.get().context("a PIX session has SSA state")?;
+        let mut unpublished = state.unpublished.lock();
+        let sent = unpublished.last_sent.context("the batch must have gone out")?;
+        unpublished.last_sent = Some(
+            sent.checked_sub(SSA_REPEAT_RESEND_GRACE)
+                .context("the clock must reach back a grace")?,
+        );
+        Ok(())
+    }
+
+    /// A repeat that arrives long after the batch went out in full has its bursts sent again, and
+    /// nothing announced.
+    ///
+    /// Publishing a burst only means the local transport took it. If a relayer on the forward path
+    /// dies, all of it can be lost, and then the Exit holds no part it could name in a scoped
+    /// re-request. Its repeat is the only prompt left. A repeat that arrives within the grace may have
+    /// crossed the burst and gets nothing, which is what keeps the ordinary in-flight repeats from
+    /// costing a retransmission each.
+    ///
+    /// The opening batch stands in for a successor here. Nothing on the Entry tells them apart, and it
+    /// spares the test serving a cycle first.
+    #[test_log::test(tokio::test)]
+    async fn a_late_repeat_sends_the_published_bursts_again_without_announcing_them() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(burst, settled_commit_count(&wire).await);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat inside the grace must succeed")?;
+        assert_eq!(burst, settled_commit_count(&wire).await, "and send nothing");
+
+        backdate_last_sent(&mgr, &pseudonym)?;
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a late repeat must be answered")?;
+        assert_eq!(
+            2 * burst,
+            settled_commit_count(&wire).await,
+            "with the whole burst again"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "and no second announcement for the same cycle"
+        );
+
+        // The re-send starts the grace over, so the repeats that crossed it get nothing.
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat right after a re-send must succeed")?;
+        assert_eq!(2 * burst, settled_commit_count(&wire).await);
+
+        // A re-send the transport cuts short is not fatal, and also starts the grace over, so a
+        // congested transport is not handed a burst on every repeat.
+        backdate_last_sent(&mgr, &pseudonym)?;
+        sends.allow(1);
+        let failure = mgr
+            .handle_ssa_request(pseudonym, request())
+            .await
+            .expect_err("a re-send that cannot get out must fail the request");
+        assert!(
+            matches!(
+                failure,
+                TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))
+            ),
+            "reported as the non-fatal refusal, got {failure:?}"
+        );
+        sends.restore();
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a repeat right after a failed re-send must succeed")?;
+        assert_eq!(2 * burst + 1, settled_commit_count(&wire).await);
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session lives");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A lost burst whose cycle has no retransmissions left is given up on, once.
+    ///
+    /// The re-send of a published burst draws on the same per-cycle budget as a scoped re-request, so
+    /// a peer cannot farm whole bursts out of this node by repeating its request. Once that budget is
+    /// spent the generator refuses, and the cycle stops counting as announced, so the repeats after it
+    /// do not even ask.
+    #[test_log::test(tokio::test)]
+    async fn a_lost_burst_with_no_retransmissions_left_is_given_up_on() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, _sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []);
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(burst, settled_commit_count(&wire).await);
+
+        for _ in 0..hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            generator.recommit(&pseudonym, SsaIndex::new(1).context("non-zero")?, [(0, 0)])?;
+        }
+
+        backdate_last_sent(&mgr, &pseudonym)?;
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("a spent cycle is given up on, which is not a failure of the request")?;
+        assert_eq!(burst, settled_commit_count(&wire).await, "nothing was sent");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "and nothing announced");
+        assert!(
+            mgr.sessions
+                .get(&pseudonym)
+                .context("session must exist")?
+                .current_ssa_state
+                .get()
+                .context("a PIX session has SSA state")?
+                .unpublished
+                .lock()
+                .announced
+                .is_empty(),
+            "the cycle is no longer one a late repeat sends again"
+        );
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session lives");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Once a cycle has used up its retransmissions it can never be published again, so it is dropped.
+    ///
+    /// Resuming spends one of a cycle's [`MAX_COMMITMENT_RETRANSMISSIONS`] answers, and that cap is
+    /// what keeps a peer from farming whole bursts out of this node by re-sending a request. Spent, the
+    /// generator refuses and nothing is sent or announced. Keeping the member owed would only make
+    /// every later re-send pay a blocking `recommit` and a log line for the same refusal, so it is
+    /// dropped from the owed set instead, and the repeats after it are plain no-ops.
+    #[test_log::test(tokio::test)]
+    async fn a_cycle_with_no_retransmissions_left_is_dropped_and_later_repeats_are_no_ops() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let before = settled_commit_count(&wire).await;
+
+        sends.allow(0);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .expect_err("a burst that cannot be sent must fail the request");
+        sends.restore();
+
+        let index = SsaIndex::new(1).context("non-zero")?;
+        for _ in 0..hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            generator.recommit(&pseudonym, index, [(0, 0)])?;
+        }
+        assert_eq!(vec![index], owed(&mgr, &pseudonym)?, "still owed until someone tries");
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("a spent cycle is given up on, which is not a failure of the request")?;
+        assert!(
+            owed(&mgr, &pseudonym)?.is_empty(),
+            "the cycle can never be published, so it is no longer owed"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await, "it was never announced");
+        assert_eq!(before, settled_commit_count(&wire).await, "and nothing was sent for it");
+
+        for _ in 0..3 {
+            mgr.handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            )
+            .await
+            .context("later repeats are plain no-ops")?;
+        }
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(before, settled_commit_count(&wire).await);
+
+        // A re-request for it is scoped like any other, and the generator refuses it the same way.
+        mgr.handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .expect_err("the spent cycle has nothing left to re-send");
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session lives");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A spent member is dropped without stopping the members after it.
+    #[test_log::test(tokio::test)]
+    async fn a_spent_member_does_not_stop_the_rest_of_the_batch() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let before = settled_commit_count(&wire).await;
+        let mut batch = ssa_request_for(1);
+        batch.extend(ssa_request_for(2));
+        let request = || SsaServerCommitmentMessage::new(pseudonym, params, batch.clone(), []);
+
+        sends.allow(0);
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .expect_err("a batch whose first burst is refused must fail the request");
+        sends.restore();
+        let second = owed_announcement(&mgr, &pseudonym, 2)?;
+        for _ in 0..hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS {
+            generator.recommit(&pseudonym, SsaIndex::new(1).context("non-zero")?, [(0, 0)])?;
+        }
+
+        mgr.handle_ssa_request(pseudonym, request())
+            .await
+            .context("the repeat publishes what can be published")?;
+        assert_eq!(
+            vec![second],
+            drain_deposits(&mut pix_events).await,
+            "the second member is announced, and the spent first one never is"
+        );
+        assert_eq!(
+            before + burst,
+            settled_commit_count(&wire).await,
+            "with its one full burst"
+        );
+        assert!(owed(&mgr, &pseudonym)?.is_empty());
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A member the generator retains nothing for is dropped too, with nothing sent.
+    ///
+    /// The retained material is what a resumption rebuilds the burst from. When it is gone — pushed out
+    /// by newer cycles — nothing will bring it back, and `recommit` says so with a different error from
+    /// the spent-cap one.
+    #[test_log::test(tokio::test)]
+    async fn a_member_with_nothing_retained_is_dropped_and_nothing_is_sent() -> anyhow::Result<()> {
+        let params = small_pix_params();
+        let pseudonym = HoprPseudonym::random();
+        let generator = Arc::new(SsaShareGenerator::<HoprPixSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: params.polys_per_ssa(),
+            threshold: params.shares_per_poly(),
+            surplus_shares: params.surplus_shares(),
+        }));
+        let (toolbox, _events) = PixToolbox::new(
+            generator,
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let state = SessionSsaState::new(params);
+        state.stage_unpublished([owed_quota(pseudonym, 1)?, owed_quota(pseudonym, 2)?]);
+
+        let (mut sender, mut sent) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        resume_publication(
+            pseudonym,
+            pseudonym,
+            &DestinationRouting::Return(pseudonym.into()),
+            &state,
+            &toolbox,
+            &mut sender,
+        )
+        .await
+        .context("members that can never be published are given up on, which is not a failure")?;
+
+        assert!(state.unpublished_indices().is_empty(), "neither stays owed");
+        assert!(sent.try_recv().is_err(), "and nothing went on the wire");
+        Ok(())
+    }
+
+    /// A resumption that fails again is the same non-fatal refusal on every path, and leaves the cycle owed.
+    ///
+    /// Reached by a repeat of the request and by a scoped re-request alike. The dispatcher logs
+    /// `NotAdmitted` at `debug!`, so a raw transport error from either path would have been an `error!`
+    /// per attempt for something the Exit retries on its own.
+    #[test_log::test(tokio::test)]
+    async fn a_resumption_cut_short_again_is_not_fatal_on_either_path() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let before = settled_commit_count(&wire).await;
+        let index = SsaIndex::new(1).context("non-zero")?;
+
+        sends.allow(1);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .expect_err("a burst cut after one message must fail the request");
+
+        // The transport is still refusing, so each resumption is cut after nothing at all.
+        sends.allow(0);
+        let by_repeat = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            )
+            .await
+            .expect_err("a repeat that cannot be published must not report success");
+        assert!(is_a_cut_short_publication(&by_repeat), "got {by_repeat:?}");
+        let by_rerequest = mgr
+            .handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .expect_err("a re-request that cannot be published must not report success");
+        assert!(is_a_cut_short_publication(&by_rerequest), "got {by_rerequest:?}");
+        assert_eq!(
+            vec![index],
+            owed(&mgr, &pseudonym)?,
+            "the cycle stays owed through both"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(
+            before + 1,
+            settled_commit_count(&wire).await,
+            "only the first message ever got out"
+        );
+
+        // And it is still finished once the transport is back.
+        sends.restore();
+        mgr.handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .context("the next re-request finishes it")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+        assert_eq!(before + 1 + burst, settled_commit_count(&wire).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A member somebody else has claimed is not published by a second resumer.
+    ///
+    /// The scoped re-request path does not take the per-pseudonym request lock, so it can run beside
+    /// the original publication or another resumption. The claim is what keeps them from announcing a
+    /// deposit twice: whoever removes a member from the owed set is its publisher, and nobody else.
+    #[test_log::test(tokio::test)]
+    async fn a_claimed_member_is_not_published_by_a_second_resumer() -> anyhow::Result<()> {
+        let params = multi_message_pix_params();
+        let wire = Arc::new(WireRecord::default());
+        let (mgr, _generator, pseudonym, mut pix_events, sends, bob_sender, bob_handle) =
+            flaky_entry(params, wire.clone()).await?;
+        let burst = burst_len(&pseudonym, &params)?;
+        let before = settled_commit_count(&wire).await;
+
+        sends.allow(0);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .expect_err("a burst that cannot be sent must fail the request");
+        sends.restore();
+
+        // Another resumer is part-way through the cycle.
+        let index = SsaIndex::new(1).context("non-zero")?;
+        let slot = mgr.sessions.get(&pseudonym).context("session must exist")?;
+        let state = slot.current_ssa_state.get().context("a PIX session has SSA state")?;
+        let claimed = state
+            .claim_unpublished(index)
+            .context("the cycle must be owed to be claimed")?;
+
+        // Neither a repeat nor a re-request may publish or announce it meanwhile.
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("a repeat of a batch that is being published is not a fault")?;
+        mgr.handle_ssa_request(pseudonym, rerequest(pseudonym, params, 1, 10))
+            .await
+            .context("a re-request of a cycle that is being published is answered as a published one")?;
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events).await,
+            "a second resumer must not announce the claimed member"
+        );
+        assert!(
+            settled_commit_count(&wire).await <= before + 1,
+            "nor send its burst: at most the scoped message of the re-request went out"
+        );
+        assert!(
+            state.claim_unpublished(index).is_none(),
+            "a claimed member cannot be claimed twice"
+        );
+
+        // The claimant fails and hands it back; now one resumption publishes it, once.
+        state.restore_unpublished(claimed);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the repeat must finish the publication that was handed back")?;
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await, "announced exactly once");
+        assert!(settled_commit_count(&wire).await >= before + burst);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// The announcement a member of `pseudonym`'s batch would be owed, for the tests that stage members
+    /// directly rather than through a request.
+    ///
+    /// Any deposit address will do; its type depends on the curve this build is configured for, so one
+    /// is derived rather than written down.
+    fn owed_quota(pseudonym: HoprPseudonym, index: u32) -> anyhow::Result<AgreedSsaQuota> {
+        let deposit_address = HoprPixSpec::group_to_deposit_address(
+            SsaShareGenerator::<HoprPixSpec>::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+            .ssa_commitment,
+        )
+        .context("a commitment has a deposit address")?;
+        let ssa_index = SsaIndex::new(index).context("non-zero")?;
+        Ok(AgreedSsaQuota {
+            ssa_id: SsaId::new(pseudonym, ssa_index),
+            deposit_address,
+            quota_per_ssa: 1,
+            deposit_data: PixDepositData {
+                id: PixAddressId::new(&pseudonym, ssa_index),
+                data: Box::default(),
+            },
+        })
+    }
+
+    /// Whether `error` is the non-fatal refusal a publication cut short by the transport is reported as.
+    ///
+    /// Told apart from the gate's own `NotAdmitted` refusals by what it says, because the point of the
+    /// tests using it is that a cut is reported the same way on every path that can meet one.
+    fn is_a_cut_short_publication(error: &TransportSessionError) -> bool {
+        matches!(
+            error,
+            TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))
+                if reason.contains("was cut short") && reason.contains("still owed")
+        )
+    }
+
+    /// The owed set is claimed once, handed back whole, and replaced by a newer batch.
+    #[test]
+    fn owed_members_are_claimed_once_and_replaced_by_a_newer_batch() -> anyhow::Result<()> {
+        let state = SessionSsaState::new(small_pix_params());
+        let pseudonym = HoprPseudonym::random();
+        let owed = |index: u32| owed_quota(pseudonym, index);
+        let index = |index: u32| SsaIndex::new(index).context("non-zero");
+
+        state.stage_unpublished([owed(3)?, owed(4)?]);
+        assert_eq!(vec![index(3)?, index(4)?], state.unpublished_indices());
+
+        let claimed = state.claim_unpublished(index(3)?).context("owed, so claimable")?;
+        assert!(state.claim_unpublished(index(3)?).is_none(), "a claim is exclusive");
+        assert_eq!(
+            vec![index(4)?],
+            state.unpublished_indices(),
+            "and takes the member out of the set"
+        );
+
+        state.restore_unpublished(claimed);
+        assert_eq!(
+            vec![index(3)?, index(4)?],
+            state.unpublished_indices(),
+            "a member handed back is owed again, in its place"
+        );
+
+        // A newer batch replaces the older one, and a straggling claimant of the old batch cannot
+        // bring its member back into the new one.
+        let straggler = state.claim_unpublished(index(3)?).context("owed")?;
+        state.stage_unpublished([owed(7)?]);
+        assert_eq!(vec![index(7)?], state.unpublished_indices());
+        state.restore_unpublished(straggler);
+        assert_eq!(
+            vec![index(7)?],
+            state.unpublished_indices(),
+            "an older batch's member has nothing left to be owed to"
+        );
+        Ok(())
+    }
+
+    /// Only members whose publication completed are sent again, only once the batch has been out for
+    /// a whole grace, and a re-send starts the grace over.
+    #[test]
+    fn a_late_repeat_resends_only_announced_members_once_per_grace() -> anyhow::Result<()> {
+        let state = SessionSsaState::new(small_pix_params());
+        let pseudonym = HoprPseudonym::random();
+        let owed = |index: u32| owed_quota(pseudonym, index);
+        let index = |index: u32| SsaIndex::new(index).context("non-zero");
+        let grace = SSA_REPEAT_RESEND_GRACE;
+        let t0 = Instant::now();
+
+        state.stage_unpublished([owed(3)?, owed(4)?]);
+        assert!(
+            state.claim_republication(t0 + grace * 10, grace).is_empty(),
+            "nothing has been announced yet"
+        );
+
+        let first = state.claim_unpublished(index(3)?).context("owed, so claimable")?;
+        state.complete_publication(first, t0);
+        let second = state.claim_unpublished(index(4)?).context("owed, so claimable")?;
+        assert!(
+            state.claim_republication(t0 + grace / 2, grace).is_empty(),
+            "a repeat inside the grace may have crossed the burst"
+        );
+        assert_eq!(
+            vec![index(3)?],
+            state.claim_republication(t0 + grace, grace),
+            "a member still being published is not sent again behind its claimant's back"
+        );
+        assert!(
+            state.claim_republication(t0 + grace + grace / 2, grace).is_empty(),
+            "a re-send starts the grace over"
+        );
+
+        state.complete_publication(second, t0 + grace * 2);
+        assert_eq!(
+            vec![index(3)?, index(4)?],
+            state.claim_republication(t0 + grace * 3, grace)
+        );
+
+        state.forget_announced(index(3)?);
+        assert_eq!(vec![index(4)?], state.claim_republication(t0 + grace * 4, grace));
+
+        // A newer batch starts with nothing announced, and a straggling claimant of an older one
+        // adds nothing to it.
+        state.stage_unpublished([owed(5)?]);
+        let straggler = state.claim_unpublished(index(5)?).context("owed, so claimable")?;
+        state.stage_unpublished([owed(7)?]);
+        state.complete_publication(straggler, t0 + grace * 5);
+        assert!(state.claim_republication(t0 + grace * 10, grace).is_empty());
+        Ok(())
+    }
+
+    /// A request that finds another one in progress for the same Session is dropped on the spot.
+    ///
+    /// The holder can be anywhere in a long handler — waiting out the near-miss window, or part-way
+    /// through generating a commitment, which at wide dimensions or a full batch takes seconds — and a
+    /// queue of the Exit's re-sends behind it would park one `for_each_concurrent` slot each for all of
+    /// that. Dropping costs nothing: either the holder admits the batch and the repeat is moot, or it
+    /// does not and the repeat is the next attempt.
+    #[test_log::test(tokio::test)]
+    async fn a_request_that_finds_the_lock_held_is_dropped_not_queued() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, _generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        let lock = mgr
+            .ssa_request_locks
+            .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
+            .await;
+        let holder = lock.lock().await;
+
+        let started = std::time::Instant::now();
+        let err = timeout(
+            SSA_SUCCESSOR_SERVICE_WAIT,
+            mgr.handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+            ),
+        )
+        .await
+        .context("a request behind a held lock must come back at once instead of waiting for it")?
+        .expect_err("a request that finds the lock held must not be served");
+        assert!(
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected NotAdmitted, got {err:?}"
+        );
+        assert!(
+            started.elapsed() * 4 < SSA_SUCCESSOR_SERVICE_WAIT,
+            "dropping took {:?}, which is a wait",
+            started.elapsed()
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
+        assert_eq!(vec![pseudonym], mgr.active_sessions(), "and the Session is untouched");
+
+        // Released, the very same request goes through: nothing was remembered against it.
+        drop(holder);
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
+        )
+        .await
+        .context("the request must be served once the lock is free")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A refusal is logged loudly once, and the repeats of it are not.
+    ///
+    /// The Exit re-sends a refused request every few seconds for as long as the gate stays shut, so
+    /// the same refusal arrives over and over. Keyed on the lowest index asked for and the reason: a
+    /// different reason for the same index, or the same reason for a different one, is news again.
+    #[test]
+    fn only_the_first_of_a_repeated_refusal_is_news() {
+        let state = SessionSsaState::new(small_pix_params());
+        let two = SsaIndex::new(2);
+        let three = SsaIndex::new(3);
+
+        assert!(
+            state.note_refusal(two, SsaRefusal::UnderServed),
+            "the first refusal is news"
+        );
+        assert!(
+            !state.note_refusal(two, SsaRefusal::UnderServed),
+            "the same refusal for the same index is not"
+        );
+        assert!(
+            state.note_refusal(two, SsaRefusal::Early),
+            "a different reason for the same index is"
+        );
+        assert!(
+            state.note_refusal(three, SsaRefusal::Early),
+            "and so is the same reason for a different index"
+        );
+        assert!(!state.note_refusal(three, SsaRefusal::Early));
+        assert!(
+            state.note_refusal(None, SsaRefusal::Stale),
+            "a request naming no index at all still has a key, and it is not the zero of 'no refusal yet'"
+        );
     }
 
     /// Concurrent `SsaRequest`s for one pseudonym must admit exactly one batch.
@@ -15645,6 +19294,9 @@ mod tests {
                     // it here — the Entry sends no commitment at all, so there is no scope to
                     // re-request and the deadline under test is the only one that can fire.
                     commitment_recommit_interval: Duration::from_millis(10),
+                    // Under the delivery deadline for the same reason. It would not fire here in any
+                    // case — this is the opening batch, which is never re-sent.
+                    ssa_request_resend_interval: Duration::from_millis(20),
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
@@ -16774,6 +20426,381 @@ mod tests {
             probe::non_zero(),
             "a Session that negotiated no PIX must contribute to no PIX aggregate"
         );
+        Ok(())
+    }
+
+    /// Offers `gate` one return packet, counted against `estimator` the way a data sink counts it.
+    fn offer_counted_packet(
+        gate: &Arc<ServiceGate>,
+        estimator: &AtomicSurbFlowEstimator,
+    ) -> anyhow::Result<EgressPermit> {
+        Ok(acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            count_return_packet_surb(estimator, small_outgoing_packet()?),
+        ))
+    }
+
+    /// A counted packet the gate fails never reaches routing resolution, so it gives its SURB back,
+    /// whether the gate was closed before it came or was poisoned while it was parked.
+    #[tokio::test]
+    async fn a_counted_packet_the_gate_fails_should_give_its_surb_back() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+
+        let closed = ServiceGate::new(10, 10);
+        closed.poison();
+        assert!(
+            offer_counted_packet(&closed, &estimator)?.await.is_err(),
+            "a poisoned gate must refuse"
+        );
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "the refused packet's SURB is back in the held count"
+        );
+
+        // Strict prepay: the packet parks, and poisoning fails the park.
+        let gate = ServiceGate::new(0, 10);
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        assert_eq!(9, estimator.saturating_diff(), "a parked packet stays counted");
+
+        gate.poison();
+        assert!(parked.await.is_err(), "poisoning must fail the park");
+        assert_eq!(10, estimator.saturating_diff(), "the failed packet's SURB is back too");
+        Ok(())
+    }
+
+    /// A parked packet dropped with its Session's sink gives its SURB back too, whether or not the sink
+    /// had polled it yet.
+    #[tokio::test]
+    async fn a_counted_packet_dropped_while_parked_should_give_its_surb_back() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let gate = ServiceGate::new(0, 10);
+
+        drop(offer_counted_packet(&gate, &estimator)?);
+        assert_eq!(
+            10,
+            estimator.saturating_diff(),
+            "a park dropped before its first poll gives its SURB back"
+        );
+
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        drop(parked);
+        assert_eq!(10, estimator.saturating_diff(), "and so does one dropped mid-park");
+        Ok(())
+    }
+
+    /// An admitted packet stays counted. It goes on with its refund, for routing resolution to give back
+    /// if it starves there, whether the gate admits it at once or once the supervisor funds the park.
+    #[tokio::test]
+    async fn a_counted_packet_the_gate_admits_should_keep_its_surb_counted() -> anyhow::Result<()> {
+        use crate::balancer::SurbFlowEstimator;
+
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+        let refund = SurbRefund::to(estimator.refunded.clone());
+
+        let (_, data) = offer_counted_packet(&ServiceGate::new(10, 10), &estimator)?
+            .await
+            .context("a gate with budget must admit at once")?;
+        assert_eq!(
+            refund, data.surb_refund,
+            "admitted at once, the packet keeps its refund"
+        );
+
+        let gate = ServiceGate::new(0, 10);
+        let mut parked = offer_counted_packet(&gate, &estimator)?;
+        assert!(
+            futures::poll!(&mut parked).is_pending(),
+            "the packet must park rather than resolve"
+        );
+        gate.release_service();
+        let (_, data) = timeout(Duration::from_secs(5), parked)
+            .await
+            .context("funding must wake the parked packet")?
+            .context("a funded gate must admit it")?;
+        assert_eq!(
+            refund, data.surb_refund,
+            "admitted after a park, the packet gets its refund back"
+        );
+
+        assert_eq!(8, estimator.saturating_diff(), "both admitted packets stay counted");
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------
+    // The action driver's decision to re-send an SSA request
+    // ---------------------------------------------------------------
+
+    /// A request as the driver would have stored it after sending.
+    ///
+    /// Any Start message will do: the decision only ever hands back a reference to what was stored,
+    /// and the tests tell it apart from a copy by address.
+    fn stored_request(session_id: HoprPseudonym) -> HoprStartProtocol {
+        HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            session_id,
+            flags: KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+    }
+
+    /// A reconstructor with a pending Exit registration for each of `indices`, as a sent request leaves it.
+    fn reconstructor_awaiting(
+        pseudonym: HoprPseudonym,
+        indices: &[u32],
+    ) -> anyhow::Result<(SsaReconstructor<HoprPixSpec>, Vec<SsaId<HoprPseudonym>>)> {
+        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig::default());
+        let ssa_ids = indices
+            .iter()
+            .map(|&index| {
+                let ssa_id = SsaId::new(pseudonym, SsaIndex::new(index).context("SSA indices are non-zero")?);
+                reconstructor.new_exit_commitment(ssa_id, small_pix_params())?;
+                Ok(ssa_id)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok((reconstructor, ssa_ids))
+    }
+
+    /// Delivers the whole constant-term set of `ssa_id`, which is what an Entry's answer is.
+    ///
+    /// The dummy constant terms sum to the identity, whose discrete logarithm is zero, so an honest
+    /// proof of knowledge over it is constructible — the same filler the commitment tests use.
+    fn complete_commitment(
+        reconstructor: &SsaReconstructor<HoprPixSpec>,
+        ssa_id: SsaId<HoprPseudonym>,
+    ) -> anyhow::Result<()> {
+        use hopr_protocol_pix::{Field, PixGroup, PixScalar, PolynomialIndex, SsaCommitmentProof};
+
+        let zero = <PixScalar<HoprPixSpec> as Field>::ZERO;
+        let proof = SsaCommitmentProof::<HoprPixSpec>::prove(&ssa_id, &zero, &PixGroup::<HoprPixSpec>::default())
+            .context("the identity proof must be constructible")?;
+        let polys = small_pix_params().polys_per_ssa() as PolynomialIndex;
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            Some(proof),
+            (0..polys).map(|poly| (poly, PixGroup::<HoprPixSpec>::default().to_bytes())),
+        )?;
+        anyhow::ensure!(state.is_verifiable, "the fixture must have completed the commitment");
+        Ok(())
+    }
+
+    /// A pending batch is re-sent as the stored message itself, not as a rebuilt one.
+    ///
+    /// Identity matters here: a rebuilt request would carry new Exit secrets, which the reconstructor
+    /// refuses as a duplicate of the pending commitment, and the deposit pool answers a batch once.
+    #[test]
+    fn a_pending_batch_is_resent_as_the_stored_message() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+        let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+        match resend_payload(Some(&last_request), &ssa_ids, &reconstructor) {
+            ResendDecision::Send(message) => assert!(
+                std::ptr::eq(message, &last_request.1),
+                "the stored message must go out, not a copy of it"
+            ),
+            refusal => anyhow::bail!("a pending batch must be re-sent, got {refusal:?}"),
+        }
+        Ok(())
+    }
+
+    /// Ids that are not exactly the stored batch are refused, and before any registration is consulted.
+    ///
+    /// The reconstructor here holds no registrations at all, so a mismatch that was decided *after*
+    /// reading them would come out as `RegistrationGone`.
+    #[test]
+    fn a_resend_of_anything_but_the_last_batch_sent_is_refused() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let ids = |indices: &[u32]| -> anyhow::Result<Vec<SsaId<HoprPseudonym>>> {
+            indices
+                .iter()
+                .map(|&index| Ok(SsaId::new(pseudonym, SsaIndex::new(index).context("non-zero")?)))
+                .collect()
+        };
+        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig::default());
+        let last_request = (ids(&[3, 4])?, stored_request(pseudonym));
+
+        for (label, asked) in [
+            ("an earlier batch", ids(&[1, 2])?),
+            ("a prefix of the batch", ids(&[3])?),
+            ("a superset of the batch", ids(&[3, 4, 5])?),
+            ("the batch in another order", ids(&[4, 3])?),
+            ("another Session's batch", {
+                let other = HoprPseudonym::random();
+                vec![
+                    SsaId::new(other, SsaIndex::new(3).context("non-zero")?),
+                    SsaId::new(other, SsaIndex::new(4).context("non-zero")?),
+                ]
+            }),
+        ] {
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &asked, &reconstructor),
+                    ResendDecision::NotLastRequest
+                ),
+                "{label} is not the last request sent"
+            );
+        }
+
+        assert!(
+            matches!(
+                resend_payload(None, &last_request.0, &reconstructor),
+                ResendDecision::NotLastRequest
+            ),
+            "with nothing stored there is nothing to send"
+        );
+        Ok(())
+    }
+
+    /// A member whose registration is gone refuses the whole batch, wherever it stands in it.
+    ///
+    /// Gone is retired or idled out. Either way the Entry's answer would reach an Exit with nothing to
+    /// match it against, so asking for it again can only waste a SURB.
+    #[test]
+    fn a_resend_with_a_missing_registration_is_refused() -> anyhow::Result<()> {
+        for retired_position in [0, 1] {
+            let pseudonym = HoprPseudonym::random();
+            let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+            let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::Send(_)
+                ),
+                "the control: before the retirement the batch is sent"
+            );
+
+            reconstructor.retire_ssa(ssa_ids[retired_position]);
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::RegistrationGone
+                ),
+                "a batch whose member {retired_position} was retired must not be re-sent"
+            );
+        }
+        Ok(())
+    }
+
+    /// A member whose commitment is complete is no reason to refuse the batch.
+    ///
+    /// The supervisor re-sends the whole batch for as long as *any* member has heard nothing, and the
+    /// Entry publishes a batch one member after another, so a complete first member beside a second
+    /// that never arrived is exactly the state a publication cut at a member boundary leaves. The
+    /// Entry's repeat branch publishes only the members it still owes, so sending the whole batch costs
+    /// nothing for the one that is done, short of a repeat late enough to mean a burst was lost.
+    #[test]
+    fn a_resend_goes_out_while_any_member_is_still_waiting() -> anyhow::Result<()> {
+        for completed_position in [0, 1] {
+            let pseudonym = HoprPseudonym::random();
+            let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+            let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+            complete_commitment(&reconstructor, ssa_ids[completed_position])?;
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::Send(_)
+                ),
+                "member {completed_position} is complete and the other is not, so the batch is sent whole"
+            );
+        }
+        Ok(())
+    }
+
+    /// A batch whose every member is complete is refused: the Entry has answered in full.
+    ///
+    /// What the supervisor may still have queued is a tick that raced the last answer, and it must find
+    /// nothing to send.
+    #[test]
+    fn a_resend_for_a_batch_complete_in_full_is_refused() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+        let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+        for ssa_id in &ssa_ids {
+            complete_commitment(&reconstructor, *ssa_id)?;
+        }
+        assert!(
+            matches!(
+                resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                ResendDecision::CommitmentComplete
+            ),
+            "a batch whose every member completed must not be re-sent"
+        );
+        Ok(())
+    }
+
+    /// A missing registration decides before completeness does, whichever member is which.
+    #[test]
+    fn a_missing_registration_outweighs_a_complete_one() -> anyhow::Result<()> {
+        for (retired_position, completed_position) in [(0, 1), (1, 0)] {
+            let pseudonym = HoprPseudonym::random();
+            let (reconstructor, ssa_ids) = reconstructor_awaiting(pseudonym, &[1, 2])?;
+            let last_request = (ssa_ids.clone(), stored_request(pseudonym));
+
+            complete_commitment(&reconstructor, ssa_ids[completed_position])?;
+            reconstructor.retire_ssa(ssa_ids[retired_position]);
+            assert!(
+                matches!(
+                    resend_payload(Some(&last_request), &ssa_ids, &reconstructor),
+                    ResendDecision::RegistrationGone
+                ),
+                "member {retired_position} is gone and member {completed_position} is complete"
+            );
+        }
+        Ok(())
+    }
+
+    /// Retiring any member of the stored batch forgets the request, and retiring anything else does not.
+    #[test]
+    fn retiring_a_member_forgets_the_stored_request() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let id = |index: u32| -> anyhow::Result<SsaId<HoprPseudonym>> {
+            Ok(SsaId::new(pseudonym, SsaIndex::new(index).context("non-zero")?))
+        };
+        let batch = vec![id(3)?, id(4)?];
+
+        for member in &batch {
+            let mut last_request = Some((batch.clone(), stored_request(pseudonym)));
+            forget_request_of(&mut last_request, member);
+            assert!(
+                last_request.is_none(),
+                "{member} is a member, so the request goes with it"
+            );
+        }
+
+        let mut last_request = Some((batch.clone(), stored_request(pseudonym)));
+        forget_request_of(&mut last_request, &id(2)?);
+        forget_request_of(&mut last_request, &id(5)?);
+        forget_request_of(
+            &mut last_request,
+            &SsaId::new(HoprPseudonym::random(), SsaIndex::new(3).context("non-zero")?),
+        );
+        assert_eq!(
+            Some(&batch),
+            last_request.as_ref().map(|(ids, _)| ids),
+            "the retirement of an earlier batch, a later one or another Session's must not drop it"
+        );
+
+        let mut nothing = None;
+        forget_request_of(&mut nothing, &batch[0]);
+        assert!(nothing.is_none(), "forgetting nothing leaves nothing");
         Ok(())
     }
 }

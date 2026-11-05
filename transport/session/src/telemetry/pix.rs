@@ -25,9 +25,11 @@
 //! | `hopr_pix_cycles_active` | MultiGauge | cycles | supervisor turn (census delta) | `phase` = `awaiting_commitment\|awaiting_deposit\|recovering\|paid_tail` |
 //! | `hopr_pix_predeposit_exposure_packets` | SimpleGauge | packets | supervisor turn (census delta) | — |
 //! | `hopr_pix_live_cycle_bytes` | SimpleGauge | bytes | admission reservation / release | — |
+//! | `hopr_pix_held_shares` | SimpleGauge | shares | progress notification delivery and progress behind the front, at most once a second; cycle retirement and Session close (recomputed) | — |
 //! | `hopr_pix_cycle_bytes_reserved_total` | SimpleCounter | bytes | admission reservation | — |
 //! | `hopr_pix_cycle_bytes_released_total` | SimpleCounter | bytes | reservation release | — |
 //! | `hopr_pix_cycles_total` | MultiCounter | cycles | supervisor transition (event-counted) | `event` = `requested\|committed\|funded\|recovered\|failed` |
+//! | `hopr_pix_ssa_requests_resent_total` | SimpleCounter | requests | supervisor re-send of an unanswered successor `SsaRequest` | — |
 //! | `hopr_pix_admission_rejections_total` | MultiCounter | refusals | incoming Start path | `reason` — see [`PixAdmissionRejection`] |
 //! | `hopr_pix_egress_packets_total` | MultiCounter | packets | supervisor turn (delta-counted from the gate) | `mode` = `predeposit\|funded` |
 //! | `hopr_pix_gate_blocks_total` | MultiCounter | episodes | first refusal of an episode | `reason` = `predeposit_exhausted\|share_lag\|closed` |
@@ -106,6 +108,16 @@
 //! ```promql
 //! sum by (event) (rate(hopr_pix_cycles_total[10m]))
 //! rate(hopr_pix_cycles_total{event="failed"}[10m])
+//!   / rate(hopr_pix_cycles_total{event="requested"}[10m])
+//! ```
+//!
+//! *Successor requests the Entry is not answering.* Re-sends per successor requested: a ratio near zero is every
+//! successor admitted on its first request, and one that climbs is Entries whose gate is shut for longer than the
+//! Exit asks early — lossy multi-hop return paths, or Entries that never admit at all. It is deliberately its own
+//! counter rather than a `hopr_pix_cycles_total` event, whose `requested` term a re-send must not touch:
+//!
+//! ```promql
+//! rate(hopr_pix_ssa_requests_resent_total[10m])
 //!   / rate(hopr_pix_cycles_total{event="requested"}[10m])
 //! ```
 //!
@@ -240,6 +252,10 @@ lazy_static::lazy_static! {
         "hopr_pix_live_cycle_bytes",
         "Reconstructor-cycle bytes currently reserved against the node's max_live_cycle_bytes"
     ).unwrap();
+    static ref METRIC_PIX_HELD_SHARES: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
+        "hopr_pix_held_shares",
+        "Shares held by the part builders of live PIX cycles on this Exit, until their polynomial reconstructs"
+    ).unwrap();
     static ref METRIC_PIX_CYCLE_BYTES_RESERVED: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_pix_cycle_bytes_reserved_total",
         "Reconstructor-cycle bytes ever reserved at PIX session admission"
@@ -252,6 +268,10 @@ lazy_static::lazy_static! {
         "hopr_pix_cycles_total",
         "SSA cycle lifecycle transitions observed by PIX supervisors, by event",
         &["event"]
+    ).unwrap();
+    static ref METRIC_PIX_SSA_REQUESTS_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_pix_ssa_requests_resent_total",
+        "Successor SsaRequests the PIX supervisor asked to have sent again because the Entry had not answered them"
     ).unwrap();
     static ref METRIC_PIX_ADMISSION_REJECTIONS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_pix_admission_rejections_total",
@@ -348,6 +368,14 @@ pub(crate) fn add_cycles_total(event: PixCycleEvent, count: u64) {
     METRIC_PIX_CYCLES_TOTAL.increment_by(&[event.to_string().as_str()], count);
 }
 
+/// Counts `count` re-sends of an unanswered successor `SsaRequest`.
+///
+/// Not a [`PixCycleEvent`]: those are lifecycle transitions with enumerated label values, and a
+/// re-send moves no cycle through any of them.
+pub(crate) fn add_ssa_requests_resent(count: u64) {
+    METRIC_PIX_SSA_REQUESTS_RESENT.increment_by(count);
+}
+
 /// Counts one incoming PIX Session refused before establishment.
 pub(crate) fn record_admission_rejection(reason: PixAdmissionRejection) {
     METRIC_PIX_ADMISSION_REJECTIONS.increment(&[reason.to_string().as_str()]);
@@ -368,6 +396,42 @@ pub(crate) fn record_admission_rejection(reason: PixAdmissionRejection) {
 pub(crate) fn record_cycle_bytes_reserved(bytes: u64) {
     METRIC_PIX_CYCLE_BYTES_RESERVED.increment_by(bytes);
     METRIC_PIX_LIVE_CYCLE_BYTES.increment(bytes as f64);
+}
+
+/// Publishes the shares the reconstructor's live part builders hold right now.
+///
+/// The reservation gauge above is the adversarial bound a cycle is admitted against; this is the
+/// occupancy a conforming Entry actually produces, which the emission window bounds at
+/// `SHARE_EMISSION_WINDOW × (threshold − 1)` per cycle on lossless, in-order delivery. Read together
+/// they say how much of the budget is in use rather than merely reserved.
+pub(crate) fn set_held_shares(count: usize) {
+    METRIC_PIX_HELD_SHARES.set(count as f64);
+}
+
+/// How often the node-wide held-shares reading is recomputed at most.
+///
+/// Computing it walks every live cycle on the node and takes each of its part locks, and the point it
+/// is refreshed from, a delivered progress notification, comes once per acknowledgement batch per
+/// Session. Unbounded, that is work quadratic in the Sessions on the action driver, ahead of the
+/// lifecycle actions it carries.
+const HELD_SHARES_REFRESH_PERIOD: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Whether the held-shares gauge is due for a refresh, node-wide; claims the refresh if it is.
+pub(crate) fn held_shares_refresh_due() -> bool {
+    static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    static LAST_MS_PLUS_ONE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    let now = u64::try_from(EPOCH.get_or_init(std::time::Instant::now).elapsed().as_millis())
+        .unwrap_or(u64::MAX - 1)
+        .saturating_add(1);
+    let period = u64::try_from(HELD_SHARES_REFRESH_PERIOD.as_millis()).unwrap_or(u64::MAX);
+    LAST_MS_PLUS_ONE
+        .fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |last| (last == 0 || now.saturating_sub(last) >= period).then_some(now),
+        )
+        .is_ok()
 }
 
 /// Counts `count` packets admitted by a PIX egress gate in one mode.
@@ -538,6 +602,7 @@ mod tests {
         add_sessions_active(PixGateMode::Funded, 3);
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
+        add_ssa_requests_resent(2);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
         add_egress_packets(PixGateMode::Predeposit, 7);
@@ -561,6 +626,7 @@ mod tests {
             "hopr_pix_sessions_active{gate_mode=\"funded\"}",
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
+            "hopr_pix_ssa_requests_resent_total",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
             "hopr_pix_cycle_bytes_reserved_total",
