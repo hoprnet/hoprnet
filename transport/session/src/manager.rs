@@ -14640,6 +14640,9 @@ mod tests {
     /// retained: during a PIX fill (the gnosis_vpn report's ~30 keep-alives/s) the Exit reported
     /// 10,597–12,263 SURBs for a ring that could hold at most 1,032, and then spent against that
     /// figure until the ring was empty.
+    ///
+    /// Each keep-alive is booked once, by `dispatch_message`. The test lets the Start task handle both
+    /// keep-alives before it reads, so a second booking there would show.
     #[test_log::test(tokio::test)]
     async fn keep_alive_surbs_must_be_booked_with_their_evictions() -> anyhow::Result<()> {
         let mgr: TestManager = SessionManager::new(Default::default());
@@ -14673,13 +14676,14 @@ mod tests {
             })
         };
 
-        // One keep-alive whose SURBs all landed, one whose SURBs were all evicted on arrival.
-        mgr.dispatch_message(pseudonym, keep_alive(8, 0)?)?;
-        mgr.dispatch_message(pseudonym, keep_alive(8, 8)?)?;
+        // One keep-alive whose SURBs all landed, one whose SURBs were all evicted on arrival. Seven is all a
+        // keep-alive can carry: eight SURBs fit in an empty packet, and the message takes one's room.
+        mgr.dispatch_message(pseudonym, keep_alive(7, 0)?)?;
+        mgr.dispatch_message(pseudonym, keep_alive(7, 7)?)?;
 
         tokio::time::timeout(Duration::from_secs(5), async {
             loop {
-                if estimator.estimate_surbs_produced() == 16 {
+                if estimator.estimate_surbs_produced() == 14 {
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -14688,8 +14692,15 @@ mod tests {
         .await
         .context("the keep-alives never reached the estimator")?;
 
+        // A second booking would land after the wait above, once the Start task gets to the keep-alives.
+        tokio::time::sleep(Duration::from_millis(200)).await;
         assert_eq!(
-            8,
+            14,
+            estimator.estimate_surbs_produced(),
+            "each keep-alive must be booked once"
+        );
+        assert_eq!(
+            7,
             estimator.saturating_diff(),
             "the level must be what the store kept, not the SURBs the keep-alives could have carried"
         );
