@@ -342,6 +342,10 @@ fn hold_for_surb_reserve(
 /// Built as one piece, and not inline where the Session is set up, so that the order of its three
 /// steps can be tested: the SURB is booked only when the packet goes on, so a packet that is held is
 /// not counted against the very stock it is waiting for.
+///
+/// The SURB is booked with the refund that gives it back (see [`count_return_packet_surb`]), as on
+/// every other path a return packet takes: a packet the gate refuses, or one routing resolution drops
+/// for want of a SURB, does not keep the stock the reserve is measured against one low.
 fn exit_data_egress<Si>(
     sink: Si,
     session_id: SessionId,
@@ -353,23 +357,19 @@ where
     Si: Sink<EgressItem, Error = std::io::Error>,
 {
     sink.with(move |(routing, data): EgressItem| -> EgressPermit {
-        // Each outgoing packet consumes one SURB
-        let book_consumed = move |estimator: &AtomicSurbFlowEstimator| {
-            estimator.consumed.fetch_add(1, Ordering::Relaxed);
+        // Each outgoing packet consumes one SURB, given back if the packet never takes it
+        let book_consumed = move |estimator: &AtomicSurbFlowEstimator, data: ApplicationDataOut| {
             #[cfg(feature = "telemetry")]
             telemetry::record_session_surb_consumed(&session_id, 1);
+            count_return_packet_surb(estimator, data)
         };
         match hold_for_surb_reserve(session_id, &estimator, &balancer) {
-            None => {
-                book_consumed(&estimator);
-                acquire_egress_permit(gate.clone(), routing, data)
-            }
+            None => acquire_egress_permit(gate.clone(), routing, book_consumed(&estimator, data)),
             Some(held) => {
                 let (estimator, gate) = (estimator.clone(), gate.clone());
                 futures::future::Either::Right(Box::pin(async move {
                     held.await;
-                    book_consumed(&estimator);
-                    acquire_egress_permit(gate, routing, data).await
+                    acquire_egress_permit(gate, routing, book_consumed(&estimator, data)).await
                 }))
             }
         }
@@ -21115,6 +21115,64 @@ mod tests {
             .context("above the reserve the packet must not wait")??;
         assert!(forwarded.try_recv().is_ok(), "forwarded");
         assert_eq!(1, estimator.estimate_surbs_consumed());
+        Ok(())
+    }
+
+    /// Data the Exit sends is counted with the refund of its SURB, as every return packet is: a packet
+    /// the gate refuses gives its SURB back at once, and one the sink forwards carries the refund on, for
+    /// routing resolution to give back if it finds no SURB.
+    #[tokio::test]
+    async fn data_the_exit_sends_should_carry_the_refund_of_its_surb() -> anyhow::Result<()> {
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(40, Ordering::Relaxed);
+
+        let closed = ServiceGate::new(10, 10);
+        closed.poison();
+        let (tx, _never_forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut refused = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer_with_target(3_200),
+            Some(closed),
+        ));
+        assert!(
+            timeout(Duration::from_secs(5), refused.send(data_packet()?))
+                .await
+                .context("a closed gate answers at once")?
+                .is_err(),
+            "a closed gate must refuse"
+        );
+        assert_eq!(
+            40,
+            estimator.saturating_diff(),
+            "the refused packet's SURB is back in the held count"
+        );
+
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer_with_target(3_200),
+            None,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("above the reserve the packet must not wait")??;
+        let (_, data) = forwarded.try_recv().ok().context("the sink must have forwarded it")?;
+        assert!(data.surb_refund.is_counted(), "a forwarded packet carries its refund");
+        assert_eq!(
+            39,
+            estimator.saturating_diff(),
+            "and is counted until it takes its SURB"
+        );
+        data.surb_refund.give_back();
+        assert_eq!(
+            40,
+            estimator.saturating_diff(),
+            "a packet that finds no SURB gives it back"
+        );
         Ok(())
     }
 
