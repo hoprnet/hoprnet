@@ -49,8 +49,8 @@ pub struct HoprCodecConfig {
     /// Configuration of the packet replay filter used by [`HoprDecoder`].
     ///
     /// The filter is global across previous hops: the replay token names the packet, not the sender, so a replay
-    /// injected through a different peer is still caught. See [`ReplayFilterConfig`] for the retention floor and
-    /// the memory consequences of the two knobs.
+    /// injected through a different peer is still caught. See [`ReplayFilterConfig`](crate::ReplayFilterConfig) for
+    /// the retention floor and the memory consequences of the two knobs.
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub replay_filter: crate::ReplayFilterConfig,
@@ -446,7 +446,10 @@ mod tests {
             .sender_decoder
             .decode(f.relay.offchain_key.public().into(), forwarded_first);
         assert!(
-            replayed_at_destination.unwrap_err().is_replay(),
+            replayed_at_destination
+                .err()
+                .context("a duplicate reply must be rejected")?
+                .is_replay(),
             "a duplicate reply must be a replay even though its opener was consumed"
         );
 
@@ -454,7 +457,10 @@ mod tests {
         let replayed = f
             .relay_decoder
             .decode(f.receiver.offchain_key.public().into(), first.data);
-        assert!(replayed.unwrap_err().is_replay(), "a replayed reply must be caught");
+        assert!(
+            replayed.err().context("a replayed reply must be rejected")?.is_replay(),
+            "a replayed reply must be caught"
+        );
 
         Ok(())
     }
@@ -510,13 +516,88 @@ mod tests {
         assert!(
             f.sender_decoder
                 .decode(f.relay.offchain_key.public().into(), forged)
-                .unwrap_err()
+                .err()
+                .context("a forged reply must be rejected")?
                 .is_undecodable(),
             "a forged reply must not decode"
         );
 
         // The genuine reply must still decrypt at the sender, which it can only do if its opener survived.
         f.sender_assert_reply(reply_to_sender, b"the genuine reply")?;
+
+        Ok(())
+    }
+
+    /// Two concurrent decodes of the *same reply* must deliver it, not consume each other's opener.
+    ///
+    /// The pipeline decodes on a pool, so both copies pass `is_replay`, both look the opener up, and only one of
+    /// them can win the tag race. If the lookup consumed the opener, the loser would fail and the winner would
+    /// then find nothing to decrypt with - losing a reply that arrived intact.
+    #[test]
+    fn concurrent_decodes_of_a_reply_should_still_deliver_it() -> anyhow::Result<()> {
+        let runtime = tokio::runtime::Runtime::new()?;
+        let f = runtime.block_on(PixTestFixture::new())?;
+        let pseudonym = HoprPseudonym::random();
+
+        let out_packet = f.sender_encoder.encode_packet(
+            b"a message carrying a surb",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)
+            .context("relay must forward the packet carrying the surb")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+        f.receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet)
+            .context("receiver must accept the packet and store the surb")?;
+
+        let reply = f.surb_reply(pseudonym, b"the genuine reply")?;
+        let reply_to_sender = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), reply.data)
+            .context("relay must forward the reply")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("reply is not forwarded"))?
+            .data
+            .clone();
+
+        // Both copies race through the sender's decoder, released together.
+        let sender_decoder = std::sync::Arc::new(create_decoder(&f.sender));
+        let relay_peer_id: PeerId = f.relay.offchain_key.public().into();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let outcomes: Vec<_> = std::thread::scope(|scope| {
+            let handles = (0..2)
+                .map(|_| {
+                    let (decoder, data, barrier) = (sender_decoder.clone(), reply_to_sender.clone(), barrier.clone());
+                    scope.spawn(move || {
+                        barrier.wait();
+                        decoder.decode(relay_peer_id, data)
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
+                .collect::<anyhow::Result<Vec<_>>>()
+                .expect("decode must not panic")
+        });
+
+        let delivered = outcomes.iter().filter(|o| o.is_ok()).count();
+        assert_eq!(1, delivered, "exactly one copy must be delivered; got {outcomes:?}");
+        assert!(
+            outcomes.iter().any(|o| matches!(o, Err(e) if e.is_replay())),
+            "the other copy must be recognised as a replay"
+        );
 
         Ok(())
     }
@@ -1032,7 +1113,7 @@ mod tests {
 
         let result = decoder.decode(sender_peer_id, invalid_data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_undecodable());
+        assert!(result.err().context("must not decode")?.is_undecodable());
 
         Ok(())
     }
@@ -1068,7 +1149,7 @@ mod tests {
         let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
         assert!(result.is_err());
         assert!(
-            result.unwrap_err().is_replay(),
+            result.err().context("a duplicate must be rejected")?.is_replay(),
             "a duplicate must be reported as a replay"
         );
 
@@ -1116,7 +1197,7 @@ mod tests {
 
         let result = decoder.decode(sender_peer_id, corrupted);
         assert!(
-            result.unwrap_err().is_replay(),
+            result.err().context("a replay must be rejected")?.is_replay(),
             "a replay must be caught from the tag, before the rest of the packet is decoded"
         );
 
@@ -1137,7 +1218,10 @@ mod tests {
         let garbage = Bytes::from(vec![0x42u8; hopr_crypto_packet::prelude::HoprPacket::SIZE]);
 
         let first = decoder.decode(sender_peer_id, garbage.clone());
-        assert!(first.unwrap_err().is_undecodable(), "random bytes must not decode");
+        assert!(
+            first.err().context("random bytes must not decode")?.is_undecodable(),
+            "random bytes must not decode"
+        );
         assert_eq!(
             0,
             decoder.replay_filter().count(),
@@ -1146,7 +1230,10 @@ mod tests {
 
         let second = decoder.decode(sender_peer_id, garbage);
         assert!(
-            second.unwrap_err().is_undecodable(),
+            second
+                .err()
+                .context("the same garbage must be rejected")?
+                .is_undecodable(),
             "the same garbage must be undecodable twice, not a replay the second time"
         );
 
@@ -1202,7 +1289,10 @@ mod tests {
                     .collect::<Vec<_>>();
                 handles
                     .into_iter()
-                    .map(|h| h.join().expect("decode must not panic"))
+                    .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
+                    .collect::<anyhow::Result<Vec<_>>>()
+                    .expect("decode must not panic")
+                    .into_iter()
                     .filter(|ok| *ok)
                     .count()
             });
@@ -1247,7 +1337,11 @@ mod tests {
         let forged = Bytes::from(forged);
 
         assert!(
-            decoder.decode(sender_peer_id, forged).unwrap_err().is_undecodable(),
+            decoder
+                .decode(sender_peer_id, forged)
+                .err()
+                .context("a damaged header must be rejected")?
+                .is_undecodable(),
             "a damaged header must be undecodable, not a replay"
         );
         assert_eq!(
@@ -1289,7 +1383,7 @@ mod tests {
         let result = decoder.decode(other_sender.offchain_key.public().into(), out_packet.data);
 
         assert!(
-            result.unwrap_err().is_replay(),
+            result.err().context("a replay must be rejected")?.is_replay(),
             "a replay must be caught regardless of which peer delivered it"
         );
 
@@ -1323,7 +1417,7 @@ mod tests {
 
         let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_undecodable());
+        assert!(result.err().context("must not decode")?.is_undecodable());
 
         Ok(())
     }

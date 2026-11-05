@@ -1609,7 +1609,14 @@ impl SurbStore for MemorySurbStore {
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener> {
         self.pseudonym_openers
             .get(&sender_id.pseudonym())
-            .and_then(|cache| cache.remove(&sender_id.surb_id()))
+            .and_then(|cache| cache.get(&sender_id.surb_id()))
+    }
+
+    #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
+    fn remove_reply_opener(&self, sender_id: &HoprSenderId) {
+        if let Some(cache) = self.pseudonym_openers.get(&sender_id.pseudonym()) {
+            cache.invalidate(&sender_id.surb_id());
+        }
     }
 
     fn current_generation(&self, pseudonym: &HoprPseudonym) -> u8 {

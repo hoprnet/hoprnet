@@ -19,9 +19,9 @@
 //! # Why a rolling filter rather than one Bloom filter that resets
 //!
 //! A Bloom filter is sized for a fixed number of items and cannot grow. The previous implementation answered
-//! overflow by clearing the whole bitmap, which forgets *every* packet at once - and, because the clear happened on
-//! every non-member insertion once full, a sustained flood left replay protection permanently off rather than
-//! merely stale.
+//! overflow by clearing the entire bitmap, which forgets *every* packet at once. It cleared once per capacity: the
+//! insertion that found the filter full of other tags reset it, so the history of all peers was dropped on a
+//! single packet.
 //!
 //! Instead, each shard keeps two generations. When the current one fills it becomes the previous one and a fresh
 //! current is allocated, so a token is remembered for at least one full generation - a floor that no insertion
@@ -29,10 +29,12 @@
 //!
 //! Aging out is proportional to insert volume (a packet count, not wall time). The cost of shortening the window is
 //! *authenticated* packets, not paid ones: a token is committed once the header MAC verifies, which still precedes
-//! ticket validation, and a final-hop packet carries no verifiable ticket at all. A direct neighbour can therefore
-//! rotate generations with packets it does not pay for - but each must authenticate under the shared secret, so it
-//! costs the same elliptic-curve work per packet that a legitimate sender pays, and the window it shortens is
-//! bounded below by one full generation.
+//! ticket validation, so a direct neighbour can rotate generations with packets it does not pay for. Each must
+//! still authenticate under the shared secret, which costs it the same elliptic-curve work a legitimate sender
+//! pays, and the window it shortens is bounded below by one full generation.
+//!
+//! The shard a token lands in is chosen by a hash keyed per filter instance, so a sender - who computes the tag -
+//! cannot aim its packets at one shard and evict only that shard's history.
 //!
 //! # Why sharded
 //!
@@ -82,7 +84,7 @@ pub struct ReplayFilterConfig {
     ///
     /// Default is 10 000 000.
     #[default(default_max_tracked_packets())]
-    #[validate(range(min = MIN_TRACKED_PACKETS, message = "max_tracked_packets must be at least MIN_TRACKED_PACKETS"))]
+    #[validate(range(min = MIN_TRACKED_PACKETS, max = MAX_TRACKED_PACKETS, message = "max_tracked_packets must be between MIN_TRACKED_PACKETS and MAX_TRACKED_PACKETS"))]
     #[cfg_attr(feature = "serde", serde(default = "default_max_tracked_packets"))]
     pub max_tracked_packets: usize,
     /// Number of independent shards.
@@ -113,6 +115,13 @@ pub const MIN_TRACKED_PACKETS: usize = MIN_CAPACITY_PER_SHARD * DEFAULT_SHARDS;
 pub const MIN_SHARDS: usize = 1;
 /// Upper bound on [`ReplayFilterConfig::shards`], enforced by the validator.
 pub const MAX_SHARDS: usize = 4096;
+/// Upper bound on [`ReplayFilterConfig::max_tracked_packets`], enforced by the validator.
+///
+/// The bound exists because generations are allocated lazily: without it, a typo in the capacity would surface as a
+/// failed allocation inside the decode path on the first packet for a shard, rather than as a rejected
+/// configuration at startup. One hundred million tokens is about 320 MB per generation at the default rate, which
+/// is the point past which a node's own memory, not its traffic, is the constraint.
+pub const MAX_TRACKED_PACKETS: usize = 100_000_000;
 /// Default for [`ReplayFilterConfig::shards`].
 const DEFAULT_SHARDS: usize = 64;
 /// Default for [`ReplayFilterConfig::max_tracked_packets`].
@@ -125,6 +134,17 @@ const DEFAULT_MAX_TRACKED_PACKETS: usize = 10_000_000;
 /// doubles the total: a decoder now allocates roughly twice the bitmap it did, against a retention floor that is no
 /// longer zero.
 const GENERATION_FALSE_POSITIVE_RATE: f64 = 0.000_005;
+
+/// Keyed hash over `token`, used to pick a shard.
+///
+/// `SipHasher13` with an explicit key, not `std::hash::DefaultHasher`: the latter's keys are fixed, so a sender who
+/// computes the tag could predict the shard exactly as well as with no hash at all.
+fn keyed_hash(key: &[u8; 16], token: &ReplayToken) -> u64 {
+    use std::hash::Hasher as _;
+    let mut hasher = siphasher::sip::SipHasher13::new_with_key(key);
+    hasher.write(token);
+    hasher.finish()
+}
 
 fn default_max_tracked_packets() -> usize {
     DEFAULT_MAX_TRACKED_PACKETS
@@ -171,6 +191,20 @@ fn validate_shards(shards: usize) -> Result<(), validator::ValidationError> {
         return Err(err);
     }
     Ok(())
+}
+
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    /// Counts shard rotations, i.e. how often a generation of replay history was dropped.
+    ///
+    /// Initialised lazily on first use; a sustained rate here means the replay window is shrinking faster than the
+    /// configured capacity suggests it should.
+    static ref METRIC_REPLAY_FILTER_ROTATIONS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_replay_filter_rotations_total",
+            "Replay filter generations dropped because their shard filled; each rotation shortens the window in              which a packet is still recognised as a replay",
+        )
+        .unwrap();
 }
 
 /// One generation pair of a shard.
@@ -225,6 +259,16 @@ impl ReplayShard {
         if self.count == self.capacity {
             // The current generation is full. The oldest one goes, the current one becomes the previous one, and
             // the token is recorded in a fresh generation.
+            //
+            // A rotation is what ages tokens out, so it is the one event an operator needs to see: a sustained rate
+            // here means the replay window is shrinking under traffic. The old single filter logged its reset at
+            // `warn`; this does the same, and counts it where telemetry is compiled in.
+            tracing::warn!(
+                capacity = self.capacity,
+                "replay filter shard rotated; its oldest generation was dropped"
+            );
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_REPLAY_FILTER_ROTATIONS.increment();
             self.previous = Some(std::mem::replace(
                 self.current.get_or_insert_with(|| Self::generation(self.capacity)),
                 Self::generation(self.capacity),
@@ -242,11 +286,23 @@ impl ReplayShard {
 
 /// Replay-detecting filter over packet replay tokens.
 ///
-/// See the [module documentation](self) for the design rationale.
+/// Each of the shards keeps two generations of a Bloom filter. When the current one fills it becomes the previous
+/// one and a fresh current is allocated, so a token is remembered for at least one full generation - the floor the
+/// previous single-filter design did not have, since it answered overflow by clearing every tag at once.
+///
+/// Sharding by token divides both the lock contention of the decode path and the memory high-water mark. The
+/// namespace is global rather than per previous hop: the token names the packet, not the sender, so a replay
+/// injected through a different peer ID is still caught.
 #[derive(Debug)]
 pub struct TagReplayFilter {
     /// Shards, each independently locked. The count is a power of two, so selection is a mask.
     shards: Box<[parking_lot::Mutex<ReplayShard>]>,
+    /// Key for shard selection, derived per filter instance.
+    ///
+    /// The tag is computed by the packet's creator, so indexing shards on its raw bytes would let a sender aim
+    /// every packet at one shard - 1/64 of the traffic would evict that shard's history. Hashing with a
+    /// per-instance key makes the shard unpredictable until a token has been seen, which restores the spread.
+    shard_key: [u8; 16],
 }
 
 impl TagReplayFilter {
@@ -257,13 +313,17 @@ impl TagReplayFilter {
     /// configuration can land here with a smaller share, which the `.max(1)` below keeps from producing a
     /// zero-sized Bloom filter.
     pub fn new(cfg: &ReplayFilterConfig) -> Self {
-        let shards = cfg.shards.max(MIN_SHARDS);
+        // Round up to a power of two. A validated configuration already is one; an unvalidated one - `new` is
+        // public, and `HoprDecoder::new` does not validate - would otherwise have `shard_for`'s mask address only
+        // the first `2^k` shards and silently waste the rest of the configured capacity.
+        let shards = cfg.shards.max(MIN_SHARDS).next_power_of_two();
         let capacity_per_shard = (cfg.max_tracked_packets / shards).max(1);
 
         Self {
             shards: (0..shards)
                 .map(|_| parking_lot::Mutex::new(ReplayShard::new(capacity_per_shard)))
                 .collect(),
+            shard_key: random_bytes(),
         }
     }
 
@@ -301,10 +361,9 @@ impl TagReplayFilter {
     }
 
     fn shard_for(&self, token: &ReplayToken) -> &parking_lot::Mutex<ReplayShard> {
-        // The token is already uniformly distributed (it is a slice of a curve point), so no mixing is needed;
-        // take the leading bytes and mask. `shards.len()` is a power of two or 1.
-        let index = usize::from_ne_bytes(token[..size_of::<usize>()].try_into().expect("token is long enough"))
-            & (self.shards.len() - 1);
+        // Keyed hash, so the sender - who computes the tag - cannot choose the shard. The mask is enough because
+        // the shard count is a power of two.
+        let index = keyed_hash(&self.shard_key, token) as usize & (self.shards.len() - 1);
         &self.shards[index]
     }
 }
@@ -378,25 +437,20 @@ mod tests {
     /// just retired is still known.
     #[test]
     fn a_token_survives_exactly_one_rotation() {
-        // Four shards of 16 tokens each; insert only shard-local tokens by using a single shard.
-        let filter = TagReplayFilter::new(&config(1024, 1));
-        assert_eq!(1024, filter.capacity());
+        // A single shard, so every token lands in it and the generations turn over deterministically.
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
+        let capacity = filter.capacity();
 
         let target = token(0);
-        filter.commit(&target);
+        assert!(!filter.commit(&target), "the target is fresh");
 
-        // Fill the generation, which rotates it once.
-        for i in 1..=1024 {
-            filter.commit(&token(i as u64));
-        }
-
+        // Fill the generation, which rotates it once. Counting successful inserts keeps a Bloom false positive
+        // from leaving the generation short and skipping the rotation.
+        commit_exactly(&filter, capacity);
         assert!(filter.contains(&target), "the retired generation still remembers it");
 
         // Fill again, which rotates the retired generation out.
-        for i in 1025..=2048 {
-            filter.commit(&token(i as u64));
-        }
-
+        commit_exactly(&filter, capacity);
         assert!(
             !filter.contains(&target),
             "after two rotations the token may age out; the floor is one generation"
@@ -405,17 +459,21 @@ mod tests {
 
     #[test]
     fn rotation_does_not_lose_the_newest_tokens() {
-        let filter = TagReplayFilter::new(&config(1024, 1));
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
 
+        // Two generations' worth, so at least one rotation happens mid-run.
         let mut recent = Vec::new();
-        for i in 0..2048u64 {
+        for i in 0..(2 * filter.capacity() as u64) {
             let t = token(i);
-            filter.commit(&t);
+            if filter.commit(&t) {
+                continue; // a false positive; it did not take a slot, so it does not count as recent
+            }
             recent.push(t);
             if recent.len() > 100 {
                 recent.remove(0);
             }
         }
+        assert!(!recent.is_empty(), "the run must have inserted tokens");
 
         for t in recent {
             assert!(
@@ -521,6 +579,20 @@ mod tests {
             used.insert(filter.shard_for(&token(i)) as *const _ as usize);
         }
         assert!(used.len() > 32, "tokens must reach most shards, saw {}", used.len());
+    }
+
+    /// A shard count that is not a power of two is rounded up rather than leaving part of the filter unaddressed,
+    /// since `TagReplayFilter::new` is public and the decoder does not validate its configuration.
+    #[test]
+    fn an_odd_shard_count_should_still_use_the_whole_filter() {
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 3));
+        assert_eq!(4, filter.shards(), "3 shards must round up to 4");
+
+        let mut used = HashSet::new();
+        for i in 0..10_000u64 {
+            used.insert(filter.shard_for(&token(i)) as *const _ as usize);
+        }
+        assert_eq!(4, used.len(), "every shard must be addressable, saw {}", used.len());
     }
 
     /// The floor is spelled as a literal in the `range` validator, matching the other configs in this crate; this

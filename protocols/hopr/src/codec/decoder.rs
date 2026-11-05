@@ -198,20 +198,23 @@ where
         //
         // The tag is derived from the shared secret, so it becomes available right after the elliptic-curve
         // multiplication - before the header MAC, the payload permutation and the message parse. The filter is
-        // asked from inside the decode, which is what lets a replay skip that remaining work. It both checks and
-        // inserts: a duplicate is reported as `PacketReplay` and the tag is recorded when the packet passes.
+        // asked from inside the decode, which is what lets a replay skip that remaining work. The check runs
+        // first and records nothing; the commit runs once the header MAC has verified.
         //
-        // The tag is authenticated by construction: it is derived from a secret only the sender and this node
-        // share, so a third party cannot choose it. A packet is recorded only once its header MAC has verified,
-        // so producing a token costs a well-formed packet; a packet that authenticates and then fails on our side
-        // is recorded too, which costs one slot and makes its retry a replay.
+        // Anybody can *compute* a tag, from the node's public key and an alpha of their choosing, so a tag is not
+        // by itself proof of anything. What costs a well-formed packet is getting one *recorded*: only a packet
+        // whose header MAC verifies reaches the commit. A packet that authenticates and then fails on our side is
+        // recorded too, which costs one slot.
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
         // Which of our SURBs this packet came back on, if any. Captured here because resolving the
         // opener is the only point that knows it; by the time the decoded packet exists the sender
         // id is gone.
+        // The opener is *peeked* here and removed below only once the reply has been delivered, so that a copy
+        // which loses a concurrent race cannot take the winner's decryption key with it.
         let replied_on_surb = std::cell::Cell::new(None);
+        let consumed_opener = std::cell::Cell::new(None);
         let packet = trace_timed!("sphinx_decode complete", {
             HoprPacket::from_incoming_checked(
                 &data,
@@ -222,6 +225,7 @@ where
                     let opener = self.surb_store.find_reply_opener(p);
                     if opener.is_some() {
                         replied_on_surb.set(Some(p.surb_id()));
+                        consumed_opener.set(Some(*p));
                     }
                     opener
                 },
@@ -251,6 +255,12 @@ where
             hopr_crypto_packet::errors::PacketError::PacketReplay => IncomingPacketError::Replay(previous_hop.into()),
             error => IncomingPacketError::undecodable(HoprProtocolError::from(error)),
         })?;
+
+        // The reply decoded, so its opener has done its job. Removing it only now means a concurrent copy that
+        // lost the tag race still found - and did not consume - the opener, so its own failure costs nothing.
+        if let Some(sender_id) = consumed_opener.get() {
+            self.surb_store.remove_reply_opener(&sender_id);
+        }
 
         match packet {
             HoprPacket::Final(incoming) => {

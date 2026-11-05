@@ -11,19 +11,30 @@ fn synthetic_token(value: u64) -> ReplayToken {
     token
 }
 
-/// Build a filter that is at capacity in its current generation, so the numbers reflect the steady state rather
-/// than a nearly empty bitmap.
+/// Build a filter whose current generations are exactly full, so the numbers reflect the steady state rather than
+/// a nearly empty bitmap.
+///
+/// Fills until the insert count stops rising, so a Bloom false positive cannot leave a generation short. Returns
+/// the filter and a token the current generation holds.
 fn saturated_filter(max_tracked_packets: usize) -> (TagReplayFilter, ReplayToken) {
     let filter = TagReplayFilter::new(&ReplayFilterConfig {
         max_tracked_packets,
         shards: 64,
     });
 
-    for i in 0..max_tracked_packets {
-        filter.commit(&synthetic_token(i as u64));
+    let target = filter.capacity();
+    let mut i = 0u64;
+    let mut present = synthetic_token(0);
+    while filter.count() < target {
+        let token = synthetic_token(i);
+        i += 1;
+        // `commit` reports a token it already knows; those do not fill a slot.
+        if !filter.commit(&token) {
+            present = token;
+        }
     }
 
-    (filter, synthetic_token(max_tracked_packets as u64 - 1))
+    (filter, present)
 }
 
 fn tag_replay_filter_bench(c: &mut Criterion) {
@@ -47,8 +58,10 @@ fn tag_replay_filter_bench(c: &mut Criterion) {
 
     group.bench_function("commit_existing", |b| b.iter(|| filter.commit(black_box(&existing))));
 
-    // Fresh tokens rotate shards as they are inserted, which is the steady state under live traffic.
-    let mut counter = 0u64;
+    // Fresh tokens rotate shards as they are inserted, which is the steady state under live traffic. The counter
+    // starts past everything `saturated_filter` inserted, so these really are new tokens rather than the cheap
+    // already-present path.
+    let mut counter = u64::MAX / 2;
     group.bench_function("commit_new", |b| {
         b.iter(|| {
             counter = counter.wrapping_add(1);

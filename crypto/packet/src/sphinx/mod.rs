@@ -21,7 +21,7 @@
 //! `X448Suite`.
 
 /// Contains simple key derivation functions for different purposes
-pub mod derivation;
+mod derivation;
 /// Implementations of the ` SphinxSuite ` trait for different elliptic curve groups
 mod ec_groups;
 /// Contains various errors returned from this crate.
@@ -40,8 +40,8 @@ pub mod prelude {
         derivation::derive_packet_tag,
         ec_groups::*,
         packet::{
-            ForwardedMetaPacket, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket, ProtocolKeyIdMapper,
-            SimpleBiMapper,
+            ForwardSecret, ForwardedMetaPacket, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket,
+            ProtocolKeyIdMapper, SimpleBiMapper,
         },
         routing::SphinxHeaderSpec,
         shared_keys::{SharedKeys, SharedSecret, SphinxSuite},

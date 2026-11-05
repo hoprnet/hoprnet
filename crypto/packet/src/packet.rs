@@ -640,25 +640,27 @@ impl HoprPacket {
             // Only a packet whose header MAC verifies gets this far, so recording the tag from here on means a
             // forged alpha costs the sender a well-formed packet rather than the public key alone.
             //
-            // A reply whose opener has already been consumed fails this step, because the lookup removes the
-            // opener. An ordinary duplicate does not reach here - `is_replay` above answers first, since the first
-            // delivery recorded the tag - but a delivery that consumed the opener and then failed inside this
-            // step did not record it. Committing on that path means a retry is recognised as a replay instead of
-            // paying a second decode that cannot succeed either.
-            let mut authenticated = false;
-            let forwarded =
-                match mp.into_forwarded_with_secret(alpha, secret, mapper, reply_openers, || authenticated = true) {
-                    Ok(forwarded) => forwarded,
-                    Err(error) => {
-                        // The sender proved the secret but the packet failed on our side. Record it, so a retry is
-                        // a replay rather than a second decode that cannot succeed either. A packet that never
-                        // authenticated is not recorded - that is what keeps a token costing a well-formed packet.
-                        if authenticated {
-                            commit(&tag);
-                        }
-                        return Err(error.into());
+            // A failure past this point is not *necessarily* permanent - on a reply it can be the opener's
+            // absence, which a concurrent copy of the same packet may still be about to fix - so the tag is
+            // committed and the original error is returned. Reporting a replay instead would misdescribe a packet
+            // that was never seen before.
+            // `authenticated` is the tag the transform derived, so the tag is not computed a second time on the
+            // failure path.
+            let mut authenticated = None;
+            let forwarded = match mp
+                .into_forwarded_with_secret(alpha, secret, mapper, reply_openers, |tag| authenticated = Some(*tag))
+            {
+                Ok(forwarded) => forwarded,
+                Err(error) => {
+                    // A packet that never authenticated is not recorded - that is what keeps a token costing a
+                    // well-formed packet. One that did is, so its retry is recognised instead of paying a second
+                    // decode that cannot succeed either.
+                    if authenticated.is_some() {
+                        let _ = commit(&tag);
                     }
-                };
+                    return Err(error.into());
+                }
+            };
 
             // Closes the race between `is_replay` above and this insertion: of two concurrent decodes of the
             // same packet, exactly one commits and the other is told it is the duplicate.
@@ -674,6 +676,9 @@ impl HoprPacket {
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
+    ///
+    /// Equivalent to [`HoprPacket::from_incoming_checked`] with no replay filter: the size check and parse live
+    /// there, so the two cannot diverge in which packets they accept.
     pub fn from_incoming<M, F>(
         data: &[u8],
         node_keypair: &OffchainKeypair,
@@ -685,18 +690,15 @@ impl HoprPacket {
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         F: FnMut(&HoprSenderId) -> Option<ReplyOpener>,
     {
-        if data.len() == Self::SIZE {
-            let (pre_packet, pre_ticket) =
-                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN);
-
-            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
-                MetaPacket::try_from(pre_packet)?;
-
-            let forwarded = mp.into_forwarded(node_keypair, mapper, reply_openers)?;
-            Self::from_forwarded_meta_packet(forwarded, pre_ticket, previous_hop)
-        } else {
-            Err(PacketDecodingError("packet has invalid size".into()))
-        }
+        Self::from_incoming_checked(
+            data,
+            node_keypair,
+            previous_hop,
+            mapper,
+            reply_openers,
+            |_| false,
+            |_| false,
+        )
     }
 
     /// Turns a transformed packet into the [`HoprPacket`] the rest of the stack consumes.
