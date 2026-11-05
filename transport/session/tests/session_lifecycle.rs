@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::{AsyncReadExt, AsyncWriteExt, StreamExt, pin_mut};
 use hopr_api::types::{
     crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -855,7 +855,7 @@ async fn an_entry_without_a_surb_balancer_should_get_the_reply_to_its_requests()
     .await
     .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
     let mut alice_session = alice_session?;
-    let mut bob_session = bob_session.expect("bob must get an incoming session").session;
+    let mut bob_session = bob_session.context("bob must get an incoming session")?.session;
     assert!(
         !alice_session.config().capabilities.contains(Capability::NoRateControl),
         "the Session must be rate-controlled at the Exit"

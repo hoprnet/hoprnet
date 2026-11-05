@@ -356,12 +356,17 @@ fn hold_for_surb_reserve(
 /// The SURB is booked with the refund that gives it back (see [`count_return_packet_surb`]), as on
 /// every other path a return packet takes: a packet the gate refuses, or one routing resolution drops
 /// for want of a SURB, does not keep the stock the reserve is measured against one low.
+///
+/// `keeps_alive` says whether the Exit runs a keep-alive stream for the Session (a SURB-level
+/// notification period, or PIX fill; see [`SessionManager::spawn_exit_keep_alive`]). The reserve is
+/// kept for that stream, so without one nothing is held back.
 fn exit_data_egress<Si>(
     sink: Si,
     session_id: SessionId,
     estimator: AtomicSurbFlowEstimator,
     balancer: Arc<BalancerStateValues>,
     gate: Option<Arc<ServiceGate>>,
+    keeps_alive: bool,
 ) -> impl Sink<EgressItem, Error = std::io::Error>
 where
     Si: Sink<EgressItem, Error = std::io::Error>,
@@ -373,7 +378,10 @@ where
             telemetry::record_session_surb_consumed(&session_id, 1);
             count_return_packet_surb(estimator, data)
         };
-        match hold_for_surb_reserve(session_id, &estimator, &balancer) {
+        let held = keeps_alive
+            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer))
+            .flatten();
+        match held {
             None => acquire_egress_permit(gate.clone(), routing, book_consumed(&estimator, data)),
             Some(held) => {
                 let (estimator, gate) = (estimator.clone(), gate.clone());
@@ -3179,10 +3187,11 @@ fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: 
 /// which is what lets the Exit's level report drop to match after the Entry advances the generation.
 ///
 /// Called for every packet that delivers SURBs to an incoming Session, and there are two kinds: Session
-/// data packets, in the `session_rx` inspectors of `new_session`, and Start protocol keep-alives, in
-/// [`handle_keep_alive`](SessionManager::handle_keep_alive). The Entry's balancer mints its SURBs as
-/// keep-alives as much as in data, so a booking in only one of them misses the other's share. Split out
-/// from the receive closure so the accounting can be unit-tested on its own.
+/// data packets, in the `session_rx` inspectors of `new_session`, and Start protocol messages, through
+/// [`book_start_message_surbs`], which `dispatch_message` calls for every Start message and the Start
+/// task for an opening `StartSession`. The Entry's balancer mints its SURBs as keep-alives as much as in
+/// data, so a booking in only one of them misses the other's share. Split out from the receive closure
+/// so the accounting can be unit-tested on its own.
 fn account_incoming_surbs(estimator: &AtomicSurbFlowEstimator, saved: u64, evicted: u64) {
     estimator
         .produced
@@ -6672,19 +6681,23 @@ where
                 (
                     // Sent packets = SURB consumption estimate. Data is held back once the stock is down
                     // to the reserve for the keep-alives, but only after the Entry's first keep-alive has
-                    // shown that a balancer on its side acts on what the Exit reports. An Entry without
-                    // one announces a target too, and the `NoRateControl` branch below has none.
+                    // shown that a balancer on its side acts on what the Exit reports, and only if the
+                    // Exit runs a keep-alive stream to hold it for (see `spawn_exit_keep_alive` below). An
+                    // Entry without a balancer announces a target too, and the `NoRateControl` branch
+                    // below has none.
                     exit_data_egress(
                         msg_sender.clone().sink_map_err(std::io::Error::other),
                         session_id,
                         surb_estimator_tx,
                         slot.surb_mgmt.clone(),
                         egress_gate,
+                        self.cfg.surb_balance_notify_period.is_some() || pix.is_some(),
                     )
                     .rate_limit_with_controller(&egress_rate_control)
                     .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate. Session data packets only: the
-                    // SURBs of a keep-alive are booked in `handle_keep_alive`.
+                    // SURBs of a Start message, a keep-alive among them, are booked by
+                    // `book_start_message_surbs`, from `dispatch_message`.
                     session_rx.inspect(move |data| {
                         // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
@@ -14175,7 +14188,7 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
         let (mgr, estimator) = exit_slot_for_keep_alives(pseudonym);
         let (new_session_tx, _new_sessions) = futures::channel::mpsc::channel(1024);
-        let (mock_sender, _sent) = futures::channel::mpsc::unbounded();
+        let (mock_sender, mut sent) = futures::channel::mpsc::unbounded();
         let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
 
         let mut packet = start_packet(HoprStartProtocol::StartSession(no_pix_offer()))?;
@@ -14185,8 +14198,17 @@ mod tests {
         assert!(carried > 0, "fixture: the opening must leave room for a SURB");
 
         mgr.dispatch_message(pseudonym, packet)?;
-        // Let the Start task refuse the duplicate before looking.
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // The refusal proves the Start task handled the duplicate. A second booking would come after it,
+        // so the task is given a moment to finish before looking.
+        let (_, refusal) = timeout(Duration::from_secs(5), sent.next())
+            .await
+            .context("the duplicate opening was never refused")?
+            .context("the manager's sender closed before the refusal")?;
+        assert!(
+            crate::testing::msg_type(&refusal, StartProtocolDiscriminants::SessionError),
+            "the Start task refuses the duplicate with a SessionError"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
 
         assert_eq!(carried, estimator.produced.load(Relaxed), "booked once");
         assert_eq!(1, estimator.evicted.load(Relaxed), "and its eviction once");
@@ -21086,6 +21108,7 @@ mod tests {
             estimator.clone(),
             balancer,
             None,
+            true,
         ));
         let item = data_packet()?;
         let sending = tokio::spawn(async move { sink.send(item).await });
@@ -21133,6 +21156,7 @@ mod tests {
             estimator.clone(),
             balancer,
             None,
+            true,
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -21159,6 +21183,7 @@ mod tests {
             estimator.clone(),
             balancer_with_target(3_200),
             Some(closed),
+            true,
         ));
         assert!(
             timeout(Duration::from_secs(5), refused.send(data_packet()?))
@@ -21180,6 +21205,7 @@ mod tests {
             estimator.clone(),
             balancer_with_target(3_200),
             None,
+            true,
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -21197,6 +21223,35 @@ mod tests {
             estimator.saturating_diff(),
             "a packet that finds no SURB gives it back"
         );
+        Ok(())
+    }
+
+    /// Without a keep-alive stream, no SURB-level notifications and no PIX fill, the reserve has nothing to
+    /// keep SURBs for: data goes out at any stock, even once the Entry refills.
+    #[tokio::test]
+    async fn data_should_not_be_held_when_the_exit_runs_no_keep_alive_stream() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(1, Ordering::Relaxed);
+        let balancer = balancer_with_target(3_200);
+        let session_id = HoprPseudonym::random();
+        assert!(
+            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            "with a keep-alive stream, a stock at the reserve would hold data"
+        );
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            session_id,
+            estimator.clone(),
+            balancer,
+            None,
+            false,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("without a keep-alive stream the packet must not wait")??;
+        assert!(forwarded.try_recv().is_ok(), "forwarded");
         Ok(())
     }
 
@@ -21232,6 +21287,7 @@ mod tests {
             estimator.clone(),
             balancer.clone(),
             None,
+            true,
         ));
         timeout(Duration::from_secs(5), sink.send(data_packet()?))
             .await
@@ -21266,6 +21322,7 @@ mod tests {
             estimator.clone(),
             balancer.clone(),
             None,
+            true,
         ));
         let item = data_packet()?;
         let sending = tokio::spawn(async move { sink.send(item).await });
