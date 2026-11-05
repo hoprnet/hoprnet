@@ -1,9 +1,10 @@
 use std::{
+    collections::VecDeque,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU8, AtomicU64},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use futures::{StreamExt, pin_mut};
@@ -166,7 +167,123 @@ pub struct BalancerStateValues {
     /// Consecutive reported levels that did not rise while below target -- the plateau hysteresis
     /// behind [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
     pub capacity_plateau_count: AtomicU64,
+    /// Set by [`on_counterparty_wiped`](Self::on_counterparty_wiped), consumed by the next balancer
+    /// update: the counterparty dropped its whole stock, so that update restarts the level estimate
+    /// from empty.
+    ///
+    /// A flag rather than a plain store of `0` into [`buffer_level`](Self::buffer_level) because the
+    /// level has another writer: the update in flight, which would write back the level it loaded
+    /// before the reset. (The counterparty's keep-alive is the other, which may still carry its
+    /// pre-wipe level; [`observe_reported_level`](Self::observe_reported_level) drops such a report
+    /// while the refill is paced.)
+    counterparty_wiped: AtomicBool,
+    /// Paces the refill after a wipe: the rate in SURBs per second in the high 32 bits and the
+    /// milliseconds it still holds for in the low 32 bits, so both are read together. Zero is
+    /// inactive. See `REFILL_PACING_SECS`.
+    refill_pacing: AtomicU64,
+    /// This side's `produced` count as it was `REPORT_LAG` before the last balancer update, published by
+    /// every update from [`ProducedHistory`]: what a counterparty report arriving now cannot have seen
+    /// yet is the production since then. `0` until the first update.
+    produced_before_lag: AtomicU64,
+    /// This side's `produced` count at the last balancer update, published with
+    /// [`produced_before_lag`](Self::produced_before_lag). What is produced after it is the next update's
+    /// to add, so a report adopted in between takes as in flight only the production up to it.
+    produced_at_update: AtomicU64,
+    /// Set when a report lowered the believed level, consumed by the next balancer update: that
+    /// update's output is held to the pacing rate, so that a correction never turns into a burst.
+    correction_cap: AtomicBool,
+    /// The instant [`last_heard`](Self::last_heard) and [`last_sent`](Self::last_sent) count from.
+    epoch: ActivityEpoch,
+    /// When the counterparty was last heard from, in milliseconds since `epoch` plus one, so that `0`
+    /// is "never". Any packet from it counts, and so does a reply the estimator counted as consumed.
+    /// Entry-side only; see [`silence_sustain`](Self::silence_sustain).
+    last_heard: AtomicU64,
+    /// When a Session data packet last went out, in the same unit as [`last_heard`](Self::last_heard).
+    last_sent: AtomicU64,
+    /// When the current run of unanswered data began, in the same unit as [`last_heard`](Self::last_heard):
+    /// the first packet sent after the counterparty was last heard. See
+    /// [`silence_sustain`](Self::silence_sustain).
+    sending_since: AtomicU64,
+    /// When a reply the estimator counted as consumed last came home, in the same unit as
+    /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
+    last_reply_heard: AtomicU64,
+    /// The fewest SURBs per second the paced fill and refill may be held to: one keep-alive's worth,
+    /// set by the Session that owns the balancer. `0` until set. See [`pacing_cap`](Self::pacing_cap).
+    pacing_floor: AtomicU64,
+    /// Exit-side: whether the Entry has shown that it refills this side's SURB stock. See
+    /// [`counterparty_refills`](Self::counterparty_refills).
+    counterparty_refills: AtomicBool,
 }
+
+/// The instant the activity stamps of a [`BalancerStateValues`] count from: when it was made.
+#[derive(Debug, Clone, Copy)]
+struct ActivityEpoch(std::time::Instant);
+
+impl Default for ActivityEpoch {
+    fn default() -> Self {
+        Self(std::time::Instant::now())
+    }
+}
+
+/// How long data can go out with nothing at all coming back before the Entry sustains the
+/// counterparty's SURBs on its own: three seconds.
+///
+/// A counterparty that was replying replies at the rate of the data it receives, so three seconds of
+/// data going out and nothing coming back, neither a reply, nor a report, nor any other packet, means
+/// that its consumption is invisible: its stock may be draining into a return path that delivers
+/// nothing, and the balancer, which learns the level from those replies and reports, cannot see it
+/// and would mint nothing. Reports alone do not tell that: the Exit sends one every
+/// `surb_balance_notify_period`, 15 s by default, so a Session the Exit does not answer (an upload)
+/// is quiet for most of every period without anything being wrong. Hence the sustain needs a reply
+/// stream that stopped; see [`REPLY_STREAM_WINDOW`] and
+/// [`silence_sustain`](BalancerStateValues::silence_sustain).
+pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
+
+/// How recent the last reply must be, relative to the last time the counterparty was heard at all, for
+/// a silence to be a reply stream that stopped rather than a Session that gets no replies: one default
+/// notify period.
+pub const REPLY_STREAM_WINDOW: Duration = Duration::from_secs(15);
+
+/// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
+/// one fifth of the target per second (at least one keep-alive's worth, never above
+/// `max_surbs_per_sec`; see `pacing_cap`), so the refill takes about as many seconds.
+///
+/// After a wipe the level is zero against the target, and left alone the PID commands its output
+/// limit (`max_surbs_per_sec`; the prototype hit 4975 per second against a ceiling of 5000 per
+/// second in the integration cluster) until the level is
+/// back. On a path through two or three relayers on one machine that burst congests the relays
+/// themselves, the replies it is meant to restore arrive late, and late replies are what the
+/// verdicts are made of. The organic gate is open for the whole refill anyway, so spreading it over
+/// a few seconds costs little: the SURBs of the next data packets arrive in the meantime.
+///
+/// The start of a session at the Entry is the same state: the counterparty holds nothing, the level
+/// estimate says so, and the PID would command its ceiling from the first tick. That flood lost
+/// replies at session start (one flush tick about three seconds in: 1037 expected, 201 observed),
+/// the corroborated verdict judged the two slowest relayers dead on those, and wiped the fresh
+/// stock; hoprnet#8484's cold burst was the same flood seen from the data path. The Entry arms the
+/// same pacing when its balancer starts ([`BalancerStateValues::arm_refill_pacing`]), and the fill
+/// reaches the target in about five seconds instead of one and a half, sparing the relays.
+///
+/// While the window lasts the PID does not run: the balancer commands the cap while the level is
+/// below the target and nothing from the moment it is reached. A cap applied to the PID's output
+/// instead would let it integrate the full error for the whole window and answer a level at or past
+/// the target with its ceiling when the window ends. The controller is rebuilt with its own gains and
+/// bounds when the window ends, so that it starts from the current error. Neither `max_surbs_per_sec`
+/// nor the bounds [`SurbBalancer::start_control_loop`] rebuilds the PID from change.
+pub const REFILL_PACING_SECS: u64 = 5;
+
+/// How long a counterparty's SURB level report is assumed to have been on its way: the production
+/// of this long before a report arrives is added to the level it carries.
+///
+/// A report says what the counterparty held when it was written, before the SURBs that were in
+/// flight to it reached it, so taken as it stands it pulls the believed level below the truth by
+/// that much. One second covers the one-way latency of a multi-hop return path with mixing; a lag
+/// taken too long errs on the high side, which the counterparty's distress signal corrects within a
+/// packet, where a lag taken too short errs low and is corrected only by the next report. (The much
+/// larger lag measured after a bump, a whole notify period, was the keep-alive stream sampling the
+/// level when the rate limiter pulled the item rather than when it released it; that is fixed at the
+/// source in `spawn_keep_alive_stream` and no longer something this constant has to cover.)
+pub const REPORT_LAG: Duration = Duration::from_secs(1);
 
 /// Consecutive non-rising reported levels (below target, no distress) before the counterparty's
 /// store capacity is inferred. Small, but greater than one: a single flat sample is ordinary churn,
@@ -236,6 +353,8 @@ impl BalancerStateValues {
     /// is a superset of `SurbDistress` on the wire, so `contains` catches both, whereas an equality
     /// match against `SurbDistress` would silently ignore the more severe of the two.
     pub fn observe_counterparty_signals(&self, signals: PacketSignals) {
+        // Any packet from the counterparty carries them, so this is the Entry hearing the Exit.
+        self.note_heard();
         let distress = signals.contains(PacketSignal::SurbDistress);
         self.counterparty_in_surb_distress
             .store(distress, std::sync::atomic::Ordering::Relaxed);
@@ -251,39 +370,119 @@ impl BalancerStateValues {
         }
     }
 
-    /// Records the SURB level the counterparty reported, and infers its real store capacity from a
-    /// plateau in that level.
+    /// Records the SURB level the counterparty reported, net of the production it cannot have seen
+    /// yet, and infers its real store capacity from a plateau in that level.
     ///
     /// Called on every `BalancerState` keep-alive, including one that repeats the last value -- a
     /// level that stops rising while the Entry is still minting toward the target is the plateau
     /// signal. See [`observed_counterparty_capacity`](Self::observed_counterparty_capacity).
+    ///
+    /// The report was written `REPORT_LAG` or less ago, so the SURBs produced since then were still on
+    /// their way when it was written and are added to it: adopting a report as it stands pulls the
+    /// level below the truth by exactly that production. Only the production up to the last balancer
+    /// update is added here, though: the next update adds everything produced after that one to the
+    /// level in any case, and adding it here as well would count it twice. A report that still lowers
+    /// the believed level marks the next balancer update so that its output is held to the pacing
+    /// rate: a correction, not a deficit to burst for.
+    ///
+    /// While the refill after a wipe is paced, every report is dropped, stored by neither the level
+    /// nor the plateau bookkeeping: a report above the believed level is the counterparty reporting
+    /// the stock it had before it saw the new SURB generation, and one below it is the stock it had
+    /// before the refill in flight reached it, thousands short at the pacing rate. The level believed
+    /// here during the window is the production since the reset, which is the truth by construction.
     pub fn observe_reported_level(&self, new_level: u64) {
         use std::sync::atomic::Ordering::Relaxed;
 
+        // Heard even when the report is dropped below: it is the Exit speaking.
+        self.note_heard();
         let prev = self.buffer_level.load(Relaxed);
+        if self.refill_pacing_active() {
+            tracing::debug!(
+                reported = new_level,
+                believed = prev,
+                "dropping a counterparty SURB level report while the refill after a wipe is paced"
+            );
+            return;
+        }
+        let in_flight = self
+            .produced_at_update
+            .load(Relaxed)
+            .saturating_sub(self.produced_before_lag.load(Relaxed));
+        let level = new_level.saturating_add(in_flight);
         let target = self.target_surb_buffer_size.load(Relaxed);
         let distress = self.counterparty_in_surb_distress.load(Relaxed);
         let inferred = self.observed_counterparty_capacity.load(Relaxed);
 
-        if inferred != 0 && new_level > inferred {
+        if inferred != 0 && level > inferred {
             // The counterparty is holding more than we inferred, so the store is larger than the
             // plateau suggested (or has grown). Forget the guess and probe again.
             self.observed_counterparty_capacity.store(0, Relaxed);
             self.capacity_plateau_count.store(0, Relaxed);
-        } else if inferred == 0 && !distress && new_level > 0 && new_level < target && new_level <= prev {
+        } else if inferred == 0 && !distress && level > 0 && level < target && level <= prev {
             // Below target with no distress, yet the level is not rising: the Entry is minting toward
             // the target but the counterparty is not accepting more, so its store is full at a level
             // below the target. Require several consecutive such reports before acting.
             let plateau = self.capacity_plateau_count.fetch_add(1, Relaxed) + 1;
             if plateau >= CAPACITY_PLATEAU_THRESHOLD {
-                self.observed_counterparty_capacity.store(new_level, Relaxed);
+                self.observed_counterparty_capacity.store(level, Relaxed);
             }
         } else {
             // Rising, at/above target, in distress, or refilling below an inferred cap: not a plateau.
             self.capacity_plateau_count.store(0, Relaxed);
         }
 
-        self.buffer_level.store(new_level, Relaxed);
+        if level < prev {
+            tracing::debug!(
+                reported = new_level,
+                in_flight,
+                believed = prev,
+                adopted = level,
+                "a counterparty SURB level report lowered the believed level; the next update is paced"
+            );
+            self.correction_cap.store(true, Relaxed);
+        }
+        self.buffer_level.store(level, Relaxed);
+    }
+
+    /// Publishes this side's `produced` count as it was `REPORT_LAG` before this update and as it is at
+    /// this update, for [`observe_reported_level`](Self::observe_reported_level). Called by every
+    /// balancer update.
+    pub(crate) fn publish_production(&self, before_lag: u64, at_update: u64) {
+        self.produced_before_lag
+            .store(before_lag, std::sync::atomic::Ordering::Relaxed);
+        self.produced_at_update
+            .store(at_update, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Takes the one-shot request to hold the next output to the pacing rate, if there is one.
+    fn take_correction_cap(&self) -> bool {
+        self.correction_cap.swap(false, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The rate the fill and the refill after a wipe are held to: `target / REFILL_PACING_SECS` SURBs
+    /// per second, at least one keep-alive's worth ([`set_pacing_floor`](Self::set_pacing_floor)) and
+    /// at least one, and never above `max_surbs_per_sec`.
+    ///
+    /// The floor matters at small targets only: a keep-alive carries a fixed number of SURBs, so a
+    /// fifth of a target of 11 is two SURBs a second, a keep-alive every four seconds, and a Session
+    /// that waited for a quarter of its target opened after four seconds instead of under one. The
+    /// ceiling is the bound the PID output had: the pacing replaces that output for its window, and
+    /// must not exceed what the client configured the balancer to mint.
+    pub(crate) fn pacing_cap(&self) -> u64 {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        (self.target_surb_buffer_size.load(Relaxed) / REFILL_PACING_SECS)
+            .max(self.pacing_floor.load(Relaxed))
+            .max(1)
+            .min(self.max_surbs_per_sec.load(Relaxed))
+            .min(u64::from(u32::MAX))
+    }
+
+    /// Sets the fewest SURBs per second the pacing may be held to: one keep-alive's worth of SURBs, so
+    /// that a paced fill sends at least one keep-alive a second. See `pacing_cap`.
+    pub fn set_pacing_floor(&self, surbs_per_sec: u64) {
+        self.pacing_floor
+            .store(surbs_per_sec, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// How many SURBs an outgoing Session data packet should carry along with its payload.
@@ -329,6 +528,209 @@ impl BalancerStateValues {
         } else {
             1
         }
+    }
+
+    /// Records that the counterparty was heard from now.
+    pub(crate) fn note_heard(&self) {
+        self.stamp(&self.last_heard, std::time::Instant::now());
+    }
+
+    /// Records that the counterparty refills this side's SURB stock. The Exit calls it on a keep-alive
+    /// from the Entry: only an Entry's SURB balancer runs a keep-alive stream.
+    pub(crate) fn note_counterparty_refills(&self) {
+        self.counterparty_refills
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether the counterparty has shown that it refills this side's SURB stock (see
+    /// [`note_counterparty_refills`](Self::note_counterparty_refills)). An Entry without a SURB
+    /// balancer never does: it attaches one SURB to each data packet and sends no keep-alives.
+    pub(crate) fn counterparty_refills(&self) -> bool {
+        self.counterparty_refills.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Records that a Session data packet is going out now. The first one since the counterparty was
+    /// last heard starts a new run of unanswered data.
+    pub(crate) fn note_sent(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let now = std::time::Instant::now();
+        if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.stamp(&self.sending_since, now);
+        }
+        self.stamp(&self.last_sent, now);
+    }
+
+    /// Records that a reply the estimator counted as consumed came home now.
+    pub(crate) fn note_reply_heard(&self) {
+        self.stamp(&self.last_reply_heard, std::time::Instant::now());
+    }
+
+    /// Test hook: as if the counterparty had last been heard from `ago` ago.
+    ///
+    /// The stamps count from the instant the state was made, so for one to lie in the past the epoch
+    /// has to be moved back before it.
+    #[cfg(test)]
+    pub(crate) fn last_heard_ago(self, ago: Duration) -> Self {
+        let state = self.last_heard_only_ago(ago);
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
+        // What it was heard on was a reply: a reply stream that stopped `ago` ago.
+        state.stamp(&state.last_reply_heard, at);
+        state
+    }
+
+    /// Test hook: as if the counterparty had last been heard from `ago` ago, by a report or a packet that
+    /// was no reply, and had never replied.
+    #[cfg(test)]
+    pub(crate) fn last_heard_only_ago(mut self, ago: Duration) -> Self {
+        let now = std::time::Instant::now();
+        self.epoch = ActivityEpoch(
+            now.checked_sub(ago + Duration::from_secs(60))
+                .expect("monotonic clock younger than the heard-ago offset"),
+        );
+        self.stamp(
+            &self.last_heard,
+            now.checked_sub(ago).expect("monotonic clock younger than `ago`"),
+        );
+        self
+    }
+
+    /// Test hook: as if data had been going out unanswered since `ago` ago, the first packet of the run
+    /// sent then. Takes the epoch [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
+    #[cfg(test)]
+    pub(crate) fn sending_since_ago(self, ago: Duration) -> Self {
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
+        self.stamp(&self.sending_since, at);
+        self.stamp(&self.last_sent, at);
+        self
+    }
+
+    /// Stamps `slot` with `at`, never moving it back.
+    fn stamp(&self, slot: &AtomicU64, at: std::time::Instant) {
+        let ms = u64::try_from(at.saturating_duration_since(self.epoch.0).as_millis()).unwrap_or(u64::MAX - 1);
+        slot.fetch_max(ms.saturating_add(1), std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether data is going out into silence: the balancer is enabled, the counterparty was heard from
+    /// at least once, and data has been going out for more than [`SILENCE_SUSTAIN_AFTER`] since the first
+    /// packet sent after the last time it was. The window starts at that first unanswered packet, not at
+    /// the last word heard: an idle stretch leaves nothing unanswered, and the Exit gets the grace to
+    /// answer the data that ends it.
+    ///
+    /// The Entry then keeps one SURB in each data packet it sends even though its level estimate is at
+    /// or above the target (see `cap_organic_surbs` in the session manager). The estimate is fed by the
+    /// Exit's reports and replies; with none arriving it stays where it was, while the Exit goes on
+    /// answering the data it gets, one SURB for each reply, into a return path that may be delivering
+    /// nothing. The estimate then never falls below the target and the Entry mints nothing, until the
+    /// Exit's stock is empty. The balancer's own `surb_decay` is the exception: on by default (5 % of
+    /// the target per 60 s) it erodes the estimate each window, so at a data rate low enough that the
+    /// sustain's one-SURB-per-packet production does not outpace it, the estimate falls below the
+    /// target within a decay window or two and the gate reopens without the sustain. One SURB per data
+    /// packet is what the Exit can be expected to spend and no more: the sustain is bounded by the rate
+    /// of the data, makes no burst, and wipes nothing. It ends at the first packet or reply from the
+    /// Exit.
+    ///
+    /// Only a reply stream that stopped counts: the last reply must be within [`REPLY_STREAM_WINDOW`] of
+    /// the last time the counterparty was heard at all. A Session the Exit does not answer hears only its
+    /// reports, one per notify period, and sustaining it would put one SURB in every data packet into a
+    /// stock nothing spends, up to the store's capacity.
+    ///
+    /// Judged between the stamps, not against the clock, so that the answer is about the packet being
+    /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.
+    pub(crate) fn silence_sustain(&self) -> bool {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        if self.is_disabled() {
+            return false;
+        }
+        match (self.last_heard.load(Relaxed), self.last_reply_heard.load(Relaxed)) {
+            (0, _) | (_, 0) => false,
+            (heard, replied) => {
+                let after = u64::try_from(SILENCE_SUSTAIN_AFTER.as_millis()).unwrap_or(u64::MAX);
+                let window = u64::try_from(REPLY_STREAM_WINDOW.as_millis()).unwrap_or(u64::MAX);
+                let since = self.sending_since.load(Relaxed);
+                // A reply stream that stopped, not a Session the counterparty does not answer, and data
+                // going out unanswered for longer than the grace, not the first packet after a pause.
+                replied.saturating_add(window) >= heard
+                    && since > heard
+                    && self.last_sent.load(Relaxed) > since.saturating_add(after)
+            }
+        }
+    }
+
+    /// Tells the state that the counterparty dropped every SURB it held, because the SURB generation
+    /// of the session advanced and the counterparty clears its store on the first batch of the new one.
+    ///
+    /// The level estimate restarts from empty at the next balancer update, and for
+    /// `REFILL_PACING_SECS` the refill is held to the pacing rate: a fifth of the target a second, at
+    /// least one keep-alive's worth and never above `max_surbs_per_sec` (see `pacing_cap`).
+    /// The counterparty's own reports follow suit once the first SURBs of the new generation reach
+    /// it. Until then it may still report the level it had before, and then the level before the
+    /// refill in flight reached it; for the paced window every report is dropped (see
+    /// [`observe_reported_level`](Self::observe_reported_level)).
+    pub fn on_counterparty_wiped(&self) {
+        use std::sync::atomic::Ordering::Release;
+
+        self.buffer_level.store(0, Release);
+        self.counterparty_wiped.store(true, Release);
+        self.arm_refill_pacing();
+    }
+
+    /// Holds the refill of an empty counterparty to the pacing rate (`pacing_cap`: a fifth of the target
+    /// a second, at least one keep-alive's worth, never above `max_surbs_per_sec`) for
+    /// `REFILL_PACING_SECS`, whatever the PID would command. A disabled balancer arms nothing.
+    ///
+    /// The second half of [`on_counterparty_wiped`](Self::on_counterparty_wiped), and what the Entry
+    /// calls when its balancer starts: a session that has just been opened is in the same state as one
+    /// that has just been wiped, the counterparty holds nothing and the level estimate says so, and
+    /// the PID would command its ceiling just the same. Unlike a wipe it resets nothing: the estimate
+    /// is already empty, and what the first tick produced is the new session's.
+    pub fn arm_refill_pacing(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        if self.is_disabled() {
+            return;
+        }
+        let cap = self.pacing_cap();
+        self.refill_pacing
+            .store((cap << 32) | (REFILL_PACING_SECS * 1000), Relaxed);
+    }
+
+    /// Takes the one-shot request to restart the level estimate from empty, if there is one.
+    fn take_counterparty_wiped(&self) -> bool {
+        self.counterparty_wiped.swap(false, std::sync::atomic::Ordering::AcqRel)
+    }
+
+    /// Whether the refill after a wipe is still paced. Read-only: unlike [`pace_refill`](Self::pace_refill)
+    /// it does not use up any of the window.
+    pub(crate) fn refill_pacing_active(&self) -> bool {
+        self.refill_pacing.load(std::sync::atomic::Ordering::Relaxed) & u64::from(u32::MAX) > 0
+    }
+
+    /// The cap on the control output while the refill after a wipe is paced, in SURBs per second, and
+    /// uses up `elapsed` of the pacing window. `None` when no pacing is active.
+    fn pace_refill(&self, elapsed: Duration) -> Option<u64> {
+        const REMAINING: u64 = u32::MAX as u64;
+
+        let elapsed_ms = elapsed.as_millis().min(u128::from(u32::MAX)) as u64;
+        self.refill_pacing
+            .fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |packed| {
+                    let remaining = packed & REMAINING;
+                    (remaining > 0).then(|| match remaining.saturating_sub(elapsed_ms) {
+                        0 => 0,
+                        left => (packed & !REMAINING) | left,
+                    })
+                },
+            )
+            .ok()
+            .map(|packed| packed >> 32)
     }
 
     /// Sets how many stored SURBs are invalid and their share of what is outstanding.
@@ -397,6 +799,27 @@ impl From<SurbBalancerConfig> for BalancerStateValues {
     }
 }
 
+/// This side's `produced` count over the last `REPORT_LAG`, one sample per balancer update, so
+/// that a counterparty report can be read net of the production it cannot have seen yet.
+#[derive(Debug, Default)]
+struct ProducedHistory {
+    samples: VecDeque<(Instant, u64)>,
+}
+
+impl ProducedHistory {
+    /// Records `produced` as of `now` and returns the count as it was `REPORT_LAG` ago: the newest
+    /// sample at least that old, or the oldest one there is while the history is still shorter than
+    /// the lag (so that the correction never exceeds what this history has seen).
+    fn record(&mut self, now: Instant, produced: u64) -> u64 {
+        self.samples.push_back((now, produced));
+        let horizon = now.checked_sub(REPORT_LAG);
+        while self.samples.len() >= 2 && horizon.is_some_and(|h| self.samples[1].0 <= h) {
+            self.samples.pop_front();
+        }
+        self.samples.front().map_or(produced, |(_, p)| *p)
+    }
+}
+
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
 /// [regulate](SurbFlowController) the flow of SURBs to the Session counterparty,
 /// to keep the number of SURBs locally or at the counterparty at a certain level.
@@ -425,8 +848,13 @@ pub struct SurbBalancer<C, E, F> {
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
+    /// Whether the previous update ran inside the refill pacing window of a wipe, to notice the one
+    /// in which the window ends.
+    was_pacing: bool,
     /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
     last_report: std::time::Instant,
+    /// `produced` over the last `REPORT_LAG`, published to the state at every update.
+    produced_history: ProducedHistory,
 }
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -461,7 +889,9 @@ where
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
+            was_pacing: false,
             last_report: std::time::Instant::now(),
+            produced_history: ProducedHistory::default(),
         }
     }
 
@@ -487,8 +917,31 @@ where
             return current;
         };
 
+        // What a counterparty report arriving before the next update cannot have seen yet: the production
+        // from REPORT_LAG before this update up to it. What comes after it, the next update adds.
+        let produced_before_lag = self.produced_history.record(self.last_update, snapshot.produced);
+        self.state.publish_production(produced_before_lag, snapshot.produced);
+
+        // A reply came home since the last tick: the counterparty answered, whether or not any of its
+        // packets reached the hooks that record it.
+        if snapshot.consumed > self.last_estimator_state.consumed {
+            self.state.note_heard();
+            self.state.note_reply_heard();
+        }
+
         self.last_estimator_state = snapshot;
-        current = current.saturating_add_signed(target_buffer_change);
+        if self.state.take_counterparty_wiped() {
+            // The counterparty dropped everything it held, so what this tick's production and
+            // consumption add to the level belongs to the stock that is gone: restart from empty.
+            tracing::debug!(
+                believed = current,
+                delta = target_buffer_change,
+                "counterparty SURBs were wiped, restarting the level estimate from empty"
+            );
+            current = 0;
+        } else {
+            current = current.saturating_add_signed(target_buffer_change);
+        }
 
         // If SURB decaying is enabled, check if the decay window has elapsed
         // and calculate the number of SURBs that will be discarded
@@ -548,7 +1001,46 @@ where
             "estimated SURB buffer change"
         );
 
-        let output = self.controller.next_control_output(usable);
+        // After a wipe the level is far below the target and the PID would command its output limit
+        // until it is back. Hold the refill to a pace the return paths can carry instead. The PID does
+        // not run at all while the window lasts: clamping its output would still let it integrate the
+        // full error for the whole window, and when the window ends it would answer a level at or past
+        // the target with the ceiling. The refill stops by itself the moment the target is reached. The
+        // controller's bounds are not touched.
+        let refill_cap = self.state.pace_refill(dt);
+        let output = match refill_cap {
+            Some(cap) => {
+                if usable >= self.controller.bounds().target() {
+                    0
+                } else {
+                    cap
+                }
+            }
+            None => {
+                if self.was_pacing {
+                    // The window just ended. Start the controller from the current error rather than
+                    // from whatever it had accumulated before the wipe, which no longer describes
+                    // anything: setting the bounds it already has rebuilds it with its own gains.
+                    self.controller.set_target_and_limit(self.controller.bounds());
+                    tracing::debug!(
+                        current,
+                        "refill pacing is over, the controller restarts from the current level"
+                    );
+                }
+                let output = self.controller.next_control_output(usable);
+                if self.state.take_correction_cap() {
+                    // A report just lowered the believed level. What the controller sees as a deficit
+                    // is a correction of the estimate, not SURBs the counterparty is missing, and the
+                    // tick is held to the pacing rate so that it does not answer with a burst.
+                    let capped = output.min(self.state.pacing_cap());
+                    tracing::debug!(output, capped, "holding the output after a level correction");
+                    capped
+                } else {
+                    output
+                }
+            }
+        };
+        self.was_pacing = refill_cap.is_some();
         tracing::trace!(output, "next balancer control output for session");
 
         // Both ends run this same loop -- the Entry with the PID driving production, the Exit with
@@ -566,12 +1058,14 @@ where
                 invalid = current - usable,
                 target = self.controller.bounds().target(),
                 output,
+                refill_cap = refill_cap.unwrap_or(0),
                 produced = self.surb_estimator.estimate_surbs_produced(),
                 consumed = self.surb_estimator.estimate_surbs_consumed(),
                 distress = self
                     .state
                     .counterparty_in_surb_distress
                     .load(std::sync::atomic::Ordering::Relaxed),
+                silent = self.state.silence_sustain(),
                 "surb balancer state"
             );
         }
@@ -1547,5 +2041,648 @@ mod tests {
             surb_estimator.saturating_diff(),
             "and the starved count no longer holds the held count one low"
         );
+    }
+    type TestBalancer = SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>;
+
+    /// One sampling interval of `dt`, without waiting for it: the balancer's clock is wound back instead.
+    fn tick_for(balancer: &mut TestBalancer, dt: Duration) {
+        balancer.last_update = std::time::Instant::now()
+            .checked_sub(dt)
+            .expect("monotonic clock too young");
+        balancer.update();
+    }
+
+    /// The configuration of a session at the client's usual target, against the usual mint ceiling.
+    fn paced_refill_config() -> SurbBalancerConfig {
+        SurbBalancerConfig {
+            target_surb_buffer_size: 7_000,
+            max_surbs_per_sec: 5_000,
+            surb_decay: None,
+        }
+    }
+
+    /// A wipe means the counterparty holds nothing, whatever the estimate says, and the estimate must
+    /// say so at the next update: not the update that was already running, nor the production that was
+    /// in flight when the SURB generation advanced, and not a report from the counterparty that has
+    /// not seen the new generation yet may bring it back.
+    #[test_log::test]
+    fn a_wipe_should_restart_the_estimate_from_empty_and_survive_the_next_tick() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
+        let step = Duration::from_millis(50);
+
+        state.observe_reported_level(7_000);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            7_000,
+            state.buffer_level(),
+            "precondition: the counterparty is at target"
+        );
+
+        // 300 SURBs were minted for the old generation just before it advanced.
+        estimator.produced.fetch_add(300, Relaxed);
+        state.on_counterparty_wiped();
+        assert_eq!(0, state.buffer_level(), "the level is reset at once");
+
+        // The counterparty reports what it held until its first SURB of the new generation lands.
+        state.observe_reported_level(7_000);
+        assert_eq!(0, state.buffer_level(), "a report above the believed level is dropped");
+
+        // An update that was already running writes back the level it loaded before the reset.
+        state.buffer_level.store(7_000, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            0,
+            state.buffer_level(),
+            "the stale level and the old generation's production must not survive the first update"
+        );
+
+        // From then on the estimate counts what is minted for the new generation, and is not reset again.
+        estimator.produced.fetch_add(200, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(200, state.buffer_level());
+        estimator.consumed.fetch_add(50, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(150, state.buffer_level(), "the reset is one-shot");
+    }
+
+    /// The counterparty keeps reporting the stock it had until the first SURB of the new generation
+    /// reaches it, and then the stock it had before the refill in flight landed. A report that lands
+    /// after the first update, when the level is already rebuilding, must neither put the level back
+    /// at the target, which would shut the organic gate and silence the PID while the counterparty
+    /// holds nothing, nor pull it below the production since the reset, which is the truth. Every
+    /// report is dropped for the window, and taken again once it is over.
+    #[test_log::test]
+    fn no_report_should_move_the_level_while_the_refill_after_a_wipe_is_paced() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(paced_refill_config());
+        let step = Duration::from_millis(50);
+
+        state.observe_reported_level(7_000);
+        tick_for(&mut balancer, step);
+        state.on_counterparty_wiped();
+        tick_for(&mut balancer, step);
+        assert_eq!(0, state.buffer_level(), "precondition: restarted from empty");
+
+        estimator.produced.fetch_add(200, Relaxed);
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            200,
+            state.buffer_level(),
+            "precondition: 200 SURBs of the new generation sent"
+        );
+
+        state.observe_reported_level(7_000);
+        assert_eq!(
+            200,
+            state.buffer_level(),
+            "the pre-wipe level is dropped for the window"
+        );
+        assert_eq!(
+            1,
+            state.organic_surbs_per_packet(),
+            "the organic gate stays open while the counterparty holds almost nothing"
+        );
+
+        state.observe_reported_level(150);
+        assert_eq!(
+            200,
+            state.buffer_level(),
+            "a report below the belief is the stock before the refill in flight landed, and is dropped too"
+        );
+
+        // Past the window (5 s of 50 ms ticks, and then some) a report is taken as it comes, net of
+        // the production it cannot have seen yet.
+        for _ in 0..110 {
+            tick_for(&mut balancer, step);
+        }
+        let in_flight = state.produced_at_update.load(Relaxed) - state.produced_before_lag.load(Relaxed);
+        state.observe_reported_level(7_000);
+        assert_eq!(
+            7_000 + in_flight,
+            state.buffer_level(),
+            "after the window the counterparty is believed again"
+        );
+    }
+
+    /// What a freshly built controller commands for `level`: the answer the first tick after the pacing
+    /// window has to give, and the one a wound-up integral would corrupt.
+    fn fresh_controller_output(cfg: SurbBalancerConfig, level: u64) -> u64 {
+        let mut controller = PidBalancerController::default();
+        controller.set_target_and_limit(cfg.as_controller_bounds());
+        controller.next_control_output(level)
+    }
+
+    /// A report says what the counterparty held when it was written; the SURBs produced since then
+    /// were on their way and are added to it, so that adopting it does not discard them.
+    #[test]
+    fn a_report_is_adopted_net_of_the_production_it_cannot_have_seen() {
+        let state = capacity_probe_state(7_000);
+        state.publish_production(1_000, 1_600);
+
+        state.observe_reported_level(5_000);
+        assert_eq!(
+            5_600,
+            state.buffer_level(),
+            "600 SURBs were in flight when the report was written"
+        );
+
+        state.publish_production(1_000, 1_000);
+        state.observe_reported_level(5_000);
+        assert_eq!(
+            5_000,
+            state.buffer_level(),
+            "nothing produced between the lag and the update, nothing in flight"
+        );
+    }
+
+    /// A report adopted between two updates takes as in flight only what was produced up to the first
+    /// of them: the second adds what came after, and that must not be counted twice.
+    #[test]
+    fn production_after_an_update_should_be_counted_once_when_a_report_lands_before_the_next() {
+        use std::sync::atomic::Ordering;
+
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 5_000,
+            max_surbs_per_sec: 2_000,
+            surb_decay: None,
+        };
+        let (mut balancer, est, state, _output) = balancer_with_feedback(cfg);
+
+        est.produced.store(1_000, Ordering::Relaxed);
+        std::thread::sleep(Duration::from_millis(15));
+        balancer.update();
+        assert_eq!(1_000, state.buffer_level.load(Ordering::Relaxed), "the first update");
+
+        // Produced after that update, then a report written before any of it reached the counterparty.
+        est.produced.fetch_add(300, Ordering::Relaxed);
+        state.observe_reported_level(800);
+        assert_eq!(
+            800,
+            state.buffer_level.load(Ordering::Relaxed),
+            "nothing was in flight up to the update"
+        );
+
+        std::thread::sleep(Duration::from_millis(15));
+        balancer.update();
+        assert_eq!(
+            1_100,
+            state.buffer_level.load(Ordering::Relaxed),
+            "the 300 produced after the first update are counted once, by the second"
+        );
+    }
+
+    /// The history answers with the newest sample at least the lag old, and with the oldest sample
+    /// there is while it is still shorter than the lag.
+    #[test]
+    fn the_produced_history_should_answer_with_the_count_from_before_the_lag() {
+        let mut history = ProducedHistory::default();
+        let t0 = Instant::now();
+        // In twentieths of the lag, so the test follows the constant.
+        let at = |twentieths: u32| t0 + REPORT_LAG * twentieths / 20;
+
+        assert_eq!(100, history.record(at(0), 100), "a lone sample is its own past");
+        assert_eq!(100, history.record(at(10), 300));
+        assert_eq!(
+            100,
+            history.record(at(25), 500),
+            "1.25 lags in, the sample one lag ago is still the first"
+        );
+        assert_eq!(
+            300,
+            history.record(at(31), 600),
+            "1.55 lags in, the 0.5 sample is one lag old"
+        );
+        assert_eq!(300, history.record(at(44), 700));
+        assert_eq!(500, history.record(at(46), 800), "the 1.25 sample is now one lag old");
+        assert_eq!(
+            4,
+            history.samples.len(),
+            "the lagged sample and the three newer ones, nothing older"
+        );
+    }
+
+    /// A report that lowers the believed level is a correction of the estimate, not SURBs the
+    /// counterparty is missing: the next update is held to the pacing rate instead of answering the
+    /// apparent deficit with the controller's ceiling, and the one after runs free.
+    #[test_log::test]
+    fn the_update_after_a_report_lowered_the_level_should_be_held_to_the_pacing_rate() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, _estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+
+        state.observe_reported_level(7_000);
+        tick_for(&mut balancer, step);
+        assert_eq!(0, output.load(Relaxed), "precondition: at target, nothing to mint");
+
+        // A lagging report, 1 800 below what is believed.
+        state.observe_reported_level(5_200);
+        assert_eq!(5_200, state.buffer_level());
+        tick_for(&mut balancer, step);
+        let held = output.load(Relaxed);
+        assert!(
+            held > 0 && held <= cap,
+            "the update after the correction is held to the pacing rate {cap}: {held}"
+        );
+
+        tick_for(&mut balancer, step);
+        assert!(
+            output.load(Relaxed) > cap,
+            "the next update answers the deficit as the controller sees it: {}",
+            output.load(Relaxed)
+        );
+    }
+
+    /// After a wipe the PID would command its output limit until the level is back. The refill is held
+    /// to a fifth of the target per second for five seconds, and left alone after that.
+    #[test_log::test]
+    fn a_wipe_should_cap_output_for_the_pacing_window() {
+        let cfg = paced_refill_config();
+        let (mut balancer, _estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+        assert_eq!(1_400, cap);
+
+        state.on_counterparty_wiped();
+
+        // Nothing is minted, so the level stays empty and the PID asks for everything it may.
+        let mut outputs = Vec::new();
+        for _ in 0..120 {
+            tick_for(&mut balancer, step);
+            outputs.push(output.load(std::sync::atomic::Ordering::Relaxed));
+        }
+
+        // Margins of half a second either side of the five-second window, so that a slow tick cannot
+        // move the edge into the assertion.
+        let window = (REFILL_PACING_SECS * 1000 / step.as_millis() as u64) as usize;
+        assert!(
+            outputs[..window - 10].iter().all(|output| *output == cap),
+            "the output must be the cap, {cap}, for the window: {outputs:?}"
+        );
+        assert!(
+            outputs[window + 10..].iter().all(|output| *output > cap),
+            "after the window the controller runs free: {outputs:?}"
+        );
+
+        // The first free tick is a fresh controller's answer to the level, not an accumulated one. At
+        // an empty level that is as much as the controller may command: one tick of its proportional
+        // and integral terms already exceeds the limit.
+        let first_free = outputs
+            .iter()
+            .position(|output| *output != cap)
+            .expect("the window ends");
+        assert_eq!(fresh_controller_output(cfg, 0), outputs[first_free]);
+    }
+
+    /// The PID does not run while the refill is paced, so it integrates nothing. Whatever it had
+    /// accumulated before the wipe (here, an integral wound up to its limit by a stretch at an empty
+    /// level) is dropped when the window ends, and the first free tick answers the level the refill
+    /// reached with a fresh controller's output. An integral carried through would answer the same
+    /// level with the ceiling, and a level at or past the target with a burst.
+    #[test_log::test]
+    fn the_first_tick_after_the_pacing_window_should_start_from_the_current_level() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+
+        // The PID winds its integral up against an empty counterparty.
+        for _ in 0..20 {
+            tick_for(&mut balancer, step);
+        }
+        assert_eq!(
+            cfg.max_surbs_per_sec,
+            output.load(Relaxed),
+            "precondition: at the ceiling"
+        );
+
+        // A wipe, and a refill that reaches 80 % of the target inside the window.
+        state.on_counterparty_wiped();
+        for _ in 0..20 {
+            tick_for(&mut balancer, step);
+        }
+        let level = cfg.target_surb_buffer_size * 4 / 5;
+        estimator.produced.fetch_add(level, Relaxed);
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            assert!(
+                state.refill_pacing_active() || state.buffer_level() == level,
+                "the level is the refill's"
+            );
+        }
+
+        tick_for(&mut balancer, step);
+        let first_free = output.load(Relaxed);
+        assert_eq!(fresh_controller_output(cfg, level), first_free);
+        assert!(
+            first_free < cfg.max_surbs_per_sec,
+            "a level at 80 % of the target is not met with the ceiling: {first_free}"
+        );
+    }
+
+    /// A session that has just been opened is in the state a wipe leaves: the counterparty holds nothing
+    /// and the PID would command its ceiling at once. The Entry arms the same pacing when its balancer
+    /// starts, and the output is the cap, a fifth of the target, for the whole window, whatever the PID
+    /// would say; then a fresh controller answers the level the fill reached. Nothing is reset on the
+    /// way in: what was minted before the first tick is the new session's.
+    #[test_log::test]
+    fn a_fresh_entry_balancer_should_pace_its_initial_fill() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+        assert_eq!(1_400, cap);
+        assert!(!state.refill_pacing_active(), "precondition: a new state paces nothing");
+
+        // What the Entry does as its balancer starts; some SURBs are already on their way.
+        state.arm_refill_pacing();
+        estimator.produced.fetch_add(100, Relaxed);
+
+        let mut outputs = Vec::new();
+        tick_for(&mut balancer, step);
+        outputs.push(output.load(Relaxed));
+        assert_eq!(100, state.buffer_level(), "starting paced does not reset the estimate");
+
+        // The fill reaches 80 % of the target inside the window; the PID, if it ran, would still ask for
+        // everything it may.
+        let level = cfg.target_surb_buffer_size * 4 / 5;
+        estimator.produced.fetch_add(level - 100, Relaxed);
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            outputs.push(output.load(Relaxed));
+            assert!(outputs.len() < 200, "the window must end");
+        }
+
+        // The window is five seconds of 50 ms ticks; margins of half a second either side, so that a slow
+        // tick cannot move the edge into the assertion.
+        let window = (REFILL_PACING_SECS * 1000 / step.as_millis() as u64) as usize;
+        assert!(
+            outputs.len().abs_diff(window) <= 10,
+            "the window lasts about {window} ticks: {}",
+            outputs.len()
+        );
+        assert!(
+            outputs.iter().all(|output| *output == cap),
+            "the output is the cap, {cap}, on every tick of the window: {outputs:?}"
+        );
+
+        tick_for(&mut balancer, step);
+        let first_free = output.load(Relaxed);
+        assert_eq!(fresh_controller_output(cfg, level), first_free);
+        assert!(
+            first_free < cfg.max_surbs_per_sec,
+            "a level at 80 % of the target is not met with the ceiling: {first_free}"
+        );
+    }
+
+    /// Arming does nothing for a balancer that is switched off.
+    #[test]
+    fn arming_the_pacing_of_a_disabled_balancer_should_do_nothing() {
+        let state = BalancerStateValues::default();
+        state.arm_refill_pacing();
+        assert!(!state.refill_pacing_active());
+    }
+
+    /// The refill stops by itself the moment the target is reached, and stays stopped until the window
+    /// ends, when the controller, fresh, answers a level at the target with nothing.
+    #[test_log::test]
+    fn pacing_should_stop_the_refill_once_the_target_is_reached_inside_the_window() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let cfg = paced_refill_config();
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(cfg);
+        let step = Duration::from_millis(50);
+        let cap = cfg.target_surb_buffer_size / REFILL_PACING_SECS;
+
+        state.on_counterparty_wiped();
+        for _ in 0..60 {
+            tick_for(&mut balancer, step);
+            assert_eq!(cap, output.load(Relaxed), "refilling at the cap while below the target");
+        }
+
+        // Three seconds in, the refill has delivered the target.
+        estimator.produced.fetch_add(cfg.target_surb_buffer_size, Relaxed);
+        let mut after_target = Vec::new();
+        for _ in 0..30 {
+            tick_for(&mut balancer, step);
+            after_target.push(output.load(Relaxed));
+        }
+        assert_eq!(cfg.target_surb_buffer_size, state.buffer_level());
+        assert!(
+            after_target.iter().all(|output| *output == 0),
+            "nothing more is commanded once the target is reached, inside the window or at its end: {after_target:?}"
+        );
+
+        // And on past the window's end, which the level holds at the target through.
+        while state.refill_pacing_active() {
+            tick_for(&mut balancer, step);
+            assert_eq!(0, output.load(Relaxed));
+        }
+        tick_for(&mut balancer, step);
+        assert_eq!(
+            0,
+            output.load(Relaxed),
+            "the first free tick at the target commands nothing"
+        );
+    }
+
+    /// The pacing is a rate the balancer commands, not a bound. The PID is rebuilt whenever the state's
+    /// bounds differ from its own, which would discard its integral, so the pacing must not be
+    /// implemented as a bound.
+    #[test_log::test]
+    fn pacing_must_not_reconfigure_the_controller_bounds() {
+        let cfg = paced_refill_config();
+        let (mut balancer, _estimator, state, _output) = balancer_with_feedback(cfg);
+        let bounds = state.controller_bounds();
+        assert_eq!(bounds, balancer.controller.bounds(), "precondition: in step");
+
+        state.on_counterparty_wiped();
+        for _ in 0..120 {
+            tick_for(&mut balancer, Duration::from_millis(50));
+            assert_eq!(
+                bounds,
+                state.controller_bounds(),
+                "the state's bounds are what the control loop compares the controller's against"
+            );
+            assert_eq!(bounds, balancer.controller.bounds());
+        }
+        assert_eq!(cfg, state.as_config());
+    }
+
+    /// With no target there is no balancing, and nothing to hold back.
+    #[test]
+    fn a_wipe_of_a_disabled_balancer_should_arm_no_pacing() {
+        let state = BalancerStateValues::default();
+        state.on_counterparty_wiped();
+        assert_eq!(None, state.pace_refill(Duration::from_millis(50)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Sustaining the counterparty's SURBs through a silence
+    // -----------------------------------------------------------------------
+
+    /// The sustain is about data going out into a silence. Without data going out for more than the grace
+    /// since the first packet after the last time the counterparty was heard, there is nothing to sustain,
+    /// and neither is there before it was heard at all, or while there is no balancer.
+    #[test]
+    fn silence_without_outgoing_data_should_not_sustain() {
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        assert!(
+            !state.silence_sustain(),
+            "heard 10 s ago, and nothing has been sent since"
+        );
+
+        // A packet that goes out inside the grace after the last time it was heard is not a silence yet.
+        let state = state.sending_since_ago(Duration::from_secs(8));
+        assert!(!state.silence_sustain(), "sent 2 s after it was heard");
+
+        let never_heard = gate_state(100, 200);
+        never_heard.note_sent();
+        assert!(
+            !never_heard.silence_sustain(),
+            "nothing was ever heard, so nothing has gone quiet"
+        );
+
+        let disabled = gate_state(0, 0).last_heard_ago(Duration::from_secs(10));
+        disabled.note_sent();
+        assert!(!disabled.silence_sustain(), "no balancer, no sustain");
+
+        let silent = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(10))
+            .sending_since_ago(Duration::from_secs(8));
+        silent.note_sent();
+        assert!(
+            silent.silence_sustain(),
+            "data going out since 8 s ago, 2 s after the last word, is a silence"
+        );
+
+        let unanswered = gate_state(100, 200).last_heard_only_ago(Duration::from_secs(10));
+        unanswered.note_sent();
+        assert!(
+            !unanswered.silence_sustain(),
+            "a Session the counterparty never answered has no reply stream to lose: heard only by its reports, it is \
+             quiet by design"
+        );
+    }
+
+    /// An idle stretch is no silence: nothing went out, so nothing was left unanswered. The window starts at
+    /// the first packet after the counterparty was last heard, and the Exit gets the grace to answer it.
+    #[test]
+    fn the_first_packet_after_an_idle_stretch_should_not_sustain() {
+        let idle = gate_state(100, 200).last_heard_ago(Duration::from_secs(10));
+        idle.note_sent();
+        assert!(
+            !idle.silence_sustain(),
+            "the first packet after 10 s with nothing sent and nothing heard"
+        );
+
+        let sending = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(10))
+            .sending_since_ago(Duration::from_secs(8));
+        sending.note_sent();
+        assert!(sending.silence_sustain(), "8 s of data going out, nothing coming back");
+
+        sending.note_heard();
+        sending.note_sent();
+        assert!(
+            !sending.silence_sustain(),
+            "heard again, and the packet after it starts a new run"
+        );
+    }
+
+    /// Whatever the Exit says is heard: a report of its level, and any packet at all, whose signals are
+    /// all the Entry reads of it.
+    #[test]
+    fn a_report_or_any_packet_from_the_counterparty_should_count_as_heard() {
+        let state = gate_state(100, 200);
+        assert_eq!(
+            0,
+            state.last_heard.load(std::sync::atomic::Ordering::Relaxed),
+            "nothing heard yet"
+        );
+
+        state.observe_counterparty_signals(PacketSignals::default());
+        let after_a_packet = state.last_heard.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(after_a_packet > 0, "a packet from the Exit");
+
+        let state = gate_state(100, 200);
+        state.observe_reported_level(50);
+        assert!(
+            state.last_heard.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "a level report"
+        );
+    }
+
+    /// A reply home is the Exit answering, counted by the estimator as a SURB consumed, even where none of
+    /// its packets reached the hooks that record it. Production minted and nothing consumed is not.
+    #[test_log::test]
+    fn a_reply_counted_as_consumed_should_count_as_heard() {
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(small_target_config());
+        let heard = || state.last_heard.load(std::sync::atomic::Ordering::Relaxed);
+
+        for _ in 0..5 {
+            tick(&mut balancer, &estimator, &output, 0);
+        }
+        assert_eq!(0, heard(), "SURBs minted and none consumed: nobody has answered");
+
+        tick(&mut balancer, &estimator, &output, 3);
+        assert!(heard() > 0, "three replies came home in that tick");
+    }
+
+    /// A fifth of a small target is a SURB or two a second, and a keep-alive carries several: the fill
+    /// would send one keep-alive every few seconds and the Session wait for it. One keep-alive's worth a
+    /// second is the floor.
+    #[test]
+    fn the_pacing_should_carry_at_least_one_keep_alive_a_second() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 11,
+            ..Default::default()
+        });
+        assert_eq!(2, state.pacing_cap(), "a fifth of the target, without a floor");
+        state.set_pacing_floor(8);
+        assert_eq!(8, state.pacing_cap(), "one keep-alive of 8 SURBs a second");
+
+        let large = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 6_887,
+            ..Default::default()
+        });
+        large.set_pacing_floor(8);
+        assert_eq!(
+            1_377,
+            large.pacing_cap(),
+            "a large target is paced at a fifth, as before"
+        );
+    }
+
+    /// The pacing replaces the PID output for its window, and must not mint more than the client
+    /// configured the balancer to.
+    #[test]
+    fn the_pacing_should_never_exceed_the_configured_ceiling() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 30_000,
+            max_surbs_per_sec: 5_000,
+            ..Default::default()
+        });
+        assert_eq!(
+            5_000,
+            state.pacing_cap(),
+            "a fifth of 30 000 is 6 000, above the ceiling"
+        );
+
+        let organic_only = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 7_000,
+            max_surbs_per_sec: 0,
+            ..Default::default()
+        });
+        organic_only.set_pacing_floor(8);
+        assert_eq!(0, organic_only.pacing_cap(), "a ceiling of nothing paces nothing");
     }
 }
