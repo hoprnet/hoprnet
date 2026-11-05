@@ -109,12 +109,15 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
-    /// Exponent applied to return-path weights before sampling, flattening the distribution.
+    /// Exponent applied to path weights before sampling, flattening the distribution. Despite the
+    /// name it applies to forward draws as well as to return draws (the name is kept for
+    /// configuration compatibility).
     ///
-    /// Return paths are drawn weighted-random by path value, which concentrates a session's SURBs
-    /// on the few highest-valued relays — losing one then costs far more than the reliable-mode
-    /// loss tolerance. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and
-    /// bad candidates without changing their order: `w' = w^γ`.
+    /// Paths are drawn weighted-random by path value, which concentrates a session's SURBs, and its
+    /// forward packets, on the few highest-valued relays — losing one then costs far more than the
+    /// reliable-mode loss tolerance, and a forward path that collapses on one relayer goes dark
+    /// with it. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and bad
+    /// candidates without changing their order: `w' = w^γ`.
     ///
     /// `1.0` samples by raw path value (most traffic on the best relays, largest blast radius when
     /// one dies). Values approaching `0.0` tend to a uniform draw (smallest blast radius, most
@@ -125,18 +128,25 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_weight_temper"))]
     #[default = 0.5]
     pub return_path_weight_temper: f64,
-    /// Fraction of return-path draws made uniformly at random instead of by weight.
+    /// Fraction of path draws, forward and return, made uniformly at random instead of by weight
+    /// (the name is kept for configuration compatibility).
     ///
     /// Weights come from observations, and observations only exist for paths that get selected — a
     /// closed loop in which a path that falls out of favour stops being measured, so its score can
     /// never recover and it is never chosen again. Spending a small share of draws uniformly keeps
-    /// every candidate under observation, which is what lets a recovered one climb back.
+    /// the plausible candidates under observation, which is what lets a recovered one climb back.
     ///
-    /// Costs throughput in proportion: this share of return paths deliberately ignores which
-    /// candidate looks best. Candidates have already passed the selector's gates (open channels,
-    /// `min_ack_rate`, and so on) before reaching here, so an exploratory draw is random only with
-    /// respect to *quality*, never a route the cost function rejected. `0.0` disables it.
-    /// Defaults to 0.1.
+    /// Plausible means a tempered weight of at least a tenth of the best candidate's. That leaves out
+    /// a relayer on probation and an edge probes measured dead, and also a healthy path slow or thin
+    /// enough to weigh less than a tenth. An exploring return draw takes one of those only within a
+    /// node-wide allowance of one a second, while an ordinary return draw keeps it at its tempered
+    /// weight: a reply through a relayer on probation is what revives it. A forward draw, exploring or
+    /// not, never takes one, as a forward packet probes nothing.
+    ///
+    /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
+    /// which plausible candidate looks best. Candidates have already passed the selector's gates
+    /// (open channels, `min_ack_rate`, and so on) before reaching here, so an exploratory draw never
+    /// takes a route the cost function rejected. `0.0` disables it. Defaults to 0.1.
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
@@ -205,16 +215,15 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     pwc.cost * lat * cap
 }
 
-/// The weight a candidate is drawn by, as the walk valued it: a return path's weight is tempered to
-/// spread SURBs over relayers (see [`PathPlannerConfig::return_path_weight_temper`]), relayer health
-/// included.
-fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams, returning: bool) -> f64 {
-    let weight = composite_weight(pwc, hops, params);
-    if returning {
-        temper_weights(&[weight], params.return_path_weight_temper)[0]
-    } else {
-        weight
-    }
+/// The weight a candidate is drawn by, as the walk valued it, tempered to spread the draws over
+/// relayers (see [`PathPlannerConfig::return_path_weight_temper`]), relayer health included.
+///
+/// Forward and return paths alike: an untempered forward draw put most of a session's packets on
+/// its single best path, and with the candidate prune diversifying first relayers only, on one
+/// middle relayer, whose death then took the whole forward direction with it (see
+/// `selector::MIDDLE_HOP_SHARE`).
+fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams) -> f64 {
+    temper_weights(&[composite_weight(pwc, hops, params)], params.return_path_weight_temper)[0]
 }
 
 /// Picks an index into `weights` with probability proportional to the weight; `None` if all are
@@ -242,12 +251,15 @@ fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
     weights.iter().rposition(|w| *w > 0.0)
 }
 
-/// Whether this draw should explore — ignore the weights and pick uniformly.
+/// Whether this draw should explore — ignore the weights and pick uniformly among the plausible
+/// candidates (see [`pick_exploring_index`]).
 ///
 /// Weights are derived from observations, and observations only exist for paths that were selected.
 /// Left alone that is a closed loop: a path that falls out of favour stops being measured, so its
 /// score can never recover and it is never chosen again. Spending a small share of draws uniformly
-/// keeps every candidate under observation, which is what lets one that has recovered climb back.
+/// keeps the plausible candidates under observation, which is what lets one that has recovered climb
+/// back. An exploring draw takes a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`] only as a return draw
+/// the [`ProbeBudget`] grants.
 fn should_explore(exploration: f64) -> bool {
     exploration > 0.0 && hopr_api::types::crypto_random::random_float_in_range(0.0..1.0) < exploration
 }
@@ -255,6 +267,98 @@ fn should_explore(exploration: f64) -> bool {
 /// Picks a uniformly random index over `len` entries.
 fn pick_uniform_index(len: usize) -> Option<usize> {
     (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
+}
+
+/// The fraction of the best candidate's (tempered) weight below which a candidate is one the cost
+/// function all but rejects.
+///
+/// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
+/// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
+/// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
+///
+/// Those figures are for the default `return_path_weight_temper` of 0.5. A weight tempered by `t`
+/// puts a relayer on probation at `0.001^t` of a healthy one, so a temper of 1/3 or less lifts it to
+/// this fraction or above: exploration then counts it as plausible, forward draws among them, and
+/// the probe budget no longer holds it back. Whoever lowers the temper that far trades this gate for
+/// the wider spread.
+const PLAUSIBLE_WEIGHT_FRACTION: f64 = 0.1;
+
+/// How often an exploring return draw may pick a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`],
+/// node-wide.
+///
+/// That draw is the probe a relayer on probation is revived by, so it cannot be ruled out, but every
+/// one through a relayer that is really gone is a SURB lost at the counterparty — its PIX share with
+/// it — and each one is written off and replaced. Uniform exploration made a tenth of all draws such
+/// a probe whenever one candidate was implausible: 26 per second at production dimensions, and with
+/// them a few percent of the counterparty's stock dead, enough for a single lost control message to
+/// close a PIX Session. One a second is enough to notice a revival.
+const IMPLAUSIBLE_PROBE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The node-wide allowance of [`IMPLAUSIBLE_PROBE_INTERVAL`].
+#[derive(Debug)]
+struct ProbeBudget {
+    epoch: std::time::Instant,
+    /// Milliseconds since `epoch` of the last probe granted, plus one so that `0` is "none yet".
+    last_ms_plus_one: std::sync::atomic::AtomicU64,
+}
+
+impl Default for ProbeBudget {
+    fn default() -> Self {
+        Self {
+            epoch: std::time::Instant::now(),
+            last_ms_plus_one: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+}
+
+impl ProbeBudget {
+    /// Grants a probe if none was granted within [`IMPLAUSIBLE_PROBE_INTERVAL`].
+    fn take(&self) -> bool {
+        let now = u64::try_from(self.epoch.elapsed().as_millis())
+            .unwrap_or(u64::MAX - 1)
+            .saturating_add(1);
+        let interval = u64::try_from(IMPLAUSIBLE_PROBE_INTERVAL.as_millis()).unwrap_or(u64::MAX);
+        self.last_ms_plus_one
+            .fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |last| (last == 0 || now.saturating_sub(last) >= interval).then_some(now),
+            )
+            .is_ok()
+    }
+}
+
+/// An exploring draw: uniform over the candidates whose weight is at least
+/// [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, and over the others only when `allow_implausible`
+/// grants it (it is asked only when the draw lands on one).
+///
+/// Uniform over the plausible ones whatever is granted: a draw that lands on an implausible candidate
+/// it may not take is redrawn among the plausible ones.
+fn pick_exploring_index(weights: &[f64], allow_implausible: impl FnOnce() -> bool) -> Option<usize> {
+    let best = weights.iter().copied().fold(0.0, f64::max);
+    if best <= 0.0 {
+        return None;
+    }
+    let floor = best * PLAUSIBLE_WEIGHT_FRACTION;
+    let drawn = pick_uniform_index(weights.len())?;
+    if weights[drawn] >= floor || allow_implausible() {
+        return Some(drawn);
+    }
+    let plausible: Vec<usize> = (0..weights.len()).filter(|&i| weights[i] >= floor).collect();
+    pick_uniform_index(plausible.len()).map(|i| plausible[i])
+}
+
+/// Zeroes every weight below [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, so that a weighted draw over
+/// `weights` never lands on a candidate the weights all but reject.
+///
+/// For ordinary forward draws. A return draw keeps such a candidate at its tempered weight, because a
+/// reply through it is what can end a relayer's probation. A forward packet probes nothing, so on such
+/// a candidate all it can do is be lost.
+fn gate_implausible(weights: &mut [f64]) {
+    let floor = weights.iter().copied().fold(0.0, f64::max) * PLAUSIBLE_WEIGHT_FRACTION;
+    for weight in weights.iter_mut().filter(|weight| **weight < floor) {
+        *weight = 0.0;
+    }
 }
 
 /// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
@@ -363,8 +467,7 @@ where
             match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
                 Ok(vp) => {
                     // Return paths are planned from the destination back to us.
-                    let returning = dest_key == me;
-                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting, returning)));
+                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting)));
                     path_metrics.push(pwc);
                 }
                 Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
@@ -580,6 +683,8 @@ pub struct PathPlanner<Surb, R, S> {
     paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
+    /// See [`IMPLAUSIBLE_PROBE_INTERVAL`]; shared by every clone of the planner.
+    probe_budget: Arc<ProbeBudget>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -626,6 +731,7 @@ where
             }),
             cache,
             refresh_period: config.refresh_period,
+            probe_budget: Arc::default(),
         }
     }
 
@@ -693,7 +799,26 @@ where
 
                 // Format from the `NodeId`s rather than re-resolving them: `cached_paths` has
                 // already done that, and for `NodeId::Chain` each resolution is a resolver lookup.
-                paths.pick_one().ok_or_else(|| {
+                //
+                // Explored like a return draw (see `return_path_exploration`): weights exist only for
+                // paths that get drawn, so without it a forward candidate that fell out of favour is
+                // never measured again, and the stream settles on one path.
+                //
+                // Over plausible candidates only, exploring or not: a forward packet through a relayer
+                // on probation, or over an edge probes measured dead, is data lost, PIX shares and
+                // SURBs with it, and it probes nothing (a probation ends on a reply through the
+                // relayer, which only a return path carries). Tempered, a relayer on probation keeps
+                // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
+                let mut weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
+                let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
+                    pick_exploring_index(&weights, || false)
+                } else {
+                    gate_implausible(&mut weights);
+                    pick_weighted_index(&weights)
+                }
+                .and_then(|i| paths.iter().nth(i))
+                .map(|(vp, _)| vp.clone());
+                drawn.ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(
                         hops_usize,
                         source.to_string(),
@@ -897,10 +1022,12 @@ where
             "drawing return paths from tempered weights"
         );
 
+        // An exploring draw may land on a candidate the weights all but reject only within the
+        // node-wide probe allowance: see `IMPLAUSIBLE_PROBE_INTERVAL`.
         let drawn = (0..count)
             .filter_map(|_| {
                 if should_explore(self.paths.weighting.return_path_exploration) {
-                    pick_uniform_index(items.len())
+                    pick_exploring_index(&weights, || self.probe_budget.take())
                 } else {
                     pick_weighted_index(&weights)
                 }
@@ -2021,6 +2148,47 @@ mod tests {
         (planner, graph)
     }
 
+    /// The mirror of [`two_relayer_return_planner`]: a `me -> {a,b} -> dest` forward topology.
+    fn two_relayer_forward_planner() -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [(me, a), (a, dest), (me, b), (b, dest)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(me_addr(), b_addr())
+            .with_open_channel(b_addr(), dest_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
     /// Same `me <- {a,b} <- dest` return topology as [`two_relayer_return_planner_with_floor`], but
     /// `unresolvable` is left out of the chain resolver's key-to-address map -- present in the graph,
     /// so the selector still offers it as a candidate relayer, but `ValidatedPath::new` cannot map it
@@ -2345,6 +2513,135 @@ mod tests {
             "the healthy relayer must keep carrying the return stream"
         );
         Ok(())
+    }
+
+    /// A forward draw explores like a return draw: the weaker relayer keeps a floor of the forward
+    /// packets, so it stays measured and a session does not settle on one path. The health here is
+    /// a sixteenth; tempered that is a quarter of the weight, and exploration adds a twentieth.
+    #[tokio::test]
+    async fn forward_draws_should_be_tempered_and_explored() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+        graph.record_node_health(&b, 1.0 / 16.0);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            } else {
+                assert_eq!(Some(&a), path.first(), "a forward path leaves through A or B");
+            }
+        }
+        // Untempered and unexplored the weaker relayer would get about a seventeenth (~235); a
+        // sixteenth of the health tempered to a quarter gives it about a fifth, plus the exploration.
+        assert!(
+            (500..1500).contains(&via_b),
+            "the weaker relayer keeps a tempered share of the forward draws, got {via_b} of 4000"
+        );
+        Ok(())
+    }
+
+    /// A forward draw never goes through a relayer the weights all but reject, such as one on
+    /// probation, exploring or not. Ungated, its tempered weight alone drew it a few percent of the
+    /// time, and uniform exploration added half of every tenth draw.
+    #[tokio::test]
+    async fn forward_draws_should_never_go_through_a_relayer_on_probation() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+        graph.record_node_health(&b, 1e-3);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            }
+        }
+        // Ungated, the tempered weight alone drew about 0.9 x 4000 x sqrt(1e-3) / (1 + sqrt(1e-3)) ~ 110,
+        // and uniform exploration over both candidates about 310.
+        assert_eq!(
+            0, via_b,
+            "a relayer on probation draws no forward packet, got {via_b} of 4000"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gating_should_zero_only_the_implausible_weights() {
+        let mut weights = [1.0, 0.8, 0.1, 0.03, 0.0];
+        gate_implausible(&mut weights);
+        assert_eq!(
+            [1.0, 0.8, 0.1, 0.0, 0.0],
+            weights,
+            "a tenth of the best stays plausible, anything less is zeroed"
+        );
+        assert!(
+            (0..2000).filter_map(|_| pick_weighted_index(&weights)).all(|i| i < 3),
+            "a weighted draw over the gated weights never lands on an implausible candidate"
+        );
+
+        let mut nothing = [0.0, 0.0];
+        gate_implausible(&mut nothing);
+        assert_eq!(None, pick_weighted_index(&nothing), "nothing to draw from");
+    }
+
+    #[test]
+    fn exploring_draws_should_skip_implausible_candidates_unless_granted() {
+        let weights = [1.0, 0.8, 0.01];
+        let denied = (0..2000)
+            .filter_map(|_| pick_exploring_index(&weights, || false))
+            .collect::<Vec<_>>();
+        assert!(
+            denied.iter().all(|&i| i != 2),
+            "never the implausible one without a grant"
+        );
+        let first = denied.iter().filter(|&&i| i == 0).count();
+        assert!(
+            (800..1200).contains(&first),
+            "uniform over the plausible two, got {first} of 2000 for the first"
+        );
+
+        let granted = (0..3000)
+            .filter_map(|_| pick_exploring_index(&weights, || true))
+            .filter(|&i| i == 2)
+            .count();
+        assert!(
+            (800..1200).contains(&granted),
+            "uniform over all three when granted, got {granted}"
+        );
+
+        assert_eq!(None, pick_exploring_index(&[0.0, 0.0], || true), "nothing to draw from");
+    }
+
+    #[test]
+    fn the_probe_budget_should_grant_one_probe_per_interval() {
+        let budget = ProbeBudget::default();
+        assert!(budget.take(), "the first probe is granted");
+        assert!((0..100).all(|_| !budget.take()), "none more within the interval");
     }
 
     /// From races to the draw: a relayer losing its races by seconds is judged, recorded in the graph,
