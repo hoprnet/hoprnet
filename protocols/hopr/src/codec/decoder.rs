@@ -243,7 +243,7 @@ where
                 // Reporting whether the tag was already present closes the race with a concurrent decode of the
                 // same packet.
                 |tag| {
-                    let is_replay = self.replay_filter.commit(tag);
+                    let is_replay = self.replay_filter.commit_from(&previous_hop, tag);
                     if is_replay {
                         tracing::debug!(%sender, "dropping packet - replay detected while committing");
                     }

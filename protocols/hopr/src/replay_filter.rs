@@ -24,8 +24,10 @@
 //! single packet.
 //!
 //! Instead, each shard keeps two generations. When the current one fills it becomes the previous one and a fresh
-//! current is allocated, so a token is remembered for at least one full generation - a floor that no insertion
-//! pattern can take away, where the old design had none.
+//! current is allocated, so a token is remembered for at least one full generation *of its shard* - a floor that no
+//! insertion pattern can take away, where the old design had none. The floor is per shard rather than global: a
+//! token's shard is chosen by a keyed hash and ages out with that shard alone, so the configured count is a bound on
+//! total retention only when traffic spreads evenly across shards (see [`ReplayFilterConfig::max_tracked_packets`]).
 //!
 //! Aging out is proportional to insert volume (a packet count, not wall time). The cost of shortening the window is
 //! *authenticated* packets, not paid ones: a token is committed once the header MAC verifies, which still precedes
@@ -72,8 +74,11 @@ pub type ReplayToken = hopr_api::types::crypto::types::PacketTag;
 pub struct ReplayFilterConfig {
     /// Number of tokens the filter remembers per generation, across all shards.
     ///
-    /// This is the retention floor: a token stays known for at least one full generation, so it stays known for at
-    /// least `max_tracked_packets` insertions. Must leave every shard at least [`MIN_CAPACITY_PER_SHARD`] slots,
+    /// This is the capacity of one generation, split evenly across the shards, and retention is **per shard**: a
+    /// token stays known until its shard has taken `max_tracked_packets / shards` further distinct tokens, twice
+    /// over (once to retire it, once more to drop the retired generation). So a token survives roughly this many
+    /// *total* inserts only if traffic spreads evenly across shards - which a keyed shard hash makes the expected
+    /// case, but it is not a hard global bound. Must leave every shard at least [`MIN_CAPACITY_PER_SHARD`] slots,
     /// i.e. be at least `shards * MIN_CAPACITY_PER_SHARD` (and at least [`MIN_TRACKED_PACKETS`]).
     ///
     /// At the default false-positive rate the bitmap costs roughly three bytes per token per generation, so a
@@ -146,10 +151,12 @@ fn keyed_hash(key: &[u8; 16], token: &ReplayToken) -> u64 {
     hasher.finish()
 }
 
+/// `serde`/`SmartDefault` default for [`ReplayFilterConfig::max_tracked_packets`].
 fn default_max_tracked_packets() -> usize {
     DEFAULT_MAX_TRACKED_PACKETS
 }
 
+/// `serde`/`SmartDefault` default for [`ReplayFilterConfig::shards`].
 fn default_shards() -> usize {
     DEFAULT_SHARDS
 }
@@ -184,6 +191,9 @@ fn validate_capacity_per_shard(cfg: &ReplayFilterConfig) -> Result<(), validator
     Ok(())
 }
 
+/// Rejects a shard count that is out of range or not a power of two.
+///
+/// Power of two so [`TagReplayFilter::shard_for`] can mask rather than divide, and so every shard stays addressable.
 fn validate_shards(shards: usize) -> Result<(), validator::ValidationError> {
     if !(MIN_SHARDS..=MAX_SHARDS).contains(&shards) || !shards.is_power_of_two() {
         let mut err = validator::ValidationError::new("shards");
@@ -227,6 +237,7 @@ struct ReplayShard {
 }
 
 impl ReplayShard {
+    /// Creates an empty shard that will hold `capacity` tokens per generation.
     fn new(capacity: usize) -> Self {
         Self {
             current: None,
@@ -236,27 +247,34 @@ impl ReplayShard {
         }
     }
 
+    /// Allocates one generation sized for `capacity` tokens.
     fn generation(capacity: usize) -> bloomfilter::Bloom<ReplayToken> {
         bloomfilter::Bloom::new_for_fp_rate_with_seed(capacity, GENERATION_FALSE_POSITIVE_RATE, &random_bytes())
             .expect("bloom filter with the specified capacity is constructible")
     }
 
+    /// Whether either generation holds `token`.
     fn contains(&self, token: &ReplayToken) -> bool {
         self.current.as_ref().is_some_and(|current| current.check(token))
             || self.previous.as_ref().is_some_and(|previous| previous.check(token))
     }
 
-    /// Inserts `token` unless it is already known. Returns `true` if it was already known.
-    fn check_and_set(&mut self, token: &ReplayToken) -> bool {
+    /// Inserts `token` unless it is already known.
+    ///
+    /// Returns `(already_known, rotated)`: whether the token was already present, and whether the shard had to
+    /// retire a generation to record it.
+    fn check_and_set(&mut self, token: &ReplayToken) -> (bool, bool) {
         // Both generations are consulted *before* any rotation. Checking them after would mis-handle the exact
         // case where it matters most: a duplicate that is the token which filled the generation is in the
         // outgoing `current`, which the rotation is about to move into `previous` - so a check made before the
         // rotation would miss it and re-admit it into the fresh generation as a brand-new packet.
         if self.contains(token) {
-            return true;
+            return (true, false);
         }
 
+        let mut rotated = false;
         if self.count == self.capacity {
+            rotated = true;
             // The current generation is full. The oldest one goes, the current one becomes the previous one, and
             // the token is recorded in a fresh generation.
             //
@@ -280,15 +298,16 @@ impl ReplayShard {
             .get_or_insert_with(|| Self::generation(self.capacity))
             .set(token);
         self.count += 1;
-        false
+        (false, rotated)
     }
 }
 
 /// Replay-detecting filter over packet replay tokens.
 ///
 /// Each of the shards keeps two generations of a Bloom filter. When the current one fills it becomes the previous
-/// one and a fresh current is allocated, so a token is remembered for at least one full generation - the floor the
-/// previous single-filter design did not have, since it answered overflow by clearing every tag at once.
+/// one and a fresh current is allocated, so a token is remembered for at least one full generation of its shard -
+/// the floor the previous single-filter design did not have, since it answered overflow by clearing every tag at
+/// once. See [`ReplayFilterConfig::max_tracked_packets`] for what that means for the configured total.
 ///
 /// Sharding by token divides both the lock contention of the decode path and the memory high-water mark. The
 /// namespace is global rather than per previous hop: the token names the packet, not the sender, so a replay
@@ -303,6 +322,24 @@ pub struct TagReplayFilter {
     /// every packet at one shard - 1/64 of the traffic would evict that shard's history. Hashing with a
     /// per-instance key makes the shard unpredictable until a token has been seen, which restores the spread.
     shard_key: [u8; 16],
+    /// How many tokens each previous hop has contributed since the last rotation.
+    ///
+    /// The namespace is shared, so without a cap one peer's traffic could rotate every shard and evict everyone
+    /// else's history. Each peer may fill at most half of what rotates a shard, and the allowance is replenished
+    /// only when a rotation actually happens - so a single peer can never rotate on its own, while a long-lived
+    /// legitimate peer is not locked out.
+    peer_budget: parking_lot::Mutex<PeerBudget>,
+    /// Number of rotations performed so far, used by [`PeerBudget`] to scope its allowance.
+    rotations: std::sync::atomic::AtomicUsize,
+}
+
+/// Per-peer insertion accounting, scoped to the rotation it was opened in.
+#[derive(Debug, Default)]
+struct PeerBudget {
+    /// The rotation count this allowance belongs to.
+    epoch: usize,
+    /// Insertions per previous hop since that rotation.
+    per_peer: std::collections::HashMap<hopr_api::types::crypto::types::OffchainPublicKey, usize>,
 }
 
 impl TagReplayFilter {
@@ -324,6 +361,8 @@ impl TagReplayFilter {
                 .map(|_| parking_lot::Mutex::new(ReplayShard::new(capacity_per_shard)))
                 .collect(),
             shard_key: random_bytes(),
+            peer_budget: parking_lot::Mutex::new(PeerBudget::default()),
+            rotations: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -357,9 +396,50 @@ impl TagReplayFilter {
     /// A `true` return means the token was inserted by a concurrent decode of the same packet between the
     /// [`Self::contains`] check and this call, so the caller holds the duplicate.
     pub fn commit(&self, token: &ReplayToken) -> bool {
-        self.shard_for(token).lock().check_and_set(token)
+        self.commit_and_report(token).0
     }
 
+    /// [`Self::commit`], also reporting whether the shard rotated.
+    fn commit_and_report(&self, token: &ReplayToken) -> (bool, bool) {
+        let (known, rotated) = self.shard_for(token).lock().check_and_set(token);
+        if rotated {
+            self.rotations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        (known, rotated)
+    }
+
+    /// Records `token` on behalf of `peer`, subject to that peer's share of the generation.
+    ///
+    /// Returns whether the token was already known - including the case where the peer is over its budget, in
+    /// which case the token is *checked* but not inserted, so a flood costs the flooding peer its own replay
+    /// detection instead of everyone else's history. A peer may contribute at most half of what rotates a shard,
+    /// so no single previous hop can evict another peer's tokens within the generation floor.
+    pub fn commit_from(&self, peer: &hopr_api::types::crypto::types::OffchainPublicKey, token: &ReplayToken) -> bool {
+        let budget = (self.capacity() / 2).max(1);
+        let mut state = self.peer_budget.lock();
+
+        // The allowance is scoped to one rotation: once any shard rotates, every peer gets its share back. So a
+        // single peer supplies at most half of what rotates a shard, and a rotation therefore needs at least two
+        // peers - which is exactly the property that one peer cannot evict another's tokens.
+        let epoch = self.rotations.load(std::sync::atomic::Ordering::Relaxed);
+        if state.epoch != epoch {
+            state.epoch = epoch;
+            state.per_peer.clear();
+        }
+
+        let used = state.per_peer.entry(*peer).or_insert(0);
+        if *used >= budget {
+            return self.contains(token);
+        }
+
+        let known = self.commit(token);
+        if !known {
+            *used += 1;
+        }
+        known
+    }
+
+    /// The shard `token` is assigned to, under the instance's keyed hash.
     fn shard_for(&self, token: &ReplayToken) -> &parking_lot::Mutex<ReplayShard> {
         // Keyed hash, so the sender - who computes the tag - cannot choose the shard. The mask is enough because
         // the shard count is a power of two.
@@ -369,6 +449,7 @@ impl TagReplayFilter {
 }
 
 impl Default for TagReplayFilter {
+    /// A filter at the default configuration.
     fn default() -> Self {
         Self::new(&ReplayFilterConfig::default())
     }
@@ -382,6 +463,7 @@ mod tests {
 
     use super::*;
 
+    /// Builds a config from the two raw fields.
     fn config(max_tracked_packets: usize, shards: usize) -> ReplayFilterConfig {
         ReplayFilterConfig {
             max_tracked_packets,
@@ -412,6 +494,7 @@ mod tests {
         last
     }
 
+    /// A deterministic synthetic token whose bytes vary with `value`.
     fn token(value: u64) -> ReplayToken {
         // Spread the counter across the token so that shard selection and the Bloom hashes both see variety.
         let mut token: ReplayToken = hopr_api::types::crypto::types::PacketTag::default();
@@ -669,6 +752,43 @@ mod tests {
         let filter = TagReplayFilter::new(&config(1024, 64));
         assert_eq!(1024, filter.capacity());
         assert_eq!(64, filter.shards());
+    }
+
+    /// One flooding peer must not evict another peer's tokens inside the generation floor.
+    ///
+    /// Each peer's allowance is replenished only by a rotation, so a lone flooder can never supply one on its own:
+    /// the victim's token stays inside the floor however much the flooder sends.
+    #[test]
+    fn one_peer_cannot_rotate_the_filter_on_its_own() {
+        use hopr_api::types::crypto::keypairs::{Keypair, OffchainKeypair};
+
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
+        let victim = *OffchainKeypair::random().public();
+        let flooder = *OffchainKeypair::random().public();
+
+        let ours = token(0);
+        assert!(!filter.commit_from(&victim, &ours), "the victim's token is fresh");
+
+        // The flooder sends several generations' worth of its own tokens. With a per-peer allowance of half a
+        // generation, it runs out long before the shard can rotate, and the rest of its traffic is checked but not
+        // recorded.
+        for i in 1..=(4 * filter.capacity() as u64) {
+            filter.commit_from(&flooder, &token(i));
+        }
+
+        let rotations = filter.rotations.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            rotations < 2,
+            "a lone peer must not reach two rotations, got {rotations}"
+        );
+        assert!(
+            filter.count() <= filter.capacity(),
+            "a lone peer must not fill more than one generation"
+        );
+        assert!(
+            filter.contains(&ours),
+            "the victim's token must survive the flood: it is still inside the generation floor"
+        );
     }
 
     #[test]

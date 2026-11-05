@@ -655,8 +655,18 @@ impl HoprPacket {
                     // A packet that never authenticated is not recorded - that is what keeps a token costing a
                     // well-formed packet. One that did is, so its retry is recognised instead of paying a second
                     // decode that cannot succeed either.
+                    //
+                    // The exception is a reply whose opener is missing: a concurrent decode of the same packet
+                    // peeked it first and is about to deliver, so that copy keeps ownership of the token. This one
+                    // therefore neither inserts nor keeps the generic error - it reports the duplicate, which is
+                    // what it is.
                     if authenticated.is_some() {
-                        let _ = commit(&tag);
+                        if matches!(error, crate::sphinx::errors::SphinxError::MissingReplyOpener) {
+                            return Err(PacketReplay);
+                        }
+                        if commit(&tag) {
+                            return Err(PacketReplay);
+                        }
                     }
                     return Err(error.into());
                 }
@@ -803,6 +813,7 @@ mod tests {
             .into();
     }
 
+    /// Re-signs a forwarded packet's ticket so the next hop sees this node as its issuer.
     fn forward(
         mut packet: HoprPacket,
         chain_keypair: &ChainKeypair,
@@ -821,6 +832,7 @@ mod tests {
     }
 
     impl HoprPacket {
+        /// Serializes the packet the way the wire format expects: sphinx payload then ticket.
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!(
                 "67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349"
@@ -844,6 +856,7 @@ mod tests {
         }
     }
 
+    /// A ticket builder for a path of `path_len` hops to `next_peer_channel_key`.
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize) -> anyhow::Result<TicketBuilder> {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
@@ -863,6 +876,7 @@ mod tests {
 
     const FLAGS: PacketSignal = PacketSignal::OutOfSurbs;
 
+    /// Builds an outgoing packet with the given forward path and optional return paths.
     fn create_packet(
         forward_hops: usize,
         pseudonym: HoprPseudonym,
@@ -903,6 +917,7 @@ mod tests {
         )?)
     }
 
+    /// Builds a reply packet over `surb`, signed by the node at `sender_node`.
     fn create_packet_from_surb(
         sender_node: usize,
         surb_id: HoprSurbId,

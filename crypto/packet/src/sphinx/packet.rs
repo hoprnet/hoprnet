@@ -517,12 +517,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 // If the received packet contains a reply message for a pseudonym,
                 // we must perform additional steps to decrypt it
                 if is_reply {
-                    let local_surb = reply_openers(&receiver_data).ok_or_else(|| {
-                        SphinxError::PacketDecodingError(format!(
-                            "couldn't find reply opener for pseudonym: {}",
-                            receiver_data.to_hex()
-                        ))
-                    })?;
+                    let local_surb = reply_openers(&receiver_data).ok_or(SphinxError::MissingReplyOpener)?;
 
                     // Encrypt the packet payload using the derived shared secrets
                     // to reverse the decryption done by individual hops
