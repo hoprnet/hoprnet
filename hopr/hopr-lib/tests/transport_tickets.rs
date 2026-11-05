@@ -289,7 +289,11 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
-    let message_count = 20;
+    // Use enough messages that P(zero wins at 20% win prob) is negligible (0.8^51 ≈ 1.2e-5).
+    // With the SURB balancer off these are the only tickets the channel sees, so a short
+    // run could draw no winner at all; the redemption assertion below needs at least one
+    // to be non-vacuous, which is also what proves the measured traffic reached `mid`.
+    let message_count = 50;
 
     let ticket_price = src
         .inner()
@@ -306,7 +310,15 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .try_into()
         .map_err(|_| anyhow::anyhow!("expected 3 channel guards"))?;
 
-    let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
+    // Disable the SURB balancer: its initial fill sends hundreds of keep-alive
+    // packets through `mid` before the measured messages, each drawing a ticket
+    // against a channel funded for only `message_count + PROBING_OVERHEAD`
+    // winners, so the channel runs dry and `mid`'s redemptions get rejected.
+    // This test is about the winning-ticket count of the measured messages, not
+    // SURB replenishment.
+    let mut session = cluster_fixture
+        .create_session_with(&[src, mid, dst], Default::default(), None)
+        .await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
