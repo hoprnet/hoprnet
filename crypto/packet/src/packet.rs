@@ -644,11 +644,9 @@ impl HoprPacket {
             // absence, which a concurrent copy of the same packet may still be about to fix - so the tag is
             // committed and the original error is returned. Reporting a replay instead would misdescribe a packet
             // that was never seen before.
-            // `authenticated` is the tag the transform derived, so the tag is not computed a second time on the
-            // failure path.
-            let mut authenticated = None;
+            let mut authenticated = false;
             let forwarded = match mp
-                .into_forwarded_with_secret(alpha, secret, mapper, reply_openers, |tag| authenticated = Some(*tag))
+                .into_forwarded_with_secret(alpha, secret, tag, mapper, reply_openers, || authenticated = true)
             {
                 Ok(forwarded) => forwarded,
                 Err(error) => {
@@ -663,16 +661,8 @@ impl HoprPacket {
                     // evicted or restart-lost opener looks like, and calling those replays would send an operator
                     // looking at the wrong subsystem. So the opener error is recorded and returned as itself, and
                     // only an already-known tag is reported as a replay.
-                    if authenticated.is_some() {
-                        let already_known = commit(&tag);
-                        if already_known {
-                            return Err(PacketReplay);
-                        }
-                        if matches!(error, crate::sphinx::errors::SphinxError::MissingReplyOpener) {
-                            // Recorded above, so a retry of *this* copy is a replay; the original error is what
-                            // describes why this one failed.
-                            return Err(error.into());
-                        }
+                    if authenticated && commit(&tag) {
+                        return Err(PacketReplay);
                     }
                     return Err(error.into());
                 }

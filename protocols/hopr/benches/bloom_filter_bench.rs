@@ -41,9 +41,10 @@ fn saturated_filter(max_tracked_packets: usize) -> (TagReplayFilter, ReplayToken
 }
 
 fn tag_replay_filter_bench(c: &mut Criterion) {
-    // A fraction of the default, so the setup loop does not dominate: the per-operation cost depends on the number
-    // of hash probes, not on the filter size.
-    let (filter, existing) = saturated_filter(200_000);
+    // The default size, because per-operation cost *does* depend on it: a filter that fits in cache hides the
+    // bitmap misses that a full-size one takes on every fresh token. Setup is linear now, so this costs about a
+    // minute including the fill.
+    let (filter, existing) = saturated_filter(10_000_000);
 
     let mut group = c.benchmark_group("tag_replay_filter");
     group.sample_size(100);

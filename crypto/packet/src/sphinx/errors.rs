@@ -13,11 +13,12 @@ pub enum SphinxError {
 
     /// No [`ReplyOpener`](super::surb::ReplyOpener) is stored for the reply's sender id.
     ///
-    /// A typed variant rather than a formatted [`SphinxError::PacketDecodingError`] because a caller has to tell it
-    /// apart: for a reply it means "a concurrent copy of this packet peeked the opener first", which is a different
-    /// outcome from a malformed packet.
-    #[error("no reply opener stored for the reply's sender id")]
-    MissingReplyOpener,
+    /// A typed variant rather than a formatted [`SphinxError::PacketDecodingError`] so a caller can recognize the
+    /// opener-cache miss specifically. It says nothing about *why* the opener is gone: a concurrent copy of the same
+    /// reply may have consumed it, or it may have expired, been evicted, or been lost with the cache on restart. The
+    /// pseudonym is carried so a log line points at the pseudonym whose openers went missing.
+    #[error("no reply opener stored for the reply's sender id (pseudonym {0})")]
+    MissingReplyOpener(String),
 
     #[error(transparent)]
     CryptoError(#[from] hopr_types::crypto::errors::CryptoError),

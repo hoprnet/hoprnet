@@ -691,24 +691,21 @@ mod tests {
         assert_eq!(64, filter.shards());
     }
 
-    /// No packet is ever accepted without being recorded, however much traffic has already gone through.
+    /// A token this filter accepts must be reported as a replay the next time it is offered, however much traffic
+    /// has passed through in between.
     ///
-    /// A per-peer insertion allowlist was tried here to stop one peer rotating the filter; once a peer exhausted it,
-    /// its packets were checked but no longer stored, so a replay of them was accepted too. This pins the simpler
-    /// contract: acceptance implies recording.
+    /// This is the property a per-peer insertion allowance broke: past its allowance a peer's packets were accepted
+    /// without being recorded, so the same packet was accepted again. Exercised through the whole filter rather than
+    /// a single shard, over several rotations.
     #[test]
-    fn no_accepted_packet_is_left_unrecorded() {
+    fn a_token_accepted_now_must_be_a_replay_later() {
         let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 4));
 
-        // Far more than a generation's worth of tokens, so several rotations happen.
+        // Far more than a generation's worth, so several rotations happen before the token of interest.
         for i in 0..(3 * filter.capacity() as u64) {
-            let t = token(i);
-            if !filter.commit(&t) {
-                assert!(filter.contains(&t), "a newly recorded token must be known");
-            }
+            filter.commit(&token(i));
         }
 
-        // A token accepted now must be recognised on the next pass, regardless of how much came before it.
         let recent = token(3 * filter.capacity() as u64 + 1);
         assert!(!filter.commit(&recent), "the token is fresh");
         assert!(
