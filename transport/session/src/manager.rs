@@ -304,6 +304,12 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 /// [`SURB_RESERVE_POLL`]. It has no deadline of its own: the Session's own deadlines apply, and a
 /// Session that is closed drops the future with the sink.
 ///
+/// Only once the Entry has shown that it refills the stock
+/// ([`BalancerStateValues::counterparty_refills`]): that is, a keep-alive from it, which only an
+/// Entry with a SURB balancer sends. An Entry without one still announces a target, so its Session is
+/// rate-controlled too, but it attaches one SURB to each data packet and nothing else. A reply held for
+/// a stock above the reserve would then wait until the Entry sent that many more packets.
+///
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
 /// directly (see [`SessionManager::spawn_exit_keep_alive`]), and the PIX fill packets are bounded by
 /// their own `min_surb_reserve`. That is the point of the reserve: they are what it is held for.
@@ -312,6 +318,10 @@ fn hold_for_surb_reserve(
     estimator: &AtomicSurbFlowEstimator,
     balancer: &Arc<BalancerStateValues>,
 ) -> Option<futures::future::BoxFuture<'static, ()>> {
+    if !balancer.counterparty_refills() {
+        return None;
+    }
+
     let stock = estimator.saturating_diff();
     let reserve = current_keep_alive_surb_reserve(balancer);
     if stock > reserve {
@@ -336,8 +346,8 @@ fn hold_for_surb_reserve(
 }
 
 /// The Exit's data egress for a rate-controlled Session: holds each packet back while the SURB stock
-/// is down to the keep-alive reserve of the target `balancer` holds, books the SURB it consumes, and
-/// passes it through the PIX egress gate.
+/// is down to the keep-alive reserve of the target `balancer` holds (once the Entry refills it, see
+/// [`hold_for_surb_reserve`]), books the SURB it consumes, and passes it through the PIX egress gate.
 ///
 /// Built as one piece, and not inline where the Session is set up, so that the order of its three
 /// steps can be tested: the SURB is booked only when the packet goes on, so a packet that is held is
@@ -6661,9 +6671,9 @@ where
                 session_config(&self.cfg, session_req.capabilities.into()),
                 (
                     // Sent packets = SURB consumption estimate. Data is held back once the stock is down
-                    // to the reserve for the keep-alives: a rate-controlled Session has a balancer on the
-                    // other side that acts on what the Exit reports, which the `NoRateControl` branch
-                    // below has not.
+                    // to the reserve for the keep-alives, but only after the Entry's first keep-alive has
+                    // shown that a balancer on its side acts on what the Exit reports. An Entry without
+                    // one announces a target too, and the `NoRateControl` branch below has none.
                     exit_data_egress(
                         msg_sender.clone().sink_map_err(std::io::Error::other),
                         session_id,
@@ -6972,6 +6982,10 @@ where
                 }
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
+                    // Only an Entry's SURB balancer sends keep-alives: from now on the Exit's data can be
+                    // held back for its keep-alive reserve, which this Entry will refill.
+                    session_slot.surb_mgmt.note_counterparty_refills();
+
                     // Allow updating SURB balancer target based on the received Keep-Alive message
                     if msg.flags.contains(KeepAliveFlag::BalancerTarget)
                         && msg.additional_data > 0
@@ -13776,6 +13790,8 @@ mod tests {
     /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's
     ///    `target_surb_buffer_size` reaches 2000 (with a 1-second timeout).
     /// 4. The target is confirmed to be 2000, proving the `BalancerTarget` flag updated it.
+    /// 5. The slot now records that the Entry refills the Exit's stock, which arms the Exit's keep-alive reserve: only
+    ///    an Entry's SURB balancer sends keep-alives.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_target_on_keep_alive_with_balancer_target_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -13825,6 +13841,10 @@ mod tests {
             initial_target,
             "initial target should be set"
         );
+        assert!(
+            !session_slot.surb_mgmt.counterparty_refills(),
+            "no keep-alive yet, so nothing shows the Entry refills"
+        );
         drop(session_slot);
 
         // Create keep-alive message with BalancerTarget flag
@@ -13867,6 +13887,10 @@ mod tests {
             0,
             session_slot.returned_packets.load(Ordering::Relaxed),
             "an Entry keep-alive received on the Exit must not count as returned Exit service"
+        );
+        assert!(
+            session_slot.surb_mgmt.counterparty_refills(),
+            "the Entry's keep-alive shows its balancer refills the Exit's stock"
         );
 
         Ok(())
@@ -21176,11 +21200,53 @@ mod tests {
         Ok(())
     }
 
+    /// The Exit's state for a Session whose Entry asks for `target` and has shown, by a keep-alive, that
+    /// it refills the Exit's stock.
     fn balancer_with_target(target: u64) -> Arc<BalancerStateValues> {
-        Arc::new(BalancerStateValues::new(SurbBalancerConfig {
+        let balancer = Arc::new(BalancerStateValues::new(SurbBalancerConfig {
             target_surb_buffer_size: target,
             ..Default::default()
-        }))
+        }));
+        balancer.note_counterparty_refills();
+        balancer
+    }
+
+    /// An Entry without a SURB balancer announces a fallback target (50 at the defaults, a reserve of 12),
+    /// but attaches one SURB to each data packet and sends no keep-alives: nothing would raise the stock
+    /// above the reserve. Until a keep-alive shows the Entry refills, the Exit sends at any stock.
+    #[tokio::test]
+    async fn data_should_not_be_held_for_an_entry_that_has_not_shown_it_refills() -> anyhow::Result<()> {
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        estimator.produced.store(1, Ordering::Relaxed);
+        let balancer = Arc::new(BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 50,
+            ..Default::default()
+        }));
+        assert_eq!(12, current_keep_alive_surb_reserve(&balancer));
+
+        let session_id = HoprPseudonym::random();
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            session_id,
+            estimator.clone(),
+            balancer.clone(),
+            None,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("the reply must not wait for a stock the Entry will never send")??;
+        assert!(
+            forwarded.try_recv().is_ok(),
+            "forwarded on the one SURB the request brought"
+        );
+
+        balancer.note_counterparty_refills();
+        assert!(
+            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            "once the Entry refills, a stock at the reserve holds data again"
+        );
+        Ok(())
     }
 
     /// The reserve follows the target the Entry asks for now, not the one the Session opened with: an

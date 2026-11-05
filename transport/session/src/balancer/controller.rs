@@ -210,6 +210,9 @@ pub struct BalancerStateValues {
     /// The fewest SURBs per second the paced fill and refill may be held to: one keep-alive's worth,
     /// set by the Session that owns the balancer. `0` until set. See [`pacing_cap`](Self::pacing_cap).
     pacing_floor: AtomicU64,
+    /// Exit-side: whether the Entry has shown that it refills this side's SURB stock. See
+    /// [`counterparty_refills`](Self::counterparty_refills).
+    counterparty_refills: AtomicBool,
 }
 
 /// The instant the activity stamps of a [`BalancerStateValues`] count from: when it was made.
@@ -530,6 +533,20 @@ impl BalancerStateValues {
     /// Records that the counterparty was heard from now.
     pub(crate) fn note_heard(&self) {
         self.stamp(&self.last_heard, std::time::Instant::now());
+    }
+
+    /// Records that the counterparty refills this side's SURB stock. The Exit calls it on a keep-alive
+    /// from the Entry: only an Entry's SURB balancer runs a keep-alive stream.
+    pub(crate) fn note_counterparty_refills(&self) {
+        self.counterparty_refills
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether the counterparty has shown that it refills this side's SURB stock (see
+    /// [`note_counterparty_refills`](Self::note_counterparty_refills)). An Entry without a SURB
+    /// balancer never does: it attaches one SURB to each data packet and sends no keep-alives.
+    pub(crate) fn counterparty_refills(&self) -> bool {
+        self.counterparty_refills.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Records that a Session data packet is going out now. The first one since the counterparty was
