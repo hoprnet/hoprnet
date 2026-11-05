@@ -191,6 +191,13 @@ fn default_admitted_headroom_percent() -> u32 {
 /// (`enforce_pix` only makes it mandatory), so the option had no safe use — and what it was for is
 /// what the generation tag does.
 ///
+/// What FIFO gives up is that SURBs the sender replaced, because their return path broke, are spent
+/// before their replacements, so a dead relayer's SURBs are spent into the void until the buffer turns
+/// over. The sender makes up for it: when a relayer is judged dead it advances the session's SURB
+/// generation, and this side drops everything it holds on the next push (see "Generations" on the
+/// internal `SurbRingBuffer`). The sender's judgement of its relayers counts on this order as well: it
+/// reads a race between two SURBs minted together by the one a FIFO replier spends first.
+///
 /// This enum, and the [`SurbStoreConfig::pop_order`] field carrying it, remain only so that existing
 /// configurations (`pop_order: fifo`) and code naming [`SurbPopOrder::Fifo`] keep working; they are
 /// candidates for removal in a later major version. `pop_order: lifo` is rejected as an unknown
@@ -1027,6 +1034,10 @@ impl MemorySurbStore {
     /// It is also why only `admit` creates an admitted entry: an insert that minted one itself would
     /// have no admission number to stamp, and a ring stamped with the sentinel is one no retire ever
     /// removes.
+    ///
+    /// The outcome adds what the fold-in evicted and superseded to what the push did, as the quarantine
+    /// arm does: those SURBs were booked when their packets arrived, and the decoder can book their
+    /// leaving only from this outcome.
     fn push_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
@@ -1034,11 +1045,16 @@ impl MemorySurbStore {
         surbs: Vec<(HoprSurbId, HoprSurb)>,
         generation: u8,
     ) -> SurbInsertOutcome {
-        self.fold_quarantine_into(pseudonym, admitted);
+        let folded = self.fold_quarantine_into(pseudonym, admitted).unwrap_or_default();
 
         let outcome = admitted.push(surbs, generation);
         self.record_ring_overflow(&outcome);
-        outcome
+        SurbInsertOutcome {
+            retained: outcome.retained,
+            evicted: outcome.evicted + folded.evicted,
+            evicted_shares: outcome.evicted_shares + folded.evicted_shares,
+            superseded: outcome.superseded + folded.superseded,
+        }
     }
 
     /// Pushes a batch into `pseudonym`'s quarantine ring, creating the ring if it has none, and books
@@ -1197,6 +1213,8 @@ impl MemorySurbStore {
                     retained: self.ring_len(pseudonym),
                     evicted: surbs.len(),
                     evicted_shares: surbs.iter().filter(|(_, surb)| surb.ssa_index().is_some()).count(),
+                    // Refused whole and booked as `evicted` above; the generation rule took nothing.
+                    superseded: 0,
                 };
             }
         }
@@ -1214,6 +1232,7 @@ impl MemorySurbStore {
                 retained: folded.retained,
                 evicted: pushed.evicted + folded.evicted,
                 evicted_shares: pushed.evicted_shares + folded.evicted_shares,
+                superseded: pushed.superseded + folded.superseded,
             },
             // Nothing left to fold: `admit`'s own promotion, or a concurrent insert, already moved it.
             None => SurbInsertOutcome {
@@ -1356,6 +1375,7 @@ impl SurbStore for MemorySurbStore {
                 retained: self.ring_len(&pseudonym),
                 evicted: 0,
                 evicted_shares: 0,
+                superseded: 0,
             };
         };
 
@@ -1370,7 +1390,9 @@ impl SurbStore for MemorySurbStore {
         let dropped = mixed - surbs.len();
         if dropped > 0 {
             // A statement about the peer that minted the batch, not a local fault: `warn`, not
-            // `error`. These are not capacity pressure, so they stay out of the `evicted` count.
+            // `error`. These are not capacity pressure, so they stay out of the `evicted` count; they
+            // are `superseded` below, because the packet reported them as received and the Exit's flow
+            // estimate has to see that they never reached the store.
             tracing::warn!(
                 %pseudonym,
                 dropped,
@@ -1394,11 +1416,14 @@ impl SurbStore for MemorySurbStore {
         // An absent entry therefore means the pseudonym is not admitted (or was just retired), and the
         // batch belongs to the quarantine like any other unadmitted one — whose arm re-checks this
         // lookup after its push, for an `admit` that lands in between.
-        if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
-            return self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation);
-        }
-
-        self.insert_surbs_into_quarantine(&pseudonym, surbs, generation)
+        let mut outcome = if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
+            self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation)
+        } else {
+            self.insert_surbs_into_quarantine(&pseudonym, surbs, generation)
+        };
+        // The mismatched ones above never entered the buffer either.
+        outcome.superseded += dropped;
+        outcome
     }
 
     fn tier_lens(&self, pseudonym: &HoprPseudonym) -> Option<(usize, usize)> {
@@ -2000,18 +2025,23 @@ impl<S> SurbRingBuffer<S> {
     /// all, since dropping a SURB is otherwise indistinguishable from a clean insert.
     /// It counts *capacity* overflow only: SURBs dropped because a newer generation superseded them
     /// were already unusable, and reporting them as pressure would ask the creator to slow down
-    /// because it re-planned its own return path.
+    /// because it re-planned its own return path. They are reported separately, as
+    /// [`superseded`](SurbInsertOutcome::superseded): the whole of what a newer generation cleared, or
+    /// the whole of an older-generation batch that was refused. The caller that tracks what the buffer
+    /// holds adds the two, so that `retained` and its own count of what was received agree.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> SurbInsertOutcome
     where
         S: SurbShareInfo,
     {
         let mut inner = self.inner.lock();
+        let mut superseded = 0;
 
         match inner.generation {
             Some(current) if generation == current => {} // ordinary refill: append below
             Some(current) if generation_is_newer(generation, current) => {
                 // Return path changed: everything held is for the superseded path. Drop it wholesale
                 // so the newer batch is all that remains and the next reply uses the live path.
+                superseded = inner.len();
                 inner.clear();
                 inner.generation = Some(generation);
             }
@@ -2022,6 +2052,7 @@ impl<S> SurbRingBuffer<S> {
                     retained: inner.len(),
                     evicted: 0,
                     evicted_shares: 0,
+                    superseded: surbs.into_iter().count(),
                 };
             }
             None => inner.generation = Some(generation),
@@ -2059,6 +2090,7 @@ impl<S> SurbRingBuffer<S> {
             retained: inner.len(),
             evicted,
             evicted_shares,
+            superseded,
         }
     }
 
@@ -2499,7 +2531,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0)
         );
@@ -2507,7 +2540,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 4,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([3u8; 8], 0), ([4u8; 8], 0)], 0)
         );
@@ -2525,7 +2559,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "a 3-element push into a 2-slot buffer drops exactly one, and it carried no share"
@@ -2556,7 +2591,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([3u8; 8], 0)], 0)
         );
@@ -2564,7 +2600,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 2,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0)
         );
@@ -2574,7 +2611,9 @@ mod tests {
     /// creator re-planned its own return path. Counting them as evictions would report capacity
     /// pressure that does not exist, and the count feeds the eviction summary (and the
     /// counterparty-facing `num_evicted_surbs`) that exists to flag over-production. The same holds for
-    /// a late older-generation batch, which is discarded without ever entering the buffer.
+    /// a late older-generation batch, which is discarded without ever entering the buffer. They are
+    /// not lost to the caller's bookkeeping, though: `superseded` carries the number, so that the
+    /// Exit's flow estimate can book the wipe.
     #[test]
     fn surb_ring_buffer_should_not_count_superseded_generations_as_evictions() {
         let rb = SurbRingBuffer::new(2);
@@ -2585,26 +2624,36 @@ mod tests {
         );
 
         // A newer generation clears the full buffer before inserting: two SURBs go, none of them to
-        // capacity pressure.
+        // capacity pressure, and both are reported as superseded.
         assert_eq!(
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 2
             },
             rb.push([([3u8; 8], 0)], 1),
-            "a supersede-and-clear is not an overflow"
+            "a supersede-and-clear is not an overflow, but the wiped stock is reported"
         );
 
-        // A late batch from the superseded generation is dropped whole, again without overflowing.
+        // A late batch from the superseded generation is dropped whole, again without overflowing;
+        // the whole batch is reported as superseded, and the buffer is untouched.
         assert_eq!(
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 2
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0),
-            "a discarded older-generation batch is not an overflow"
+            "a discarded older-generation batch is not an overflow, but its size is reported"
+        );
+
+        // An ordinary refill at the current generation supersedes nothing.
+        assert_eq!(
+            0,
+            rb.push([([6u8; 8], 0)], 1).superseded,
+            "an equal generation appends and supersedes nothing"
         );
     }
 
@@ -3117,6 +3166,11 @@ mod tests {
             "a mismatched SURB is not capacity pressure and must not be reported as eviction"
         );
         assert_eq!(0, outcome.evicted_shares, "and it cannot have cost a share either");
+        assert_eq!(
+            2, outcome.superseded,
+            "the generation-0 SURB the batch wiped and the mismatched one it refused are both gone from the buffer, \
+             though the packet reported both of its SURBs as received"
+        );
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
@@ -3159,7 +3213,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 3,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([share_surb(1)?, plain_surb(2)?, share_surb(3)?], 0)
         );
@@ -3168,7 +3223,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 3,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([share_surb(4)?], 0),
             "the share-less SURB goes, not the older share, so no share is lost"
@@ -3191,7 +3247,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([plain_surb(3)?], 0)
         );
@@ -3212,7 +3269,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 1
+                evicted_shares: 1,
+                superseded: 0
             },
             rb.push([share_surb(3)?], 0)
         );
@@ -3234,7 +3292,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([plain_surb(1)?, share_surb(2)?, share_surb(3)?], 0)
         );
@@ -3244,7 +3303,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 2,
-                evicted_shares: 1
+                evicted_shares: 1,
+                superseded: 0
             },
             rb.push([plain_surb(4)?, share_surb(5)?], 0)
         );
@@ -3800,7 +3860,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill)
         );
@@ -3810,7 +3871,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![share.clone()])
         );
@@ -3820,7 +3882,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 2,
-                evicted_shares: 2
+                evicted_shares: 2,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![share.clone(); 2])
         );
@@ -3830,7 +3893,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 3,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![plain; 3])
         );
@@ -4294,7 +4358,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: fill.len(),
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill),
             "the successor's larger target must have raised the ring's ceiling, not been left at the predecessor's"
@@ -4330,12 +4395,66 @@ mod tests {
             SurbInsertOutcome {
                 retained: fill.len(),
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill),
             "a smaller successor target must not narrow the ceiling the predecessor already established"
         );
 
+        Ok(())
+    }
+
+    /// An admitted insert that folds in a quarantine ring left by the race around `admit` reports what
+    /// the fold-in took: SURBs of an older generation the admitted ring refuses were booked when their
+    /// packets arrived, and only this outcome tells the decoder they left.
+    #[test]
+    fn the_admitted_arm_must_report_what_its_fold_in_superseded() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let _token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+        let admitted = AdmittedRing::clone(
+            &store
+                .admitted_surbs_per_pseudonym
+                .get(&pseudonym)
+                .context("the Session's admitted entry must exist")?,
+        );
+        store.insert_surbs_into_admitted(
+            &pseudonym,
+            admitted.clone(),
+            vec![([1u8; 8], surb_via(relayer, DIRECT)?)],
+            1,
+        );
+
+        // An insert that routed to the quarantine just before `admit` left an older generation there.
+        store.push_into_quarantine(
+            &pseudonym,
+            vec![
+                ([2u8; 8], surb_via(relayer, DIRECT)?),
+                ([3u8; 8], surb_via(relayer, DIRECT)?),
+            ],
+            0,
+        );
+
+        let outcome =
+            store.insert_surbs_into_admitted(&pseudonym, admitted, vec![([4u8; 8], surb_via(relayer, DIRECT)?)], 1);
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 0,
+                evicted_shares: 0,
+                superseded: 2
+            },
+            outcome,
+            "the two quarantined SURBs the newer generation refused were booked when they arrived, so their leaving \
+             must reach the decoder"
+        );
+        assert!(
+            store.quarantine_surbs.get(&pseudonym).is_none(),
+            "the fold-in drained the quarantine ring"
+        );
         Ok(())
     }
 
@@ -4373,7 +4492,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the batch must be retained in the admitted ring, not strained against the quarantine cap"
@@ -4572,7 +4692,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the batch must be retained, in the quarantine"
@@ -4610,7 +4731,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the outcome must report what the admitted ring holds once the batch is folded in"
@@ -4768,7 +4890,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 99,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the drain must have freed room for the whole batch over several passes"

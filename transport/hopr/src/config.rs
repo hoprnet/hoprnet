@@ -272,6 +272,39 @@ pub struct HoprProtocolConfig {
         serde(default = "default_surb_flush_interval", with = "humantime_serde")
     )]
     pub surb_flush_interval: Duration,
+    /// How long a relayer's SURB reply races are remembered when judging its health, in multiples of
+    /// its own typical margin plus spread. Longer is steadier but slower to notice a stall and to
+    /// forgive a recovery. `0` judges dead or healthy only.
+    #[default(default_latency_race_memory())]
+    #[cfg_attr(feature = "serde", serde(default = "default_latency_race_memory"))]
+    pub latency_race_memory: u32,
+    /// How hard relayer health bites in path selection: the graph gets `health^weight`. `1` as judged,
+    /// above `1` harsher, `0` switches the mitigation off, dead relayers included. Must be finite.
+    #[default(default_relayer_health_weight())]
+    #[validate(custom(function = "validate_relayer_health_weight"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_relayer_health_weight"))]
+    pub relayer_health_weight: f64,
+}
+
+fn default_latency_race_memory() -> u32 {
+    4
+}
+
+fn default_relayer_health_weight() -> f64 {
+    1.0
+}
+
+/// Rejects a negative or non-finite `relayer_health_weight`. A minimum alone lets NaN and `+inf` through:
+/// `health^NaN` is NaN, and `health^inf` zeroes every health below one, either way dropping valid paths
+/// from weighted selection.
+fn validate_relayer_health_weight(value: f64) -> Result<(), ValidationError> {
+    if value.is_finite() && value >= 0.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "relayer health weight must be finite and non-negative",
+        ))
+    }
 }
 
 /// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
@@ -1046,6 +1079,24 @@ mod tests {
             *incoming.quota_range.end(),
             "the accepted range must be anchored at the nominal default quota"
         );
+    }
+
+    #[test]
+    fn relayer_health_weight_must_be_finite_and_non_negative() {
+        for weight in [0.0, 1.0, 2.5] {
+            let config = HoprProtocolConfig {
+                relayer_health_weight: weight,
+                ..Default::default()
+            };
+            assert!(config.validate().is_ok(), "a weight of {weight} must be accepted");
+        }
+        for weight in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let config = HoprProtocolConfig {
+                relayer_health_weight: weight,
+                ..Default::default()
+            };
+            assert!(config.validate().is_err(), "a weight of {weight} must be rejected");
+        }
     }
 
     #[test]
