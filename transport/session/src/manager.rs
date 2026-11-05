@@ -899,6 +899,15 @@ pub(crate) struct SessionSlot {
     /// The same cell is what identifies this slot to the commit that allocated it — see
     /// [`AdmissionCell`].
     admission_token: AdmissionCell,
+    /// The largest SURB target a `BalancerTarget` keep-alive has announced for this Session, or
+    /// `None` while none has.
+    ///
+    /// Kept because the Exit answers `SessionEstablished` before it commits, so the Entry's ramp can
+    /// announce a raised target in that window: the ring is sized at `commit`, from the target
+    /// announced at establishment, and a raise that arrived earlier would otherwise be lost until the
+    /// Entry announced it again. The commit applies this figure too, and every later raise widens the
+    /// ring on the spot (see [`SurbAdmissionControl::raise_target`]).
+    raised_surb_target: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl SessionSlot {
@@ -914,6 +923,36 @@ impl SessionSlot {
     /// got there first (or the Session was never admitted at all).
     fn claim_admission_token(&self) -> AdmissionToken {
         *self.admission_token.get_or_init(|| AdmissionToken::NONE)
+    }
+
+    /// The token this slot holds, or [`AdmissionToken::NONE`] while no `commit` has run.
+    ///
+    /// Read-only, unlike [`claim_admission_token`](Self::claim_admission_token): a keep-alive asking
+    /// the store to widen this Session's ring must not *claim* the cell, or it would initialize it and
+    /// make the establishment's own `commit` fail its `set` — retiring the live admission and leaving
+    /// the Session's SURBs unadmitted.
+    fn peek_admission_token(&self) -> AdmissionToken {
+        self.admission_token.get().copied().unwrap_or(AdmissionToken::NONE)
+    }
+
+    /// Records a target announced by a `BalancerTarget` keep-alive, if it is the largest so far.
+    ///
+    /// Monotone on purpose, matching the ring it widens: the announcement stream is a slew, and the
+    /// last value seen is the one the Entry is filling toward. Recorded even before `commit` has
+    /// sized the ring, which is the window the Exit's `SessionEstablished`-before-commit ordering
+    /// opens; [`peek_raised_surb_target`](Self::peek_raised_surb_target) then lets the commit start
+    /// from the largest figure already announced rather than from establishment's.
+    fn note_raised_surb_target(&self, target: usize) {
+        self.raised_surb_target
+            .fetch_max(target, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// The largest target announced since establishment, or `None` while none has been.
+    fn peek_raised_surb_target(&self) -> Option<usize> {
+        match self.raised_surb_target.load(std::sync::atomic::Ordering::Relaxed) {
+            0 => None,
+            target => Some(target),
+        }
     }
 }
 
@@ -1452,7 +1491,12 @@ impl<'a> SessionSlotGuard<'a> {
         // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
         // this admission's to stamp. The commit itself — logging and the metric below — still happens.
         if let (Some(admission), Some(slot)) = (admission, slot) {
-            let token = admission.admit(&self.session_id, capacity);
+            // The Exit commits after it has answered `SessionEstablished`, so a `BalancerTarget`
+            // keep-alive can have announced a raised target before the ring exists. Admit at the
+            // larger of the two: the ring is sized once here, and a raise that arrived in that
+            // window must not be lost until the Entry announces it again.
+            let announced = capacity.max(slot.peek_raised_surb_target().unwrap_or(0));
+            let token = admission.admit(&self.session_id, announced);
             if slot.admission_token.set(token).is_err() {
                 // A teardown claimed the cell first, so nothing will retire this admission. Retire
                 // it here — see the doc comment for why this is immediate rather than deferred.
@@ -1461,6 +1505,10 @@ impl<'a> SessionSlotGuard<'a> {
                     "session was torn down while it committed; retiring the admission it could not record"
                 );
                 admission.retire(&self.session_id, token);
+            } else if let Some(raised) = slot.peek_raised_surb_target().filter(|&raised| raised > announced) {
+                // The target moved again between the admit and the token being recorded; widen for
+                // it rather than leave the ring a step behind until the next announcement.
+                admission.raise_target(&self.session_id, token, raised);
             }
         }
 
@@ -2975,7 +3023,7 @@ where
                             HoprStartProtocol::SessionError(error_type) => {
                                 myself.handle_session_error(error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg, packet_info).await,
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
                                 myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
@@ -3378,6 +3426,7 @@ where
                                 // charged by the side that reconstructs.
                                 cycle_budget: None,
                                 admission_token: Default::default(),
+                                raised_surb_target: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -3512,6 +3561,7 @@ where
                                 // charged by the side that reconstructs.
                                 cycle_budget: None,
                                 admission_token: Default::default(),
+                                raised_surb_target: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -4801,6 +4851,7 @@ where
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
             admission_token: Default::default(),
+            raised_surb_target: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -4835,6 +4886,7 @@ where
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
             admission_token: Default::default(),
+            raised_surb_target: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -5274,6 +5326,7 @@ where
             returned_packets: Default::default(),
             cycle_budget,
             admission_token: Default::default(),
+            raised_surb_target: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -5644,8 +5697,12 @@ where
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip(self, msg))]
-    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> errors::Result<()> {
+    #[tracing::instrument(level = "trace", skip(self, msg, in_packet_info))]
+    async fn handle_keep_alive(
+        &self,
+        msg: KeepAliveMessage<SessionId>,
+        in_packet_info: IncomingPacketInfo,
+    ) -> errors::Result<()> {
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -5674,33 +5731,63 @@ where
                 }
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
-                    // Allow updating SURB balancer target based on the received Keep-Alive message
+                    // Allow updating SURB balancer target based on the received Keep-Alive message.
+                    //
+                    // Clamped exactly as establishment clamps it, and for every use below. The value
+                    // is a peer's claim: the balancer's set-point and the ring's ceiling are two
+                    // views of one figure, and letting an over-announcing Entry set them apart would
+                    // have the Exit aim at a buffer the ring can never hold.
+                    let announced = msg.additional_data.min(self.cfg.maximum_surb_buffer_size as u64);
                     if msg.flags.contains(KeepAliveFlag::BalancerTarget)
-                        && msg.additional_data > 0
+                        && announced > 0
                         && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
+                        && session_slot.surb_mgmt.controller_bounds().target() != announced
                     {
                         // Update the target buffer size as sent to us from the Entry
                         session_slot
                             .surb_mgmt
                             .target_surb_buffer_size
-                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                            .store(announced, std::sync::atomic::Ordering::Relaxed);
                         // Update maximum SURBs per second based on the new target
                         session_slot.surb_mgmt.max_surbs_per_sec.store(
-                            msg.additional_data / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                            announced / self.cfg.minimum_surb_buffer_duration.as_secs(),
                             std::sync::atomic::Ordering::Relaxed,
                         );
-                        debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
+
+                        // The store sized this Session's ring once, off the target announced at
+                        // establishment. A target raised afterwards must widen it, or every SURB
+                        // minted toward the new one is evicted on arrival — under PIX, together with
+                        // the share it carried. See `SurbAdmissionControl::raise_target`.
+                        //
+                        // Recorded on the slot before the call as well: the Exit answers
+                        // `SessionEstablished` before it commits, so this can arrive before the ring
+                        // exists. The commit sizes the ring from the recorded figure; once the
+                        // admission exists, the raise widens it on the spot.
+                        session_slot.note_raised_surb_target(announced as usize);
+                        if let Some(admission) = self.surb_admission.get() {
+                            admission.raise_target(
+                                &session_id,
+                                session_slot.peek_admission_token(),
+                                announced as usize,
+                            );
+                        }
+
+                        debug!(%session_id, target_surb_buffer_size = announced, "keep-alive updated SURB balancer target buffer size from the Entry");
                     }
 
-                    // Increase the number of received SURBs in the estimator.
-                    let produced = msg.max_surbs()? as u64;
-                    session_slot
-                        .surb_estimator
-                        .produced
-                        .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                    // Increase the number of received SURBs in the estimator. The packet info is the
+                    // only exact count: `max_surbs()` is what the keep-alive *could* carry, and
+                    // `num_evicted_surbs` is what the full store dropped on arrival. Booking the
+                    // bound without the evictions makes the level report, and the PIX fill reserve
+                    // measured against it, read a store far fuller than it is.
+                    let saved = in_packet_info.num_saved_surbs as u64;
+                    account_incoming_surbs(
+                        &session_slot.surb_estimator,
+                        saved,
+                        in_packet_info.num_evicted_surbs as u64,
+                    );
                     #[cfg(feature = "telemetry")]
-                    telemetry::record_session_surb_produced(&session_id, produced);
+                    telemetry::record_session_surb_produced(&session_id, saved);
                 }
             }
         } else {
@@ -6957,6 +7044,7 @@ mod tests {
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
+                raised_surb_target: Default::default(),
             },
         );
 
@@ -7391,6 +7479,10 @@ mod tests {
         admit_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
         /// The tokens `retire` presented, in call order.
         retire_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// The tokens `raise_target` presented, in call order.
+        raise_tokens: Arc<Mutex<Vec<AdmissionToken>>>,
+        /// The `expected_surbs` each `admit` was called with, in call order.
+        admit_targets: Arc<Mutex<Vec<usize>>>,
         /// Mints the tokens `admit` returns, so each admission of a pseudonym is distinguishable —
         /// the property the token guard below pins.
         token_counter: Arc<std::sync::atomic::AtomicU64>,
@@ -7454,6 +7546,26 @@ mod tests {
         fn retire_tokens(&self) -> Vec<AdmissionToken> {
             self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
         }
+
+        /// The `expected_surbs` each `admit` was called with, in call order.
+        fn admitted_targets(&self) -> Vec<usize> {
+            self.admit_targets.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        }
+
+        /// The tokens presented by `raise_target`, in call order.
+        fn raise_tokens(&self) -> Vec<AdmissionToken> {
+            self.raise_tokens.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        }
+
+        /// The targets `raise_target` was called with, in call order.
+        fn raised_targets(&self) -> Vec<usize> {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .iter()
+                .filter_map(|(event, _)| event.strip_prefix("raise_target:")?.parse().ok())
+                .collect()
+        }
     }
 
     impl SurbAdmissionControl for RecordingAdmission {
@@ -7462,6 +7574,10 @@ mod tests {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .push(("admit".into(), *pseudonym));
+            self.admit_targets
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(expected_surbs);
             // `expected_surbs` is only observable here, so assert the contract inline rather than
             // thread a second channel out of the mock: a manager that admitted with a zero target
             // would defeat the store's sizing, so it is worth catching at the one point it happens.
@@ -7483,6 +7599,16 @@ mod tests {
                 .unwrap_or_else(|e| e.into_inner())
                 .push(("retire".into(), *pseudonym));
             self.retire_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
+        }
+
+        fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
+            // Recorded with the target, since a raise that names the wrong ring is only visible from
+            // both halves at once.
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((format!("raise_target:{expected_surbs}"), *pseudonym));
+            self.raise_tokens.lock().unwrap_or_else(|e| e.into_inner()).push(token);
         }
     }
 
@@ -8647,6 +8773,22 @@ mod tests {
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();
 
+        // The SURBs a keep-alive actually carried, as the wire would report them. Alice's keep-alives
+        // are the only SURB source in this fixture, so the Exit's estimate has to be built from these
+        // packet infos rather than from `max_surbs()` alone.
+        let surbs_carried = |data: &ApplicationDataOut| -> IncomingPacketInfo {
+            let carried = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                .map(|msg| match msg {
+                    StartProtocol::KeepAlive(ka) => ka.max_surbs().unwrap_or_default(),
+                    _ => 0,
+                })
+                .unwrap_or_default();
+            IncomingPacketInfo {
+                num_saved_surbs: carried,
+                ..Default::default()
+            }
+        };
+
         // Alice sends the StartSession message
         let mut open_sequence = mockall::Sequence::new();
         let bob_mgr_clone = bob_mgr.clone();
@@ -8661,12 +8803,13 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
+                    let packet_info = surbs_carried(&data);
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info,
                             },
                         )
                         ?;
@@ -8714,12 +8857,13 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
+                    let packet_info = surbs_carried(&data);
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info,
                             },
                         )
                         ?;
@@ -8742,12 +8886,13 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
+                    let packet_info = surbs_carried(&data);
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info,
                             },
                         )
                         ?;
@@ -8800,12 +8945,13 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
+                    let packet_info = surbs_carried(&data);
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
                             ApplicationDataIn {
                                 data: data.data,
-                                packet_info: Default::default(),
+                                packet_info,
                             },
                         )
                         ?;
@@ -11161,6 +11307,7 @@ mod tests {
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
+                raised_surb_target: Default::default(),
             },
         );
 
@@ -11222,6 +11369,50 @@ mod tests {
         Ok(())
     }
 
+    /// Reading the admission token must not claim the cell.
+    ///
+    /// The Exit answers `SessionEstablished` before it commits, so a `BalancerTarget` keep-alive can
+    /// be processed in that window. `claim_admission_token` exists for teardowns, which *claim* an
+    /// empty cell by writing `NONE` into it — a keep-alive that did the same would make the
+    /// establishment's own `set` fail, and its `commit` would then retire the admission it had just
+    /// made. The Session's SURBs would land in the quarantine, which is exactly the unadmitted-Session
+    /// failure the admission seam exists to prevent (hoprnet#8515).
+    #[test]
+    fn peeking_the_admission_token_must_leave_the_cell_for_the_commit() {
+        let slot = {
+            let (session_tx, _rx) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(1);
+            SessionSlot {
+                session_tx,
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(HoprPseudonym::random())),
+                abort_handles: Default::default(),
+                surb_mgmt: Default::default(),
+                surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
+                pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
+                returned_packets: Default::default(),
+                cycle_budget: None,
+                admission_token: Default::default(),
+                raised_surb_target: Default::default(),
+            }
+        };
+
+        assert_eq!(
+            AdmissionToken::NONE,
+            slot.peek_admission_token(),
+            "a slot nothing has admitted yet holds no token"
+        );
+
+        // The cell is still empty, so the establishment's commit can still take it.
+        let minted = AdmissionToken::from_raw(7);
+        assert!(
+            slot.admission_token.set(minted).is_ok(),
+            "peeking must not have claimed the cell"
+        );
+        assert_eq!(minted, slot.peek_admission_token());
+    }
+
     /// Verifies that a `KeepAlive` message with the `BalancerTarget` flag updates the session's
     /// target SURB buffer size in the manager.
     ///
@@ -11272,6 +11463,7 @@ mod tests {
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
+                raised_surb_target: Default::default(),
             },
         );
 
@@ -11326,6 +11518,318 @@ mod tests {
             "an Entry keep-alive received on the Exit must not count as returned Exit service"
         );
 
+        Ok(())
+    }
+
+    /// A raised `BalancerTarget` must reach the SURB store, so the Session's ring grows with it.
+    ///
+    /// The ring is sized once at establishment from the target then announced. The gnosis_vpn client
+    /// opens at a ping tier and announces its main tier seconds later (gnosis/gnosis_vpn#739); an
+    /// Exit that only updates the balancer's set-point leaves the ring at the ping tier, and every
+    /// SURB minted toward the main one is evicted on arrival — losing the PIX share each carried.
+    ///
+    /// The token matters as much as the call: the store widens only the admission the token names,
+    /// and a raise under a successor's pseudonym must not touch its ring.
+    #[test_log::test(tokio::test)]
+    async fn a_raised_balancer_target_must_widen_the_sessions_ring() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        assert!(mgr.set_surb_admission(Arc::new(admission.clone())));
+
+        let pseudonym = HoprPseudonym::random();
+        // The ping tier the Session is admitted with — the low 32 bits of the options word are the
+        // announced SURB target, which is what the Exit sizes the ring from.
+        let announced = 688_u64;
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                additional_data: into_initiation_additional_data(announced),
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+
+        // The Entry's main tier, announced seconds later.
+        let raised = 6_887_usize;
+        mgr.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: pseudonym,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: raised as u64,
+                })
+                .try_into()?,
+                packet_info: Default::default(),
+            },
+        )?;
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if !admission.raised_targets().is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the raised target never reached the SURB store")?;
+
+        assert_eq!(
+            vec![raised],
+            admission.raised_targets(),
+            "the announced target, not the one the Session was admitted with, is what the ring is widened to"
+        );
+        assert_eq!(
+            admission.minted_tokens(),
+            admission.raise_tokens(),
+            "the raise must name the admission the Session holds, or the store widens nothing"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// A keep-alive that arrives *before* the admission is committed must not claim the token cell.
+    ///
+    /// The Exit answers `SessionEstablished` before it commits, so a `BalancerTarget` keep-alive can
+    /// be processed in that window. Reading the cell the way a teardown does would initialize it with
+    /// `NONE`, and the establishment's own `commit` would then fail its `set` — retiring the live
+    /// admission and leaving the Session's SURBs in the quarantine, which is precisely the
+    /// unadmitted-Session failure the seam exists to prevent (hoprnet#8515).
+    #[test_log::test(tokio::test)]
+    async fn a_keep_alive_before_commit_must_not_claim_the_admission_token() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        assert!(mgr.set_surb_admission(Arc::new(admission.clone())));
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(pseudonym, no_pix_offer())
+            .await?;
+
+        // The Session exists but its `commit` has not run yet; the Entry's ramp announces here.
+        mgr.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: pseudonym,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: 256,
+                })
+                .try_into()?,
+                packet_info: Default::default(),
+            },
+        )?;
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if admission.admitted(&pseudonym) == 1 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the establishment's commit never admitted the Session")?;
+
+        assert_eq!(
+            1,
+            admission.minted_tokens().len(),
+            "the establishment's commit must admit exactly once"
+        );
+        assert!(
+            admission.retire_tokens().is_empty(),
+            "a keep-alive racing the commit must leave it to succeed, not make it retire its own \
+             admission; retires were {:?}",
+            admission.retire_tokens()
+        );
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// A target announced in the `SessionEstablished`-before-commit window must survive the commit.
+    ///
+    /// That window is real — the Exit answers before it commits — and the ring is sized once, at
+    /// `commit`. A raise processed in it has no admission to widen yet, so the figure is recorded on
+    /// the slot and the commit sizes the ring from the larger of it and establishment's target.
+    /// Without that, an Entry that announces its main tier early gets a ping-tier ring, which is the
+    /// gnosis_vpn shape (gnosis/gnosis_vpn#739) reached one interleaving earlier.
+    #[test_log::test(tokio::test)]
+    async fn a_target_announced_before_commit_must_survive_the_commit() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let (mgr, sender, transport, _err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        assert!(mgr.set_surb_admission(Arc::new(admission.clone())));
+
+        let pseudonym = HoprPseudonym::random();
+        let admitted_with = 688_u64;
+        let raised = 6_887_usize;
+
+        // Establish and announce the main tier in one turn, so the announcement is queued behind the
+        // establishment — it is processed by the same Start-protocol worker, and whether it lands
+        // before or after `commit` is the scheduling detail this test must not depend on.
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                additional_data: into_initiation_additional_data(admitted_with),
+                ..no_pix_offer()
+            },
+        )
+        .await?;
+        mgr.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: pseudonym,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: raised as u64,
+                })
+                .try_into()?,
+                packet_info: Default::default(),
+            },
+        )?;
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if admission.raised_targets().contains(&raised) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the announcement never reached the SURB store")?;
+
+        // Whether the raise widened a live admission or the commit sized the ring from it, the store
+        // must have been told about the raised target and the Session must be admitted, not retired.
+        assert!(
+            admission.raised_targets().contains(&raised),
+            "the commit must start from the recorded target when the raise preceded it, got {:?}",
+            admission.raised_targets()
+        );
+        assert!(
+            admission.retire_tokens().is_empty(),
+            "the commit must not retire the admission the raise raced it into"
+        );
+
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// The Exit's SURB level must fall by what its store actually lost, not by what a keep-alive
+    /// could have carried.
+    ///
+    /// Keep-alives are Start-protocol traffic, so they never pass through `session_rx`, which is
+    /// where data packets book both the SURBs saved and the ones the full store evicted. Booking
+    /// `max_surbs()` alone here counts every SURB a keep-alive *could* carry as if it had been
+    /// retained: during a PIX fill (the gnosis_vpn report's ~30 keep-alives/s) the Exit reported
+    /// 10,597–12,263 SURBs for a ring that could hold at most 1,032, and then spent against that
+    /// figure until the ring was empty.
+    #[test_log::test(tokio::test)]
+    async fn keep_alive_surbs_must_be_booked_with_their_evictions() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let (sender, handle) = mock_packet_planning(MockMsgSender::new());
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender, new_session_tx, None, None)?;
+
+        // The Exit side of a Session: it receives the Entry's keep-alives and books their SURBs.
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let slot = mgr.sessions.get(&pseudonym).context("slot must exist")?;
+        let estimator = slot.surb_estimator.clone();
+        drop(slot);
+
+        // A keep-alive with no SURBs of its own is not evidence that it retained any: the packet
+        // info says both what arrived and what the full store dropped to make room.
+        let keep_alive = |saved: usize, evicted: usize| -> anyhow::Result<ApplicationDataIn> {
+            Ok(ApplicationDataIn {
+                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: pseudonym,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: 1_000,
+                })
+                .try_into()?,
+                packet_info: IncomingPacketInfo {
+                    num_saved_surbs: saved,
+                    num_evicted_surbs: evicted,
+                    ..Default::default()
+                },
+            })
+        };
+
+        // One keep-alive whose SURBs all landed, one whose SURBs were all evicted on arrival.
+        mgr.dispatch_message(pseudonym, keep_alive(8, 0)?)?;
+        mgr.dispatch_message(pseudonym, keep_alive(8, 8)?)?;
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if estimator.estimate_surbs_produced() == 16 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the keep-alives never reached the estimator")?;
+
+        assert_eq!(
+            8,
+            estimator.saturating_diff(),
+            "the level must be what the store kept, not the SURBs the keep-alives could have carried"
+        );
+
+        handle.abort();
+        Ok(())
+    }
+
+    /// A keep-alive that carries no SURBs at all must book none.
+    ///
+    /// The bound `max_surbs()` is what the message *could* carry, and a keep-alive sent with
+    /// `max_surbs_in_packet` of zero carries nothing. At the report's fill rate that bound alone
+    /// inflated the Exit's level by several times the ring's whole capacity.
+    #[test_log::test(tokio::test)]
+    async fn a_surbless_keep_alive_must_not_book_surbs() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let (sender, handle) = mock_packet_planning(MockMsgSender::new());
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let slot = mgr.sessions.get(&pseudonym).context("slot must exist")?;
+        let estimator = slot.surb_estimator.clone();
+        drop(slot);
+
+        mgr.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: pseudonym,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: 1_000,
+                })
+                .try_into()?,
+                packet_info: Default::default(),
+            },
+        )?;
+
+        // Give the Start-protocol worker time to have run, then assert the absence rather than racing it.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(
+            0,
+            estimator.estimate_surbs_produced(),
+            "a keep-alive with no SURBs must not be booked as carrying the packet's maximum"
+        );
+
+        handle.abort();
         Ok(())
     }
 
@@ -15609,6 +16113,7 @@ mod tests {
             returned_packets: Default::default(),
             cycle_budget: None,
             admission_token: Default::default(),
+            raised_surb_target: Default::default(),
         };
         let guard = mgr.allocate_session_slot(session_id, slot.clone());
         assert!(guard.is_some(), "slot allocation must succeed");
@@ -15640,6 +16145,7 @@ mod tests {
             returned_packets: Default::default(),
             cycle_budget: None,
             admission_token: Default::default(),
+            raised_surb_target: Default::default(),
         }
     }
 
@@ -15726,6 +16232,37 @@ mod tests {
             admission.retire_tokens(),
             vec![minted[0]],
             "the admission the commit could not record must be retired by the commit itself"
+        );
+        Ok(())
+    }
+
+    /// A commit must size the ring from a target the Entry announced before it.
+    ///
+    /// The Exit answers `SessionEstablished` before it commits, so a `BalancerTarget` keep-alive can
+    /// be processed while the ring does not exist yet. Its raise has no admission to widen; it records
+    /// the figure on the slot, and the commit has to start from the larger of it and the target
+    /// announced at establishment — otherwise an Entry that announces its main tier early gets a
+    /// ping-tier ring and evicts everything minted past it (gnosis/gnosis_vpn#739, one interleaving
+    /// earlier).
+    #[test_log::test(tokio::test)]
+    async fn a_commit_must_size_the_ring_from_a_target_announced_before_it() -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let slot = unregistered_slot(session_id);
+        let mut guard = mgr
+            .allocate_session_slot(session_id, slot.clone())
+            .context("slot allocation must succeed")?;
+
+        // The Entry's main tier, announced while the Session is established but not yet committed.
+        slot.note_raised_surb_target(6_887);
+        guard.commit(Some(&slot), Some(&admission), 688);
+
+        assert_eq!(
+            vec![6_887],
+            admission.admitted_targets(),
+            "the commit must admit at the largest target already announced, not the ping tier"
         );
         Ok(())
     }

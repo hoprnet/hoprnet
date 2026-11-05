@@ -22,8 +22,8 @@ use {
     hopr_lib::{
         HoprSessionClientConfig,
         api::node::{
-            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations,
-            PixDepositData, PixEvent,
+            HasChainApi, HasExitIncentivization, HasTransportApi, HoprSessionClientOperations,
+            IncentiveChannelOperations, PixDepositData, PixEvent,
         },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
@@ -2072,5 +2072,124 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
         recovered = recovered_ids.len(),
         "batched PIX session test PASSED"
     );
+    Ok(())
+}
+
+/// A target raised mid-Session must widen the Exit's SURB ring, not just its balancer set-point.
+///
+/// This is the gnosis_vpn shape (gnosis/gnosis_vpn#739). The client opens at a ping-tier target and
+/// announces its main tier a few seconds later, slewing in steps via
+/// `HoprSessionConfigurator::update_surb_balancer_config`, each of which reaches the Exit as a
+/// `BalancerTarget` keep-alive. The Exit sized its ring once, at establishment, off the ping tier:
+/// with the target raised to the main tier it minted into a ring that could not grow, evicted every
+/// SURB past the old ceiling on arrival — and, under PIX, the share each carried.
+///
+/// The assertion is on the ring's *ceiling*, which is the property that was wrong. Capacity is the
+/// one figure the Session cannot correct after the fact: a SURB evicted here is gone for good.
+#[rstest]
+#[case(1)]
+#[case(2)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyhow::Result<()> {
+    use hopr_lib::exports::transport::{HoprSessionConfigurator, SurbBalancerConfig};
+
+    let exit_pix = fill_pix_config(Default::default());
+    let cluster = build_pix_cluster(hops, exit_pix, Duration::from_secs(120)).await?;
+    // The Exit's first SSA request blocks on the deposit pool, and its keep-alive stream only runs
+    // once a cycle is live; both must be served before the Session can be established.
+    let (_driver, _milestones) = spawn_exit_pix_driver(&cluster);
+
+    // The ping tier first, so the Session is admitted at the smaller ceiling.
+    let ping_target = 64_u64;
+    let main_target = 512_u64;
+    assert!(
+        main_target > ping_target,
+        "the fixture's point is that the target rises"
+    );
+
+    let ping = SurbBalancerConfig {
+        target_surb_buffer_size: ping_target,
+        max_surbs_per_sec: 40,
+        ..Default::default()
+    };
+
+    let ip = IpOrHost::from_str(":0")?;
+    let routing = hops.try_into()?;
+    let (session, configurator): (hopr_lib::HoprSession, HoprSessionConfigurator) = tokio::time::timeout(
+        Duration::from_secs(120),
+        cluster.entry.inner().connect_to(
+            cluster.exit.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            HoprSessionClientConfig {
+                forward_path: routing,
+                return_path: routing,
+                // Rate control on, which is the branch on which the Entry announces a target at
+                // all — and the branch every gnosis client opens.
+                capabilities: SessionCapability::Segmentation | SessionCapability::UsePIX,
+                pseudonym: None,
+                surb_management: Some(ping),
+                max_surbs_per_data_packet: 1,
+                flow_control: None,
+                max_frames_behind_gap: None,
+            },
+        ),
+    )
+    .await
+    .context("session connection timed out after 120s")??;
+
+    let pseudonym = *session.id();
+    let ring_ceiling = || {
+        cluster
+            .exit
+            .inner()
+            .transport()
+            .surb_store()
+            .admitted_ring_ceiling(&pseudonym)
+    };
+
+    let ping_ceiling = ring_ceiling().context("the Exit admitted no ring for the Session")?;
+    assert!(
+        ping_ceiling < main_target as usize,
+        "fixture: the ping-tier ceiling ({ping_ceiling}) must be too narrow for the main target"
+    );
+
+    // Raise the target the way the client's ramp does. Several steps, so this also covers the
+    // repeated announce rather than a single jump.
+    for step in [128_u64, 256, 384, main_target] {
+        configurator
+            .update_surb_balancer_config(SurbBalancerConfig {
+                target_surb_buffer_size: step,
+                max_surbs_per_sec: 40,
+                ..Default::default()
+            })
+            .context("raising the SURB target on a live Session must succeed")?;
+    }
+
+    // The raise rides a keep-alive, on the config's own notify cadence.
+    let widened = tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            match ring_ceiling() {
+                Some(ceiling) if ceiling >= main_target as usize => break Some(ceiling),
+                _ => tokio::time::sleep(Duration::from_millis(100)).await,
+            }
+        }
+    })
+    .await
+    .context("the Exit's ring was never widened")?;
+
+    let widened = widened.context("the Session's ring disappeared")?;
+    tracing::info!(
+        ping_ceiling,
+        widened,
+        main_target,
+        "the Exit's ring grew with the target"
+    );
+    assert!(
+        widened >= main_target as usize,
+        "the Exit's ring must reach the announced target: ceiling {widened}, target {main_target}"
+    );
+
     Ok(())
 }

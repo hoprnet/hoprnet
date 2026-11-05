@@ -919,6 +919,22 @@ impl MemorySurbStore {
         self.invalidated_relayers.read().contains(relayer)
     }
 
+    /// Ceiling on how many SURBs the admitted ring for `pseudonym` can hold, or `None` when it holds
+    /// no admitted ring.
+    ///
+    /// Observability seam: the ceiling is what an announced target has to raise, since a Session
+    /// whose ring is too narrow loses SURBs — and, under PIX, the shares they carried — the moment the
+    /// Entry mints past it.
+    ///
+    /// Note this is a cache `get`, so it records recency on the admitted cache's LRU. Every live
+    /// Session holds a ring and the cache is sized for that census, so a read here cannot evict one;
+    /// it is only a diagnostic, not a hot path.
+    pub fn admitted_ring_ceiling(&self, pseudonym: &HoprPseudonym) -> Option<usize> {
+        self.admitted_surbs_per_pseudonym
+            .get(pseudonym)
+            .map(|ring| ring.capacity())
+    }
+
     /// Capacity for a newly created admitted ring, derived from the Session's announced SURB target.
     ///
     /// The target gets [`SurbStoreConfig::admitted_headroom_percent`] of headroom — the balancer aims
@@ -934,6 +950,44 @@ impl MemorySurbStore {
         }
         let headroom = expected_surbs.saturating_mul(100 + self.cfg.admitted_headroom_percent as usize) / 100;
         headroom.max(floor).min(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY))
+    }
+
+    /// Widens `pseudonym`'s admitted ring for an announced SURB target that changed mid-Session.
+    ///
+    /// [`admit`](SurbStore::admit) sizes the ring once, from the target in force at establishment,
+    /// and a peer may raise that target afterwards: the gnosis_vpn client ramps its balancer from a
+    /// ping tier to a main tier seconds into the Session and announces each step (see
+    /// gnosis/gnosis_vpn#739). Left alone, the ring keeps the first tier's ceiling while the Entry
+    /// mints toward the new one — every SURB past the ceiling is evicted on arrival, and under PIX so
+    /// is the share it carried, which is unrecoverable.
+    ///
+    /// The re-admission path already grows a ring in place ([`SurbRingBuffer::raise_capacity`] is a
+    /// `fetch_max`, so it only ever widens). This is that path, for a peer rather than a successor
+    /// Session: it mints no new admission number, so the `token` the Session already holds still
+    /// names this admission and its teardown retires it as before. A `token` that no longer names the
+    /// pseudonym's current admission is a no-op, for the same reason a stale retire is.
+    ///
+    /// `expected_surbs` is the *announced target*, not a ring size: the headroom, floor and ceiling
+    /// arithmetic is this store's, exactly as in [`admit`](SurbStore::admit).
+    pub fn raise_admitted_capacity(&self, pseudonym: &HoprPseudonym, token: u64, expected_surbs: usize) {
+        if token == 0 {
+            return;
+        }
+
+        let capacity = self.admitted_ring_capacity(expected_surbs);
+        self.admitted_surbs_per_pseudonym
+            .entry_by_ref(pseudonym)
+            .and_compute_with(|entry: Option<moka::Entry<HoprPseudonym, AdmittedRing>>| match entry {
+                // Only the admission the caller names may be widened, and the ring it holds is kept:
+                // this is a ceiling change, not a new admission, so no epoch is stamped and the
+                // resident SURBs stay where they are.
+                Some(entry) if entry.value().epoch() == token => {
+                    entry.value().raise_capacity(capacity);
+                    moka::ops::compute::Op::Nop
+                }
+                // No ring, or a successor's: nothing here is this caller's to widen.
+                _ => moka::ops::compute::Op::Nop,
+            });
     }
 
     /// SURBs held for `pseudonym` across both classes.
@@ -1916,6 +1970,11 @@ impl<S> SurbRingBuffer<S> {
             // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
             capacity: Arc::new(std::sync::atomic::AtomicUsize::new(capacity.max(1))),
         }
+    }
+
+    /// The ceiling on how many SURBs this buffer retains.
+    pub fn capacity(&self) -> usize {
+        self.capacity.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Raises this buffer's ceiling to at least `to` retained SURBs, never lowering it.
@@ -4327,6 +4386,87 @@ mod tests {
             },
             store.insert_surbs(pseudonym, fill),
             "a smaller successor target must not narrow the ceiling the predecessor already established"
+        );
+
+        Ok(())
+    }
+
+    /// A Session that announces a *larger* target mid-life must get a ring wide enough to hold it.
+    ///
+    /// This is the gnosis_vpn-client shape (gnosis/gnosis_vpn#739): the client ramps its SURB
+    /// balancer target from a ping tier (688) to the main tier (~6,900) a few seconds after the
+    /// Session opens, and announces each step with a `BalancerTarget` keep-alive. `admit` ran once,
+    /// at establishment, off the *first* target — so the ring was sized for 688 and stayed there
+    /// while the Entry minted toward 6,900. Every SURB past the old ceiling was evicted, taking the
+    /// PIX share it carried with it, and the Exit then ran dry exactly when the deposit confirmed.
+    ///
+    /// The property: raising the announced target raises the resident ring's ceiling, in place, with
+    /// nothing held discarded — the same re-admission path a successor Session takes.
+    #[test]
+    fn a_raised_announced_target_must_widen_the_resident_ring() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        // The ping tier: 688 × 1.5 = 1,032 slots, which is what the exit held in the report.
+        let ping_target = 688;
+        let ping_capacity = store.admitted_ring_capacity(ping_target);
+        assert_eq!(1_032, ping_capacity, "fixture: the ping-tier ceiling");
+
+        let token = store.admit(&pseudonym, ping_target);
+
+        // The Entry ramps to its main tier and announces it. Before the fix the ring stayed at 1,032.
+        let main_target = 6_887;
+        store.raise_admitted_capacity(&pseudonym, token, main_target);
+
+        // A fill one SURB past the old ceiling but well inside the new one must be retained whole.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..(ping_capacity as u64 + 1))
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: fill.len(),
+                evicted: 0,
+                evicted_shares: 0
+            },
+            store.insert_surbs(pseudonym, fill),
+            "a raised announcement must widen the ring past the target the Session was admitted with"
+        );
+
+        Ok(())
+    }
+
+    /// A raise must widen only the admission it names.
+    ///
+    /// A pseudonym is client-chosen and reusable, and a teardown's retire is deferred, so a
+    /// successor Session can be admitted on the same pseudonym while a stale announcement is still
+    /// in flight. Widening whatever ring is resident there would size the successor's ring from its
+    /// predecessor's ramp — and the reverse, a stale *smaller* target, is worse: the ceiling only
+    /// ever grows, so the smallest target ever named would win for good.
+    #[test]
+    fn a_raise_must_not_widen_a_successors_ring() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let stale = store.admit(&pseudonym, 200);
+        let successor = store.admit(&pseudonym, 200);
+        assert_ne!(stale, successor, "fixture: each admission mints its own number");
+
+        store.raise_admitted_capacity(&pseudonym, stale, 6_887);
+
+        // The predecessor's target would give a ring of 10,330; the successor's own 200 gives 300.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..301u64)
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        let outcome = store.insert_surbs(pseudonym, fill);
+        assert_eq!(
+            300, outcome.retained,
+            "a stale raise must leave the successor's ring at the successor's own ceiling"
+        );
+        assert_eq!(
+            1, outcome.evicted,
+            "and the SURB past that ceiling must be the only one dropped"
         );
 
         Ok(())

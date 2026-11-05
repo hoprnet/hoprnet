@@ -174,6 +174,11 @@ impl SurbAdmissionControl for StoreSurbAdmission {
     fn retire(&self, pseudonym: &SessionId, token: AdmissionToken) {
         self.store.retire(pseudonym, token.into_raw());
     }
+
+    fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
+        self.store
+            .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
+    }
 }
 
 /// Share of the counter flush interval a conformance report waits for its packets' acknowledgments.
