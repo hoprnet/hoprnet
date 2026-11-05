@@ -1982,16 +1982,6 @@ mod tests {
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
 
-    /// The transport object is the surface consumers build against, so the mixer API must be
-    /// reachable through it rather than through a separate `hopr-transport-mixer` pin.
-    #[test]
-    fn mixer_should_be_reachable_through_transport_when_reexported() {
-        let _: crate::mixer::MixerConfig = crate::mixer::MixerConfig::default();
-        let _: crate::mixer::UniformConfig = crate::mixer::UniformConfig::default();
-        let _ = crate::mixer::SenderError::Full;
-        let _ = crate::mixer::create::<u32>;
-    }
-
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.
     ///

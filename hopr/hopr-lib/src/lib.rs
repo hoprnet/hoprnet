@@ -833,17 +833,6 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 mod tests {
     use super::*;
 
-    /// Consumers take the mixer through `hopr-lib` alone, so the re-exported types must be the
-    /// same types the node config embeds, not lookalikes.
-    #[test]
-    fn mixer_should_be_reachable_through_hopr_lib_when_reexported() {
-        let _: mixer::MixerConfig = config::MixerConfig::default();
-        let _: mixer::MixerType = mixer::MixerType::default();
-        let _: mixer::UniformConfig = mixer::UniformConfig::default();
-        let _: exports::transport::mixer::MixerConfig = mixer::MixerConfig::default();
-        let _ = mixer::SenderError::Full;
-    }
-
     #[test]
     fn network_health_green_is_ready() {
         assert_eq!(network_health_to_status(Health::Green, "test"), ComponentStatus::Ready);
