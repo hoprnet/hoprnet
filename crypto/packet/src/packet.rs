@@ -656,16 +656,22 @@ impl HoprPacket {
                     // well-formed packet. One that did is, so its retry is recognised instead of paying a second
                     // decode that cannot succeed either.
                     //
-                    // The exception is a reply whose opener is missing: a concurrent decode of the same packet
-                    // peeked it first and is about to deliver, so that copy keeps ownership of the token. This one
-                    // therefore neither inserts nor keeps the generic error - it reports the duplicate, which is
-                    // what it is.
+                    // `commit` reporting an already-present tag means a concurrent decode of the same packet got
+                    // there first, so this copy is the duplicate - whatever local failure ended this attempt.
+                    //
+                    // A missing reply opener is *not* by itself evidence of that: it is equally what an expired,
+                    // evicted or restart-lost opener looks like, and calling those replays would send an operator
+                    // looking at the wrong subsystem. So the opener error is recorded and returned as itself, and
+                    // only an already-known tag is reported as a replay.
                     if authenticated.is_some() {
-                        if matches!(error, crate::sphinx::errors::SphinxError::MissingReplyOpener) {
+                        let already_known = commit(&tag);
+                        if already_known {
                             return Err(PacketReplay);
                         }
-                        if commit(&tag) {
-                            return Err(PacketReplay);
+                        if matches!(error, crate::sphinx::errors::SphinxError::MissingReplyOpener) {
+                            // Recorded above, so a retry of *this* copy is a replay; the original error is what
+                            // describes why this one failed.
+                            return Err(error.into());
                         }
                     }
                     return Err(error.into());

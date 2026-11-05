@@ -486,7 +486,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     {
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
-        on_authenticated(&derive_packet_tag(&secret)?);
+        // Derived once here and handed to both the callback and the returned packet.
+        let packet_tag = derive_packet_tag(&secret)?;
+        on_authenticated(&packet_tag);
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
@@ -501,7 +503,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => ForwardedMetaPacket::Relayed {
                 packet: Self::new_from_parts(alpha, next_header, decrypted),
-                packet_tag: derive_packet_tag(&secret)?,
+                packet_tag,
                 derived_secret: secret,
                 next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
                     SphinxError::PacketDecodingError(format!("couldn't map id to public key: {}", next_node.to_hex()))
@@ -543,7 +545,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 payload.drain(..<S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE);
 
                 ForwardedMetaPacket::Final {
-                    packet_tag: derive_packet_tag(&secret)?,
+                    packet_tag,
                     derived_secret: secret,
                     plain_text: PaddedPayload::from_padded(payload)?,
                     receiver_data,

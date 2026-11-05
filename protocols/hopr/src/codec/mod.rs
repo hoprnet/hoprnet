@@ -589,8 +589,7 @@ mod tests {
                 .into_iter()
                 .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
                 .collect::<anyhow::Result<Vec<_>>>()
-                .expect("decode must not panic")
-        });
+        })?;
 
         let delivered = outcomes.iter().filter(|o| o.is_ok()).count();
         assert_eq!(1, delivered, "exactly one copy must be delivered; got {outcomes:?}");
@@ -1291,11 +1290,8 @@ mod tests {
                     .into_iter()
                     .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
                     .collect::<anyhow::Result<Vec<_>>>()
-                    .expect("decode must not panic")
-                    .into_iter()
-                    .filter(|ok| *ok)
-                    .count()
-            });
+                    .map(|joined| joined.into_iter().filter(|ok| *ok).count())
+            })?;
 
             assert_eq!(1, successes, "exactly one concurrent decode may succeed");
         }

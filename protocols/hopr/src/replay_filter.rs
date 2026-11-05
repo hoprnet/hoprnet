@@ -212,7 +212,7 @@ lazy_static::lazy_static! {
     static ref METRIC_REPLAY_FILTER_ROTATIONS: hopr_api::types::telemetry::SimpleCounter =
         hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_replay_filter_rotations_total",
-            "Replay filter generations dropped because their shard filled; each rotation shortens the window in              which a packet is still recognised as a replay",
+            "Replay filter generations dropped because their shard filled; each rotation shortens the window in which a packet is still recognised as a replay",
         )
         .unwrap();
 }
@@ -259,29 +259,24 @@ impl ReplayShard {
             || self.previous.as_ref().is_some_and(|previous| previous.check(token))
     }
 
-    /// Inserts `token` unless it is already known.
-    ///
-    /// Returns `(already_known, rotated)`: whether the token was already present, and whether the shard had to
-    /// retire a generation to record it.
-    fn check_and_set(&mut self, token: &ReplayToken) -> (bool, bool) {
+    /// Inserts `token` unless it is already known. Returns `true` if it was already known.
+    fn check_and_set(&mut self, token: &ReplayToken) -> bool {
         // Both generations are consulted *before* any rotation. Checking them after would mis-handle the exact
         // case where it matters most: a duplicate that is the token which filled the generation is in the
         // outgoing `current`, which the rotation is about to move into `previous` - so a check made before the
         // rotation would miss it and re-admit it into the fresh generation as a brand-new packet.
         if self.contains(token) {
-            return (true, false);
+            return true;
         }
 
-        let mut rotated = false;
         if self.count == self.capacity {
-            rotated = true;
             // The current generation is full. The oldest one goes, the current one becomes the previous one, and
             // the token is recorded in a fresh generation.
             //
-            // A rotation is what ages tokens out, so it is the one event an operator needs to see: a sustained rate
-            // here means the replay window is shrinking under traffic. The old single filter logged its reset at
-            // `warn`; this does the same, and counts it where telemetry is compiled in.
-            tracing::warn!(
+            // A rotation is normal in this design, so it is `debug`: at the default capacity a busy node rotates
+            // every few tens of seconds, and warning on each would be noise. The counter is the signal an operator
+            // alerts on; this line is for chasing a single rotation, and it is logged while the shard is locked.
+            tracing::debug!(
                 capacity = self.capacity,
                 "replay filter shard rotated; its oldest generation was dropped"
             );
@@ -298,7 +293,7 @@ impl ReplayShard {
             .get_or_insert_with(|| Self::generation(self.capacity))
             .set(token);
         self.count += 1;
-        (false, rotated)
+        false
     }
 }
 
@@ -322,24 +317,6 @@ pub struct TagReplayFilter {
     /// every packet at one shard - 1/64 of the traffic would evict that shard's history. Hashing with a
     /// per-instance key makes the shard unpredictable until a token has been seen, which restores the spread.
     shard_key: [u8; 16],
-    /// How many tokens each previous hop has contributed since the last rotation.
-    ///
-    /// The namespace is shared, so without a cap one peer's traffic could rotate every shard and evict everyone
-    /// else's history. Each peer may fill at most half of what rotates a shard, and the allowance is replenished
-    /// only when a rotation actually happens - so a single peer can never rotate on its own, while a long-lived
-    /// legitimate peer is not locked out.
-    peer_budget: parking_lot::Mutex<PeerBudget>,
-    /// Number of rotations performed so far, used by [`PeerBudget`] to scope its allowance.
-    rotations: std::sync::atomic::AtomicUsize,
-}
-
-/// Per-peer insertion accounting, scoped to the rotation it was opened in.
-#[derive(Debug, Default)]
-struct PeerBudget {
-    /// The rotation count this allowance belongs to.
-    epoch: usize,
-    /// Insertions per previous hop since that rotation.
-    per_peer: std::collections::HashMap<hopr_api::types::crypto::types::OffchainPublicKey, usize>,
 }
 
 impl TagReplayFilter {
@@ -354,15 +331,15 @@ impl TagReplayFilter {
         // public, and `HoprDecoder::new` does not validate - would otherwise have `shard_for`'s mask address only
         // the first `2^k` shards and silently waste the rest of the configured capacity.
         let shards = cfg.shards.max(MIN_SHARDS).next_power_of_two();
-        let capacity_per_shard = (cfg.max_tracked_packets / shards).max(1);
+        // A validated configuration is already in range; an unvalidated one - `new` is public and the decoder does
+        // not validate - is clamped here rather than left to fail allocating a generation inside the decode path.
+        let capacity_per_shard = (cfg.max_tracked_packets.min(MAX_TRACKED_PACKETS) / shards).max(1);
 
         Self {
             shards: (0..shards)
                 .map(|_| parking_lot::Mutex::new(ReplayShard::new(capacity_per_shard)))
                 .collect(),
             shard_key: random_bytes(),
-            peer_budget: parking_lot::Mutex::new(PeerBudget::default()),
-            rotations: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -385,8 +362,8 @@ impl TagReplayFilter {
     /// until the token's generation rotates out.
     ///
     /// A hit here means "seen before" up to the filter's false-positive rate; a miss means "new" without exception.
-    /// The tag it is given is authenticated by construction, so a hit cannot be provoked by a third party without
-    /// that party deriving the same shared secret.
+    /// The value is only meaningful once a header MAC has verified it - a tag is computable by anyone from the
+    /// node's public key, so an *unrecorded* tag proves nothing.
     pub fn contains(&self, token: &ReplayToken) -> bool {
         self.shard_for(token).lock().contains(token)
     }
@@ -396,47 +373,7 @@ impl TagReplayFilter {
     /// A `true` return means the token was inserted by a concurrent decode of the same packet between the
     /// [`Self::contains`] check and this call, so the caller holds the duplicate.
     pub fn commit(&self, token: &ReplayToken) -> bool {
-        self.commit_and_report(token).0
-    }
-
-    /// [`Self::commit`], also reporting whether the shard rotated.
-    fn commit_and_report(&self, token: &ReplayToken) -> (bool, bool) {
-        let (known, rotated) = self.shard_for(token).lock().check_and_set(token);
-        if rotated {
-            self.rotations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-        (known, rotated)
-    }
-
-    /// Records `token` on behalf of `peer`, subject to that peer's share of the generation.
-    ///
-    /// Returns whether the token was already known - including the case where the peer is over its budget, in
-    /// which case the token is *checked* but not inserted, so a flood costs the flooding peer its own replay
-    /// detection instead of everyone else's history. A peer may contribute at most half of what rotates a shard,
-    /// so no single previous hop can evict another peer's tokens within the generation floor.
-    pub fn commit_from(&self, peer: &hopr_api::types::crypto::types::OffchainPublicKey, token: &ReplayToken) -> bool {
-        let budget = (self.capacity() / 2).max(1);
-        let mut state = self.peer_budget.lock();
-
-        // The allowance is scoped to one rotation: once any shard rotates, every peer gets its share back. So a
-        // single peer supplies at most half of what rotates a shard, and a rotation therefore needs at least two
-        // peers - which is exactly the property that one peer cannot evict another's tokens.
-        let epoch = self.rotations.load(std::sync::atomic::Ordering::Relaxed);
-        if state.epoch != epoch {
-            state.epoch = epoch;
-            state.per_peer.clear();
-        }
-
-        let used = state.per_peer.entry(*peer).or_insert(0);
-        if *used >= budget {
-            return self.contains(token);
-        }
-
-        let known = self.commit(token);
-        if !known {
-            *used += 1;
-        }
-        known
+        self.shard_for(token).lock().check_and_set(token)
     }
 
     /// The shard `token` is assigned to, under the instance's keyed hash.
@@ -754,40 +691,29 @@ mod tests {
         assert_eq!(64, filter.shards());
     }
 
-    /// One flooding peer must not evict another peer's tokens inside the generation floor.
+    /// No packet is ever accepted without being recorded, however much traffic has already gone through.
     ///
-    /// Each peer's allowance is replenished only by a rotation, so a lone flooder can never supply one on its own:
-    /// the victim's token stays inside the floor however much the flooder sends.
+    /// A per-peer insertion allowlist was tried here to stop one peer rotating the filter; once a peer exhausted it,
+    /// its packets were checked but no longer stored, so a replay of them was accepted too. This pins the simpler
+    /// contract: acceptance implies recording.
     #[test]
-    fn one_peer_cannot_rotate_the_filter_on_its_own() {
-        use hopr_api::types::crypto::keypairs::{Keypair, OffchainKeypair};
+    fn no_accepted_packet_is_left_unrecorded() {
+        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 4));
 
-        let filter = TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 1));
-        let victim = *OffchainKeypair::random().public();
-        let flooder = *OffchainKeypair::random().public();
-
-        let ours = token(0);
-        assert!(!filter.commit_from(&victim, &ours), "the victim's token is fresh");
-
-        // The flooder sends several generations' worth of its own tokens. With a per-peer allowance of half a
-        // generation, it runs out long before the shard can rotate, and the rest of its traffic is checked but not
-        // recorded.
-        for i in 1..=(4 * filter.capacity() as u64) {
-            filter.commit_from(&flooder, &token(i));
+        // Far more than a generation's worth of tokens, so several rotations happen.
+        for i in 0..(3 * filter.capacity() as u64) {
+            let t = token(i);
+            if !filter.commit(&t) {
+                assert!(filter.contains(&t), "a newly recorded token must be known");
+            }
         }
 
-        let rotations = filter.rotations.load(std::sync::atomic::Ordering::Relaxed);
+        // A token accepted now must be recognised on the next pass, regardless of how much came before it.
+        let recent = token(3 * filter.capacity() as u64 + 1);
+        assert!(!filter.commit(&recent), "the token is fresh");
         assert!(
-            rotations < 2,
-            "a lone peer must not reach two rotations, got {rotations}"
-        );
-        assert!(
-            filter.count() <= filter.capacity(),
-            "a lone peer must not fill more than one generation"
-        );
-        assert!(
-            filter.contains(&ours),
-            "the victim's token must survive the flood: it is still inside the generation floor"
+            filter.commit(&recent),
+            "a token that was just accepted must be reported as a replay when repeated"
         );
     }
 

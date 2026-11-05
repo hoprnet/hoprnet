@@ -23,8 +23,9 @@ pub enum PacketError {
 
     /// The packet was already seen, according to the caller's replay filter.
     ///
-    /// Returned by [`HoprPacket::from_incoming_checked`](crate::packet::HoprPacket::from_incoming_checked), whose
-    /// caller has already recorded the tag before this is produced.
+    /// Returned by [`HoprPacket::from_incoming_checked`](crate::packet::HoprPacket::from_incoming_checked) when
+    /// the check found the tag already known, or when the commit that records new tags found it present - so the
+    /// caller can assume the tag is recorded either way.
     #[error("packet replay detected")]
     PacketReplay,
 
