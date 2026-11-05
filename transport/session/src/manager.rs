@@ -1270,6 +1270,15 @@ impl SessionSlot {
     fn note_raised_surb_target(&self, target: usize) {
         self.raised_surb_target
             .fetch_max(target, std::sync::atomic::Ordering::Relaxed);
+        // Pairs with the fence after `commit` records the admission token. The two sides are a
+        // store-then-load handshake across *two* cells: this side records the target and then reads
+        // the token, `commit` writes the token and then reads the target. With both sides `Relaxed`
+        // and no fence, a weakly ordered CPU lets each read the other's old value — the keep-alive
+        // sees no token (so its raise is a no-op) while `commit` sees no target (so it sizes from the
+        // establishment figure). The balancer set-point has already moved by then, so the
+        // `!= announced` guard in `handle_keep_alive` never retries the raise and the ring stays
+        // undersized for the Session's life. The fence makes sure at least one side sees the other.
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
     }
 
     /// The largest target announced since establishment, or `None` while none has been.
@@ -1850,7 +1859,14 @@ impl<'a> SessionSlotGuard<'a> {
                     "session was torn down while it committed; retiring the admission it could not record"
                 );
                 admission.retire(&self.session_id, token);
-            } else if let Some(raised) = slot.peek_raised_surb_target().filter(|&raised| raised > announced) {
+            } else if {
+                // Pairs with the fence in `note_raised_surb_target`: either this side sees the
+                // recorded target, or a concurrent keep-alive sees the token this `set` just wrote
+                // and raises the ring itself. See that method for the failure the pair rules out.
+                std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+                true
+            } && let Some(raised) = slot.peek_raised_surb_target().filter(|&raised| raised > announced)
+            {
                 // The target moved again between the admit and the token being recorded; widen for
                 // it rather than leave the ring a step behind until the next announcement.
                 admission.raise_target(&self.session_id, token, raised);
@@ -13692,56 +13708,74 @@ mod tests {
     /// `NONE`, and the establishment's own `commit` would then fail its `set` — retiring the live
     /// admission and leaving the Session's SURBs in the quarantine, which is precisely the
     /// unadmitted-Session failure the seam exists to prevent (hoprnet#8515).
+    ///
+    /// Driven deterministically rather than by racing a real establishment: the slot is allocated
+    /// and left uncommitted, the keep-alive is delivered while its token cell is still empty, and only
+    /// then does the commit run — which is the ordering the Exit produces on the wire.
     #[test_log::test(tokio::test)]
     async fn a_keep_alive_before_commit_must_not_claim_the_admission_token() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
-        let (mgr, sender, transport, _err_rx, _incoming) =
-            started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
+        let pseudonym = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
         assert!(mgr.set_surb_admission(Arc::new(admission.clone())));
 
-        let pseudonym = HoprPseudonym::random();
-        mgr.handle_incoming_session_initiation(pseudonym, no_pix_offer())
-            .await?;
+        let (sender, handle) = mock_packet_planning(MockMsgSender::new());
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender, new_session_tx, None, None)?;
 
-        // The Session exists but its `commit` has not run yet; the Entry's ramp announces here.
-        mgr.dispatch_message(
-            pseudonym,
-            ApplicationDataIn {
-                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                    session_id: pseudonym,
-                    flags: KeepAliveFlag::BalancerTarget.into(),
-                    additional_data: 256,
-                })
-                .try_into()?,
-                packet_info: Default::default(),
-            },
-        )?;
-
-        tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                if admission.admitted(&pseudonym) == 1 {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-        })
-        .await
-        .context("the establishment's commit never admitted the Session")?;
-
+        // Uncommitted: the Session exists, but nothing has admitted it yet.
+        let slot = unregistered_slot(pseudonym);
+        let mut guard = mgr
+            .allocate_session_slot(pseudonym, slot.clone())
+            .context("slot allocation must succeed")?;
         assert_eq!(
-            1,
-            admission.minted_tokens().len(),
-            "the establishment's commit must admit exactly once"
+            AdmissionToken::NONE,
+            slot.peek_admission_token(),
+            "fixture: the slot must start uncommitted"
+        );
+
+        // The Entry's ramp announces while the cell is still empty.
+        mgr.handle_keep_alive(
+            pseudonym,
+            KeepAliveMessage {
+                session_id: pseudonym,
+                flags: KeepAliveFlag::BalancerTarget.into(),
+                additional_data: 256,
+            },
+            Default::default(),
+        )
+        .await
+        .context("the keep-alive must be handled without error while uncommitted")?;
+
+        assert!(
+            slot.admission_token.get().is_none(),
+            "handling a keep-alive must not claim the cell, or the commit's own `set` would fail"
+        );
+
+        // The establishment's commit runs next and must succeed — admitting at the announced target,
+        // not retiring the admission it just made.
+        guard.commit(Some(&slot), Some(&admission), 64);
+
+        let minted = admission.minted_tokens();
+        assert_eq!(1, minted.len(), "the commit must admit exactly once");
+        assert_eq!(
+            Some(minted[0]),
+            slot.admission_token.get().copied(),
+            "the commit's token must land in the cell the keep-alive left untouched"
         );
         assert!(
             admission.retire_tokens().is_empty(),
-            "a keep-alive racing the commit must leave it to succeed, not make it retire its own \
-             admission; retires were {:?}",
+            "a keep-alive racing the commit must leave it to succeed, not make it retire its own admission; retires \
+             were {:?}",
             admission.retire_tokens()
         );
+        assert_eq!(
+            vec![256],
+            admission.admitted_targets(),
+            "the commit must size the ring from the target the keep-alive announced before it"
+        );
 
-        sender.close_channel();
-        transport.await??;
+        handle.abort();
         Ok(())
     }
 

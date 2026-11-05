@@ -961,7 +961,7 @@ impl MemorySurbStore {
     /// mints toward the new one — every SURB past the ceiling is evicted on arrival, and under PIX so
     /// is the share it carried, which is unrecoverable.
     ///
-    /// The re-admission path already grows a ring in place ([`SurbRingBuffer::raise_capacity`] is a
+    /// The re-admission path already grows a ring in place (`SurbRingBuffer::raise_capacity` is a
     /// `fetch_max`, so it only ever widens). This is that path, for a peer rather than a successor
     /// Session: it mints no new admission number, so the `token` the Session already holds still
     /// names this admission and its teardown retires it as before. A `token` that no longer names the
@@ -1979,13 +1979,17 @@ impl<S> SurbRingBuffer<S> {
 
     /// Raises this buffer's ceiling to at least `to` retained SURBs, never lowering it.
     ///
-    /// Called when a pseudonym is re-admitted: [`SurbStore::admit`] keeps the resident ring rather than
-    /// replacing it (a `Put` of a fresh ring would trip the admitted cache's `Replaced` listener and be
-    /// booked as an eviction the ring never suffered), but the successor Session may have announced a
-    /// larger SURB target than its predecessor. Without this the resident ring would keep the
-    /// predecessor's smaller ceiling for the successor's whole lifetime, and once its balancer filled
-    /// past it, `push` would evict — losing PIX shares permanently, with nothing but an `evicted` count
-    /// to show for it.
+    /// Two callers raise a ceiling, and both are about a target the ring was not sized for:
+    ///
+    /// * [`SurbStore::admit`], when a pseudonym is re-admitted. It keeps the resident ring rather than replacing it (a
+    ///   `Put` of a fresh ring would trip the admitted cache's `Replaced` listener and be booked as an eviction the
+    ///   ring never suffered), but the successor Session may have announced a larger SURB target than its predecessor.
+    /// * [`MemorySurbStore::raise_admitted_capacity`], when a live peer raises its announced target mid-Session and
+    ///   says so in a keep-alive.
+    ///
+    /// Without this the resident ring would keep the smaller ceiling for the Session's whole
+    /// lifetime, and once its balancer filled past it, `push` would evict — losing PIX shares
+    /// permanently, with nothing but an `evicted` count to show for it.
     ///
     /// The raise is monotone on purpose. Narrowing on a re-admission would strand SURBs a live Session
     /// may already have inserted and would make the ceiling depend on admission order; `fetch_max`
