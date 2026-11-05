@@ -155,7 +155,10 @@ pub struct HoprSessionClientConfig {
     ///
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
     /// The value is bounded by the packet size and will saturate there.
-    /// The default `1` follows the balancer's target; values greater than `1` bypass that gate.
+    /// Every finite value follows the balancer's target: packets carry this many SURBs while the
+    /// counterparty is below its target and none once it is at or above it, so a value greater than `1`
+    /// cannot keep the counterparty more than one packet's SURBs above its target. Only `usize::MAX` is
+    /// not gated.
     /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
     /// configured, there will be no SURBs produced at all, making the traffic only possible in
     /// one direction.

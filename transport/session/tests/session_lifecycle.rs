@@ -2,15 +2,15 @@
 
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
-use futures::{AsyncWriteExt, StreamExt, pin_mut};
+use anyhow::{Context, Result};
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt, pin_mut};
 use hopr_api::types::{
     crypto::{keypairs::ChainKeypair, prelude::Keypair},
     crypto_random::Randomizable,
     internal::{prelude::HoprPseudonym, routing::SurbMatcher},
     primitive::prelude::Address,
 };
-use hopr_protocol_app::v1::ApplicationData;
+use hopr_protocol_app::v1::{ApplicationData, IncomingPacketInfo};
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig,
@@ -751,6 +751,147 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
         .await;
 
     // Cleanup: close senders and await handles
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+
+    Ok(())
+}
+
+/// Verifies that an Entry without a SURB balancer gets replies once the Exit's stock lets them out.
+///
+/// hoprd opens such an Entry for a `responseBuffer` below two packets. Its Session is rate-controlled:
+/// it announces a fallback SURB target (50), and the Exit's egress balancer lets data out only above a
+/// tenth of it (5 SURBs, at 10 SURBs per second), as before. The Exit's keep-alive reserve (12) must not
+/// raise that bar: the Entry attaches one SURB to each data packet and sends no keep-alives, so the
+/// Exit applies the reserve only once a keep-alive shows the Entry refills.
+///
+/// ## Steps
+/// 1. Alice opens a Session to Bob with `Segmentation` only, which leaves it rate-controlled, and without a SURB
+///    balancer.
+/// 2. Each message the mock carries from Alice to Bob brings one SURB, as on the network.
+/// 3. Alice sends ten requests, which leaves Bob's stock above the egress balancer's bar and at most at the reserve.
+/// 4. Bob answers, and Alice reads the answer within 5 seconds.
+#[test(tokio::test)]
+async fn an_entry_without_a_surb_balancer_should_get_the_reply_to_its_requests() -> Result<()> {
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(Default::default());
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    // Everything Alice sends reaches Bob, with the one SURB a packet of an Entry without a balancer carries
+    let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let bob_mgr = bob_mgr_for_alice.clone();
+            Box::pin(async move {
+                bob_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: IncomingPacketInfo {
+                            num_saved_surbs: 1,
+                            ..Default::default()
+                        },
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    // Everything Bob sends goes back to Alice
+    let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let alice_mgr = alice_mgr_for_bob.clone();
+            Box::pin(async move {
+                alice_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let mut ahs = Vec::new();
+
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
+
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio::time::timeout(
+        Duration::from_secs(2),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::Segmentation.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
+    let mut alice_session = alice_session?;
+    let mut bob_session = bob_session.context("bob must get an incoming session")?.session;
+    assert!(
+        !alice_session.config().capabilities.contains(Capability::NoRateControl),
+        "the Session must be rate-controlled at the Exit"
+    );
+
+    const REQUEST: &[u8] = b"ping";
+    const REQUESTS: usize = 10;
+    const REPLY: &[u8] = b"pong";
+
+    // One packet each, so one SURB each
+    for _ in 0..REQUESTS {
+        alice_session.write_all(REQUEST).await?;
+        alice_session.flush().await?;
+    }
+    let mut requests = [0u8; REQUESTS * REQUEST.len()];
+    tokio::time::timeout(Duration::from_secs(2), bob_session.read_exact(&mut requests))
+        .await
+        .map_err(|e| anyhow::anyhow!("bob got no requests: {e}"))??;
+    assert_eq!(REQUEST.repeat(REQUESTS), requests);
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        bob_session.write_all(REPLY).await?;
+        bob_session.flush().await
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("bob could not send the reply: {e}"))??;
+    let mut reply = [0u8; REPLY.len()];
+    tokio::time::timeout(Duration::from_secs(5), alice_session.read_exact(&mut reply))
+        .await
+        .map_err(|e| anyhow::anyhow!("alice got no reply: {e}"))??;
+    assert_eq!(REPLY, reply);
+
+    futures::stream::iter(ahs)
+        .for_each(|ah| async move { ah.abort() })
+        .await;
+
     alice_sender.close_channel();
     bob_sender.close_channel();
     alice_handle.await??;

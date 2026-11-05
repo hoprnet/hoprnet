@@ -40,9 +40,11 @@ pub struct AuxiliaryPacketInfo {
     pub packet_signals: PacketSignals,
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
-    /// How many of those SURBs the store dropped on arrival because the per-pseudonym buffer was
-    /// already full: the SURBs that left the store, or never entered it, to make room. A share-less
-    /// newcomer the store turned away counts as well.
+    /// How many SURBs the store lost on arrival: the ones that left it, or never entered it, because
+    /// the per-pseudonym buffer was already full ([`SurbInsertOutcome::evicted`], a share-less newcomer
+    /// the store turned away included), plus the ones a newer SURB generation wiped or an older one
+    /// refused ([`SurbInsertOutcome::superseded`]). The batch the packet itself carries is counted in
+    /// `num_surbs`, so a refused older-generation batch shows up here as its own size.
     ///
     /// This is the only point at which an overflow is visible per packet. The store gives up
     /// share-less SURBs first, and refuses a share-less newcomer before it evicts a share-bearing
@@ -55,15 +57,19 @@ pub struct AuxiliaryPacketInfo {
     /// `ring_share` value of the `cache` label of `hopr_surb_store_evictions_count`, and a warning per
     /// report interval). The redundancy budget that absorbs those losses is a fixed surplus per
     /// polynomial, and emission is windowed, so on deployed dimensions a burst of roughly
-    /// `surplus × SHARE_EMISSION_WINDOW` evicted share-bearing SURBs is enough to put polynomials
-    /// below their threshold — and a cycle short of recovery is worth nothing at all. See
+    /// `surplus × SHARE_EMISSION_WINDOW` evicted share-bearing SURBs (40 448 at the deployed 79 surplus
+    /// shares and a window of 512) is enough to put polynomials below their threshold — and a cycle
+    /// short of recovery is worth nothing at all. See
     /// [`SurbStoreConfig::rb_capacity`](crate::SurbStoreConfig::rb_capacity) and
     /// `hopr_protocol_pix::SHARE_EMISSION_WINDOW`.
     ///
     /// The Exit's Session books this count into its SURB flow estimate — an evicted SURB has left the
     /// buffer just as a spent one has — so the meaning above must not change: it is the total of
-    /// SURBs that left or never entered the store, not the number of lost shares. See
-    /// `counterparty_buffer_capacity` in `hopr-transport-session`.
+    /// SURBs that left or never entered the store, not the number of lost shares. The superseded
+    /// ones belong in it for the same reason: after the Entry advances the SURB generation, the Exit's
+    /// stock is gone, and the keep-alive that reports its level must say so, or the Entry would read
+    /// the pre-wipe level back and never refill. See `counterparty_buffer_capacity` in
+    /// `hopr-transport-session`.
     pub num_evicted_surbs: usize,
     /// Fewest intermediate hops on the return path of any SURB the packet carried, or `None` if it
     /// carried none.
@@ -212,6 +218,11 @@ pub struct FoundSurb {
 /// with it permanently, whereas a share-less one is only a lost return path. `evicted_shares` is the
 /// exact number of shares lost to overflow, which is what tells routine share-less churn from a loss
 /// that matters.
+///
+/// The `superseded` count is the other way SURBs leave the buffer: not capacity pressure, but a
+/// change of SURB generation. It is kept apart from `evicted` so that the eviction summary and the
+/// overflow log stay a statement about capacity, while a caller that must know what the store really
+/// holds (the Exit's flow estimate) can add the two.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SurbInsertOutcome {
     /// Number of SURBs held for the pseudonym after the insert.
@@ -227,6 +238,15 @@ pub struct SurbInsertOutcome {
     /// `evicted - evicted_shares` is the number of share-less SURBs dropped or refused, which cost a
     /// return path and nothing more.
     pub evicted_shares: usize,
+    /// Number of SURBs the generation rule took out of play during this insert, which is not capacity
+    /// pressure and so is not part of [`evicted`](Self::evicted):
+    /// - on a **newer** generation, everything the buffer held (both tiers), cleared before the batch went in;
+    /// - on an **older** generation, the batch itself, refused as a late or reordered leftover.
+    ///
+    /// The Entry advances the generation when a relayer is judged dead, precisely so that the Exit
+    /// stops spending the SURBs it holds. Those SURBs are gone from the Exit's buffer all the same, and
+    /// the Exit's flow estimate has to say so.
+    pub superseded: usize,
 }
 
 /// Determines the result of how an acknowledgement was resolved.
