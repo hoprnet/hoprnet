@@ -70,6 +70,12 @@ pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
 use hopr_protocol_pix::ShareResolution;
+/// Packet mixing API, re-exported whole so a consumer of the transport object can configure and
+/// inspect the mixer without pinning `hopr-transport-mixer` itself.
+///
+/// Every engine feature is already enabled by this crate's dependency declaration, so `create`,
+/// `poisson_channel`, `channel` and `MixerSink` are reached through this module.
+pub use hopr_transport_mixer as mixer;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -1975,6 +1981,16 @@ mod tests {
 
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+
+    /// The transport object is the surface consumers build against, so the mixer API must be
+    /// reachable through it rather than through a separate `hopr-transport-mixer` pin.
+    #[test]
+    fn mixer_should_be_reachable_through_transport_when_reexported() {
+        let _: crate::mixer::MixerConfig = crate::mixer::MixerConfig::default();
+        let _: crate::mixer::UniformConfig = crate::mixer::UniformConfig::default();
+        let _ = crate::mixer::SenderError::Full;
+        let _ = crate::mixer::create::<u32>;
+    }
 
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.

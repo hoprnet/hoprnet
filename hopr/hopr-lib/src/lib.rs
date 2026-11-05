@@ -71,6 +71,11 @@ use hopr_api::{
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
 pub use hopr_transport::SESSION_MTU;
+/// Packet mixing API, re-exported so a consumer takes the mixer through `hopr-lib` alone instead of
+/// pinning `hopr-transport-mixer` as a separate dependency.
+///
+/// Both `hopr_lib::mixer` and `hopr_lib::exports::transport::mixer` name the same items.
+pub use hopr_transport::mixer;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
@@ -827,6 +832,17 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Consumers take the mixer through `hopr-lib` alone, so the re-exported types must be the
+    /// same types the node config embeds, not lookalikes.
+    #[test]
+    fn mixer_should_be_reachable_through_hopr_lib_when_reexported() {
+        let _: mixer::MixerConfig = config::MixerConfig::default();
+        let _: mixer::MixerType = mixer::MixerType::default();
+        let _: mixer::UniformConfig = mixer::UniformConfig::default();
+        let _: exports::transport::mixer::MixerConfig = mixer::MixerConfig::default();
+        let _ = mixer::SenderError::Full;
+    }
 
     #[test]
     fn network_health_green_is_ready() {
