@@ -1034,6 +1034,10 @@ impl MemorySurbStore {
     /// It is also why only `admit` creates an admitted entry: an insert that minted one itself would
     /// have no admission number to stamp, and a ring stamped with the sentinel is one no retire ever
     /// removes.
+    ///
+    /// The outcome adds what the fold-in evicted and superseded to what the push did, as the quarantine
+    /// arm does: those SURBs were booked when their packets arrived, and the decoder can book their
+    /// leaving only from this outcome.
     fn push_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
@@ -1041,11 +1045,16 @@ impl MemorySurbStore {
         surbs: Vec<(HoprSurbId, HoprSurb)>,
         generation: u8,
     ) -> SurbInsertOutcome {
-        self.fold_quarantine_into(pseudonym, admitted);
+        let folded = self.fold_quarantine_into(pseudonym, admitted).unwrap_or_default();
 
         let outcome = admitted.push(surbs, generation);
         self.record_ring_overflow(&outcome);
-        outcome
+        SurbInsertOutcome {
+            retained: outcome.retained,
+            evicted: outcome.evicted + folded.evicted,
+            evicted_shares: outcome.evicted_shares + folded.evicted_shares,
+            superseded: outcome.superseded + folded.superseded,
+        }
     }
 
     /// Pushes a batch into `pseudonym`'s quarantine ring, creating the ring if it has none, and books
@@ -4386,6 +4395,59 @@ mod tests {
             "a smaller successor target must not narrow the ceiling the predecessor already established"
         );
 
+        Ok(())
+    }
+
+    /// An admitted insert that folds in a quarantine ring left by the race around `admit` reports what
+    /// the fold-in took: SURBs of an older generation the admitted ring refuses were booked when their
+    /// packets arrived, and only this outcome tells the decoder they left.
+    #[test]
+    fn the_admitted_arm_must_report_what_its_fold_in_superseded() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let _token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+        let admitted = AdmittedRing::clone(
+            &store
+                .admitted_surbs_per_pseudonym
+                .get(&pseudonym)
+                .context("the Session's admitted entry must exist")?,
+        );
+        store.insert_surbs_into_admitted(
+            &pseudonym,
+            admitted.clone(),
+            vec![([1u8; 8], surb_via(relayer, DIRECT)?)],
+            1,
+        );
+
+        // An insert that routed to the quarantine just before `admit` left an older generation there.
+        store.push_into_quarantine(
+            &pseudonym,
+            vec![
+                ([2u8; 8], surb_via(relayer, DIRECT)?),
+                ([3u8; 8], surb_via(relayer, DIRECT)?),
+            ],
+            0,
+        );
+
+        let outcome =
+            store.insert_surbs_into_admitted(&pseudonym, admitted, vec![([4u8; 8], surb_via(relayer, DIRECT)?)], 1);
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 0,
+                evicted_shares: 0,
+                superseded: 2
+            },
+            outcome,
+            "the two quarantined SURBs the newer generation refused were booked when they arrived, so their leaving \
+             must reach the decoder"
+        );
+        assert!(
+            store.quarantine_surbs.get(&pseudonym).is_none(),
+            "the fold-in drained the quarantine ring"
+        );
         Ok(())
     }
 
