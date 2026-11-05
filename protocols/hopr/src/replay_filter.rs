@@ -327,10 +327,13 @@ impl TagReplayFilter {
     /// configuration can land here with a smaller share, which the `.max(1)` below keeps from producing a
     /// zero-sized Bloom filter.
     pub fn new(cfg: &ReplayFilterConfig) -> Self {
-        // Round up to a power of two. A validated configuration already is one; an unvalidated one - `new` is
-        // public, and `HoprDecoder::new` does not validate - would otherwise have `shard_for`'s mask address only
-        // the first `2^k` shards and silently waste the rest of the configured capacity.
-        let shards = cfg.shards.max(MIN_SHARDS).next_power_of_two();
+        // Clamped first, because an unvalidated `shards` - `new` is public and `HoprDecoder::new` does not
+        // validate - could otherwise overflow `next_power_of_two` (panic in debug, zero in release) or try to
+        // allocate an unbounded number of shards.
+        //
+        // Then rounded up to a power of two: `shard_for`'s mask addresses only the first `2^k` shards, so an odd
+        // count would silently waste the rest of the configured capacity.
+        let shards = cfg.shards.clamp(MIN_SHARDS, MAX_SHARDS).next_power_of_two();
         // A validated configuration is already in range; an unvalidated one - `new` is public and the decoder does
         // not validate - is clamped here rather than left to fail allocating a generation inside the decode path.
         let capacity_per_shard = (cfg.max_tracked_packets.min(MAX_TRACKED_PACKETS) / shards).max(1);
@@ -341,6 +344,18 @@ impl TagReplayFilter {
                 .collect(),
             shard_key: random_bytes(),
         }
+        .with_metrics_registered()
+    }
+
+    /// Registers this type's telemetry at construction, so the series exists before the first rotation.
+    ///
+    /// Registering lazily on first use would leave `hopr_replay_filter_rotations_total` absent until a rotation
+    /// happened - and `rate()`/`increase()` do not count the first increment of a series that did not exist before
+    /// it - and would run the registration, and its `unwrap`, inside the decode path while a shard is locked.
+    fn with_metrics_registered(self) -> Self {
+        #[cfg(all(feature = "telemetry", not(test)))]
+        lazy_static::initialize(&METRIC_REPLAY_FILTER_ROTATIONS);
+        self
     }
 
     /// Number of shards, for tests and telemetry.
@@ -711,6 +726,22 @@ mod tests {
         assert!(
             filter.commit(&recent),
             "a token that was just accepted must be reported as a replay when repeated"
+        );
+    }
+
+    /// An unvalidated `shards` must not overflow or allocate unboundedly: `new` is public and the decoder does not
+    /// validate its configuration.
+    #[test]
+    fn an_unvalidated_shard_count_is_clamped() {
+        assert_eq!(
+            MAX_SHARDS,
+            TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, usize::MAX)).shards(),
+            "an oversized shard count must clamp to the ceiling, not overflow"
+        );
+        assert_eq!(
+            MIN_SHARDS,
+            TagReplayFilter::new(&config(MIN_TRACKED_PACKETS, 0)).shards(),
+            "a zero shard count must clamp to the floor"
         );
     }
 
