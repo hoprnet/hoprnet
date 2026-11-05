@@ -202,6 +202,15 @@
             cargoExtraArgs = "--bin ticket-inspector -F redb,serde,cli";
           };
 
+          # Nix otherwise uses the crate name when selecting the executable for `nix run`.
+          mkTicketInspector =
+            builder:
+            (builder.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs).overrideAttrs (old: {
+              meta = (old.meta or { }) // {
+                mainProgram = "ticket-inspector";
+              };
+            });
+
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
           fixUtoipaEmbedPaths =
             drv:
@@ -215,9 +224,9 @@
 
           hoprPackages = {
             # ticket-inspector: diagnostic CLI for inspecting the tickets database
-            binary-ticket-inspector = rust-builder-local.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            binary-ticket-inspector = mkTicketInspector rust-builder-local;
+            binary-ticket-inspector-x86_64-linux = mkTicketInspector rust-builder-x86_64-linux;
+            binary-ticket-inspector-aarch64-linux = mkTicketInspector rust-builder-aarch64-linux;
             test-unit =
               (fixUtoipaEmbedPaths (
                 rust-builder-local.callPackage nixLib.mkRustPackage (

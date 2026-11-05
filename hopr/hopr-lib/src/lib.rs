@@ -23,6 +23,8 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
+/// Periodic operational state dump: extra sections and the bridge from transport events.
+pub mod state_dump;
 /// Testing utilities: cluster fixtures, node wiring helpers, echo server.
 #[cfg(feature = "testing")]
 pub mod testing;
@@ -280,6 +282,8 @@ pub(crate) enum HoprLibProcess {
     TicketEvents,
     #[strum(to_string = "neglecting tickets on closed channels")]
     ChannelClosureNeglect,
+    #[strum(to_string = "periodic operational state dump")]
+    StateDump,
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.

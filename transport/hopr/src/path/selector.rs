@@ -16,6 +16,7 @@ use super::{
     errors::{PathPlannerError, Result},
     traits::{PathSelector, PathWithMetrics},
 };
+use crate::observer::{PathDirection, PhaseCounts, TransportEvent, TransportObserver};
 
 /// Accumulated path cost and quality aggregates, folded edge-by-edge during DFS.
 ///
@@ -287,14 +288,16 @@ fn compute_paths<G, W>(
     length: std::num::NonZeroUsize,
     take: usize,
     value_fn: MetricsValueFn<W>,
-) -> Vec<PathWithMetrics>
+) -> (Vec<PathWithMetrics>, usize)
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey, Observed = W>,
     W: EdgeObservableRead + Send + 'static,
 {
     let raw = graph.simple_paths(src, dest, length.get(), Some(take), value_fn);
 
-    raw.into_iter()
+    let returned = raw.len();
+    let paths = raw
+        .into_iter()
         .filter_map(|(path, _, metrics)| {
             tracing::trace!(?path, cost = metrics.cost, "evaluating candidate path");
             if metrics.cost > 0.0 {
@@ -305,7 +308,8 @@ where
                 None
             }
         })
-        .collect()
+        .collect();
+    (paths, returned)
 }
 
 /// A lightweight graph-backed path selector.
@@ -327,6 +331,7 @@ pub struct HoprGraphPathSelector<G> {
     edge_penalty: f64,
     min_ack_rate: f64,
     anonymity_floor: usize,
+    observer: Option<TransportObserver>,
 }
 
 impl<G> HoprGraphPathSelector<G>
@@ -362,7 +367,14 @@ where
             edge_penalty,
             min_ack_rate,
             anonymity_floor,
+            observer: None,
         }
+    }
+
+    /// Report graph searches to `observer`. Attach it before the selector is shared.
+    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
+        self.observer = observer;
+        self
     }
 
     /// Extended forward path search: find shorter paths using
@@ -383,7 +395,7 @@ where
         existing: &[PathWithMetrics],
         // The caller's snapshot, so both phases of one query cost against the same face value.
         ticket_face_value: Option<hopr_api::graph::traits::Balance>,
-    ) -> Vec<PathWithMetrics> {
+    ) -> (Vec<PathWithMetrics>, usize) {
         // `forward_without_self_loopback` counts the *finished* path length — the one that includes
         // the `dest` edge appended below — not the shorter traversal depth. Passing the search depth
         // understates it by one: for a 1-hop path it collapses `length` to 1, so the first
@@ -404,7 +416,9 @@ where
             .graph
             .simple_paths_from(src, shorter_length.get(), Some(take), value_fn);
 
-        raw.into_iter()
+        let returned = raw.len();
+        let paths = raw
+            .into_iter()
             .filter_map(|(path, _, metrics)| {
                 if metrics.cost <= 0.0 {
                     return None;
@@ -427,7 +441,8 @@ where
                 Some(PathWithMetrics::from((metrics, candidate)))
             })
             .take(take)
-            .collect()
+            .collect();
+        (paths, returned)
     }
 }
 
@@ -452,7 +467,7 @@ where
     /// The function has a potential to run expensive operations, it should be benchmarked
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
-    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)]
+    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err(level = "trace"))]
     fn select_path(
         &self,
         src: OffchainPublicKey,
@@ -460,7 +475,7 @@ where
         hops: usize,
     ) -> Result<Vec<PathWithMetrics>> {
         let direction = if src == self.me { "forward" } else { "return" };
-        tracing::debug!(%src, %dest, hops, direction, "computing paths from graph");
+        tracing::trace!(%src, %dest, hops, direction, "computing paths from graph");
 
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
@@ -470,9 +485,11 @@ where
         // of the same graph, so `composite_weight` would rank a candidate against itself.
         let ticket_face_value = self.graph.ticket_face_value();
 
+        let phase1;
+        let mut phase2 = None;
         let paths = if src == self.me {
             // Phase 1: search for full-length forward paths to dest.
-            let mut found = compute_paths(
+            let (mut found, returned) = compute_paths(
                 &self.graph,
                 &src,
                 &dest,
@@ -483,7 +500,11 @@ where
                     ticket_face_value,
                 },
             );
-            tracing::debug!(
+            phase1 = PhaseCounts {
+                returned: returned as u64,
+                eligible: found.len() as u64,
+            };
+            tracing::trace!(
                 direction,
                 phase = 1,
                 count = found.len(),
@@ -496,9 +517,13 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                let extended =
+                let (extended, returned) =
                     self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found, ticket_face_value);
-                tracing::debug!(
+                phase2 = Some(PhaseCounts {
+                    returned: returned as u64,
+                    eligible: extended.len() as u64,
+                });
+                tracing::trace!(
                     direction,
                     phase = 2,
                     count = extended.len(),
@@ -509,7 +534,7 @@ where
 
             found
         } else {
-            let found = compute_paths(
+            let (found, returned) = compute_paths(
                 &self.graph,
                 &src,
                 &dest,
@@ -520,12 +545,16 @@ where
                     ticket_face_value,
                 },
             );
-            tracing::debug!(direction, count = found.len(), "[return] candidates");
+            phase1 = PhaseCounts {
+                returned: returned as u64,
+                eligible: found.len() as u64,
+            };
+            tracing::trace!(direction, count = found.len(), "[return] candidates");
             found
         };
 
         for (i, pwm) in paths.iter().enumerate() {
-            tracing::debug!(
+            tracing::trace!(
                 direction,
                 index = i,
                 path = ?pwm.path,
@@ -535,30 +564,44 @@ where
             );
         }
 
-        if paths.is_empty() {
+        let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
+        if let Some(observer) = &self.observer {
+            let (direction, destination) = if src == self.me {
+                (PathDirection::Forward, dest)
+            } else {
+                (PathDirection::Return, src)
+            };
+            observer(TransportEvent::PathSearched {
+                direction,
+                destination: hopr_api::types::internal::NodeId::Offchain(destination),
+                phase1,
+                phase2,
+                retained: pruned.len() as u64,
+            });
+        }
+        if pruned.is_empty() {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops,
                 src.to_string(),
                 dest.to_string(),
             )));
         }
-
-        let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
-        let relayer_set = pruned
-            .iter()
-            .filter_map(|p| p.path.first())
-            .collect::<std::collections::HashSet<_>>();
-        tracing::debug!(
-            %src,
-            %dest,
-            hops,
-            direction,
-            survived = pruned.len(),
-            distinct_relayers = relayer_set.len(),
-            first_relayers = ?relayer_set,
-            "pruned candidate paths",
-        );
-
+        if tracing::enabled!(tracing::Level::TRACE) {
+            let relayer_set = pruned
+                .iter()
+                .filter_map(|p| p.path.first())
+                .collect::<std::collections::HashSet<_>>();
+            tracing::trace!(
+                %src,
+                %dest,
+                hops,
+                direction,
+                survived = pruned.len(),
+                distinct_relayers = relayer_set.len(),
+                first_relayers = ?relayer_set,
+                "pruned candidate paths",
+            );
+        }
         Ok(pruned)
     }
 }
@@ -1556,4 +1599,71 @@ mod tests {
     // The forward cost function requires a funding balance on all non-last edges, so
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
+    #[test]
+    fn path_cost_equality_ignores_quality_metadata() {
+        let cost = PathCostWithMetrics {
+            cost: 0.5,
+            total_latency_ms: None,
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            fundable_tickets_floor: None,
+        };
+        let measured = PathCostWithMetrics {
+            total_latency_ms: Some(100),
+            min_probe_success_rate: Some(0.9),
+            min_ack_rate: Some(0.8),
+            fundable_tickets_floor: Some(3),
+            ..cost.clone()
+        };
+        assert_eq!(cost, measured);
+        assert_ne!(cost, PathCostWithMetrics { cost: 0.6, ..measured });
+    }
+
+    #[test]
+    fn trace_diagnostics_preserve_the_selected_candidates() -> anyhow::Result<()> {
+        let (me, _, dest, graph) = two_hop_graph();
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let expected = selector.select_path(me, dest, 1)?;
+        let subscriber = test_log::tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(std::io::sink)
+            .finish();
+        let actual = tracing::subscriber::with_default(subscriber, || selector.select_path(me, dest, 1))?;
+        assert_eq!(actual.len(), expected.len());
+        assert_eq!(actual[0].path, expected[0].path);
+        assert_eq!(actual[0].cost, expected[0].cost);
+        Ok(())
+    }
+
+    #[test]
+    fn observer_sees_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
+        let (me, _, dest, graph) = two_hop_graph();
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS, 0.5, 0.5, 0).with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
+        selector.select_path(me, dest, 1)?;
+        assert!(selector.select_path(pubkey(&SECRET_4), me, 1).is_err());
+
+        let events = events.lock();
+        assert_eq!(events.len(), 2, "one event per search, and no resolve is invented");
+        let searches: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                TransportEvent::PathSearched {
+                    phase1,
+                    phase2,
+                    retained,
+                    ..
+                } => Some((*phase1, *phase2, *retained)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(searches.len(), 2);
+        assert_eq!(1, searches.iter().filter(|(_, _, retained)| *retained == 0).count());
+        assert!(searches.iter().any(|(phase1, ..)| phase1.returned > 0));
+        assert!(searches.iter().any(|(_, phase2, _)| phase2.is_some()));
+        Ok(())
+    }
 }

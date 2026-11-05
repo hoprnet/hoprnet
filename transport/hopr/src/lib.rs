@@ -18,6 +18,7 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
+pub mod observer;
 /// Graph-based path planning for the HOPR transport layer.
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
@@ -103,7 +104,11 @@ use tracing::{debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
-pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
+pub use crate::{
+    config::HoprProtocolConfig,
+    observer::{TransportEvent, TransportObserver},
+    protocol::PeerProtocolCounterRegistry,
+};
 use crate::{
     config::PixGlobalConfig,
     constants::SESSION_INITIATION_TIMEOUT_BASE,
@@ -312,6 +317,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     chain_api: Chain,
+    observer: Option<TransportObserver>,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
@@ -357,6 +363,18 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
+        Self::new_with_observer(identity, resolver, graph, my_multiaddresses, cfg, None)
+    }
+
+    /// Build transport that reports path, SURB and probe events to `observer`.
+    pub fn new_with_observer(
+        identity: (&ChainKeypair, &OffchainKeypair),
+        resolver: Chain,
+        graph: Graph,
+        my_multiaddresses: Vec<Multiaddr>,
+        cfg: HoprProtocolConfig,
+        observer: Option<TransportObserver>,
+    ) -> errors::Result<Self> {
         // Validated at the constructor boundary, because this is the boundary. The shared node
         // builder does validate before all four of its build methods reach here, but this function is
         // `pub`, and a direct caller then skips every relational check on the way in — including
@@ -378,7 +396,8 @@ where
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
             planner_config.min_paths_anonymity_floor,
-        );
+        )
+        .with_observer(observer.clone());
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
@@ -424,7 +443,8 @@ where
             resolver.clone(),
             selector,
             planner_config,
-        );
+        )
+        .with_observer(observer.clone());
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -501,6 +521,7 @@ where
             my_multiaddresses,
             smgr,
             chain_api: resolver,
+            observer,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
@@ -919,7 +940,8 @@ where
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        let surb_round_trips =
+            protocol::surb_telemetry::SurbRoundTripRegistry::default().with_observer(self.observer.clone());
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
@@ -1194,7 +1216,10 @@ where
             crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
         let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
-        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        let mut probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
+        if let Some(observer) = self.observer.clone() {
+            probe = probe.with_observer(move |outcome| observer(TransportEvent::Probe(outcome)));
+        }
 
         let (probing_processes, probe_classifier) = probe
             .continuously_scan(

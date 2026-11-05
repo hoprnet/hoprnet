@@ -33,8 +33,12 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_protocol_hopr::{IncomingPacket, IncomingPacketError, OutgoingPacket, PacketDecoder, PacketEncoder};
 
+use crate::observer::{TransportEvent, TransportObserver};
+
 /// Slots in a [`PathId`], and therefore the longest leg that can be reported.
 const PATH_ID_SLOTS: usize = 5;
+/// Keep named destination diagnostics bounded even during widespread degradation.
+const MAX_DEBUG_DESTINATIONS: usize = 8;
 
 /// How long a minted SURB stays eligible to be observed coming back.
 ///
@@ -84,7 +88,7 @@ impl SurbRoundTripCounters {
 /// Batching is not an optimisation here but a requirement: recording an edge takes a write lock on
 /// the whole graph, a packet carries several SURBs, and a session at 0.5 MB/s moves hundreds of
 /// packets a second -- reporting per event would contend the graph thousands of times a second.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SurbRoundTripRegistry {
     inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
     /// Destination each pair of legs leads to, so a collapse can name what to re-plan.
@@ -99,6 +103,7 @@ pub struct SurbRoundTripRegistry {
     /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
     /// reply leg terminates here. [`ME_SLOT_UNKNOWN`] means not yet known.
     me_slot: Arc<AtomicU64>,
+    observer: Option<TransportObserver>,
 }
 
 /// `me_slot` value meaning "this node's slot has not been learned yet".
@@ -116,6 +121,7 @@ impl Default for SurbRoundTripRegistry {
             silence: Default::default(),
             replanned: Default::default(),
             me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
+            observer: None,
         }
     }
 }
@@ -165,7 +171,20 @@ const SILENT_FLUSHES_BEFORE_DEGRADED: u32 = 5;
 /// just to be judged), short enough to retry twice inside the recovery budget.
 const FLUSHES_BETWEEN_REPLANS: u32 = 8;
 
+impl std::fmt::Debug for SurbRoundTripRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SurbRoundTripRegistry")
+            .field("pairs", &self.inner.len())
+            .finish_non_exhaustive()
+    }
+}
 impl SurbRoundTripRegistry {
+    /// Report minted and returned SURBs to `observer`. Attach it before cloning this registry.
+    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
+        self.observer = observer;
+        self
+    }
+
     fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
         self.inner.entry(paths).or_default().value().clone()
     }
@@ -179,6 +198,14 @@ impl SurbRoundTripRegistry {
     pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
         self.counters(paths).record_expected(count);
+        if let Some(observer) = &self.observer {
+            observer(TransportEvent::Surb {
+                destination,
+                paths,
+                minted: count,
+                returned: 0,
+            });
+        }
     }
 
     /// Destinations whose return path has been silent for long enough to act on.
@@ -295,7 +322,7 @@ impl SurbRoundTripRegistry {
             // Early warning: this pair used to deliver, is now silent, and a sibling to the same
             // destination is still answering — so the silence is attributable and climbing toward a
             // re-plan. Surfacing the run as it builds turns "suddenly re-planned" into a visible ramp.
-            tracing::debug!(
+            tracing::trace!(
                 destination = %dest,
                 runs = state.runs,
                 threshold = SILENT_FLUSHES_BEFORE_DEGRADED,
@@ -330,7 +357,8 @@ impl SurbRoundTripRegistry {
             tracing::debug!(
                 degraded = degraded.len(),
                 blind_spot = blind_spot.len(),
-                blind_spot_destinations = ?blind_spot,
+                blind_spot_destinations = ?blind_spot.iter().take(MAX_DEBUG_DESTINATIONS).collect::<Vec<_>>(),
+                blind_spot_omitted = blind_spot.len().saturating_sub(MAX_DEBUG_DESTINATIONS),
                 delivering_destinations = delivering.len(),
                 delivering_relayers = delivering_relayers.len(),
                 "surb return-path degradation scan",
@@ -343,6 +371,17 @@ impl SurbRoundTripRegistry {
     /// Records that `count` replies arrived over these legs.
     pub fn record_observed(&self, paths: ForwardAndReturnPath, count: u64) {
         self.counters(paths).record_observed(count);
+        if let Some(observer) = &self.observer {
+            let destination = self.destinations.get(&paths).map(|destination| *destination);
+            if let Some(destination) = destination {
+                observer(TransportEvent::Surb {
+                    destination,
+                    paths,
+                    minted: 0,
+                    returned: count,
+                });
+            }
+        }
     }
 
     /// Takes every non-empty entry, resetting the counts.
@@ -482,9 +521,9 @@ where
         legs += 1;
         total_expected += expected;
         total_observed += observed;
-        // Per pair, at debug: the aggregate cannot answer whether a dead relayer's legs diverge
-        // from healthy ones, which is the property any trigger built on this signal depends on.
-        tracing::debug!(
+        // Per-pair details belong at TRACE; bounded sibling comparisons are supplied to
+        // the periodic state reporter independently of this graph telemetry drain.
+        tracing::trace!(
             forward = ?paths.forward,
             reply = ?paths.reply,
             expected,
@@ -589,7 +628,7 @@ impl<C> SurbTelemetryCodec<C> {
             self.registry.note_me_slot(slot);
         }
 
-        tracing::debug!(
+        tracing::trace!(
             minted = minted.len(),
             return_paths = return_paths.len(),
             forward_hops = forward.len(),
@@ -599,7 +638,7 @@ impl<C> SurbTelemetryCodec<C> {
         for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
             let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
             let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
-                tracing::debug!(reply_hops = reply.len(), "surb round-trip legs did not resolve");
+                tracing::trace!(reply_hops = reply.len(), "surb round-trip legs did not resolve");
                 continue;
             };
 
@@ -613,7 +652,7 @@ impl<C> SurbTelemetryCodec<C> {
         // A SURB is single-use, so the association is consumed with it.
         match self.pending.remove(surb_id) {
             Some(paths) => self.registry.record_observed(paths, 1),
-            None => tracing::debug!("reply on a surb with no pending legs"),
+            None => tracing::trace!("reply on a surb with no pending legs"),
         }
     }
 }
@@ -659,7 +698,7 @@ where
         let packet = self.inner.decode(sender, data)?;
 
         if let IncomingPacket::Final(f) = &packet {
-            tracing::debug!(on_surb = f.replied_on_surb.is_some(), "final packet decoded");
+            tracing::trace!(on_surb = f.replied_on_surb.is_some(), "final packet decoded");
         }
 
         if let IncomingPacket::Final(final_packet) = &packet
@@ -903,10 +942,94 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn uncorroborated_silence_emits_one_bounded_debug_summary_without_replanning() -> anyhow::Result<()> {
+        let count = MAX_DEBUG_DESTINATIONS + 3;
+        let (_graph, _me, peers) = graph_with(count);
+        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {})));
+        let logs = Arc::new(InfoCounter::default());
+        tracing::subscriber::with_default(logs.clone(), || {
+            for (index, destination) in peers.iter().enumerate() {
+                let slot = (index + 1) as u64;
+                let paths = ForwardAndReturnPath {
+                    forward: [0, slot, 0, 0, 0],
+                    reply: [slot, 0, 0, 0, 0],
+                };
+                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
+                registry.record_observed(paths, 1);
+            }
+            assert!(flush(&registry).is_empty());
+            for (index, destination) in peers.iter().enumerate() {
+                let slot = (index + 1) as u64;
+                let paths = ForwardAndReturnPath {
+                    forward: [0, slot, 0, 0, 0],
+                    reply: [slot, 0, 0, 0, 0],
+                };
+                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
+            }
+            assert!(
+                flush(&registry).is_empty(),
+                "silence without a delivering sibling cannot identify a dead path"
+            );
+        });
+        assert_eq!(logs.debugs.load(Ordering::Relaxed), 1);
+        let fields = logs.debug_fields.lock();
+        assert_eq!(fields.get("blind_spot"), Some(&count.to_string()));
+        assert_eq!(fields.get("blind_spot_omitted").map(String::as_str), Some("3"));
+        let destinations = fields
+            .get("blind_spot_destinations")
+            .context("bounded destination list")?;
+        assert_eq!(destinations.matches(", ").count() + 1, MAX_DEBUG_DESTINATIONS);
+        let debug = format!("{registry:?}");
+        assert!(debug.contains(&format!("pairs: {count}")));
+        assert!(
+            !debug.contains(&peers[0].to_string()),
+            "registry Debug output must stay bounded"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn routine_surb_traffic_should_not_emit_debug_per_mint_or_pair() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let recorder = recorder(graph.clone());
+        let logs = Arc::new(InfoCounter::default());
+        tracing::subscriber::with_default(logs.clone(), || {
+            for _ in 0..1000 {
+                recorder.on_minted(
+                    &ResolvedTransportRouting::Forward {
+                        pseudonym: HoprPseudonym::random(),
+                        forward_path: ValidatedPath::direct(peers[0], address()),
+                        return_paths: vec![ValidatedPath::direct(me, address())],
+                    },
+                    &[surb_id(1)],
+                );
+                recorder.on_replied(&surb_id(1));
+            }
+            flush_into(&recorder.registry, &graph, 0);
+        });
+        assert_eq!(logs.debugs.load(Ordering::Relaxed), 0);
+        assert_eq!(logs.infos.load(Ordering::Relaxed), 1);
+        Ok(())
+    }
+
     /// Counts INFO events; `enabled` is always true so the logging macros' bodies actually run.
     #[derive(Default)]
     struct InfoCounter {
         infos: AtomicU64,
+        debugs: AtomicU64,
+        debug_fields: parking_lot::Mutex<std::collections::BTreeMap<String, String>>,
+    }
+
+    struct DebugFields<'a>(&'a InfoCounter);
+
+    impl tracing::field::Visit for DebugFields<'_> {
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            self.0
+                .debug_fields
+                .lock()
+                .insert(field.name().into(), format!("{value:?}"));
+        }
     }
 
     impl tracing::Subscriber for InfoCounter {
@@ -925,6 +1048,12 @@ mod tests {
         fn event(&self, event: &tracing::Event<'_>) {
             if *event.metadata().level() == tracing::Level::INFO {
                 self.infos.fetch_add(1, Ordering::Relaxed);
+            }
+            if *event.metadata().level() == tracing::Level::DEBUG
+                && event.metadata().target() == "hopr_transport::protocol::surb_telemetry"
+            {
+                self.debugs.fetch_add(1, Ordering::Relaxed);
+                event.record(&mut DebugFields(self));
             }
         }
 
@@ -1499,5 +1628,92 @@ mod tests {
         recorder.on_replied(&surb_id(9));
 
         assert!(recorder.registry.drain().is_empty());
+    }
+    #[test]
+    fn observed_callback_can_access_the_destination_without_a_held_guard() {
+        let (_, _, peers) = graph_with(1);
+        let destination = peers[0];
+        let paths = legs();
+        let registry = registry_at_slot_zero();
+        registry.record_expected(paths, 3, destination);
+        let destinations = registry.destinations.clone();
+        let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let registry = registry.with_observer(Some(Arc::new({
+            let calls = calls.clone();
+            move |event| {
+                // A nonblocking write detects the regression without hanging the test runner.
+                assert!(matches!(
+                    destinations.try_get_mut(&paths),
+                    dashmap::try_result::TryResult::Present(_)
+                ));
+                assert!(matches!(
+                    event,
+                    TransportEvent::Surb {
+                        minted: 0,
+                        returned: 2,
+                        ..
+                    }
+                ));
+                calls.fetch_add(1, Ordering::Relaxed);
+            }
+        })));
+        registry.record_observed(paths, 2);
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        assert_eq!(registry.drain(), vec![(paths, 3, 2)]);
+    }
+
+    #[test]
+    fn observing_an_unknown_destination_keeps_counts_without_notifying() {
+        let paths = legs();
+        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {
+            panic!("unknown destinations must not notify the observer");
+        })));
+        registry.record_observed(paths, 2);
+        assert_eq!(registry.drain(), vec![(paths, 0, 2)]);
+    }
+
+    #[test]
+    fn observed_surb_counts_are_independent_of_graph_drains_and_duplicate_replies() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let mut recorder = recorder(graph);
+        recorder.registry = recorder.registry.with_observer(Some(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        })));
+        let surbs = |events: &mut Vec<TransportEvent>| -> (u64, u64, Vec<OffchainPublicKey>) {
+            events
+                .drain(..)
+                .fold((0, 0, Vec::new()), |(m, r, mut d), event| match event {
+                    TransportEvent::Surb {
+                        destination,
+                        minted,
+                        returned,
+                        ..
+                    } => {
+                        d.push(destination);
+                        (m + minted, r + returned, d)
+                    }
+                    _ => (m, r, d),
+                })
+        };
+        recorder.on_minted(
+            &ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(peers[0], address()),
+                return_paths: vec![ValidatedPath::direct(me, address())],
+            },
+            &[surb_id(1)],
+        );
+        let (minted, returned, _) = surbs(&mut events.lock());
+        assert_eq!((minted, returned), (1, 0));
+        assert_eq!(recorder.registry.drain().len(), 1);
+        recorder.on_replied(&surb_id(1));
+        recorder.on_replied(&surb_id(1));
+        assert_eq!(recorder.registry.drain().len(), 1);
+        let (minted, returned, destinations) = surbs(&mut events.lock());
+        assert_eq!((minted, returned), (0, 1), "a duplicate reply is not counted twice");
+        assert_eq!(destinations, vec![peers[0]]);
+        Ok(())
     }
 }

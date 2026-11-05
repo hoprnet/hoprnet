@@ -47,7 +47,7 @@ fn make_builder<Chain>(
     chain_connector: Chain,
 ) -> FullyConfiguredBuilder<Chain>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + hopr_chain_connector::state_dump::StateRead + Clone + Send + Sync + 'static,
 {
     let path_cfg = config.protocol.path_planner;
     let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
@@ -107,7 +107,7 @@ pub async fn build_edge_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + hopr_chain_connector::state_dump::StateRead + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -147,7 +147,7 @@ pub async fn build_full_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<FullHopr<Chain>>>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + hopr_chain_connector::state_dump::StateRead + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -193,7 +193,7 @@ pub async fn build_entry_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + hopr_chain_connector::state_dump::StateRead + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -236,7 +236,7 @@ pub async fn build_exit_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + hopr_chain_connector::state_dump::StateRead + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;

@@ -140,7 +140,6 @@ testing = [
   "dep:tokio-util",
   "dep:hopr-ticket-manager",
   "dep:hopr-transport-p2p",
-  "dep:hopr-chain-connector",
   "dep:hopr-ct-full-network",
   "dep:hopr-network-graph",
   "hopr-chain-connector/testing",
@@ -201,7 +200,7 @@ hopr-transport = { workspace = true }
 
 hopr-ticket-manager = { workspace = true, optional = true }
 hopr-transport-p2p = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true, optional = true }
+hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
 
@@ -209,12 +208,14 @@ hopr-network-graph = { workspace = true, optional = true }
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
+serde_json = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
 insta = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
+temp-env = { workspace = true }
 serde-saphyr = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
@@ -249,3 +250,7 @@ ignored = ["humantime-serde", "pprof"]
 
 [package.metadata.cargo-shear]
 ignored = ["humantime-serde"]
+
+[[test]]
+name = "state_dump"
+required-features = ["testing"]

@@ -4205,9 +4205,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fb6f363700957a383f5be7c6fcda692206e468e1a2b38bb0d4e9921a286754f"
+version = "0.31.1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4227,6 +4226,7 @@ dependencies = [
  "petgraph",
  "postcard",
  "redb",
+ "serde",
  "serde_json",
  "smart-default",
  "tempfile",
@@ -4315,10 +4315,12 @@ dependencies = [
  "rstest",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "serde_with",
  "serial_test",
  "smart-default",
  "strum",
+ "temp-env",
  "tempfile",
  "test-log",
  "thiserror 2.0.21",
@@ -4331,9 +4333,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5521c74b022c255d71df222a319506606910d0edc2611c972606b540368056d"
+version = "0.10.1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4641,6 +4642,7 @@ dependencies = [
  "lazy_static",
  "moka",
  "more-asserts",
+ "parking_lot 0.12.5",
  "rand 0.10.3",
  "rstest",
  "serde",
@@ -7330,7 +7332,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7370,7 +7372,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7383,7 +7385,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 

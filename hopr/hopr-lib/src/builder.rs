@@ -48,6 +48,7 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
+use hopr_chain_connector::state_dump::{Collector, Config as StateDumpConfig, IntervalCounters, StateRead};
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{
@@ -60,7 +61,10 @@ use validator::Validate;
 
 use crate::{
     Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
-    config::HoprLibConfig, constants, helpers::BroadcastSenderSink,
+    config::HoprLibConfig,
+    constants,
+    helpers::BroadcastSenderSink,
+    state_dump::{SectionValue, StateDumpSection},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -110,6 +114,7 @@ pub struct BuildCtx {
     /// Node configuration.
     pub cfg: HoprLibConfig,
     peer_discovery_rx: PeerDiscoveryRx,
+    state_dump_sections: Vec<(&'static str, StateDumpSection)>,
 }
 
 impl BuildCtx {
@@ -156,6 +161,7 @@ impl HoprBuilderWithIdentity {
                 packet_key: self.packet_key,
                 cfg,
                 peer_discovery_rx: Arc::new(parking_lot::Mutex::new(Some(peer_discovery_rx))),
+                state_dump_sections: Vec::new(),
             },
             safe_and_module: None,
             chain_factory: None,
@@ -189,6 +195,19 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
+    /// Adds a named section to every periodic state dump record, for example the states of the
+    /// strategies the embedding node runs. `section` is called once per record and must not block.
+    ///
+    /// Sections are ignored when the state dump is disabled (`HOPR_STATE_DUMP_INTERVAL=0`).
+    pub fn with_state_dump_section(
+        mut self,
+        name: &'static str,
+        section: impl Fn() -> SectionValue + Send + Sync + 'static,
+    ) -> Self {
+        self.ctx.state_dump_sections.push((name, Arc::new(section)));
+        self
+    }
+
     /// Sets the node Safe and module addresses.
     pub fn with_safe_module(mut self, safe: &Address, module: &Address) -> Self {
         self.safe_and_module = Some((*safe, *module));
@@ -474,7 +493,7 @@ async fn pre_build_inner<Chain, Graph, Net, Ct>(
     mut processes: AbortableList<HoprLibProcess>,
 ) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -487,6 +506,9 @@ where
     // First, so it is in the log even when the configuration or the chain fails below.
     log_startup(&ctx);
     ctx.cfg.validate()?;
+    let state_dump_config = StateDumpConfig::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
+    let state_dump_counters = state_dump_config.interval().map(|_| IntervalCounters::default());
+    let transport_observer = state_dump_counters.clone().map(crate::state_dump::transport_observer);
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
     tracing::info!(?network_tuning, "OS network tuning specs");
@@ -511,12 +533,13 @@ where
 
     let (chain_id, transport_id) = (ctx.chain_key.clone(), ctx.packet_key.clone());
 
-    let transport_api = HoprTransport::new(
+    let transport_api = HoprTransport::new_with_observer(
         (&chain_id, &transport_id),
         chain_api.clone(),
         graph.clone(),
         vec![(&ctx.cfg.host).try_into().map_err(HoprLibError::TransportError)?],
         ctx.cfg.protocol.clone(),
+        transport_observer,
     )
     .map_err(HoprLibError::TransportError)?;
 
@@ -805,6 +828,28 @@ where
             )
         });
         processes.insert(HoprLibProcess::ChannelEvents, hopr_utils::spawn_as_abortable!(proc));
+    }
+
+    if state_dump_config.interval().is_some() {
+        let collector = ctx.state_dump_sections.iter().fold(
+            Collector::new(
+                chain_api.clone(),
+                graph.clone(),
+                network.clone(),
+                safe_addr,
+                state_dump_config,
+            ),
+            |collector, (name, section)| {
+                let section = section.clone();
+                collector.with_section(name, move || section())
+            },
+        );
+        processes.insert(
+            HoprLibProcess::StateDump,
+            hopr_utils::spawn_as_abortable!(async move {
+                collector.run(state_dump_counters).await;
+            }),
+        );
     }
 
     Ok(PreHopr {
@@ -1177,7 +1222,7 @@ macro_rules! impl_build_methods {
 #[cfg(feature = "session-server")]
 impl<Chain, Graph, Net, Ct> HoprBuilderWithSession<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1199,7 +1244,7 @@ where
 #[cfg(not(feature = "session-server"))]
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1250,6 +1295,38 @@ mod tests {
         tracing::subscriber::with_default(subscriber, log);
         buffer.flush().context("flush captured logs")?;
         String::from_utf8(buffer.0.lock().clone()).context("logs should be UTF-8")
+    }
+
+    #[test]
+    fn state_dump_sections_are_lazy_and_keep_their_names_and_shared_state() -> anyhow::Result<()> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        let builder = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default())
+            .with_state_dump_section(
+                "strategies",
+                move || serde_json::json!({ "calls": observed.fetch_add(1, Ordering::Relaxed) }),
+            )
+            .with_state_dump_section("health", || serde_json::json!({ "ready": true }));
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            0,
+            "registering a section must not collect it"
+        );
+        let sections = &builder.ctx.state_dump_sections;
+        assert_eq!(
+            sections.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            ["strategies", "health"]
+        );
+        let section = sections[0].1.clone();
+        assert_eq!(section(), serde_json::json!({ "calls": 0 }));
+        assert_eq!(sections[0].1(), serde_json::json!({ "calls": 1 }));
+        assert_eq!(sections[1].1(), serde_json::json!({ "ready": true }));
+        assert_eq!(calls.load(Ordering::Relaxed), 2);
+        Ok(())
     }
 
     #[test]
@@ -1318,6 +1395,58 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "testing")]
+    #[rstest::rstest]
+    #[serial_test::serial(state_dump_env)]
+    #[case::disabled("0", true)]
+    #[case::enabled("5", true)]
+    #[case::too_short("4", false)]
+    #[case::too_long("86401", false)]
+    #[case::malformed("invalid", false)]
+    fn state_dump_interval_is_validated_before_component_factories(
+        #[case] interval: &str,
+        #[case] valid: bool,
+    ) -> anyhow::Result<()> {
+        type TestBuilder = HoprBuilderConfigured<
+            Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+            hopr_network_graph::SharedChannelGraph,
+            hopr_transport_p2p::HoprNetwork,
+            hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
+        >;
+        temp_env::with_var("HOPR_STATE_DUMP_INTERVAL", Some(interval), || {
+            let builder = HoprBuilder
+                .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+                .with_config(HoprLibConfig::default());
+            let configured = TestBuilder {
+                ctx: builder.ctx,
+                safe_and_module: None,
+                chain_factory: None,
+                graph_factory: None,
+                network_factory: None,
+                ct_factory: None,
+                peer_discovery_tx: builder.peer_discovery_tx,
+            };
+            let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
+            let error =
+                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
+                    .err()
+                    .context("startup should stop before constructing components")?;
+            if valid {
+                assert!(
+                    matches!(error, HoprLibError::BuilderError("missing chain factory")),
+                    "{error}"
+                );
+            } else {
+                assert!(matches!(error, HoprLibError::GeneralError(_)), "{error}");
+                assert!(
+                    error.to_string().contains("interval") || error.to_string().contains("HOPR_STATE_DUMP_INTERVAL"),
+                    "{error}"
+                );
+            }
+            Ok(())
+        })
+    }
+
     #[rstest::rstest]
     #[case::available(true)]
     #[case::unavailable(false)]
@@ -1355,5 +1484,22 @@ mod tests {
             assert!(!information.contains("chain_id="));
         }
         Ok(())
+    }
+    #[test]
+    fn state_dump_sections_survive_component_factory_changes() {
+        let configured = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default())
+            .with_state_dump_section("before", || serde_json::json!("first"))
+            .with_chain_api(|_| 1_u8)
+            .with_graph(|_| "graph")
+            .with_cover_traffic(|_| ())
+            .with_state_dump_section("after", || serde_json::json!("second"));
+        let sections = configured.ctx.state_dump_sections;
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0, "before");
+        assert_eq!(sections[1].0, "after");
+        assert_eq!(sections[0].1(), serde_json::json!("first"));
+        assert_eq!(sections[1].1(), serde_json::json!("second"));
     }
 }
