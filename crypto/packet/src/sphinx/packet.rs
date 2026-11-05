@@ -328,13 +328,50 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
     }
 }
 
-/// The blinded alpha for the next hop together with the shared secret the current one derived.
+/// What [`MetaPacket::forward_secret`] derives for this hop, and what
+/// [`MetaPacket::into_forwarded_with_secret`] consumes.
 ///
-/// Produced by [`MetaPacket::forward_secret`] and consumed by [`MetaPacket::into_forwarded_with_secret`].
-pub type ForwardSecret<S> = (
+/// The fields are private and the tag is derived only here, so a caller cannot pair a tag with a secret it does not
+/// belong to - the invariant is carried by the type rather than by a doc comment.
+pub struct ForwardSecret<S: SphinxSuite> {
+    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    secret: SharedSecret,
+    tag: PacketTag,
+}
+
+/// The three fields of a [`ForwardSecret`], for the transform's internal destructuring.
+///
+/// The tag is here as well as in `ForwardSecret`, so the pairing is decided inside `forward_secret` rather than by a
+/// caller.
+type ForwardSecretParts<S> = (
     Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>,
     SharedSecret,
+    PacketTag,
 );
+
+impl<S: SphinxSuite> ForwardSecret<S> {
+    /// The packet's [`PacketTag`], derived from the secret above.
+    ///
+    /// This is what a replay filter keys on: a value only a party that derived this hop's secret can produce, and
+    /// which is stable across replays of the same packet.
+    pub fn tag(&self) -> &PacketTag {
+        &self.tag
+    }
+
+    /// Splits the value into the parts the transform needs.
+    fn into_parts(self) -> ForwardSecretParts<S> {
+        (self.alpha, self.secret, self.tag)
+    }
+}
+
+impl<S: SphinxSuite> std::fmt::Debug for ForwardSecret<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The secret is redacted, as everywhere else it appears.
+        f.debug_struct("ForwardSecret")
+            .field("tag", &self.tag)
+            .finish_non_exhaustive()
+    }
+}
 
 /// Represent a [`MetaPacket`] with one layer of encryption removed, exposing the details
 /// about the next hop.
@@ -444,8 +481,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     {
         let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
             .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
-        SharedKeys::<S::E, S::G>::forward_transform(&alpha_arr, &(node_keypair.into()), node_keypair.public().into())
-            .map_err(SphinxError::from)
+        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
+            &alpha_arr,
+            &(node_keypair.into()),
+            node_keypair.public().into(),
+        )
+        .map_err(SphinxError::from)?;
+
+        let tag = derive_packet_tag(&secret)?;
+        Ok(ForwardSecret { alpha, secret, tag })
     }
 
     /// Attempts to remove the layer of encryption in this packet by using the given `node_keypair`.
@@ -461,14 +505,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
-        let (alpha, secret) = self.forward_secret(node_keypair)?;
-        let packet_tag = derive_packet_tag(&secret)?;
-        self.into_forwarded_with_secret(alpha, secret, packet_tag, key_mapper, reply_openers, || {})
+        let state = self.forward_secret(node_keypair)?;
+        self.into_forwarded_with_secret(state, key_mapper, reply_openers, || {})
     }
 
     /// As [`MetaPacket::into_forwarded`], but for a caller that has already derived the shared secret with
     /// [`MetaPacket::forward_secret`].
-    /// `packet_tag` is the tag the caller already derived from `secret`, so it is not derived a second time here.
+    /// `state` is what [`MetaPacket::forward_secret`] returned, so the tag is the one belonging to this secret.
     ///
     /// `on_authenticated` runs once the header MAC has verified, i.e. once the sender has proven knowledge of the
     /// shared secret, and before anything on this hop's side is consumed. A caller that records the tag can use it
@@ -476,9 +519,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     /// authenticated".
     pub fn into_forwarded_with_secret<K, F, A>(
         mut self,
-        alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
-        secret: SharedSecret,
-        packet_tag: PacketTag,
+        state: ForwardSecret<S>,
         key_mapper: &K,
         mut reply_openers: F,
         on_authenticated: A,
@@ -488,6 +529,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         A: FnOnce(),
     {
+        let (alpha, secret, packet_tag) = state.into_parts();
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
         on_authenticated();

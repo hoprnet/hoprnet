@@ -631,8 +631,8 @@ impl HoprPacket {
             let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
                 MetaPacket::try_from(pre_packet)?;
 
-            let (alpha, secret) = mp.forward_secret(node_keypair)?;
-            let tag = derive_packet_tag(&secret)?;
+            let state = mp.forward_secret(node_keypair)?;
+            let tag = *state.tag();
             if is_replay(&tag) {
                 return Err(PacketReplay);
             }
@@ -645,9 +645,7 @@ impl HoprPacket {
             // committed and the original error is returned. Reporting a replay instead would misdescribe a packet
             // that was never seen before.
             let mut authenticated = false;
-            let forwarded = match mp
-                .into_forwarded_with_secret(alpha, secret, tag, mapper, reply_openers, || authenticated = true)
-            {
+            let forwarded = match mp.into_forwarded_with_secret(state, mapper, reply_openers, || authenticated = true) {
                 Ok(forwarded) => forwarded,
                 Err(error) => {
                     // A packet that never authenticated is not recorded - that is what keeps a token costing a
