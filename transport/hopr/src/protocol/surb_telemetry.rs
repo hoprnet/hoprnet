@@ -201,11 +201,12 @@ pub struct SurbRoundTripRegistry {
     /// dead, and for `REBUMP_COOLDOWN` after it is not, so a pair advanced in this death stays
     /// advanced, and a quick re-death after a revival is not advanced again either.
     bumped: Arc<DashMap<(HoprPseudonym, OffchainPublicKey), Instant>>,
-    /// The return legs of SURBs written off, for as long as a SURB is remembered.
+    /// The return legs of SURBs written off or wiped, for as long as a SURB is remembered.
     ///
     /// Writing a SURB off takes it out of `pending`, but the counterparty still holds it and may spend
-    /// it: the reply of a probe through a relayer on probation arrives after the write-off. Recognising
-    /// it here is what lets a reply home lift the verdict or the probation of the relayers on its leg.
+    /// it: the reply of a probe through a relayer on probation arrives after the write-off, and a
+    /// wiped stock is spent until the new generation reaches the counterparty. Recognising it here is
+    /// what lets a reply home lift the verdict or the probation of the relayers on its leg.
     written_off_legs: moka::sync::Cache<HoprSurbId, ReturnRelayers>,
 }
 
@@ -390,16 +391,20 @@ impl SurbRoundTripRegistry {
                 }
             }
 
-            // The counterparty drops its whole stock on the first batch of the new generation, so the
-            // SURBs these sessions hold out now will never be spent. Forgotten here, they cannot make a
-            // second relayer confirmed at a later flush look as if it still had a stock to wipe.
-            let wiped: Vec<HoprSurbId> = self
+            // The counterparty drops its whole stock on the first batch of the new generation, but it
+            // goes on spending that stock until the batch arrives. Taken out of `pending`, these SURBs
+            // cannot make a second relayer confirmed at a later flush look as if it still had a stock
+            // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
+            // that a reply spent in the meantime still proves its relayers alive: it can revive one
+            // judged dead in this same flush, whose verdict is not confirmed yet.
+            let wiped: Vec<(HoprSurbId, ReturnRelayers)> = self
                 .pending
                 .iter()
                 .filter(|(_, pending)| reached.contains(&pending.pseudonym))
-                .map(|(id, _)| *id)
+                .map(|(id, pending)| (*id, pending.return_relayers))
                 .collect();
-            for id in wiped {
+            for (id, return_relayers) in wiped {
+                self.written_off_legs.insert(id, return_relayers);
                 self.pending.invalidate(&id);
             }
         }
@@ -1347,9 +1352,11 @@ impl<C> SurbTelemetryCodec<C> {
         health.record_reply();
         // A SURB is single-use, so the association is consumed with it.
         let Some(pending) = self.registry.pending.remove(surb_id) else {
-            // Written off because its relayer was judged dead, and spent by the counterparty all the same:
-            // a probe through a relayer on probation arrives like this. Its legs are not credited, the
-            // expectation was written off with it, but it proves its relayers are delivering.
+            // Written off because its relayer was judged dead, or wiped with its Session's stock, and
+            // spent by the counterparty all the same: a probe through a relayer on probation arrives
+            // like this, and so does a SURB spent before the new generation reached the counterparty.
+            // Its legs are not credited, the expectation was written off with it, but it proves its
+            // relayers are delivering.
             if let Some(leg) = self.registry.written_off_legs.remove(surb_id) {
                 health.note_home(&leg);
                 health.revive_by_reply(&leg);
@@ -3639,6 +3646,39 @@ mod tests {
              drop the counterparty's fresh stock again"
         );
         assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), registry.invalid());
+    }
+
+    /// A wipe takes the Session's pending SURBs, but the counterparty spends its old stock until the
+    /// new generation reaches it. A reply on a wiped SURB still proves its relayers alive: a relayer
+    /// judged dead in the same flush, whose verdict is not confirmed yet, is revived by it instead of
+    /// being confirmed at the next flush and put on probation.
+    #[test]
+    fn a_reply_on_a_wiped_surb_should_revive_a_relayer_judged_in_the_same_flush() {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let [dead, straggler] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        registry.pending.insert(surb_id(2), pending_to(&[straggler], None, 0));
+        judge_dead(&health, dead);
+        health.mark_dead(straggler);
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the confirmed verdict wipes the stock"
+        );
+        assert!(
+            registry.pending.get(&surb_id(2)).is_none(),
+            "the straggler's SURB went with the wipe"
+        );
+
+        recorder.on_replied(&surb_id(2));
+        assert!(
+            !health.is_known_dead(&straggler),
+            "a reply on a wiped SURB revives the relayer it came home through"
+        );
+        assert!(health.is_known_dead(&dead), "and only that one");
     }
 
     /// What a cluster run showed: three relayers judged dead around one flush, the session bumped once
