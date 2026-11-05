@@ -14,8 +14,9 @@ fn synthetic_token(value: u64) -> ReplayToken {
 /// Build a filter whose current generations are exactly full, so the numbers reflect the steady state rather than
 /// a nearly empty bitmap.
 ///
-/// Fills until the insert count stops rising, so a Bloom false positive cannot leave a generation short. Returns
-/// the filter and a token the current generation holds.
+/// Fills by counting successful inserts, so a Bloom false positive cannot leave a generation short. The count is
+/// kept locally rather than read back from `TagReplayFilter::count`, which locks every shard - doing that once per
+/// insert made the setup quadratic. Returns the filter and a token the current generation holds.
 fn saturated_filter(max_tracked_packets: usize) -> (TagReplayFilter, ReplayToken) {
     let filter = TagReplayFilter::new(&ReplayFilterConfig {
         max_tracked_packets,
@@ -23,13 +24,15 @@ fn saturated_filter(max_tracked_packets: usize) -> (TagReplayFilter, ReplayToken
     });
 
     let target = filter.capacity();
-    let mut i = 0u64;
+    let mut inserted = 0usize;
+    let mut candidate = 0u64;
     let mut present = synthetic_token(0);
-    while filter.count() < target {
-        let token = synthetic_token(i);
-        i += 1;
+    while inserted < target {
+        let token = synthetic_token(candidate);
+        candidate += 1;
         // `commit` reports a token it already knows; those do not fill a slot.
         if !filter.commit(&token) {
+            inserted += 1;
             present = token;
         }
     }
@@ -38,9 +41,9 @@ fn saturated_filter(max_tracked_packets: usize) -> (TagReplayFilter, ReplayToken
 }
 
 fn tag_replay_filter_bench(c: &mut Criterion) {
-    // A fifth of the default, so the setup loop does not dominate: the per-operation cost does not depend on the
-    // filter size, only on the number of hash probes.
-    let (filter, existing) = saturated_filter(2_000_000);
+    // A fraction of the default, so the setup loop does not dominate: the per-operation cost depends on the number
+    // of hash probes, not on the filter size.
+    let (filter, existing) = saturated_filter(200_000);
 
     let mut group = c.benchmark_group("tag_replay_filter");
     group.sample_size(100);
