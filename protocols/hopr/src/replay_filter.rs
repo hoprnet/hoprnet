@@ -89,7 +89,15 @@ pub struct ReplayFilterConfig {
     ///
     /// Default is 10 000 000.
     #[default(default_max_tracked_packets())]
-    #[validate(range(min = MIN_TRACKED_PACKETS, max = MAX_TRACKED_PACKETS, message = "max_tracked_packets must be between MIN_TRACKED_PACKETS and MAX_TRACKED_PACKETS"))]
+    // Concrete numbers in the message: `validator` takes a literal, so the constants cannot be interpolated here.
+    // The test `the_tracked_packet_floor_agrees_with_the_validator` keeps them in step.
+    #[validate(
+        range(
+            min = MIN_TRACKED_PACKETS,
+            max = MAX_TRACKED_PACKETS,
+            message = "max_tracked_packets must be between 4096 and 100000000"
+        )
+    )]
     #[cfg_attr(feature = "serde", serde(default = "default_max_tracked_packets"))]
     pub max_tracked_packets: usize,
     /// Number of independent shards.
@@ -630,16 +638,32 @@ mod tests {
         assert_eq!(4, used.len(), "every shard must be addressable, saw {}", used.len());
     }
 
-    /// The floor is spelled as a literal in the `range` validator, matching the other configs in this crate; this
-    /// keeps the exported constant and the enforced bound from drifting apart.
+    /// The bounds and their message are spelled out as literals in the `range` validator, because `validator`
+    /// cannot interpolate constants. This keeps the exported constants, the enforced bounds and the numbers an
+    /// operator reads in the error message from drifting apart.
     #[test]
-    fn the_tracked_packet_floor_agrees_with_the_validator() -> anyhow::Result<()> {
+    fn the_tracked_packet_bounds_agree_with_the_validator() -> anyhow::Result<()> {
         let mut cfg = config(MIN_TRACKED_PACKETS, 64);
         validator::Validate::validate(&cfg).context("the floor itself must be accepted")?;
+
         cfg.max_tracked_packets = MIN_TRACKED_PACKETS - 1;
+        let err = validator::Validate::validate(&cfg)
+            .err()
+            .context("one below the exported floor must be rejected")?;
+        let message = format!("{}", err.field_errors()["max_tracked_packets"][0]);
         assert!(
-            validator::Validate::validate(&cfg).is_err(),
-            "one below the exported floor must be rejected"
+            message.contains(&MIN_TRACKED_PACKETS.to_string()),
+            "the message must state the real lower bound, got: {message}"
+        );
+
+        cfg.max_tracked_packets = MAX_TRACKED_PACKETS + 1;
+        let err = validator::Validate::validate(&cfg)
+            .err()
+            .context("one above the exported ceiling must be rejected")?;
+        let message = format!("{}", err.field_errors()["max_tracked_packets"][0]);
+        assert!(
+            message.contains(&MAX_TRACKED_PACKETS.to_string()),
+            "the message must state the real upper bound, got: {message}"
         );
         Ok(())
     }
