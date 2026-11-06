@@ -351,9 +351,9 @@ fn surb_report_session_config(
 ///
 /// A ping that fails is not ignored. The drops are measured as a delta of a process-global counter,
 /// so a Session that died halfway through would otherwise read as "zero drops" — the same result the
-/// fix is meant to produce, indistinguishable from it. Only the last ping is allowed to fail, because
-/// the Session may be torn down as the window closes; a failure of any earlier one means the traffic
-/// driving the test stopped, and the drop count no longer measures anything.
+/// fix is meant to produce, indistinguishable from it. So every ping must succeed, the last one
+/// included: nothing closes the Session as the window ends, and each ping waits for its reply under
+/// its own timeout, so a failure anywhere is a reply the Exit could not send.
 ///
 /// The counter is process-global and every node in the cluster shares it, so the delta covers all of
 /// them. That is sound here because the Exit is the only node that originates *return-routed* packets
@@ -379,11 +379,10 @@ async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> 
         tokio::time::sleep(PING).await;
     }
 
-    // Only the final ping may fail: the Session can be torn down as the window closes.
-    if let Some(failed) = failed_pings.iter().find(|&&number| number != pings) {
+    if let Some(failed) = failed_pings.first() {
         anyhow::bail!(
-            "ping {failed} of {pings} failed (failed pings: {failed_pings:?}), so the Session stopped carrying \
-             traffic before the window closed and its drop count measures nothing"
+            "ping {failed} of {pings} failed (failed pings: {failed_pings:?}), so the Session did not carry all of \
+             its reply traffic and its drop count does not measure the fix"
         );
     }
     Ok(routing_resolution_surb_timeout_count() - before)
