@@ -1986,6 +1986,7 @@ mod tests {
 
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+    use rstest::rstest;
 
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.
@@ -2115,6 +2116,49 @@ mod tests {
             "the retire must release the ring"
         );
 
+        Ok(())
+    }
+
+    /// A Session that announces the largest target the transport allows is admitted a full-size ring.
+    ///
+    /// The Exit gives a Session that announced no target exactly that figure
+    /// (`maximum_surb_buffer_size`, set from `surb_buffer_target_ceiling`), so this is the link that
+    /// makes such a Session's ring `rb_capacity` and not the few dozen SURBs the balancer's fallback
+    /// would give it: the ceiling is two thirds of the capacity, and the store's default headroom of
+    /// 50 % takes it back up. Integer division can leave it a SURB short.
+    #[rstest]
+    #[case::the_smallest_allowed(1_024)]
+    #[case::a_round_one(30_000)]
+    #[case::the_default(hopr_protocol_hopr::SurbStoreConfig::default().rb_capacity)]
+    #[test]
+    fn announcing_the_target_ceiling_admits_a_ring_of_the_full_capacity(
+        #[case] rb_capacity: usize,
+    ) -> anyhow::Result<()> {
+        use anyhow::Context;
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl, surb_buffer_target_ceiling};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig {
+                rb_capacity,
+                ..Default::default()
+            }),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+
+        admission.admit(&pseudonym, surb_buffer_target_ceiling(rb_capacity));
+        let ring = admission
+            .store
+            .admitted_ring_ceiling(&pseudonym)
+            .context("the admission must have installed a ring")?;
+
+        assert!(
+            ring <= rb_capacity && rb_capacity - ring <= 1,
+            "a Session announcing the target ceiling must get the whole {rb_capacity}-SURB capacity (to within a SURB \
+             of rounding), got a ring of {ring}"
+        );
         Ok(())
     }
 }

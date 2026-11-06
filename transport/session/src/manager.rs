@@ -1966,11 +1966,12 @@ impl<'a> SessionSlotGuard<'a> {
     /// [`allocate_session_slot`](SessionManager::allocate_session_slot), which runs while the Start
     /// handshake is still in flight — admitting there would put an unauthenticated peer into the
     /// store's admitted class, the exact state the admission control exists to prevent
-    /// (hoprnet#8515). The Exit's negotiated `announced_surb_target` is likewise only known by the
-    /// time its branch reaches `commit`, which allocation is too early to see.
+    /// (hoprnet#8515). The Exit's negotiated ring target is likewise only known by the time its
+    /// branch reaches `commit`, which allocation is too early to see.
     ///
     /// `admission` is `Some` on every production path — the guard carries the manager's seam, and
-    /// `capacity` is the buffer target this branch announced. The `Option` keeps the guard usable
+    /// `capacity` is the buffer target the ring is sized from: the one the Entry announced, or the
+    /// node's maximum when it announced none. The `Option` keeps the guard usable
     /// from tests and callers that run without a store.
     ///
     /// The token `admit` returns lands in the slot's own cell rather than on the guard: the guard is
@@ -2541,6 +2542,9 @@ pub struct SessionManagerConfig {
     /// so values greater than that do not make sense. This value should be ideally set equal
     /// to the size of the global transport SURB RB.
     ///
+    /// On the Exit it is also the largest target it takes from an Entry, and the target the SURB ring of
+    /// a Session is sized from when its Entry announces none.
+    ///
     /// Default is 10 000 SURBs.
     #[default(10_000)]
     pub maximum_surb_buffer_size: usize,
@@ -2567,20 +2571,19 @@ pub struct SessionManagerConfig {
     ///
     /// This is useful when the client plans to change the SURB balancer target dynamically.
     ///
-    /// The Exit sizes a Session's SURB ring from that target, and widens the ring when a raised one
-    /// arrives. A rate-controlled Exit also takes its balancer's set-point, its egress cap
-    /// (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
+    /// For a Session that announced a target, the Exit sizes the SURB ring from it, and widens the ring
+    /// when a raised one arrives. A rate-controlled Exit also takes its balancer's set-point, its egress
+    /// cap (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
     /// and follows every change the Entry announces, lowered as well as raised.
     ///
     /// With this off, the Exit only knows the target announced at establishment, and no change to it
-    /// is seen, lower or higher. A rate-controlled Exit then keeps its balancer, egress cap and
+    /// is seen, lower or higher. A rate-controlled Exit then keeps its ring, balancer, egress cap and
     /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
-    /// the Exit's egress cap, and one that lowers it to that reserve or below may leave the Exit holding
-    /// its data back for good, waiting for a stock the Entry no longer keeps. A `NoRateControl` Session announces no
-    /// target at establishment, so its ring stays at a fallback size on the Exit for its whole life, and
-    /// SURBs minted past it are evicted on arrival (under PIX, with the shares they carry). The Exit's
-    /// SURB-level reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged
-    /// or not.
+    /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
+    /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
+    /// Session that announces no target at establishment, as a `NoRateControl` Entry does, gets the
+    /// full ring from the start, so turning this off costs it nothing. The Exit's SURB-level reports
+    /// are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(true)]
@@ -6775,8 +6778,11 @@ where
         // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
         // figure, and on that branch the fallback below — the same one the balancer would have used —
         // is the only estimate of the buffer there is.
+        //
+        // That fallback serves the balancer and the fill reserve only. It is not what the SURB ring is
+        // sized from when nothing was announced: see `ring_surb_target` below.
+        let surb_target = initiation_options(session_req.additional_data) as u32;
         let announced_surb_target = {
-            let surb_target = initiation_options(session_req.additional_data) as u32;
             if surb_target > 0 {
                 (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
@@ -6787,6 +6793,31 @@ where
                         .max(MIN_SURB_BUFFER_DURATION)
                         .as_secs()
             }
+        };
+
+        // The target this Session's SURB ring is sized from: the one the Entry announced, or, when it
+        // announced none, the largest this node allows (`maximum_surb_buffer_size`).
+        //
+        // Decided from the raw figure on the wire and not from `announced_surb_target`, which is
+        // clamped and has already fallen back when nothing was announced.
+        //
+        // The fallback is a balancer-rate estimate (`initial_return_session_egress_rate` times the
+        // minimum buffer duration, 50 at the defaults), not a buffer anyone asked for, and the store
+        // turns it into a ring of 75. A `NoRateControl` Entry announces nothing at establishment, and
+        // one that runs no balancer sends no keep-alives to announce a target later either, so nothing
+        // would ever widen that ring: a Session that bursts replies finds its SURBs evicted past the
+        // 75th, and the replies without one. The ring is a ceiling and not a reservation (it
+        // allocates with occupancy, see `SurbStoreConfig::rb_capacity`), so a large one costs what is
+        // actually stored in it. And any Entry can have the same ring by announcing the maximum
+        // target, so a smaller one for an Entry that announces nothing protects nothing here; it only
+        // starves the Entries that cannot announce one, such as a `NoRateControl` Session opened
+        // without `surb_management`. The transport sets the maximum to two thirds of `rb_capacity`,
+        // which the store's headroom turns into a ring of `rb_capacity` (to within a SURB of integer
+        // rounding).
+        let ring_surb_target = if surb_target > 0 {
+            announced_surb_target
+        } else {
+            self.cfg.maximum_surb_buffer_size as u64
         };
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
@@ -7002,16 +7033,17 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_NUM_ESTABLISHED_SESSIONS.increment();
 
-        // `announced_surb_target` — the buffer the Entry asked for — is what this Session will
-        // actually fill, so the store sizes the admitted ring off it rather than off our own
-        // ceiling. It is live only from its resolution at the top of this function, which is why
-        // the admit rides on `commit` rather than on slot allocation.
+        // `ring_surb_target` — the buffer the Entry asked for, or the largest this node allows when it
+        // asked for none — is what the store sizes the admitted ring off. It is live only from its
+        // resolution at the top of this function, which is why the admit rides on `commit` rather than
+        // on slot allocation. See where it is resolved for why an Entry that announced nothing is not
+        // given the balancer's fallback figure, on both branches.
         commit_slot_guard(
             &mut slot_guard,
             &self.sessions,
             session_id,
             self.surb_admission.clone(),
-            announced_surb_target as usize,
+            ring_surb_target as usize,
         );
 
         Ok(())
@@ -7143,10 +7175,11 @@ where
                     //
                     // A `NoRateControl` Session runs no balancer on this side, so there is no
                     // set-point to move (its target is never set). Its ring is the same bounded
-                    // store, though, sized at establishment from the target the Entry announced then,
-                    // which a `NoRateControl` Entry does not announce: the fallback size. An Entry
-                    // that balances announces its real target in these keep-alives, and the ring has
-                    // to follow it for the same reason as any other (gnosis/gnosis_vpn#739). With no
+                    // store, though, sized at establishment from the target the Entry announced then.
+                    // A Session whose Entry announced nothing was given the full ring at that point
+                    // (see `ring_surb_target` in `new_session`), so there is nothing left to widen;
+                    // the raise matters for one that announced a target at establishment and has since
+                    // raised it, for the same reason as for any other (gnosis/gnosis_vpn#739). With no
                     // set-point to compare against, a raise is whatever exceeds the largest figure
                     // already recorded on the slot; the ring only ever widens, so a repeated
                     // announcement changes nothing.
@@ -15095,8 +15128,10 @@ mod tests {
     /// Exit that only updates the balancer's set-point leaves the ring at the ping tier, and every
     /// SURB minted toward the main one is evicted on arrival — losing the PIX share each carried.
     /// A `NoRateControl` Session has no set-point to move (`no_rate_control`: its balancer state stays
-    /// disabled), yet its ring is the same store and has the same need. That Session was sized from the
-    /// fallback, its Entry announcing no target at establishment, which is why it starts from none.
+    /// disabled), yet its ring is the same store and has the same need, when its Entry announced a
+    /// target at establishment for the ring to be sized from. One that announced none starts with the
+    /// full ring, which leaves nothing to widen
+    /// (`the_admitted_ring_follows_the_announced_target_or_takes_the_ceiling`).
     ///
     /// Only a keep-alive that carries `BalancerTarget` raises anything. An Entry whose
     /// `surb_target_notify` is off sends its keep-alives without it, and the Exit then learns of no
@@ -15106,9 +15141,9 @@ mod tests {
     /// and a raise under a successor's pseudonym must not touch its ring.
     #[rstest]
     #[case::rate_controlled(Capability::Segmentation.into(), 688, true)]
-    #[case::no_rate_control(Capability::Segmentation | Capability::NoRateControl, 0, true)]
+    #[case::no_rate_control(Capability::Segmentation | Capability::NoRateControl, 688, true)]
     #[case::rate_controlled_without_target_notify(Capability::Segmentation.into(), 688, false)]
-    #[case::no_rate_control_without_target_notify(Capability::Segmentation | Capability::NoRateControl, 0, false)]
+    #[case::no_rate_control_without_target_notify(Capability::Segmentation | Capability::NoRateControl, 688, false)]
     #[test_log::test(tokio::test)]
     async fn a_raised_balancer_target_must_widen_the_sessions_ring(
         #[case] capabilities: Capabilities,
@@ -15229,6 +15264,69 @@ mod tests {
 
         sender.close_channel();
         transport.await??;
+        Ok(())
+    }
+
+    /// The node's `maximum_surb_buffer_size` in the ring tests: well clear of the balancer's fallback
+    /// (50) and of anything a test announces, and inside the bound the recording admission asserts.
+    const RING_CEILING: usize = 4_000;
+    const _: () = assert!(RING_CEILING <= MAXIMUM_SURB_BUFFER_SIZE_FOR_TESTS);
+
+    /// The SURB ring the Exit admits follows the target the Entry announced, and is the node's ceiling
+    /// when the Entry announced none.
+    ///
+    /// Without an announcement the Exit used to pass the balancer's fallback figure (50 at the defaults)
+    /// to the store, which turned it into a ring of 75. An Entry that runs no balancer announces
+    /// nothing and sends no keep-alive to raise a target later, so nothing widened that ring, and a
+    /// burst of replies found its SURBs evicted past the 75th. The ring is a ceiling that allocates with
+    /// occupancy, so the Session is given the largest one the node allows (`maximum_surb_buffer_size`)
+    /// and pays for what it stores. This holds on both kinds of Session, because the ring is the same
+    /// store whether or not the Exit runs a balancer.
+    ///
+    /// An announcement is still the Session's own figure, clamped to the ceiling, however small.
+    #[rstest]
+    #[case::rate_controlled_announcing_nothing(Capability::Segmentation.into(), 0, RING_CEILING)]
+    #[case::no_rate_control_announcing_nothing(Capability::Segmentation | Capability::NoRateControl, 0, RING_CEILING)]
+    #[case::rate_controlled_announcing_64(Capability::Segmentation.into(), 64, 64)]
+    #[case::no_rate_control_announcing_64(Capability::Segmentation | Capability::NoRateControl, 64, 64)]
+    #[case::rate_controlled_announcing_more_than_the_ceiling(Capability::Segmentation.into(), 9_999, RING_CEILING)]
+    #[test_log::test(tokio::test)]
+    async fn the_admitted_ring_follows_the_announced_target_or_takes_the_ceiling(
+        #[case] capabilities: Capabilities,
+        #[case] announced: u64,
+        #[case] expected: usize,
+    ) -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            maximum_surb_buffer_size: RING_CEILING,
+            ..Default::default()
+        });
+        assert!(mgr.set_surb_admission(Arc::new(admission.clone())));
+        // Held for the whole test: the establishment answer is sent through it.
+        let (msg_tx, _msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(capabilities),
+                additional_data: into_initiation_additional_data(announced),
+            },
+        )
+        .await?;
+
+        assert_eq!(
+            vec![expected],
+            admission.admitted_targets(),
+            "the ring is sized from what the Entry announced ({announced}), or from the node's ceiling when it \
+             announced nothing"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
         Ok(())
     }
 

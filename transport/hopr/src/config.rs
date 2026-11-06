@@ -1027,20 +1027,19 @@ pub struct SessionGlobalConfig {
 
     /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
     ///
-    /// The Exit sizes a Session's SURB ring from that target, and widens the ring when a raised one
-    /// arrives. A rate-controlled Exit also takes its balancer's set-point, its egress cap
-    /// (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
+    /// For a Session that announced a target, the Exit sizes the SURB ring from it, and widens the ring
+    /// when a raised one arrives. A rate-controlled Exit also takes its balancer's set-point, its egress
+    /// cap (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
     /// and follows every change the Entry announces, lowered as well as raised.
     ///
     /// With this off, the Exit only knows the target announced at establishment, and no change to it
-    /// is seen, lower or higher. A rate-controlled Exit then keeps its balancer, egress cap and
+    /// is seen, lower or higher. A rate-controlled Exit then keeps its ring, balancer, egress cap and
     /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
-    /// the Exit's egress cap, and one that lowers it to that reserve or below may leave the Exit holding
-    /// its data back for good, waiting for a stock the Entry no longer keeps. A `NoRateControl` Session announces no
-    /// target at establishment, so its ring stays at a fallback size on the Exit for its whole life, and
-    /// SURBs minted past it are evicted on arrival (under PIX, with the shares they carry). The Exit's
-    /// SURB-level reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged
-    /// or not.
+    /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
+    /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
+    /// Session that announces no target at establishment, as a `NoRateControl` Entry does, gets the
+    /// full ring from the start, so turning this off costs it nothing. The Exit's SURB-level reports
+    /// are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(default_session_surb_target_notify())]
