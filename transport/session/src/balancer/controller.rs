@@ -536,7 +536,7 @@ impl BalancerStateValues {
     }
 
     /// Records that the counterparty refills this side's SURB stock. The Exit calls it on a keep-alive
-    /// from the Entry: only an Entry's SURB balancer runs a keep-alive stream.
+    /// from the Entry other than a manual ping: only an Entry's SURB balancer runs a keep-alive stream.
     pub(crate) fn note_counterparty_refills(&self) {
         self.counterparty_refills
             .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -544,7 +544,8 @@ impl BalancerStateValues {
 
     /// Whether the counterparty has shown that it refills this side's SURB stock (see
     /// [`note_counterparty_refills`](Self::note_counterparty_refills)). An Entry without a SURB
-    /// balancer never does: it attaches one SURB to each data packet and sends no keep-alives.
+    /// balancer never does: it attaches one SURB to each data packet and sends no keep-alives of its own,
+    /// only the odd manual ping (an Entry that predates `ManualPing` and pings by hand still sets it).
     pub(crate) fn counterparty_refills(&self) -> bool {
         self.counterparty_refills.load(std::sync::atomic::Ordering::Relaxed)
     }

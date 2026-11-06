@@ -36,6 +36,7 @@ pub fn create_hopr_instance_config(
     pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     transit_latency: Option<TransitLatencyConfig>,
     pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
+    surb_balance_notify_period: Option<Duration>,
 ) -> HoprLibConfig {
     HoprLibConfig {
         host: crate::config::HostConfig {
@@ -53,11 +54,12 @@ pub fn create_hopr_instance_config(
             },
             session: SessionGlobalConfig {
                 idle_timeout: Duration::from_millis(idle_timeout_ms),
-                // Disable EXIT→ENTRY SURB level notifications in test clusters.
-                // With the default notify period (2 s) less than idle_timeout (2.5 s),
-                // each notification resets the moka TTI and prevents session expiration tests
-                // from working correctly.
-                surb_balance_notify_period: None,
+                // Forwarded unchanged from the caller; `TestNodeConfig::default` is what supplies
+                // the `None` that disables EXIT→ENTRY SURB level notifications. With a period
+                // shorter than `idle_timeout`, each notification resets the moka TTI and breaks
+                // session expiration tests, so a test that wants the Exit's keep-alive stream has
+                // to set a period explicitly.
+                surb_balance_notify_period,
                 ..Default::default()
             },
             probe: crate::config::ProbeConfig {

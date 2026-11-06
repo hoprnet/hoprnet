@@ -330,7 +330,7 @@
 //! | Bound | What it stops |
 //! |---|---|
 //! | [`max_rate`](PixFillConfig::max_rate) | The instantaneous cost of one Session. Validated *upwards* too — `validate_incoming_session_pix_config` refuses a ceiling below the rate the widest accepted quota needs, because a filler that cannot finish is worse than none. |
-//! | [`min_surb_reserve`](PixFillConfig::min_surb_reserve) | Fill spending the SURBs the Session needs for its own replies. Not an optimisation: a return packet that finds no SURB holds every packet this node originates for `surb_resolution_wait`, so an over-eager filler stalls the Session it is saving. The SURB-level notification is exempt, being the message that asks for more. A ceiling rather than the figure used — the buffer it is measured against is the Entry's choice, so the effective reserve is never more than a quarter of the target the Entry announced. |
+//! | [`min_surb_reserve`](PixFillConfig::min_surb_reserve) | Fill spending the SURBs the Session needs for its own replies. Not an optimisation: a return packet that finds no SURB holds every packet this node originates for `surb_resolution_wait`, so an over-eager filler stalls the Session it is saving. The SURB-level notification is exempt from the reserve, being the message that asks for more, but it still needs an Entry that refills and at least one SURB (see `PixFillControl::admit`). A ceiling rather than the figure used — the buffer it is measured against is the Entry's choice, so the effective reserve is never more than a quarter of the target the Entry announced. |
 //! | The stall rule | A doomed cycle, or a share-less SURB supply, burning `max_rate × max_recovery_time`. Once the target has not moved for [`max_recovery_idle`](SupervisorConfig::max_recovery_idle), fill drops to its heartbeat until the cycle moves again. |
 //! | The existing deadlines and the service gate | Unchanged. Fill is not a way around the backstop: an Exit with nothing to send strands exactly as it did before. |
 //!
@@ -1281,8 +1281,10 @@ pub struct PixFillConfig {
     /// that must yield. Spending the last SURBs on fill is not merely wasteful: a return packet with
     /// no SURB to ride holds *every* packet this node originates for the resolver's
     /// `surb_resolution_wait`, so an over-eager filler stalls the Session it is trying to save. The
-    /// SURB-level notification is exempt — it is the signal that asks for more SURBs — but the
-    /// heartbeat is not, being fill at its floor rather than a different message.
+    /// SURB-level notification is exempt from the reserve — it is the signal that asks for more SURBs —
+    /// but it still needs an Entry that has shown it refills and at least one SURB to be sent on (see
+    /// `PixFillControl::admit`). The heartbeat is not exempt, being fill at its floor rather than a
+    /// different message.
     ///
     /// A ceiling rather than the figure used, because the two sides of the comparison are chosen by
     /// different nodes: the reserve is measured against the Exit's estimate of its own SURB buffer for

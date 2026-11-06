@@ -893,6 +893,10 @@ fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
 
+fn default_session_surb_target_notify() -> bool {
+    true
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -1005,6 +1009,10 @@ pub struct SessionGlobalConfig {
     /// silently inflates the estimate until the Exit runs out of SURBs and can no longer
     /// send reply data.
     ///
+    /// A report costs the Exit one SURB, so it is sent only to an Entry that has shown it runs a SURB
+    /// balancer, by having sent a keep-alive (whether or not that keep-alive announces a target, but not a manual
+    /// ping), and only while the Exit's own estimate of the SURBs it holds for the Session is above 0.
+    ///
     /// Default is 15 seconds. Set to `null` to disable; minimum effective period is 1 second.
     #[validate(custom(function = "validate_surb_balance_notify_period"))]
     #[default(default_session_surb_balance_notify_period())]
@@ -1016,6 +1024,28 @@ pub struct SessionGlobalConfig {
         )
     )]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
+    ///
+    /// For a Session that announced a target, the Exit sizes the SURB ring from it, and widens the ring
+    /// when a raised one arrives. A rate-controlled Exit also takes its balancer's set-point, its egress
+    /// cap (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
+    /// and follows every change the Entry announces, lowered as well as raised.
+    ///
+    /// With this off, the Exit only knows the target announced at establishment, and no change to it
+    /// is seen, lower or higher. A rate-controlled Exit then keeps its ring, balancer, egress cap and
+    /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
+    /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
+    /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
+    /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
+    /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
+    /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
+    /// balancer's keep-alives, flagged or not.
+    ///
+    /// Default is true.
+    #[default(default_session_surb_target_notify())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
+    pub surb_target_notify: bool,
 
     /// How many later frames may queue behind a missing one before the reassembler gives up on it
     /// and releases what it already has.
@@ -1525,6 +1555,30 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    /// The Entry's `surb_target_notify` is reachable from a node's configuration file, and a file that
+    /// predates it keeps the behaviour the Entry always had.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_target_notify_is_configurable_and_on_by_default() -> anyhow::Result<()> {
+        assert!(SessionGlobalConfig::default().surb_target_notify);
+
+        let omitted: SessionGlobalConfig =
+            serde_saphyr::from_str("idle_timeout: 3m\n").context("config without the setting must parse")?;
+        assert!(
+            omitted.surb_target_notify,
+            "a configuration that does not name the setting must announce the target, as it always did"
+        );
+
+        let off: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_target_notify: false\n").context("config turning it off must parse")?;
+        assert!(!off.surb_target_notify);
+
+        let on: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_target_notify: true\n").context("config turning it on must parse")?;
+        assert!(on.surb_target_notify);
+        Ok(())
     }
 
     #[cfg(feature = "serde")]

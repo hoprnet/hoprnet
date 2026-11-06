@@ -4683,6 +4683,7 @@ dependencies = [
  "pid",
  "pin-project",
  "rand 0.10.3",
+ "rstest",
  "serde",
  "serde_bytes",
  "serde_repr",
