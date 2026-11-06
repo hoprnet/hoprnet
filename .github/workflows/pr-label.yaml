@@ -13,7 +13,7 @@ on:
       - labeled
 
 concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr-label
+  group: ${{ github.event.pull_request.number || github.ref }}-pr-label
   cancel-in-progress: true
 
 permissions:
@@ -22,7 +22,8 @@ permissions:
 jobs:
   build-candidate:
     name: Build Candidate
-    if: github.event.label.name == 'build:candidate'
+    # Fork PR branches do not exist in this repository, so building them by name fails or builds a stale branch.
+    if: github.event.label.name == 'build:candidate' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 20
     steps:
@@ -41,6 +42,10 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.dappnode_repository }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write # build-dappnode.yaml authenticates to GCP with OIDC
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
