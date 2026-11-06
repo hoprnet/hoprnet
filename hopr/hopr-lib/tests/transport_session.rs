@@ -348,10 +348,10 @@ fn surb_report_session_config(
 /// The pings keep the Session from being evicted and each hands the Exit one SURB for its reply, so a
 /// Session that still starves is spending SURBs faster than one ping at a time can supply them.
 ///
-/// A ping that fails is counted rather than ignored. The drops are measured as a delta of a
-/// process-global counter, so a Session that died halfway through would otherwise read as "zero drops"
-/// — the same result the fix is meant to produce, indistinguishable from it. The last ping is allowed
-/// to fail because the Session may be torn down as the window closes; more than one means the traffic
+/// A ping that fails is not ignored. The drops are measured as a delta of a process-global counter,
+/// so a Session that died halfway through would otherwise read as "zero drops" — the same result the
+/// fix is meant to produce, indistinguishable from it. Only the last ping is allowed to fail, because
+/// the Session may be torn down as the window closes; a failure of any earlier one means the traffic
 /// driving the test stopped, and the drop count no longer measures anything.
 ///
 /// The counter is process-global and every node in the cluster shares it, so the delta covers all of
@@ -361,7 +361,8 @@ async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> 
     let started = tokio::time::Instant::now();
     let before = routing_resolution_surb_timeout_count();
     let mut buf = [0u8; 4];
-    let mut failed_pings = 0usize;
+    // The one-based numbers of the pings that failed.
+    let mut failed_pings = Vec::new();
     let mut pings = 0usize;
     while started.elapsed() < total {
         let ping = tokio::time::timeout(PING * 3, async {
@@ -372,16 +373,18 @@ async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> 
         .await;
         pings += 1;
         if !matches!(ping, Ok(Ok(()))) {
-            failed_pings += 1;
+            failed_pings.push(pings);
         }
         tokio::time::sleep(PING).await;
     }
 
-    anyhow::ensure!(
-        failed_pings <= 1,
-        "{failed_pings} of {pings} pings failed, so the Session stopped carrying traffic and its drop count measures \
-         nothing"
-    );
+    // Only the final ping may fail: the Session can be torn down as the window closes.
+    if let Some(failed) = failed_pings.iter().find(|&&number| number != pings) {
+        anyhow::bail!(
+            "ping {failed} of {pings} failed (failed pings: {failed_pings:?}), so the Session stopped carrying \
+             traffic before the window closed and its drop count measures nothing"
+        );
+    }
     Ok(routing_resolution_surb_timeout_count() - before)
 }
 
