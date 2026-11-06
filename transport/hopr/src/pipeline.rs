@@ -22,12 +22,6 @@ use crate::{
     },
 };
 
-/// Ceiling on SURBs awaiting a reply before the oldest are forgotten.
-///
-/// Only bounds memory: a SURB evicted early simply stops being creditable, which understates
-/// delivery slightly rather than misattributing it.
-const MAX_PENDING_SURBS: u64 = 100_000;
-
 /// Builder for the HOPR packet pipeline.
 ///
 /// Creates the encoder/decoder, the unacknowledged-ticket processor, optionally hooks up the
@@ -491,16 +485,8 @@ where
         // ever identified and the decorator costs one closure call per minted SURB.
         let (surb_registry, path_slots) = surb_telemetry;
         let me = *packet_key.public();
-        // One map for both halves: the encoder mints and the decoder observes the reply.
-        let pending_legs = surb_telemetry::pending_legs(MAX_PENDING_SURBS);
-        let encoder = SurbTelemetryCodec::new(
-            encoder,
-            me,
-            path_slots.clone(),
-            surb_registry.clone(),
-            pending_legs.clone(),
-        );
-        let decoder = SurbTelemetryCodec::new(decoder, me, path_slots, surb_registry, pending_legs);
+        let encoder = SurbTelemetryCodec::new(encoder, me, path_slots.clone(), surb_registry.clone());
+        let decoder = SurbTelemetryCodec::new(decoder, me, path_slots, surb_registry);
 
         #[allow(unused_mut)]
         let mut processes = AbortableList::default();

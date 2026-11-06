@@ -1335,7 +1335,6 @@ mod tests {
         );
 
         let other_errors = [
-            HoprProtocolError::Replay,
             HoprProtocolError::InvalidSender,
             HoprProtocolError::KeyNotFound,
             HoprProtocolError::ChannelNotFound(Address::default(), Address::default()),
