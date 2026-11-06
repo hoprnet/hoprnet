@@ -13,7 +13,7 @@ on:
       - labeled
 
 concurrency:
-  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr-label
+  group: ${{ github.event.pull_request.number || github.ref }}-pr-label
   cancel-in-progress: true
 
 permissions:
