@@ -190,6 +190,11 @@ impl SurbAdmissionControl for StoreSurbAdmission {
     fn retire(&self, pseudonym: &SessionId, token: AdmissionToken) {
         self.store.retire(pseudonym, token.into_raw());
     }
+
+    fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
+        self.store
+            .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
+    }
 }
 
 /// Share of the counter flush interval a conformance report waits for its packets' acknowledgments.
@@ -2059,5 +2064,57 @@ mod tests {
 
         canary.abort();
         canary.await.ok();
+    }
+    /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
+    ///
+    /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
+    /// a raised target widens the ring the token names, and a stale token (a successor Session's
+    /// admission) leaves the resident ring at the size its own admission gave it.
+    #[test]
+    fn surb_admission_raise_target_delegates_to_the_store() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig::default()),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+
+        // The ping tier, then the main tier the client ramps to.
+        let token = admission.admit(&pseudonym, 688);
+        let ping_ceiling = admission
+            .store
+            .admitted_ring_ceiling(&pseudonym)
+            .context("the admission must have installed a ring")?;
+        assert_eq!(1_032, ping_ceiling, "fixture: 688 with 50% headroom");
+
+        admission.raise_target(&pseudonym, token, 6_887);
+        assert!(
+            admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0) > ping_ceiling,
+            "a raise must widen the ring the token names"
+        );
+
+        // A successor's admission invalidates the predecessor's token; the raise must then be a no-op.
+        let successor = admission.admit(&pseudonym, 64);
+        let successor_ceiling = admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0);
+        admission.raise_target(&pseudonym, token, 9_999);
+        assert_eq!(
+            successor_ceiling,
+            admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0),
+            "a stale token must not widen the successor's ring"
+        );
+        assert_ne!(token, successor);
+
+        // And retiring through the seam still releases the admission the store minted.
+        admission.retire(&pseudonym, successor);
+        assert!(
+            admission.store.admitted_ring_ceiling(&pseudonym).is_none(),
+            "the retire must release the ring"
+        );
+
+        Ok(())
     }
 }
