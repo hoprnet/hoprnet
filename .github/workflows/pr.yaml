@@ -161,10 +161,11 @@ jobs:
     uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      enable_unit_tests: ${{ needs.changes.outputs.code == 'true' }}
-      unit_test_command: "nix build -L .#test-unit"
-      enable_integration_tests: ${{ needs.changes.outputs.code == 'true' }}
-      integration_test_command: "nix build -L .#test-integration"
+      # Coverage runs the same nextest selection as test-unit and test-integration
+      # (--lib / --test '*' with identical features and profile), so the plain
+      # test jobs would run every test twice. Nightly stays: other toolchain.
+      enable_unit_tests: false
+      enable_integration_tests: false
       enable_nightly_tests: ${{ needs.changes.outputs.code == 'true' }}
       nightly_test_command: "nix build -L .#test-nightly"
       enable_benchmarks: false
