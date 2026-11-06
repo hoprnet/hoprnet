@@ -411,9 +411,11 @@ async fn open_session_without_a_balancer(
 /// none. `no_rate_control` is the shape gnosis_vpn#748 reports; `rate_controlled` is the same Entry on
 /// the default Session, which used to be sent the reports whatever it ran.
 ///
-/// Before the fix this dropped a packet every period — measured at 19–20 drops in this window, at
-/// exactly the period's cadence, with the Exit's own `announced_surb_target=… effective=…` derivation
-/// confirming it was the notification stream doing it.
+/// Before the fix this dropped a packet every period. On the `no_rate_control` shape that was measured
+/// at 19–20 drops in this window, at exactly the period's cadence, with the Exit's own
+/// `announced_surb_target=… effective=…` derivation confirming it was the notification stream doing it.
+/// On the `rate_controlled` shape, against the code that only gated on the announced target, the log
+/// showed a drop about every second for the whole window; the exact count was not recorded.
 #[rstest]
 #[case::rate_controlled(SessionCapability::Segmentation.into())]
 #[case::no_rate_control(SessionCapability::Segmentation | SessionCapability::NoRateControl)]

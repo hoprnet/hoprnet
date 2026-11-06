@@ -1652,9 +1652,12 @@ impl PixFillControl {
     ///   resolver holds a return packet that finds no SURB for the whole of `surb_resolution_wait` and holds every
     ///   packet this node originates with it (gnosis_vpn#748).
     ///
-    /// A notification that is due and withheld on either count keeps its slot: it is tried again on the next
-    /// packet, and goes out the moment both hold. It is also not mistaken for fill. While the PIX supervisor runs a
-    /// fill, the packet is fill and meets the reserve like any other; while none runs, it is dropped.
+    /// A notification that is due and withheld on either count keeps its slot: the next packet to ask is still
+    /// classified as the notification, and goes out as soon as both hold. The withheld packet has used its release
+    /// from the rate limiter, though, so with no fill running that next packet is up to a notification period away,
+    /// and with one running it is the next fill packet. A withheld notification is also not mistaken for fill. While
+    /// the PIX supervisor runs a fill, the packet is fill and meets the reserve like any other; while none runs, it
+    /// is dropped.
     ///
     /// Fill above that rate is refused while the estimate is below the reserve, and that refusal is
     /// not an optimisation. A return packet that finds no SURB is not dropped — the routing resolver
@@ -2550,10 +2553,10 @@ pub struct SessionManagerConfig {
     ///
     /// The Exit sends it only to an Entry that has shown it runs a SURB balancer, by having sent a
     /// keep-alive (whether or not that keep-alive announces a target), and only while the Exit's own
-    /// estimate shows a SURB to send it on. An Entry without a balancer attaches a SURB to each data
-    /// packet and reads no report. The notification carries the Exit balancer's level on a
-    /// rate-controlled Session, and the Exit's own count of its SURBs on a `NoRateControl` one, which
-    /// runs no balancer.
+    /// estimate of the SURBs it holds for the Session is above 0. An Entry without a balancer
+    /// attaches a SURB to each data packet and reads no report. The notification carries the Exit
+    /// balancer's level on a rate-controlled Session, and the Exit's own count of its SURBs on a
+    /// `NoRateControl` one, which runs no balancer.
     ///
     /// Default is None (no notification sent to the client), minimum is 1 second.
     #[default(None)]
@@ -2565,11 +2568,19 @@ pub struct SessionManagerConfig {
     /// This is useful when the client plans to change the SURB balancer target dynamically.
     ///
     /// The Exit sizes a Session's SURB ring from that target, and widens the ring when a raised one
-    /// arrives. With this off, the Exit only knows the target announced at establishment: raises are
-    /// never seen, and a `NoRateControl` Session, which announces none, keeps a fallback-sized ring on
-    /// the Exit for its whole life, so SURBs minted past it are evicted on arrival (under PIX, with
-    /// the shares they carry). The Exit's SURB-level reports are unaffected: it recognises a balancing
-    /// Entry by its keep-alives, flagged or not.
+    /// arrives. A rate-controlled Exit also takes its balancer's set-point, its egress cap
+    /// (`max_surbs_per_sec`) and the SURB reserve it holds back for its keep-alives from the target,
+    /// and follows every change the Entry announces, lowered as well as raised.
+    ///
+    /// With this off, the Exit only knows the target announced at establishment, and no change to it
+    /// is seen, lower or higher. A rate-controlled Exit then keeps its balancer, egress cap and
+    /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
+    /// the Exit's egress cap, and one that lowers it to that reserve or below may leave the Exit holding
+    /// its data back for good, waiting for a stock the Entry no longer keeps. A `NoRateControl` Session announces no
+    /// target at establishment, so its ring stays at a fallback size on the Exit for its whole life, and
+    /// SURBs minted past it are evicted on arrival (under PIX, with the shares they carry). The Exit's
+    /// SURB-level reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged
+    /// or not.
     ///
     /// Default is true.
     #[default(true)]
@@ -7118,7 +7129,9 @@ where
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
                     // Only an Entry's SURB balancer sends keep-alives: from now on the Exit's data can be
-                    // held back for its keep-alive reserve, which this Entry will refill.
+                    // held back for its keep-alive reserve, which this Entry will refill, and the Exit's
+                    // SURB-level reports can go out, since this Entry has a balancer to read them (see
+                    // `PixFillControl::admit`).
                     session_slot.surb_mgmt.note_counterparty_refills();
 
                     // Allow updating SURB balancer target based on the received Keep-Alive message.
@@ -7183,7 +7196,7 @@ where
                         if balanced {
                             debug!(%session_id, target_surb_buffer_size = announced, "keep-alive updated SURB balancer target buffer size from the Entry");
                         } else {
-                            debug!(%session_id, target_surb_buffer_size = announced, "keep-alive raised the SURB target of a session without a balancer");
+                            debug!(%session_id, target_surb_buffer_size = announced, "keep-alive target recorded for the SURB ring of a session without a balancer");
                         }
                     }
                 }
@@ -10311,7 +10324,7 @@ mod tests {
         let t0 = Instant::now();
         assert!(
             control.admit_at(t0),
-            "the first packet is the notification, whatever the estimate says"
+            "the first packet is the notification, below the reserve"
         );
 
         // A shade under the period — the shape a rate rounded down by a microsecond produces.
@@ -10362,7 +10375,8 @@ mod tests {
     /// to give the Exit back (gnosis_vpn#748). What the Exit has seen of it, and not what it announced,
     /// is the evidence: the announced target is a figure the peer picks.
     ///
-    /// The withheld notification keeps its slot, so that it goes out the moment the Entry is heard.
+    /// The withheld notification keeps its slot, so that the next packet to ask is the notification once the Entry is
+    /// heard.
     #[test]
     fn a_level_notification_waits_for_an_entry_that_refills() {
         const RESERVE: u64 = 100;
@@ -10385,7 +10399,7 @@ mod tests {
         surb_mgmt.note_counterparty_refills();
         assert!(
             control.admit_at(now + Duration::from_millis(2)),
-            "the withheld notification must go out as soon as the Entry is heard, not a period later"
+            "the withheld notification keeps its slot: the next packet to ask goes out as the notification"
         );
         assert!(
             !control.admit_at(now + Duration::from_millis(3)),
