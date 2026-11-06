@@ -77,8 +77,7 @@ jobs:
         run: |
           gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+          BRANCH="refs/pull/${PR_NUMBER}/merge"
 
           echo "Fetching list of cache key"
           mapfile -t cacheKeysForPR < <(gh actions-cache list -R "$REPO" -B "$BRANCH" --json key --jq '.[].key')
@@ -93,3 +92,5 @@ jobs:
           echo "Done"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
