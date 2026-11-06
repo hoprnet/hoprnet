@@ -109,12 +109,15 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
-    /// Exponent applied to return-path weights before sampling, flattening the distribution.
+    /// Exponent applied to path weights before sampling, flattening the distribution. Despite the
+    /// name it applies to forward draws as well as to return draws (the name is kept for
+    /// configuration compatibility).
     ///
-    /// Return paths are drawn weighted-random by path value, which concentrates a session's SURBs
-    /// on the few highest-valued relays — losing one then costs far more than the reliable-mode
-    /// loss tolerance. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and
-    /// bad candidates without changing their order: `w' = w^γ`.
+    /// Paths are drawn weighted-random by path value, which concentrates a session's SURBs, and its
+    /// forward packets, on the few highest-valued relays — losing one then costs far more than the
+    /// reliable-mode loss tolerance, and a forward path that collapses on one relayer goes dark
+    /// with it. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and bad
+    /// candidates without changing their order: `w' = w^γ`.
     ///
     /// `1.0` samples by raw path value (most traffic on the best relays, largest blast radius when
     /// one dies). Values approaching `0.0` tend to a uniform draw (smallest blast radius, most
@@ -125,18 +128,25 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_weight_temper"))]
     #[default = 0.5]
     pub return_path_weight_temper: f64,
-    /// Fraction of return-path draws made uniformly at random instead of by weight.
+    /// Fraction of path draws, forward and return, made uniformly at random instead of by weight
+    /// (the name is kept for configuration compatibility).
     ///
     /// Weights come from observations, and observations only exist for paths that get selected — a
     /// closed loop in which a path that falls out of favour stops being measured, so its score can
     /// never recover and it is never chosen again. Spending a small share of draws uniformly keeps
-    /// every candidate under observation, which is what lets a recovered one climb back.
+    /// the plausible candidates under observation, which is what lets a recovered one climb back.
     ///
-    /// Costs throughput in proportion: this share of return paths deliberately ignores which
-    /// candidate looks best. Candidates have already passed the selector's gates (open channels,
-    /// `min_ack_rate`, and so on) before reaching here, so an exploratory draw is random only with
-    /// respect to *quality*, never a route the cost function rejected. `0.0` disables it.
-    /// Defaults to 0.1.
+    /// Plausible means a tempered weight of at least a tenth of the best candidate's. That leaves out
+    /// a relayer on probation and an edge probes measured dead, and also a healthy path slow or thin
+    /// enough to weigh less than a tenth. An exploring return draw takes one of those only within a
+    /// node-wide allowance of one a second, while an ordinary return draw keeps it at its tempered
+    /// weight: a reply through a relayer on probation is what revives it. A forward draw, exploring or
+    /// not, never takes one, as a forward packet probes nothing.
+    ///
+    /// Costs throughput in proportion: this share of draws, forward and return, deliberately ignores
+    /// which plausible candidate looks best. Candidates have already passed the selector's gates
+    /// (open channels, `min_ack_rate`, and so on) before reaching here, so an exploratory draw never
+    /// takes a route the cost function rejected. `0.0` disables it. Defaults to 0.1.
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
@@ -160,6 +170,8 @@ fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError
 struct WeightingParams {
     latency_halflife: Duration,
     capacity_reference: u128,
+    return_path_weight_temper: f64,
+    return_path_exploration: f64,
 }
 
 /// Continuous, monotonically decreasing latency factor, bounded in (0, 1].
@@ -203,6 +215,17 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     pwc.cost * lat * cap
 }
 
+/// The weight a candidate is drawn by, as the walk valued it, tempered to spread the draws over
+/// relayers (see [`PathPlannerConfig::return_path_weight_temper`]), relayer health included.
+///
+/// Forward and return paths alike: an untempered forward draw put most of a session's packets on
+/// its single best path, and with the candidate prune diversifying first relayers only, on one
+/// middle relayer, whose death then took the whole forward direction with it (see
+/// `selector::MIDDLE_HOP_SHARE`).
+fn selection_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams) -> f64 {
+    temper_weights(&[composite_weight(pwc, hops, params)], params.return_path_weight_temper)[0]
+}
+
 /// Picks an index into `weights` with probability proportional to the weight; `None` if all are
 /// non-positive.
 ///
@@ -228,12 +251,15 @@ fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
     weights.iter().rposition(|w| *w > 0.0)
 }
 
-/// Whether this draw should explore — ignore the weights and pick uniformly.
+/// Whether this draw should explore — ignore the weights and pick uniformly among the plausible
+/// candidates (see [`pick_exploring_index`]).
 ///
 /// Weights are derived from observations, and observations only exist for paths that were selected.
 /// Left alone that is a closed loop: a path that falls out of favour stops being measured, so its
 /// score can never recover and it is never chosen again. Spending a small share of draws uniformly
-/// keeps every candidate under observation, which is what lets one that has recovered climb back.
+/// keeps the plausible candidates under observation, which is what lets one that has recovered climb
+/// back. An exploring draw takes a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`] only as a return draw
+/// the [`ProbeBudget`] grants.
 fn should_explore(exploration: f64) -> bool {
     exploration > 0.0 && hopr_api::types::crypto_random::random_float_in_range(0.0..1.0) < exploration
 }
@@ -241,6 +267,98 @@ fn should_explore(exploration: f64) -> bool {
 /// Picks a uniformly random index over `len` entries.
 fn pick_uniform_index(len: usize) -> Option<usize> {
     (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
+}
+
+/// The fraction of the best candidate's (tempered) weight below which a candidate is one the cost
+/// function all but rejects.
+///
+/// A relayer on probation is published at a health of a thousandth and an edge probes measured dead
+/// is floored at a billionth: tempered, they sit at about 3 % and 0.003 % of a healthy candidate. A
+/// stalled relayer still delivering at a hundredth of its health is at 10 %, and stays explorable.
+///
+/// Those figures are for the default `return_path_weight_temper` of 0.5. A weight tempered by `t`
+/// puts a relayer on probation at `0.001^t` of a healthy one, so a temper of 1/3 or less lifts it to
+/// this fraction or above: exploration then counts it as plausible, forward draws among them, and
+/// the probe budget no longer holds it back. Whoever lowers the temper that far trades this gate for
+/// the wider spread.
+const PLAUSIBLE_WEIGHT_FRACTION: f64 = 0.1;
+
+/// How often an exploring return draw may pick a candidate below [`PLAUSIBLE_WEIGHT_FRACTION`],
+/// node-wide.
+///
+/// That draw is the probe a relayer on probation is revived by, so it cannot be ruled out, but every
+/// one through a relayer that is really gone is a SURB lost at the counterparty — its PIX share with
+/// it — and each one is written off and replaced. Uniform exploration made a tenth of all draws such
+/// a probe whenever one candidate was implausible: 26 per second at production dimensions, and with
+/// them a few percent of the counterparty's stock dead, enough for a single lost control message to
+/// close a PIX Session. One a second is enough to notice a revival.
+const IMPLAUSIBLE_PROBE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The node-wide allowance of [`IMPLAUSIBLE_PROBE_INTERVAL`].
+#[derive(Debug)]
+struct ProbeBudget {
+    epoch: std::time::Instant,
+    /// Milliseconds since `epoch` of the last probe granted, plus one so that `0` is "none yet".
+    last_ms_plus_one: std::sync::atomic::AtomicU64,
+}
+
+impl Default for ProbeBudget {
+    fn default() -> Self {
+        Self {
+            epoch: std::time::Instant::now(),
+            last_ms_plus_one: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+}
+
+impl ProbeBudget {
+    /// Grants a probe if none was granted within [`IMPLAUSIBLE_PROBE_INTERVAL`].
+    fn take(&self) -> bool {
+        let now = u64::try_from(self.epoch.elapsed().as_millis())
+            .unwrap_or(u64::MAX - 1)
+            .saturating_add(1);
+        let interval = u64::try_from(IMPLAUSIBLE_PROBE_INTERVAL.as_millis()).unwrap_or(u64::MAX);
+        self.last_ms_plus_one
+            .fetch_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |last| (last == 0 || now.saturating_sub(last) >= interval).then_some(now),
+            )
+            .is_ok()
+    }
+}
+
+/// An exploring draw: uniform over the candidates whose weight is at least
+/// [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, and over the others only when `allow_implausible`
+/// grants it (it is asked only when the draw lands on one).
+///
+/// Uniform over the plausible ones whatever is granted: a draw that lands on an implausible candidate
+/// it may not take is redrawn among the plausible ones.
+fn pick_exploring_index(weights: &[f64], allow_implausible: impl FnOnce() -> bool) -> Option<usize> {
+    let best = weights.iter().copied().fold(0.0, f64::max);
+    if best <= 0.0 {
+        return None;
+    }
+    let floor = best * PLAUSIBLE_WEIGHT_FRACTION;
+    let drawn = pick_uniform_index(weights.len())?;
+    if weights[drawn] >= floor || allow_implausible() {
+        return Some(drawn);
+    }
+    let plausible: Vec<usize> = (0..weights.len()).filter(|&i| weights[i] >= floor).collect();
+    pick_uniform_index(plausible.len()).map(|i| plausible[i])
+}
+
+/// Zeroes every weight below [`PLAUSIBLE_WEIGHT_FRACTION`] of the best, so that a weighted draw over
+/// `weights` never lands on a candidate the weights all but reject.
+///
+/// For ordinary forward draws. A return draw keeps such a candidate at its tempered weight, because a
+/// reply through it is what can end a relayer's probation. A forward packet probes nothing, so on such
+/// a candidate all it can do is be lost.
+fn gate_implausible(weights: &mut [f64]) {
+    let floor = weights.iter().copied().fold(0.0, f64::max) * PLAUSIBLE_WEIGHT_FRACTION;
+    for weight in weights.iter_mut().filter(|weight| **weight < floor) {
+        *weight = 0.0;
+    }
 }
 
 /// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
@@ -255,7 +373,7 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
 
 /// What a rebuild observed about return-path relayer diversity for its key.
 ///
-/// Returned by [`rebuild_candidates`] rather than acted on inside it, so the caller applies the
+/// Returned by [`PathBuilder::rebuild`] rather than acted on inside it, so the caller applies the
 /// transition to the shared tracker only once the rebuilt path actually reaches the cache. A
 /// background refresh whose stale path is rejected by `put_if_unchanged` must not move the tracker
 /// or log a recovery (issue #8502).
@@ -283,8 +401,7 @@ fn apply_diversity_transition(
                 kind,
                 distinct_relayers = obs.distinct_relayers,
                 candidates = obs.candidates,
-                "return-path relayer diversity collapsed to a single relayer; degradation detection \
-                 cannot corroborate a dead relayer for this destination",
+                "return-path relayer diversity collapsed to a single relayer",
             );
         }
     } else if collapsed.remove(&obs.key) {
@@ -298,113 +415,133 @@ fn apply_diversity_transition(
     }
 }
 
-/// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
-/// whatever the graph currently says.
-///
-/// Shared by the lazy cache fill, the background sweep and the on-demand recompute, so all three
-/// necessarily agree: a divergence here would make a session's weights depend on which of the three
-/// happened to run last.
-///
-/// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
-/// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
-/// alone. `Err` is reserved for a selector that actually failed.
-#[allow(clippy::too_many_arguments)]
-#[tracing::instrument(name = "planner.rebuild_candidates", level = "trace", skip_all)]
-async fn rebuild_candidates<R, S>(
-    resolver: &R,
-    selector: &S,
+type RebuiltPaths = (
+    hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+    Option<DiversityObservation>,
+);
+
+/// What a cache entry is rebuilt from, shared by the planner and its background sweep.
+struct PathBuilder<R, S> {
+    resolver: R,
+    selector: S,
     weighting: WeightingParams,
     me: OffchainPublicKey,
-    src_key: OffchainPublicKey,
-    dest_key: OffchainPublicKey,
-    hops: usize,
-    kind: &'static str,
-) -> Result<
-    Option<(
-        hopr_utils::statistics::WeightedCollection<ValidatedPath>,
-        Option<DiversityObservation>,
-    )>,
->
+    /// Keys currently in the collapsed return-path diversity state, so the WARN fires once on the
+    /// transition into it (and an INFO once on recovery) rather than on every rebuild (#8502).
+    collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>>,
+}
+
+impl<R, S> PathBuilder<R, S>
 where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
     S: PathSelector,
 {
-    let candidates = selector.select_path(src_key, dest_key, hops)?;
-    let discovered = candidates.len();
+    /// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
+    /// whatever the graph currently says.
+    ///
+    /// Shared by the lazy cache fill, the background sweep and the on-demand recompute, so all three
+    /// necessarily agree: a divergence here would make a session's weights depend on which of the three
+    /// happened to run last.
+    ///
+    /// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
+    /// what that means — a fill turns it into `PathNotFound`, a refresh drops the existing entry.
+    /// `Err` is reserved for a selector that actually failed.
+    #[tracing::instrument(name = "planner.rebuild_candidates", level = "trace", skip_all)]
+    async fn rebuild(
+        &self,
+        src_key: OffchainPublicKey,
+        dest_key: OffchainPublicKey,
+        hops: usize,
+        kind: &'static str,
+    ) -> Result<Option<RebuiltPaths>> {
+        let (resolver, weighting, me) = (&self.resolver, self.weighting, self.me);
+        // Dead relayers are pruned by the traversal itself, and stalled ones cost less there: the SURB
+        // telemetry records their health in the graph.
+        let candidates = self.selector.select_path(src_key, dest_key, hops)?;
+        let discovered = candidates.len();
 
-    let chain_resolver = ChainPathResolver::from(resolver);
-    let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-    let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-    for pwc in candidates {
-        // Clone the nodes for validation rather than moving them out of `pwc`: the path is needed
-        // intact in `path_metrics` so the relayer-diversity count below sees the real first hops. An
-        // earlier `std::mem::take` emptied it here, which made `distinct_first_relayers` always read
-        // zero and fire the collapse WARN on every return path, healthy or not (issue #8502).
-        let node_ids: Vec<NodeId> = pwc.path.iter().cloned().map(NodeId::Offchain).collect::<Vec<_>>();
-        match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
-            Ok(vp) => {
-                valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
-                path_metrics.push(pwc);
+        let chain_resolver = ChainPathResolver::from(resolver);
+        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+        for pwc in candidates {
+            // Cloned, not taken: `distinct_first_relayers` below needs the path intact (#8502).
+            let node_ids: Vec<NodeId> = pwc.path.iter().cloned().map(NodeId::Offchain).collect::<Vec<_>>();
+            match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
+                Ok(vp) => {
+                    // Return paths are planned from the destination back to us.
+                    valid_paths.push((vp, selection_weight(&pwc, hops, weighting)));
+                    path_metrics.push(pwc);
+                }
+                Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
             }
-            Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
         }
-    }
 
-    // A return path that resolves to a single relayer is the blind spot the degradation detector
-    // cannot escape: with no sibling relayer to the same destination, sustained silence is
-    // indistinguishable from a quiet peer, so a dead return relayer is never attributed and never
-    // re-planned. Checked here, after validation, rather than in the selector: validation can reject
-    // every candidate through one of several relayers the selector saw, so only the survivors here
-    // reflect what a session can actually draw from.
-    // Observe diversity here but do not act on it: the caller applies the transition only once this
-    // rebuild's path reaches the cache, so a refresh whose stale path loses the `put_if_unchanged`
-    // race cannot flip the tracker or log a spurious recovery (issue #8502).
-    let diversity = (src_key != me && hops > 0 && !path_metrics.is_empty()).then(|| {
-        let distinct_relayers = super::selector::distinct_first_relayers(&path_metrics);
-        DiversityObservation {
-            key: (src_key, dest_key, hops as u32),
-            collapsed: distinct_relayers <= 1,
-            distinct_relayers,
-            candidates: path_metrics.len(),
-        }
-    });
+        // A return path that resolves to a single first relayer puts every SURB of the destination
+        // behind it. Checked after validation: only the survivors reflect what a session can draw.
+        let diversity = (src_key != me && hops > 0 && !path_metrics.is_empty()).then(|| {
+            let distinct_relayers = super::selector::distinct_first_relayers(&path_metrics);
+            DiversityObservation {
+                key: (src_key, dest_key, hops as u32),
+                collapsed: distinct_relayers <= 1,
+                distinct_relayers,
+                candidates: path_metrics.len(),
+            }
+        });
 
-    tracing::debug!(
-        discovered,
-        validated = valid_paths.len(),
-        rejected = discovered - valid_paths.len(),
-        outcome = if discovered == 0 {
-            "no paths discovered"
-        } else if valid_paths.is_empty() {
-            "no valid paths"
-        } else {
-            "completed"
-        },
-        "candidate validation"
-    );
-    if valid_paths.is_empty() {
-        return Ok(None);
-    }
-
-    let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-    let total_wt = weighted.total_weight();
-    for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
         tracing::debug!(
-            kind,
-            destination = %dest_key,
-            hops,
-            path = %vp,
-            cost = pwm.cost,
-            composite_weight = w,
-            base_weight_share = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-            total_latency_ms = ?pwm.total_latency_ms,
-            min_probe_success_rate = ?pwm.min_probe_success_rate,
-            min_ack_rate = ?pwm.min_ack_rate,
-            fundable_tickets_floor = ?pwm.fundable_tickets_floor,
-            "weighted candidate path",
+            discovered,
+            validated = valid_paths.len(),
+            rejected = discovered - valid_paths.len(),
+            outcome = if discovered == 0 {
+                "no paths discovered"
+            } else if valid_paths.is_empty() {
+                "no valid paths"
+            } else {
+                "completed"
+            },
+            "candidate validation"
         );
+        if valid_paths.is_empty() {
+            return Ok(None);
+        }
+
+        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+        let total_wt = weighted.total_weight();
+        // Return draws spend `exploration` of their picks uniformly, so log what a draw actually does.
+        let exploration = if dest_key == me {
+            weighting.return_path_exploration
+        } else {
+            0.0
+        };
+        let candidates = weighted.iter().count() as f64;
+        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+            tracing::debug!(
+                kind,
+                destination = %dest_key,
+                hops,
+                path = %vp,
+                cost = pwm.cost,
+                selection_weight = w,
+                sampling_probability = if total_wt > 0.0 {
+                    (1.0 - exploration) * w.max(0.0) / total_wt + exploration / candidates
+                } else {
+                    0.0
+                },
+                total_latency_ms = ?pwm.total_latency_ms,
+                min_probe_success_rate = ?pwm.min_probe_success_rate,
+                min_ack_rate = ?pwm.min_ack_rate,
+                fundable_tickets_floor = ?pwm.fundable_tickets_floor,
+                "weighted candidate path",
+            );
+        }
+        Ok(Some((weighted, diversity)))
     }
-    Ok(Some((weighted, diversity)))
+
+    fn apply_diversity(&self, kind: &str, diversity: Option<DiversityObservation>) {
+        if let Some(obs) = diversity {
+            apply_diversity_transition(&self.collapsed_diversity, &obs.key.0, kind, &obs);
+        }
+    }
 }
 
 /// Smallest change in a candidate's share of the draws that counts as traffic having moved.
@@ -501,6 +638,58 @@ async fn put_if_unchanged(
     }
 }
 
+async fn drop_if_unchanged(
+    cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    key: PlannerCacheKey,
+    swept: &PlannerCacheValue,
+) {
+    cache
+        .entry(key)
+        .and_compute_with(|current| {
+            futures::future::ready(match current {
+                Some(current) if Arc::ptr_eq(current.value(), swept) => moka::ops::compute::Op::Remove,
+                _ => moka::ops::compute::Op::Nop,
+            })
+        })
+        .await;
+}
+
+impl<R, S> PathBuilder<R, S>
+where
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
+    S: PathSelector,
+{
+    /// Rebuilds every cached multi-hop entry from the current graph, one pass of the background sweep.
+    async fn sweep(&self, cache: &moka::future::Cache<PlannerCacheKey, PlannerCacheValue>) {
+        for (key, swept) in cache.iter() {
+            let (src_key, dest_key, hops_u32) = *key.as_ref();
+            if hops_u32 == 0 {
+                continue;
+            }
+
+            let rebuilt = self
+                .rebuild(src_key, dest_key, hops_u32 as usize, "background-refresh")
+                .await;
+            // Only if this is still the entry the sweep read: a `recompute_paths_from` that ran
+            // during the rebuild built from newer evidence, and its route must not be overwritten.
+            match rebuilt {
+                Ok(Some((weighted, diversity))) => {
+                    // A rejected stale refresh must not move the diversity tracker (#8502).
+                    if put_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await {
+                        self.apply_diversity("background-refresh", diversity);
+                    }
+                }
+                // No route left, e.g. every candidate runs through a dead relayer: serving the old one
+                // would keep drawing it.
+                Ok(None) | Err(PathPlannerError::Path(PathError::PathNotFound(..))) => {
+                    drop_if_unchanged(cache, (src_key, dest_key, hops_u32), &swept).await
+                }
+                Err(error) => tracing::debug!(%error, "background refresh failed, keeping the cached paths"),
+            }
+        }
+    }
+}
+
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
 /// The planner delegates path *discovery* to any [`PathSelector`] implementation and
@@ -518,18 +707,11 @@ async fn put_if_unchanged(
 pub struct PathPlanner<Surb, R, S> {
     me: OffchainPublicKey,
     pub surb_store: Surb,
-    resolver: Arc<R>,
-    selector: Arc<S>,
+    paths: Arc<PathBuilder<R, S>>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
-    /// Keys currently in the collapsed return-path diversity state, so the WARN fires once on the
-    /// transition into it (and an INFO once on recovery) rather than on every rebuild while it
-    /// persists -- lazy fill, recompute and background sweep all funnel through `rebuild_candidates`
-    /// and share this set (issue #8502).
-    collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>>,
     refresh_period: Duration,
-    weighting: WeightingParams,
-    return_path_weight_temper: f64,
-    return_path_exploration: f64,
+    /// See [`IMPLAUSIBLE_PROBE_INTERVAL`]; shared by every clone of the planner.
+    probe_budget: Arc<ProbeBudget>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -562,17 +744,21 @@ where
         Self {
             me,
             surb_store,
-            resolver: Arc::new(resolver),
-            selector: Arc::new(selector),
+            paths: Arc::new(PathBuilder {
+                resolver,
+                selector,
+                weighting: WeightingParams {
+                    latency_halflife: config.latency_halflife,
+                    capacity_reference: config.capacity_reference,
+                    return_path_weight_temper: config.return_path_weight_temper,
+                    return_path_exploration: config.return_path_exploration,
+                },
+                me,
+                collapsed_diversity,
+            }),
             cache,
-            collapsed_diversity,
             refresh_period: config.refresh_period,
-            weighting: WeightingParams {
-                latency_halflife: config.latency_halflife,
-                capacity_reference: config.capacity_reference,
-            },
-            return_path_weight_temper: config.return_path_weight_temper,
-            return_path_exploration: config.return_path_exploration,
+            probe_budget: Arc::default(),
         }
     }
 
@@ -580,7 +766,7 @@ where
     /// return-path relayer diversity, used to assert the WARN fires on the transition only.
     #[cfg(test)]
     fn collapsed_diversity_len(&self) -> usize {
-        self.collapsed_diversity.lock().len()
+        self.paths.collapsed_diversity.lock().len()
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -588,7 +774,7 @@ where
         match node_id {
             NodeId::Offchain(key) => Ok(*key),
             NodeId::Chain(addr) => {
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 resolver
                     .resolve_transport_address(addr)
                     .await
@@ -616,7 +802,7 @@ where
                     ?explicit_path,
                     "resolving intermediate path"
                 );
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 ValidatedPath::new(
                     source,
                     explicit_path
@@ -630,7 +816,7 @@ where
 
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 tracing::trace!(hops = 0, "resolving zero-hop direct path");
-                let resolver = ChainPathResolver::from(&*self.resolver);
+                let resolver = ChainPathResolver::from(&self.paths.resolver);
                 ValidatedPath::new(source, vec![destination], &resolver).await?
             }
 
@@ -640,7 +826,26 @@ where
 
                 // Format from the `NodeId`s rather than re-resolving them: `cached_paths` has
                 // already done that, and for `NodeId::Chain` each resolution is a resolver lookup.
-                paths.pick_one().ok_or_else(|| {
+                //
+                // Explored like a return draw (see `return_path_exploration`): weights exist only for
+                // paths that get drawn, so without it a forward candidate that fell out of favour is
+                // never measured again, and the stream settles on one path.
+                //
+                // Over plausible candidates only, exploring or not: a forward packet through a relayer
+                // on probation, or over an edge probes measured dead, is data lost, PIX shares and
+                // SURBs with it, and it probes nothing (a probation ends on a reply through the
+                // relayer, which only a return path carries). Tempered, a relayer on probation keeps
+                // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
+                let mut weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
+                let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
+                    pick_exploring_index(&weights, || false)
+                } else {
+                    gate_implausible(&mut weights);
+                    pick_weighted_index(&weights)
+                }
+                .and_then(|i| paths.iter().nth(i))
+                .map(|(vp, _)| vp.clone());
+                drawn.ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(
                         hops_usize,
                         source.to_string(),
@@ -680,31 +885,34 @@ where
 
         let cache_key: PlannerCacheKey = (src_key, dest_key, u32::from(hops));
 
-        let resolver = self.resolver.clone();
-        let selector = self.selector.clone();
-        let weighting = self.weighting;
-        let me = self.me;
-        let collapsed_diversity = self.collapsed_diversity.clone();
+        let paths = self.paths.clone();
 
         self.cache
             .try_get_with(cache_key, async move {
                 tracing::trace!(hops = hops_usize, "path cache miss, querying selector");
-                rebuild_candidates(
-                    &*resolver, &*selector, weighting, me, src_key, dest_key, hops_usize, "fill",
-                )
-                .await?
-                .map(|(weighted, diversity)| {
-                    if let Some(obs) = diversity {
-                        apply_diversity_transition(&collapsed_diversity, &src_key, "fill", &obs);
-                    }
-                    Arc::new(weighted)
-                })
-                .ok_or_else(|| {
-                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
-                })
+                let (weighted, diversity) =
+                    paths
+                        .rebuild(src_key, dest_key, hops_usize, "fill")
+                        .await?
+                        .ok_or_else(|| {
+                            PathPlannerError::Path(PathError::PathNotFound(
+                                hops_usize,
+                                src_key.to_hex(),
+                                dest_key.to_hex(),
+                            ))
+                        })?;
+                // A fill always becomes the cache entry, so its transition can be applied here.
+                paths.apply_diversity("fill", diversity);
+                Ok(Arc::new(weighted))
             })
             .await
             .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Runs one background sweep now: called when relayer health in the graph changes, so cached
+    /// paths follow it at once instead of up to [`PathPlannerConfig::refresh_period`] later.
+    pub(crate) async fn refresh_cached_paths(&self) {
+        self.paths.sweep(&self.cache).await
     }
 
     /// Rebuilds every cached entry whose paths originate at `source`, replacing each in place.
@@ -734,17 +942,8 @@ where
 
         let mut moved = 0usize;
         for (src_key, dest_key, hops) in keys {
-            if let Ok(Some((weighted, diversity))) = rebuild_candidates(
-                &*self.resolver,
-                &*self.selector,
-                self.weighting,
-                self.me,
-                src_key,
-                dest_key,
-                hops as usize,
-                "recompute",
-            )
-            .await
+            if let Ok(Some((weighted, diversity))) =
+                self.paths.rebuild(src_key, dest_key, hops as usize, "recompute").await
             {
                 let key = (src_key, dest_key, hops);
                 // A fresh entry counts as moved -- there was no previous distribution to compare
@@ -776,9 +975,7 @@ where
                     );
                 }
                 // The recompute always installs, so its diversity transition always applies.
-                if let Some(obs) = diversity {
-                    apply_diversity_transition(&self.collapsed_diversity, &src_key, "recompute", &obs);
-                }
+                self.paths.apply_diversity("recompute", diversity);
                 if shifted {
                     moved += 1;
                 }
@@ -797,9 +994,9 @@ where
     /// smaller any single relay's share of the return stream.
     ///
     /// Draws are independent — deliberately. Spreading a *batch* over K distinct relayers was tried
-    /// and cannot work: a batch is the SURBs that fit in one packet, and `HoprPacket::PAYLOAD_SIZE /
-    /// HoprSurb::SIZE` is 2, so K was capped at 2 whatever the configuration said, while each packet
-    /// re-drew independently regardless. Tempering has no such ceiling.
+    /// and cannot work: a batch is the SURBs that fit in one packet (`HoprPacket::PAYLOAD_SIZE /
+    /// HoprSurb::SIZE`, a handful at most), so K was capped by it whatever the configuration said,
+    /// while each packet re-drew independently regardless. Tempering has no such ceiling.
     ///
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
@@ -833,10 +1030,7 @@ where
 
         let candidates = self.cached_paths(destination, me, hops).await?;
         let items: Vec<&(ValidatedPath, f64)> = candidates.iter().collect();
-        let weights = temper_weights(
-            &items.iter().map(|(_, w)| *w).collect::<Vec<_>>(),
-            self.return_path_weight_temper,
-        );
+        let weights = items.iter().map(|(_, w)| *w).collect::<Vec<_>>();
 
         if weights.iter().all(|w| *w <= 0.0) {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
@@ -848,7 +1042,7 @@ where
 
         // Distinct first relayers in the candidate pool: the return-relayer diversity actually
         // available for this destination. A value of 1 is the corroboration blind spot (a dead
-        // relayer cannot be told from a quiet peer) — the same condition `rebuild_candidates` WARNs
+        // relayer cannot be told from a quiet peer) — the same condition `PathBuilder::rebuild` WARNs
         // on. This draw runs per-packet, so both sets below are built only when DEBUG is actually
         // recorded -- not on every call.
         let log_relayer_diversity = tracing::enabled!(tracing::Level::DEBUG);
@@ -864,15 +1058,17 @@ where
             count,
             candidates = items.len(),
             distinct_relayers = candidate_relayers.as_ref().map_or(0, |r| r.len()),
-            temper = self.return_path_weight_temper,
-            exploration = self.return_path_exploration,
+            temper = self.paths.weighting.return_path_weight_temper,
+            exploration = self.paths.weighting.return_path_exploration,
             "drawing return paths from tempered weights"
         );
 
+        // An exploring draw may land on a candidate the weights all but reject only within the
+        // node-wide probe allowance: see `IMPLAUSIBLE_PROBE_INTERVAL`.
         let drawn = (0..count)
             .filter_map(|_| {
-                if should_explore(self.return_path_exploration) {
-                    pick_uniform_index(items.len())
+                if should_explore(self.paths.weighting.return_path_exploration) {
+                    pick_exploring_index(&weights, || self.probe_budget.take())
                 } else {
                     pick_weighted_index(&weights)
                 }
@@ -1013,12 +1209,8 @@ where
     fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
         // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
         let cache = self.cache.clone();
-        let resolver = self.resolver.clone();
-        let selector = self.selector.clone();
+        let paths = self.paths.clone();
         let refresh_period = self.refresh_period;
-        let weighting = self.weighting;
-        let me = self.me;
-        let collapsed_diversity = self.collapsed_diversity.clone();
 
         // run at a non-zero interval
         futures_time::stream::interval(futures_time::time::Duration::from_millis(
@@ -1026,49 +1218,8 @@ where
         ))
         .for_each(move |_| {
             let cache = cache.clone();
-            let resolver = resolver.clone();
-            let selector = selector.clone();
-            let weighting = weighting;
-            let collapsed_diversity = collapsed_diversity.clone();
-
-            async move {
-                for (key, swept) in cache.iter() {
-                    let (src_key, dest_key, hops_u32) = {
-                        let k = key.as_ref();
-                        (k.0, k.1, k.2)
-                    };
-
-                    if hops_u32 == 0 {
-                        continue;
-                    }
-
-                    // The key already holds resolved offchain keys, which is what the selector
-                    // wants -- so nothing has to be resolved again here.
-                    if let Ok(Some((weighted, diversity))) = rebuild_candidates(
-                        &*resolver,
-                        &*selector,
-                        weighting,
-                        me,
-                        src_key,
-                        dest_key,
-                        hops_u32 as usize,
-                        "background-refresh",
-                    )
-                    .await
-                    {
-                        // Only if this is still the entry the sweep read: a `recompute_paths_from`
-                        // that ran during the rebuild built from newer evidence, and its route must
-                        // not be overwritten by this older selection.
-                        let installed =
-                            put_if_unchanged(&cache, (src_key, dest_key, hops_u32), &swept, Arc::new(weighted)).await;
-                        // Apply the diversity transition only when this rebuild's path actually landed;
-                        // a rejected stale refresh must not move the tracker or log a recovery (#8502).
-                        if installed && let Some(obs) = diversity {
-                            apply_diversity_transition(&collapsed_diversity, &src_key, "background-refresh", &obs);
-                        }
-                    }
-                }
-            }
+            let paths = paths.clone();
+            async move { paths.sweep(&cache).await }
         })
         .instrument(tracing::debug_span!(parent: None, "planner.background_refresh"))
     }
@@ -2039,6 +2190,47 @@ mod tests {
         (planner, graph)
     }
 
+    /// The mirror of [`two_relayer_return_planner`]: a `me -> {a,b} -> dest` forward topology.
+    fn two_relayer_forward_planner() -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [(me, a), (a, dest), (me, b), (b, dest)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(me_addr(), b_addr())
+            .with_open_channel(b_addr(), dest_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
     /// Same `me <- {a,b} <- dest` return topology as [`two_relayer_return_planner_with_floor`], but
     /// `unresolvable` is left out of the chain resolver's key-to-address map -- present in the graph,
     /// so the selector still offers it as a candidate relayer, but `ValidatedPath::new` cannot map it
@@ -2244,6 +2436,293 @@ mod tests {
         Ok(())
     }
 
+    /// A neighbour that disconnects must stop being drawn as soon as the cache is refreshed, not
+    /// up to a refresh period later.
+    #[tokio::test]
+    async fn refreshing_after_a_disconnect_should_drop_the_lost_relayer() -> anyhow::Result<()> {
+        use hopr_api::graph::traits::EdgeWeightType;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+
+        let before = fill_return_cache(&planner).await;
+        assert!(
+            share_of(&before, &b) > 0.0,
+            "vacuity guard: B must be a candidate first"
+        );
+
+        for (src, dst) in [(me, b), (b, me)] {
+            graph.upsert_edge(&src, &dst, |obs| obs.record(EdgeWeightType::Connected(false)));
+        }
+        planner.refresh_cached_paths().await;
+
+        let after = planner
+            .cache
+            .get(&(dest, me, 1))
+            .await
+            .context("the entry is still cached")?;
+        assert_eq!(0.0, share_of(&after, &b), "the disconnected relayer must not be drawn");
+        assert!(
+            share_of(&after, &pubkey(&SECRET_A)) > 0.0,
+            "the connected relayer must remain"
+        );
+        Ok(())
+    }
+
+    /// A relayer judged dead is pruned by the traversal itself, in any position, instead of
+    /// lingering at a floored but drawable weight.
+    #[tokio::test]
+    async fn a_relayer_judged_dead_should_leave_the_cached_paths() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+
+        let before = fill_return_cache(&planner).await;
+        assert!(
+            share_of(&before, &b) > 0.0,
+            "vacuity guard: B must be a candidate first"
+        );
+
+        graph.record_node_health(&b, 0.0);
+        planner.refresh_cached_paths().await;
+
+        let after = planner
+            .cache
+            .get(&(dest, me, 1))
+            .await
+            .context("the entry is still cached")?;
+        assert_eq!(0.0, share_of(&after, &b), "the dead relayer must not be drawn");
+        assert!(share_of(&after, &a) > 0.0, "the live relayer must remain");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn an_entry_left_without_a_route_should_leave_the_cache() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
+
+        fill_return_cache(&planner).await;
+        graph.record_node_health(&pubkey(&SECRET_A), 0.0);
+        graph.record_node_health(&pubkey(&SECRET_B), 0.0);
+        planner.refresh_cached_paths().await;
+
+        assert!(
+            planner.cache.get(&(dest, me, 1)).await.is_none(),
+            "no route must be served from an entry through dead relayers"
+        );
+        Ok(())
+    }
+
+    /// Health is part of the walked value, so the return temper flattens it like any other quality;
+    /// `HoprProtocolConfig::relayer_health_weight` sets how hard it bites.
+    #[tokio::test]
+    async fn a_stalled_relayer_should_have_its_share_cut_by_its_health() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+        graph.record_node_health(&b, 1.0 / 16.0);
+        planner.refresh_cached_paths().await;
+
+        let paths = planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(pubkey(&SECRET_DEST)),
+                RoutingOptions::Hops(1.try_into()?),
+                4000,
+            )
+            .await?;
+        let via_b = paths.iter().filter(|vp| vp.first() == Some(&b)).count();
+        assert_eq!(4000, paths.len());
+        // Untouched it would carry about half; a sixteenth of the health, tempered, leaves about a quarter.
+        assert!(
+            via_b < 1300,
+            "the stalled relayer's share must shrink, got {via_b} of 4000"
+        );
+        assert!(
+            via_b > 0,
+            "a stalled relayer must stay drawable, or it can never prove recovery"
+        );
+        assert!(
+            paths.iter().any(|vp| vp.first() == Some(&a)),
+            "the healthy relayer must keep carrying the return stream"
+        );
+        Ok(())
+    }
+
+    /// A forward draw explores like a return draw: the weaker relayer keeps a floor of the forward
+    /// packets, so it stays measured and a session does not settle on one path. The health here is
+    /// a sixteenth; tempered that is a quarter of the weight, and exploration adds a twentieth.
+    #[tokio::test]
+    async fn forward_draws_should_be_tempered_and_explored() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, a, b, dest) = (
+            pubkey(&SECRET_ME),
+            pubkey(&SECRET_A),
+            pubkey(&SECRET_B),
+            pubkey(&SECRET_DEST),
+        );
+        graph.record_node_health(&b, 1.0 / 16.0);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            } else {
+                assert_eq!(Some(&a), path.first(), "a forward path leaves through A or B");
+            }
+        }
+        // Untempered and unexplored the weaker relayer would get about a seventeenth (~235); a
+        // sixteenth of the health tempered to a quarter gives it about a fifth, plus the exploration.
+        assert!(
+            (500..1500).contains(&via_b),
+            "the weaker relayer keeps a tempered share of the forward draws, got {via_b} of 4000"
+        );
+        Ok(())
+    }
+
+    /// A forward draw never goes through a relayer the weights all but reject, such as one on
+    /// probation, exploring or not. Ungated, its tempered weight alone drew it a few percent of the
+    /// time, and uniform exploration added half of every tenth draw.
+    #[tokio::test]
+    async fn forward_draws_should_never_go_through_a_relayer_on_probation() -> anyhow::Result<()> {
+        use hopr_api::graph::NetworkGraphUpdate;
+
+        let (planner, graph) = two_relayer_forward_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+        graph.record_node_health(&b, 1e-3);
+        planner.refresh_cached_paths().await;
+
+        let mut via_b = 0;
+        for _ in 0..4000 {
+            let path = planner
+                .resolve_path(
+                    NodeId::Offchain(me),
+                    NodeId::Offchain(dest),
+                    RoutingOptions::Hops(1.try_into()?),
+                )
+                .await?;
+            if path.first() == Some(&b) {
+                via_b += 1;
+            }
+        }
+        // Ungated, the tempered weight alone drew about 0.9 x 4000 x sqrt(1e-3) / (1 + sqrt(1e-3)) ~ 110,
+        // and uniform exploration over both candidates about 310.
+        assert_eq!(
+            0, via_b,
+            "a relayer on probation draws no forward packet, got {via_b} of 4000"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gating_should_zero_only_the_implausible_weights() {
+        let mut weights = [1.0, 0.8, 0.1, 0.03, 0.0];
+        gate_implausible(&mut weights);
+        assert_eq!(
+            [1.0, 0.8, 0.1, 0.0, 0.0],
+            weights,
+            "a tenth of the best stays plausible, anything less is zeroed"
+        );
+        assert!(
+            (0..2000).filter_map(|_| pick_weighted_index(&weights)).all(|i| i < 3),
+            "a weighted draw over the gated weights never lands on an implausible candidate"
+        );
+
+        let mut nothing = [0.0, 0.0];
+        gate_implausible(&mut nothing);
+        assert_eq!(None, pick_weighted_index(&nothing), "nothing to draw from");
+    }
+
+    #[test]
+    fn exploring_draws_should_skip_implausible_candidates_unless_granted() {
+        let weights = [1.0, 0.8, 0.01];
+        let denied = (0..2000)
+            .filter_map(|_| pick_exploring_index(&weights, || false))
+            .collect::<Vec<_>>();
+        assert!(
+            denied.iter().all(|&i| i != 2),
+            "never the implausible one without a grant"
+        );
+        let first = denied.iter().filter(|&&i| i == 0).count();
+        assert!(
+            (800..1200).contains(&first),
+            "uniform over the plausible two, got {first} of 2000 for the first"
+        );
+
+        let granted = (0..3000)
+            .filter_map(|_| pick_exploring_index(&weights, || true))
+            .filter(|&i| i == 2)
+            .count();
+        assert!(
+            (800..1200).contains(&granted),
+            "uniform over all three when granted, got {granted}"
+        );
+
+        assert_eq!(None, pick_exploring_index(&[0.0, 0.0], || true), "nothing to draw from");
+    }
+
+    #[test]
+    fn the_probe_budget_should_grant_one_probe_per_interval() {
+        let budget = ProbeBudget::default();
+        assert!(budget.take(), "the first probe is granted");
+        assert!((0..100).all(|_| !budget.take()), "none more within the interval");
+    }
+
+    /// From races to the draw: a relayer losing its races by seconds is judged, recorded in the graph,
+    /// and the re-plan that follows cuts its share of the cached return paths.
+    #[tokio::test]
+    async fn a_relayer_losing_its_races_should_have_its_share_cut() -> anyhow::Result<()> {
+        use crate::protocol::surb_telemetry::{SurbRoundTripRegistry, refresh_relayer_health};
+
+        let (planner, graph) = two_relayer_return_planner();
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+        let before = share_of(&fill_return_cache(&planner).await, &b);
+
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let leg = |relayer| {
+            let mut leg = [None; crate::protocol::surb_telemetry::PATH_ID_SLOTS];
+            leg[0] = Some(relayer);
+            leg
+        };
+        for seed in 0..10u8 {
+            health.record_race(
+                &leg(b),
+                [seed; 8],
+                &leg(a),
+                Duration::from_millis(200),
+                Duration::from_secs(3),
+            );
+        }
+        refresh_relayer_health(&registry, &graph, 4, 1.0, || planner.refresh_cached_paths()).await;
+
+        let after = share_of(&fill_return_cache(&planner).await, &b);
+        assert!(
+            after < before / 2.0,
+            "the late relayer's share must fall, from {before} to {after}"
+        );
+        assert!(share_of(&fill_return_cache(&planner).await, &a) > 0.5);
+        Ok(())
+    }
+
     /// Share of the collection's total weight held by candidates whose first hop is `relayer`.
     ///
     /// This -- not the raw weight -- is what decides how much of a session's return stream rides on
@@ -2432,7 +2911,7 @@ mod tests {
     /// resolves to a chain address), so what a session can actually draw from has collapsed to `a`
     /// alone. A diversity check computed on the selector's pre-validation output would have missed
     /// this entirely -- it must be computed on the validated survivors, which is what
-    /// `rebuild_candidates` now does.
+    /// `PathBuilder::rebuild` now does.
     #[tokio::test]
     async fn validation_rejecting_one_relayer_should_collapse_diversity_even_though_the_selector_saw_two() {
         let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
@@ -2635,6 +3114,8 @@ mod tests {
         WeightingParams {
             latency_halflife: Duration::from_millis(100),
             capacity_reference: 10_000_000,
+            return_path_weight_temper: 1.0,
+            return_path_exploration: 0.0,
         }
     }
 

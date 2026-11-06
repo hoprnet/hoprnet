@@ -56,6 +56,7 @@ base64 = "0.23.1"
 bimap = "0.6.3"
 bitvec = "1.1.1"
 bloomfilter = { version = "3.0.1" }
+siphasher = "1.0.4"
 bytesize = { version = "2.7.0", features = ["serde"] }
 bytes = "1.12.1"
 cfg-if = "1.0.5"

@@ -30,7 +30,9 @@ pub trait SurbStore {
     /// discarded lightly: it is the only evidence that the sender is over-producing. Evictions fall on
     /// share-less SURBs first, so an evicted SURB takes an undelivered PIX share with it only once the
     /// buffer holds nothing but share-bearing ones; [`SurbInsertOutcome::evicted_shares`] is the exact
-    /// number of shares lost that way.
+    /// number of shares lost that way. SURBs that a change of SURB generation took out of play (the
+    /// stock a newer generation cleared, or an older-generation batch that was refused) are not
+    /// evictions; they are reported apart, as [`SurbInsertOutcome::superseded`].
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> SurbInsertOutcome;
 
     /// How many SURBs are held for `pseudonym` in each of the store's tiers, as `(share-bearing,
@@ -54,13 +56,23 @@ pub trait SurbStore {
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener);
 
-    /// Tries to find a [`ReplyOpener`] given the [`sender_id`](HoprSenderId).
+    /// Tries to find a [`ReplyOpener`] given the [`sender_id`](HoprSenderId), without consuming it.
     ///
-    /// This is done by the sending side of the original packet when the reply to that
-    /// packet is received and needs to be decrypted.
+    /// This is done by the sending side of the original packet when the reply to that packet is received and needs
+    /// to be decrypted. It is the read half of a check-then-use pair: the decoder peeks to decrypt the reply, and
+    /// [removes](SurbStore::remove_reply_opener) the opener only once the packet has been delivered. Consuming it
+    /// at lookup time instead would lose the reply when two copies of it are decoded concurrently - the copy that
+    /// loses the race would remove the opener and then fail, taking the winner's decryption key with it.
     ///
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener>;
+
+    /// Removes a [`ReplyOpener`] that has been used to deliver a reply.
+    ///
+    /// Called after the reply decrypted with this opener has been delivered, so a reply is only ever spent once it
+    /// has actually produced a packet. Removing an opener that is already gone is a no-op, which is what makes the
+    /// concurrent case safe: the two copies both decrypt, and only one removal is meaningful.
+    fn remove_reply_opener(&self, sender_id: &HoprSenderId);
 
     /// Marks the edge from this node to `relayer` as unusable, so stored SURBs whose return path
     /// starts there are no longer handed out.

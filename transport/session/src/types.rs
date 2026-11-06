@@ -547,6 +547,23 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
     /// A no-op when `token` no longer names `pseudonym`'s current admission — a successor Session
     /// was admitted in the meantime, and its ring is not this retire's to release. Idempotent.
     fn retire(&self, pseudonym: &SessionId, token: AdmissionToken);
+
+    /// Widens the ring of the admission `token` names to fit a target `expected_surbs` announced
+    /// *after* establishment.
+    ///
+    /// The counterpart of [`admit`](Self::admit) for a target that changes mid-Session. A peer may
+    /// raise its SURB balancer target and say so in a keep-alive; the gnosis_vpn client ramps from a
+    /// ping tier to a main tier seconds after the Session opens (gnosis/gnosis_vpn#739). Without
+    /// this, the ring keeps the target the Session was admitted with, and every SURB minted toward
+    /// the larger one is evicted on arrival — under PIX, together with the share it carried.
+    ///
+    /// Like [`retire`](Self::retire), a `token` that no longer names the pseudonym's current
+    /// admission is a no-op: a successor Session's ring is not this announcement's to widen. Widening
+    /// must keep the resident SURBs and the admission number, so that the token the Session holds
+    /// still names its admission and its teardown still releases it.
+    ///
+    /// Defaults to a no-op, for implementations that do not size a per-Session ring.
+    fn raise_target(&self, _pseudonym: &SessionId, _token: AdmissionToken, _expected_surbs: usize) {}
 }
 
 /// Configures the Session protocol socket over HOPR.

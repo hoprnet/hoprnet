@@ -67,7 +67,7 @@ use hopr_api::{
 };
 pub use hopr_crypto_packet::HoprPixSpec;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
+pub use hopr_protocol_hopr::{MIN_TRACKED_PACKETS, MemorySurbStore, SurbStore};
 /// Re-exported so a consumer can name `<HoprPixSpec as PixSpec>::DepositAddress` and assert at
 /// compile time that it is the variant it can actually settle. Which instantiation is in play is
 /// a feature-graph outcome rather than a local decision, and getting it wrong is otherwise silent
@@ -75,6 +75,12 @@ pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
 use hopr_protocol_pix::ShareResolution;
+/// Packet mixing API, re-exported whole so a consumer of the transport object can configure and
+/// inspect the mixer without pinning `hopr-transport-mixer` itself.
+///
+/// Every engine feature is already enabled by this crate's dependency declaration, so `create`,
+/// `poisson_channel`, `channel` and `MixerSink` are reached through this module.
+pub use hopr_transport_mixer as mixer;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -139,6 +145,16 @@ lazy_static::lazy_static! {
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
 
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_SURB_GENERATION_BUMPS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_surb_generation_bumps_total",
+            "SURB generation bumps after a dead relayer verdict",
+        )
+        .unwrap();
+}
+
 /// Fraction of the SURB ring buffer a Session's balancer target may occupy.
 ///
 /// The remainder is headroom for balancer overshoot. The target used to be the ring buffer capacity
@@ -178,6 +194,11 @@ impl SurbAdmissionControl for StoreSurbAdmission {
 
     fn retire(&self, pseudonym: &SessionId, token: AdmissionToken) {
         self.store.retire(pseudonym, token.into_raw());
+    }
+
+    fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
+        self.store
+            .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
     }
 }
 
@@ -321,6 +342,8 @@ pub struct HoprTransport<Chain, Graph, Net> {
     network: Arc<OnceLock<Net>>,
     graph: Graph,
     path_planner: PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>>,
+    /// SURB round-trip counters and per-relayer health, shared with the planner.
+    surb_round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -421,8 +444,9 @@ where
             ..cfg.packet.surb_store
         };
 
-        // Built before the session manager so the latter can be handed the seam that lets a
-        // session re-plan its return path on sustained loss.
+        // The race telemetry reads a reply's lateness by the SURB a replier spends first, which FIFO, the
+        // only pop order, makes the older of the two.
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -503,6 +527,7 @@ where
             network: Arc::new(OnceLock::new()),
             graph,
             path_planner,
+            surb_round_trips,
             my_multiaddresses,
             smgr,
             chain_api: resolver,
@@ -919,7 +944,7 @@ where
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );
 
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+        let surb_round_trips = self.surb_round_trips.clone();
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
@@ -1091,32 +1116,22 @@ where
 
         // -- periodic SURB round-trip flush
         tracing::info!(?role, "starting surb round-trip flush task");
-        // Long enough to outlast the silence gate that produced the evidence, so a path that stays
-        // dead is re-marked before the previous mark lapses, and short enough that a path which
-        // recovers unnoticed returns to closed-loop control promptly.
-        const RETURN_PATH_DEGRADED_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_smgr = self.smgr.clone();
-        let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
+        #[cfg(feature = "telemetry")]
         let surb_flush_store = self.path_planner.surb_store.clone();
+        let latency_race_memory = self.cfg.latency_race_memory;
+        let relayer_health_weight = self.cfg.relayer_health_weight;
+        #[cfg(all(feature = "telemetry", not(test)))]
+        lazy_static::initialize(&METRIC_SURB_GENERATION_BUMPS);
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
-                let mut episodes = protocol::return_path_recovery::ReturnPathEpisodes::new(RETURN_PATH_DEGRADED_GRACE);
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
-
+                let mut invalid = std::collections::HashMap::new();
                 while ticks.next().await.is_some() {
-                    // Re-plan first, refill only if re-planning moved traffic. Run the other way
-                    // round the refill mints SURBs onto the very route the planner is abandoning --
-                    // see `protocol::return_path_recovery`. Detection/flush/tick ordering lives in
-                    // `run_flush_tick`.
-                    //
-                    // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
-                    // they capture has to survive being invoked once per silent destination.
-                    let (planner, chain, smgr, store) =
-                        (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr, &surb_flush_store);
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
@@ -1127,58 +1142,55 @@ where
                     #[cfg(feature = "telemetry")]
                     surb_flush_store.surbs_held();
 
-                    for step in protocol::return_path_recovery::run_flush_tick(
+                    protocol::surb_telemetry::flush_into(&surb_round_trips, &surb_flush_graph, now_ms);
+                    // Relayer health lives in the graph, so path selection prunes the dead and weights
+                    // the stalled natively.
+                    let reached = protocol::surb_telemetry::refresh_relayer_health(
                         &surb_round_trips,
                         &surb_flush_graph,
-                        now_ms,
-                        &mut episodes,
-                        |destination| async move { planner.recompute_paths_from(&destination).await },
-                        |destination| async move {
-                            // Sessions name their destination by its chain address, this
-                            // telemetry by its packet key, and a `NodeId` holding one is never
-                            // equal to a `NodeId` holding the other -- so the match has to be
-                            // made on a resolved form, not on the enum.
-                            //
-                            // The counterparty has to still be receiving SURBs to reply with,
-                            // and its silence has by now convinced our balancer that it is well
-                            // stocked -- so tell the Sessions routed there to stop believing
-                            // that estimate while the evidence says otherwise.
-                            match chain.packet_key_to_chain_key(&destination) {
-                                Ok(Some(address)) => {
-                                    let marked = smgr.mark_return_path_degraded(
-                                        &hopr_api::types::internal::prelude::NodeId::Chain(address),
-                                        RETURN_PATH_DEGRADED_GRACE,
-                                    );
-                                    // The return path for these sessions was just re-planned; advance
-                                    // each one's SURB generation so the fresh batch supersedes the
-                                    // SURBs the counterparty still holds for the dead path.
-                                    for pseudonym in &marked {
-                                        store.bump_generation(pseudonym);
-                                    }
-                                    marked.len()
-                                }
-                                // A resolver error is exactly the failure this recovery path exists
-                                // to surface, so it must not be collapsed into "no chain key" — log
-                                // it rather than silently marking zero sessions.
-                                Err(error) => {
-                                    tracing::warn!(%destination, %error, "could not resolve a silent destination's chain key to mark it degraded");
-                                    0
-                                }
-                                Ok(None) => 0,
-                            }
-                        },
+                        latency_race_memory,
+                        relayer_health_weight,
+                        || surb_flush_planner.refresh_cached_paths(),
                     )
-                    .await
-                    {
-                        match step {
-                            protocol::return_path_recovery::RecoveryStep::Replanned { destination, moved } => {
-                                tracing::info!(%destination, entries = moved, "return path silent, re-planned")
-                            }
-                            protocol::return_path_recovery::RecoveryStep::Refilled { destination, sessions } => {
-                                tracing::info!(%destination, sessions, "refilling behind the re-plan")
-                            }
+                    .await;
+
+                    // The counterparty sees only the first hop of the SURBs it holds, so it cannot tell
+                    // which of them run through the dead relayer, and a FIFO store would spend them into
+                    // the void until it turned over. Advancing the session's SURB generation makes it
+                    // drop its whole stock on the next push. The write-off above is count-only (the SURBs
+                    // through the relayer); the session's balancer is told the stock is gone instead, so
+                    // that it refills from empty over the re-planned paths, at a pace (see
+                    // `REFILL_PACING_SECS`) the paths can carry. The session is asked first: a session
+                    // the manager no longer knows is only forgotten, its generation is not advanced
+                    // (that would leave a stray entry in the store and log a bump for a closed session).
+                    for pseudonym in reached {
+                        if !surb_flush_smgr.on_counterparty_surbs_wiped(&pseudonym) {
+                            surb_round_trips.forget_session(&pseudonym);
+                            continue;
+                        }
+                        let generation = surb_flush_planner.surb_store.bump_generation(&pseudonym);
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_SURB_GENERATION_BUMPS.increment();
+                        tracing::info!(
+                            %pseudonym,
+                            generation,
+                            "dead relayer verdict: SURB generation advanced, the counterparty drops its stock on the next push"
+                        );
+                    }
+
+                    // The counterparty still counts SURBs through a dead relayer, so each session is
+                    // told how many of those it holds, to replace them.
+                    let current = surb_round_trips.invalid();
+                    for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
+                        if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
+                            surb_round_trips.forget_session(&session);
+                        } else if !invalid.contains_key(&session) {
+                            tracing::info!(%session, count, share, "marking SURBs that cannot bring a reply home invalid");
+                        } else if share == 0.0 {
+                            tracing::info!(%session, "clearing invalid SURBs");
                         }
                     }
+                    invalid = current;
                 }
             }),
         );
@@ -1416,6 +1428,11 @@ where
     /// Returns a reference to the network graph.
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// Returns the per-relayer health, so connectivity events can report neighbours we lost or regained.
+    pub fn relayer_health(&self) -> std::sync::Arc<protocol::surb_telemetry::RelayerHealth> {
+        self.surb_round_trips.relayer_health()
     }
 
     /// Returns a reference to the SURB store.
@@ -2225,5 +2242,57 @@ mod tests {
 
         canary.abort();
         canary.await.ok();
+    }
+    /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
+    ///
+    /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
+    /// a raised target widens the ring the token names, and a stale token (a successor Session's
+    /// admission) leaves the resident ring at the size its own admission gave it.
+    #[test]
+    fn surb_admission_raise_target_delegates_to_the_store() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig::default()),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+
+        // The ping tier, then the main tier the client ramps to.
+        let token = admission.admit(&pseudonym, 688);
+        let ping_ceiling = admission
+            .store
+            .admitted_ring_ceiling(&pseudonym)
+            .context("the admission must have installed a ring")?;
+        assert_eq!(1_032, ping_ceiling, "fixture: 688 with 50% headroom");
+
+        admission.raise_target(&pseudonym, token, 6_887);
+        assert!(
+            admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0) > ping_ceiling,
+            "a raise must widen the ring the token names"
+        );
+
+        // A successor's admission invalidates the predecessor's token; the raise must then be a no-op.
+        let successor = admission.admit(&pseudonym, 64);
+        let successor_ceiling = admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0);
+        admission.raise_target(&pseudonym, token, 9_999);
+        assert_eq!(
+            successor_ceiling,
+            admission.store.admitted_ring_ceiling(&pseudonym).unwrap_or(0),
+            "a stale token must not widen the successor's ring"
+        );
+        assert_ne!(token, successor);
+
+        // And retiring through the seam still releases the admission the store minted.
+        admission.retire(&pseudonym, successor);
+        assert!(
+            admission.store.admitted_ring_ceiling(&pseudonym).is_none(),
+            "the retire must release the ring"
+        );
+
+        Ok(())
     }
 }

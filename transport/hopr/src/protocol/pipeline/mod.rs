@@ -92,6 +92,18 @@ fn unack_rejection_metric_label<T: UnacknowledgedTicketProcessor>(error: &T::Err
     }
 }
 
+/// Metric label a replayed packet is rejected under.
+///
+/// Unlike `duplicate_ticket_index` this is not a ticket failure, so it gets a label of its own rather than sharing
+/// `processing_error`.
+///
+/// A named function rather than a literal at the increment site, so the test can pin the label while the counter
+/// increment itself stays behind `#[cfg(all(feature = "telemetry", not(test)))]`.
+#[cfg(any(feature = "telemetry", test))]
+fn replay_rejection_metric_label() -> &'static str {
+    "replay"
+}
+
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
@@ -101,7 +113,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
-        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts packets dropped before forwarding because their ticket index was already accepted on the same channel and epoch (replayed index attack)",
+        "Number of incoming packets rejected due various reasons; reason=duplicate_ticket_index counts packets dropped before forwarding because their ticket index was already accepted on the same channel and epoch (replayed index attack); reason=replay counts packets dropped during decoding, as soon as their replay token is derived, because it had already been seen (these are not acknowledged)",
         &["reason"]
     ).unwrap();
     // Tracks how often the Rayon-backed packet decode path exceeds PACKET_DECODING_TIMEOUT.
@@ -358,6 +370,19 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
 
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_REJECTED_COUNT.increment(&["undecodable"]);
+
+                        None
+                    },
+                    Ok(Ok(Err(IncomingPacketError::Replay(sender)))) => {
+                        // A replay comes from the packet's token: usually before the header MAC is verified, so
+                        // the copy is unauthenticated, but also when a concurrent decode recorded the token
+                        // first, in which case this copy authenticated. Do not acknowledge either: an ack would
+                        // pay for a packet nobody has proved, or re-pay for one already acknowledged, and would
+                        // hide from the sender that its retransmission carries the token that must be delivered.
+                        tracing::debug!(%peer, sender = sender.to_peerid_str(), "not sending ack back on replayed packet");
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_REJECTED_COUNT.increment(&[replay_rejection_metric_label()]);
 
                         None
                     },
@@ -1684,17 +1709,25 @@ mod tests {
             "a replayed index must be reported under its own label"
         );
 
-        for other in [
-            HoprProtocolError::Replay,
-            HoprProtocolError::InvalidSender,
-            HoprProtocolError::KeyNotFound,
-        ] {
+        for other in [HoprProtocolError::InvalidSender, HoprProtocolError::KeyNotFound] {
             assert_eq!(
                 unack_rejection_metric_label::<LabelTestTicketProc>(&other),
                 "unack_processing_error",
                 "{other} must keep the generic label"
             );
         }
+    }
+
+    /// A replayed packet must be alertable on its own: it is dropped before the packet is authenticated, which is a
+    /// different condition from a ticket-processing failure.
+    #[test]
+    fn a_replay_has_its_own_rejection_metric_label() {
+        assert_eq!(replay_rejection_metric_label(), "replay");
+        assert_ne!(
+            replay_rejection_metric_label(),
+            "processing_error",
+            "sharing the generic label would hide replays among ordinary drops"
+        );
     }
 
     /// Regression guard for the 4.1.x relay throughput collapse (#8246 fallout).
@@ -2303,5 +2336,79 @@ mod tests {
             "buffered(concurrency) must emit decoded packets in arrival order regardless of decode latency; got \
              {output:?}. A regression to then_concurrent()/FuturesUnordered would emit completion order and fail here."
         );
+    }
+
+    /// Drives `start_incoming_packet_pipeline` with a decoder that always reports a replay, so the ack sink can be
+    /// observed. A replay is detected before the header MAC is verified, so nothing may be acknowledged.
+    #[tokio::test]
+    async fn a_replayed_packet_should_not_be_acknowledged() -> anyhow::Result<()> {
+        struct AlwaysReplay(std::sync::atomic::AtomicUsize);
+
+        impl PacketDecoder for AlwaysReplay {
+            type Error = HoprProtocolError;
+
+            fn decode(
+                &self,
+                sender: PeerId,
+                _: bytes::Bytes,
+            ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Err(IncomingPacketError::Replay(
+                    OffchainPublicKey::from_peerid(&sender)
+                        .map_err(|_| IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender))?
+                        .into(),
+                ))
+            }
+        }
+
+        let sender = *OffchainKeypair::random().public();
+        // `wire_in` is the stream of decoded packets; `wire_out` is where the pipeline would put the ones it
+        // forwards. Neither is exercised beyond admitting the replayed packet.
+        let (packet_tx, packet_rx) = futures::channel::mpsc::unbounded::<(PeerId, bytes::Bytes)>();
+        let (wire_out, _wire_out_rx) = futures::channel::mpsc::unbounded::<(PeerId, bytes::Bytes)>();
+        let (app_out, _app_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
+        let (ack_out_tx, mut ack_out_rx) = futures::channel::mpsc::unbounded::<(OffchainPublicKey, Option<HalfKey>)>();
+        let (ack_in_tx, _ack_in_rx) = futures::channel::mpsc::unbounded::<(OffchainPublicKey, Vec<Acknowledgement>)>();
+        // The pipeline requires sinks whose error is a timeout wrapper; `.with_timeout` supplies it.
+        let app_out = app_out.with_timeout(QUEUE_SEND_TIMEOUT);
+        let ack_out_tx = ack_out_tx.with_timeout(QUEUE_SEND_TIMEOUT);
+        let ack_in_tx = ack_in_tx.with_timeout(QUEUE_SEND_TIMEOUT);
+        let (ticket_evt, _ticket_rx) = mpsc::channel::<TicketEvent>(4);
+
+        let decoder = std::sync::Arc::new(AlwaysReplay(Default::default()));
+        let _process = hopr_utils::spawn_as_abortable!(start_incoming_packet_pipeline(
+            (wire_out, packet_rx),
+            decoder.clone(),
+            std::sync::Arc::new(NoopTicketProcessor),
+            ticket_evt,
+            (ack_out_tx, ack_in_tx),
+            app_out,
+            PeerProtocolCounterRegistry::default(),
+            1,
+        ));
+
+        // One replayed packet in; the pipeline must swallow it without an ack.
+        packet_tx.unbounded_send((sender.into(), bytes::Bytes::from_static(b"replayed")))?;
+
+        // Wait until the decoder has actually been asked, so the absence of an ack below is not just the
+        // pipeline not having started yet.
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while decoder.0.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("the packet must reach the decoder"))?;
+
+        let acked = tokio::time::timeout(std::time::Duration::from_millis(300), ack_out_rx.next())
+            .await
+            .ok()
+            .flatten();
+        assert!(
+            acked.is_none(),
+            "a replayed packet must not be acknowledged, got {acked:?}"
+        );
+
+        Ok(())
     }
 }
