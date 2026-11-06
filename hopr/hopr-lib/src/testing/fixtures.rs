@@ -551,8 +551,9 @@ pub struct TestNodeConfig {
     pub pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
     /// The Exit's SURB-level notification period, or `None` to disable the notification.
     ///
-    /// The fixture otherwise pins it to `None` (see `create_hopr_instance_config`); this is the
-    /// override for tests that need the Exit's keep-alive stream to actually run.
+    /// Defaults to `None`, which disables EXIT→ENTRY SURB level notifications: with a period shorter
+    /// than `idle_timeout` each notification resets the moka TTI and breaks session expiration tests.
+    /// This is the override for tests that need the Exit's keep-alive stream to actually run.
     pub surb_balance_notify_period: Option<Duration>,
 }
 

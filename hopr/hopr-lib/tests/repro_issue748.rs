@@ -2,17 +2,19 @@
 //!
 //! Since #8396 the Exit runs a SURB-level keep-alive stream on a `NoRateControl` Session, one packet
 //! every `surb_balance_notify_period` (15 s by default). Every such packet is return-routed, so it
-//! spends one SURB from the Exit's store for the Session. The `NoRateControl` branch runs no SURB
-//! balancer on either side, so nothing replenishes that buffer beyond what the Entry's own outgoing
-//! packets carry; it drains, and once it is empty each further keep-alive waits out
-//! `surb_resolution_wait` and is dropped with "no SURB for its return path within the wait". A report
-//! already queued when a client request arrives takes the SURB that request needed, which is the
-//! client-visible stall the issue reports.
+//! spends one SURB from the Exit's store for the Session. When the Entry on that branch runs no SURB
+//! balancer, nothing replenishes that buffer beyond what the Entry's own outgoing packets carry; it
+//! drains, and once it is empty each further keep-alive waits out `surb_resolution_wait` and is
+//! dropped with "no SURB for its return path within the wait". A report already queued when a client
+//! request arrives takes the SURB that request needed, which is the client-visible stall the issue
+//! reports.
 //!
-//! The fix withholds the notification from a Session whose SURB balancer is disabled, which on this
-//! branch is every one of them: the report exists to correct the Entry's balancer, and there is none.
-//! These tests pin both halves — that such a Session no longer starves, and that a Session whose
-//! balancer *is* enabled still reports, since that is the case the notification exists for.
+//! The fix withholds the notification from a Session that announced no SURB target, which on this
+//! branch means one whose Entry runs no balancer: the report exists to correct that balancer, and
+//! there is none. A `NoRateControl` Entry that *does* enable `surb_management` announces a target and
+//! keeps its reports. These tests pin the cluster-visible half of that — that neither shape drops
+//! packets; that the reports are still delivered to a balanced Session is pinned by the unit test
+//! `a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports`.
 //!
 //! The period is compressed so the drain would complete inside a test against the unfixed code, and
 //! the Exit's idle timeout is raised the way the PIX tests do so the Session outlives it.
@@ -48,25 +50,33 @@ const PING: Duration = Duration::from_secs(4);
 
 /// The Exit's routing wait for a missing return SURB.
 ///
-/// hoprd configures 1 s for its 3 s frame timeout; the library default of 6 s would make each drop
-/// take longer than the whole observation window.
+/// hoprd configures 1 s for its 3 s frame timeout. With the library default of 6 s each drop would
+/// spend six periods waiting for a SURB that is not coming, and far fewer would complete inside the
+/// observation window.
 const SURB_WAIT: Duration = Duration::from_secs(1);
 
-/// A two-node cluster with a long Exit idle timeout and a short routing wait.
+/// A two-node cluster with a long idle timeout on both nodes and a short routing wait.
 ///
 /// `notify_period` is the Exit's `surb_balance_notify_period`; the fixture otherwise pins it to
 /// `None`, which would disable the very stream under test.
+///
+/// Both nodes raise their idle timeout, and the Entry's matters as much as the Exit's: a Session is
+/// evicted once *either* side sees no traffic for its own timeout, and this fixture's default is
+/// 2.5 s — shorter than one [`PING`] interval, so the Entry would evict a Session whose own traffic
+/// had not yet arrived. That produced a silent stall rather than a test failure until the pings were
+/// made to assert, which is why the fixture states the constraint here rather than relying on the
+/// default.
 fn live_cluster(notify_period: Option<Duration>) -> hopr_lib::testing::fixtures::ClusterGuard {
+    let idle_timeout_ms = Duration::from_secs(60).as_millis() as u64;
     cluster_fixture(vec![
         TestNodeConfig {
             win_prob: 1.0,
+            idle_timeout_ms,
             ..Default::default()
         },
         TestNodeConfig {
             win_prob: 1.0,
-            // The shipped period is 15 s, longer than this cluster's default 2.5 s idle timeout; the
-            // Session has to outlive the observation window.
-            idle_timeout_ms: Duration::from_secs(60).as_millis() as u64,
+            idle_timeout_ms,
             pipeline: Some(hopr_lib::exports::transport::protocol::PacketPipelineConfig {
                 surb_resolution_wait: Some(SURB_WAIT),
                 ..Default::default()
@@ -101,23 +111,46 @@ fn nrc_session_config(surb_target: Option<u64>) -> anyhow::Result<HoprSessionCli
 ///
 /// The pings keep the Session from being evicted and each hands the Exit one SURB for its reply, so a
 /// Session that still starves is spending SURBs faster than one ping at a time can supply them.
+///
+/// A ping that fails is counted rather than ignored. The drops are measured as a delta of a
+/// process-global counter, so a Session that died halfway through would otherwise read as "zero drops"
+/// — the same result the fix is meant to produce, indistinguishable from it. The last ping is allowed
+/// to fail because the Session may be torn down as the window closes; more than one means the traffic
+/// driving the test stopped, and the drop count no longer measures anything.
+///
+/// The counter is process-global and every node in the cluster shares it, so the delta covers all of
+/// them. That is sound here because the Exit is the only node that originates *return-routed* packets
+/// in these tests — the Entry's own traffic is forward-routed — and each test builds its own cluster.
 async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> anyhow::Result<usize> {
     let started = tokio::time::Instant::now();
     let before = routing_resolution_surb_timeout_count();
     let mut buf = [0u8; 4];
+    let mut failed_pings = 0usize;
+    let mut pings = 0usize;
     while started.elapsed() < total {
-        let _ = tokio::time::timeout(PING * 3, async {
+        let ping = tokio::time::timeout(PING * 3, async {
             session.write_all(b"ping").await?;
             session.flush().await?;
             session.read_exact(&mut buf).await
         })
         .await;
+        pings += 1;
+        if !matches!(ping, Ok(Ok(()))) {
+            failed_pings += 1;
+        }
         tokio::time::sleep(PING).await;
     }
+
+    anyhow::ensure!(
+        failed_pings <= 1,
+        "{failed_pings} of {pings} pings failed, so the Session stopped carrying traffic and its drop count measures \
+         nothing"
+    );
     Ok(routing_resolution_surb_timeout_count() - before)
 }
 
-/// The bug: a `NoRateControl` Session whose Entry runs no balancer must not be kept alive by the Exit.
+/// The bug: a `NoRateControl` Session whose Entry runs no balancer must not drop packets for want of a
+/// SURB.
 ///
 /// Before the fix this dropped a packet every period — measured at 19–20 drops in this window, at
 /// exactly the period's cadence, with the Exit's own `announced_surb_target=… effective=…` derivation
@@ -126,7 +159,7 @@ async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> 
 #[serial]
 #[test_log::test]
 #[cfg(feature = "session-client")]
-async fn a_balanced_less_entry_keeps_the_exit_alive_without_spending_surbs() -> anyhow::Result<()> {
+async fn a_no_rate_control_entry_without_a_balancer_triggers_no_surb_drops() -> anyhow::Result<()> {
     let cluster = live_cluster(Some(NOTIFY_PERIOD));
     let ip = IpOrHost::from_str(":0")?;
     let (mut session, _cfg) = cluster[0]
@@ -177,12 +210,13 @@ async fn an_idle_no_rate_control_session_originates_nothing_it_cannot_pay_for() 
     Ok(())
 }
 
-/// The other half of the rule: disabling the notification entirely must not be what fixes this, since
-/// a Session whose balancer *is* enabled still needs its level corrected.
+/// A `NoRateControl` Entry that *does* balance must not starve either.
 ///
-/// Asserting on behaviour rather than on the config keeps the two apart: this Session's Exit keeps the
-/// configured period, so the stream is live, and the only reason it is unobservable here is that a
-/// balanced Entry answers it with a SURB every period instead of starving.
+/// The Exit keeps its configured period on this Session, so the reports are still sent; the Entry's
+/// balancer answers each with a SURB, which is why nothing is dropped. That the reports are actually
+/// delivered is asserted at unit level instead
+/// (`a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports`) — a cluster test
+/// cannot see them, since a zero drop count holds whether or not any report arrived.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[test_log::test]
@@ -212,15 +246,17 @@ async fn a_balanced_entry_is_not_starved_by_the_exits_reports() -> anyhow::Resul
 }
 
 /// The notification must still be produced where it is consumed: a Session whose balancer is enabled
-/// gets its report at the configured period.
+/// keeps receiving its report at the configured period.
 ///
-/// This is the guard against "fix it by disabling the feature". A `NoRateControl` Entry that *does*
-/// run a balancer is the case the report serves, and it must keep receiving them.
+/// That is asserted by the unit test `a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports`,
+/// which can observe the originated reports directly. A cluster test cannot: the Entry exposes no
+/// counter for reports received, so the best it can do is a zero drop count, which holds whether or
+/// not a single report arrived.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[test_log::test]
 #[cfg(feature = "session-client")]
-async fn a_balanced_session_still_receives_the_exits_level_reports() -> anyhow::Result<()> {
+async fn a_balanced_session_keeps_its_period_and_affords_the_reports() -> anyhow::Result<()> {
     let cluster = live_cluster(Some(NOTIFY_PERIOD));
     let ip = IpOrHost::from_str(":0")?;
     let (mut session, _cfg) = cluster[0]
@@ -234,16 +270,17 @@ async fn a_balanced_session_still_receives_the_exits_level_reports() -> anyhow::
         .context("the NoRateControl session must establish")?;
 
     let drops = drive_session(&mut session, OBSERVE).await?;
-    assert_eq!(0, drops, "the report stream must be affordable for a balanced Entry");
+    assert_eq!(
+        0, drops,
+        "a balanced Entry answers each report with a SURB, so the Exit's stream must stay affordable"
+    );
 
-    // The Exit's reports are what the Entry's balancer reads, so a Session that ran for the whole
-    // window must have consumed far more return packets than its own pings account for.
-    let elapsed_secs = OBSERVE.as_secs_f64();
-    let keep_alives = (elapsed_secs / NOTIFY_PERIOD.as_secs_f64()).ceil() as usize;
-    tracing::info!(keep_alives, "reports expected at this period");
+    // Window sanity check only: no report is observed here, so this just asserts the window is long
+    // enough for the notification period to matter.
+    let reports_in_window = (OBSERVE.as_secs_f64() / NOTIFY_PERIOD.as_secs_f64()).ceil() as usize;
     assert!(
-        keep_alives > 5,
-        "the window must be long enough for the period to matter ({keep_alives} reports in {OBSERVE:?})"
+        reports_in_window > 5,
+        "{OBSERVE:?} is too short to exercise a {NOTIFY_PERIOD:?} period ({reports_in_window} reports)"
     );
     Ok(())
 }

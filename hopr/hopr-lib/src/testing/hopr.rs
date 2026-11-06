@@ -54,10 +54,11 @@ pub fn create_hopr_instance_config(
             },
             session: SessionGlobalConfig {
                 idle_timeout: Duration::from_millis(idle_timeout_ms),
-                // Disable EXIT→ENTRY SURB level notifications in test clusters by default.
-                // With a notify period shorter than idle_timeout, each notification resets the
-                // moka TTI and prevents session expiration tests from working correctly. Tests
-                // that need the Exit's keep-alive stream opt back in through `TestNodeConfig`.
+                // Forwarded unchanged from the caller; `TestNodeConfig::default` is what supplies
+                // the `None` that disables EXIT→ENTRY SURB level notifications. With a period
+                // shorter than `idle_timeout`, each notification resets the moka TTI and breaks
+                // session expiration tests, so a test that wants the Exit's keep-alive stream has
+                // to set a period explicitly.
                 surb_balance_notify_period,
                 ..Default::default()
             },

@@ -6733,7 +6733,7 @@ where
         //
         // A zero is meaningful rather than missing: it is what a `NoRateControl` Entry that runs no
         // balancer announces, and it is the Exit's signal that a SURB-level report would have no
-        // reader. `announced_surb_target` is filled with the customary fallback either way, because
+        // reader. On the no-target path `announced_surb_target` takes the customary fallback, because
         // the Exit's fill reserve is derived from it and that derivation has to work on a Session
         // whose Entry balances nothing.
         let (surb_target_announced, announced_surb_target) = {
