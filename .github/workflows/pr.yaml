@@ -239,3 +239,38 @@ jobs:
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             nix build -L .#docs
+
+  # Single aggregate merge gate: green only if every other job in this run
+  # succeeded. Mark THIS one as the required check in the branch ruleset, so
+  # adding, renaming, or removing a job never needs a ruleset change
+  # (hoprnet/hopr-devops#372). `if: always()` runs it even when a dependency
+  # fails; alls-green then reds the gate on any non-success (a failed job, or
+  # a skip that is not allowed).
+  merge-gate:
+    name: Merge gate
+    if: always()
+    needs:
+      - validate-pr-title
+      - label
+      - changes
+      - check-allowed-dependencies
+      - checks
+      - tests
+      - benchmarks
+      - build-library
+      - docs
+    runs-on: depot-ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Require all jobs to pass
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}
+          # validate-pr-title and label run on pull_request only; benchmarks
+          # also skips for fork PRs. `tests`, `build-library` and `docs` are
+          # gated on `changes.outputs.code`; when every inner job of a
+          # reusable workflow skips, the caller job reports skipped as well.
+          # So their skip is allowed only for a docs-only change; a code
+          # change still has to run all three. A failed stage also skips the
+          # later stages, but the failed job itself reds the gate.
+          allowed-skips: ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label, benchmarks, tests, build-library, docs' }}
