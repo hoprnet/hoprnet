@@ -306,8 +306,10 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 ///
 /// Only once the Entry has shown that it refills the stock
 /// ([`BalancerStateValues::counterparty_refills`]): that is, a keep-alive from it, which only an
-/// Entry with a SURB balancer sends. An Entry without one still announces a target, so its Session is
-/// rate-controlled too, but it attaches one SURB to each data packet and nothing else. A reply held for
+/// Entry with a SURB balancer sends. An Entry without one can run a rate-controlled Session too: it
+/// announces no target (one that predates this announces the balancer-rate fallback, which the Exit
+/// cannot tell from a real target), attaches one SURB to each data packet and sends no keep-alives.
+/// So the announcement says nothing about a balancer either way. A reply held for
 /// a stock above the reserve would then wait until the Entry sent that many more packets.
 ///
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
@@ -2582,9 +2584,10 @@ pub struct SessionManagerConfig {
     /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
     /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
     /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
-    /// Session that announces no target at establishment, as an Entry without a SURB balancer does,
-    /// gets the full ring from the start, so turning this off costs it nothing. The Exit's SURB-level
-    /// reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
+    /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
+    /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
+    /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
+    /// keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(true)]
@@ -6859,8 +6862,9 @@ where
                     // to the reserve for the keep-alives, but only after the Entry's first keep-alive has
                     // shown that a balancer on its side acts on what the Exit reports, and only if the
                     // Exit runs a keep-alive stream to hold it for (see `spawn_exit_keep_alive` below). An
-                    // Entry without a balancer announces a target too, and the `NoRateControl` branch
-                    // below has none.
+                    // Entry without a balancer runs this branch too, and what it announces says nothing
+                    // either way: it announces no target, or the balancer-rate fallback if it predates
+                    // that. The `NoRateControl` branch below has no such reserve.
                     exit_data_egress(
                         msg_sender.clone().sink_map_err(std::io::Error::other),
                         session_id,
@@ -15440,6 +15444,8 @@ mod tests {
                  announced"
             );
         }
+
+        assert!(exit.close_session(&pseudonym));
         Ok(())
     }
 

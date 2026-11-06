@@ -1037,9 +1037,10 @@ pub struct SessionGlobalConfig {
     /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
     /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
     /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
-    /// Session that announces no target at establishment, as an Entry without a SURB balancer does,
-    /// gets the full ring from the start, so turning this off costs it nothing. The Exit's SURB-level
-    /// reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
+    /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
+    /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
+    /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
+    /// keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(default_session_surb_target_notify())]
