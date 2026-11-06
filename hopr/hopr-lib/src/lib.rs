@@ -71,6 +71,11 @@ use hopr_api::{
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
 pub use hopr_transport::SESSION_MTU;
+/// Packet mixing API, re-exported so a consumer takes the mixer through `hopr-lib` alone instead of
+/// pinning `hopr-transport-mixer` as a separate dependency.
+///
+/// Both `hopr_lib::mixer` and `hopr_lib::exports::transport::mixer` name the same items.
+pub use hopr_transport::mixer;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
