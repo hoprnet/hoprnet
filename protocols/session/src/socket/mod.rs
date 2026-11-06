@@ -249,11 +249,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         })
                     }
                     Err(error) => {
-                        match error {
-                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
-                                tracing::error!(%error, "invalid session header; terminating session reader");
-                            }
-                            _ => tracing::error!(%error, "unparseable packet"),
+                        if error.is_fatal_header() {
+                            tracing::error!(%error, "invalid session header; terminating session reader");
+                        } else {
+                            tracing::error!(%error, "unparseable packet");
                         }
                         #[cfg(feature = "telemetry")]
                         s1.error();
@@ -464,11 +463,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         })
                     }
                     Err(error) => {
-                        match error {
-                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
-                                tracing::error!(%error, "invalid session header; terminating session reader");
-                            }
-                            _ => tracing::error!(%error, "unparseable packet"),
+                        if error.is_fatal_header() {
+                            tracing::error!(%error, "invalid session header; terminating session reader");
+                        } else {
+                            tracing::error!(%error, "unparseable packet");
                         }
                         #[cfg(feature = "telemetry")]
                         s1.error();
