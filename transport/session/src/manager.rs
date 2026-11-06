@@ -3943,20 +3943,31 @@ where
 
         let mut additional_data = 0_u64;
 
-        // SURB balancer target announcement is encoded in the lower 32-bits of the options word
+        // SURB balancer target announcement is encoded in the lower 32-bits of the options word.
+        //
+        // A `NoRateControl` Session announces here only when it runs a balancer of its own. It used to
+        // announce nothing at all, which left the Exit no way to tell "this Entry balances SURBs" from
+        // "this Entry does not", and it needs to: its SURB-level notifications are the input to that
+        // balancer, and sending them to an Entry without one spends a SURB per period for a report
+        // nothing reads (gnosis_vpn#748). A zero thus means "wants no reports", which is also what the
+        // disabled default of `SurbBalancerConfig` reports.
+        let announced_target = cfg
+            .surb_management
+            .map(|c| c.target_surb_buffer_size)
+            .unwrap_or(
+                self.cfg.initial_return_session_egress_rate as u64
+                    * self
+                        .cfg
+                        .minimum_surb_buffer_duration
+                        .max(MIN_SURB_BUFFER_DURATION)
+                        .as_secs(),
+            )
+            .min(u32::MAX as u64);
         if !cfg.capabilities.contains(Capability::NoRateControl) {
-            additional_data |= cfg
-                .surb_management
-                .map(|c| c.target_surb_buffer_size)
-                .unwrap_or(
-                    self.cfg.initial_return_session_egress_rate as u64
-                        * self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs(),
-                )
-                .min(u32::MAX as u64);
+            additional_data |= announced_target;
+        } else if cfg.surb_management.is_some() {
+            // A balancing `NoRateControl` Entry names its target so the Exit keeps reporting to it.
+            additional_data |= announced_target;
         }
 
         // PIX quota parameter announcement is encoded in the upper 32-bits of the options word.
@@ -4925,9 +4936,13 @@ where
     /// sent for different reasons, so they share one stream and one rate controller. See
     /// [`PixFillControl`].
     ///
+    /// The notification half additionally requires a Session whose SURB balancer is enabled: it
+    /// reports a level the Entry's balancer acts on, so on the `NoRateControl` branch — where neither
+    /// side runs one — it is a SURB spent to say nothing. See the filter below.
+    ///
     /// Returns without spawning anything when neither producer applies, which is an Exit Session that
-    /// is not PIX on a node that has switched the notification off. Such a Session originates nothing,
-    /// which is what it did before this existed.
+    /// is not PIX, has no balancer, and is on a node that has switched the notification off. Such a
+    /// Session originates nothing, which is what it did before this existed.
     ///
     /// Deliberately not passed through the PIX egress gate. These packets carry no payload; gating
     /// them would let an exhausted predeposit budget silence the very signal the Entry needs in order
@@ -4947,8 +4962,17 @@ where
         msg_sender: S,
         is_pix: bool,
         announced_surb_target: u64,
+        entry_balances_surbs: bool,
     ) {
-        let notify_period = self.cfg.surb_balance_notify_period;
+        // The level report exists to correct the Entry's SURB balancer, so it is worth a SURB only
+        // when the Entry says it has one. A `NoRateControl` Entry without a balancer announces no
+        // target, and is exactly the case that starves: nothing on its side replenishes the buffer
+        // beyond its own outgoing packets, so a report every period drains it, and once it is empty
+        // each further report waits out `surb_resolution_wait` and is dropped — and a report already
+        // queued takes the SURB a client request needed (gnosis_vpn#748).
+        //
+        // PIX fill is unaffected: `is_pix` below keeps the stream alive for it regardless.
+        let notify_period = self.cfg.surb_balance_notify_period.filter(|_| entry_balances_surbs);
         if notify_period.is_none() && !is_pix {
             return;
         }
@@ -6390,21 +6414,26 @@ where
         // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
         // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
-        // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
-        // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
-        // figure, and on that branch the fallback below — the same one the balancer would have used —
-        // is the only estimate of the buffer there is.
-        let announced_surb_target = {
+        // A zero is meaningful rather than missing: it is what a `NoRateControl` Entry that runs no
+        // balancer announces, and it is the Exit's signal that a SURB-level report would have no
+        // reader. `announced_surb_target` is filled with the customary fallback either way, because
+        // the Exit's fill reserve is derived from it and that derivation has to work on a Session
+        // whose Entry balances nothing.
+        let (surb_target_announced, announced_surb_target) = {
             let surb_target = initiation_options(session_req.additional_data) as u32;
             if surb_target > 0 {
-                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+                let target = (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64);
+                (target > 0, target)
             } else {
-                self.cfg.initial_return_session_egress_rate as u64
-                    * self
-                        .cfg
-                        .minimum_surb_buffer_duration
-                        .max(MIN_SURB_BUFFER_DURATION)
-                        .as_secs()
+                (
+                    false,
+                    self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs(),
+                )
             }
         };
 
@@ -6499,6 +6528,9 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
+                // The rate-controlled branch always announces a target, so its report has always had
+                // a reader on the Entry side.
+                true,
             );
 
             session
@@ -6546,6 +6578,7 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
+                surb_target_announced,
             );
 
             session
@@ -8931,6 +8964,91 @@ mod tests {
         );
 
         Ok((mgr, msg_rx, new_session_rx, pseudonym))
+    }
+
+    /// A non-PIX `NoRateControl` Exit Session, with the Entry's announcement under the caller's control.
+    ///
+    /// `announced_target` is what the Entry puts in `StartInitiation::additional_data`: zero is a
+    /// `NoRateControl` Entry that runs no balancer, non-zero is one that announced a buffer target.
+    async fn no_rate_control_exit_session(
+        notify_period: Option<Duration>,
+        announced_target: u64,
+    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_balance_notify_period: notify_period,
+            ..Default::default()
+        });
+        let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::NoRateControl.into()),
+                additional_data: into_initiation_additional_data(announced_target),
+            },
+        )
+        .await?;
+
+        Ok((mgr, msg_rx, pseudonym))
+    }
+
+    /// A `NoRateControl` Entry with no balancer gets no SURB-level reports: there is no reader, so each
+    /// report is a return-routed packet spending one of the Session's SURBs to say nothing.
+    ///
+    /// This is gnosis_vpn#748. Against the unfixed code the same Session emitted one report per
+    /// period, which is what drained the Exit's buffer and then lost the client's own requests.
+    #[test_log::test(tokio::test)]
+    async fn a_no_rate_control_session_without_a_balancer_gets_no_level_reports() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = no_rate_control_exit_session(Some(KEEP_ALIVE_PERIOD), 0).await?;
+
+        let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 3).await;
+        let reports = observed
+            .iter()
+            .filter(|(routing, data)| {
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+            })
+            .count();
+        assert_eq!(
+            0, reports,
+            "a NoRateControl Session that announced no buffer target has no balancer for a report to correct, yet the \
+             Exit originated {reports} of them"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
+    /// The other side of the same rule: a `NoRateControl` Entry that *does* announce a target has a
+    /// balancer, and must keep receiving the reports that correct it.
+    ///
+    /// Without this, the fix would be indistinguishable from switching the notification off.
+    #[test_log::test(tokio::test)]
+    async fn a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports() -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = no_rate_control_exit_session(Some(KEEP_ALIVE_PERIOD), 64).await?;
+
+        let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 3).await;
+        let reports = observed
+            .iter()
+            .filter(|(routing, data)| {
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+            })
+            .count();
+        assert!(
+            reports > 0,
+            "a NoRateControl Session whose Entry announced a buffer target runs a balancer, so the Exit must keep \
+             reporting to it; none arrived over {:?}",
+            KEEP_ALIVE_PERIOD * 3
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
     }
 
     /// Asserts `mgr` originates nothing further for `pseudonym`.
