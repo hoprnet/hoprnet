@@ -1442,8 +1442,9 @@ fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: Appli
 /// One stream, two producers with different jobs, and this is what reconciles them:
 ///
 /// * the **SURB-level notification**, sent every `surb_balance_notify_period`, which tells the Entry's balancer how
-///   many SURBs the Exit believes it holds. It is the signal that asks for more, so it must go out even when there are
-///   none left;
+///   many SURBs the Exit believes it holds. It is the signal that asks for more, so it is exempt from the SURB reserve;
+///   but it is a return packet like any other, so it goes out only to an Entry that has shown it refills, and only
+///   while the Exit's estimate shows a SURB to send it on (see [`admit`](Self::admit));
 /// * **PIX fill**, whose rate the supervisor plans once a second so that a funded cycle completes inside its own
 ///   deadline even if the application never sends a byte.
 ///
@@ -1469,6 +1470,10 @@ pub(crate) struct PixFillControl {
     min_surb_reserve: u64,
     /// The Session's SURB flow estimate, which is what the reserve is measured against.
     estimator: AtomicSurbFlowEstimator,
+    /// The Session's balancer state, read for whether the Entry has shown that it refills this side's
+    /// SURBs ([`counterparty_refills`](BalancerStateValues::counterparty_refills)): the evidence that a
+    /// SURB-level notification has a reader.
+    surb_mgmt: Arc<BalancerStateValues>,
     state: parking_lot::Mutex<PixFillState>,
 }
 
@@ -1503,6 +1508,7 @@ impl PixFillControl {
         notify_period: Option<Duration>,
         min_surb_reserve: u64,
         estimator: AtomicSurbFlowEstimator,
+        surb_mgmt: Arc<BalancerStateValues>,
     ) -> Self {
         Self {
             session_id,
@@ -1514,6 +1520,7 @@ impl PixFillControl {
             // load-bearing for the tests that construct a control directly.
             min_surb_reserve: min_surb_reserve.max(1),
             estimator,
+            surb_mgmt,
             state: parking_lot::Mutex::new(PixFillState {
                 notify_started: false,
                 fill: FillRate::ZERO,
@@ -1631,8 +1638,23 @@ impl PixFillControl {
 
     /// Decides whether the next keep-alive may go out, and books it if so.
     ///
-    /// The SURB-level notification always may: it is the message that asks the Entry for more SURBs,
-    /// so refusing it when SURBs are scarce is refusing to ask for the thing that is scarce.
+    /// The SURB-level notification is exempt from the SURB reserve: it is the message that asks the Entry
+    /// for more SURBs, so holding it to the reserve would be refusing to ask for the thing that is
+    /// scarce. It still needs two things, because it is a return packet like any other.
+    ///
+    /// * **A reader.** The Entry must have shown that it refills this side's SURBs
+    ///   ([`counterparty_refills`](BalancerStateValues::counterparty_refills)), which is any keep-alive from it,
+    ///   flagged or not: only an Entry with a SURB balancer sends one. An Entry without a balancer attaches a SURB to
+    ///   each data packet and acts on no report, so every report to it spends a SURB to say nothing. This is decided
+    ///   from what this side has seen and not from the target the Entry announced, because that is a figure the peer
+    ///   picks, and a report sent on the strength of it can find no SURB.
+    /// * **A SURB to send it on.** The estimate must be above zero. With none, the report would not go: the routing
+    ///   resolver holds a return packet that finds no SURB for the whole of `surb_resolution_wait` and holds every
+    ///   packet this node originates with it (gnosis_vpn#748).
+    ///
+    /// A notification that is due and withheld on either count keeps its slot: it is tried again on the next
+    /// packet, and goes out the moment both hold. It is also not mistaken for fill. While the PIX supervisor runs a
+    /// fill, the packet is fill and meets the reserve like any other; while none runs, it is dropped.
     ///
     /// Fill above that rate is refused while the estimate is below the reserve, and that refusal is
     /// not an optimisation. A return packet that finds no SURB is not dropped — the routing resolver
@@ -1679,8 +1701,17 @@ impl PixFillControl {
             });
 
         if notification_due {
-            state.last_notify_at = Some(now);
-            return true;
+            if self.surb_mgmt.counterparty_refills() && self.estimator.saturating_diff() > 0 {
+                state.last_notify_at = Some(now);
+                return true;
+            }
+
+            // Withheld. With no fill running, the slot is not fill either: letting it fall through to the reserve
+            // check would send a report every period, labelled as fill, from any Session that is above the reserve
+            // and has no Entry reading it.
+            if state.fill.is_zero() {
+                return false;
+            }
         }
 
         if self.estimator.saturating_diff() >= self.min_surb_reserve {
@@ -2516,6 +2547,13 @@ pub struct SessionManagerConfig {
     ///
     /// Keep in mind that each notification also costs 1 SURB, so the notification period should
     /// not be too frequent.
+    ///
+    /// The Exit sends it only to an Entry that has shown it runs a SURB balancer, by having sent a
+    /// keep-alive (whether or not that keep-alive announces a target), and only while the Exit's own
+    /// estimate shows a SURB to send it on. An Entry without a balancer attaches a SURB to each data
+    /// packet and reads no report. The notification carries the Exit balancer's level on a
+    /// rate-controlled Session, and the Exit's own count of its SURBs on a `NoRateControl` one, which
+    /// runs no balancer.
     ///
     /// Default is None (no notification sent to the client), minimum is 1 second.
     #[default(None)]
@@ -4237,31 +4275,20 @@ where
 
         let mut additional_data = 0_u64;
 
-        // SURB balancer target announcement is encoded in the lower 32-bits of the options word.
-        //
-        // A `NoRateControl` Session announces here only when it runs a balancer of its own. It used to
-        // announce nothing at all, which left the Exit no way to tell "this Entry balances SURBs" from
-        // "this Entry does not", and it needs to: its SURB-level notifications are the input to that
-        // balancer, and sending them to an Entry without one spends a SURB per period for a report
-        // nothing reads (gnosis_vpn#748). A zero thus means "wants no reports", which is also what the
-        // disabled default of `SurbBalancerConfig` reports.
-        let announced_target = cfg
-            .surb_management
-            .map(|c| c.target_surb_buffer_size)
-            .unwrap_or(
-                self.cfg.initial_return_session_egress_rate as u64
-                    * self
-                        .cfg
-                        .minimum_surb_buffer_duration
-                        .max(MIN_SURB_BUFFER_DURATION)
-                        .as_secs(),
-            )
-            .min(u32::MAX as u64);
+        // SURB balancer target announcement is encoded in the lower 32-bits of the options word
         if !cfg.capabilities.contains(Capability::NoRateControl) {
-            additional_data |= announced_target;
-        } else if cfg.surb_management.is_some() {
-            // A balancing `NoRateControl` Entry names its target so the Exit keeps reporting to it.
-            additional_data |= announced_target;
+            additional_data |= cfg
+                .surb_management
+                .map(|c| c.target_surb_buffer_size)
+                .unwrap_or(
+                    self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs(),
+                )
+                .min(u32::MAX as u64);
         }
 
         // PIX quota parameter announcement is encoded in the upper 32-bits of the options word.
@@ -5249,13 +5276,16 @@ where
     /// sent for different reasons, so they share one stream and one rate controller. See
     /// [`PixFillControl`].
     ///
-    /// The notification half additionally requires a Session whose SURB balancer is enabled: it
-    /// reports a level the Entry's balancer acts on, so on the `NoRateControl` branch — where neither
-    /// side runs one — it is a SURB spent to say nothing. See the filter below.
-    ///
     /// Returns without spawning anything when neither producer applies, which is an Exit Session that
-    /// is not PIX, has no balancer, and is on a node that has switched the notification off. Such a
-    /// Session originates nothing, which is what it did before this existed.
+    /// is not PIX on a node that has switched the notification off. Such a Session originates nothing,
+    /// which is what it did before this existed.
+    ///
+    /// The notification is not sent to just any Entry. A report spends one of the Session's SURBs, and
+    /// an Entry with no SURB balancer reads nothing: it attaches a SURB to each data packet and sends
+    /// no keep-alives. [`PixFillControl::admit`] therefore lets a report out only once the Entry has
+    /// shown that it refills (by a keep-alive, flagged or not) and the Exit's own estimate shows a SURB
+    /// to spend on it. That is decided per packet rather than here, once, because the evidence arrives
+    /// after the Session is established.
     ///
     /// Deliberately not passed through the PIX egress gate. These packets carry no payload; gating
     /// them would let an exhausted predeposit budget silence the very signal the Entry needs in order
@@ -5275,17 +5305,8 @@ where
         msg_sender: S,
         is_pix: bool,
         announced_surb_target: u64,
-        entry_balances_surbs: bool,
     ) {
-        // The level report exists to correct the Entry's SURB balancer, so it is worth a SURB only
-        // when the Entry says it has one. A `NoRateControl` Entry without a balancer announces no
-        // target, and is exactly the case that starves: nothing on its side replenishes the buffer
-        // beyond its own outgoing packets, so a report every period drains it, and once it is empty
-        // each further report waits out `surb_resolution_wait` and is dropped — and a report already
-        // queued takes the SURB a client request needed (gnosis_vpn#748).
-        //
-        // PIX fill is unaffected: `is_pix` below keeps the stream alive for it regardless.
-        let notify_period = self.cfg.surb_balance_notify_period.filter(|_| entry_balances_surbs);
+        let notify_period = self.cfg.surb_balance_notify_period;
         if notify_period.is_none() && !is_pix {
             return;
         }
@@ -5302,6 +5323,7 @@ where
             notify_period,
             min_surb_reserve,
             slot.surb_estimator.clone(),
+            slot.surb_mgmt.clone(),
         ));
 
         let control_for_admission = control.clone();
@@ -6731,26 +6753,21 @@ where
         // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
         // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
-        // A zero is meaningful rather than missing: it is what a `NoRateControl` Entry that runs no
-        // balancer announces, and it is the Exit's signal that a SURB-level report would have no
-        // reader. On the no-target path `announced_surb_target` takes the customary fallback, because
-        // the Exit's fill reserve is derived from it and that derivation has to work on a Session
-        // whose Entry balances nothing.
-        let (surb_target_announced, announced_surb_target) = {
+        // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
+        // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
+        // figure, and on that branch the fallback below — the same one the balancer would have used —
+        // is the only estimate of the buffer there is.
+        let announced_surb_target = {
             let surb_target = initiation_options(session_req.additional_data) as u32;
             if surb_target > 0 {
-                let target = (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64);
-                (target > 0, target)
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
-                (
-                    false,
-                    self.cfg.initial_return_session_egress_rate as u64
-                        * self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs(),
-                )
+                self.cfg.initial_return_session_egress_rate as u64
+                    * self
+                        .cfg
+                        .minimum_surb_buffer_duration
+                        .max(MIN_SURB_BUFFER_DURATION)
+                        .as_secs()
             }
         };
 
@@ -6849,9 +6866,6 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
-                // The rate-controlled branch always announces a target, so its report has always had
-                // a reader on the Entry side.
-                true,
             );
 
             session
@@ -6899,7 +6913,6 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
-                surb_target_announced,
             );
 
             session
@@ -8203,9 +8216,10 @@ mod tests {
     };
     use hopr_crypto_packet::prelude::{PacketSignal, PacketSignals};
     use hopr_protocol_pix::{SsaGeneratorConfig, SsaIndex, SsaReconstructorConfig};
-    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
+    use hopr_protocol_start::{KeepAliveFlags, StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
+    use rstest::rstest;
     use tokio::time::timeout;
 
     use super::*;
@@ -9392,6 +9406,11 @@ mod tests {
     /// The "observably running" part is load-bearing for every caller: `nothing was originated` is
     /// equally true of a stream that stopped and one that never started, so a test that does not
     /// first establish the stream is alive proves nothing when it later sees silence.
+    ///
+    /// The Exit's level report goes only to an Entry that has shown it refills, and only while the
+    /// Exit holds a SURB to send it on (see [`PixFillControl::admit`]). Nothing here runs an Entry, so
+    /// the fixture stands in for both: the Session is marked as refilled and given a stock of SURBs
+    /// to report from, which is what an Entry's first keep-alive would have done.
     async fn exit_session_originating_keep_alives(
         cfg: SessionManagerConfig,
         admission: Option<Arc<dyn SurbAdmissionControl>>,
@@ -9433,6 +9452,14 @@ mod tests {
         )
         .await?;
 
+        // The reports are one SURB each; this outlasts every test that uses the fixture many times over.
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_mgmt.note_counterparty_refills();
+        slot.surb_estimator
+            .produced
+            .fetch_add(1_000, std::sync::atomic::Ordering::Relaxed);
+        drop(slot);
+
         let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 2 + Duration::from_millis(500)).await;
         let keep_alives = observed
             .iter()
@@ -9451,20 +9478,55 @@ mod tests {
         Ok((mgr, msg_rx, new_session_rx, pseudonym))
     }
 
-    /// A non-PIX `NoRateControl` Exit Session, with the Entry's announcement under the caller's control.
+    /// How long the level reports of an Exit Session are watched: three notification periods, and half a
+    /// second over so that the third report is not decided by a scheduling tick.
+    const REPORT_WINDOW: Duration = Duration::from_millis(3_500);
+
+    /// SURBs the simulated Entry delivers. A keep-alive only carries as many as fit beside it, so the
+    /// number the Exit ends up counting is read back from its estimate rather than assumed.
+    const ENTRY_SURBS: usize = 3;
+
+    /// An Entry as the Exit has come to know it by the time its level reports are watched.
+    #[derive(Clone, Copy, Debug)]
+    enum SimulatedEntry {
+        /// An Entry whose SURB balancer is running: its keep-alives refill the Exit and carry `surbs`
+        /// SURBs. `target_notify` says whether they announce its target (`BalancerTarget`) or not.
+        Balancing { target_notify: bool, surbs: usize },
+        /// An Entry with no SURB balancer: it sends no keep-alive, and its `surbs` SURBs arrived with
+        /// data.
+        WithoutBalancer { surbs: usize },
+    }
+
+    /// What the Exit's level reports are expected to do.
+    #[derive(Clone, Copy, Debug)]
+    enum Expect {
+        /// They flow.
+        Reports,
+        /// They do not, until the Entry turns into a reader (a keep-alive carrying SURBs arrives).
+        /// Silence alone proves nothing: a stream that never ran is as quiet, so the case then shows
+        /// the reports start.
+        SilenceUntilTheEntryReads,
+    }
+
+    /// A non-PIX Exit Session on a manager with the level reports on, with the Entry's announcement
+    /// under the caller's control.
     ///
-    /// `announced_target` is what the Entry puts in `StartInitiation::additional_data`: zero is a
-    /// `NoRateControl` Entry that runs no balancer, non-zero is one that announced a buffer target.
-    async fn no_rate_control_exit_session(
-        notify_period: Option<Duration>,
+    /// `announced_target` is what the Entry puts in `StartInitiation::additional_data`.
+    async fn exit_session_reporting_levels(
+        capabilities: Capabilities,
         announced_target: u64,
-    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        HoprPseudonym,
+    )> {
         let mgr = RecordingManager::new(SessionManagerConfig {
-            surb_balance_notify_period: notify_period,
+            surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
             ..Default::default()
         });
         let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
-        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
         mgr.start(msg_tx, new_session_tx, None, None)?;
 
         let pseudonym = HoprPseudonym::random();
@@ -9473,64 +9535,225 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: HoprSessionCapabilities(Capability::NoRateControl.into()),
+                capabilities: HoprSessionCapabilities(capabilities),
                 additional_data: into_initiation_additional_data(announced_target),
             },
         )
         .await?;
 
-        Ok((mgr, msg_rx, pseudonym))
+        Ok((mgr, msg_rx, new_session_rx, pseudonym))
     }
 
-    /// A `NoRateControl` Entry with no balancer gets no SURB-level reports: there is no reader, so each
-    /// report is a return-routed packet spending one of the Session's SURBs to say nothing.
-    ///
-    /// This is gnosis_vpn#748. Against the unfixed code the same Session emitted one report per
-    /// period, which is what drained the Exit's buffer and then lost the client's own requests.
-    #[test_log::test(tokio::test)]
-    async fn a_no_rate_control_session_without_a_balancer_gets_no_level_reports() -> anyhow::Result<()> {
-        let (mgr, mut msg_rx, pseudonym) = no_rate_control_exit_session(Some(KEEP_ALIVE_PERIOD), 0).await?;
-
-        let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 3).await;
-        let reports = observed
-            .iter()
-            .filter(|(routing, data)| {
-                msg_type(data, StartProtocolDiscriminants::KeepAlive)
-                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
-            })
-            .count();
-        assert_eq!(
-            0, reports,
-            "a NoRateControl Session that announced no buffer target has no balancer for a report to correct, yet the \
-             Exit originated {reports} of them"
-        );
-
-        assert!(mgr.close_session(&pseudonym));
-        Ok(())
+    /// Waits (bounded) until the Exit has handled a keep-alive from the Entry. The manager's Start
+    /// protocol task does that after `dispatch_message` returns.
+    async fn wait_for_counterparty_refills(mgr: &RecordingManager, pseudonym: &HoprPseudonym) -> anyhow::Result<()> {
+        timeout(Duration::from_secs(5), async {
+            loop {
+                if mgr
+                    .sessions
+                    .get(pseudonym)
+                    .is_some_and(|slot| slot.surb_mgmt.counterparty_refills())
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the Exit never handled the Entry's keep-alive")
     }
 
-    /// The other side of the same rule: a `NoRateControl` Entry that *does* announce a target has a
-    /// balancer, and must keep receiving the reports that correct it.
-    ///
-    /// Without this, the fix would be indistinguishable from switching the notification off.
-    #[test_log::test(tokio::test)]
-    async fn a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports() -> anyhow::Result<()> {
-        let (mgr, mut msg_rx, pseudonym) = no_rate_control_exit_session(Some(KEEP_ALIVE_PERIOD), 64).await?;
-
-        let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 3).await;
-        let reports = observed
+    /// The levels carried by the Exit's return-routed keep-alives for `pseudonym` over `window`, in the
+    /// order they were sent.
+    async fn level_reports_during(rx: &mut Originated, pseudonym: HoprPseudonym, window: Duration) -> Vec<u64> {
+        originated_during(rx, window)
+            .await
             .iter()
-            .filter(|(routing, data)| {
-                msg_type(data, StartProtocolDiscriminants::KeepAlive)
-                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+            .filter(|(routing, _)| matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == pseudonym))
+            .filter_map(|(_, data)| {
+                match HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text).ok()? {
+                    StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) => {
+                        Some(ka.additional_data)
+                    }
+                    _ => None,
+                }
             })
-            .count();
-        assert!(
-            reports > 0,
-            "a NoRateControl Session whose Entry announced a buffer target runs a balancer, so the Exit must keep \
-             reporting to it; none arrived over {:?}",
-            KEEP_ALIVE_PERIOD * 3
-        );
+            .collect()
+    }
+
+    /// Makes `entry` known to the Exit Session of `pseudonym`, and returns the SURBs the Exit counts.
+    async fn show_exit_its_entry(
+        mgr: &RecordingManager,
+        pseudonym: HoprPseudonym,
+        entry: SimulatedEntry,
+    ) -> anyhow::Result<u64> {
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        match entry {
+            SimulatedEntry::Balancing { target_notify, surbs } => {
+                let flags: KeepAliveFlags = if target_notify {
+                    KeepAliveFlag::BalancerTarget.into()
+                } else {
+                    None.into()
+                };
+                dispatch_entry_keep_alive(mgr, pseudonym, flags, surbs, 0)?;
+                wait_for_counterparty_refills(mgr, &pseudonym).await?;
+            }
+            SimulatedEntry::WithoutBalancer { surbs } => {
+                // Its SURBs arrive with data, which books them like this and tells the Exit nothing
+                // about a balancer.
+                slot.surb_estimator
+                    .produced
+                    .fetch_add(surbs as u64, std::sync::atomic::Ordering::Relaxed);
+                assert!(
+                    !slot.surb_mgmt.counterparty_refills(),
+                    "fixture: an Entry without a balancer has sent no keep-alive"
+                );
+            }
+        }
+        Ok(slot.surb_estimator.saturating_diff())
+    }
+
+    /// The Exit's SURB-level reports follow what the Exit has seen of its Entry, for every kind of
+    /// Session and every kind of Entry.
+    ///
+    /// A report spends one of the Session's SURBs, so it is sent only to an Entry that has shown it
+    /// refills (any keep-alive from it, whether or not it announces its target) and only while the
+    /// Exit holds a SURB to send it on. What it says depends on whether the Exit runs a balancer: the
+    /// balancer's level on a rate-controlled Session, the Exit's own count of its SURBs on a
+    /// `NoRateControl` one, which has none.
+    ///
+    /// What the Entry announced when the Session was established decides nothing: the target is a
+    /// figure the peer picks, and an Entry that announces one can still run no balancer
+    /// (`d_entry_announcing_without_balancer`), or announce none and run one
+    /// (`c_balancing_entry`, `c_balancing_entry_without_target_notify`).
+    ///
+    /// The cases that expect silence then let the Entry read, and want the reports to start: a stream
+    /// that never ran would be as quiet.
+    #[rstest]
+    #[case::a_balancing_entry(
+        Capabilities::empty(),
+        SimulatedEntry::Balancing { target_notify: true, surbs: ENTRY_SURBS },
+        64,
+        Expect::Reports
+    )]
+    #[case::a_balancing_entry_without_target_notify(
+        Capabilities::empty(),
+        SimulatedEntry::Balancing { target_notify: false, surbs: ENTRY_SURBS },
+        64,
+        Expect::Reports
+    )]
+    #[case::b_entry_without_balancer(
+        Capabilities::empty(),
+        SimulatedEntry::WithoutBalancer { surbs: ENTRY_SURBS },
+        64,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[case::c_balancing_entry(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::Balancing { target_notify: true, surbs: ENTRY_SURBS },
+        0,
+        Expect::Reports
+    )]
+    #[case::c_balancing_entry_without_target_notify(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::Balancing { target_notify: false, surbs: ENTRY_SURBS },
+        0,
+        Expect::Reports
+    )]
+    #[case::c_balancing_entry_announcing(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::Balancing { target_notify: true, surbs: ENTRY_SURBS },
+        64,
+        Expect::Reports
+    )]
+    #[case::d_entry_without_balancer(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::WithoutBalancer { surbs: ENTRY_SURBS },
+        0,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[case::d_entry_announcing_without_balancer(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::WithoutBalancer { surbs: ENTRY_SURBS },
+        64,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[case::a_balancing_entry_empty_store(
+        Capabilities::empty(),
+        SimulatedEntry::Balancing { target_notify: true, surbs: 0 },
+        64,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[case::c_balancing_entry_empty_store(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::Balancing { target_notify: true, surbs: 0 },
+        0,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[test_log::test(tokio::test)]
+    async fn exit_level_reports_follow_the_entry(
+        #[case] capabilities: Capabilities,
+        #[case] entry: SimulatedEntry,
+        #[case] announced: u64,
+        #[case] expect: Expect,
+    ) -> anyhow::Result<()> {
+        let rate_controlled = !capabilities.contains(Capability::NoRateControl);
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) =
+            exit_session_reporting_levels(capabilities, announced).await?;
+        let held = show_exit_its_entry(&mgr, pseudonym, entry).await?;
+
+        let levels = level_reports_during(&mut msg_rx, pseudonym, REPORT_WINDOW).await;
+        match expect {
+            Expect::Reports => {
+                anyhow::ensure!(
+                    held > 0,
+                    "fixture: the Entry must have delivered SURBs for a report to be sent on"
+                );
+                anyhow::ensure!(
+                    !levels.is_empty(),
+                    "{entry:?} holds {held} SURB(s) of the Exit and refills it, yet no level report arrived over \
+                     {REPORT_WINDOW:?}"
+                );
+                if rate_controlled {
+                    // The Exit's balancer is running and the report is its level.
+                    assert!(
+                        levels.iter().all(|level| (1..=held).contains(level)),
+                        "a rate-controlled Session reports its balancer's level, which is within 1..={held}: \
+                         {levels:?}"
+                    );
+                } else {
+                    // No balancer: the report is the Exit's own count, and every report spent one.
+                    assert_eq!(
+                        Some(held),
+                        levels.first().copied(),
+                        "a NoRateControl Session reports the SURBs it holds, not its balancer's unwritten zero: \
+                         {levels:?}"
+                    );
+                    assert!(
+                        levels.windows(2).all(|pair| pair[1] <= pair[0]),
+                        "each report spent a SURB, so the count it carries cannot rise: {levels:?}"
+                    );
+                }
+            }
+            Expect::SilenceUntilTheEntryReads => {
+                assert!(
+                    levels.is_empty(),
+                    "{entry:?} gives the Exit no reason to report, yet it sent {} report(s) {levels:?}",
+                    levels.len()
+                );
+
+                // The Entry becomes a reader: a balancing one's keep-alive, carrying SURBs.
+                dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), ENTRY_SURBS, 0)?;
+                wait_for_counterparty_refills(&mgr, &pseudonym).await?;
+
+                let levels = level_reports_during(&mut msg_rx, pseudonym, REPORT_WINDOW).await;
+                assert!(
+                    !levels.is_empty(),
+                    "the silence was the gate and not a dead stream: once the Entry refills the Exit and delivers \
+                     SURBs, the reports must start, and none arrived over {REPORT_WINDOW:?}"
+                );
+            }
+        }
 
         assert!(mgr.close_session(&pseudonym));
         Ok(())
@@ -9775,19 +9998,34 @@ mod tests {
     // PIX fill — the Exit's own keep-alives
     // ---------------------------------------------------------------
 
-    /// A [`PixFillControl`] over a random pseudonym and an empty SURB estimate.
+    /// A [`PixFillControl`] over a random pseudonym, an empty SURB estimate, and an Entry that has
+    /// shown it refills.
     ///
     /// `reserve` is the *effective* reserve, as [`effective_surb_reserve`] would have derived it —
     /// these tests are about what `admit` does with one, not about where it came from. Against an
     /// estimate that starts empty, any `reserve` above zero refuses fill outright, which is what makes
-    /// admission a usable assertion that a packet was classified as the notification.
+    /// admission a usable assertion that a packet was classified as the notification: a test that
+    /// wants one admitted gives the estimate a SURB, because the notification is not sent on none.
     fn fill_control(notify_period: Option<Duration>, reserve: u64) -> PixFillControl {
+        let surb_mgmt = Arc::new(BalancerStateValues::default());
+        surb_mgmt.note_counterparty_refills();
+        fill_control_for(notify_period, reserve, surb_mgmt)
+    }
+
+    /// [`fill_control`] over a balancer state the caller holds on to, so a test can decide when, if
+    /// ever, the Entry is shown to refill.
+    fn fill_control_for(
+        notify_period: Option<Duration>,
+        reserve: u64,
+        surb_mgmt: Arc<BalancerStateValues>,
+    ) -> PixFillControl {
         PixFillControl::new(
             HoprPseudonym::random(),
             RateController::new(0, Duration::from_secs(1)),
             notify_period,
             reserve,
             Default::default(),
+            surb_mgmt,
         )
     }
 
@@ -9915,30 +10153,42 @@ mod tests {
         assert_eq!(FillRate::ZERO, fill_only.effective_rate());
     }
 
-    /// Fill yields to the Session's own SURB reserve; the SURB-level notification does not.
+    /// Fill yields to the Session's own SURB reserve; the SURB-level notification does not, though it
+    /// still needs a SURB to be sent on.
     ///
     /// The asymmetry is the whole rule. A return packet that finds no SURB is not dropped — the
     /// routing resolver holds it, and every packet this node originates behind it, for the whole of
     /// `surb_resolution_wait`. So an Exit that filled a cycle down to its last SURB would stall the
     /// Session it was filling for, and every other Session on the node with it. The notification is
-    /// exempt because it is the message that *asks* for more SURBs: refusing to send it when SURBs
-    /// are scarce is refusing to ask for the thing that is scarce.
+    /// exempt from the reserve because it is the message that *asks* for more SURBs: refusing to send
+    /// it when SURBs are scarce is refusing to ask for the thing that is scarce. With none at all, it
+    /// is the same packet that finds no SURB, and it is withheld like one.
     #[test]
     fn fill_withholds_below_the_surb_reserve_while_the_level_notification_does_not() {
         const RESERVE: u64 = 100;
         let control = fill_control(Some(Duration::from_secs(3600)), RESERVE);
         control.start_notify();
 
-        // The first packet is the notification, whatever the estimate says.
-        assert!(control.admit(), "the level notification must go out on an empty buffer");
-        // The notification period is an hour, so everything after it is fill — and there is nothing
+        assert!(
+            !control.admit(),
+            "the level notification has no SURB to be sent on, and must not wait out the resolver for one"
+        );
+
+        // One SURB, 99 short of the reserve: enough for the notification, which the reserve does not
+        // bind, and the first packet is it.
+        control
+            .estimator
+            .produced
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        assert!(control.admit(), "the level notification must go out below the reserve");
+        // The notification period is an hour, so everything after it is fill — and there is too little
         // to spend.
         assert!(!control.admit(), "fill must not spend a SURB the Session does not have");
 
         control
             .estimator
             .produced
-            .fetch_add(RESERVE - 1, std::sync::atomic::Ordering::Relaxed);
+            .fetch_add(RESERVE - 2, std::sync::atomic::Ordering::Relaxed);
         assert!(!control.admit(), "one short of the reserve is still short");
 
         control
@@ -9968,7 +10218,13 @@ mod tests {
     #[test]
     fn only_one_caller_can_take_a_session_into_its_drain() {
         let notify = Duration::from_secs(60);
-        let control = fill_control(Some(notify), 1);
+        // A reserve of two over a stock of one, so that fill is refused and a notification, which the
+        // reserve does not bind, would not be: only the drain can be what refuses the last packet.
+        let control = fill_control(Some(notify), 2);
+        control
+            .estimator
+            .produced
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         control.start_notify();
         assert_eq!(FillRate::once_per(notify), control.effective_rate());
 
@@ -10005,9 +10261,9 @@ mod tests {
     /// reserve, drop it. That is the message that *asks* for the SURBs whose absence caused the drop,
     /// and it runs on every Exit Session with a notification period configured, PIX or not.
     ///
-    /// The reserve here is the instrument: the estimator is empty, so a packet the rule classifies as
-    /// fill is refused and a packet it classifies as the notification is admitted. Admission is
-    /// therefore the assertion that it was not counted as fill.
+    /// The reserve here is the instrument: the estimator holds one SURB against a reserve of a hundred,
+    /// so a packet the rule classifies as fill is refused and a packet it classifies as the
+    /// notification is admitted. Admission is therefore the assertion that it was not counted as fill.
     #[test]
     fn a_level_notification_released_a_shade_early_is_still_the_notification() {
         const RESERVE: u64 = 100;
@@ -10015,6 +10271,12 @@ mod tests {
         // bounds are distinguishable.
         let period = Duration::from_secs(2);
         let control = fill_control(Some(period), RESERVE);
+        // One SURB to send the notification on, far short of the reserve: the notification is not sent
+        // on none.
+        control
+            .estimator
+            .produced
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         control.start_notify();
 
         let t0 = Instant::now();
@@ -10050,6 +10312,10 @@ mod tests {
         // A period short enough that `MAX_WAIT_CHUNK` would swallow it keeps half of itself.
         let short = Duration::from_millis(200);
         let control = fill_control(Some(short), RESERVE);
+        control
+            .estimator
+            .produced
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         control.start_notify();
         let t0 = Instant::now();
         assert!(control.admit_at(t0));
@@ -10058,6 +10324,128 @@ mod tests {
             "the slack is capped at half the period, so it cannot widen a short period away to nothing"
         );
         assert!(control.admit_at(t0 + short / 2));
+    }
+
+    /// The level notification goes only to an Entry that has shown it refills.
+    ///
+    /// A report spends one of the Session's own SURBs. An Entry without a SURB balancer acts on no
+    /// report, so every one sent to it spends a SURB to say nothing, and it is the Entry that has least
+    /// to give the Exit back (gnosis_vpn#748). What the Exit has seen of it, and not what it announced,
+    /// is the evidence: the announced target is a figure the peer picks.
+    ///
+    /// The withheld notification keeps its slot, so that it goes out the moment the Entry is heard.
+    #[test]
+    fn a_level_notification_waits_for_an_entry_that_refills() {
+        const RESERVE: u64 = 100;
+        let surb_mgmt = Arc::new(BalancerStateValues::default());
+        let control = fill_control_for(Some(Duration::from_secs(3600)), RESERVE, surb_mgmt.clone());
+        control.start_notify();
+        // SURBs to send it on, short of the reserve: this is not about the SURBs.
+        control
+            .estimator
+            .produced
+            .fetch_add(10, std::sync::atomic::Ordering::Relaxed);
+
+        let now = Instant::now();
+        assert!(
+            !control.admit_at(now),
+            "an Entry that has not been heard to refill has nobody reading the report"
+        );
+        assert!(!control.admit_at(now + Duration::from_millis(1)));
+
+        surb_mgmt.note_counterparty_refills();
+        assert!(
+            control.admit_at(now + Duration::from_millis(2)),
+            "the withheld notification must go out as soon as the Entry is heard, not a period later"
+        );
+        assert!(
+            !control.admit_at(now + Duration::from_millis(3)),
+            "and it was the notification: the packet after it is fill, below the reserve"
+        );
+    }
+
+    /// The level notification is not sent on a SURB the Session does not have.
+    ///
+    /// A return packet that finds none is held by the routing resolver for the whole of
+    /// `surb_resolution_wait`, and every packet this node originates with it. The decision reads the
+    /// estimate, so SURBs that were spent do not count.
+    #[test]
+    fn a_level_notification_waits_for_a_surb_to_send_it_on() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let period = Duration::from_secs(3600);
+        let control = fill_control(Some(period), 100);
+        control.start_notify();
+
+        let now = Instant::now();
+        assert!(
+            !control.admit_at(now),
+            "an empty estimate has no SURB to send the notification on"
+        );
+
+        control.estimator.produced.fetch_add(2, Relaxed);
+        assert!(control.admit_at(now + Duration::from_millis(1)));
+
+        // A period on, the two SURBs have been spent.
+        control.estimator.consumed.fetch_add(2, Relaxed);
+        assert!(
+            !control.admit_at(now + period),
+            "SURBs already spent are not SURBs to send on"
+        );
+
+        control.estimator.produced.fetch_add(1, Relaxed);
+        assert!(
+            control.admit_at(now + period + Duration::from_millis(1)),
+            "the notification keeps its slot until there is a SURB for it"
+        );
+    }
+
+    /// A notification that is due and withheld is not let through as fill.
+    ///
+    /// The packet is the same either way, and a withheld notification would otherwise fall through to
+    /// the reserve check. Above the reserve that check admits, so a Session with no Entry reading its
+    /// reports would send one every period, labelled as fill. While a fill is running, the packet is
+    /// fill and meets the reserve like any other, but it is not counted as the notification.
+    #[test]
+    fn a_withheld_level_notification_is_not_let_through_as_fill() {
+        const RESERVE: u64 = 100;
+        let surb_mgmt = Arc::new(BalancerStateValues::default());
+        let control = fill_control_for(Some(Duration::from_secs(3600)), RESERVE, surb_mgmt.clone());
+        control.start_notify();
+        // Far above the reserve, so a packet classified as fill would be admitted.
+        control
+            .estimator
+            .produced
+            .fetch_add(10 * RESERVE, std::sync::atomic::Ordering::Relaxed);
+
+        let now = Instant::now();
+        for n in 0..3 {
+            assert!(
+                !control.admit_at(now + Duration::from_millis(n)),
+                "with no fill running there is nothing for a withheld notification to be mistaken for"
+            );
+        }
+        assert!(
+            control.state.lock().last_notify_at.is_none(),
+            "a withheld notification has not been sent, and keeps its slot"
+        );
+
+        control.set_fill(FillRate::per_second(10));
+        assert!(
+            control.admit_at(now + Duration::from_millis(3)),
+            "while a fill runs the packet is fill, and the estimate is above the reserve"
+        );
+        assert!(
+            control.state.lock().last_notify_at.is_none(),
+            "fill that took the notification's slot did not send the notification"
+        );
+
+        surb_mgmt.note_counterparty_refills();
+        assert!(control.admit_at(now + Duration::from_millis(4)));
+        assert!(
+            control.state.lock().last_notify_at.is_some(),
+            "once the Entry is heard the notification is sent in its own right"
+        );
     }
 
     /// The reserve is a ceiling on a figure derived from the buffer the *Entry* asked for.
@@ -10368,12 +10756,15 @@ mod tests {
         )
         .await?;
 
-        mgr.sessions
-            .get(&pseudonym)
-            .context("the session slot must exist")?
-            .surb_estimator
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_estimator
             .produced
             .fetch_add(100, std::sync::atomic::Ordering::Relaxed);
+        // An Entry that has been heard, so that the notification is one of the packets that shows the
+        // stream running before the close, as it was before it was held for a reader. It does not
+        // depend on the supervisor's first plan, which fill does.
+        slot.surb_mgmt.note_counterparty_refills();
+        drop(slot);
         anyhow::ensure!(
             keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(1500)).await > 0,
             "the stream must be running before the close for its absence afterwards to mean anything"
@@ -10452,20 +10843,29 @@ mod tests {
         Ok(())
     }
 
-    /// The same Session, with no SURBs to spend, must fall back to its SURB-level notification.
+    /// The same Session, with an Entry that reads its reports but supplies too few SURBs to fill with,
+    /// must fall back to its SURB-level notification. Both kinds of Session do: the Exit's rule is the
+    /// same with a balancer running (`rate_controlled`) and without one (`no_rate_control`).
     ///
-    /// A Session whose Entry has stopped supplying SURBs is the one case where filling harder is
-    /// actively harmful: the packets cannot be routed, and an unroutable origination holds up every
-    /// packet the node sends. What must survive is the notification, because it is the message that
-    /// asks for the SURBs whose absence caused the backoff.
+    /// "No SURBs to spend" means below the reserve, which is the point at which fill stops: a few SURBs
+    /// are still held, which is what the notification is sent on. A Session whose Entry has stopped
+    /// supplying SURBs is the one case where filling harder is actively harmful: the packets cannot be
+    /// routed, and an unroutable origination holds up every packet the node sends. What must survive is
+    /// the notification, because it is the message that asks for the SURBs whose absence caused the
+    /// backoff.
+    #[rstest]
+    #[case::rate_controlled(Capabilities::empty())]
+    #[case::no_rate_control(Capability::NoRateControl.into())]
     #[test_log::test(tokio::test)]
-    async fn fill_backs_off_to_the_notification_when_the_entry_supplies_no_surbs() -> anyhow::Result<()> {
+    async fn fill_backs_off_to_the_notification_when_the_entry_supplies_no_surbs(
+        #[case] capabilities: Capabilities,
+    ) -> anyhow::Result<()> {
         // At `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, so it survives the clamp `SessionManager::new`
         // applies. A shorter value would be raised to this one anyway, and the bound below would then
         // be computed from a period that is not the one in effect.
         let notify = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
         let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
-            Capabilities::empty(),
+            capabilities,
             Some(notify),
             crate::supervision::PixFillConfig {
                 min_surb_reserve: 500,
@@ -10478,6 +10878,25 @@ mod tests {
             Some(notify),
             mgr.cfg.surb_balance_notify_period,
             "the fixture's notification period must be the one the manager actually runs"
+        );
+
+        // A balancing Entry has been heard, and it delivered a few SURBs: more than none, short of the
+        // reserve. The reserve is the effective one, which the Entry's announced buffer lowers.
+        dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), 1, 0)?;
+        wait_for_counterparty_refills(&mgr, &pseudonym).await?;
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_estimator
+            .produced
+            .fetch_add(6, std::sync::atomic::Ordering::Relaxed);
+        let reserve = slot
+            .pix_fill
+            .get()
+            .context("a PIX session has a fill control")?
+            .min_surb_reserve;
+        let held = slot.surb_estimator.saturating_diff();
+        anyhow::ensure!(
+            0 < held && held < reserve,
+            "fixture: the Exit must hold some SURBs, but fewer than its reserve of {reserve}; it holds {held}"
         );
 
         let _ramp = originated_during(&mut msg_rx, Duration::from_millis(1500)).await;
@@ -10498,6 +10917,67 @@ mod tests {
             observed <= notify_only + 1,
             "with no SURBs to spend the Exit originated {observed} keep-alive(s) over {window:?}, against the \
              {notify_only} its notification alone accounts for at one every {promote_every:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
+    /// An Exit that has not been heard to read its reports originates nothing while it is below its
+    /// SURB reserve, not even the notification.
+    ///
+    /// The other half of the rule above. With no balancer on the Entry's side the notification has no
+    /// reader, and fill, which the reserve holds back, is the only thing the Session is entitled to
+    /// send. Both kinds of Session behave alike. Silence alone proves nothing, so the stock is then
+    /// raised above the reserve and fill must flow: the stream was gated, not dead.
+    #[rstest]
+    #[case::rate_controlled(Capabilities::empty())]
+    #[case::no_rate_control(Capability::NoRateControl.into())]
+    #[test_log::test(tokio::test)]
+    async fn a_pix_session_without_a_reader_below_its_reserve_originates_nothing(
+        #[case] capabilities: Capabilities,
+    ) -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            capabilities,
+            Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 500,
+                ..Default::default()
+            },
+            None,
+        )
+        .await?;
+
+        // Its SURBs arrived with data, and it has sent no keep-alive: no balancer to read a report.
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_estimator
+            .produced
+            .fetch_add(6, std::sync::atomic::Ordering::Relaxed);
+        let reserve = slot
+            .pix_fill
+            .get()
+            .context("a PIX session has a fill control")?
+            .min_surb_reserve;
+        anyhow::ensure!(
+            6 < reserve && !slot.surb_mgmt.counterparty_refills(),
+            "fixture: below the reserve of {reserve}, with an Entry that has not been heard"
+        );
+
+        // Long enough for the supervisor's first plan and for several periods of the notification.
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(3_500)).await;
+        assert_eq!(
+            0, observed,
+            "with nobody reading the reports and too few SURBs to fill with, the Exit originated {observed} \
+             keep-alive(s)"
+        );
+
+        slot.surb_estimator
+            .produced
+            .fetch_add(100_000, std::sync::atomic::Ordering::Relaxed);
+        let observed = keep_alives_during(&mut msg_rx, pseudonym, Duration::from_millis(2_000)).await;
+        assert!(
+            observed > 0,
+            "the silence was the SURB reserve and not a dead stream: above it, fill must flow"
         );
 
         assert!(mgr.close_session(&pseudonym));
@@ -14257,16 +14737,22 @@ mod tests {
     }
 
     /// Dispatches a keep-alive from the Entry whose packet stored `saved` SURBs and lost `evicted`. The
-    /// manager's Start protocol task books it asynchronously.
+    /// SURBs are booked as it is dispatched; the rest of the keep-alive (that the Entry refills, and
+    /// any target it announces) is handled asynchronously by the manager's Start protocol task.
+    ///
+    /// `flags` is what the Entry's balancer says: [`KeepAliveFlag::BalancerTarget`] is one that
+    /// announces its target, and no flags one that has `surb_target_notify` off. It announces a target
+    /// of zero either way, which changes nothing on the Exit.
     fn dispatch_entry_keep_alive(
         mgr: &SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
         pseudonym: HoprPseudonym,
+        flags: KeepAliveFlags,
         saved: usize,
         evicted: usize,
     ) -> anyhow::Result<()> {
         let keep_alive = KeepAliveMessage::<SessionId> {
             session_id: pseudonym,
-            flags: KeepAliveFlag::BalancerTarget.into(),
+            flags,
             additional_data: 0,
         };
         mgr.dispatch_message(
@@ -14302,7 +14788,7 @@ mod tests {
         let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
 
         // The first batch of a newer generation: it wipes a stock of 7000 and stores its own two SURBs.
-        dispatch_entry_keep_alive(&mgr, pseudonym, 2, 7_000)?;
+        dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), 2, 7_000)?;
 
         tokio::time::timeout(Duration::from_secs(1), async {
             while estimator.produced.load(Relaxed) == 0 {
@@ -14331,7 +14817,7 @@ mod tests {
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
         let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
 
-        dispatch_entry_keep_alive(&mgr, pseudonym, 2, 0)?;
+        dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), 2, 0)?;
 
         tokio::time::timeout(Duration::from_secs(1), async {
             while estimator.produced.load(Relaxed) == 0 {
