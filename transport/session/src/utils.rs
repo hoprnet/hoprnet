@@ -25,7 +25,7 @@ use tracing::{Instrument, debug, instrument, warn};
 
 use crate::{
     AtomicSurbFlowEstimator, SessionId,
-    balancer::{BalancerStateValues, RateController, RateLimitStreamExt},
+    balancer::{BalancerStateValues, RateController, RateLimitStreamExt, SurbFlowEstimator},
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
@@ -343,14 +343,24 @@ where
                     flags: KeepAliveFlag::BalancerTarget.into(),
                     additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
                 }),
-                // Report the level this side acts on: the balancer's accumulator, fed by
-                // `produced - consumed - evicted` and clamped to the store capacity on every update,
-                // read at the moment the keep-alive goes out. The estimator stays in the enum for the
-                // callers.
-                SurbNotificationMode::Level(_estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                // Report the level this side holds, read at the moment the keep-alive goes out.
+                //
+                // With a balancer running, that is its accumulator, fed by
+                // `produced - consumed - evicted` and clamped to the store capacity on every update.
+                // `cfg.buffer_level()` is written by that balancer and by nothing else, so without one
+                // (a `NoRateControl` Session, whose `cfg` is never given a target) it stays at its
+                // initial zero, and a report read from it would say the buffer is empty however many
+                // SURBs the Exit holds. The estimator is the same count the balancer's accumulator
+                // is built from, so it is the figure to report there. It already subtracts evicted
+                // SURBs and counts a wiped generation as gone, so it needs no clamp of its own.
+                SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                     session_id,
                     flags: KeepAliveFlag::BalancerState.into(),
-                    additional_data: cfg.buffer_level(),
+                    additional_data: if cfg.is_disabled() {
+                        estimator.saturating_diff()
+                    } else {
+                        cfg.buffer_level()
+                    },
                 }),
                 SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                     session_id,
@@ -879,6 +889,52 @@ mod tests {
                 assert_eq!(
                     7_000, ka.additional_data,
                     "the level at send time, not the one from a period earlier"
+                );
+            }
+            other => anyhow::bail!("not a keep-alive: {other:?}"),
+        }
+        Ok(())
+    }
+
+    /// With no balancer running, the report carries the Exit's own count of what it holds.
+    ///
+    /// `BalancerStateValues::buffer_level` is written by the balancer and by nothing else, so on a
+    /// `NoRateControl` Session, whose state is never given a target, it stays at zero. A report read
+    /// from it would say "empty" whatever the Exit holds; the estimate is the figure there is.
+    #[tokio::test]
+    async fn a_keep_alive_without_a_balancer_should_report_the_estimated_level() -> anyhow::Result<()> {
+        let (tx, mut sent) = futures::channel::mpsc::unbounded();
+        let controller = RateController::new(2, Duration::from_secs(1));
+        let pseudonym = HoprPseudonym::random();
+        let state = Arc::new(BalancerStateValues::default());
+        assert!(state.is_disabled(), "precondition: no balancer is running");
+        assert_eq!(0, state.buffer_level(), "precondition: nothing wrote a level");
+
+        let estimator = crate::balancer::AtomicSurbFlowEstimator::default();
+        estimator.produced.store(50, Ordering::Relaxed);
+        estimator.consumed.store(8, Ordering::Relaxed);
+        let abort = spawn_keep_alive_stream(
+            pseudonym,
+            tx,
+            DestinationRouting::Return(pseudonym.into()),
+            SurbNotificationMode::Level(estimator),
+            state,
+            &controller,
+            || true,
+        );
+
+        let (_, data) = tokio::time::timeout(Duration::from_secs(5), sent.next())
+            .await
+            .map_err(|_| anyhow!("the first keep-alive never arrived"))?
+            .ok_or_else(|| anyhow!("the stream ended"))?;
+        abort.abort();
+        let msg = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)?;
+        match msg {
+            HoprStartProtocol::KeepAlive(ka) => {
+                assert!(ka.flags.contains(KeepAliveFlag::BalancerState));
+                assert_eq!(
+                    42, ka.additional_data,
+                    "the 50 SURBs produced less the 8 consumed, not the balancer's unwritten zero"
                 );
             }
             other => anyhow::bail!("not a keep-alive: {other:?}"),
