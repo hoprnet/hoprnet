@@ -239,26 +239,30 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
 }
 
 // =========================================================================
-//  The Exit's SURB-level reports on a `NoRateControl` Session
+//  The Exit's SURB-level reports, for every kind of Session
 // =========================================================================
 //
-// Since #8396 the Exit runs a SURB-level keep-alive stream on a `NoRateControl` Session, one packet
-// every `surb_balance_notify_period` (15 s by default). Every such packet is return-routed, so it
-// spends one SURB from the Exit's store for the Session. When the Entry on that branch runs no SURB
-// balancer, nothing replenishes that buffer beyond what the Entry's own outgoing packets carry; it
-// drains, and once it is empty each further keep-alive waits out `surb_resolution_wait` and is
-// dropped with "no SURB for its return path within the wait". A report already queued when a client
-// request arrives takes the SURB that request needed, which is the client-visible stall
-// gnosis_vpn#748 reports.
+// The Exit runs a SURB-level keep-alive stream on every Session, one packet every
+// `surb_balance_notify_period` (15 s by default). Every such packet is return-routed, so it spends one
+// SURB from the Exit's store for the Session. When the Entry runs no SURB balancer, nothing replenishes
+// that buffer beyond what the Entry's own outgoing packets carry; it drains, and once it is empty each
+// further keep-alive waits out `surb_resolution_wait` and is dropped with "no SURB for its return path
+// within the wait". A report already queued when a client request arrives takes the SURB that request
+// needed, which is the client-visible stall gnosis_vpn#748 reports.
 //
-// The fix withholds the notification from a Session that announced no SURB target, which on this
-// branch means one whose Entry runs no balancer: the report exists to correct that balancer, and
-// there is none. A `NoRateControl` Entry that *does* enable `surb_management` announces a target and
-// keeps its reports. These tests pin the cluster-visible half of that — that neither shape drops
-// packets; that the reports are still delivered to a balanced Session is pinned by the unit test
-// `a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports` in `hopr-transport-session`.
+// So the Exit sends a report only to an Entry that has shown it refills, by any keep-alive from it,
+// and only while it holds a SURB to send it on. That is decided from what the Exit observes and not
+// from what the Entry announced, and it holds for both kinds of Session:
 //
-// The period is compressed so the drain would complete inside a test against the unfixed code.
+// * rate-controlled (the Exit runs a balancer of its own), with an Entry that balances or one that does not;
+// * `NoRateControl` (the Exit runs none), likewise.
+//
+// These tests pin the cluster-visible half of that: that no shape of Session drops packets, and that a
+// Session that is left alone still carries traffic afterwards. That the reports are delivered to a
+// balancing Entry, and what they say, cannot be seen from here (a zero drop count holds whether or not
+// any report arrived). It is pinned by `exit_level_reports_follow_the_entry` in `hopr-transport-session`.
+//
+// The period is compressed so that a drain would complete inside a test against the unfixed code.
 
 /// The Exit's SURB-level notification period. The shipped default is 15 s; compressed here so that
 /// an unfixed Exit would drain the buffer inside a test. The floor the manager enforces is 1 s.
@@ -313,13 +317,19 @@ fn surb_report_cluster(notify_period: Option<Duration>) -> hopr_lib::testing::fi
     ])
 }
 
-/// The Session shape gnosis_vpn opens for its bridge and probe sessions: `NoRateControl`, with SURB
-/// balancing under the caller's control.
-fn nrc_session_config(surb_target: Option<u64>) -> anyhow::Result<hopr_lib::HoprSessionClientConfig> {
+/// The Session shapes under test, with SURB balancing under the caller's control.
+///
+/// `capabilities` decides whether the Exit runs a balancer: `NoRateControl` is the shape gnosis_vpn
+/// opens for its bridge and probe sessions, and its absence is the rate-controlled default. Whether
+/// the Entry balances is `surb_target`: `Some` runs a balancer on the Entry, `None` none.
+fn surb_report_session_config(
+    capabilities: hopr_lib::SessionCapabilities,
+    surb_target: Option<u64>,
+) -> anyhow::Result<hopr_lib::HoprSessionClientConfig> {
     Ok(hopr_lib::HoprSessionClientConfig {
         forward_path: hopr_lib::HopRouting::try_from(0usize)?,
         return_path: hopr_lib::HopRouting::try_from(0usize)?,
-        capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
+        capabilities,
         pseudonym: None,
         surb_management: surb_target.map(|target_surb_buffer_size| hopr_lib::SurbBalancerConfig {
             target_surb_buffer_size,
@@ -375,59 +385,75 @@ async fn drive_session(session: &mut hopr_lib::HoprSession, total: Duration) -> 
     Ok(routing_resolution_surb_timeout_count() - before)
 }
 
-/// The bug: a `NoRateControl` Session whose Entry runs no balancer must not drop packets for want of a
-/// SURB.
+/// The Session an Entry without a balancer opens: no `surb_management`, so it attaches one SURB to each
+/// data packet and sends no keep-alive.
+async fn open_session_without_a_balancer(
+    cluster: &hopr_lib::testing::fixtures::ClusterGuard,
+    capabilities: hopr_lib::SessionCapabilities,
+) -> anyhow::Result<hopr_lib::HoprSession> {
+    let ip = IpOrHost::from_str(":0")?;
+    let (session, _cfg) = cluster[0]
+        .inner()
+        .connect_to(
+            cluster[1].address(),
+            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            surb_report_session_config(capabilities, None)?,
+        )
+        .await
+        .context("the session must establish")?;
+    Ok(session)
+}
+
+/// The bug: a Session whose Entry runs no balancer must not drop packets for want of a SURB, whether
+/// or not the Exit runs one itself.
+///
+/// The Entry sends no keep-alive, so the Exit has no sign that anything reads its reports and sends
+/// none. `no_rate_control` is the shape gnosis_vpn#748 reports; `rate_controlled` is the same Entry on
+/// the default Session, which used to be sent the reports whatever it ran.
 ///
 /// Before the fix this dropped a packet every period — measured at 19–20 drops in this window, at
 /// exactly the period's cadence, with the Exit's own `announced_surb_target=… effective=…` derivation
 /// confirming it was the notification stream doing it.
 #[rstest]
+#[case::rate_controlled(SessionCapability::Segmentation.into())]
+#[case::no_rate_control(SessionCapability::Segmentation | SessionCapability::NoRateControl)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[cfg(feature = "session-client")]
-async fn a_no_rate_control_entry_without_a_balancer_triggers_no_surb_drops() -> anyhow::Result<()> {
+async fn an_entry_without_a_balancer_triggers_no_surb_drops(
+    #[case] capabilities: hopr_lib::SessionCapabilities,
+) -> anyhow::Result<()> {
     let cluster = surb_report_cluster(Some(NOTIFY_PERIOD));
-    let ip = IpOrHost::from_str(":0")?;
-    let (mut session, _cfg) = cluster[0]
-        .inner()
-        .connect_to(
-            cluster[1].address(),
-            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            nrc_session_config(None)?,
-        )
-        .await
-        .context("the NoRateControl session must establish")?;
+    let mut session = open_session_without_a_balancer(&cluster, capabilities).await?;
 
     let drops = drive_session(&mut session, OBSERVE).await?;
     tracing::info!(drops, "SURB timeout drops observed");
     assert_eq!(
         0, drops,
-        "an Exit Session with no balancer on either side has a level report to deliver to no one, so every one of \
-         them is a SURB spent for nothing; {drops} were dropped where none should have been originated"
+        "an Exit Session whose Entry runs no balancer has a level report to deliver to no one, so every one of them \
+         is a SURB spent for nothing; {drops} were dropped where none should have been originated"
     );
     Ok(())
 }
 
 /// An idle Session is the starkest case: no traffic at all, so any drop is attributable to the Exit
 /// alone rather than competing with the client's own requests for the last SURB.
+///
+/// A zero drop count is also what a Session that has died reads as, so it is followed by a ping that
+/// must come back: the Session was quiet because it was gated, not because it was gone.
 #[rstest]
+#[case::rate_controlled(SessionCapability::Segmentation.into())]
+#[case::no_rate_control(SessionCapability::Segmentation | SessionCapability::NoRateControl)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[cfg(feature = "session-client")]
-async fn an_idle_no_rate_control_session_originates_nothing_it_cannot_pay_for() -> anyhow::Result<()> {
+async fn an_idle_session_without_a_balancer_originates_nothing_it_cannot_pay_for(
+    #[case] capabilities: hopr_lib::SessionCapabilities,
+) -> anyhow::Result<()> {
     let cluster = surb_report_cluster(Some(NOTIFY_PERIOD));
-    let ip = IpOrHost::from_str(":0")?;
-    let (_session, _cfg) = cluster[0]
-        .inner()
-        .connect_to(
-            cluster[1].address(),
-            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            nrc_session_config(None)?,
-        )
-        .await
-        .context("the NoRateControl session must establish")?;
+    let mut session = open_session_without_a_balancer(&cluster, capabilities).await?;
 
     let before = routing_resolution_surb_timeout_count();
     tokio::time::sleep(OBSERVE).await;
@@ -435,22 +461,37 @@ async fn an_idle_no_rate_control_session_originates_nothing_it_cannot_pay_for() 
 
     tracing::info!(drops, "drops from an idle session");
     assert_eq!(0, drops, "an idle Session must not originate reports it cannot pay for");
+
+    let mut buf = [0u8; 4];
+    tokio::time::timeout(PING * 3, async {
+        session.write_all(b"ping").await?;
+        session.flush().await?;
+        session.read_exact(&mut buf).await
+    })
+    .await
+    .context("the ping after the idle window timed out, so the Session was gone and the drop count meant nothing")?
+    .context("the ping after the idle window failed, so the Session was gone and the drop count meant nothing")?;
     Ok(())
 }
 
-/// A `NoRateControl` Entry that *does* balance must not starve either.
+/// An Entry that *does* balance must not starve either, and the Exit's reports to it are paid for.
 ///
-/// The Exit keeps its configured period on this Session, so the reports are still sent; the Entry's
-/// balancer answers each with a SURB, which is why nothing is dropped. That the reports are actually
-/// delivered is asserted at unit level instead
-/// (`a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports`) — a cluster test
-/// cannot see them, since a zero drop count holds whether or not any report arrived.
+/// Its keep-alives show the Exit that it refills, so the reports are sent; the Entry's balancer answers
+/// each with a SURB, which is why nothing is dropped. `rate_controlled` is the Session with a balancer
+/// on each side, `no_rate_control` the one with a balancer on the Entry only. That the reports are
+/// actually delivered is asserted at unit level instead (`exit_level_reports_follow_the_entry` in
+/// `hopr-transport-session`) — a cluster test cannot see them, since a zero drop count holds whether or
+/// not any report arrived.
 #[rstest]
+#[case::rate_controlled(SessionCapability::Segmentation.into())]
+#[case::no_rate_control(SessionCapability::Segmentation | SessionCapability::NoRateControl)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[cfg(feature = "session-client")]
-async fn a_balanced_entry_is_not_starved_by_the_exits_reports() -> anyhow::Result<()> {
+async fn a_balanced_entry_is_not_starved_by_the_exits_reports(
+    #[case] capabilities: hopr_lib::SessionCapabilities,
+) -> anyhow::Result<()> {
     let cluster = surb_report_cluster(Some(NOTIFY_PERIOD));
     let ip = IpOrHost::from_str(":0")?;
     let (mut session, _cfg) = cluster[0]
@@ -460,57 +501,16 @@ async fn a_balanced_entry_is_not_starved_by_the_exits_reports() -> anyhow::Resul
             hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
             // A small target: the production default of 7000 is indistinguishable from "never starves"
             // against this cluster's buffers.
-            nrc_session_config(Some(64))?,
+            surb_report_session_config(capabilities, Some(64))?,
         )
         .await
-        .context("the NoRateControl session must establish")?;
+        .context("the session must establish")?;
 
     let drops = drive_session(&mut session, OBSERVE).await?;
     tracing::info!(drops, "drops with Entry-side SURB management");
     assert_eq!(
         0, drops,
         "an Entry-side balancer is what the Exit's notification exists to inform, and it must keep the Exit supplied"
-    );
-    Ok(())
-}
-
-/// The notification must still be produced where it is consumed: a Session whose balancer is enabled
-/// keeps receiving its report at the configured period.
-///
-/// That is asserted by the unit test `a_no_rate_control_session_that_announced_a_target_keeps_its_level_reports`,
-/// which can observe the originated reports directly. A cluster test cannot: the Entry exposes no
-/// counter for reports received, so the best it can do is a zero drop count, which holds whether or
-/// not a single report arrived.
-#[rstest]
-#[serial]
-#[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
-#[cfg(feature = "session-client")]
-async fn a_balanced_session_keeps_its_period_and_affords_the_reports() -> anyhow::Result<()> {
-    let cluster = surb_report_cluster(Some(NOTIFY_PERIOD));
-    let ip = IpOrHost::from_str(":0")?;
-    let (mut session, _cfg) = cluster[0]
-        .inner()
-        .connect_to(
-            cluster[1].address(),
-            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            nrc_session_config(Some(64))?,
-        )
-        .await
-        .context("the NoRateControl session must establish")?;
-
-    let drops = drive_session(&mut session, OBSERVE).await?;
-    assert_eq!(
-        0, drops,
-        "a balanced Entry answers each report with a SURB, so the Exit's stream must stay affordable"
-    );
-
-    // Window sanity check only: no report is observed here, so this just asserts the window is long
-    // enough for the notification period to matter.
-    let reports_in_window = (OBSERVE.as_secs_f64() / NOTIFY_PERIOD.as_secs_f64()).ceil() as usize;
-    assert!(
-        reports_in_window > 5,
-        "{OBSERVE:?} is too short to exercise a {NOTIFY_PERIOD:?} period ({reports_in_window} reports)"
     );
     Ok(())
 }
