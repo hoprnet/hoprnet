@@ -62,10 +62,6 @@ name = "transport_tickets"
 required-features = ["testing"]
 
 [[test]]
-name = "repro_issue748"
-required-features = ["testing"]
-
-[[test]]
 name = "cluster_throughput-size5"
 required-features = ["testing"]
 
