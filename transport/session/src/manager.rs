@@ -2582,9 +2582,9 @@ pub struct SessionManagerConfig {
     /// keep-alive reserve at the establishment target: an Entry that raises its target does not lift
     /// the Exit's egress cap or widen its ring, and one that lowers it to that reserve or below may
     /// leave the Exit holding its data back for good, waiting for a stock the Entry no longer keeps. A
-    /// Session that announces no target at establishment, as a `NoRateControl` Entry does, gets the
-    /// full ring from the start, so turning this off costs it nothing. The Exit's SURB-level reports
-    /// are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
+    /// Session that announces no target at establishment, as an Entry without a SURB balancer does,
+    /// gets the full ring from the start, so turning this off costs it nothing. The Exit's SURB-level
+    /// reports are unaffected: it recognises a balancing Entry by its keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(true)]
@@ -4297,19 +4297,27 @@ where
 
         let mut additional_data = 0_u64;
 
-        // SURB balancer target announcement is encoded in the lower 32-bits of the options word
+        // SURB balancer target announcement is encoded in the lower 32-bits of the options word.
+        //
+        // Only a target this Entry actually balances toward is announced. An Entry without a SURB
+        // balancer (`surb_management` is `None`, as for a hoprd `responseBuffer` below two packets)
+        // announces none, on this branch as on the `NoRateControl` one, and sends no keep-alives to
+        // announce one later. It used to announce the balancer-rate fallback instead (the initial
+        // return egress rate times the minimum buffer duration, 50 at the defaults), which the Exit
+        // cannot tell from a real target of 50: it admitted a ring of 75 SURBs for it, and nothing
+        // ever widened that ring. A zero is what lets the Exit tell, and give such a Session the full
+        // ring (see `ring_surb_target` in `handle_incoming_session_initiation`).
+        //
+        // The Exit still needs a figure for its own balancer and fill reserve, and now takes it from
+        // its own configuration. The initial egress rate is a constant (10) in the transport, but the
+        // minimum buffer duration is an operator setting (`balancer_minimum_surb_buffer_duration`,
+        // 5 s by default), so the Entry's and the Exit's could differ, and the Exit never had a reason
+        // to prefer the Entry's. An Exit that predates this takes the same fallback on a zero.
         if !cfg.capabilities.contains(Capability::NoRateControl) {
             additional_data |= cfg
                 .surb_management
                 .map(|c| c.target_surb_buffer_size)
-                .unwrap_or(
-                    self.cfg.initial_return_session_egress_rate as u64
-                        * self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs(),
-                )
+                .unwrap_or(0)
                 .min(u32::MAX as u64);
         }
 
@@ -6775,10 +6783,10 @@ where
         // has configured as its target buffer size in the Balancer. The lower 32 bits of the options
         // word contain the SURB target; its upper 32 bits carry PIX parameters and must be masked out.
         //
-        // Resolved even on the `NoRateControl` branch, which runs no balancer and never announces a
-        // target of its own: the Exit's keep-alive stream derives its fill SURB reserve from this
-        // figure, and on that branch the fallback below — the same one the balancer would have used —
-        // is the only estimate of the buffer there is.
+        // Resolved even for an Entry that announces none (a `NoRateControl` one, or a rate-controlled one
+        // without a SURB balancer), and on the `NoRateControl` branch, which runs no balancer: the Exit's
+        // keep-alive stream derives its fill SURB reserve from this figure, and the fallback below — the
+        // same one a rate-controlled Exit's balancer runs at — is the only estimate of the buffer there is.
         //
         // That fallback serves the balancer and the fill reserve only. It is not what the SURB ring is
         // sized from when nothing was announced: see `ring_surb_target` below.
@@ -6804,16 +6812,18 @@ where
         //
         // The fallback is a balancer-rate estimate (`initial_return_session_egress_rate` times the
         // minimum buffer duration, 50 at the defaults), not a buffer anyone asked for, and the store
-        // turns it into a ring of 75. A `NoRateControl` Entry announces nothing at establishment, and
-        // one that runs no balancer sends no keep-alives to announce a target later either, so nothing
-        // would ever widen that ring: a Session that bursts replies finds its SURBs evicted past the
-        // 75th, and the replies without one. The ring is a ceiling and not a reservation (it
+        // turns it into a ring of 75. An Entry that runs no balancer announces nothing at establishment
+        // (a `NoRateControl` one, or a rate-controlled one without `surb_management`; an Entry that
+        // predates that announced the fallback itself, which cannot be told from a real target of 50),
+        // and it sends no keep-alives to announce a target later either, so nothing would ever widen
+        // that ring: a Session that bursts replies finds its SURBs evicted past the 75th, and the
+        // replies without one. The ring is a ceiling and not a reservation (it
         // allocates with occupancy, see `SurbStoreConfig::rb_capacity`), so a large one costs at most
         // what it has held: its storage grows with the SURBs stored and never shrinks below that
         // high-water mark, but is not taken up front. And any Entry can have the same ring by
         // announcing the maximum target, so a smaller one for an Entry that announces nothing protects
-        // nothing here; it only starves the Entries that cannot announce one, such as a `NoRateControl`
-        // Session opened without `surb_management`. The transport sets the maximum to two thirds of
+        // nothing here; it only starves the Entries that cannot announce one, such as a Session opened
+        // without `surb_management`. The transport sets the maximum to two thirds of
         // `rb_capacity`, which the store's headroom, at its default of 50 %, turns into a ring of
         // `rb_capacity` (to within a SURB of integer rounding).
         let ring_surb_target = if surb_target > 0 {
@@ -15269,6 +15279,170 @@ mod tests {
         Ok(())
     }
 
+    /// What an Entry with `capabilities` and, if it balances, a SURB balancer targeting `balancer_target`
+    /// sends to open a Session: its `StartSession`, as the Exit would receive it.
+    async fn entry_start_session(
+        pseudonym: HoprPseudonym,
+        capabilities: Capabilities,
+        balancer_target: Option<u64>,
+    ) -> anyhow::Result<ApplicationData> {
+        let mgr = RecordingManager::new(Default::default());
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        // Nobody answers, so the opening never completes: only the `StartSession` it sends is of interest.
+        let opening = timeout(
+            Duration::from_millis(500),
+            mgr.new_session(
+                (&ChainKeypair::random()).into(),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities,
+                    pseudonym: pseudonym.into(),
+                    surb_management: balancer_target.map(|target_surb_buffer_size| SurbBalancerConfig {
+                        target_surb_buffer_size,
+                        max_surbs_per_sec: 100,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            ),
+        )
+        .await;
+        anyhow::ensure!(
+            opening.is_err(),
+            "fixture: nobody answered, so the opening cannot have completed"
+        );
+
+        originated_during(&mut msg_rx, Duration::ZERO)
+            .await
+            .into_iter()
+            .map(|(_, data)| data.data)
+            .find(|data| {
+                matches!(
+                    HoprStartProtocol::decode(data.application_tag, &data.plain_text),
+                    Ok(StartProtocol::StartSession(_))
+                )
+            })
+            .context("the Entry must have sent a StartSession")
+    }
+
+    /// The SURB target an Entry announces is the one it balances toward, and none otherwise.
+    ///
+    /// An Entry that runs no SURB balancer (`surb_management` unset, as for a hoprd `responseBuffer`
+    /// below two packets) used to announce the balancer-rate fallback on the rate-controlled branch (50 at
+    /// the defaults), which the Exit cannot tell from a real target of 50. It admitted a ring of 75 for
+    /// it, and nothing widened that ring. A zero lets the Exit tell, and give such a Session the full ring
+    /// (`an_exit_gives_an_entry_without_a_balancer_the_full_ring`). A `NoRateControl` Entry announces
+    /// nothing either way, whether or not it runs a balancer.
+    ///
+    /// Only the lower 32 bits of the options word are the SURB target; its upper half carries the PIX
+    /// parameters, which these cases do not use and the assertion would not look at anyway.
+    #[rstest]
+    #[case::rate_controlled_with_a_balancer(Capability::Segmentation.into(), Some(300), 300)]
+    #[case::rate_controlled_without_a_balancer(Capability::Segmentation.into(), None, 0)]
+    #[case::no_rate_control_with_a_balancer(Capability::Segmentation | Capability::NoRateControl, Some(300), 0)]
+    #[case::no_rate_control_without_a_balancer(Capability::Segmentation | Capability::NoRateControl, None, 0)]
+    #[test_log::test(tokio::test)]
+    async fn the_entry_announces_the_target_it_balances_toward_and_none_otherwise(
+        #[case] capabilities: Capabilities,
+        #[case] balancer_target: Option<u64>,
+        #[case] expected: u32,
+    ) -> anyhow::Result<()> {
+        let start = entry_start_session(HoprPseudonym::random(), capabilities, balancer_target).await?;
+        let Ok(StartProtocol::StartSession(initiation)) =
+            HoprStartProtocol::decode(start.application_tag, &start.plain_text)
+        else {
+            anyhow::bail!("not a StartSession");
+        };
+
+        assert_eq!(
+            expected,
+            initiation_options(initiation.additional_data) as u32,
+            "the SURB target in the low 32 bits of the options word"
+        );
+        Ok(())
+    }
+
+    /// An Exit gives the Entry's own `StartSession` the ring and the balancer it should: the full ring
+    /// when the Entry announced no target, its target otherwise, and for a rate-controlled Exit the
+    /// balancer at the announced target, or at the Exit's own fallback when there was none.
+    ///
+    /// The end-to-end half of `the_entry_announces_the_target_it_balances_toward_and_none_otherwise`
+    /// and of `the_admitted_ring_follows_the_announced_target_or_takes_the_ceiling`: a rate-controlled
+    /// Entry without a balancer is the one whose announcement changed, and it is the case that was left
+    /// with a ring of 75 SURBs.
+    #[rstest]
+    #[case::rate_controlled_with_a_balancer(Capability::Segmentation.into(), Some(300), 300)]
+    #[case::rate_controlled_without_a_balancer(Capability::Segmentation.into(), None, 0)]
+    #[case::no_rate_control_with_a_balancer(Capability::Segmentation | Capability::NoRateControl, Some(300), 0)]
+    #[case::no_rate_control_without_a_balancer(Capability::Segmentation | Capability::NoRateControl, None, 0)]
+    #[test_log::test(tokio::test)]
+    async fn an_exit_gives_an_entry_without_a_balancer_the_full_ring(
+        #[case] capabilities: Capabilities,
+        #[case] balancer_target: Option<u64>,
+        #[case] announced: u32,
+    ) -> anyhow::Result<()> {
+        let rate_controlled = !capabilities.contains(Capability::NoRateControl);
+        let pseudonym = HoprPseudonym::random();
+        let start = entry_start_session(pseudonym, capabilities, balancer_target).await?;
+
+        let admission = RecordingAdmission::default();
+        let exit = RecordingManager::new(SessionManagerConfig {
+            maximum_surb_buffer_size: RING_CEILING,
+            ..Default::default()
+        });
+        assert!(exit.set_surb_admission(Arc::new(admission.clone())));
+        let (msg_tx, _msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        exit.start(msg_tx, new_session_tx, None, None)?;
+
+        exit.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: start,
+                packet_info: Default::default(),
+            },
+        )?;
+        timeout(Duration::from_secs(5), async {
+            while admission.admitted_targets().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the Exit never admitted the Session")?;
+
+        assert_eq!(
+            vec![if announced > 0 {
+                announced as usize
+            } else {
+                RING_CEILING
+            }],
+            admission.admitted_targets(),
+            "the ring is sized from what the Entry announced, or from the Exit's ceiling when it announced nothing"
+        );
+
+        if rate_controlled {
+            let fallback = exit.cfg.initial_return_session_egress_rate as u64
+                * exit
+                    .cfg
+                    .minimum_surb_buffer_duration
+                    .max(MIN_SURB_BUFFER_DURATION)
+                    .as_secs();
+            let balancer = exit
+                .get_surb_balancer_config(&pseudonym)?
+                .context("a rate-controlled Exit runs a balancer")?;
+            assert_eq!(
+                if announced > 0 { announced as u64 } else { fallback },
+                balancer.target_surb_buffer_size,
+                "the Exit's balancer follows the announced target, or runs at the Exit's own fallback when none was \
+                 announced"
+            );
+        }
+        Ok(())
+    }
+
     /// The node's `maximum_surb_buffer_size` in the ring tests: well clear of the balancer's fallback
     /// (50) and of anything a test announces, and inside the bound the recording admission asserts.
     const RING_CEILING: usize = 4_000;
@@ -15279,8 +15453,9 @@ mod tests {
     ///
     /// Without an announcement the Exit used to pass the balancer's fallback figure (50 at the defaults)
     /// to the store, which turned it into a ring of 75. An Entry that runs no balancer announces
-    /// nothing and sends no keep-alive to raise a target later, so nothing widened that ring, and a
-    /// burst of replies found its SURBs evicted past the 75th. The ring is a ceiling that allocates with
+    /// nothing (see `the_entry_announces_the_target_it_balances_toward_and_none_otherwise`) and sends no
+    /// keep-alive to raise a target later, so nothing widened that ring, and a burst of replies found
+    /// its SURBs evicted past the 75th. The ring is a ceiling that allocates with
     /// occupancy, so the Session is given the largest one the node allows (`maximum_surb_buffer_size`)
     /// and pays for what it stores. This holds on both kinds of Session, because the ring is the same
     /// store whether or not the Exit runs a balancer.
@@ -22711,9 +22886,10 @@ mod tests {
         balancer
     }
 
-    /// An Entry without a SURB balancer announces a fallback target (50 at the defaults, a reserve of 12),
-    /// but attaches one SURB to each data packet and sends no keep-alives: nothing would raise the stock
-    /// above the reserve. Until a keep-alive shows the Entry refills, the Exit sends at any stock.
+    /// An Entry without a SURB balancer announces no target, so the Exit's balancer runs at its own fallback
+    /// (50 at the defaults, a reserve of 12; an Entry that predates this announces the same figure itself).
+    /// Such an Entry attaches one SURB to each data packet and sends no keep-alives: nothing would raise the
+    /// stock above the reserve. Until a keep-alive shows the Entry refills, the Exit sends at any stock.
     #[tokio::test]
     async fn data_should_not_be_held_for_an_entry_that_has_not_shown_it_refills() -> anyhow::Result<()> {
         let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();

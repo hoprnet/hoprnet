@@ -762,10 +762,10 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
 /// Verifies that an Entry without a SURB balancer gets replies once the Exit's stock lets them out.
 ///
 /// hoprd opens such an Entry for a `responseBuffer` below two packets. Its Session is rate-controlled:
-/// it announces a fallback SURB target (50), and the Exit's egress balancer lets data out only above a
-/// tenth of it (5 SURBs, at 10 SURBs per second), as before. The Exit's keep-alive reserve (12) must not
-/// raise that bar: the Entry attaches one SURB to each data packet and sends no keep-alives, so the
-/// Exit applies the reserve only once a keep-alive shows the Entry refills.
+/// it announces no SURB target, so the Exit's egress balancer runs at the Exit's own fallback (50), and
+/// lets data out only above a tenth of it (5 SURBs, at 10 SURBs per second), as before. The Exit's
+/// keep-alive reserve (12) must not raise that bar: the Entry attaches one SURB to each data packet and
+/// sends no keep-alives, so the Exit applies the reserve only once a keep-alive shows the Entry refills.
 ///
 /// ## Steps
 /// 1. Alice opens a Session to Bob with `Segmentation` only, which leaves it rate-controlled, and without a SURB
