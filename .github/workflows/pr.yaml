@@ -207,8 +207,12 @@ jobs:
   build-library:
     name: Verify publish dry-run
     # Stage 3: builds run only after stage 1 (checks) and stage 2 (tests) are green.
-    # When the path filter skips `tests`, `enabled` is false here too.
+    # When the path filter skips `tests`, a plain success() would skip this
+    # caller job too, and a skipped caller creates no inner check run. The
+    # tolerant `if` lets it start so the inner job reports its own skip
+    # (`enabled` is false); !failure() still stops it after a failed stage.
     needs: [changes, checks, check-allowed-dependencies, tests]
+    if: ${{ !cancelled() && !failure() }}
     uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
     permissions:
       contents: read
