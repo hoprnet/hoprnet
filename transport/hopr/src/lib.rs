@@ -482,7 +482,7 @@ where
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(|ms| Some(Duration::from_millis(ms)))
                 .unwrap_or(cfg.session.surb_balance_notify_period),
-            surb_target_notify: true,
+            surb_target_notify: cfg.session.surb_target_notify,
             maximum_sessions: cfg.session.maximum_managed_sessions,
             pix_config: cfg.incoming_session_pix_config.clone(),
             max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,

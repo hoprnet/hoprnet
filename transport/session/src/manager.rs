@@ -2564,6 +2564,13 @@ pub struct SessionManagerConfig {
     ///
     /// This is useful when the client plans to change the SURB balancer target dynamically.
     ///
+    /// The Exit sizes a Session's SURB ring from that target, and widens the ring when a raised one
+    /// arrives. With this off, the Exit only knows the target announced at establishment: raises are
+    /// never seen, and a `NoRateControl` Session, which announces none, keeps a fallback-sized ring on
+    /// the Exit for its whole life, so SURBs minted past it are evicted on arrival (under PIX, with
+    /// the shares they carry). The Exit's SURB-level reports are unaffected: it recognises a balancing
+    /// Entry by its keep-alives, flagged or not.
+    ///
     /// Default is true.
     #[default(true)]
     pub surb_target_notify: bool,
@@ -11355,15 +11362,25 @@ mod tests {
     /// 4. A 1500ms sleep allows the SURB balancer's periodic keep-alive timer to fire multiple times.
     /// 5. `update_surb_balancer_config` is called to raise the target to 200. After another 1500ms, Bob's manager
     ///    reflects the updated target via `get_surb_balancer_config`, confirming keep-alives communicated the change.
+    ///    That is with Alice's `surb_target_notify` on (`target_notify`). With it off, Alice's keep-alives carry no
+    ///    `BalancerTarget` flag and no target, and Bob keeps the one announced at establishment.
     /// 6. `get_surb_level_estimates` is called on both sides; both report positive sent/received/used counts,
     ///    confirming the balancer collected SURB statistics.
     /// 7. Alice closes the session; `ping_session` returns `NonExistingSession` after a short wait.
     ///
+    /// Bob's level reports are required in both cases, and are the end-to-end proof that the Exit sends them to
+    /// an Entry it knows to be balancing by its keep-alives, whether or not those announce its target.
+    ///
     /// The mock transports hand Alice's keep-alives to Bob with the packet info the pipeline would give
     /// them (`keep_alive_packet_info`): the SURBs the packet carried. Bob books those, not the message's
     /// declared maximum, so a mock that reported none would leave him with no received SURBs.
+    #[rstest]
+    #[case::target_notify_on(true)]
+    #[case::target_notify_off(false)]
     #[test_log::test(tokio::test)]
-    async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
+    async fn session_manager_should_send_keep_alives_via_surb_balancer(
+        #[case] target_notify: bool,
+    ) -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
@@ -11371,11 +11388,17 @@ mod tests {
             surb_balance_notify_period: Some(Duration::from_millis(500)),
             ..Default::default()
         };
-        let alice_mgr = SessionManager::new(Default::default());
+        let alice_mgr = SessionManager::new(SessionManagerConfig {
+            surb_target_notify: target_notify,
+            ..Default::default()
+        });
         let bob_mgr = SessionManager::new(bob_cfg.clone());
 
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();
+
+        // What Alice's keep-alives said: their flags and their additional data, in the order sent.
+        let alice_keep_alives: Arc<parking_lot::Mutex<Vec<(KeepAliveFlags, u64)>>> = Default::default();
 
         // The SURBs a keep-alive actually carried, as the wire would report them. Alice's keep-alives
         // are the only SURB source in this fixture, so the Exit's estimate has to be built from these
@@ -11449,48 +11472,31 @@ mod tests {
         // something by Bob's first level report, 500 ms in; the mock accepts only reports above zero.
         const INITIAL_BALANCER_TARGET: u64 = 100;
 
-        // Alice sends the KeepAlive messages reporting the initial balancer target
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .times(1..)
-            //.in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == INITIAL_BALANCER_TARGET))
-                //msg_type(data, StartProtocolDiscriminants::KeepAlive)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                packet_info: keep_alive_packet_info(&data.data),
-                                data: data.data,
-                            },
-                        )
-                        ?;
-                    Ok(())
-                })
-            });
-
         const NEXT_BALANCER_TARGET: u64 = 200;
 
-        // Alice sends also the KeepAlive messages reporting the updated balancer target
+        // Alice sends KeepAlive messages from her balancer, which Bob receives. What they say is
+        // recorded rather than matched here: with `surb_target_notify` on they announce the balancer
+        // target (the initial one, then the updated one), and with it off they say nothing, and either
+        // way they are the evidence to Bob that Alice balances.
         let bob_mgr_clone = bob_mgr.clone();
+        let alice_keep_alives_clone = alice_keep_alives.clone();
         alice_transport
             .expect_send_message()
             .times(1..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == NEXT_BALANCER_TARGET))
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
+                let alice_keep_alives_clone = alice_keep_alives_clone.clone();
                 Box::pin(async move {
+                    if let Ok(StartProtocol::KeepAlive(ka)) =
+                        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    {
+                        alice_keep_alives_clone.lock().push((ka.flags, ka.additional_data));
+                    }
                     bob_mgr_clone
                         .dispatch_message(
                             alice_pseudonym,
@@ -11716,18 +11722,46 @@ mod tests {
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
-        // Bob should know about the updated target
+        // Bob knows about the updated target only if Alice announces it.
         let remote_cfg = bob_mgr
             .get_surb_balancer_config(bob_session.session.id())?
             .ok_or(anyhow!("no remote config at bob"))?;
-        assert_eq!(
-            remote_cfg.target_surb_buffer_size,
+        let expected_remote_target = if target_notify {
             new_balancer_cfg.target_surb_buffer_size
+        } else {
+            balancer_cfg.target_surb_buffer_size
+        };
+        assert_eq!(
+            remote_cfg.target_surb_buffer_size, expected_remote_target,
+            "Bob learns the raised target exactly when Alice's keep-alives announce it"
         );
         assert_eq!(
             remote_cfg.max_surbs_per_sec,
-            new_balancer_cfg.target_surb_buffer_size / bob_cfg.minimum_surb_buffer_duration.as_secs()
+            expected_remote_target / bob_cfg.minimum_surb_buffer_duration.as_secs()
         );
+
+        // Alice's keep-alives carry `BalancerTarget` with her target exactly when she announces it.
+        let said = alice_keep_alives.lock().clone();
+        assert!(!said.is_empty(), "Alice's balancer must have sent keep-alives");
+        if target_notify {
+            assert!(
+                said.iter()
+                    .all(|(flags, _)| flags.contains(KeepAliveFlag::BalancerTarget)),
+                "every keep-alive of an announcing Entry names her target: {said:?}"
+            );
+            for target in [INITIAL_BALANCER_TARGET, NEXT_BALANCER_TARGET] {
+                assert!(
+                    said.iter().any(|(_, announced)| *announced == target),
+                    "no keep-alive announced the target {target}: {said:?}"
+                );
+            }
+        } else {
+            assert!(
+                said.iter()
+                    .all(|(flags, announced)| flags.is_empty() && *announced == 0),
+                "with `surb_target_notify` off the keep-alives carry no flag and no target: {said:?}"
+            );
+        }
 
         let (alice_surb_sent, alice_surb_used) = alice_mgr.get_surb_level_estimates(alice_session.id())?;
         let (bob_surb_recv, bob_surb_used) = bob_mgr.get_surb_level_estimates(bob_session.session.id())?;

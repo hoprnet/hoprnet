@@ -893,6 +893,10 @@ fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
 
+fn default_session_surb_target_notify() -> bool {
+    true
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -1016,6 +1020,20 @@ pub struct SessionGlobalConfig {
         )
     )]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
+    ///
+    /// The Exit sizes a Session's SURB ring from that target, and widens the ring when a raised one
+    /// arrives. With this off, the Exit only knows the target announced at establishment: raises are
+    /// never seen, and a `NoRateControl` Session, which announces none, keeps a fallback-sized ring on
+    /// the Exit for its whole life, so SURBs minted past it are evicted on arrival (under PIX, with
+    /// the shares they carry). The Exit's SURB-level reports are unaffected: it recognises a balancing
+    /// Entry by its keep-alives, flagged or not.
+    ///
+    /// Default is true.
+    #[default(default_session_surb_target_notify())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_surb_target_notify"))]
+    pub surb_target_notify: bool,
 
     /// How many later frames may queue behind a missing one before the reassembler gives up on it
     /// and releases what it already has.
@@ -1525,6 +1543,27 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    /// The Entry's `surb_target_notify` is reachable from a node's configuration file, and a file that
+    /// predates it keeps the behaviour the Entry always had.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_target_notify_is_configurable_and_on_by_default() {
+        assert!(SessionGlobalConfig::default().surb_target_notify);
+
+        let omitted: SessionGlobalConfig = serde_saphyr::from_str("idle_timeout: 3m\n").expect("config must parse");
+        assert!(
+            omitted.surb_target_notify,
+            "a configuration that does not name the setting must announce the target, as it always did"
+        );
+
+        let off: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_target_notify: false\n").expect("config must parse");
+        assert!(!off.surb_target_notify);
+
+        let on: SessionGlobalConfig = serde_saphyr::from_str("surb_target_notify: true\n").expect("config must parse");
+        assert!(on.surb_target_notify);
     }
 
     #[cfg(feature = "serde")]
