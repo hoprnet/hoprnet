@@ -7120,22 +7120,40 @@ where
                     // is a peer's claim: the balancer's set-point and the ring's ceiling are two
                     // views of one figure, and letting an over-announcing Entry set them apart would
                     // have the Exit aim at a buffer the ring can never hold.
+                    //
+                    // A `NoRateControl` Session runs no balancer on this side, so there is no
+                    // set-point to move (its target is never set). Its ring is the same bounded
+                    // store, though, sized at establishment from the target the Entry announced then,
+                    // which a `NoRateControl` Entry does not announce: the fallback size. An Entry
+                    // that balances announces its real target in these keep-alives, and the ring has
+                    // to follow it for the same reason as any other (gnosis/gnosis_vpn#739). With no
+                    // set-point to compare against, a raise is whatever exceeds the largest figure
+                    // already recorded on the slot; the ring only ever widens, so a repeated
+                    // announcement changes nothing.
                     let announced = msg.additional_data.min(self.cfg.maximum_surb_buffer_size as u64);
+                    let balanced = !session_slot.surb_mgmt.is_disabled();
                     if msg.flags.contains(KeepAliveFlag::BalancerTarget)
                         && announced > 0
-                        && !session_slot.surb_mgmt.is_disabled()
-                        && session_slot.surb_mgmt.controller_bounds().target() != announced
+                        && if balanced {
+                            session_slot.surb_mgmt.controller_bounds().target() != announced
+                        } else {
+                            session_slot
+                                .peek_raised_surb_target()
+                                .is_none_or(|raised| announced as usize > raised)
+                        }
                     {
-                        // Update the target buffer size as sent to us from the Entry
-                        session_slot
-                            .surb_mgmt
-                            .target_surb_buffer_size
-                            .store(announced, std::sync::atomic::Ordering::Relaxed);
-                        // Update maximum SURBs per second based on the new target
-                        session_slot.surb_mgmt.max_surbs_per_sec.store(
-                            announced / self.cfg.minimum_surb_buffer_duration.as_secs(),
-                            std::sync::atomic::Ordering::Relaxed,
-                        );
+                        if balanced {
+                            // Update the target buffer size as sent to us from the Entry
+                            session_slot
+                                .surb_mgmt
+                                .target_surb_buffer_size
+                                .store(announced, std::sync::atomic::Ordering::Relaxed);
+                            // Update maximum SURBs per second based on the new target
+                            session_slot.surb_mgmt.max_surbs_per_sec.store(
+                                announced / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
+                        }
 
                         // The store sized this Session's ring once, off the target announced at
                         // establishment. A target raised afterwards must widen it, or every SURB
@@ -7155,7 +7173,11 @@ where
                             );
                         }
 
-                        debug!(%session_id, target_surb_buffer_size = announced, "keep-alive updated SURB balancer target buffer size from the Entry");
+                        if balanced {
+                            debug!(%session_id, target_surb_buffer_size = announced, "keep-alive updated SURB balancer target buffer size from the Entry");
+                        } else {
+                            debug!(%session_id, target_surb_buffer_size = announced, "keep-alive raised the SURB target of a session without a balancer");
+                        }
                     }
                 }
             }
@@ -15017,17 +15039,35 @@ mod tests {
         Ok(())
     }
 
-    /// A raised `BalancerTarget` must reach the SURB store, so the Session's ring grows with it.
+    /// A raised `BalancerTarget` must reach the SURB store, so the Session's ring grows with it, on a
+    /// `NoRateControl` Session as much as on a rate-controlled one.
     ///
     /// The ring is sized once at establishment from the target then announced. The gnosis_vpn client
     /// opens at a ping tier and announces its main tier seconds later (gnosis/gnosis_vpn#739); an
     /// Exit that only updates the balancer's set-point leaves the ring at the ping tier, and every
     /// SURB minted toward the main one is evicted on arrival — losing the PIX share each carried.
+    /// A `NoRateControl` Session has no set-point to move (`no_rate_control`: its balancer state stays
+    /// disabled), yet its ring is the same store and has the same need. That Session was sized from the
+    /// fallback, its Entry announcing no target at establishment, which is why it starts from none.
+    ///
+    /// Only a keep-alive that carries `BalancerTarget` raises anything. An Entry whose
+    /// `surb_target_notify` is off sends its keep-alives without it, and the Exit then learns of no
+    /// raise (`*_without_target_notify`).
     ///
     /// The token matters as much as the call: the store widens only the admission the token names,
     /// and a raise under a successor's pseudonym must not touch its ring.
+    #[rstest]
+    #[case::rate_controlled(Capability::Segmentation.into(), 688, true)]
+    #[case::no_rate_control(Capability::Segmentation | Capability::NoRateControl, 0, true)]
+    #[case::rate_controlled_without_target_notify(Capability::Segmentation.into(), 688, false)]
+    #[case::no_rate_control_without_target_notify(Capability::Segmentation | Capability::NoRateControl, 0, false)]
     #[test_log::test(tokio::test)]
-    async fn a_raised_balancer_target_must_widen_the_sessions_ring() -> anyhow::Result<()> {
+    async fn a_raised_balancer_target_must_widen_the_sessions_ring(
+        #[case] capabilities: Capabilities,
+        #[case] announced: u64,
+        #[case] target_notify: bool,
+    ) -> anyhow::Result<()> {
+        let rate_controlled = !capabilities.contains(Capability::NoRateControl);
         let admission = RecordingAdmission::default();
         let (mgr, sender, transport, _err_rx, _incoming) =
             started_manager_admitting_small_params(1..=small_params_quota(), false, None)?;
@@ -15036,52 +15076,108 @@ mod tests {
         let pseudonym = HoprPseudonym::random();
         // The ping tier the Session is admitted with — the low 32 bits of the options word are the
         // announced SURB target, which is what the Exit sizes the ring from.
-        let announced = 688_u64;
         mgr.handle_incoming_session_initiation(
             pseudonym,
             StartInitiation {
+                capabilities: HoprSessionCapabilities(capabilities),
                 additional_data: into_initiation_additional_data(announced),
                 ..no_pix_offer()
             },
         )
         .await?;
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        assert_eq!(
+            !rate_controlled,
+            slot.surb_mgmt.is_disabled(),
+            "fixture: only a rate-controlled Exit runs a balancer"
+        );
 
         // The Entry's main tier, announced seconds later.
         let raised = 6_887_usize;
-        mgr.dispatch_message(
-            pseudonym,
-            ApplicationDataIn {
-                data: HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                    session_id: pseudonym,
-                    flags: KeepAliveFlag::BalancerTarget.into(),
-                    additional_data: raised as u64,
-                })
-                .try_into()?,
-                packet_info: Default::default(),
-            },
-        )?;
+        let flags: KeepAliveFlags = if target_notify {
+            KeepAliveFlag::BalancerTarget.into()
+        } else {
+            None.into()
+        };
+        let keep_alive = KeepAliveMessage::<SessionId> {
+            session_id: pseudonym,
+            flags,
+            additional_data: raised as u64,
+        };
 
-        tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                if !admission.raised_targets().is_empty() {
-                    break;
+        if target_notify {
+            mgr.dispatch_message(
+                pseudonym,
+                ApplicationDataIn {
+                    data: HoprStartProtocol::KeepAlive(keep_alive.clone()).try_into()?,
+                    packet_info: Default::default(),
+                },
+            )?;
+
+            tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    if !admission.raised_targets().is_empty() {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
                 }
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-        })
-        .await
-        .context("the raised target never reached the SURB store")?;
+            })
+            .await
+            .context("the raised target never reached the SURB store")?;
 
-        assert_eq!(
-            vec![raised],
-            admission.raised_targets(),
-            "the announced target, not the one the Session was admitted with, is what the ring is widened to"
-        );
-        assert_eq!(
-            admission.minted_tokens(),
-            admission.raise_tokens(),
-            "the raise must name the admission the Session holds, or the store widens nothing"
-        );
+            assert_eq!(
+                vec![raised],
+                admission.raised_targets(),
+                "the announced target, not the one the Session was admitted with, is what the ring is widened to"
+            );
+            assert_eq!(
+                admission.minted_tokens(),
+                admission.raise_tokens(),
+                "the raise must name the admission the Session holds, or the store widens nothing"
+            );
+
+            // The Entry repeats the announcement on every keep-alive. Handled here and not dispatched,
+            // so that it is known to be done when the count is read.
+            mgr.handle_keep_alive(pseudonym, keep_alive).await?;
+            assert_eq!(
+                1,
+                admission.raised_targets().len(),
+                "an announcement that raises nothing further must not ask the store again"
+            );
+
+            assert_eq!(
+                !rate_controlled,
+                slot.surb_mgmt.is_disabled(),
+                "a raise must not switch on a balancer the Session does not run"
+            );
+            if rate_controlled {
+                assert_eq!(
+                    raised as u64,
+                    slot.surb_mgmt.controller_bounds().target(),
+                    "a rate-controlled Exit follows the Entry's target with its balancer too"
+                );
+            }
+        } else {
+            // Handled here and not dispatched: nothing happens that could be waited for, and the
+            // refills flag is set before the raise is decided, so it could not say the handler is done.
+            mgr.handle_keep_alive(pseudonym, keep_alive).await?;
+            assert!(
+                slot.surb_mgmt.counterparty_refills(),
+                "the keep-alive must have been handled, or its silence proves nothing"
+            );
+            assert!(
+                admission.raised_targets().is_empty(),
+                "a keep-alive that announces no target raises no ring, whatever value it carries; got {:?}",
+                admission.raised_targets()
+            );
+            if rate_controlled {
+                assert_eq!(
+                    announced,
+                    slot.surb_mgmt.controller_bounds().target(),
+                    "nor does it move the balancer's target"
+                );
+            }
+        }
 
         sender.close_channel();
         transport.await??;
