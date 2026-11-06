@@ -22,7 +22,8 @@ permissions:
 jobs:
   build-candidate:
     name: Build Candidate
-    if: github.event.label.name == 'build:candidate'
+    # Fork PR branches do not exist in this repository, so building them by name fails or builds a stale branch.
+    if: github.event.label.name == 'build:candidate' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 20
     steps:
@@ -41,6 +42,7 @@ jobs:
           - DAppNodePackage-Hopr
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.dappnode_repository }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
