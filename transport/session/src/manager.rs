@@ -309,7 +309,7 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 /// Entry with a SURB balancer sends (a manual ping, [`KeepAliveFlag::ManualPing`], is not one). An Entry without one
 /// can run a rate-controlled Session too: it announces no target (one that predates this announces the balancer-rate
 /// fallback, which the Exit cannot tell from a real target), attaches one SURB to each data packet and sends no
-/// keep-alives. So the announcement says nothing about a balancer either way. A reply held for
+/// keep-alives but the odd manual ping. So the announcement says nothing about a balancer either way. A reply held for
 /// a stock above the reserve would then wait until the Entry sent that many more packets.
 ///
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender

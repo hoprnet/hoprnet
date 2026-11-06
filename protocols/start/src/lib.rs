@@ -450,10 +450,11 @@ flagset::flags! {
         BalancerState = 0x02,
         /// The keep-alive was sent by an explicit ping, not by a SURB balancer.
         ///
-        /// It carries no `additional_data`. A recipient must not read it as evidence that the sender
-        /// runs a SURB balancer and refills SURBs: a sender without one can ping by hand, and an
-        /// unflagged keep-alive cannot say so, because a balancer that does not announce its target
-        /// sends those too.
+        /// It gives `additional_data` no meaning of its own; any other flag set beside it keeps its
+        /// meaning, but the keep-alive still does not count as a balancer's. A recipient must not read
+        /// it as evidence that the sender runs a SURB balancer and refills SURBs: a sender without one
+        /// can ping by hand, and an unflagged keep-alive cannot say so, because a balancer that does not
+        /// announce its target sends those too.
         ///
         /// A node that predates this flag drops the bit when it decodes the message, and treats the
         /// ping as it always did.

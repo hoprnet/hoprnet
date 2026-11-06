@@ -250,9 +250,10 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
 // within the wait". A report already queued when a client request arrives takes the SURB that request
 // needed, which is the client-visible stall gnosis_vpn#748 reports.
 //
-// So the Exit sends a report only to an Entry that has shown it refills, by any keep-alive from it,
-// and only while it holds a SURB to send it on. That is decided from what the Exit observes and not
-// from what the Entry announced, and it holds for both kinds of Session:
+// So the Exit sends a report only to an Entry that has shown it refills, by any keep-alive from its
+// balancer (a manual ping does not count), and only while it holds a SURB to send it on. That is
+// decided from what the Exit observes and not from what the Entry announced, and it holds for both
+// kinds of Session:
 //
 // * rate-controlled (the Exit runs a balancer of its own), with an Entry that balances or one that does not;
 // * `NoRateControl` (the Exit runs none), likewise.

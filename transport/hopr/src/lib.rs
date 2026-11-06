@@ -280,7 +280,7 @@ impl HoprSessionConfigurator {
     /// NOTE: The keep-alive is marked as a manual ping, so the other side does not take it for a sign
     /// that this Session runs a SURB balancer: an Exit that receives it does not start its SURB-level
     /// reports or the reserve it keeps for them. A Session without a SURB balancer can ping without
-    /// being sent reports it does not read.
+    /// being sent reports it does not read. An Exit that predates the mark still starts them.
     ///
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
