@@ -16,8 +16,7 @@ on:
 concurrency:
   group: release
   cancel-in-progress: false
-permissions:
-  contents: read
+permissions: {}
 jobs:
   build-library:
     name: Build & Publish Library

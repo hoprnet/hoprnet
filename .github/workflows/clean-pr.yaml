@@ -9,6 +9,8 @@ on:
         required: true
         description: "Pull request number"
 
+permissions: {}
+
 jobs:
   cleanup-pr:
     name: Remove cache
