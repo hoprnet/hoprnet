@@ -14,8 +14,7 @@ on:
 concurrency:
   group: merge-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: false
-permissions:
-  contents: read
+permissions: {}
 jobs:
   docs:
     name: Docs

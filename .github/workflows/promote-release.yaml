@@ -24,6 +24,8 @@ concurrency:
   group: promote-release
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   promote_release:
     name: Promote Release

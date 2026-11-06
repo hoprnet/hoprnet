@@ -18,7 +18,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write # zizmor: ignore[excessive-permissions]
 
 concurrency:
   group: ${{ github.event.pull_request.number || github.ref }}-pr
@@ -115,6 +114,9 @@ jobs:
 
   tests:
     name: Test
+    permissions:
+      contents: read
+      id-token: write # Codecov OIDC upload in the coverage jobs
     uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}

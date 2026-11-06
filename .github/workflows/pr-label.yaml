@@ -43,6 +43,9 @@ jobs:
           - DAppNodePackage-Hopr-testnet
     name: ${{ matrix.dappnode_repository }}
     if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write # build-dappnode.yaml authenticates to GCP with OIDC
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
