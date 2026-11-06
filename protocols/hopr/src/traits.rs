@@ -56,13 +56,23 @@ pub trait SurbStore {
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener);
 
-    /// Tries to find a [`ReplyOpener`] given the [`sender_id`](HoprSenderId).
+    /// Tries to find a [`ReplyOpener`] given the [`sender_id`](HoprSenderId), without consuming it.
     ///
-    /// This is done by the sending side of the original packet when the reply to that
-    /// packet is received and needs to be decrypted.
+    /// This is done by the sending side of the original packet when the reply to that packet is received and needs
+    /// to be decrypted. It is the read half of a check-then-use pair: the decoder peeks to decrypt the reply, and
+    /// [removes](SurbStore::remove_reply_opener) the opener only once the packet has been delivered. Consuming it
+    /// at lookup time instead would lose the reply when two copies of it are decoded concurrently - the copy that
+    /// loses the race would remove the opener and then fail, taking the winner's decryption key with it.
     ///
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener>;
+
+    /// Removes a [`ReplyOpener`] that has been used to deliver a reply.
+    ///
+    /// Called after the reply decrypted with this opener has been delivered, so a reply is only ever spent once it
+    /// has actually produced a packet. Removing an opener that is already gone is a no-op, which is what makes the
+    /// concurrent case safe: the two copies both decrypt, and only one removal is meaningful.
+    fn remove_reply_opener(&self, sender_id: &HoprSenderId);
 
     /// Marks the edge from this node to `relayer` as unusable, so stored SURBs whose return path
     /// starts there are no longer handed out.

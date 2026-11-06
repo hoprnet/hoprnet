@@ -230,7 +230,7 @@ fn hopr_decoder_bench(c: &mut Criterion) {
     });
 
     let decoder = create_decoder(&relay);
-    let final_packet = decoder.decode(prev_hop, relay_packet.data).unwrap();
+    let final_packet = decoder.decode(prev_hop, relay_packet.data.clone()).unwrap();
 
     let prev_hop: PeerId = PEERS[1].1.public().into();
     group.bench_with_input("recipient", &final_packet, |b, packet| {
@@ -244,6 +244,22 @@ fn hopr_decoder_bench(c: &mut Criterion) {
             |(decoder, data)| decoder.decode(prev_hop, data),
             BatchSize::PerIteration,
         )
+    });
+
+    // A replay that has been seen before costs the shared-secret derivation plus a hash and two bit checks: the tag
+    // is checked as soon as the secret exists, before the header MAC, payload permutation and message parse.
+    // Compare against `relay` above, which is the same packet decoded from scratch: the difference is what the
+    // drop avoids.
+    let relay_prev_hop: PeerId = PEERS[0].1.public().into();
+    let replayed = {
+        let decoder = create_decoder(&relay);
+        decoder
+            .decode(relay_prev_hop, relay_packet.data.clone())
+            .expect("the first decode must succeed");
+        (decoder, relay_packet.data.clone())
+    };
+    group.bench_with_input("relay_replay", &replayed, |b, (decoder, data)| {
+        b.iter(|| decoder.decode(relay_prev_hop, data.clone()))
     });
 }
 
