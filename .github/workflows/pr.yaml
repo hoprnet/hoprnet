@@ -87,6 +87,40 @@ jobs:
             gh pr edit "$PR_NUMBER" --add-label "external"
           fi
 
+  # Gate jobs through inputs on the reusable workflows, not with a caller-level
+  # `if:`: an input-skipped inner job still reports its check name as skipped
+  # (green), a skipped caller job does not. Merge-queue runs always run
+  # everything. Only `docs/**` counts as non-code; format and pre-commit
+  # cover every file type and always run.
+  changes:
+    name: Detect changes
+    runs-on: depot-ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+      lockfile: ${{ github.event_name != 'pull_request' || steps.filter.outputs.lockfile == 'true' }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - "**"
+              - "!docs/**"
+            lockfile:
+              - "Cargo.toml"
+              - "**/Cargo.toml"
+              - "Cargo.lock"
+              - ".cargo/**"
+              - "flake.nix"
+              - "flake.lock"
+              - ".github/workflows/**"
+
   check-allowed-dependencies:
     name: Disallowed git dependencies in cargo
     runs-on: depot-ubuntu-24.04
@@ -105,10 +139,14 @@ jobs:
 
   checks:
     name: Check
+    needs: changes
     uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-checks-v2
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       lint_command: "nix build -L .#workspace-clippy"
+      lint: ${{ needs.changes.outputs.code == 'true' }}
+      deps: ${{ needs.changes.outputs.code == 'true' }}
+      audit: ${{ needs.changes.outputs.lockfile == 'true' }}
       runner_small: depot-ubuntu-24.04
       runner_large: depot-ubuntu-24.04-4
     secrets:
@@ -116,21 +154,22 @@ jobs:
 
   tests:
     name: Test
+    needs: changes
     permissions:
       contents: read
       id-token: write # Codecov OIDC upload in the coverage jobs
     uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      enable_unit_tests: true
+      enable_unit_tests: ${{ needs.changes.outputs.code == 'true' }}
       unit_test_command: "nix build -L .#test-unit"
-      enable_integration_tests: true
+      enable_integration_tests: ${{ needs.changes.outputs.code == 'true' }}
       integration_test_command: "nix build -L .#test-integration"
-      enable_nightly_tests: true
+      enable_nightly_tests: ${{ needs.changes.outputs.code == 'true' }}
       nightly_test_command: "nix build -L .#test-nightly"
       enable_benchmarks: false
-      enable_unit_coverage: true
-      enable_integration_coverage: true
+      enable_unit_coverage: ${{ needs.changes.outputs.code == 'true' }}
+      enable_integration_coverage: ${{ needs.changes.outputs.code == 'true' }}
       unit_coverage_command: "nix build -L .#coverage-unit -o coverage.lcov"
       integration_coverage_command: "nix build -L .#coverage-integration -o coverage.lcov"
       runner_unit: depot-ubuntu-24.04-16
@@ -163,6 +202,7 @@ jobs:
 
   build-library:
     name: Verify publish dry-run
+    needs: changes
     uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
     permissions:
       contents: read
@@ -172,11 +212,14 @@ jobs:
       version_type: pr
       architecture: x86_64-linux
       runner: depot-ubuntu-24.04-4
+      enabled: ${{ needs.changes.outputs.code == 'true' }}
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   docs:
     name: Docs
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     permissions:
