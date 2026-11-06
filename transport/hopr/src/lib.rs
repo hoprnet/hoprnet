@@ -70,6 +70,12 @@ pub use hopr_protocol_hopr::{MIN_TRACKED_PACKETS, MemorySurbStore, SurbStore};
 pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
 use hopr_protocol_pix::ShareResolution;
+/// Packet mixing API, re-exported whole so a consumer of the transport object can configure and
+/// inspect the mixer without pinning `hopr-transport-mixer` itself.
+///
+/// Every engine feature is already enabled by this crate's dependency declaration, so `create`,
+/// `poisson_channel`, `channel` and `MixerSink` are reached through this module.
+pub use hopr_transport_mixer as mixer;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,

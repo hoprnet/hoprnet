@@ -29,6 +29,8 @@ mod pool;
 
 #[cfg(feature = "uniform-channel")]
 pub use channel::channel;
+#[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
+pub use config::UniformConfig;
 pub use config::{MixerConfig, MixerType, PoissonConfig};
 #[cfg(any(feature = "uniform-channel", feature = "poisson"))]
 pub use dispatch::{AnyReceiver, AnySender, create};
