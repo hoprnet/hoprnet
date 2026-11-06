@@ -277,6 +277,11 @@ impl HoprSessionConfigurator {
     /// NOTE: This usually carries at least 2 SURBs on the HOPR protocol level and can be
     /// used for manual SURB balancing.
     ///
+    /// NOTE: The keep-alive is marked as a manual ping, so the other side does not take it for a sign
+    /// that this Session runs a SURB balancer: an Exit that receives it does not start its SURB-level
+    /// reports or the reserve it keeps for them. A Session without a SURB balancer can ping without
+    /// being sent reports it does not read.
+    ///
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
     pub async fn ping(&self) -> errors::Result<()> {

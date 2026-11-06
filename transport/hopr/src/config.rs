@@ -1010,8 +1010,8 @@ pub struct SessionGlobalConfig {
     /// send reply data.
     ///
     /// A report costs the Exit one SURB, so it is sent only to an Entry that has shown it runs a SURB
-    /// balancer, by having sent a keep-alive (whether or not that keep-alive announces a target), and
-    /// only while the Exit's own estimate of the SURBs it holds for the Session is above 0.
+    /// balancer, by having sent a keep-alive (whether or not that keep-alive announces a target, but not a manual
+    /// ping), and only while the Exit's own estimate of the SURBs it holds for the Session is above 0.
     ///
     /// Default is 15 seconds. Set to `null` to disable; minimum effective period is 1 second.
     #[validate(custom(function = "validate_surb_balance_notify_period"))]
@@ -1040,7 +1040,7 @@ pub struct SessionGlobalConfig {
     /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
     /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
     /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
-    /// keep-alives, flagged or not.
+    /// balancer's keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(default_session_surb_target_notify())]

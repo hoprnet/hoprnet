@@ -305,11 +305,11 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 /// Session that is closed drops the future with the sink.
 ///
 /// Only once the Entry has shown that it refills the stock
-/// ([`BalancerStateValues::counterparty_refills`]): that is, a keep-alive from it, which only an
-/// Entry with a SURB balancer sends. An Entry without one can run a rate-controlled Session too: it
-/// announces no target (one that predates this announces the balancer-rate fallback, which the Exit
-/// cannot tell from a real target), attaches one SURB to each data packet and sends no keep-alives.
-/// So the announcement says nothing about a balancer either way. A reply held for
+/// ([`BalancerStateValues::counterparty_refills`]): that is, a keep-alive from its balancer, which only an
+/// Entry with a SURB balancer sends (a manual ping, [`KeepAliveFlag::ManualPing`], is not one). An Entry without one
+/// can run a rate-controlled Session too: it announces no target (one that predates this announces the balancer-rate
+/// fallback, which the Exit cannot tell from a real target), attaches one SURB to each data packet and sends no
+/// keep-alives. So the announcement says nothing about a balancer either way. A reply held for
 /// a stock above the reserve would then wait until the Entry sent that many more packets.
 ///
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
@@ -1645,11 +1645,12 @@ impl PixFillControl {
     /// scarce. It still needs two things, because it is a return packet like any other.
     ///
     /// * **A reader.** The Entry must have shown that it refills this side's SURBs
-    ///   ([`counterparty_refills`](BalancerStateValues::counterparty_refills)), which is any keep-alive from it,
-    ///   flagged or not: only an Entry with a SURB balancer sends one. An Entry without a balancer attaches a SURB to
-    ///   each data packet and acts on no report, so every report to it spends a SURB to say nothing. This is decided
-    ///   from what this side has seen and not from the target the Entry announced, because that is a figure the peer
-    ///   picks, and a report sent on the strength of it can find no SURB.
+    ///   ([`counterparty_refills`](BalancerStateValues::counterparty_refills)), which is any keep-alive from its
+    ///   balancer, flagged or not, but not a manual ping ([`KeepAliveFlag::ManualPing`]): only an Entry with a SURB
+    ///   balancer sends one of its own accord. An Entry without a balancer attaches a SURB to each data packet and acts
+    ///   on no report, so every report to it spends a SURB to say nothing. This is decided from what this side has seen
+    ///   and not from the target the Entry announced, because that is a figure the peer picks, and a report sent on the
+    ///   strength of it can find no SURB.
     /// * **A SURB to send it on.** The estimate must be above zero. With none, the report would not go: the routing
     ///   resolver holds a return packet that finds no SURB for the whole of `surb_resolution_wait` and holds every
     ///   packet this node originates with it (gnosis_vpn#748).
@@ -2559,8 +2560,8 @@ pub struct SessionManagerConfig {
     /// not be too frequent.
     ///
     /// The Exit sends it only to an Entry that has shown it runs a SURB balancer, by having sent a
-    /// keep-alive (whether or not that keep-alive announces a target), and only while the Exit's own
-    /// estimate of the SURBs it holds for the Session is above 0. An Entry without a balancer
+    /// keep-alive (whether or not that keep-alive announces a target, but not a manual ping), and only while the
+    /// Exit's own estimate of the SURBs it holds for the Session is above 0. An Entry without a balancer
     /// attaches a SURB to each data packet and reads no report. The notification carries the Exit
     /// balancer's level on a rate-controlled Session, and the Exit's own count of its SURBs on a
     /// `NoRateControl` one, which runs no balancer.
@@ -2587,7 +2588,7 @@ pub struct SessionManagerConfig {
     /// Session that announces no target at establishment, as an Entry without a SURB balancer or any
     /// `NoRateControl` Entry does, gets the full ring from the start, so turning this off costs it
     /// nothing. The Exit's SURB-level reports are unaffected: it recognises a balancing Entry by its
-    /// keep-alives, flagged or not.
+    /// balancer's keep-alives, flagged or not.
     ///
     /// Default is true.
     #[default(true)]
@@ -4861,6 +4862,11 @@ where
     /// Sends a keep-alive packet with the given [`SessionId`].
     ///
     /// This currently "fires & forgets" and does not expect nor await any "pong" response.
+    ///
+    /// The keep-alive is marked as a manual ping ([`KeepAliveFlag::ManualPing`]), so an Exit does not
+    /// take it for a sign that this Session's Entry runs a SURB balancer: a ping, whatever SURBs it
+    /// brings, starts neither the Exit's SURB-level reports nor the reserve it keeps for them. An Exit
+    /// that predates the mark does take it for one.
     pub async fn ping_session(&self, id: &SessionId) -> errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id) {
             trace!(session_id = ?id, "pinging manually session");
@@ -4868,7 +4874,11 @@ where
             send_via_msg_sender(
                 &mut msg_sender,
                 session_data.routing_opts.clone(),
-                HoprStartProtocol::KeepAlive((*id).into()),
+                HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id: *id,
+                    flags: KeepAliveFlag::ManualPing.into(),
+                    additional_data: 0,
+                }),
                 "session ping message",
             )
             .await
@@ -5316,8 +5326,8 @@ where
     /// The notification is not sent to just any Entry. A report spends one of the Session's SURBs, and
     /// an Entry with no SURB balancer reads nothing: it attaches a SURB to each data packet and sends
     /// no keep-alives. [`PixFillControl::admit`] therefore lets a report out only once the Entry has
-    /// shown that it refills (by a keep-alive, flagged or not) and the Exit's own estimate shows a SURB
-    /// to spend on it. That is decided per packet rather than here, once, because the evidence arrives
+    /// shown that it refills (by a keep-alive, flagged or not, but not a manual ping) and the Exit's own estimate shows
+    /// a SURB to spend on it. That is decided per packet rather than here, once, because the evidence arrives
     /// after the Session is established.
     ///
     /// Deliberately not passed through the PIX egress gate. These packets carry no payload; gating
@@ -7176,11 +7186,21 @@ where
                 }
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
-                    // Only an Entry's SURB balancer sends keep-alives: from now on the Exit's data can be
-                    // held back for its keep-alive reserve, which this Entry will refill, and the Exit's
-                    // SURB-level reports can go out, since this Entry has a balancer to read them (see
-                    // `PixFillControl::admit`).
-                    session_slot.surb_mgmt.note_counterparty_refills();
+                    // Only an Entry's SURB balancer sends keep-alives of its own accord: from now on the
+                    // Exit's data can be held back for its keep-alive reserve, which this Entry will
+                    // refill, and the Exit's SURB-level reports can go out, since this Entry has a
+                    // balancer to read them (see `PixFillControl::admit`).
+                    //
+                    // Not a manual ping, though: an Entry without a balancer pings by hand through
+                    // `ping_session` too, and would otherwise be taken for one that has. The mark is the
+                    // only way to tell the two apart, as a balancer that does not announce its target
+                    // sends its keep-alives unflagged (`surb_target_notify` off). The SURBs a ping
+                    // carries are booked all the same, with those of every Start message
+                    // (`book_start_message_surbs`). An Entry that predates the mark sends its pings
+                    // unflagged, and is taken for a balancer as it always was.
+                    if !msg.flags.contains(KeepAliveFlag::ManualPing) {
+                        session_slot.surb_mgmt.note_counterparty_refills();
+                    }
 
                     // Allow updating SURB balancer target based on the received Keep-Alive message.
                     //
@@ -9586,6 +9606,9 @@ mod tests {
         /// An Entry with no SURB balancer: it sends no keep-alive, and its `surbs` SURBs arrived with
         /// data.
         WithoutBalancer { surbs: usize },
+        /// An Entry with no SURB balancer that pings by hand (`ping_session`): its only keep-alives are
+        /// marked as manual pings, and each carries `surbs` SURBs, as a real one does.
+        PingingByHand { surbs: usize },
     }
 
     /// What the Exit's level reports are expected to do.
@@ -9700,6 +9723,11 @@ mod tests {
                     "fixture: an Entry without a balancer has sent no keep-alive"
                 );
             }
+            SimulatedEntry::PingingByHand { surbs } => {
+                // The Exit books the SURBs the ping carried, as with every Start message, but is told
+                // nothing about a balancer.
+                dispatch_entry_keep_alive(mgr, pseudonym, KeepAliveFlag::ManualPing.into(), surbs, 0)?;
+            }
         }
         Ok(slot.surb_estimator.saturating_diff())
     }
@@ -9708,9 +9736,9 @@ mod tests {
     /// Session and every kind of Entry.
     ///
     /// A report spends one of the Session's SURBs, so it is sent only to an Entry that has shown it
-    /// refills (any keep-alive from it, whether or not it announces its target) and only while the
-    /// Exit holds a SURB to send it on. What it says depends on whether the Exit runs a balancer: the
-    /// balancer's level on a rate-controlled Session, the Exit's own count of its SURBs on a
+    /// refills (any keep-alive from its balancer, whether or not it announces its target, but not a manual ping) and
+    /// only while the Exit holds a SURB to send it on. What it says depends on whether the Exit runs a balancer:
+    /// the balancer's level on a rate-controlled Session, the Exit's own count of its SURBs on a
     /// `NoRateControl` one, which has none.
     ///
     /// What the Entry announced when the Session was established decides nothing: the target is a
@@ -9720,6 +9748,10 @@ mod tests {
     ///
     /// The cases that expect silence then let the Entry read, and want the reports to start: a stream
     /// that never ran would be as quiet.
+    ///
+    /// An Entry that only pings by hand (`a_entry_that_only_pings_by_hand`, `d_entry_that_only_pings_by_hand`)
+    /// runs no balancer, though it sends keep-alives, and each of them brings SURBs. The mark on its pings
+    /// is all that tells it from a balancing one, and the Exit stays quiet for it.
     #[rstest]
     #[case::a_balancing_entry(
         Capabilities::empty(),
@@ -9781,6 +9813,18 @@ mod tests {
         0,
         Expect::SilenceUntilTheEntryReads
     )]
+    #[case::a_entry_that_only_pings_by_hand(
+        Capabilities::empty(),
+        SimulatedEntry::PingingByHand { surbs: ENTRY_SURBS },
+        64,
+        Expect::SilenceUntilTheEntryReads
+    )]
+    #[case::d_entry_that_only_pings_by_hand(
+        Capability::NoRateControl.into(),
+        SimulatedEntry::PingingByHand { surbs: ENTRY_SURBS },
+        0,
+        Expect::SilenceUntilTheEntryReads
+    )]
     #[test_log::test(tokio::test)]
     async fn exit_level_reports_follow_the_entry(
         #[case] capabilities: Capabilities,
@@ -9832,6 +9876,19 @@ mod tests {
                     "{entry:?} gives the Exit no reason to report, yet it sent {} report(s) {levels:?}",
                     levels.len()
                 );
+
+                if matches!(entry, SimulatedEntry::PingingByHand { .. }) {
+                    // Handled by now, over a window of several periods, so this is not just a ping
+                    // that has yet to be looked at.
+                    assert!(
+                        !mgr.sessions
+                            .get(&pseudonym)
+                            .context("the session slot must exist")?
+                            .surb_mgmt
+                            .counterparty_refills(),
+                        "a manual ping must not be taken for a sign that the Entry runs a balancer"
+                    );
+                }
 
                 // The Entry becomes a reader: a balancing one's keep-alive, carrying SURBs.
                 dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), ENTRY_SURBS, 0)?;
@@ -15280,6 +15337,97 @@ mod tests {
 
         sender.close_channel();
         transport.await??;
+        Ok(())
+    }
+
+    /// A keep-alive shows the Exit that its Entry refills it, unless the Entry sent it as a manual ping.
+    ///
+    /// An Entry without a SURB balancer can ping a Session by hand (`ping_session`), and that keep-alive
+    /// brings SURBs like any other. Taken for a balancer's, it would make the Exit send the Entry level
+    /// reports nothing reads, each at the cost of a reply SURB, and on a rate-controlled Session hold its
+    /// data at the keep-alive reserve. The mark on the ping is the only way to tell it from a balancer
+    /// that keeps `surb_target_notify` off, whose keep-alives carry no flag either.
+    ///
+    /// Each keep-alive is handled directly, so that the answer is known to be final once it is read. The
+    /// level reports it decides are covered through the real dispatch by `exit_level_reports_follow_the_entry`.
+    #[rstest]
+    #[case::a_manual_ping(KeepAliveFlag::ManualPing.into(), false)]
+    #[case::a_balancer_announcing_its_target(KeepAliveFlag::BalancerTarget.into(), true)]
+    #[case::a_balancer_not_announcing_its_target_or_an_older_entrys_ping(None.into(), true)]
+    #[test_log::test(tokio::test)]
+    async fn a_keep_alive_shows_the_entry_refills_unless_it_is_a_manual_ping(
+        #[case] flags: KeepAliveFlags,
+        #[case] latched: bool,
+    ) -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, _estimator) = exit_slot_for_keep_alives(pseudonym);
+        let (new_session_tx, _new_sessions) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _sent) = futures::channel::mpsc::unbounded();
+        let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
+
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        assert!(
+            !slot.surb_mgmt.counterparty_refills(),
+            "fixture: nothing has shown the Exit that its Entry refills it"
+        );
+
+        mgr.handle_keep_alive(
+            pseudonym,
+            KeepAliveMessage::<SessionId> {
+                session_id: pseudonym,
+                flags,
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        assert_eq!(
+            latched,
+            slot.surb_mgmt.counterparty_refills(),
+            "a keep-alive with flags {flags:?} {} that the Entry refills the Exit",
+            if latched { "must show" } else { "must not show" }
+        );
+        Ok(())
+    }
+
+    /// `ping_session` marks its keep-alive as a manual ping, and it is no bigger than any other.
+    ///
+    /// The mark is what stops an Exit from taking the ping of an Entry without a balancer for the sign
+    /// of a balancer (`a_keep_alive_shows_the_entry_refills_unless_it_is_a_manual_ping`). It must not
+    /// change how many SURBs the ping can carry, which is what a manual ping is used for.
+    #[test_log::test(tokio::test)]
+    async fn ping_session_sends_a_keep_alive_marked_as_a_manual_ping() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, _estimator) = exit_slot_for_keep_alives(pseudonym);
+        let (new_session_tx, _new_sessions) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, mut sent) = futures::channel::mpsc::unbounded();
+        let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
+
+        mgr.ping_session(&pseudonym).await?;
+
+        let (_, data) = timeout(Duration::from_secs(5), sent.next())
+            .await
+            .context("the ping was never sent")?
+            .context("the manager's sender closed")?;
+        let StartProtocol::KeepAlive(ping) =
+            HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)?
+        else {
+            anyhow::bail!("not a keep-alive");
+        };
+        assert_eq!(pseudonym, ping.session_id);
+        assert_eq!(
+            KeepAliveFlags::from(KeepAliveFlag::ManualPing),
+            ping.flags,
+            "the ping is marked as one, and as nothing a balancer sends"
+        );
+        assert_eq!(0, ping.additional_data);
+
+        let unmarked: ApplicationData = HoprStartProtocol::KeepAlive(pseudonym.into()).try_into()?;
+        assert_eq!(
+            unmarked.total_len(),
+            data.data.total_len(),
+            "the mark must not change how many SURBs fit beside the ping"
+        );
         Ok(())
     }
 

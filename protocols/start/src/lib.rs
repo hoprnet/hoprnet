@@ -448,6 +448,16 @@ flagset::flags! {
         ///
         /// Mutually exclusive with `BalancerTarget`.
         BalancerState = 0x02,
+        /// The keep-alive was sent by an explicit ping, not by a SURB balancer.
+        ///
+        /// It carries no `additional_data`. A recipient must not read it as evidence that the sender
+        /// runs a SURB balancer and refills SURBs: a sender without one can ping by hand, and an
+        /// unflagged keep-alive cannot say so, because a balancer that does not announce its target
+        /// sends those too.
+        ///
+        /// A node that predates this flag drops the bit when it decodes the message, and treats the
+        /// ping as it always did.
+        ManualPing = 0x04,
     }
 }
 
@@ -2019,6 +2029,60 @@ mod tests {
         let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    /// A keep-alive marked as a manual ping keeps the mark across the wire, and costs the same to send.
+    ///
+    /// The mark is what tells a recipient that the sender did not send it as a SURB balancer, and it
+    /// has to be told from the keep-alives a balancer sends without a flag. It uses a bit of the flag
+    /// byte the message already has, so it must neither be taken for a balancer flag nor change how many
+    /// SURBs fit beside the message.
+    #[test]
+    fn a_manual_ping_keep_alive_round_trips_with_its_flag() -> anyhow::Result<()> {
+        type Protocol = StartProtocol<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>;
+
+        let ping = KeepAliveMessage {
+            session_id: 10_i32,
+            flags: KeepAliveFlag::ManualPing.into(),
+            additional_data: 0,
+        };
+        let unflagged = KeepAliveMessage::from(10_i32);
+        assert_eq!(
+            unflagged.max_surbs()?,
+            ping.max_surbs()?,
+            "the flag lives in a byte that is already sent"
+        );
+        assert_eq!(
+            Protocol::KeepAlive(unflagged.clone()).encode()?.1.len(),
+            Protocol::KeepAlive(ping.clone()).encode()?.1.len(),
+            "the marked ping is no longer on the wire"
+        );
+
+        let (tag, encoded) = Protocol::KeepAlive(ping.clone()).encode()?;
+        match Protocol::decode(tag, &encoded)? {
+            StartProtocol::KeepAlive(decoded) => {
+                assert_eq!(ping, decoded);
+                assert!(decoded.flags.contains(KeepAliveFlag::ManualPing));
+                assert!(
+                    !decoded.flags.contains(KeepAliveFlag::BalancerTarget)
+                        && !decoded.flags.contains(KeepAliveFlag::BalancerState),
+                    "a manual ping is neither of the balancer's messages"
+                );
+            }
+            other => anyhow::bail!("expected KeepAlive, got {other:?}"),
+        }
+
+        let (tag, encoded) = Protocol::KeepAlive(unflagged.clone()).encode()?;
+        match Protocol::decode(tag, &encoded)? {
+            StartProtocol::KeepAlive(decoded) => {
+                assert!(
+                    !decoded.flags.contains(KeepAliveFlag::ManualPing),
+                    "an unflagged keep-alive must not read as a manual ping"
+                );
+            }
+            other => anyhow::bail!("expected KeepAlive, got {other:?}"),
+        }
         Ok(())
     }
 
