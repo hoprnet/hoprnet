@@ -1970,9 +1970,10 @@ impl<'a> SessionSlotGuard<'a> {
     /// branch reaches `commit`, which allocation is too early to see.
     ///
     /// `admission` is `Some` on every production path — the guard carries the manager's seam, and
-    /// `capacity` is the buffer target the ring is sized from: the one the Entry announced, or the
-    /// node's maximum when it announced none. The `Option` keeps the guard usable
-    /// from tests and callers that run without a store.
+    /// `capacity` is the buffer target the ring is sized from. On the Exit that is the one the Entry
+    /// announced, or the node's maximum when it announced none; the Entry's own commits always pass
+    /// the node's `maximum_surb_buffer_size`. The `Option` keeps the guard usable from tests and
+    /// callers that run without a store.
     ///
     /// The token `admit` returns lands in the slot's own cell rather than on the guard: the guard is
     /// gone by the time the Session is torn down, and the teardown reads the token from the slot it
@@ -6807,13 +6808,14 @@ where
         // one that runs no balancer sends no keep-alives to announce a target later either, so nothing
         // would ever widen that ring: a Session that bursts replies finds its SURBs evicted past the
         // 75th, and the replies without one. The ring is a ceiling and not a reservation (it
-        // allocates with occupancy, see `SurbStoreConfig::rb_capacity`), so a large one costs what is
-        // actually stored in it. And any Entry can have the same ring by announcing the maximum
-        // target, so a smaller one for an Entry that announces nothing protects nothing here; it only
-        // starves the Entries that cannot announce one, such as a `NoRateControl` Session opened
-        // without `surb_management`. The transport sets the maximum to two thirds of `rb_capacity`,
-        // which the store's headroom turns into a ring of `rb_capacity` (to within a SURB of integer
-        // rounding).
+        // allocates with occupancy, see `SurbStoreConfig::rb_capacity`), so a large one costs at most
+        // what it has held: its storage grows with the SURBs stored and never shrinks below that
+        // high-water mark, but is not taken up front. And any Entry can have the same ring by
+        // announcing the maximum target, so a smaller one for an Entry that announces nothing protects
+        // nothing here; it only starves the Entries that cannot announce one, such as a `NoRateControl`
+        // Session opened without `surb_management`. The transport sets the maximum to two thirds of
+        // `rb_capacity`, which the store's headroom, at its default of 50 %, turns into a ring of
+        // `rb_capacity` (to within a SURB of integer rounding).
         let ring_surb_target = if surb_target > 0 {
             announced_surb_target
         } else {
@@ -7177,12 +7179,12 @@ where
                     // set-point to move (its target is never set). Its ring is the same bounded
                     // store, though, sized at establishment from the target the Entry announced then.
                     // A Session whose Entry announced nothing was given the full ring at that point
-                    // (see `ring_surb_target` in `new_session`), so there is nothing left to widen;
-                    // the raise matters for one that announced a target at establishment and has since
-                    // raised it, for the same reason as for any other (gnosis/gnosis_vpn#739). With no
-                    // set-point to compare against, a raise is whatever exceeds the largest figure
-                    // already recorded on the slot; the ring only ever widens, so a repeated
-                    // announcement changes nothing.
+                    // (see `ring_surb_target` in `handle_incoming_session_initiation`), so there is nothing left to
+                    // widen; the raise matters for one that announced a target at establishment and
+                    // has since raised it, for the same reason as for any other
+                    // (gnosis/gnosis_vpn#739). With no set-point to compare against, a raise is
+                    // whatever exceeds the largest figure already recorded on the slot; the ring
+                    // only ever widens, so a repeated announcement changes nothing.
                     let announced = msg.additional_data.min(self.cfg.maximum_surb_buffer_size as u64);
                     let balanced = !session_slot.surb_mgmt.is_disabled();
                     if msg.flags.contains(KeepAliveFlag::BalancerTarget)
@@ -15325,6 +15327,32 @@ mod tests {
             "the ring is sized from what the Entry announced ({announced}), or from the node's ceiling when it \
              announced nothing"
         );
+
+        // The ring takes the ceiling, but the balancer keeps the figure it always had when nothing was
+        // announced (so does the fill reserve, which derives from the same one): the rate the Exit starts
+        // at times the buffer duration it has to outlast, which is a different number from the ring's. A
+        // NoRateControl Exit runs no balancer, so there is nothing to read there.
+        if !capabilities.contains(Capability::NoRateControl) {
+            let fallback = mgr.cfg.initial_return_session_egress_rate as u64
+                * mgr
+                    .cfg
+                    .minimum_surb_buffer_duration
+                    .max(MIN_SURB_BUFFER_DURATION)
+                    .as_secs();
+            anyhow::ensure!(
+                fallback as usize != RING_CEILING,
+                "fixture: the fallback must differ from the ring's ceiling for this to tell them apart"
+            );
+            let balancer = mgr
+                .get_surb_balancer_config(&pseudonym)?
+                .context("a rate-controlled Exit runs a balancer")?;
+            let expected_target = if announced > 0 { expected as u64 } else { fallback };
+            assert_eq!(
+                expected_target, balancer.target_surb_buffer_size,
+                "the balancer is given what the Entry announced, or the balancer-rate fallback ({fallback}) when it \
+                 announced nothing, and never the ring's ceiling"
+            );
+        }
 
         assert!(mgr.close_session(&pseudonym));
         Ok(())

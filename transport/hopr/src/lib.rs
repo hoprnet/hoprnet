@@ -2126,6 +2126,10 @@ mod tests {
     /// makes such a Session's ring `rb_capacity` and not the few dozen SURBs the balancer's fallback
     /// would give it: the ceiling is two thirds of the capacity, and the store's default headroom of
     /// 50 % takes it back up. Integer division can leave it a SURB short.
+    ///
+    /// It pins the store arithmetic only. It calls `surb_buffer_target_ceiling` itself, so it would not
+    /// notice the transport ceasing to set `maximum_surb_buffer_size` from it: the session manager
+    /// config is built inline in `HoprTransport::new`, which has no seam small enough to test here.
     #[rstest]
     #[case::the_smallest_allowed(1_024)]
     #[case::a_round_one(30_000)]
