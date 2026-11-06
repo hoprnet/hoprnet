@@ -30,7 +30,9 @@ crate-type = ["rlib"]
 doctest = false
 
 [features]
-default = ["pix-bjj", "p2p-announce-quic"]
+default = ["pix-bjj", "p2p-announce-quic", "tracing-context"]
+# Capture the producer span when enqueueing messages across transport tasks.
+tracing-context = []
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
 # Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
 # production settles.

@@ -81,6 +81,12 @@ where
                 value: (unresolved, mut data),
                 span,
             } = message;
+            let request_span = tracing::debug_span!(
+                parent: &span,
+                "transport.send",
+                packet_id = crate::trace_context::next_packet_id()
+            );
+            let span = if request_span.is_disabled() { span } else { request_span };
             let output_span = span.clone();
             let resolve = resolve.clone();
             async move {
@@ -165,6 +171,7 @@ where
                 }
             }
             .instrument(tracing::debug_span!(parent: &span, "routing.resolve"))
+            .instrument(span)
         })
         .buffered(concurrency)
         .filter_map(futures::future::ready)
@@ -214,18 +221,24 @@ mod tests {
     use super::*;
     use crate::path::errors::PathPlannerError;
 
-    #[test_log::test(tokio::test)]
+    #[rstest::rstest]
+    #[case(hopr_transport_session::Capabilities::default())]
+    #[case(hopr_transport_session::Capability::Segmentation.into())]
+    #[case(hopr_transport_session::Capability::Segmentation | hopr_transport_session::Capability::RetransmissionAck)]
+    #[cfg(feature = "tracing-context")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[serial_test::serial(routing_logs)]
-    async fn queued_sessions_should_keep_their_context_through_routing_and_encoding() -> anyhow::Result<()> {
+    async fn queued_sessions_should_keep_their_context_through_routing_and_encoding(
+        #[case] capabilities: hopr_transport_session::Capabilities,
+    ) -> anyhow::Result<()> {
         use anyhow::Context as _;
         use futures::AsyncWriteExt;
-        use tracing::instrument::WithSubscriber;
 
-        use crate::{path::test_support::Logs, trace_context::ContextSender};
+        use crate::{tests::support::Logs, trace_context::ContextSender};
 
         let logs = Logs::default();
         let subscriber = logs.subscriber(tracing::Level::DEBUG);
-        async {
+        logs.with_cpu_subscriber(subscriber, async {
             let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(4);
             let tx = ContextSender::new(tx);
             let ids = [HoprPseudonym::random(), HoprPseudonym::random()];
@@ -235,7 +248,7 @@ mod tests {
                     *id,
                     forward_routing(),
                     hopr_transport_session::HoprSessionConfig {
-                        capabilities: Default::default(),
+                        capabilities,
                         ..Default::default()
                     },
                     (tx.clone(), futures::stream::pending()),
@@ -263,7 +276,13 @@ mod tests {
             // The encoder receives these envelopes after routing's instrumented future exits.
             // Exercise the same CPU boundary used by the packet encoder.
             for message in resolved_messages {
-                let marker = message.value.1.data.plain_text[0];
+                let marker = *message
+                    .value
+                    .1
+                    .data
+                    .plain_text
+                    .last()
+                    .context("missing session payload")?;
                 let dispatch = tracing::dispatcher::get_default(Clone::clone);
                 async move {
                     hopr_utils::parallelize::cpu::spawn_encode_blocking(
@@ -287,25 +306,41 @@ mod tests {
                 .chain(logs.records("session CPU encoding"))
             {
                 assert!(event.ancestry.contains(&"session"), "missing session ancestor");
+                assert!(event.ancestry.contains(&"transport.send"), "missing packet ancestor");
+                assert!(!event.fields.contains_key("session_id"));
+                assert!(!event.fields.contains_key("packet_id"));
             }
             assert_eq!(logs.records("session route resolved").len(), 2);
             assert_eq!(logs.records("session CPU encoding").len(), 2);
             let output = logs.output();
             for (marker, id) in ids.iter().enumerate() {
+                let route = output
+                    .lines()
+                    .find(|line| line.contains("session route resolved") && line.contains(&id.to_string()))
+                    .context("missing routed session")?;
+                let packet_id = route
+                    .split("packet_id=")
+                    .nth(1)
+                    .context("routing must expose its packet identifier")?
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>();
                 let line = output
                     .lines()
                     .find(|line| line.contains("session CPU encoding") && line.contains(&format!("marker={marker}")))
                     .context("missing encoded session")?;
                 assert!(line.contains(&id.to_string()), "encoder lost its session: {line}");
                 assert!(
+                    line.contains(&format!("packet_id={packet_id}}}")),
+                    "encoder changed its packet: {line}"
+                );
+                assert!(
                     !line.contains(&ids[1 - marker].to_string()),
                     "session context leaked: {line}"
                 );
             }
             anyhow::Ok(())
-        }
-        .with_subscriber(subscriber)
-        .await
+        })?
     }
 
     /// Bound on every test in this module. The stall under test is unbounded, so a test that hits

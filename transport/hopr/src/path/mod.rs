@@ -15,9 +15,6 @@ pub(crate) mod resolve;
 pub mod selector;
 pub mod traits;
 
-#[cfg(test)]
-pub(crate) mod test_support;
-
 pub use errors::{PathPlannerError, Result};
 pub use planner::{PathPlanner, PathPlannerConfig};
 pub use selector::HoprGraphPathSelector;

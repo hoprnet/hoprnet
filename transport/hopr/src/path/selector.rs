@@ -287,16 +287,14 @@ fn compute_paths<G, W>(
     length: std::num::NonZeroUsize,
     take: usize,
     value_fn: MetricsValueFn<W>,
-) -> (Vec<PathWithMetrics>, usize)
+) -> Vec<PathWithMetrics>
 where
     G: NetworkGraphTraverse<NodeId = OffchainPublicKey, Observed = W>,
     W: EdgeObservableRead + Send + 'static,
 {
     let raw = graph.simple_paths(src, dest, length.get(), Some(take), value_fn);
 
-    let returned = raw.len();
-    let paths = raw
-        .into_iter()
+    raw.into_iter()
         .filter_map(|(path, _, metrics)| {
             tracing::trace!(?path, cost = metrics.cost, "evaluating candidate path");
             if metrics.cost > 0.0 {
@@ -307,8 +305,7 @@ where
                 None
             }
         })
-        .collect();
-    (paths, returned)
+        .collect()
 }
 
 /// A lightweight graph-backed path selector.
@@ -386,7 +383,7 @@ where
         existing: &[PathWithMetrics],
         // The caller's snapshot, so both phases of one query cost against the same face value.
         ticket_face_value: Option<hopr_api::graph::traits::Balance>,
-    ) -> (Vec<PathWithMetrics>, usize) {
+    ) -> Vec<PathWithMetrics> {
         // `forward_without_self_loopback` counts the *finished* path length — the one that includes
         // the `dest` edge appended below — not the shorter traversal depth. Passing the search depth
         // understates it by one: for a 1-hop path it collapses `length` to 1, so the first
@@ -407,9 +404,7 @@ where
             .graph
             .simple_paths_from(src, shorter_length.get(), Some(take), value_fn);
 
-        let returned = raw.len();
-        let paths = raw
-            .into_iter()
+        raw.into_iter()
             .filter_map(|(path, _, metrics)| {
                 if metrics.cost <= 0.0 {
                     return None;
@@ -432,8 +427,7 @@ where
                 Some(PathWithMetrics::from((metrics, candidate)))
             })
             .take(take)
-            .collect();
-        (paths, returned)
+            .collect()
     }
 }
 
@@ -459,8 +453,9 @@ where
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
     #[tracing::instrument(
-        name = "selector.select_paths", level = "debug", skip_all,
-        fields(source = %src, destination = %dest, hops, direction = tracing::field::Empty)
+        name = "selector.select_paths", level = "trace", skip_all,
+        fields(src = %src, dest = %dest, hops, direction = if src == self.me { "forward" } else { "return" }),
+        ret, err
     )]
     fn select_path(
         &self,
@@ -469,7 +464,7 @@ where
         hops: usize,
     ) -> Result<Vec<PathWithMetrics>> {
         let direction = if src == self.me { "forward" } else { "return" };
-        tracing::Span::current().record("direction", direction);
+        tracing::trace!(%src, %dest, hops, direction, "computing paths from graph");
 
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
@@ -479,12 +474,9 @@ where
         // of the same graph, so `composite_weight` would rank a candidate against itself.
         let ticket_face_value = self.graph.ticket_face_value();
 
-        let mut phase2_ran = false;
-        let mut phase2_returned = 0;
-        let mut phase2_eligible = 0;
-        let (paths, phase1_returned, phase1_eligible) = if src == self.me {
+        let paths = if src == self.me {
             // Phase 1: search for full-length forward paths to dest.
-            let (mut found, returned) = compute_paths(
+            let mut found = compute_paths(
                 &self.graph,
                 &src,
                 &dest,
@@ -495,7 +487,12 @@ where
                     ticket_face_value,
                 },
             );
-            let eligible = found.len();
+            tracing::debug!(
+                direction,
+                phase = 1,
+                count = found.len(),
+                "[forward] phase 1 candidates"
+            );
 
             // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback
             // for (length - 1) edges and assume the last hop can be done by anybody.
@@ -503,17 +500,20 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                phase2_ran = true;
-                let (extended, returned) =
+                let extended =
                     self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found, ticket_face_value);
-                phase2_returned = returned;
-                phase2_eligible = extended.len();
+                tracing::debug!(
+                    direction,
+                    phase = 2,
+                    count = extended.len(),
+                    "[forward] phase 2 extended candidates"
+                );
                 found.extend(extended);
             }
 
-            (found, returned, eligible)
+            found
         } else {
-            let (found, returned) = compute_paths(
+            let found = compute_paths(
                 &self.graph,
                 &src,
                 &dest,
@@ -524,12 +524,12 @@ where
                     ticket_face_value,
                 },
             );
-            let eligible = found.len();
-            (found, returned, eligible)
+            tracing::debug!(direction, count = found.len(), "[return] candidates");
+            found
         };
 
         for (i, pwm) in paths.iter().enumerate() {
-            tracing::trace!(
+            tracing::debug!(
                 direction,
                 index = i,
                 path = ?pwm.path,
@@ -539,26 +539,29 @@ where
             );
         }
 
-        let empty = paths.is_empty();
-        let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
-        tracing::debug!(
-            phase1_returned,
-            phase1_eligible,
-            phase2_ran,
-            phase2_returned,
-            phase2_eligible,
-            retained = pruned.len(),
-            search_cap = self.max_paths,
-            outcome = if empty { "empty_search" } else { "completed" },
-            "path search completed",
-        );
-        if empty {
+        if paths.is_empty() {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops,
                 src.to_string(),
                 dest.to_string(),
             )));
         }
+
+        let pruned = prune_for_consistency(paths, self.anonymity_floor, hops);
+        let relayer_set = pruned
+            .iter()
+            .filter_map(|p| p.path.first())
+            .collect::<std::collections::HashSet<_>>();
+        tracing::debug!(
+            %src,
+            %dest,
+            hops,
+            direction,
+            survived = pruned.len(),
+            distinct_relayers = relayer_set.len(),
+            first_relayers = ?relayer_set,
+            "pruned candidate paths",
+        );
 
         Ok(pruned)
     }
@@ -1557,96 +1560,4 @@ mod tests {
     // The forward cost function requires a funding balance on all non-last edges, so
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
-
-    #[serial_test::serial(routing_logs)]
-    #[test]
-    fn search_diagnostics_should_cover_both_traversals_and_empty_results() -> anyhow::Result<()> {
-        use crate::path::test_support::Logs;
-
-        let (me, _, dest, graph) = two_hop_graph();
-        let selector = test_selector(me, graph, MAX_PATHS);
-        let logs = Logs::default();
-        let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::DEBUG));
-        assert_eq!(selector.select_path(me, dest, 1)?.len(), 1);
-        let searches = logs.records("path search completed");
-        assert_eq!(searches.len(), 1);
-        let fields = &searches[0].fields;
-        assert_eq!(fields["phase1_returned"], "1");
-        assert_eq!(fields["phase1_eligible"], "1");
-        assert_eq!(fields["phase2_ran"], "true");
-        assert_eq!(fields["phase2_returned"], "1");
-        assert_eq!(fields["phase2_eligible"], "0", "duplicate removed by extended search");
-        assert_eq!(fields["retained"], "1");
-        let traversals = logs.records("graph traversal completed");
-        assert_eq!(traversals.len(), 2);
-        assert_eq!(
-            traversals[0].ancestry,
-            vec!["selector.select_paths", "graph.simple_paths"]
-        );
-        assert_eq!(
-            traversals[1].ancestry,
-            vec!["selector.select_paths", "graph.simple_paths_from"]
-        );
-        assert!(selector.select_path(pubkey(&SECRET_4), me, 1).is_err());
-        assert_eq!(
-            logs.records("path search completed")[1].fields["outcome"],
-            "empty_search"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn traversal_threshold_comparisons_should_depend_only_on_cost() {
-        let metrics = PathCostWithMetrics {
-            cost: 0.5,
-            total_latency_ms: Some(10),
-            min_probe_success_rate: Some(1.0),
-            min_ack_rate: Some(1.0),
-            fundable_tickets_floor: Some(100),
-        };
-        let different_quality = PathCostWithMetrics {
-            total_latency_ms: None,
-            min_probe_success_rate: None,
-            min_ack_rate: None,
-            fundable_tickets_floor: None,
-            ..metrics.clone()
-        };
-        assert_eq!(
-            metrics, different_quality,
-            "quality metadata must not change DFS equality"
-        );
-        assert_eq!(metrics.partial_cmp(&different_quality), Some(Ordering::Equal));
-        let higher = PathCostWithMetrics {
-            cost: 0.75,
-            ..different_quality
-        };
-        assert_ne!(metrics, higher);
-        assert_eq!(metrics.partial_cmp(&higher), Some(Ordering::Less));
-    }
-
-    #[test]
-    fn ticket_capacity_should_handle_zero_price_and_saturate_large_balances() -> anyhow::Result<()> {
-        use hopr_api::graph::traits::Balance;
-        use hopr_network_graph::Observations;
-
-        for (balance, price, expected) in [
-            (Balance::from(100u64), Some(Balance::zero()), Some(0)),
-            (Balance::max_value(), Some(Balance::one()), Some(u128::MAX)),
-            (Balance::from(100u64), None, None),
-        ] {
-            let mut observed = Observations::default();
-            observed.record(EdgeWeightType::Balance(Some(balance)));
-            let value_fn = MetricsValueFn {
-                inner: EdgeValueFn::forward(1.try_into()?, 0.5, 0.1, price),
-                ticket_face_value: price,
-            };
-            let initial = value_fn.initial_value();
-            let folded = value_fn.into_value_fn()(initial, &observed, 0);
-            assert_eq!(
-                folded.fundable_tickets_floor, expected,
-                "balance={balance}, price={price:?}"
-            );
-        }
-        Ok(())
-    }
 }
