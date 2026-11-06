@@ -409,44 +409,53 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
 ///   `dispatch_start_protocol`'s `session_hit_forward` also measures — so the interesting read is against that case,
 ///   which carries the identical tail but no `contains_key`.
 ///
-/// Like the neighbouring groups, none of these fixtures is new: `make_manager_with_session` and
-/// `make_manager_without_session` are exactly what `dispatch_start_protocol` uses, so a change in
-/// the filter's cost cannot be masked by a change in the fixture. The intended branch is checked
-/// once per benchmark *run* — before `b.iter` is ever called — by a plain `assert!(matches!(...))`
-/// over the same `dispatch_message` call the closure then measures, outside the timed section:
-/// asserting inside `b.iter` would put the assert in the measurement, and it is only ever needed
-/// once, since the fixture is fixed for the life of the group. It is a plain `assert!` rather than
-/// `debug_assert!` because `[profile.bench]` does not enable `debug-assertions`, so a
-/// `debug_assert!` would compile out of `cargo bench` and the check would silently never run. The
-/// timed closures themselves discard the result exactly as the existing ones do.
+/// Admitted messages use bounded batches and a queue without workers. Every result and the queue
+/// drain count are checked outside timing; no measurement may silently switch to queue rejection.
 pub fn dispatch_start_protocol_filter(c: &mut Criterion) {
     let mut group = c.benchmark_group("dispatch_start_protocol_filter");
     group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
-    // `SsaRequest` for a Session held as an outgoing (Forward) slot: the Exit's own Entry. Passes
-    // the filter on the `sessions.get` + `Forward` match, and is enqueued.
-    {
-        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session(forward_routing);
-        let in_data = make_ssa_request_data(session_id);
-
-        assert!(
-            matches!(
-                manager.dispatch_message(session_id, in_data.clone()),
-                Ok(DispatchResult::Processed)
-            ),
-            "fixture must take the filter's Forward-slot arm: the SsaRequest names a session held as an outgoing \
-             (Forward) slot, so dispatch_message must enqueue it, not drop it"
-        );
-
-        group.bench_function("ssa_request_forward_slot", |b| {
-            b.iter(|| {
-                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+    const BATCH: usize = 256;
+    for (name, message) in [
+        (
+            "ssa_request_forward_slot",
+            make_ssa_request_data as fn(SessionId) -> ApplicationDataIn,
+        ),
+        ("keep_alive_registered", make_keep_alive_data),
+    ] {
+        let manager: SessionManager<BenchSink> = SessionManager::new(SessionManagerConfig::default());
+        let mut drain = manager.benchmark_start_queue(BATCH).expect("install benchmark queue");
+        let id = SessionId::random();
+        let _session_rx = manager.pre_populate_session_with_receiver(id, forward_routing(id));
+        let input = message(id);
+        group.bench_function(name, |b| {
+            b.iter_custom(|iterations| {
+                let mut elapsed = std::time::Duration::ZERO;
+                let mut remaining = iterations;
+                while remaining > 0 {
+                    let count = remaining.min(BATCH as u64) as usize;
+                    let before = hopr_transport_session::counters::start_protocol_send_drop_count();
+                    let mut results = Vec::with_capacity(count);
+                    let started = std::time::Instant::now();
+                    for _ in 0..count {
+                        results.push(manager.dispatch_message(id, input.clone()));
+                    }
+                    elapsed += started.elapsed();
+                    assert!(
+                        results
+                            .iter()
+                            .all(|result| matches!(result, Ok(DispatchResult::Processed)))
+                    );
+                    assert_eq!(drain(), count, "every admitted message must reach the queue");
+                    assert_eq!(
+                        hopr_transport_session::counters::start_protocol_send_drop_count(),
+                        before
+                    );
+                    remaining -= count as u64;
+                }
+                elapsed
             });
         });
-
-        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
-        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
-        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
     }
 
     // `SsaRequest` for a pseudonym this node never issued: the DoS flood. Fails the filter after
@@ -468,32 +477,6 @@ pub fn dispatch_start_protocol_filter(c: &mut Criterion) {
         group.bench_function("ssa_request_stranger", |b| {
             b.iter(|| {
                 let _ = manager.dispatch_message(stranger, in_data.clone()).ok();
-            });
-        });
-
-        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
-        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
-        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
-    }
-
-    // `KeepAlive` for a live Session: the steady-state control traffic the flood above must not be
-    // able to starve. Passes the filter on a single `contains_key`, and is enqueued.
-    {
-        let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session(forward_routing);
-        let in_data = make_keep_alive_data(session_id);
-
-        assert!(
-            matches!(
-                manager.dispatch_message(session_id, in_data.clone()),
-                Ok(DispatchResult::Processed)
-            ),
-            "fixture must take the filter's KeepAlive arm: the KeepAlive names a registered session, so \
-             dispatch_message must enqueue it, not drop it"
-        );
-
-        group.bench_function("keep_alive_registered", |b| {
-            b.iter(|| {
-                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
             });
         });
 

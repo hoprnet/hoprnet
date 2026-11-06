@@ -6148,6 +6148,25 @@ where
         Ok(DispatchResult::Unrelated(in_data))
     }
 
+    /// Installs a bounded Start queue without workers and returns a drain operation for benchmarks.
+    ///
+    /// Keeping dequeue work outside the timed section makes dispatch measurements independent of
+    /// worker scheduling. Returns `AlreadyStarted` if a processing queue is already installed.
+    #[cfg(any(feature = "benchmark", test))]
+    pub fn benchmark_start_queue(&self, capacity: usize) -> errors::Result<impl FnMut() -> usize + use<S>> {
+        let (tx, rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        self.start_protocol_tx
+            .set(tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        Ok(move || {
+            let mut drained = 0;
+            while rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            drained
+        })
+    }
+
     /// Pre-populates the sessions cache with a session slot for benchmarking.
     ///
     /// Intended for benchmarks that need a session to exist before calling
