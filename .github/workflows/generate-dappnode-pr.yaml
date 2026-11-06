@@ -34,6 +34,8 @@ concurrency:
   group: dappnode
   cancel-in-progress: false
 
+permissions: {}
+
 jobs:
   build:
     name: package
