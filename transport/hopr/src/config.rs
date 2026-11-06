@@ -7,7 +7,9 @@ use std::{
 };
 
 use hopr_api::Multiaddr;
-pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbPopOrder, SurbStoreConfig};
+pub use hopr_protocol_hopr::{
+    HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, ReplayFilterConfig, SurbPopOrder, SurbStoreConfig,
+};
 use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;

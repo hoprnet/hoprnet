@@ -69,6 +69,13 @@ pub fn create_hopr_instance_config(
             packet: crate::config::HoprPacketPipelineConfig {
                 codec: crate::exports::transport::config::HoprCodecConfig {
                     outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
+                    // Test clusters run several decoders per process; the ten-million-token default generation
+                    // would cost tens of megabytes each. No test needs a longer replay window than the smallest
+                    // accepted one.
+                    replay_filter: crate::exports::transport::config::ReplayFilterConfig {
+                        max_tracked_packets: crate::exports::transport::MIN_TRACKED_PACKETS,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 pipeline: pipeline.unwrap_or_default(),

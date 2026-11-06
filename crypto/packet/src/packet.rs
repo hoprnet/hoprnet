@@ -16,7 +16,7 @@ use crate::{
     HoprEncryptedPartialSsaShare, HoprPixSpec, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite,
     HoprSurb, PAYLOAD_SIZE_INT,
     errors::{
-        PacketError::{PacketConstructionError, PacketDecodingError},
+        PacketError::{PacketConstructionError, PacketDecodingError, PacketReplay},
         Result,
     },
     expand::KeyExpander,
@@ -589,7 +589,100 @@ impl HoprPacket {
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
+    /// packet can be further delivered (relayed to the next hop or read), after asking `is_replay` about the
+    /// packet's [`PacketTag`].
+    ///
+    /// The tag is derived from the shared secret, so it is meaningful only once the elliptic-curve multiplication
+    /// has been done - but it is available *before* the header MAC is verified and before the payload is permuted
+    /// or parsed. This constructor therefore lets a caller reject a replayed packet after the multiplication and
+    /// before that remaining work.
+    ///
+    /// `is_replay` is called at most once, after the secret is derived and before the header MAC is verified; it
+    /// should only *check*. `commit` is called at most once, once the header MAC and the payload permutation have
+    /// succeeded, and it should insert. Returning `true` from either reports [`PacketReplay`].
+    ///
+    /// Splitting them this way is what makes a token cost a well-formed packet: the secret is derived from the
+    /// node's *public* key and the packet's alpha, so anybody can make this function derive a tag - but only a
+    /// packet whose header MAC verifies reaches `commit`, and the MAC cannot be forged without the real secret.
+    ///
+    /// A tag that passes `is_replay` but whose packet then fails to transform is committed only if the header MAC
+    /// had already verified - the "we consumed the SURB opener, then could not finish" case, so its retry is
+    /// recognised. A packet that never authenticated is not committed, so a forged alpha neither advances the
+    /// filter nor can be retried for free.
+    pub fn from_incoming_checked<M, F, R, C>(
+        data: &[u8],
+        node_keypair: &OffchainKeypair,
+        previous_hop: OffchainPublicKey,
+        mapper: &M,
+        reply_openers: F,
+        is_replay: R,
+        commit: C,
+    ) -> Result<Self>
+    where
+        M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        F: FnMut(&HoprSenderId) -> Option<ReplyOpener>,
+        R: FnOnce(&PacketTag) -> bool,
+        C: FnOnce(&PacketTag) -> bool,
+    {
+        if data.len() == Self::SIZE {
+            let (pre_packet, pre_ticket) =
+                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN);
+
+            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
+                MetaPacket::try_from(pre_packet)?;
+
+            let state = mp.forward_secret(node_keypair)?;
+            let tag = *state.tag();
+            if is_replay(&tag) {
+                return Err(PacketReplay);
+            }
+
+            // Only a packet whose header MAC verifies gets this far, so recording the tag from here on means a
+            // forged alpha costs the sender a well-formed packet rather than the public key alone.
+            //
+            // A failure past this point is not *necessarily* permanent - on a reply it can be the opener's
+            // absence, which a concurrent copy of the same packet may still be about to fix - so the tag is
+            // committed and the original error is returned. Reporting a replay instead would misdescribe a packet
+            // that was never seen before.
+            let mut authenticated = false;
+            let forwarded = match mp.into_forwarded_with_secret(state, mapper, reply_openers, || authenticated = true) {
+                Ok(forwarded) => forwarded,
+                Err(error) => {
+                    // A packet that never authenticated is not recorded - that is what keeps a token costing a
+                    // well-formed packet. One that did is, so its retry is recognised instead of paying a second
+                    // decode that cannot succeed either.
+                    //
+                    // `commit` reporting an already-present tag means a concurrent decode of the same packet got
+                    // there first, so this copy is the duplicate - whatever local failure ended this attempt.
+                    //
+                    // A missing reply opener is *not* by itself evidence of that: it is equally what an expired,
+                    // evicted or restart-lost opener looks like, and calling those replays would send an operator
+                    // looking at the wrong subsystem. So the opener error is recorded and returned as itself, and
+                    // only an already-known tag is reported as a replay.
+                    if authenticated && commit(&tag) {
+                        return Err(PacketReplay);
+                    }
+                    return Err(error.into());
+                }
+            };
+
+            // Closes the race between `is_replay` above and this insertion: of two concurrent decodes of the
+            // same packet, exactly one commits and the other is told it is the duplicate.
+            if commit(&tag) {
+                return Err(PacketReplay);
+            }
+
+            Self::from_forwarded_meta_packet(forwarded, pre_ticket, previous_hop)
+        } else {
+            Err(PacketDecodingError("packet has invalid size".into()))
+        }
+    }
+
+    /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
+    ///
+    /// Equivalent to [`HoprPacket::from_incoming_checked`] with no replay filter: the size check and parse live
+    /// there, so the two cannot diverge in which packets they accept.
     pub fn from_incoming<M, F>(
         data: &[u8],
         node_keypair: &OffchainKeypair,
@@ -601,76 +694,86 @@ impl HoprPacket {
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         F: FnMut(&HoprSenderId) -> Option<ReplyOpener>,
     {
-        if data.len() == Self::SIZE {
-            let (pre_packet, pre_ticket) =
-                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN);
+        Self::from_incoming_checked(
+            data,
+            node_keypair,
+            previous_hop,
+            mapper,
+            reply_openers,
+            |_| false,
+            |_| false,
+        )
+    }
 
-            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
-                MetaPacket::try_from(pre_packet)?;
+    /// Turns a transformed packet into the [`HoprPacket`] the rest of the stack consumes.
+    ///
+    /// Shared by [`HoprPacket::from_incoming`] and [`HoprPacket::from_incoming_checked`], so that the checked
+    /// constructor cannot drift from the unchecked one in what it returns.
+    fn from_forwarded_meta_packet(
+        forwarded: ForwardedMetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>,
+        pre_ticket: &[u8],
+        previous_hop: OffchainPublicKey,
+    ) -> Result<Self> {
+        match forwarded {
+            ForwardedMetaPacket::Relayed {
+                packet,
+                derived_secret,
+                additional_info,
+                packet_tag,
+                next_node,
+                path_pos,
+                ..
+            } => {
+                let ack_key = derive_ack_key_share(&derived_secret);
 
-            match mp.into_forwarded(node_keypair, mapper, reply_openers)? {
-                ForwardedMetaPacket::Relayed {
-                    packet,
-                    derived_secret,
-                    additional_info,
-                    packet_tag,
-                    next_node,
-                    path_pos,
-                    ..
-                } => {
-                    let ack_key = derive_ack_key_share(&derived_secret);
-
-                    let ticket = Ticket::try_from(pre_ticket)?;
-                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
-                    Ok(Self::Forwarded(
-                        HoprForwardedPacket {
-                            outgoing: HoprOutgoingPacket {
-                                packet,
-                                ticket,
-                                next_hop: next_node,
-                                ack_challenge: verification_output.ack_challenge,
-                                encrypted_pix_share: None,
-                            },
-                            packet_tag,
-                            ack_key,
-                            previous_hop,
-                            path_pos,
-                            own_key: verification_output.own_key,
-                            next_challenge: verification_output.next_ticket_challenge,
-                        }
-                        .into(),
-                    ))
-                }
-                ForwardedMetaPacket::Final {
-                    packet_tag,
-                    plain_text,
-                    derived_secret,
-                    receiver_data,
-                    no_ack,
-                } => {
-                    // The pre_ticket is not parsed nor verified on the final hop
-                    let HoprPacketParts {
-                        surbs,
-                        payload,
-                        signals,
-                    } = HoprPacketMessage::from(plain_text).try_into()?;
-                    let should_acknowledge = !no_ack;
-                    Ok(Self::Final(
-                        HoprIncomingPacket {
-                            packet_tag,
-                            ack_key: should_acknowledge.then(|| derive_ack_key_share(&derived_secret)),
-                            previous_hop,
-                            plain_text: payload.into(),
-                            surbs: receiver_data.into_sequence().map(|d| d.surb_id()).zip(surbs).collect(),
-                            sender: receiver_data.pseudonym(),
-                            signals,
-                        }
-                        .into(),
-                    ))
-                }
+                let ticket = Ticket::try_from(pre_ticket)?;
+                let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
+                Ok(Self::Forwarded(
+                    HoprForwardedPacket {
+                        outgoing: HoprOutgoingPacket {
+                            packet,
+                            ticket,
+                            next_hop: next_node,
+                            ack_challenge: verification_output.ack_challenge,
+                            encrypted_pix_share: None,
+                        },
+                        packet_tag,
+                        ack_key,
+                        previous_hop,
+                        path_pos,
+                        own_key: verification_output.own_key,
+                        next_challenge: verification_output.next_ticket_challenge,
+                    }
+                    .into(),
+                ))
             }
-        } else {
-            Err(PacketDecodingError("packet has invalid size".into()))
+            ForwardedMetaPacket::Final {
+                packet_tag,
+                plain_text,
+                derived_secret,
+                receiver_data,
+                no_ack,
+            } => {
+                // The pre_ticket is not parsed nor verified on the final hop
+                let HoprPacketParts {
+                    surbs,
+                    payload,
+                    signals,
+                } = HoprPacketMessage::from(plain_text).try_into()?;
+                let should_acknowledge = !no_ack;
+                Ok(Self::Final(
+                    HoprIncomingPacket {
+                        packet_tag,
+                        ack_key: should_acknowledge.then(|| derive_ack_key_share(&derived_secret)),
+                        previous_hop,
+                        plain_text: payload.into(),
+                        surbs: receiver_data.into_sequence().map(|d| d.surb_id()).zip(surbs).collect(),
+                        sender: receiver_data.pseudonym(),
+                        signals,
+                    }
+                    .into(),
+                ))
+            }
         }
     }
 }
@@ -704,6 +807,7 @@ mod tests {
             .into();
     }
 
+    /// Re-signs a forwarded packet's ticket so the next hop sees this node as its issuer.
     fn forward(
         mut packet: HoprPacket,
         chain_keypair: &ChainKeypair,
@@ -722,6 +826,7 @@ mod tests {
     }
 
     impl HoprPacket {
+        /// Serializes the packet the way the wire format expects: sphinx payload then ticket.
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!(
                 "67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349"
@@ -745,6 +850,7 @@ mod tests {
         }
     }
 
+    /// A ticket builder for a path of `path_len` hops to `next_peer_channel_key`.
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize) -> anyhow::Result<TicketBuilder> {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
@@ -764,6 +870,7 @@ mod tests {
 
     const FLAGS: PacketSignal = PacketSignal::OutOfSurbs;
 
+    /// Builds an outgoing packet with the given forward path and optional return paths.
     fn create_packet(
         forward_hops: usize,
         pseudonym: HoprPseudonym,
@@ -804,6 +911,7 @@ mod tests {
         )?)
     }
 
+    /// Builds a reply packet over `surb`, signed by the node at `sender_node`.
     fn create_packet_from_surb(
         sender_node: usize,
         surb_id: HoprSurbId,
@@ -1188,5 +1296,195 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    /// The checked constructor must report a replay through its own error, after having called the check exactly
+    /// once, and before returning a packet.
+    #[test]
+    fn a_rejected_tag_should_stop_the_decode() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(1, SimplePseudonym::random(), vec![], b"replay checked")?;
+        let wire = packet.to_bytes();
+        let mut calls = 0;
+        let mut commits = 0;
+
+        let result = HoprPacket::from_incoming_checked(
+            &wire,
+            &PEERS[1].1,
+            *PEERS[0].1.public(),
+            &*MAPPER,
+            |_| None,
+            |_| {
+                calls += 1;
+                true
+            },
+            |_| {
+                commits += 1;
+                false
+            },
+        );
+
+        assert!(
+            matches!(result, Err(crate::errors::PacketError::PacketReplay)),
+            "must report a replay"
+        );
+        assert_eq!(1, calls, "the check must be asked exactly once");
+        assert_eq!(0, commits, "a packet rejected by the check must not be committed");
+        Ok(())
+    }
+
+    /// A tag that the check accepts must let the packet through unchanged, and both callbacks must have seen the
+    /// tag the decoded packet carries - the invariant the decoder's replay filter relies on.
+    #[test]
+    fn an_accepted_tag_should_decode_to_the_same_packet() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(2, SimplePseudonym::random(), vec![], b"replay checked")?;
+        let wire = packet.to_bytes();
+        let mut seen = None;
+        let mut committed = None;
+
+        let checked = HoprPacket::from_incoming_checked(
+            &wire,
+            &PEERS[1].1,
+            *PEERS[0].1.public(),
+            &*MAPPER,
+            |_| None,
+            |tag| {
+                seen = Some(*tag);
+                false
+            },
+            |tag| {
+                committed = Some(*tag);
+                false
+            },
+        )?;
+        let unchecked = HoprPacket::from_incoming(&wire, &PEERS[1].1, *PEERS[0].1.public(), &*MAPPER, |_| None)?;
+
+        assert_eq!(
+            seen.as_ref(),
+            checked.packet_tag(),
+            "the check must see the tag the packet carries"
+        );
+        assert_eq!(
+            committed.as_ref(),
+            checked.packet_tag(),
+            "the commit must see the tag the packet carries"
+        );
+        assert_eq!(
+            checked.packet_tag(),
+            unchecked.packet_tag(),
+            "the checked and unchecked constructors must derive the same tag"
+        );
+        Ok(())
+    }
+
+    /// A packet whose header MAC does not verify must not be committed, even though its tag was derivable and the
+    /// check let it through. This is what makes a committed token cost a well-formed packet rather than the node's
+    /// public key.
+    #[test]
+    fn a_packet_failing_the_header_mac_should_not_be_committed() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(1, SimplePseudonym::random(), vec![], b"replay checked")?;
+        let mut wire = packet.to_bytes().to_vec();
+
+        // Keep the alpha, so the secret - and hence the tag - is derivable, but corrupt the header after it.
+        const ALPHA_LEN: usize = 32;
+        wire[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+
+        let mut checked = 0;
+        let mut committed = 0;
+        let result = HoprPacket::from_incoming_checked(
+            &wire,
+            &PEERS[1].1,
+            *PEERS[0].1.public(),
+            &*MAPPER,
+            |_| None,
+            |_| {
+                checked += 1;
+                false
+            },
+            |_| {
+                committed += 1;
+                false
+            },
+        );
+
+        assert!(result.is_err(), "a corrupted header must not decode");
+        assert_eq!(1, checked, "the tag is derivable, so the check runs");
+        assert_eq!(0, committed, "a packet failing the header MAC must not be committed");
+        Ok(())
+    }
+
+    /// Every hop re-blinds the secret, so the tag a node sees differs from its predecessor's - otherwise the second
+    /// hop would reject a legitimate packet.
+    #[test]
+    fn the_tag_should_differ_between_hops_of_the_same_packet() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(2, SimplePseudonym::random(), vec![], b"replay checked")?;
+
+        let first_tag = {
+            let mut seen = None;
+            HoprPacket::from_incoming_checked(
+                &packet.to_bytes(),
+                &PEERS[1].1,
+                *PEERS[0].1.public(),
+                &*MAPPER,
+                |_| None,
+                |tag| {
+                    seen = Some(*tag);
+                    false
+                },
+                |_| false,
+            )?;
+            seen.context("the check must have been called")?
+        };
+
+        let forwarded = process_packet_at_node(3, 1, false, packet, |_| None)?;
+        let second_tag = {
+            let mut seen = None;
+            HoprPacket::from_incoming_checked(
+                &forwarded.to_bytes(),
+                &PEERS[2].1,
+                *PEERS[1].1.public(),
+                &*MAPPER,
+                |_| None,
+                |tag| {
+                    seen = Some(*tag);
+                    false
+                },
+                |_| false,
+            )?;
+            seen.context("the check must have been called")?
+        };
+
+        assert_ne!(first_tag, second_tag, "the shared secret must change at every hop");
+        Ok(())
+    }
+
+    /// A packet whose size is wrong must be rejected before either callback runs, so a caller whose filter is keyed
+    /// on the tag is never asked about a buffer that has none.
+    #[test]
+    fn a_wrong_size_packet_should_not_reach_the_replay_predicate() {
+        let checked = std::cell::Cell::new(0);
+        let committed = std::cell::Cell::new(0);
+        let result = HoprPacket::from_incoming_checked(
+            &[0u8; 100],
+            &PEERS[1].1,
+            *PEERS[0].1.public(),
+            &*MAPPER,
+            |_| None,
+            |_| {
+                checked.set(checked.get() + 1);
+                false
+            },
+            |_| {
+                committed.set(committed.get() + 1);
+                false
+            },
+        );
+
+        assert!(result.is_err(), "a short buffer must not decode");
+        assert_eq!(0, checked.get(), "the check must not be called for a wrong-size buffer");
+        assert_eq!(
+            0,
+            committed.get(),
+            "the commit must not be called for a wrong-size buffer"
+        );
     }
 }
