@@ -10007,8 +10007,8 @@ mod tests {
     /// make the comparison about SURB scarcity rather than about cadence.
     #[test_log::test(tokio::test)]
     async fn a_losing_exit_session_reports_faster_until_the_loss_stops() -> anyhow::Result<()> {
-        // Four normal periods a second apart: a normal period slow enough that the normal cadence
-        // cannot fit twice in the windows below, and a degraded period fast enough to fit there.
+        // A normal period long enough that the normal cadence cannot fit twice in the windows below,
+        // and a degraded period fast enough to fit several times.
         let normal = Duration::from_secs(4);
         let degraded = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
         let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
