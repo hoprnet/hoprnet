@@ -81,8 +81,8 @@ impl FrameLossSignal {
 
     /// Frames lost since this signal was created.
     ///
-    /// Unlike [`FrameLossReport`](super::loss_report)'s counters, this one is never reset by a
-    /// window closing.
+    /// Unlike the socket's per-window log summary, this count is never reset: it is the total for
+    /// the life of the socket.
     pub fn lost_total(&self) -> u64 {
         self.lost_total.load(Ordering::Relaxed)
     }
