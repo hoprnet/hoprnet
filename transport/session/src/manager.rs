@@ -3314,9 +3314,8 @@ impl<S> Clone for SessionManager<S> {
     }
 }
 
-#[cfg(any(test, feature = "telemetry"))]
 fn session_config(cfg: &SessionManagerConfig, capabilities: Capabilities) -> HoprSessionConfig {
-    session_config_with(cfg, capabilities, None, None)
+    session_config_with(cfg, capabilities, None)
 }
 
 /// As [`session_config`], with the initiating session's own head-of-line bound.
@@ -3331,7 +3330,6 @@ fn session_config_with(
     cfg: &SessionManagerConfig,
     capabilities: Capabilities,
     max_frames_behind_gap: Option<usize>,
-    exit_loss_signal: Option<Arc<FrameLossSignal>>,
 ) -> HoprSessionConfig {
     // Only a session that cannot recover the missing frame should abandon it early. With
     // retransmission the gap is a request away, so waiting is productive and cutting it short
@@ -3354,8 +3352,6 @@ fn session_config_with(
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
         max_frames_behind_gap: (!can_retransmit).then_some(bound).flatten(),
-        // Only the Exit passes one: its frame loss is what the Entry's dead-relayer verdict waits on.
-        exit_loss_signal,
     }
 }
 
@@ -4833,7 +4829,7 @@ where
                     let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
-                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap, None),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
                         (
                             reduced_surb_scoring_sender,
                             session_rx.inspect(move |_| {
@@ -4857,6 +4853,7 @@ where
                         // anti-grief down-only ceiling, and the client's opt-in flow-control config.
                         Some(surb_mgmt.clone()),
                         cfg.flow_control,
+                        None,
                     )?;
 
                     #[cfg(feature = "telemetry")]
@@ -4953,7 +4950,7 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap, None),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
                         (
                             reduced_surb_sender,
                             session_rx.inspect(move |_| {
@@ -7103,7 +7100,7 @@ where
             let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
-                session_config_with(&self.cfg, session_req.capabilities.into(), None, loss_signal.clone()),
+                session_config(&self.cfg, session_req.capabilities.into()),
                 (
                     // Sent packets = SURB consumption estimate. Data is held back once the stock is down
                     // to the reserve for the keep-alives, but only after the Entry's first keep-alive has
@@ -7137,6 +7134,7 @@ where
                 Some(closure_notifier),
                 None,
                 None,
+                loss_signal.clone(),
             )?;
 
             // The SURB balancer will start intervening by rate-limiting the
@@ -7194,7 +7192,7 @@ where
             let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
-                session_config_with(&self.cfg, session_req.capabilities.into(), None, loss_signal.clone()),
+                session_config(&self.cfg, session_req.capabilities.into()),
                 (
                     msg_sender.clone().sink_map_err(std::io::Error::other).with(
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
@@ -7222,6 +7220,7 @@ where
                 Some(closure_notifier),
                 None,
                 None,
+                loss_signal.clone(),
             )?;
 
             self.spawn_exit_keep_alive(
@@ -8692,17 +8691,17 @@ mod tests {
         };
 
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), Some(16), None).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), Some(16)).max_frames_behind_gap,
             Some(16),
             "the session's own value must win over the node default"
         );
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), None, None).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), None).max_frames_behind_gap,
             Some(256),
             "saying nothing must inherit the node default"
         );
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), Some(0), None).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), Some(0)).max_frames_behind_gap,
             None,
             "zero disables the bound for this session, matching the env knob's semantics"
         );
@@ -8713,7 +8712,7 @@ mod tests {
     fn a_session_override_should_not_reach_a_session_that_can_retransmit() {
         let node = SessionManagerConfig::default();
         assert_eq!(
-            session_config_with(&node, Capability::RetransmissionAck.into(), Some(4), None).max_frames_behind_gap,
+            session_config_with(&node, Capability::RetransmissionAck.into(), Some(4)).max_frames_behind_gap,
             None,
             "retransmission can recover the gap, so no caller should be able to cut the wait short"
         );

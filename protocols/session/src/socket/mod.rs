@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Configuration object for [`SessionSocket`].
-#[derive(Debug, Clone, Eq, PartialEq, smart_default::SmartDefault)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct SessionSocketConfig {
     /// The maximum size of a frame on the read/write interface of the [`SessionSocket`].
     ///
@@ -113,16 +113,6 @@ pub struct SessionSocketConfig {
     /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
     #[default(None)]
     pub max_frames_behind_gap: Option<usize>,
-    /// Live frame loss this socket records into, for a reader that has to react within seconds.
-    ///
-    /// The socket already counts loss for its per-window log summary (see `loss_report`), but that
-    /// window is 30 s wide: a reader deciding on it would learn about a lost frame half a minute
-    /// late, and keep reacting to one that stopped. This signal is stamped at every loss and never
-    /// reset, so a reader can ask whether loss happened in, say, the last three seconds.
-    ///
-    /// `None` (the default) records nothing, which is every socket whose loss nobody acts on.
-    #[default(None)]
-    pub loss_signal: Option<Arc<FrameLossSignal>>,
 }
 
 /// Logs a failed update of the socket state.
@@ -180,10 +170,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
     ///
     /// Note that this results in a faster socket than if created via [`SessionSocket::new`] with
     /// [`Stateless`]. This is because the frame inspector does not need to be instantiated.
+    ///
+    /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
+    /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
+    /// seconds; the per-window log summary is too coarse for that. `None` records nothing.
     pub fn new_stateless<T, I>(
         id: I,
         transport: T,
         cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
         #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
@@ -225,7 +220,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let loss_report = Arc::new(FrameLossReport::with_signal(
             &id,
             FRAME_LOSS_REPORT_INTERVAL,
-            cfg.loss_signal.clone(),
+            loss_signal,
         ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
@@ -348,10 +343,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     /// Creates a stateful socket with frame inspection capabilities - suitable for communication
     /// requiring TCP-like delivery guarantees.
+    ///
+    /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
+    /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
+    /// seconds; the per-window log summary is too coarse for that. `None` records nothing.
     pub fn new<T>(
         transport: T,
         mut state: S,
         cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
         #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
@@ -445,7 +445,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let loss_report = Arc::new(FrameLossReport::with_signal(
             state.session_id(),
             FRAME_LOSS_REPORT_INTERVAL,
-            cfg.loss_signal.clone(),
+            loss_signal,
         ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
@@ -734,6 +734,7 @@ mod tests {
                         "malformed",
                         transport.compat(),
                         SessionSocketConfig::default(),
+                        None,
                         #[cfg(feature = "telemetry")]
                         NoopTracker,
                     )?
@@ -742,6 +743,7 @@ mod tests {
                         transport.compat(),
                         Stateless::<MTU>::new("malformed"),
                         SessionSocketConfig::default(),
+                        None,
                         #[cfg(feature = "telemetry")]
                         NoopTracker,
                     )?
@@ -778,6 +780,7 @@ mod tests {
             alice,
             Stateless::<MTU>::new("alice"),
             SessionSocketConfig::default(),
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -824,14 +827,16 @@ mod tests {
             let mut sender = SessionSocket::<MTU, _>::new_stateless(
                 "alice",
                 alice,
-                cfg.clone(),
+                cfg,
+                None,
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
             let mut receiver = SessionSocket::<MTU, _>::new_stateless(
                 "bob",
                 bob,
-                cfg.clone(),
+                cfg,
+                None,
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
@@ -866,14 +871,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -923,14 +930,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -971,14 +980,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1041,14 +1052,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1101,14 +1114,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1156,14 +1171,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1205,14 +1222,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1274,14 +1293,16 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg.clone(),
+            sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1350,6 +1371,7 @@ mod tests {
             "alice",
             alice,
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -1357,6 +1379,7 @@ mod tests {
             "bob",
             bob,
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1419,7 +1442,6 @@ mod tests {
                 frame_size: FRAME_SIZE,
                 frame_timeout: Duration::from_millis(300),
                 max_frames_behind_gap: Some(1),
-                loss_signal: Some(signal.clone()),
                 ..Default::default()
             };
             let alice_cfg = SessionSocketConfig {
@@ -1432,6 +1454,7 @@ mod tests {
                     "alice",
                     alice,
                     alice_cfg,
+                    None,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?
@@ -1440,6 +1463,7 @@ mod tests {
                     alice,
                     Stateless::<MTU>::new("alice"),
                     alice_cfg,
+                    None,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?
@@ -1449,6 +1473,7 @@ mod tests {
                     "bob",
                     bob,
                     bob_cfg,
+                    Some(signal.clone()),
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?
@@ -1457,6 +1482,7 @@ mod tests {
                     bob,
                     Stateless::<MTU>::new("bob"),
                     bob_cfg,
+                    Some(signal.clone()),
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?
@@ -1522,6 +1548,7 @@ mod tests {
                 frame_size: FRAME_SIZE,
                 ..Default::default()
             },
+            None,
             #[cfg(feature = "telemetry")]
             TestTelemetryTracker::default(),
         )?;
@@ -1534,6 +1561,7 @@ mod tests {
                 max_frames_behind_gap,
                 ..Default::default()
             },
+            None,
             #[cfg(feature = "telemetry")]
             TestTelemetryTracker::default(),
         )?;
@@ -1624,6 +1652,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1631,6 +1660,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1699,6 +1729,7 @@ mod tests {
             "alice",
             alice,
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -1706,6 +1737,7 @@ mod tests {
             "bob",
             bob,
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1795,6 +1827,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?
@@ -1804,6 +1837,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?

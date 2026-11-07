@@ -323,7 +323,8 @@ mod tests {
         let mut alice_socket = SessionSocket::new(
             alice,
             CloneableMockState::new(alice_state, "alice"),
-            cfg.clone(),
+            cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -331,6 +332,7 @@ mod tests {
             bob,
             CloneableMockState::new(bob_state, "bob"),
             cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;

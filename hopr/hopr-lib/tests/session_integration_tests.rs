@@ -290,7 +290,7 @@ async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketA
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cfg.clone(),
+        cfg,
         (
             alice_tx,
             alice_rx.map(|(_, d)| ApplicationDataIn {
@@ -305,7 +305,7 @@ async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketA
     let bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.into()),
-        cfg.clone(),
+        cfg,
         (
             bob_tx,
             bob_rx.map(|(_, d)| ApplicationDataIn {
@@ -438,7 +438,7 @@ async fn nodelay_on_reliable_session_keeps_byte_stream_framing(
     let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cfg.clone(),
+        cfg,
         (
             alice_tx,
             alice_rx.map(|(_, d)| ApplicationDataIn {
@@ -451,7 +451,7 @@ async fn nodelay_on_reliable_session_keeps_byte_stream_framing(
     let mut bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.into()),
-        cfg.clone(),
+        cfg,
         (
             bob_tx,
             bob_rx.map(|(_, d)| ApplicationDataIn {
