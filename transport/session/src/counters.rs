@@ -133,8 +133,8 @@ pub fn session_malformed_start_message_count() -> usize {
     SESSION_MALFORMED_START_MESSAGES.load(Ordering::Relaxed)
 }
 
-/// Cumulative count of Start-protocol messages that never reached the processing queue: the queue
-/// was full, or the manager was shutting down (`try_send` failed).
+/// Cumulative count of Start-protocol messages that never reached a processing lane: the lane was
+/// full, or the manager was shutting down (`try_send` failed).
 ///
 /// Distinct from [`SESSION_STALE_START_MESSAGES`]: these named real local state and were lost to
 /// backpressure or to shutdown rather than to the admission filter. Before the filter existed this
