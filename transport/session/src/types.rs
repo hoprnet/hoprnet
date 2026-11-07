@@ -25,8 +25,8 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SegmentRequest,
-    SeqIndicator, SessionSocketConfig, UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
+    SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -640,13 +640,18 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
     /// flow-control config. `flow_control` = the client's [`FlowControlConfig`] for this session
     /// (`None` leaves it unpaced); `surb_mgmt` gives the window its anti-grief down-only SURB ceiling.
-    /// The entry (sending) side passes `Some(..)`; sites without them pass `None`.
+    /// The entry (sending) side passes `Some(..)` for it; sites without them pass `None`.
+    ///
+    /// `loss_signal` is the Exit's handle on the frames its socket fails to reassemble: the socket
+    /// stamps it at every loss, so the Exit can react within seconds. It reaches only the sockets of
+    /// Sessions with [`Capability::Segmentation`] (a raw Session has no frames to lose); `None`
+    /// records nothing.
     #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(
@@ -657,6 +662,7 @@ impl HoprSession {
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
         flow_control: Option<FlowControlConfig>,
+        loss_signal: Option<Arc<FrameLossSignal>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -789,6 +795,7 @@ impl HoprSession {
                     transport,
                     ack_state,
                     socket_cfg,
+                    loss_signal,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?;
@@ -817,6 +824,7 @@ impl HoprSession {
                     id,
                     transport,
                     socket_cfg,
+                    loss_signal,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?)
@@ -1304,6 +1312,7 @@ mod tests {
                 max_window_size: SESSION_MTU,
                 ..Default::default()
             }),
+            None,
         )?;
         let frame = vec![7u8; SESSION_MTU];
         session.write_all(&frame).await?;
@@ -1399,6 +1408,66 @@ mod tests {
         assert_eq!(&alice_sent, bob_recv.as_slice());
         assert_eq!(bob_sent, alice_recv);
 
+        Ok(())
+    }
+
+    /// A loss signal passed to `new_with_surb_state` reaches the socket, and the socket records into it.
+    ///
+    /// This is the seam the Exit relies on: the manager creates the signal per Exit Session, hands it
+    /// to the Session constructor, and the socket stamps it on every frame it fails to reassemble. A segment
+    /// whose frame never completes is exactly that — the frame expires incomplete.
+    #[test_log::test(tokio::test)]
+    async fn a_passed_loss_signal_records_the_frames_the_socket_fails_to_reassemble() -> anyhow::Result<()> {
+        use hopr_protocol_session::types::{Segment, SeqIndicator, SessionMessage};
+
+        let id: SessionId = HoprPseudonym::random();
+        let signal = Arc::new(FrameLossSignal::new());
+        let (mut incoming, rx) = futures::channel::mpsc::channel(4);
+        let session = HoprSession::new_with_surb_state(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation.into(),
+                // Three segments per frame, of which only the first ever arrives.
+                frame_mtu: 3 * SESSION_MTU,
+                frame_timeout: Duration::from_millis(100),
+                ..Default::default()
+            },
+            (futures::sink::drain(), rx),
+            None,
+            None,
+            None,
+            Some(signal.clone()),
+        )?;
+
+        assert_eq!(0, signal.lost_total(), "nothing lost before anything arrived");
+        incoming
+            .send(ApplicationDataIn {
+                data: ApplicationData::new(
+                    SESSION_APPLICATION_TAG,
+                    SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::Segment(Segment {
+                        frame_id: 1,
+                        seq_idx: 0,
+                        // One segment of a three-segment frame: the other two never arrive.
+                        seq_flags: SeqIndicator::new_with_flags(3, false),
+                        data: vec![0u8; SESSION_MTU].into_boxed_slice(),
+                    })
+                    .into_encoded()
+                    .into_vec(),
+                )?,
+                packet_info: Default::default(),
+            })
+            .await?;
+
+        // The frame expires incomplete, which is the loss the signal exists to carry.
+        let mut buf = [0u8; SESSION_MTU];
+        let mut session = session;
+        let _ = tokio::time::timeout(Duration::from_secs(2), session.read(&mut buf)).await;
+        assert!(
+            signal.lost_total() > 0,
+            "a frame that expired incomplete must be recorded in the signal passed to the socket"
+        );
+        assert!(signal.lost_within(Duration::from_secs(5)));
         Ok(())
     }
 
