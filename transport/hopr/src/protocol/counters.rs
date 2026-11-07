@@ -7,19 +7,68 @@ use std::{
 };
 
 use dashmap::DashMap;
-use hopr_api::types::crypto::types::OffchainPublicKey;
+use hopr_api::types::{
+    crypto::types::{HalfKeyChallenge, OffchainPublicKey},
+    internal::prelude::Acknowledgement,
+};
+
+/// Outlasts the counter flush grace, so a late genuine ack still matches.
+const EXPECTED_ACK_TTL: Duration = Duration::from_secs(30);
+const EXPECTED_ACK_CAPACITY: u64 = 65_536;
 
 /// Minimal atomic counters for per-peer protocol conformance tracking.
 ///
 /// Tracks the number of messages sent and acknowledgments received for a
 /// single peer. All operations are lock-free using relaxed atomic ordering.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PeerProtocolCounters {
     messages_sent: AtomicU64,
     acks_received: AtomicU64,
+    unmatched_acks: AtomicU64,
+    expected_acks: moka::sync::Cache<HalfKeyChallenge, ()>,
+}
+
+impl Default for PeerProtocolCounters {
+    fn default() -> Self {
+        Self {
+            messages_sent: AtomicU64::new(0),
+            acks_received: AtomicU64::new(0),
+            unmatched_acks: AtomicU64::new(0),
+            expected_acks: moka::sync::Cache::builder()
+                .time_to_live(EXPECTED_ACK_TTL)
+                .max_capacity(EXPECTED_ACK_CAPACITY)
+                .build(),
+        }
+    }
 }
 
 impl PeerProtocolCounters {
+    /// Record a packet this peer must relay; 0-hop packets say nothing about relaying, so skip them.
+    pub fn record_relayed_message_sent(&self, ack_challenge: HalfKeyChallenge) {
+        self.messages_sent.fetch_add(1, Ordering::Relaxed);
+        self.expected_acks.insert(ack_challenge, ());
+    }
+
+    /// Count acks solving an awaited challenge; a rejecting relay's random ack solves none.
+    pub fn record_genuine_acks(&self, peer: &OffchainPublicKey, acks: &[Acknowledgement]) -> u64 {
+        let verified = Acknowledgement::verify_batch(acks.iter().map(|ack| (*peer, *ack)));
+        let genuine = verified
+            .into_iter()
+            .filter_map(|ack| ack.ok()?.ack_key_share().to_challenge().ok())
+            .filter(|challenge| self.expected_acks.remove(challenge).is_some())
+            .count() as u64;
+
+        self.acks_received.fetch_add(genuine, Ordering::Relaxed);
+        self.unmatched_acks
+            .fetch_add(acks.len() as u64 - genuine, Ordering::Relaxed);
+        genuine
+    }
+
+    /// Swap the counter of acks that matched no expected challenge to 0, returning its value.
+    pub fn take_unmatched_acks(&self) -> u64 {
+        self.unmatched_acks.swap(0, Ordering::Relaxed)
+    }
+
     /// Record that a message was sent to this peer.
     #[inline]
     pub fn record_message_sent(&self) {

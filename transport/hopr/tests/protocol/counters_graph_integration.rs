@@ -2,6 +2,7 @@ mod common;
 
 use std::time::Duration;
 
+use anyhow::Context;
 use common::{
     PEERS, PEERS_CHAIN, emulate_channel_communication, make_outgoing_packets, peer_setup_for_with_counters,
     random_packets_of_count, resolve_mock_path,
@@ -10,10 +11,14 @@ use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::{
     graph::{
-        NetworkGraphWrite,
-        traits::{EdgeObservableWrite, EdgeWeightType},
+        NetworkGraphView, NetworkGraphWrite,
+        traits::{EdgeImmediateProtocolObservable, EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
     },
-    types::{crypto::prelude::*, internal::errors::PathError},
+    types::{
+        crypto::prelude::*,
+        crypto_random::Randomizable,
+        internal::{errors::PathError, prelude::VerifiedAcknowledgement},
+    },
 };
 use hopr_network_graph::ChannelGraph;
 use hopr_transport::{
@@ -262,6 +267,127 @@ async fn a_cold_burst_flush_decides_whether_the_one_hop_route_survives() -> anyh
     assert!(
         selector.select_path(me, dest, 1).is_ok(),
         "the grace keeps the relay above min_ack_rate, so the 1-hop route survives"
+    );
+
+    Ok(())
+}
+
+/// 0-hop packets must not feed the neighbour's relay ack rate; 1-hop genuine acks must.
+#[serial]
+#[test_log::test(tokio::test)]
+async fn only_relayed_packets_and_their_genuine_acks_are_counted() -> anyhow::Result<()> {
+    let packet_count = 3;
+    let (wire_apis, mut apis, _ticket_channels, _processes, counters) = peer_setup_for_with_counters(3).await?;
+    tokio::task::spawn(emulate_channel_communication(wire_apis));
+
+    let zero_hop = resolve_mock_path(
+        PEERS_CHAIN[0].public().to_address(),
+        vec![PEERS_CHAIN[1].public().to_address()],
+    )
+    .await?;
+    let out_msgs = make_outgoing_packets(&random_packets_of_count(packet_count), zero_hop);
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+    (&mut apis[1].1)
+        .take(packet_count)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT))
+        .await?;
+
+    let one_hop = resolve_mock_path(
+        PEERS_CHAIN[0].public().to_address(),
+        PEERS_CHAIN[1..3].iter().map(|k| k.public().to_address()).collect(),
+    )
+    .await?;
+    let out_msgs = make_outgoing_packets(&random_packets_of_count(packet_count), one_hop);
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+    (&mut apis[2].1)
+        .take(packet_count)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT))
+        .await?;
+
+    let relay = *PEERS[1].public();
+    let report = counters[0].drain_settled(Duration::from_secs(1)).await;
+    let (_, sent, acks) = report
+        .iter()
+        .find(|(peer, ..)| *peer == relay)
+        .context("the relay must be reported")?;
+    assert_eq!(*sent, packet_count as u64, "only the 1-hop packets count as sent");
+    assert_eq!(*acks, packet_count as u64, "only their genuine acks count");
+    assert_eq!(
+        counters[0].get_or_create(&relay).take_unmatched_acks(),
+        packet_count as u64,
+        "the 0-hop acks match no relayed packet"
+    );
+
+    Ok(())
+}
+
+/// Conformance report for `packet_count` relayed packets plus `probe_acks` genuine 0-hop probe acks.
+fn relay_ack_report(
+    relay_key: &OffchainKeypair,
+    packet_count: usize,
+    relay_rejects: bool,
+    probe_acks: usize,
+) -> Vec<(OffchainPublicKey, u64, u64)> {
+    let registry = PeerProtocolCounterRegistry::default();
+    let counters = registry.get_or_create(relay_key.public());
+
+    let mut acks = Vec::new();
+    for _ in 0..packet_count {
+        let half_key = HalfKey::random();
+        let challenge = half_key.to_challenge().expect("random half key has a challenge");
+        counters.record_relayed_message_sent(challenge);
+        let ack = if relay_rejects {
+            VerifiedAcknowledgement::random(relay_key)
+        } else {
+            VerifiedAcknowledgement::new(half_key, relay_key)
+        };
+        acks.push(ack.leak());
+    }
+    for _ in 0..probe_acks {
+        acks.push(VerifiedAcknowledgement::new(HalfKey::random(), relay_key).leak());
+    }
+    counters.record_genuine_acks(relay_key.public(), &acks);
+
+    registry.drain()
+}
+
+/// Probe acks must not cycle a random-acking relay back into path selection.
+#[serial]
+#[test_log::test(tokio::test)]
+async fn a_relay_answering_with_random_acks_loses_the_one_hop_route() -> anyhow::Result<()> {
+    let me = *PEERS[0].public();
+    let relay = *PEERS[1].public();
+    let dest = *PEERS[2].public();
+
+    for probe_acks in [0, 50] {
+        let (graph, selector) = one_hop_cluster(me, relay, dest);
+        apply_conformance_report(&graph, &me, &relay_ack_report(&PEERS[1], 20, true, probe_acks));
+        let rate = graph
+            .edge(&me, &relay)
+            .and_then(|obs| obs.immediate_qos().and_then(|imm| imm.ack_rate()))
+            .context("the relay edge must have an ack rate")?;
+        assert!(
+            rate < PathPlannerConfig::default().min_ack_rate,
+            "rate {rate} with {probe_acks} probe acks"
+        );
+        assert!(
+            selector.select_path(me, dest, 1).is_err(),
+            "a rejecting relay must not be a first hop ({probe_acks} probe acks)"
+        );
+    }
+
+    let (graph, selector) = one_hop_cluster(me, relay, dest);
+    apply_conformance_report(&graph, &me, &relay_ack_report(&PEERS[1], 20, false, 50));
+    let rate = graph
+        .edge(&me, &relay)
+        .and_then(|obs| obs.immediate_qos().and_then(|imm| imm.ack_rate()))
+        .context("the relay edge must have an ack rate")?;
+    assert!(rate >= 0.95, "an honest relay keeps its rate, got {rate}");
+    assert!(
+        selector.select_path(me, dest, 1).is_ok(),
+        "an honest relay stays a first hop"
     );
 
     Ok(())
