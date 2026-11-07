@@ -833,7 +833,15 @@ mod tests {
             let (through, around) = values(hops)?;
             let best_around = around.iter().copied().fold(0.0, f64::max);
             assert!(best_around > 0.0, "{hops} hop(s): the honest relay must stay routable");
+            assert!(
+                !through.is_empty(),
+                "{hops} hop(s): a starved relay must stay a candidate, not disappear"
+            );
             for cost in through {
+                assert!(
+                    cost > 0.0,
+                    "{hops} hop(s): a starved relay must keep a positive weight, got {cost}"
+                );
                 assert!(
                     cost / (cost + best_around) < 1e-6,
                     "{hops} hop(s): a relay none of whose loopbacks returned must draw a negligible share, got {cost} \

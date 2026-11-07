@@ -104,8 +104,9 @@ pub struct PathPlannerConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_ack_rate: f64,
-    /// Rate below which the first relay of a path is starved in path selection, when what travels over
-    /// its edge says it is dead.
+    /// Rate below which a relay is starved in path selection, when what travels over its edge says it
+    /// is dead. Every edge but the last of a path is judged: in a forward path each edge into a relay,
+    /// in a return path each edge before the one into `me`. A direct route has no relay to judge.
     ///
     /// A relay that rejects our packets still answers pings and signs an ack for every packet, so its
     /// ack rate stays healthy. Two witnesses are read: the share of loopbacks over the edge that
