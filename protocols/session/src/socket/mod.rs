@@ -113,6 +113,21 @@ pub struct SessionSocketConfig {
     /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
     #[default(None)]
     pub max_frames_behind_gap: Option<usize>,
+    /// Wait on a missing frame only as long as the reordering the Session has shown supports:
+    /// twice the deepest of the last minute, at least 250 ms, at most [`Self::frame_timeout`],
+    /// and all of it before any reordering is seen. Stateless sockets only.
+    ///
+    /// Head-of-line bound by time where [`Self::max_frames_behind_gap`] bounds by count. The frame
+    /// timeout is sized for the worst a deployment may see, and a Session without retransmission
+    /// that loses a frame holds everything behind it for that long, waiting for something that is
+    /// never coming. Measured on a cluster after a forward relayer died: the Exit's first
+    /// complete frames waited the whole 3 s behind frames lost before the path was replaced. A
+    /// frame that arrives after its gap was given up lengthens the wait again. A reliable socket
+    /// keeps the whole timeout, since a retransmission can still fill the gap.
+    ///
+    /// Default is true.
+    #[default(true)]
+    pub adapt_gap_wait: bool,
 }
 
 /// Logs a failed update of the socket state.
@@ -298,6 +313,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 capacity: cfg.capacity,
                 max_item_age: cfg.max_frame_age,
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                adapt_to_reordering: cfg.adapt_gap_wait,
             })
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
@@ -538,6 +554,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 capacity: cfg.capacity,
                 max_item_age: cfg.max_frame_age,
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                // A retransmission can still fill the gap, so it is waited out in full.
+                adapt_to_reordering: false,
             })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames

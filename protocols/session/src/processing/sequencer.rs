@@ -16,6 +16,78 @@ use crate::{errors::SessionError, protocol::FrameId};
 /// Floor on a gap timer, so a gap already past its wait still yields to the runtime once.
 const MIN_GAP_WAIT: Duration = Duration::from_millis(1);
 
+/// How long a reordering sample informs the gap wait.
+///
+/// Long enough to carry what a sequence learned across an idle spell: a forward path that died
+/// while nothing was sent shows only once data resumes. Short enough that reordering on paths
+/// since replaced stops lengthening every later gap.
+const REORDER_MEMORY: Duration = Duration::from_secs(60);
+
+/// The gap wait as a multiple of the deepest reordering remembered.
+const REORDER_FACTOR: u32 = 2;
+
+/// The shortest gap wait reordering can bring the wait down to.
+const REORDER_FLOOR: Duration = Duration::from_millis(250);
+
+/// Abandoned gaps remembered, to tell a frame that comes after its gap was given up.
+const ABANDONED_MEMORY: usize = 64;
+
+/// The reordering a sequence has shown, and the gap wait it supports.
+///
+/// A sample is how long a frame came after the earliest frame already waiting behind it: its gap
+/// closed when it arrived, or it came after its gap had been given up, which is what a wait too
+/// short for the sequence leads to and what lengthens the wait again. The gap wait is
+/// [`REORDER_FACTOR`] times the deepest sample of the last [`REORDER_MEMORY`], within
+/// `[REORDER_FLOOR, max_wait]`; before any sample it is `max_wait`.
+#[derive(Debug, Default)]
+struct ReorderWindow {
+    samples: std::collections::VecDeque<(Instant, Duration)>,
+    abandoned: std::collections::VecDeque<(FrameId, Instant)>,
+}
+
+impl ReorderWindow {
+    fn record(&mut self, now: Instant, sample: Duration) {
+        while self
+            .samples
+            .front()
+            .is_some_and(|(at, _)| now.duration_since(*at) > REORDER_MEMORY)
+        {
+            self.samples.pop_front();
+        }
+        self.samples.push_back((now, sample));
+    }
+
+    fn wait(&self, now: Instant, max_wait: Duration) -> Duration {
+        self.samples
+            .iter()
+            .filter(|(at, _)| now.duration_since(*at) <= REORDER_MEMORY)
+            .map(|(_, sample)| *sample)
+            .max()
+            .map_or(max_wait, |deepest| {
+                deepest
+                    .saturating_mul(REORDER_FACTOR)
+                    .clamp(REORDER_FLOOR.min(max_wait), max_wait)
+            })
+    }
+
+    /// Remembers that the gap at `id` was given up while the frame behind it had waited since
+    /// `behind_since`.
+    fn note_abandoned(&mut self, id: FrameId, behind_since: Instant) {
+        if self.abandoned.len() == ABANDONED_MEMORY {
+            self.abandoned.pop_front();
+        }
+        self.abandoned.push_back((id, behind_since));
+    }
+
+    /// How late `id` came, if its gap was given up.
+    fn late(&self, id: FrameId, now: Instant) -> Option<Duration> {
+        self.abandoned
+            .iter()
+            .find(|(abandoned, _)| *abandoned == id)
+            .map(|(_, behind_since)| now.duration_since(*behind_since))
+    }
+}
+
 /// Buffer entry pairing an item with when it entered the buffer.
 ///
 /// Ordering delegates entirely to `item`, so the heap behaves exactly as before; `buffered_at`
@@ -98,6 +170,8 @@ pub struct Sequencer<S: futures::Stream> {
     /// Head-of-line bound: abandon the frame due next once the sequence has advanced this far
     /// past it, rather than holding everything for `max_wait`. `None` disables it.
     max_frames_behind_gap: Option<usize>,
+    /// Waits on a gap only as long as the reordering seen supports, when set.
+    reorder: Option<ReorderWindow>,
     state: State,
 }
 
@@ -116,6 +190,7 @@ where
         capacity: usize,
         max_item_age: Option<Duration>,
         max_frames_behind_gap: Option<usize>,
+        adapt_to_reordering: bool,
     ) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
@@ -129,6 +204,7 @@ where
             // turning every momentary gap into loss. One later frame is the strictest evidence
             // that still *is* evidence.
             max_frames_behind_gap: max_frames_behind_gap.map(|n| n.max(1)),
+            reorder: adapt_to_reordering.then(ReorderWindow::default),
             state: State::Polling,
         }
     }
@@ -182,10 +258,36 @@ where
                             }
                             (Poll::Ready(Some(item)), _) => {
                                 if item.lt(this.next_id) {
-                                    // Do not accept older frame ids
-                                    tracing::error!("old item");
+                                    // Do not accept older frame ids. A frame whose gap was given up
+                                    // is reordering the wait did not cover, and lengthens it.
+                                    let now = Instant::now();
+                                    match this.reorder.as_mut().and_then(|reorder| {
+                                        (1..=ABANDONED_MEMORY as FrameId)
+                                            .map(|back| this.next_id.wrapping_sub(back))
+                                            .find(|id| item.eq(id))
+                                            .and_then(|id| reorder.late(id, now))
+                                            .map(|late| (reorder, late))
+                                    }) {
+                                        Some((reorder, late)) => {
+                                            tracing::debug!(
+                                                late_ms = late.as_millis() as u64,
+                                                "frame came after its gap was given up"
+                                            );
+                                            reorder.record(now, late);
+                                        }
+                                        None => tracing::error!("old item"),
+                                    }
                                     *this.state = State::Polling;
                                 } else {
+                                    // The frame due next closes its gap: how long it came after the
+                                    // earliest frame waiting behind it is the reordering it took.
+                                    if let Some(reorder) = this.reorder.as_mut()
+                                        && item.eq(this.next_id)
+                                        && let Some(behind_since) = this.buffer.iter().map(|b| b.0.buffered_at).min()
+                                    {
+                                        let now = Instant::now();
+                                        reorder.record(now, now.duration_since(behind_since));
+                                    }
                                     // Push new item to the buffer
                                     tracing::trace!("new item");
                                     this.buffer.push(std::cmp::Reverse(Buffered {
@@ -214,6 +316,10 @@ where
                 State::BufferUpdated => {
                     // The buffer has been updated, check if we can yield something
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
+                        let max_wait = this
+                            .reorder
+                            .as_ref()
+                            .map_or(*this.max_wait, |reorder| reorder.wait(Instant::now(), *this.max_wait));
                         if next.eq(this.next_id) {
                             let stale = this
                                 .max_item_age
@@ -239,7 +345,7 @@ where
                         // Each gap waits `max_wait` from the arrival of the frame right behind it, so
                         // emissions in between don't push it back: K gaps left by one outage drain
                         // together instead of one per `max_wait`.
-                        } else if next.buffered_at.elapsed() >= *this.max_wait
+                        } else if next.buffered_at.elapsed() >= max_wait
                             || this.buffer.len() == this.buffer.capacity()
                             // The sequence has moved far enough past the gap to conclude the
                             // missing frame was lost rather than reordered. Waiting out `max_wait`
@@ -265,10 +371,14 @@ where
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!(discarded, "discard frame");
+                            let behind_since = next.buffered_at;
+                            if let Some(reorder) = this.reorder.as_mut() {
+                                reorder.note_abandoned(discarded, behind_since);
+                            }
 
                             return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
                         }
-                        let remaining = this.max_wait.saturating_sub(next.buffered_at.elapsed());
+                        let remaining = max_wait.saturating_sub(next.buffered_at.elapsed());
                         // The floor only stands in for a deadline already past, so a sub-millisecond
                         // `max_wait` is kept as configured.
                         let wait = if remaining.is_zero() { MIN_GAP_WAIT } else { remaining };
@@ -333,6 +443,15 @@ pub struct SequencerConfig {
     /// two frames arriving ahead is ordinary reordering across paths of differing latency; a queue
     /// building up behind a gap is a frame that was lost.
     pub max_frames_behind_gap: Option<usize>,
+    /// Waits on a gap only as long as the reordering this sequence has shown supports: twice the
+    /// deepest of the last minute, at least 250 ms, at most [`Self::max_wait`], and all of
+    /// [`Self::max_wait`] before any reordering is seen.
+    ///
+    /// For a sequence that is not retransmitted. `max_wait` is sized for the worst a deployment
+    /// may see, so a frame lost on a sequence whose frames arrive within a few hundred
+    /// milliseconds of each other holds everything behind it for seconds, waiting for something
+    /// that is never coming. A frame that comes after its gap was given up lengthens the wait.
+    pub adapt_to_reordering: bool,
 }
 
 /// Stream extensions methods for item sequencing.
@@ -344,7 +463,7 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, None, None)
+        Sequencer::new(self, timeout, capacity, None, None, false)
     }
 
     /// As [`SequencerExt::sequencer`], but discards items buffered longer than `max_item_age`
@@ -359,7 +478,7 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, max_item_age, None)
+        Sequencer::new(self, timeout, capacity, max_item_age, None, false)
     }
 
     /// As [`SequencerExt::sequencer`], with every stopping rule stated explicitly.
@@ -374,6 +493,7 @@ pub trait SequencerExt: futures::Stream {
             cfg.capacity,
             cfg.max_item_age,
             cfg.max_frames_behind_gap,
+            cfg.adapt_to_reordering,
         )
     }
 }
@@ -521,6 +641,7 @@ mod tests {
             capacity: 4096,
             max_item_age: None,
             max_frames_behind_gap: Some(2),
+            adapt_to_reordering: false,
         });
         pin_mut!(seq_stream);
 
@@ -568,6 +689,7 @@ mod tests {
             capacity: 4096,
             max_item_age: None,
             max_frames_behind_gap: Some(4),
+            adapt_to_reordering: false,
         });
         pin_mut!(seq_stream);
 
@@ -612,6 +734,7 @@ mod tests {
             capacity: 4096,
             max_item_age: None,
             max_frames_behind_gap: Some(3),
+            adapt_to_reordering: false,
         });
         pin_mut!(seq_stream);
 
@@ -647,6 +770,7 @@ mod tests {
             capacity: 4096,
             max_item_age: None,
             max_frames_behind_gap: None,
+            adapt_to_reordering: false,
         });
         pin_mut!(seq_stream);
 
@@ -943,6 +1067,131 @@ mod tests {
         assert_eq!(chunks, vec![vec![1, 2, 3, 4], vec![5, 6, 7]]);
         jh.await??;
 
+        Ok(())
+    }
+
+    fn adaptive(max_wait: Duration) -> SequencerConfig {
+        SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: None,
+            adapt_to_reordering: true,
+        }
+    }
+
+    /// Feeds `late` after `early`, `apart` apart, as two frames that swapped places on the way.
+    async fn reorder<S>(
+        sink: &mut futures::channel::mpsc::UnboundedSender<u32>,
+        seq: &mut std::pin::Pin<&mut S>,
+        early: u32,
+        late: u32,
+        apart: Duration,
+    ) -> anyhow::Result<()>
+    where
+        S: futures::Stream<Item = Result<u32, SessionError>>,
+    {
+        sink.unbounded_send(early)?;
+        // The sequencer buffers `early` here and holds it behind the gap.
+        assert!(
+            tokio::time::timeout(apart, seq.next()).await.is_err(),
+            "{early} must wait for {late}"
+        );
+        sink.unbounded_send(late)?;
+        assert_eq!(Some(late), seq.next().await.transpose()?);
+        assert_eq!(Some(early), seq.next().await.transpose()?);
+        Ok(())
+    }
+
+    /// How long the sequencer takes to give up on `missing` once `behind` is waiting.
+    async fn time_to_abandon<S>(
+        sink: &mut futures::channel::mpsc::UnboundedSender<u32>,
+        seq: &mut std::pin::Pin<&mut S>,
+        missing: u32,
+        behind: u32,
+    ) -> anyhow::Result<Duration>
+    where
+        S: futures::Stream<Item = Result<u32, SessionError>>,
+    {
+        sink.unbounded_send(behind)?;
+        let start = Instant::now();
+        assert!(matches!(seq.next().await, Some(Err(SessionError::FrameDiscarded(id))) if id == missing));
+        let took = start.elapsed();
+        assert_eq!(Some(behind), seq.next().await.transpose()?);
+        Ok(took)
+    }
+
+    /// Before any reordering is seen there is nothing to size the wait by, so a gap waits all of
+    /// `max_wait`, as without the adaptation.
+    #[test_log::test(tokio::test)]
+    async fn an_adaptive_gap_wait_should_be_max_wait_before_any_reordering() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(600);
+        let (mut sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer_with(adaptive(max_wait));
+        pin_mut!(seq);
+
+        let took = time_to_abandon(&mut sink, &mut seq, 1, 2).await?;
+        assert!(took >= max_wait - Duration::from_millis(20), "{took:?}");
+        Ok(())
+    }
+
+    /// Frames that came 100 ms out of order: the next gap is given up after the 250 ms floor
+    /// rather than the 5 s `max_wait`.
+    #[test_log::test(tokio::test)]
+    async fn an_adaptive_gap_wait_should_follow_the_reordering_seen() -> anyhow::Result<()> {
+        let max_wait = Duration::from_secs(5);
+        let (mut sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer_with(adaptive(max_wait));
+        pin_mut!(seq);
+
+        reorder(&mut sink, &mut seq, 2, 1, Duration::from_millis(100)).await?;
+        let took = time_to_abandon(&mut sink, &mut seq, 3, 4).await?;
+        assert!(took >= REORDER_FLOOR - Duration::from_millis(20), "{took:?}");
+        assert!(took < Duration::from_secs(1), "{took:?}");
+        Ok(())
+    }
+
+    /// Twice the deepest reordering, above the floor: 400 ms apart, an 800 ms wait.
+    #[test_log::test(tokio::test)]
+    async fn an_adaptive_gap_wait_should_be_twice_the_deepest_reordering() -> anyhow::Result<()> {
+        let max_wait = Duration::from_secs(5);
+        let (mut sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer_with(adaptive(max_wait));
+        pin_mut!(seq);
+
+        reorder(&mut sink, &mut seq, 2, 1, Duration::from_millis(400)).await?;
+        let took = time_to_abandon(&mut sink, &mut seq, 3, 4).await?;
+        assert!(took >= Duration::from_millis(780), "{took:?}");
+        assert!(took < Duration::from_millis(1500), "{took:?}");
+        Ok(())
+    }
+
+    /// A frame that comes after its gap was given up is reordering the wait did not cover: it is
+    /// dropped as before, and the wait grows to cover it.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_after_its_abandoned_gap_should_lengthen_the_wait() -> anyhow::Result<()> {
+        let max_wait = Duration::from_secs(5);
+        let (mut sink, stream) = futures::channel::mpsc::unbounded();
+        let seq = stream.sequencer_with(adaptive(max_wait));
+        pin_mut!(seq);
+
+        reorder(&mut sink, &mut seq, 2, 1, Duration::from_millis(100)).await?;
+        // Frame 3 is given up after the floor ...
+        let took = time_to_abandon(&mut sink, &mut seq, 3, 4).await?;
+        assert!(took < Duration::from_secs(1), "{took:?}");
+        // ... and turns up 600 ms after frame 4 began waiting: dropped, but remembered.
+        tokio::time::sleep(Duration::from_millis(600).saturating_sub(took)).await;
+        sink.unbounded_send(3)?;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), seq.next())
+                .await
+                .is_err(),
+            "a late frame is not emitted"
+        );
+
+        let took = time_to_abandon(&mut sink, &mut seq, 5, 6).await?;
+        assert!(took >= Duration::from_millis(1150), "{took:?}");
+        assert!(took < Duration::from_secs(3), "{took:?}");
         Ok(())
     }
 }
