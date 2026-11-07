@@ -1105,10 +1105,12 @@ where
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(flush_interval));
                 while ticks.next().await.is_some() {
                     for (peer, num_packets, num_acks) in flush_counters.drain_settled(ack_grace).await {
-                        tracing::trace!(
+                        let num_unmatched_acks = flush_counters.get_or_create(&peer).take_unmatched_acks();
+                        tracing::debug!(
                             %peer,
                             num_packets,
                             num_acks,
+                            num_unmatched_acks,
                             "flushing protocol conformance counters"
                         );
                         flush_graph.upsert_edge(&flush_me, &peer, |obs| {
