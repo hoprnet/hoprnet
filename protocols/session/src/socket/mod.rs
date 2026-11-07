@@ -1415,17 +1415,15 @@ mod tests {
         Ok(())
     }
 
-    /// A loss signal on the receive side records the frames that were lost, and nothing else.
+    /// A sequencer discard is recorded into the loss signal, on both socket kinds.
     ///
-    /// The Exit is the side that reports on loss, so the signal is what the receiver must fill. Both
-    /// socket kinds do: a frame that expired incomplete and a sequencer discard are the two loss
-    /// events, and a duplicate segment is delivery.
-    ///
-    /// The duplicate is produced by the same drop that causes the loss: frame 1 never completes, so
-    /// the sender's retransmission of its first segment arrives after the frame was discarded and is
-    /// filtered as already seen.
+    /// The network drops the one segment of frame 1, so that frame never arrives at all and the
+    /// sequencer gives up on the gap once later frames have arrived behind it (`max_frames_behind_gap`).
+    /// That is the discard event. Both kinds run with a state that does not retransmit (`Stateless`),
+    /// so the lost frame is not recovered and there is no retransmitted duplicate here; the duplicate
+    /// case has its own test, which feeds one in directly.
     #[test_log::test(tokio::test)]
-    async fn a_loss_signal_records_the_frames_that_were_lost() -> anyhow::Result<()> {
+    async fn a_sequencer_discard_is_recorded_by_both_socket_kinds() -> anyhow::Result<()> {
         for stateless in [true, false] {
             let (alice, bob) = setup_alice_bob::<MTU>(
                 FaultyNetworkConfig {
@@ -1507,16 +1505,137 @@ mod tests {
 
             assert!(
                 signal.lost_within(Duration::from_secs(30)),
-                "the frame that never completed must be recorded as recent loss (stateless={stateless})"
+                "the discarded frame must be recorded as recent loss (stateless={stateless})"
             );
             assert_eq!(
                 1,
                 signal.lost_total(),
-                "one lost frame is one loss, however many segments of it arrived (stateless={stateless})"
+                "one discarded frame is one loss (stateless={stateless})"
             );
 
             alice_socket.close().await?;
             bob_socket.close().await?;
+        }
+        Ok(())
+    }
+
+    /// One raw segment message, as it arrives off the wire.
+    fn raw_segment(frame_id: u32, seq_idx: u8, segments: u8, data: &[u8]) -> Vec<u8> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        Vec::from(SessionMessage::<MTU>::Segment(Segment {
+            frame_id,
+            seq_idx,
+            seq_flags: SeqIndicator::new_with_flags(segments, false),
+            data: data.to_vec().into_boxed_slice(),
+        }))
+    }
+
+    /// Opens the receive side of either socket kind over an in-memory transport, recording into `signal`.
+    ///
+    /// `reliable` is the real [`ReliableSocket`](crate::ReliableSocket) with an [`AcknowledgementState`], which
+    /// requests the missing segments of an incomplete frame, not the stateless one.
+    fn open_raw_receiver(
+        reliable: bool,
+        frame_timeout: Duration,
+        signal: &Arc<FrameLossSignal>,
+    ) -> anyhow::Result<(Box<dyn futures::io::AsyncRead + Send + Unpin>, tokio::io::DuplexStream)> {
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            frame_timeout,
+            ..Default::default()
+        };
+        let socket: Box<dyn futures::io::AsyncRead + Send + Unpin> = if reliable {
+            Box::new(SessionSocket::<MTU, _>::new(
+                transport.compat(),
+                AcknowledgementState::<MTU>::new("bob", AcknowledgementStateConfig::default()),
+                cfg,
+                Some(signal.clone()),
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?)
+        } else {
+            Box::new(SessionSocket::<MTU, _>::new_stateless(
+                "bob",
+                transport.compat(),
+                cfg,
+                Some(signal.clone()),
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?)
+        };
+        Ok((socket, remote))
+    }
+
+    /// A frame that expires incomplete is recorded, on the stateless and on the reliable socket alike.
+    ///
+    /// Only the first of the frame's two segments ever arrives, so the reassembler gives up on the
+    /// frame when its timeout runs out. The reliable socket asks for the missing segment meanwhile (into
+    /// the transport nobody reads), which does not change that it is lost.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_that_expires_incomplete_is_recorded_by_both_socket_kinds() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+            assert_eq!(0, signal.lost_total(), "nothing lost yet (reliable={reliable})");
+
+            remote.write_all(&raw_segment(1, 0, 2, b"first half")).await?;
+
+            // Nothing is ever delivered; the read only gives the reassembler time to expire the frame.
+            let mut buf = [0u8; 64];
+            let _ = tokio::time::timeout(Duration::from_millis(800), socket.read(&mut buf)).await;
+
+            assert!(
+                signal.lost_within(Duration::from_secs(30)),
+                "the incomplete frame must be recorded as recent loss (reliable={reliable})"
+            );
+            assert_eq!(
+                1,
+                signal.lost_total(),
+                "one incomplete frame is one loss (reliable={reliable})"
+            );
+        }
+        Ok(())
+    }
+
+    /// A duplicate segment is delivery, not loss, on both socket kinds.
+    ///
+    /// Frame 1 is delivered whole and read, which makes it the last emitted frame; its segment then
+    /// arrives a second time, which is the duplicate the socket filters as already seen, and frame 2
+    /// behind it still comes through. Nothing was lost, so the signal stays empty.
+    #[test_log::test(tokio::test)]
+    async fn a_duplicate_segment_is_not_recorded_by_either_socket_kind() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+
+            let first = raw_segment(1, 0, 1, b"frame one");
+            remote.write_all(&first).await?;
+            let mut buf = [0u8; 9];
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await??;
+            assert_eq!(b"frame one", &buf, "reliable={reliable}");
+
+            // The duplicate: the same segment of a frame that has already been emitted.
+            remote.write_all(&first).await?;
+            remote.write_all(&raw_segment(2, 0, 1, b"frame two")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await??;
+            assert_eq!(b"frame two", &buf, "reliable={reliable}");
+
+            // Give any frame timeout the duplicate might have started a chance to run out.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            assert_eq!(
+                0,
+                signal.lost_total(),
+                "a duplicate is not a loss (reliable={reliable})"
+            );
+            assert!(!signal.lost_within(Duration::from_secs(30)), "reliable={reliable}");
         }
         Ok(())
     }
