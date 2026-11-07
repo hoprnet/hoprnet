@@ -104,7 +104,7 @@ pub struct PathPlannerConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_ack_rate: f64,
-    /// Minimum share of the loopbacks over an edge, in the last 10 s, that must return for its first
+    /// Minimum share of the loopbacks over an edge, in the last 60 s, that must return for its first
     /// relay to keep its weight in path selection.
     ///
     /// A relay that rejects our packets still answers pings and signs an ack for every packet, so its
