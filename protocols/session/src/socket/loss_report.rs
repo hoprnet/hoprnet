@@ -10,9 +10,14 @@
 //! the next event or until this report is dropped before logging its remaining counts.
 
 use std::{
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
+
+use super::loss_signal::FrameLossSignal;
 
 /// Minimum time between summaries, except for the final summary when the report is dropped.
 pub(crate) const FRAME_LOSS_REPORT_INTERVAL: Duration = Duration::from_secs(30);
@@ -71,10 +76,24 @@ pub(crate) struct FrameLossReport {
     not_reassembled: AtomicU64,
     duplicates: AtomicU64,
     window_start: parking_lot::Mutex<Instant>,
+    /// Live loss, for a reader that has to react within seconds rather than within a window.
+    ///
+    /// `None` for a socket nobody observes, which is every socket but an Exit Session's.
+    loss_signal: Option<Arc<FrameLossSignal>>,
 }
 
 impl FrameLossReport {
+    #[cfg(test)]
     pub fn new(session_id: impl std::fmt::Display, interval: Duration) -> Self {
+        Self::with_signal(session_id, interval, None)
+    }
+
+    /// As [`new`](Self::new), also recording every loss into `loss_signal` as it happens.
+    pub fn with_signal(
+        session_id: impl std::fmt::Display,
+        interval: Duration,
+        loss_signal: Option<Arc<FrameLossSignal>>,
+    ) -> Self {
         Self {
             session_id: session_id.to_string(),
             interval,
@@ -83,6 +102,7 @@ impl FrameLossReport {
             not_reassembled: AtomicU64::new(0),
             duplicates: AtomicU64::new(0),
             window_start: parking_lot::Mutex::new(Instant::now()),
+            loss_signal,
         }
     }
 
@@ -93,12 +113,23 @@ impl FrameLossReport {
 
     pub fn frame_discarded(&self) {
         self.discarded.fetch_add(1, Ordering::Relaxed);
+        self.record_loss();
         self.report_if_due();
     }
 
     pub fn frame_not_reassembled(&self) {
         self.not_reassembled.fetch_add(1, Ordering::Relaxed);
+        self.record_loss();
         self.report_if_due();
+    }
+
+    /// Records a loss into the live signal, if there is one.
+    ///
+    /// Only the two loss events call this: a duplicate segment is delivery, not loss.
+    fn record_loss(&self) {
+        if let Some(signal) = &self.loss_signal {
+            signal.record();
+        }
     }
 
     pub fn duplicate_segment(&self) {
@@ -236,6 +267,42 @@ mod tests {
             };
             assert!(summary.has_loss());
         }
+    }
+
+    #[test]
+    fn loss_is_recorded_into_the_signal_while_the_window_goes_on() {
+        let signal = Arc::new(FrameLossSignal::new());
+        let report = FrameLossReport::with_signal("test", INTERVAL, Some(signal.clone()));
+
+        report.frame_discarded();
+        report.frame_not_reassembled();
+        assert_eq!(2, signal.lost_total(), "both loss events are loss");
+
+        // A duplicate segment is delivery, not loss, and the window closing does not reset the signal.
+        report.duplicate_segment();
+        assert_eq!(2, signal.lost_total());
+        let start = *report.window_start.lock();
+        assert!(report.close_window_if_due(start + INTERVAL).is_some());
+        assert_eq!(
+            2,
+            signal.lost_total(),
+            "the signal outlives the window that the log summary resets"
+        );
+        assert!(signal.lost_within(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn a_report_without_a_signal_counts_as_before() {
+        let report = FrameLossReport::new("test", INTERVAL);
+        report.frame_discarded();
+        report.frame_not_reassembled();
+        report.duplicate_segment();
+
+        let summary = report.take_counts(Duration::ZERO);
+        assert_eq!(
+            (1, 1, 1),
+            (summary.discarded, summary.not_reassembled, summary.duplicates)
+        );
     }
 
     #[test]

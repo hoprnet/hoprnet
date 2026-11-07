@@ -2622,6 +2622,60 @@ mod tests {
         );
     }
 
+    /// Reports arriving every second keep the Entry out of `silence_sustain`, and its level follows them.
+    ///
+    /// This is the Entry half of the Exit's degraded cadence (hoprnet#8596), and it is the reason the
+    /// Entry needs no change of its own. The sustain engages after [`SILENCE_SUSTAIN_AFTER`] of data
+    /// going out with nothing coming back, and it would then put one SURB in every data packet. A
+    /// degraded Exit reports once a second, so nothing is ever silent long enough for it — and what
+    /// the Entry reads is the Exit's real level, which is a better input for its balancer than the
+    /// sustain's guess that the return path is gone.
+    #[test_log::test]
+    fn reports_every_second_keep_the_entry_out_of_the_silence_sustain() {
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(small_target_config());
+
+        // A healthy stretch, so that the state has both a reply stream and data going out to lose.
+        for _ in 0..5 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+        assert!(
+            state.last_heard.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "the Entry must have heard the Exit before a silence can be judged"
+        );
+
+        // The forward path goes dark: no more replies come home, and data keeps going out. Only the
+        // Exit's degraded reports arrive, one a second — which is what keeps the Entry out of the
+        // sustain, so the balancer's own ticks record nothing.
+        let deadline = std::time::Instant::now() + SILENCE_SUSTAIN_AFTER * 2;
+        let mut data_packets = 0;
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+            data_packets += 1;
+            state.note_sent();
+            if data_packets % 10 == 0 {
+                // One report a second: the Exit's degraded cadence.
+                state.observe_reported_level(500);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+            balancer.update();
+            assert!(
+                !state.silence_sustain(),
+                "a report a second is not a silence, so the Entry must not sustain on its own"
+            );
+        }
+        assert!(
+            data_packets >= 20,
+            "fixture: the data has to go out for longer than the sustain's grace to prove anything"
+        );
+
+        // And the level the Entry holds is the Exit's own, not a sustain-driven guess.
+        assert_eq!(
+            500,
+            state.buffer_level(),
+            "the Entry must track the Exit's reports while the forward path is dark"
+        );
+    }
+
     /// A reply home is the Exit answering, counted by the estimator as a SURB consumed, even where none of
     /// its packets reached the hooks that record it. Production minted and nothing consumed is not.
     #[test_log::test]

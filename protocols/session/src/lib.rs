@@ -48,6 +48,7 @@ pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTel
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
+    loss_signal::FrameLossSignal,
     state::{SocketComponents, SocketState, Stateless},
 };
 

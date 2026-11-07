@@ -31,6 +31,7 @@ use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec,
     SsaCommitmentGuard, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
 };
+use hopr_protocol_session::FrameLossSignal;
 use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
@@ -284,6 +285,43 @@ const SURB_RESERVE_POLL: Duration = Duration::from_millis(50);
 /// find the Exit unable to send it anything at all.
 fn keep_alive_surb_reserve(target: u64) -> u64 {
     (target / 100).max(32).min(target / 4)
+}
+
+/// How often the Exit's loss driver re-reads the Session's forward path.
+///
+/// The same value as the rate limiter's re-read interval (`MAX_WAIT_CHUNK`), because that is the
+/// granularity at which a changed notification period takes effect anyway: polling faster would only
+/// wake up to find the stream not yet listening.
+const SURB_DEGRADED_POLL: Duration = MAX_WAIT_CHUNK;
+
+/// How long a frame loss keeps the Exit's notification at its degraded period.
+///
+/// Longer than one degraded period and shorter than the normal one: the point is to keep reporting at
+/// the fast cadence through a burst of loss (a lost frame is detected when its reassembly times out,
+/// which arrives in gaps) without staying fast once the forward path is whole again. Three seconds at
+/// one report per second is three reports, which is what a dead-relayer verdict needs.
+const SURB_DEGRADED_HOLD: Duration = Duration::from_secs(3);
+
+/// Whether the Exit should report its SURB level faster than its normal period.
+///
+/// Three conditions, all of them required:
+///
+/// * **The forward path is losing frames.** The Exit's echo replies are what corroborate a dead relayer's overdue
+///   races. While frames do not reassemble, no reply goes out, and the Entry's only remaining evidence is this report.
+///   Without loss there is nothing to report faster about.
+/// * **The Entry reads the reports.** As [`PixFillControl::admit`] decides anyway, but also here: a report to an Entry
+///   with no balancer spends a SURB to say nothing, and reporting one per second to it would do so fourteen times as
+///   often.
+/// * **The stock is above the keep-alive reserve.** This is the budget: at or below the reserve, the normal period is
+///   what the Exit can afford, and the reserve is what keeps those reports sendable.
+fn exit_forward_path_is_degraded(
+    loss_signal: &FrameLossSignal,
+    estimator: &AtomicSurbFlowEstimator,
+    balancer: &BalancerStateValues,
+) -> bool {
+    loss_signal.lost_within(SURB_DEGRADED_HOLD)
+        && balancer.counterparty_refills()
+        && estimator.saturating_diff() > current_keep_alive_surb_reserve(balancer)
 }
 
 /// The keep-alive reserve of a Session whose Entry currently asks for the target `balancer` holds.
@@ -844,6 +882,11 @@ enum SessionHandles {
     /// the period lasts, and no maximum is enforced on that period, so an unregistered task keeps a
     /// closed Session's fill control alive for however long the operator configured.
     SurbNotifyDelay,
+    /// Handle to the driver that switches the SURB-level notification to its degraded period.
+    ///
+    /// Runs only on an Exit Session that is configured for the degraded period *and* has a frame
+    /// loss signal to read, which is what tells it that the forward path went dark.
+    SurbNotifyDegraded,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
     /// Handle to the task that executes the PIX supervisor's actions.
@@ -864,6 +907,7 @@ impl std::fmt::Display for SessionHandles {
             Self::Ingress => write!(f, "Ingress"),
             Self::KeepAlive => write!(f, "KeepAlive"),
             Self::SurbNotifyDelay => write!(f, "SurbNotifyDelay"),
+            Self::SurbNotifyDegraded => write!(f, "SurbNotifyDegraded"),
             Self::Balancer => write!(f, "Balancer"),
             Self::PixActionDriver => write!(f, "PixActionDriver"),
             Self::PixDepositObserver(idx) => write!(f, "PixDepositObserver({idx})"),
@@ -1298,6 +1342,13 @@ pub(crate) struct SessionSlot {
     /// on it is spawned after the slot is published, so it must find the handle rather than race its
     /// installation.
     pix_fill: Arc<OnceLock<Arc<PixFillControl>>>,
+    /// This Session's live frame loss signal, where the Exit created one for it.
+    ///
+    /// Exit-side, and set only for a Session that can report at the degraded period — an Exit with a
+    /// notification period, a degraded one and a forward path to watch. The socket records into it,
+    /// and the keep-alive driver reads it; kept in the slot as the single handle both sides of the
+    /// Session and the tests can reach.
+    exit_loss_signal: Arc<OnceLock<Arc<FrameLossSignal>>>,
     /// Exit → Entry Session packets received on this Session, ever.
     ///
     /// Entry-side only; stays zero on the Exit, which is the side that *sends* them. This includes
@@ -1464,6 +1515,11 @@ pub(crate) struct PixFillControl {
     /// `None` disables the notification half entirely; the stream then runs at the fill rate alone,
     /// which is how a PIX Session on a node with `surb_balance_notify_period: None` still fills.
     notify_period: Option<Duration>,
+    /// The period to report at while the Session's forward path is degraded, if one is configured.
+    ///
+    /// See [`set_degraded`](Self::set_degraded). `None` leaves the notification at
+    /// [`notify_period`](Self::notify_period) whatever happens to the forward path.
+    degraded_notify_period: Option<Duration>,
     /// SURBs that must remain estimated-available before a *fill* packet is let through.
     ///
     /// The *effective* reserve for this Session, not the configured one: the Entry decides how deep
@@ -1501,6 +1557,12 @@ struct PixFillState {
     /// Set once, by [`PixFillControl::enter_drain`], and never cleared: a drain ends with the
     /// Session, and the stream with it.
     draining: bool,
+    /// Whether the Session's forward path is degraded, so the notification runs faster.
+    ///
+    /// Set by the Exit's loss driver (see [`SessionManager::spawn_exit_keep_alive`]) and cleared the
+    /// same way. Only meaningful with a [`degraded_notify_period`](PixFillControl::degraded_notify_period)
+    /// configured.
+    degraded: bool,
 }
 
 impl PixFillControl {
@@ -1508,6 +1570,7 @@ impl PixFillControl {
         session_id: SessionId,
         controller: RateController,
         notify_period: Option<Duration>,
+        degraded_notify_period: Option<Duration>,
         min_surb_reserve: u64,
         estimator: AtomicSurbFlowEstimator,
         surb_mgmt: Arc<BalancerStateValues>,
@@ -1516,6 +1579,7 @@ impl PixFillControl {
             session_id,
             controller,
             notify_period,
+            degraded_notify_period,
             // Clamped rather than trusted: a `SessionManager` can be built from a config that never
             // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
             // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
@@ -1529,8 +1593,56 @@ impl PixFillControl {
                 last_notify_at: None,
                 withholding: false,
                 draining: false,
+                degraded: false,
             }),
         }
+    }
+
+    /// The notification period the stream is running at, normal or degraded.
+    ///
+    /// Degraded only while the Session's forward path is degraded *and* a degraded period is
+    /// configured: `None` there means the operator wants one cadence whatever the path is doing.
+    fn period(&self, state: &PixFillState) -> Option<Duration> {
+        if state.degraded {
+            self.degraded_notify_period.or(self.notify_period)
+        } else {
+            self.notify_period
+        }
+    }
+
+    /// Enters or leaves the degraded notification period, and re-applies the rate if that changed it.
+    ///
+    /// The driver that calls this lives in [`SessionManager::spawn_exit_keep_alive`] and owns the
+    /// decision of when the forward path is degraded (a recent frame loss at the Exit, a reader on the
+    /// Entry, and a SURB stock above the keep-alive reserve). What is here is only the consequence:
+    /// the notification half of the stream reports at the degraded period instead of the normal one.
+    ///
+    /// Entering degraded mode after the last notification is already older than the degraded period
+    /// makes the next released packet the notification at once, because
+    /// [`admit_at`](Self::admit_at) measures the gap against the period in force rather than against
+    /// the one that was in force when the last report went out. That is what turns a 15 s cadence into
+    /// a 1 s one within the rate limiter's re-read interval, rather than a period later.
+    ///
+    /// PIX fill is unaffected either way: it is classified and admitted exactly as before, and the
+    /// notification keeps its exemption from the SURB reserve.
+    pub(crate) fn set_degraded(&self, on: bool) {
+        let mut state = self.state.lock();
+        if state.degraded == on {
+            return;
+        }
+        state.degraded = on;
+        self.apply(&state);
+    }
+
+    /// Whether the stream is currently reporting at the degraded period.
+    #[cfg(test)]
+    pub(crate) fn is_degraded(&self) -> bool {
+        self.state.lock().degraded
+    }
+
+    /// Whether the notification's initial delay has elapsed.
+    pub(crate) fn notify_started(&self) -> bool {
+        self.state.lock().notify_started
     }
 
     /// Turns the SURB-level notification on, after its initial delay.
@@ -1605,7 +1717,8 @@ impl PixFillControl {
     /// tested as the rule it is, rather than inferred from packet timings.
     #[cfg(test)]
     pub(crate) fn effective_rate(&self) -> FillRate {
-        Self::effective(&self.state.lock(), self.notify_period)
+        let state = self.state.lock();
+        Self::effective(&state, self.period(&state))
     }
 
     fn effective(state: &PixFillState, notify_period: Option<Duration>) -> FillRate {
@@ -1624,7 +1737,7 @@ impl PixFillControl {
     }
 
     fn apply(&self, state: &PixFillState) {
-        let rate = Self::effective(state, self.notify_period);
+        let rate = Self::effective(state, self.period(state));
         // A zero period would trip the controller's own assertion. `FillRate` never carries one —
         // `ZERO` is one second and the two constructors take a validated period — so this is a
         // belt-and-braces floor rather than a case that arises.
@@ -1699,7 +1812,7 @@ impl PixFillControl {
         // Due *slightly early*: see the classification rule on `admit`. The slack is what keeps this
         // from resting on the scheduling latency of the stream that releases the packet.
         let notification_due = state.notify_started
-            && self.notify_period.is_some_and(|period| {
+            && self.period(&state).is_some_and(|period| {
                 let slack = MAX_WAIT_CHUNK.min(period / 2);
                 state
                     .last_notify_at
@@ -2570,6 +2683,26 @@ pub struct SessionManagerConfig {
     #[default(None)]
     pub surb_balance_notify_period: Option<Duration>,
 
+    /// The period the Exit reports its SURB level at while the Session's forward path is degraded.
+    ///
+    /// The Exit's level reports are the only replies that reach the Entry when the forward path goes
+    /// dark — the data frames never reassemble, so no echo reply goes out. A report per
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) (15 s by default) therefore
+    /// leaves the Entry's verdict on a dead relayer waiting for the report, measured at +12 to +28 s
+    /// after the kill instead of the ~+11 s an intact forward path gives.
+    ///
+    /// This is that period for the duration of the degradation: while the Session has lost a frame
+    /// within the last three seconds, its Entry has shown it reads the reports, and its SURB stock is
+    /// above the keep-alive reserve, the Exit reports this often instead. The cost is bounded by
+    /// both the hold and the reserve: at most one SURB per report, never into the reserve, and the
+    /// normal period resumes within three seconds of the last loss.
+    ///
+    /// `None` disables it. A value at or above [`surb_balance_notify_period`](Self::surb_balance_notify_period)
+    /// is treated as disabled, since it would report no faster; so is a value on a Session with no
+    /// notification period at all. Minimum is 1 second.
+    #[default(Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD))]
+    pub surb_degraded_notify_period: Option<Duration>,
+
     /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
     /// the local SURB balancer target using keep-alive packets from the SURB balancer.
     ///
@@ -3176,8 +3309,9 @@ impl<S> Clone for SessionManager<S> {
     }
 }
 
+#[cfg(any(test, feature = "telemetry"))]
 fn session_config(cfg: &SessionManagerConfig, capabilities: Capabilities) -> HoprSessionConfig {
-    session_config_with(cfg, capabilities, None)
+    session_config_with(cfg, capabilities, None, None)
 }
 
 /// As [`session_config`], with the initiating session's own head-of-line bound.
@@ -3192,6 +3326,7 @@ fn session_config_with(
     cfg: &SessionManagerConfig,
     capabilities: Capabilities,
     max_frames_behind_gap: Option<usize>,
+    exit_loss_signal: Option<Arc<FrameLossSignal>>,
 ) -> HoprSessionConfig {
     // Only a session that cannot recover the missing frame should abandon it early. With
     // retransmission the gap is a request away, so waiting is productive and cutting it short
@@ -3214,6 +3349,8 @@ fn session_config_with(
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
         max_frames_behind_gap: (!can_retransmit).then_some(bound).flatten(),
+        // Only the Exit passes one: its frame loss is what the Entry's dead-relayer verdict waits on.
+        exit_loss_signal,
     }
 }
 
@@ -3776,6 +3913,22 @@ where
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+        cfg.surb_degraded_notify_period = cfg
+            .surb_degraded_notify_period
+            .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+        // Said once, here, rather than per Session: a degraded period that does not report faster than
+        // the normal one is a switch between two equal cadences, so it is treated as off.
+        match (cfg.surb_degraded_notify_period, cfg.surb_balance_notify_period) {
+            (Some(degraded), Some(normal)) if degraded >= normal => warn!(
+                degraded = ?degraded,
+                normal = ?normal,
+                "the degraded SURB notification period is not faster than the normal one, so it is disabled"
+            ),
+            (Some(_), None) => warn!(
+                "the degraded SURB notification period is configured but the normal one is not, so it is disabled"
+            ),
+            _ => {}
+        }
         cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
         // Ensure the Frame MTU is at least the size of the Session segment MTU payload
@@ -4601,6 +4754,7 @@ where
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
                                 pix_fill: Default::default(),
+                                exit_loss_signal: Default::default(),
                                 returned_packets: returned_packets.clone(),
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
@@ -4674,7 +4828,7 @@ where
                     let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
-                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap, None),
                         (
                             reduced_surb_scoring_sender,
                             session_rx.inspect(move |_| {
@@ -4753,6 +4907,7 @@ where
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
                                 pix_fill: Default::default(),
+                                exit_loss_signal: Default::default(),
                                 returned_packets,
                                 // Nor does it hold reconstructor state: the live-cycle budget is
                                 // charged by the side that reconstructs.
@@ -4793,7 +4948,7 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap, None),
                         (
                             reduced_surb_sender,
                             session_rx.inspect(move |_| {
@@ -5348,11 +5503,19 @@ where
         msg_sender: S,
         is_pix: bool,
         announced_surb_target: u64,
+        loss_signal: Option<Arc<FrameLossSignal>>,
     ) {
         let notify_period = self.cfg.surb_balance_notify_period;
         if notify_period.is_none() && !is_pix {
             return;
         }
+
+        // Only when it actually reports faster: a degraded period at or above the normal one would be
+        // a switch that changes nothing. `notify_period` being `None` already makes it inapplicable.
+        let degraded_period = self
+            .cfg
+            .surb_degraded_notify_period
+            .filter(|degraded| notify_period.is_some_and(|normal| *degraded < normal));
 
         let configured_reserve = self.cfg.pix_config.supervision.fill.min_surb_reserve;
         let min_surb_reserve = effective_surb_reserve(configured_reserve, announced_surb_target);
@@ -5364,6 +5527,7 @@ where
             session_id,
             controller.clone(),
             notify_period,
+            degraded_period,
             min_surb_reserve,
             slot.surb_estimator.clone(),
             slot.surb_mgmt.clone(),
@@ -5402,13 +5566,50 @@ where
             //
             // Registered so `close_session` can abort it. It is a one-shot, but it holds a clone of
             // the control for the whole period, and nothing bounds how long an operator may make that.
+            let notify_control = control.clone();
             let notify_delay = hopr_utils::spawn_as_abortable!(async move {
                 hopr_utils::runtime::prelude::sleep(period).await;
-                control.start_notify();
+                notify_control.start_notify();
             });
             slot.abort_handles
                 .lock()
                 .insert(SessionHandles::SurbNotifyDelay, notify_delay);
+        }
+
+        // No notification period means nothing to make faster, and `degraded_period` is already `None`
+        // in that case; the driver needs both a period to speed up and a signal that says when.
+        if let (Some(degraded_period), Some(loss_signal)) = (degraded_period, loss_signal) {
+            let driver_control = control.clone();
+            let surb_estimator = slot.surb_estimator.clone();
+            let surb_mgmt = slot.surb_mgmt.clone();
+            let driver = hopr_utils::spawn_as_abortable!(async move {
+                // The normal start path is kept: until the one-shot delay has turned the notification
+                // on there is no period to be faster than, so the driver waits for it rather than
+                // counting the same period out again from its own start.
+                while !driver_control.notify_started() {
+                    hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
+                }
+                let mut degraded = false;
+                loop {
+                    let next = exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt);
+                    if next != degraded {
+                        debug!(
+                            %session_id,
+                            degraded = next,
+                            ?degraded_period,
+                            stock = surb_estimator.saturating_diff(),
+                            reserve = current_keep_alive_surb_reserve(&surb_mgmt),
+                            "switched the exit SURB-level notification cadence"
+                        );
+                        driver_control.set_degraded(next);
+                        degraded = next;
+                    }
+                    hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
+                }
+            });
+            slot.abort_handles
+                .lock()
+                .insert(SessionHandles::SurbNotifyDegraded, driver);
         }
 
         // An order of magnitude is the point at which the operator's intent and the Session's shape
@@ -6248,6 +6449,7 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             pix_fill: Default::default(),
+            exit_loss_signal: Default::default(),
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
@@ -6283,6 +6485,7 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             pix_fill: Default::default(),
+            exit_loss_signal: Default::default(),
             returned_packets: Default::default(),
             // Never PIX, so there is no reconstructor state to charge for.
             cycle_budget: None,
@@ -6724,6 +6927,7 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             pix_fill: Default::default(),
+            exit_loss_signal: Default::default(),
             returned_packets: Default::default(),
             cycle_budget,
             admission_token: Default::default(),
@@ -6851,6 +7055,19 @@ where
             }
         });
 
+        // One per Exit Session, and only when the degraded cadence is configured: the socket records
+        // into it on every lost frame, and the keep-alive driver reads it to decide whether the Exit's
+        // forward path went dark (see `spawn_exit_keep_alive`).
+        let loss_signal = self
+            .cfg
+            .surb_degraded_notify_period
+            .map(|_| Arc::new(FrameLossSignal::new()));
+        // Published on the slot rather than only handed to the two users, so that what the driver
+        // decides and what the tests inject refer to the same signal.
+        if let Some(signal) = &loss_signal {
+            let _ = slot.exit_loss_signal.set(signal.clone());
+        }
+
         let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
             // Because of SURB scarcity, control the egress rate of incoming sessions
             let egress_rate_control =
@@ -6863,10 +7080,10 @@ where
             // Resolved once, here, rather than per packet: the gate was installed before this point,
             // so the egress path never has to look inside the `OnceLock` again.
             let egress_gate = slot.pix_egress_gate.get().cloned();
-            let session = HoprSession::new(
+            let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
-                session_config(&self.cfg, session_req.capabilities.into()),
+                session_config_with(&self.cfg, session_req.capabilities.into(), None, loss_signal.clone()),
                 (
                     // Sent packets = SURB consumption estimate. Data is held back once the stock is down
                     // to the reserve for the keep-alives, but only after the Entry's first keep-alive has
@@ -6898,6 +7115,8 @@ where
                     }),
                 ),
                 Some(closure_notifier),
+                None,
+                None,
             )?;
 
             // The SURB balancer will start intervening by rate-limiting the
@@ -6941,6 +7160,7 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
+                loss_signal,
             );
 
             session
@@ -6951,10 +7171,10 @@ where
             let egress_gate = slot.pix_egress_gate.get().cloned();
             let surb_estimator_tx = slot.surb_estimator.clone();
             let surb_estimator_rx = slot.surb_estimator.clone();
-            let session = HoprSession::new(
+            let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
-                session_config(&self.cfg, session_req.capabilities.into()),
+                session_config_with(&self.cfg, session_req.capabilities.into(), None, loss_signal.clone()),
                 (
                     msg_sender.clone().sink_map_err(std::io::Error::other).with(
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
@@ -6980,6 +7200,8 @@ where
                     }),
                 ),
                 Some(closure_notifier),
+                None,
+                None,
             )?;
 
             self.spawn_exit_keep_alive(
@@ -6988,6 +7210,7 @@ where
                 msg_sender.clone(),
                 pix.is_some(),
                 announced_surb_target,
+                loss_signal,
             );
 
             session
@@ -8449,17 +8672,17 @@ mod tests {
         };
 
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), Some(16)).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), Some(16), None).max_frames_behind_gap,
             Some(16),
             "the session's own value must win over the node default"
         );
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), None).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), None, None).max_frames_behind_gap,
             Some(256),
             "saying nothing must inherit the node default"
         );
         assert_eq!(
-            session_config_with(&node, Capabilities::empty(), Some(0)).max_frames_behind_gap,
+            session_config_with(&node, Capabilities::empty(), Some(0), None).max_frames_behind_gap,
             None,
             "zero disables the bound for this session, matching the env knob's semantics"
         );
@@ -8470,7 +8693,7 @@ mod tests {
     fn a_session_override_should_not_reach_a_session_that_can_retransmit() {
         let node = SessionManagerConfig::default();
         assert_eq!(
-            session_config_with(&node, Capability::RetransmissionAck.into(), Some(4)).max_frames_behind_gap,
+            session_config_with(&node, Capability::RetransmissionAck.into(), Some(4), None).max_frames_behind_gap,
             None,
             "retransmission can recover the gap, so no caller should be able to cut the wait short"
         );
@@ -8950,6 +9173,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
@@ -9635,10 +9859,33 @@ mod tests {
         futures::channel::mpsc::Receiver<IncomingSession>,
         HoprPseudonym,
     )> {
-        let mgr = RecordingManager::new(SessionManagerConfig {
-            surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
-            ..Default::default()
-        });
+        exit_session_reporting_levels_with(
+            capabilities,
+            announced_target,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// [`exit_session_reporting_levels`] over a manager configuration the caller supplies.
+    ///
+    /// The degraded notification period is what the caller changes here: with the notification at
+    /// [`KEEP_ALIVE_PERIOD`] a degraded period can only be *at* it, which is the disabled case, so the
+    /// degraded tests use a slower normal period and a faster degraded one.
+    async fn exit_session_reporting_levels_with(
+        capabilities: Capabilities,
+        announced_target: u64,
+        cfg: SessionManagerConfig,
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        HoprPseudonym,
+    )> {
+        let mgr = RecordingManager::new(cfg);
         let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
         mgr.start(msg_tx, new_session_tx, None, None)?;
@@ -9730,6 +9977,246 @@ mod tests {
             }
         }
         Ok(slot.surb_estimator.saturating_diff())
+    }
+
+    /// A Session that loses frames reports at the degraded period, and returns to the normal one when
+    /// the loss stops.
+    ///
+    /// The loss is injected into the Session's own signal — the same handle the socket records into —
+    /// rather than produced by a real faulty socket: what is under test here is the driver's decision
+    /// and its effect on the stream (the socket end is covered in `hopr-protocol-session`). The normal
+    /// period is deliberately much longer than the degraded one, so the two cadences cannot be
+    /// confused within a test-length window.
+    ///
+    /// The stock is above the keep-alive reserve throughout: a report that could not be sent would
+    /// make the comparison about SURB scarcity rather than about cadence.
+    #[test_log::test(tokio::test)]
+    async fn a_losing_exit_session_reports_faster_until_the_loss_stops() -> anyhow::Result<()> {
+        // Four normal periods a second apart: a normal period slow enough that the normal cadence
+        // cannot fit twice in the windows below, and a degraded period fast enough to fit there.
+        let normal = Duration::from_secs(4);
+        let degraded = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capabilities::empty(),
+            64,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(normal),
+                surb_degraded_notify_period: Some(degraded),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let (signal, control) = {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            (
+                slot.exit_loss_signal
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a degraded period must publish a loss signal")?,
+                slot.pix_fill
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a notification period steers a fill control")?,
+            )
+        };
+
+        // A balancing Entry, and SURBs far above the keep-alive reserve so the report is never withheld.
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: true,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            slot.surb_estimator
+                .produced
+                .fetch_add(10_000, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        // The stream is alive before anything is measured: the first report waits one normal period,
+        // so without this the degraded case could be read out of a stream that never started.
+        let window = Duration::from_millis(1_500);
+        timeout(Duration::from_secs(10), async {
+            while !control.notify_started() {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .context("the notification never started, so no cadence could be observed")?;
+        let _first = level_reports_during(&mut msg_rx, pseudonym, window).await;
+        assert!(
+            !control.is_degraded(),
+            "a whole forward path reports at the normal period"
+        );
+
+        // Loss now, kept alive for the whole window as a continuously faulty path would. The window
+        // is two and a half degraded periods, so the degraded cadence has room to show two reports
+        // where the normal period cannot fit even one.
+        let loss_window = degraded * 5 / 2;
+        let lossy = async {
+            let deadline = tokio::time::Instant::now() + loss_window;
+            while tokio::time::Instant::now() < deadline {
+                signal.record();
+                tokio::time::sleep(degraded / 4).await;
+            }
+        };
+        let (reports, ()) = futures::join!(level_reports_during(&mut msg_rx, pseudonym, loss_window), lossy);
+        // The report count and the control's own state are two independent statements of the same
+        // thing: the stream says it is degraded, and it says it in reports.
+        assert!(
+            control.is_degraded(),
+            "a Session that lost a frame within the hold must be degraded"
+        );
+        assert!(
+            reports.len() >= 2,
+            "a losing Session must report at the degraded period ({degraded:?}) rather than the normal one \
+             ({normal:?}), but {} report(s) arrived over {loss_window:?}: {reports:?}",
+            reports.len()
+        );
+
+        // The loss stops; once the hold has passed, the normal period is back.
+        timeout(Duration::from_secs(10), async {
+            loop {
+                if !control.is_degraded() {
+                    break;
+                }
+                tokio::time::sleep(SURB_DEGRADED_POLL).await;
+            }
+        })
+        .await
+        .context("the Session never left degraded mode after its loss stopped")?;
+        assert!(
+            !exit_forward_path_is_degraded(
+                &signal,
+                &mgr.sessions.get(&pseudonym).unwrap().surb_estimator,
+                &mgr.sessions.get(&pseudonym).unwrap().surb_mgmt
+            ),
+            "the rule and the control must agree on the recovery"
+        );
+
+        // And the cadence is the normal one again: over a window shorter than the normal period, at
+        // most one report can be due — where the degraded period would have produced several.
+        let _in_flight = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        let after = level_reports_during(&mut msg_rx, pseudonym, window).await;
+        assert!(
+            after.len() <= 1,
+            "back at the normal period ({normal:?}), {window:?} holds at most one report, but {} arrived: {after:?}",
+            after.len()
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
+    /// The manager floors the degraded period at `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, like the
+    /// normal one, and keeps "not faster" as the disabled case rather than rewriting the value.
+    #[test]
+    fn the_degraded_period_is_floored_and_kept_above_the_normal_one() {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_balance_notify_period: Some(Duration::from_secs(15)),
+            surb_degraded_notify_period: Some(Duration::from_millis(50)),
+            ..Default::default()
+        });
+        assert_eq!(
+            Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+            mgr.cfg.surb_degraded_notify_period,
+            "a sub-second degraded period must be raised to the floor the normal one has"
+        );
+
+        // A degraded period no faster than the normal one is left as configured: the switch that
+        // consumes it treats it as off, so both a value above and one equal to the normal period are
+        // the same disabled case and neither has to be rewritten.
+        for normal in [Duration::from_secs(1), Duration::from_secs(15)] {
+            let cfg = SessionManagerConfig {
+                surb_balance_notify_period: Some(normal),
+                surb_degraded_notify_period: Some(normal),
+                ..Default::default()
+            };
+            let mgr = RecordingManager::new(cfg.clone());
+            assert!(cfg.surb_degraded_notify_period >= mgr.cfg.surb_balance_notify_period);
+        }
+
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_balance_notify_period: Some(Duration::from_secs(15)),
+            surb_degraded_notify_period: None,
+            ..Default::default()
+        });
+        assert_eq!(
+            None, mgr.cfg.surb_degraded_notify_period,
+            "`None` stays `None`: the operator switched the fast cadence off"
+        );
+    }
+
+    /// At the keep-alive reserve, the degraded period does not run: the fast reports are what the
+    /// reserve exists to pay for.
+    #[test_log::test(tokio::test)]
+    async fn a_session_at_its_reserve_reports_at_the_normal_period() -> anyhow::Result<()> {
+        let normal = Duration::from_secs(30);
+        let degraded = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capabilities::empty(),
+            64,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(normal),
+                surb_degraded_notify_period: Some(degraded),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let signal = mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .exit_loss_signal
+            .get()
+            .cloned()
+            .context("an Exit Session with a degraded period must publish a loss signal")?;
+
+        // A reader, and a stock parked exactly at the reserve.
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: true,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            let reserve = slot
+                .surb_mgmt
+                .target_surb_buffer_size
+                .load(std::sync::atomic::Ordering::Relaxed)
+                / 100;
+            slot.surb_estimator
+                .produced
+                .fetch_add(reserve.max(1), std::sync::atomic::Ordering::Relaxed);
+        }
+
+        let window = Duration::from_millis(2_500);
+        let lossy = async {
+            let deadline = tokio::time::Instant::now() + window;
+            while tokio::time::Instant::now() < deadline {
+                signal.record();
+                tokio::time::sleep(degraded / 2).await;
+            }
+        };
+        let (_, reports) = futures::join!(lossy, level_reports_during(&mut msg_rx, pseudonym, window));
+        assert!(
+            reports.is_empty(),
+            "at the reserve the Session reports at the normal period ({normal:?}), so a {window:?} window must hold \
+             no report: {reports:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
     }
 
     /// The Exit's SURB-level reports follow what the Exit has seen of its Entry, for every kind of
@@ -10171,10 +10658,42 @@ mod tests {
             HoprPseudonym::random(),
             RateController::new(0, Duration::from_secs(1)),
             notify_period,
+            None,
             reserve,
             Default::default(),
             surb_mgmt,
         )
+    }
+
+    /// [`fill_control`] that also has a degraded notification period configured.
+    ///
+    /// The Entry is taken as a reader (`fill_control` does that too) and given `stock` SURBs, because
+    /// a degraded period is only ever reached with both: without a reader or a SURB the notification
+    /// is withheld before its cadence can matter.
+    fn fill_control_degraded(
+        notify_period: Option<Duration>,
+        degraded_period: Option<Duration>,
+        reserve: u64,
+        stock: u64,
+    ) -> PixFillControl {
+        let control = PixFillControl::new(
+            HoprPseudonym::random(),
+            RateController::new(0, Duration::from_secs(1)),
+            notify_period,
+            degraded_period,
+            reserve,
+            Default::default(),
+            {
+                let surb_mgmt = Arc::new(BalancerStateValues::default());
+                surb_mgmt.note_counterparty_refills();
+                surb_mgmt
+            },
+        );
+        control
+            .estimator
+            .produced
+            .fetch_add(stock, std::sync::atomic::Ordering::Relaxed);
+        control
     }
 
     /// The `surb_starved` gauge moves on the edges, and a control dropped mid-stall returns it.
@@ -10510,6 +11029,173 @@ mod tests {
         assert!(
             !control.admit_at(now + Duration::from_millis(3)),
             "and it was the notification: the packet after it is fill, below the reserve"
+        );
+    }
+
+    /// The degraded period reports faster, and leaving it restores the normal one.
+    ///
+    /// The admission rule is the instrument again: the stock is one SURB against a reserve of a
+    /// hundred, so only the notification is admitted. In the normal period that is one packet per
+    /// period; in the degraded period it is one per degraded period, which is what turns a 15 s
+    /// cadence into a 1 s one when the Exit's forward path goes dark.
+    #[test]
+    fn the_degraded_notification_period_reports_faster_and_leaves_on_request() {
+        const RESERVE: u64 = 100;
+        let normal = Duration::from_secs(3600);
+        let degraded = Duration::from_secs(1);
+        let control = fill_control_degraded(Some(normal), Some(degraded), RESERVE, 1);
+        control.start_notify();
+
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0), "the first packet is the notification");
+        assert!(
+            !control.admit_at(t0 + degraded),
+            "inside the normal period, with no degradation, it is fill and there is nothing to spend"
+        );
+
+        control.set_degraded(true);
+        assert_eq!(
+            FillRate::once_per(degraded),
+            control.effective_rate(),
+            "the stream must run at the degraded period, not only classify at it"
+        );
+        // Entering after a gap longer than the degraded period releases the next packet at once,
+        // because the gap is measured against the period in force.
+        assert!(
+            control.admit_at(t0 + Duration::from_secs(2)),
+            "entering degraded mode after a long gap makes the next packet the notification at once"
+        );
+        assert!(
+            !control.admit_at(t0 + Duration::from_secs(2) + degraded / 2 - Duration::from_millis(1)),
+            "and the cadence that follows it is the degraded one, less the classification slack"
+        );
+        assert!(control.admit_at(t0 + Duration::from_secs(2) + degraded));
+
+        control.set_degraded(false);
+        assert_eq!(
+            FillRate::once_per(normal),
+            control.effective_rate(),
+            "leaving degraded mode restores the normal period"
+        );
+        assert_eq!(
+            Some(normal),
+            control.period(&control.state.lock()),
+            "and the notification is classified against it"
+        );
+    }
+
+    /// Entering degraded mode releases the next notification at once, and leaving it does not.
+    ///
+    /// The first half is what makes the switch worth having: a Session that has just lost its forward
+    /// path has been waiting out the normal period, and the report that corroborates the verdict must
+    /// go now rather than a period later.
+    #[test]
+    fn entering_the_degraded_period_releases_the_next_notification_at_once() {
+        const RESERVE: u64 = 100;
+        let control = fill_control_degraded(
+            Some(Duration::from_secs(3600)),
+            Some(Duration::from_secs(1)),
+            RESERVE,
+            1,
+        );
+        control.start_notify();
+
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0));
+        // A long silence, as if the normal period were far longer than the test.
+        let later = t0 + Duration::from_secs(10);
+        control.set_degraded(true);
+        assert!(control.admit_at(later), "a degraded report is due at once");
+        control.set_degraded(false);
+        assert!(
+            !control.admit_at(later + Duration::from_secs(1)),
+            "back on the normal period, the next report waits for the normal period from the last one"
+        );
+    }
+
+    /// A degraded mode switch changes nothing about fill, and nothing about what the notification is.
+    ///
+    /// Fill above the notification rate is still classified as fill in either mode, still bounded by
+    /// the reserve, and a withheld notification still keeps its slot.
+    #[test]
+    fn the_degraded_period_leaves_fill_and_withholding_alone() {
+        const RESERVE: u64 = 100;
+        // One SURB, far below the reserve: only a notification may spend it.
+        let control = fill_control_degraded(None, Some(Duration::from_secs(1)), RESERVE, 1);
+        control.start_notify();
+        // No notification period at all, so the degraded one cannot be what runs: the period helper
+        // falls back to the normal one, which is absent.
+        assert_eq!(None, control.period(&control.state.lock()));
+        assert_eq!(FillRate::ZERO, control.effective_rate());
+
+        let control = fill_control_degraded(Some(Duration::from_secs(60)), Some(Duration::from_secs(1)), RESERVE, 1);
+        control.start_notify();
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0), "the notification is exempt from the reserve");
+        assert!(!control.admit_at(t0 + Duration::from_millis(10)), "fill is not");
+
+        // A fill running above the degraded period takes over the stream, as it does at the normal one.
+        control.set_fill(FillRate::per_second(10));
+        control.set_degraded(true);
+        assert_eq!(FillRate::per_second(10), control.effective_rate());
+        control.set_degraded(false);
+        assert_eq!(FillRate::per_second(10), control.effective_rate());
+    }
+
+    /// The driver's rule: loss, a reader, and a stock above the reserve — all three, every time.
+    #[test]
+    fn the_degraded_rule_needs_loss_a_reader_and_a_stock_above_the_reserve() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let signal = FrameLossSignal::new();
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 10_000,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        });
+        let estimator = AtomicSurbFlowEstimator::default();
+        let reserve = current_keep_alive_surb_reserve(&state);
+        assert!(reserve > 0);
+
+        // No loss yet, everything else in place.
+        state.note_counterparty_refills();
+        estimator.produced.fetch_add(reserve + 1, Relaxed);
+        assert!(
+            !exit_forward_path_is_degraded(&signal, &estimator, &state),
+            "a whole forward path has nothing to report faster about"
+        );
+
+        // Loss, but the Entry reads nothing: one report a second to it would spend SURBs for nothing.
+        signal.record();
+        let unread = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 10_000,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        });
+        assert!(
+            !exit_forward_path_is_degraded(&signal, &estimator, &unread),
+            "an Entry that has not shown it refills has no reader for the report"
+        );
+
+        // Loss and a reader, but the stock is at the reserve: the budget is spent.
+        let at_reserve = AtomicSurbFlowEstimator::default();
+        at_reserve.produced.fetch_add(reserve, Relaxed);
+        assert!(
+            !exit_forward_path_is_degraded(&signal, &at_reserve, &state),
+            "at the reserve the normal period is what the Exit can afford"
+        );
+
+        // All three.
+        assert!(
+            exit_forward_path_is_degraded(&signal, &estimator, &state),
+            "loss, a reader and a stock above the reserve is a degraded forward path"
+        );
+
+        // And the loss ages out of the hold, which is what returns the Session to its normal period.
+        std::thread::sleep(SURB_DEGRADED_HOLD * 2);
+        assert!(
+            !exit_forward_path_is_degraded(&signal, &estimator, &state),
+            "a loss older than the hold is not a degraded forward path"
         );
     }
 
@@ -14653,6 +15339,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
@@ -14740,6 +15427,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
@@ -14811,6 +15499,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
@@ -14903,6 +15592,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
                 returned_packets: Default::default(),
                 cycle_budget: None,
                 admission_token: Default::default(),
@@ -21792,6 +22482,7 @@ mod tests {
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             pix_fill: Default::default(),
+            exit_loss_signal: Default::default(),
             returned_packets: Default::default(),
             cycle_budget: None,
             admission_token: Default::default(),
@@ -21824,6 +22515,7 @@ mod tests {
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             pix_fill: Default::default(),
+            exit_loss_signal: Default::default(),
             returned_packets: Default::default(),
             cycle_budget: None,
             admission_token: Default::default(),
