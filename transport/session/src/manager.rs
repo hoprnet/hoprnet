@@ -7068,12 +7068,14 @@ where
             }
         });
 
-        // One per Exit Session, and only when the degraded cadence is configured: the socket records
-        // into it on every lost frame, and the keep-alive driver reads it to decide whether the Exit's
-        // forward path went dark (see `spawn_exit_keep_alive`).
+        // One per Exit Session, and only when the degraded cadence can actually run — a notification
+        // period to speed up and a faster period to speed it up to. Otherwise the socket records into
+        // a signal nobody reads, and the driver is never spawned (see `spawn_exit_keep_alive`).
         let loss_signal = self
             .cfg
             .surb_degraded_notify_period
+            .zip(self.cfg.surb_balance_notify_period)
+            .filter(|(degraded, normal)| degraded < normal)
             .map(|_| Arc::new(FrameLossSignal::new()));
         // Published on the slot rather than only handed to the two users, so that what the driver
         // decides and what the tests inject refer to the same signal.
