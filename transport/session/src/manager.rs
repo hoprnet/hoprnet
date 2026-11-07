@@ -311,6 +311,21 @@ const SURB_DEGRADED_HOLD: Duration = Duration::from_secs(3);
 /// frames' worth of a stream moving data, and far below the frame timeout.
 const SURB_DEGRADED_STALL: Duration = Duration::from_secs(1);
 
+/// How often the Exit reports its SURB level while its frames stall: while the forward path is dark.
+///
+/// Dark, the Exit's reports are the only replies the Entry gets. Each spends one of the Session's oldest SURBs,
+/// a share of which runs through the dead relayer, and the Entry's verdict needs three races lost by it: three
+/// times the first SURB of a pair out while the second is home. At the degraded period of a second that took
+/// tens of seconds whenever the dead relayer carried a modest share of the reports' return paths. Measured on
+/// forward-dark relayer loss: at one report a second, 8 of 38 runs missed the 15 s recovery boundary; at one
+/// every 100 ms, none of 22 did.
+///
+/// Only while the frames stall, which takes multi-segment frames that stop completing: a Session that merely
+/// loses frames now and then, and every Session of single-segment datagrams, keeps the degraded period. The
+/// keep-alive reserve bounds this cadence like the degraded one, so a dark Session spends at most its stock
+/// above the reserve, ten SURBs a second, and only until the Entry's verdict lets its frames through.
+const SURB_DARK_NOTIFY_PERIOD: Duration = Duration::from_millis(100);
+
 /// Whether the Exit holds a SURB target the Entry announced for this Session.
 ///
 /// A `NoRateControl` Session runs no balancer on this side and stores none (`0`). A rate-controlled Session whose
@@ -362,6 +377,7 @@ fn exit_forward_path_is_degraded(
 #[derive(Debug, Default)]
 struct DegradedSwitch {
     degraded: bool,
+    dark: bool,
     last_stall: Option<Instant>,
 }
 
@@ -379,6 +395,15 @@ impl DegradedSwitch {
     fn change_to(&mut self, next: bool) -> Option<bool> {
         (self.degraded != next).then(|| {
             self.degraded = next;
+            next
+        })
+    }
+
+    /// As [`change_to`](Self::change_to), for whether the degraded forward path is dark: degraded by frames
+    /// that stalled, rather than by frames lost while others still complete.
+    fn change_dark_to(&mut self, next: bool) -> Option<bool> {
+        (self.dark != next).then(|| {
+            self.dark = next;
             next
         })
     }
@@ -1624,6 +1649,10 @@ struct PixFillState {
     /// same way. Only meaningful with a [`degraded_notify_period`](PixFillControl::degraded_notify_period)
     /// configured.
     degraded: bool,
+    /// Whether the degraded forward path is dark, so the notification runs at [`SURB_DARK_NOTIFY_PERIOD`].
+    ///
+    /// Set by the same driver, and only while `degraded` is.
+    dark: bool,
 }
 
 impl PixFillControl {
@@ -1658,6 +1687,7 @@ impl PixFillControl {
                 withholding: false,
                 draining: false,
                 degraded: false,
+                dark: false,
             }),
         }
     }
@@ -1670,7 +1700,12 @@ impl PixFillControl {
         if state.degraded {
             // `PixFillControl::new` only keeps a degraded period alongside a normal one, so this
             // shortens the cadence the Session would have had rather than giving it one.
-            self.degraded_notify_period.or(self.notify_period)
+            match self.degraded_notify_period {
+                // Dark is a degraded forward path at its worst; with no degraded period configured
+                // there is no faster cadence to have.
+                Some(degraded) if state.dark => Some(degraded.min(SURB_DARK_NOTIFY_PERIOD)),
+                degraded => degraded.or(self.notify_period),
+            }
         } else {
             self.notify_period
         }
@@ -1700,10 +1735,32 @@ impl PixFillControl {
         self.apply(&state);
     }
 
+    /// Marks the degraded forward path as dark or not, and re-applies the rate if that changed it.
+    ///
+    /// Dark takes effect only while the stream is degraded (see [`period`](Self::period)): the notification
+    /// then runs at [`SURB_DARK_NOTIFY_PERIOD`] rather than the degraded period. As with
+    /// [`set_degraded`](Self::set_degraded), the gap since the last notification is measured against the
+    /// period in force, so turning dark releases the next notification at once if it is overdue at the new
+    /// cadence.
+    pub(crate) fn set_dark(&self, on: bool) {
+        let mut state = self.state.lock();
+        if state.dark == on {
+            return;
+        }
+        state.dark = on;
+        self.apply(&state);
+    }
+
     /// Whether the stream is currently reporting at the degraded period.
     #[cfg(test)]
     pub(crate) fn is_degraded(&self) -> bool {
         self.state.lock().degraded
+    }
+
+    /// Whether the degraded forward path is currently taken for dark.
+    #[cfg(test)]
+    pub(crate) fn is_dark(&self) -> bool {
+        self.state.lock().dark
     }
 
     /// Whether the notification's initial delay has elapsed.
@@ -5687,16 +5744,24 @@ where
                         switch.note_stall(loss_signal.stalled_for(SURB_DEGRADED_STALL), Instant::now());
                     let next =
                         exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt, recently_stalled);
+                    // Degraded by frames that stalled is a dark forward path, which reports faster still
+                    // (`SURB_DARK_NOTIFY_PERIOD`); degraded by loss alone keeps the degraded period.
+                    let dark = next && recently_stalled;
                     if let Some(next) = switch.change_to(next) {
                         debug!(
                             %session_id,
                             degraded = next,
+                            dark,
                             ?degraded_period,
                             stock = surb_estimator.saturating_diff(),
                             reserve = current_keep_alive_surb_reserve(&surb_mgmt),
                             "switched the exit SURB-level notification cadence"
                         );
                         driver_control.set_degraded(next);
+                    }
+                    if let Some(dark) = switch.change_dark_to(dark) {
+                        debug!(%session_id, dark, "switched the exit SURB-level notification's dark cadence");
+                        driver_control.set_dark(dark);
                     }
                     hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
                 }
@@ -10526,6 +10591,105 @@ mod tests {
         Ok(())
     }
 
+    /// A Session whose frames stall reports at the dark cadence, and once frames complete again, while it still
+    /// loses some, at the degraded period.
+    ///
+    /// Two frames are under way and neither completes: the forward path delivers segments but no frames, the
+    /// Session is dark from the moment the stall has lasted [`SURB_DEGRADED_STALL`], and it reports every
+    /// [`SURB_DARK_NOTIFY_PERIOD`]. A frame completing ends the stall; the loss that goes on keeps the Session
+    /// degraded, and once the stall's hold has passed, at the degraded period only.
+    #[test_log::test(tokio::test)]
+    async fn a_session_whose_frames_stall_reports_at_the_dark_cadence() -> anyhow::Result<()> {
+        let normal = Duration::from_secs(4);
+        let degraded = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capability::Segmentation.into(),
+            400,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(normal),
+                surb_degraded_notify_period: Some(degraded),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let (signal, control, estimator) = {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            (
+                slot.exit_loss_signal
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a degraded period must publish a loss signal")?,
+                slot.pix_fill
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a notification period steers a fill control")?,
+                slot.surb_estimator.clone(),
+            )
+        };
+        timeout(Duration::from_secs(10), async {
+            while !control.notify_started() {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .context("the notification never started")?;
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        // Far above the reserve of 32, so the stock never ends the fast cadence here.
+        let _stock = hold_stock_at(&estimator, 10_000);
+
+        signal.segment_received(1);
+        signal.segment_received(2);
+        timeout(Duration::from_secs(5), async {
+            while !control.is_dark() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("stalled frames never made the Session dark")?;
+        assert!(control.is_degraded(), "dark is a degraded forward path");
+        assert_eq!(0, signal.lost_total(), "and it went dark before any frame was lost");
+
+        let window = Duration::from_millis(1_500);
+        let _settle = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        let dark_reports = level_reports_during(&mut msg_rx, pseudonym, window).await;
+        assert!(
+            dark_reports.len() >= 8,
+            "dark, the Session reports every {SURB_DARK_NOTIFY_PERIOD:?}, about 15 times in {window:?}: \
+             {dark_reports:?}"
+        );
+
+        // A frame completes, and loss goes on: the Session stays degraded, and once the stall's hold has
+        // passed it is no longer dark.
+        signal.frame_completed();
+        let _loss = lose_frames_continuously(signal.clone(), degraded / 4);
+        timeout(SURB_DEGRADED_HOLD + Duration::from_secs(3), async {
+            while control.is_dark() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("the Session stayed dark after its frames completed again")?;
+        assert!(control.is_degraded(), "the loss that goes on keeps it degraded");
+        let _settle = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
+        let degraded_reports = level_reports_during(&mut msg_rx, pseudonym, Duration::from_millis(2_500)).await;
+        assert!(
+            (1..=4).contains(&degraded_reports.len()),
+            "degraded by loss alone, the Session reports at the degraded period ({degraded:?}), two or three times in \
+             2.5 s: {degraded_reports:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
     /// A Session for which the Exit holds no announced SURB target never goes degraded, however lossy its path,
     /// however many SURBs it holds and however well its Entry reads: its keep-alive reserve is 0, so a degraded
     /// report would have nothing to stop it short of the last SURB.
@@ -11968,6 +12132,62 @@ mod tests {
             "as soon as there is a SURB the withheld notification goes out"
         );
         assert!(control.state.lock().last_notify_at.is_some());
+    }
+
+    /// While the degraded forward path is dark, the notification runs at [`SURB_DARK_NOTIFY_PERIOD`]; dark alone,
+    /// without degradation or without a degraded period configured, changes nothing.
+    #[test]
+    fn a_dark_forward_path_reports_at_the_dark_cadence_only_while_degraded() {
+        const RESERVE: u64 = 100;
+        let normal = Duration::from_secs(15);
+        let degraded = Duration::from_secs(1);
+        let control = fill_control_degraded(Some(normal), Some(degraded), RESERVE, 1);
+        control.start_notify();
+
+        control.set_dark(true);
+        assert_eq!(
+            FillRate::once_per(normal),
+            control.effective_rate(),
+            "dark without degradation is not a cadence"
+        );
+
+        control.set_degraded(true);
+        assert_eq!(FillRate::once_per(SURB_DARK_NOTIFY_PERIOD), control.effective_rate());
+        let t0 = Instant::now();
+        assert!(control.admit_at(t0), "the first packet is the notification");
+        let slack = SURB_DARK_NOTIFY_PERIOD / 10;
+        assert!(
+            !control.admit_at(t0 + SURB_DARK_NOTIFY_PERIOD - slack - Duration::from_millis(1)),
+            "the next is due a dark period later, less a tenth of it"
+        );
+        assert!(control.admit_at(t0 + SURB_DARK_NOTIFY_PERIOD));
+
+        control.set_dark(false);
+        assert_eq!(
+            FillRate::once_per(degraded),
+            control.effective_rate(),
+            "a degraded path that is no longer dark reports at the degraded period"
+        );
+
+        let without = fill_control_degraded(Some(normal), None, RESERVE, 1);
+        without.start_notify();
+        without.set_degraded(true);
+        without.set_dark(true);
+        assert_eq!(
+            FillRate::once_per(normal),
+            without.effective_rate(),
+            "with the degraded period switched off there is no faster cadence to have"
+        );
+    }
+
+    /// The driver tells the stream about a change of darkness, and only about a change, as for degradation.
+    #[test]
+    fn the_driver_switches_the_dark_cadence_only_on_transitions() {
+        let mut switch = DegradedSwitch::default();
+        let polled = [false, true, true, false, false, true];
+        let acted: Vec<Option<bool>> = polled.iter().map(|next| switch.change_dark_to(*next)).collect();
+        assert_eq!(vec![None, Some(true), None, Some(false), None, Some(true)], acted);
+        assert!(!switch.degraded, "darkness is switched apart from degradation");
     }
 
     /// The driver tells the stream about a change in its answer, and only about a change.
