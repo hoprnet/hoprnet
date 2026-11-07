@@ -2652,7 +2652,8 @@ mod tests {
             std::thread::sleep(Duration::from_millis(100));
             data_packets += 1;
             state.note_sent();
-            if data_packets % 10 == 0 {
+            // Each pass of this loop is 200 ms, so every fifth is one report a second.
+            if data_packets % 5 == 0 {
                 // One report a second: the Exit's degraded cadence.
                 state.observe_reported_level(500);
             }
