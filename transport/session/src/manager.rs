@@ -10167,6 +10167,37 @@ mod tests {
         );
     }
 
+    /// A degraded period that reports no faster than the normal one disables the feature outright.
+    ///
+    /// The Session publishes no loss signal, so the socket never stamps one and the driver is never
+    /// spawned: "no faster" must cost nothing at all rather than run a switch between two equal
+    /// cadences. The operator is warned once at construction (`SessionManager::new`).
+    #[test_log::test(tokio::test)]
+    async fn a_degraded_period_no_faster_than_the_normal_one_disables_the_feature() -> anyhow::Result<()> {
+        for degraded in [Duration::from_secs(15), Duration::from_secs(60)] {
+            let (mgr, _msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+                Capabilities::empty(),
+                64,
+                SessionManagerConfig {
+                    surb_balance_notify_period: Some(Duration::from_secs(15)),
+                    surb_degraded_notify_period: Some(degraded),
+                    ..Default::default()
+                },
+            )
+            .await?;
+
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            assert!(
+                slot.exit_loss_signal.get().is_none(),
+                "a degraded period of {degraded:?} against a 15s normal one must publish no loss signal"
+            );
+            drop(slot);
+
+            assert!(mgr.close_session(&pseudonym));
+        }
+        Ok(())
+    }
+
     /// At the keep-alive reserve, the degraded period does not run: the fast reports are what the
     /// reserve exists to pay for.
     ///
