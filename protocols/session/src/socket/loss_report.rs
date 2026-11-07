@@ -88,7 +88,7 @@ impl FrameLossReport {
         Self::with_signal(session_id, interval, None)
     }
 
-    /// As [`new`](Self::new), also recording every loss into `loss_signal` as it happens.
+    /// As `new`, also recording every loss into `loss_signal` as it happens.
     pub fn with_signal(
         session_id: impl std::fmt::Display,
         interval: Duration,
