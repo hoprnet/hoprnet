@@ -324,6 +324,26 @@ fn exit_forward_path_is_degraded(
         && estimator.saturating_diff() > current_keep_alive_surb_reserve(balancer)
 }
 
+/// What the Exit's loss driver last told the notification stream, so that it acts only when the answer changes.
+///
+/// The driver re-evaluates [`exit_forward_path_is_degraded`] every [`SURB_DEGRADED_POLL`], and most polls
+/// repeat the previous answer. Each switch re-derives the stream's rate and is logged, so only a change
+/// gets through.
+#[derive(Debug, Default)]
+struct DegradedSwitch {
+    degraded: bool,
+}
+
+impl DegradedSwitch {
+    /// Returns `Some(next)` when `next` differs from what was last applied, and records it; `None` otherwise.
+    fn change_to(&mut self, next: bool) -> Option<bool> {
+        (self.degraded != next).then(|| {
+            self.degraded = next;
+            next
+        })
+    }
+}
+
 /// The keep-alive reserve of a Session whose Entry currently asks for the target `balancer` holds.
 ///
 /// Read at every check rather than fixed when the Session opens: the Entry may lower its target while
@@ -1345,9 +1365,10 @@ pub(crate) struct SessionSlot {
     /// This Session's live frame loss signal, where the Exit created one for it.
     ///
     /// Exit-side, and set only for a Session that can report at the degraded period — an Exit with a
-    /// notification period, a degraded one and a forward path to watch. The socket records into it,
-    /// and the keep-alive driver reads it; kept in the slot as the single handle both sides of the
-    /// Session and the tests can reach.
+    /// notification period, a degraded one and frames to lose (`Capability::Segmentation`). The socket
+    /// records into it and the keep-alive driver reads it, each through its own clone. Nothing in
+    /// production reads this slot: it is kept so that tests can reach the very signal the driver
+    /// watches and inject loss into it, which they cannot do through the socket.
     exit_loss_signal: Arc<OnceLock<Arc<FrameLossSignal>>>,
     /// Exit → Entry Session packets received on this Session, ever.
     ///
@@ -1790,9 +1811,9 @@ impl PixFillControl {
     ///
     /// Nothing about a packet says which producer it belongs to, so the notification is the first one
     /// released no sooner than a period after the last — *less a slack of
-    /// `min(MAX_WAIT_CHUNK, period / 2)`*, which is what keeps the classification from resting on
-    /// scheduling latency. The rate limiter that releases these packets sleeps in chunks of
-    /// [`MAX_WAIT_CHUNK`], re-reads its controller on each wake, and rounds a rate into an integer
+    /// `min(MAX_WAIT_CHUNK, period / 2)`* (`period / 10` while degraded, see below), which is what keeps the
+    /// classification from resting on scheduling latency. The rate limiter that releases these packets sleeps in
+    /// chunks of [`MAX_WAIT_CHUNK`], re-reads its controller on each wake, and rounds a rate into an integer
     /// packet count, so a stream asked for one packet per period releases them a shade over or a
     /// shade under it. Compared against the period exactly, a period the controller rounds short by a
     /// microsecond would classify every other notification as fill — counted in
@@ -1805,6 +1826,20 @@ impl PixFillControl {
     /// notification, and every fill packet that follows it inside the period is still fill and is
     /// still bounded by the reserve. The cap at half the period is what stops a very short period
     /// from having its window widened away to nothing.
+    ///
+    /// While the Session is degraded the slack is `min(MAX_WAIT_CHUNK, period / 10)` instead: 100 ms at the
+    /// one-second degraded default. A half-period slack would make a notification due 500 ms after the last, so a
+    /// degraded PIX Session with fill running (where fill packets are released between the notifications) would
+    /// report about twice a second and spend twice the SURBs the degraded period promises. A tenth is still
+    /// wider than the rate limiter's rounding, and keeps the cadence at about one report per degraded period.
+    ///
+    /// # Budget
+    ///
+    /// A degraded report is a notification and is exempt from the data reserve, exactly as a normal one is; what
+    /// stops degraded reports at the keep-alive reserve ([`keep_alive_surb_reserve`]) is the loss driver, which
+    /// leaves degraded mode once the stock is at or below it (see [`exit_forward_path_is_degraded`]). That holds on
+    /// PIX Sessions too. PIX fill itself is not affected by degradation: it keeps its own reserve
+    /// (`min_surb_reserve`) and is classified and admitted as it is outside degraded mode.
     pub(crate) fn admit(&self) -> bool {
         self.admit_at(Instant::now())
     }
@@ -1818,7 +1853,7 @@ impl PixFillControl {
         // from resting on the scheduling latency of the stream that releases the packet.
         let notification_due = state.notify_started
             && self.period(&state).is_some_and(|period| {
-                let slack = MAX_WAIT_CHUNK.min(period / 2);
+                let slack = MAX_WAIT_CHUNK.min(period / if state.degraded { 10 } else { 2 });
                 state
                     .last_notify_at
                     .is_none_or(|at| now.saturating_duration_since(at) >= period.saturating_sub(slack))
@@ -3919,16 +3954,16 @@ where
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
         // Said once, here, rather than per Session: a degraded period that does not report faster than
         // the normal one is a switch between two equal cadences, so it is treated as off.
-        match (cfg.surb_degraded_notify_period, cfg.surb_balance_notify_period) {
-            (Some(degraded), Some(normal)) if degraded >= normal => warn!(
+        // With no normal period there is nothing to speed up, which is the default of a node that reports
+        // no levels at all, so that case is silent.
+        if let (Some(degraded), Some(normal)) = (cfg.surb_degraded_notify_period, cfg.surb_balance_notify_period)
+            && degraded >= normal
+        {
+            warn!(
                 degraded = ?degraded,
                 normal = ?normal,
                 "the degraded SURB notification period is not faster than the normal one, so it is disabled"
-            ),
-            (Some(_), None) => warn!(
-                "the degraded SURB notification period is configured but the normal one is not, so it is disabled"
-            ),
-            _ => {}
+            );
         }
         cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
@@ -5599,7 +5634,7 @@ where
                     }
                     hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
                 }
-                let mut degraded = false;
+                let mut switch = DegradedSwitch::default();
                 loop {
                     // A drain silences the notification outright, and the driver holds a clone of the
                     // control for as long as it runs: stop rather than outlive the stream it steers.
@@ -5607,7 +5642,7 @@ where
                         return;
                     }
                     let next = exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt);
-                    if next != degraded {
+                    if let Some(next) = switch.change_to(next) {
                         debug!(
                             %session_id,
                             degraded = next,
@@ -5617,7 +5652,6 @@ where
                             "switched the exit SURB-level notification cadence"
                         );
                         driver_control.set_degraded(next);
-                        degraded = next;
                     }
                     hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
                 }
@@ -7071,13 +7105,16 @@ where
         });
 
         // One per Exit Session, and only when the degraded cadence can actually run — a notification
-        // period to speed up and a faster period to speed it up to. Otherwise the socket records into
-        // a signal nobody reads, and the driver is never spawned (see `spawn_exit_keep_alive`).
+        // period to speed up and a faster period to speed it up to — and the Session has frames to
+        // lose (`Capability::Segmentation`; a raw Session has none, and its socket never takes a
+        // signal). Otherwise the socket records into a signal nobody reads, and the driver is never
+        // spawned (see `spawn_exit_keep_alive`).
         let loss_signal = self
             .cfg
             .surb_degraded_notify_period
             .zip(self.cfg.surb_balance_notify_period)
             .filter(|(degraded, normal)| degraded < normal)
+            .filter(|_| session_req.capabilities.0.contains(Capability::Segmentation))
             .map(|_| Arc::new(FrameLossSignal::new()));
         // Published on the slot rather than only handed to the two users, so that what the driver
         // decides and what the tests inject refer to the same signal.
