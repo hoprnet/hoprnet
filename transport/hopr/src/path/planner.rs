@@ -57,6 +57,12 @@ fn validate_weight_temper(temper: f64) -> std::result::Result<(), ValidationErro
 
 /// Configuration for [`PathPlanner`]'s internal path cache.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default, deny_unknown_fields)
+)]
+#[validate(schema(function = "validate_refresh_within_ttl", skip_on_field_errors = false))]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
@@ -70,16 +76,21 @@ pub struct PathPlannerConfig {
     /// 60 s a relay that stopped delivering kept its full share of return-path draws for a minute
     /// after the graph had already scored it down.
     #[default(Duration::from_secs(10))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub cache_ttl: Duration,
     /// Period between proactive background cache-refresh sweeps.
     ///
     /// Held at half the TTL so a steady-state session is normally served from an entry that was
     /// re-weighted rather than one that expired under it.
     #[default(Duration::from_secs(5))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    #[validate(custom(function = "validate_refresh_period"))]
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
+    /// Must be at least 1: a zero limit leaves the selector unable to return any multi-hop path.
     #[default = 50]
+    #[validate(range(min = 1))]
     pub max_cached_paths: usize,
     /// Penalty multiplier for edges lacking probe-based quality observations.
     /// Applied during path cost evaluation to down-weight unprobed edges.
@@ -103,6 +114,7 @@ pub struct PathPlannerConfig {
     /// Total path latency at which the latency factor in the composite weight equals 0.5.
     /// Higher values make the weight less sensitive to latency differences.
     #[default(Duration::from_millis(100))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub latency_halflife: Duration,
     /// Reference channel balance used to scale the capacity factor in the composite weight.
     /// `capacity_factor` saturates at 1.0 near this value.
@@ -154,7 +166,39 @@ pub struct PathPlannerConfig {
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
     #[default(Duration::from_secs(30))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
+}
+
+/// Shortest accepted `refresh_period`. A zero period makes the sweep loop rebuild every cached
+/// multi-hop path back to back, keeping the selector and resolver continuously busy.
+const MIN_REFRESH_PERIOD: Duration = Duration::from_secs(1);
+
+fn validate_refresh_period(period: &Duration) -> std::result::Result<(), ValidationError> {
+    if *period >= MIN_REFRESH_PERIOD {
+        return Ok(());
+    }
+    let mut err = ValidationError::new("refresh_period_too_short");
+    err.message = Some(format!("refresh_period ({period:?}) must be at least {MIN_REFRESH_PERIOD:?}").into());
+    Err(err)
+}
+
+/// A sweep that runs less often than entries expire never reaches them: the sweep walks live entries
+/// only, so an expired one is refilled on demand, and a refill that finds no paths is `PathNotFound`
+/// where a refreshed entry would have kept its previous weights.
+fn validate_refresh_within_ttl(cfg: &PathPlannerConfig) -> std::result::Result<(), ValidationError> {
+    if cfg.refresh_period < cfg.cache_ttl {
+        return Ok(());
+    }
+    let mut err = ValidationError::new("refresh_period_not_below_cache_ttl");
+    err.message = Some(
+        format!(
+            "refresh_period ({:?}) must be shorter than cache_ttl ({:?})",
+            cfg.refresh_period, cfg.cache_ttl
+        )
+        .into(),
+    );
+    Err(err)
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -1383,6 +1427,47 @@ mod tests {
             (0..1_000).any(|_| pick_uniform_index(weights.len()) == Some(1)),
             "an exploratory draw must be able to reach it"
         );
+    }
+
+    #[test]
+    fn a_zero_candidate_limit_should_fail_validation() {
+        let cfg = PathPlannerConfig {
+            max_cached_paths: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+        assert!(PathPlannerConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn a_refresh_period_below_the_minimum_should_fail_validation() {
+        for period in [Duration::ZERO, MIN_REFRESH_PERIOD - Duration::from_millis(1)] {
+            let cfg = PathPlannerConfig {
+                refresh_period: period,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "{period:?} must be rejected");
+        }
+        let cfg = PathPlannerConfig {
+            refresh_period: MIN_REFRESH_PERIOD,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn a_refresh_period_not_shorter_than_the_cache_ttl_should_fail_validation() {
+        let cfg = |cache_ttl, refresh_period| PathPlannerConfig {
+            cache_ttl,
+            refresh_period,
+            ..Default::default()
+        };
+        assert!(cfg(Duration::from_secs(1), Duration::from_secs(5)).validate().is_err());
+        assert!(
+            cfg(Duration::from_secs(5), Duration::from_secs(5)).validate().is_err(),
+            "an entry must not expire at the moment the sweep reaches it"
+        );
+        assert!(cfg(Duration::from_secs(10), Duration::from_secs(5)).validate().is_ok());
     }
 
     /// Cached candidate weights are frozen at fill time, so the TTL bounds how stale the numbers a

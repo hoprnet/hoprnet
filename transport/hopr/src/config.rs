@@ -251,7 +251,7 @@ pub struct HoprProtocolConfig {
     pub stream: StreamProtocolConfig,
     /// Path planner configuration
     #[validate(nested)]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub path_planner: crate::path::PathPlannerConfig,
     /// Interval at which per-peer protocol conformance counters are flushed
     /// into the network graph.
@@ -1579,6 +1579,47 @@ mod tests {
             serde_saphyr::from_str("surb_target_notify: true\n").context("config turning it on must parse")?;
         assert!(on.surb_target_notify);
         Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn path_planner_weights_are_reachable_from_serialized_config() {
+        let json = r#"{
+            "path_planner": {
+                "latency_halflife": "250ms",
+                "capacity_reference": 5000,
+                "edge_penalty": 0.8,
+                "return_path_weight_temper": 0.25
+            }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("path planner weights must deserialize");
+        let planner = cfg.path_planner;
+        let defaults = crate::path::PathPlannerConfig::default();
+
+        assert_eq!(Duration::from_millis(250), planner.latency_halflife);
+        assert_eq!(5000, planner.capacity_reference);
+        assert_eq!(0.8, planner.edge_penalty);
+        assert_eq!(0.25, planner.return_path_weight_temper);
+        assert_eq!(
+            defaults.min_ack_rate, planner.min_ack_rate,
+            "unspecified planner fields must keep their defaults"
+        );
+        assert_eq!(defaults.cache_ttl, planner.cache_ttl);
+        assert!(cfg.validate().is_ok());
+
+        let bad_temper = r#"{ "path_planner": { "return_path_weight_temper": 1.5 } }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(bad_temper).expect("it parses; validation rejects it");
+        assert!(cfg.validate().is_err(), "an out-of-range temper must fail validation");
+
+        let typo = r#"{ "path_planner": { "latency_halflif": "250ms" } }"#;
+        assert!(
+            serde_json::from_str::<HoprProtocolConfig>(typo).is_err(),
+            "a misspelled planner key must be rejected, not silently ignored"
+        );
+
+        let round_trip: HoprProtocolConfig =
+            serde_json::from_str(&serde_json::to_string(&cfg).expect("serialize")).expect("round trip");
+        assert_eq!(cfg, round_trip);
     }
 
     #[cfg(feature = "serde")]
