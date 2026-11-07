@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOPR_PIX_COMMITMENT_PROOF_SIZE","S_MASK"],"enum":["PacketSignal"],"struct":["HoprPixCommitmentProof","HoprPixGroupElement","PacketMessage","PacketParts","SurbReceiverInfo"],"type":["HoprPacketMessage","HoprPacketParts","PacketSignals"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AnyReceiver","AnySender"],"fn":["create"],"macro":[["forward",1]]};

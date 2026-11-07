@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ShareResolution"],"trait":["EntryShareGenerator","ExitAcknowledgementShareProcessor"],"type":["ShareResolutions"]};

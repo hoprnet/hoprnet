@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["KEEP_ALIVE_FAILURE_REPORT_PERIOD"],"enum":["SurbNotificationMode"],"fn":["insert_into_next_slot","spawn_keep_alive_stream","transfer_session","transfer_session_datagram"],"struct":["KeepAliveFailureReport","SlotNotify","SlotNotifyFuture","SlotNotifyInner"]};

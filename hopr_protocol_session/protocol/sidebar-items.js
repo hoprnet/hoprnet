@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SessionMessage","SessionMessageDiscriminants"],"fn":["stop_on_invalid_header"],"mod":["frames","messages"],"struct":["SessionCodec"]};
