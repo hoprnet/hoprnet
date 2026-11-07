@@ -10169,9 +10169,14 @@ mod tests {
 
     /// At the keep-alive reserve, the degraded period does not run: the fast reports are what the
     /// reserve exists to pay for.
+    ///
+    /// The normal period is short enough that, with the reserve cleared, the same window would hold
+    /// several reports — `a_losing_exit_session_reports_faster_until_the_loss_stops` is that same
+    /// fixture with a stock above the reserve. So an empty window here is the reserve holding the
+    /// cadence back, not a stream that never ran; the degraded switch itself is asserted directly.
     #[test_log::test(tokio::test)]
     async fn a_session_at_its_reserve_reports_at_the_normal_period() -> anyhow::Result<()> {
-        let normal = Duration::from_secs(30);
+        let normal = Duration::from_secs(4);
         let degraded = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
         let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
             Capabilities::empty(),
@@ -10184,14 +10189,19 @@ mod tests {
         )
         .await?;
 
-        let signal = mgr
-            .sessions
-            .get(&pseudonym)
-            .context("the session slot must exist")?
-            .exit_loss_signal
-            .get()
-            .cloned()
-            .context("an Exit Session with a degraded period must publish a loss signal")?;
+        let (signal, control) = {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            (
+                slot.exit_loss_signal
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a degraded period must publish a loss signal")?,
+                slot.pix_fill
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a notification period steers a fill control")?,
+            )
+        };
 
         // A reader, and a stock parked exactly at the reserve.
         show_exit_its_entry(
@@ -10215,6 +10225,17 @@ mod tests {
                 .fetch_add(reserve.max(1), std::sync::atomic::Ordering::Relaxed);
         }
 
+        // The stream is running before anything is measured, so that silence afterwards means the
+        // reserve and not a stream that had yet to start.
+        timeout(Duration::from_secs(10), async {
+            while !control.notify_started() {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .context("the notification never started")?;
+        let _first = level_reports_during(&mut msg_rx, pseudonym, Duration::from_millis(1_500)).await;
+
         let window = Duration::from_millis(2_500);
         let lossy = async {
             let deadline = tokio::time::Instant::now() + window;
@@ -10223,11 +10244,15 @@ mod tests {
                 tokio::time::sleep(degraded / 2).await;
             }
         };
-        let (_, reports) = futures::join!(lossy, level_reports_during(&mut msg_rx, pseudonym, window));
+        let (reports, ()) = futures::join!(level_reports_during(&mut msg_rx, pseudonym, window), lossy);
         assert!(
-            reports.is_empty(),
-            "at the reserve the Session reports at the normal period ({normal:?}), so a {window:?} window must hold \
-             no report: {reports:?}"
+            !control.is_degraded(),
+            "a stock at the reserve must leave the Session at its normal period"
+        );
+        assert!(
+            reports.len() <= 1,
+            "at the reserve the Session reports at the normal period ({normal:?}), so a {window:?} window holds at \
+             most one report where the degraded period would produce several: {reports:?}"
         );
 
         assert!(mgr.close_session(&pseudonym));
