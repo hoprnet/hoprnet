@@ -1465,7 +1465,7 @@ mod tests {
         let _ = tokio::time::timeout(Duration::from_secs(2), session.read(&mut buf)).await;
         assert!(
             signal.lost_total() > 0,
-            "a frame that expired incomplete must be recorded in the signal the config carried"
+            "a frame that expired incomplete must be recorded in the signal passed to the socket"
         );
         assert!(signal.lost_within(Duration::from_secs(5)));
         Ok(())

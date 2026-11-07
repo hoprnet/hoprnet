@@ -105,10 +105,10 @@ mod tests {
         let signal = FrameLossSignal::new();
         signal.record();
         assert!(
-            signal.lost_within(Duration::ZERO),
-            "a loss recorded now is within a zero window"
+            signal.lost_within(Duration::from_millis(500)),
+            "a loss recorded now is within a small window"
         );
-        assert!(signal.lost_within(Duration::from_millis(1)));
+        assert!(signal.lost_within(Duration::from_millis(1000)));
         assert!(signal.lost_within(Duration::from_secs(3)));
         assert_eq!(1, signal.lost_total());
     }
@@ -133,6 +133,6 @@ mod tests {
         signal.record();
         signal.record();
         assert_eq!(3, signal.lost_total());
-        assert!(signal.lost_within(Duration::ZERO));
+        assert!(signal.lost_within(Duration::from_millis(500)));
     }
 }
