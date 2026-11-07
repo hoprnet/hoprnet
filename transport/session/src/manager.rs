@@ -302,6 +302,15 @@ const SURB_DEGRADED_POLL: Duration = MAX_WAIT_CHUNK;
 /// one report per second is three reports, which is what a dead-relayer verdict needs.
 const SURB_DEGRADED_HOLD: Duration = Duration::from_secs(3);
 
+/// How long the Exit's frames have to stall before the forward path counts as degraded without a loss yet.
+///
+/// A loss is known only when a frame's reassembly times out, three to six seconds into an outage at the
+/// default 3 s frame timeout (see [`FrameLossSignal`]), and every second of that is a second the Entry's
+/// verdict on a dead relayer waits for its first report. A forward path that delivers segments but no
+/// frames shows sooner: segments of two frames arriving with neither completing. One second is several
+/// frames' worth of a stream moving data, and far below the frame timeout.
+const SURB_DEGRADED_STALL: Duration = Duration::from_secs(1);
+
 /// Whether the Exit holds a SURB target the Entry announced for this Session.
 ///
 /// A `NoRateControl` Session runs no balancer on this side and stores none (`0`). A rate-controlled Session whose
@@ -316,9 +325,12 @@ fn has_announced_surb_target(balancer: &BalancerStateValues) -> bool {
 ///
 /// Four conditions, all of them required:
 ///
-/// * **The forward path is losing frames.** The Exit's echo replies are what corroborate a dead relayer's overdue
-///   races. While frames do not reassemble, no reply goes out, and the Entry's only remaining evidence is this report.
-///   Without loss there is nothing to report faster about.
+/// * **The forward path is losing frames, or they stall.** The Exit's echo replies are what corroborate a dead
+///   relayer's overdue races. While frames do not reassemble, no reply goes out, and the Entry's only remaining
+///   evidence is this report. Without loss there is nothing to report faster about. A loss is known only once a frame
+///   times out, so frames that stalled for [`SURB_DEGRADED_STALL`] count as well (`recently_stalled`, which the driver
+///   holds for [`SURB_DEGRADED_HOLD`] like a loss): that is the same dark forward path, seconds before its first frame
+///   times out.
 /// * **The Entry reads the reports.** As [`PixFillControl::admit`] decides anyway, but also here: a report to an Entry
 ///   with no balancer spends a SURB to say nothing, and reporting one per second to it would do so fifteen times as
 ///   often.
@@ -330,9 +342,10 @@ fn exit_forward_path_is_degraded(
     loss_signal: &FrameLossSignal,
     estimator: &AtomicSurbFlowEstimator,
     balancer: &BalancerStateValues,
+    recently_stalled: bool,
 ) -> bool {
     has_announced_surb_target(balancer)
-        && loss_signal.lost_within(SURB_DEGRADED_HOLD)
+        && (loss_signal.lost_within(SURB_DEGRADED_HOLD) || recently_stalled)
         && balancer.counterparty_refills()
         && estimator.saturating_diff() > current_keep_alive_surb_reserve(balancer)
 }
@@ -342,12 +355,26 @@ fn exit_forward_path_is_degraded(
 /// The driver re-evaluates [`exit_forward_path_is_degraded`] every [`SURB_DEGRADED_POLL`], and most polls
 /// repeat the previous answer. Each switch re-derives the stream's rate and is logged, so only a change
 /// gets through.
+///
+/// It also holds when frames were last seen stalled. A stall ends at the first frame that completes, and
+/// a forward path that delivers a frame now and then is still a dark one, so a stall counts for
+/// [`SURB_DEGRADED_HOLD`] after it was last seen, as a loss does.
 #[derive(Debug, Default)]
 struct DegradedSwitch {
     degraded: bool,
+    last_stall: Option<Instant>,
 }
 
 impl DegradedSwitch {
+    /// Notes whether frames are stalled now, and returns whether they were within [`SURB_DEGRADED_HOLD`].
+    fn note_stall(&mut self, stalled: bool, now: Instant) -> bool {
+        if stalled {
+            self.last_stall = Some(now);
+        }
+        self.last_stall
+            .is_some_and(|at| now.saturating_duration_since(at) <= SURB_DEGRADED_HOLD)
+    }
+
     /// Returns `Some(next)` when `next` differs from what was last applied, and records it; `None` otherwise.
     fn change_to(&mut self, next: bool) -> Option<bool> {
         (self.degraded != next).then(|| {
@@ -5656,7 +5683,10 @@ where
                     if driver_control.is_draining() {
                         return;
                     }
-                    let next = exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt);
+                    let recently_stalled =
+                        switch.note_stall(loss_signal.stalled_for(SURB_DEGRADED_STALL), Instant::now());
+                    let next =
+                        exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt, recently_stalled);
                     if let Some(next) = switch.change_to(next) {
                         debug!(
                             %session_id,
@@ -10167,7 +10197,8 @@ mod tests {
             !exit_forward_path_is_degraded(
                 &signal,
                 &mgr.sessions.get(&pseudonym).unwrap().surb_estimator,
-                &mgr.sessions.get(&pseudonym).unwrap().surb_mgmt
+                &mgr.sessions.get(&pseudonym).unwrap().surb_mgmt,
+                false
             ),
             "the rule and the control must agree on the recovery"
         );
@@ -11652,7 +11683,7 @@ mod tests {
         state.note_counterparty_refills();
         estimator.produced.fetch_add(reserve + 1, Relaxed);
         assert!(
-            !exit_forward_path_is_degraded(&signal, &estimator, &state),
+            !exit_forward_path_is_degraded(&signal, &estimator, &state, false),
             "a whole forward path has nothing to report faster about"
         );
 
@@ -11664,7 +11695,7 @@ mod tests {
             ..Default::default()
         });
         assert!(
-            !exit_forward_path_is_degraded(&signal, &estimator, &unread),
+            !exit_forward_path_is_degraded(&signal, &estimator, &unread, false),
             "an Entry that has not shown it refills has no reader for the report"
         );
 
@@ -11672,21 +11703,72 @@ mod tests {
         let at_reserve = AtomicSurbFlowEstimator::default();
         at_reserve.produced.fetch_add(reserve, Relaxed);
         assert!(
-            !exit_forward_path_is_degraded(&signal, &at_reserve, &state),
+            !exit_forward_path_is_degraded(&signal, &at_reserve, &state, false),
             "at the reserve the normal period is what the Exit can afford"
         );
 
         // All three.
         assert!(
-            exit_forward_path_is_degraded(&signal, &estimator, &state),
+            exit_forward_path_is_degraded(&signal, &estimator, &state, false),
             "loss, a reader and a stock above the reserve is a degraded forward path"
         );
 
         // And the loss ages out of the hold, which is what returns the Session to its normal period.
         std::thread::sleep(SURB_DEGRADED_HOLD * 2);
         assert!(
-            !exit_forward_path_is_degraded(&signal, &estimator, &state),
+            !exit_forward_path_is_degraded(&signal, &estimator, &state, false),
             "a loss older than the hold is not a degraded forward path"
+        );
+    }
+
+    /// Frames that stall degrade the forward path before any of them is lost.
+    ///
+    /// A loss is known only once a frame times out, seconds into an outage. Segments of two frames with
+    /// neither completing is the same dark forward path, and it counts once it has lasted
+    /// [`SURB_DEGRADED_STALL`]. A frame that completes ends it.
+    #[test]
+    fn stalled_frames_degrade_the_forward_path_before_any_is_lost() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let signal = FrameLossSignal::new();
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 10_000,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        });
+        let estimator = AtomicSurbFlowEstimator::default();
+        state.note_counterparty_refills();
+        estimator
+            .produced
+            .fetch_add(current_keep_alive_surb_reserve(&state) + 1, Relaxed);
+        let mut switch = DegradedSwitch::default();
+        let mut degraded_at = |now: Instant| {
+            let recently_stalled = switch.note_stall(signal.stalled_for(SURB_DEGRADED_STALL), now);
+            exit_forward_path_is_degraded(&signal, &estimator, &state, recently_stalled)
+        };
+
+        signal.segment_received(1);
+        signal.segment_received(2);
+        assert!(!degraded_at(Instant::now()), "two frames under way are not a stall yet");
+
+        std::thread::sleep(SURB_DEGRADED_STALL + Duration::from_millis(50));
+        let stalled_at = Instant::now();
+        assert!(
+            degraded_at(stalled_at),
+            "segments of two frames and none completing for the stall time is a degraded forward path"
+        );
+        assert_eq!(0, signal.lost_total(), "and no frame has been lost yet");
+
+        // A frame gets through now and then on a forward path that is still mostly dark: the stall ends
+        // with it, and the Session stays degraded for the hold, as after a loss.
+        signal.frame_completed();
+        assert!(
+            degraded_at(stalled_at + SURB_DEGRADED_HOLD),
+            "a stall counts for the hold after it was last seen"
+        );
+        assert!(
+            !degraded_at(stalled_at + SURB_DEGRADED_HOLD + Duration::from_millis(1)),
+            "after the hold, with no loss and no stall, the path is whole again"
         );
     }
 
