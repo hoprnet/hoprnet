@@ -302,9 +302,19 @@ const SURB_DEGRADED_POLL: Duration = MAX_WAIT_CHUNK;
 /// one report per second is three reports, which is what a dead-relayer verdict needs.
 const SURB_DEGRADED_HOLD: Duration = Duration::from_secs(3);
 
+/// Whether the Exit holds a SURB target the Entry announced for this Session.
+///
+/// A `NoRateControl` Session runs no balancer on this side and stores none (`0`). A rate-controlled Session whose
+/// Entry announces nothing runs its balancer at the fallback target, which the Exit cannot tell from an announced one,
+/// so it holds a non-zero value and is not covered by this rule; a zero target is what is. With none, the keep-alive
+/// reserve is `0`, which would let degraded reports spend down to the last SURB.
+fn has_announced_surb_target(balancer: &BalancerStateValues) -> bool {
+    balancer.target_surb_buffer_size.load(Ordering::Relaxed) > 0
+}
+
 /// Whether the Exit should report its SURB level faster than its normal period.
 ///
-/// Three conditions, all of them required:
+/// Four conditions, all of them required:
 ///
 /// * **The forward path is losing frames.** The Exit's echo replies are what corroborate a dead relayer's overdue
 ///   races. While frames do not reassemble, no reply goes out, and the Entry's only remaining evidence is this report.
@@ -312,6 +322,8 @@ const SURB_DEGRADED_HOLD: Duration = Duration::from_secs(3);
 /// * **The Entry reads the reports.** As [`PixFillControl::admit`] decides anyway, but also here: a report to an Entry
 ///   with no balancer spends a SURB to say nothing, and reporting one per second to it would do so fourteen times as
 ///   often.
+/// * **The Exit holds an announced SURB target.** Without one (a `NoRateControl` Session, which stores none) the
+///   Session never degrades and keeps the normal period: there is no reserve to budget the reports against.
 /// * **The stock is above the keep-alive reserve.** This is the budget: at or below the reserve, the normal period is
 ///   what the Exit can afford, and the reserve is what keeps those reports sendable.
 fn exit_forward_path_is_degraded(
@@ -319,7 +331,8 @@ fn exit_forward_path_is_degraded(
     estimator: &AtomicSurbFlowEstimator,
     balancer: &BalancerStateValues,
 ) -> bool {
-    loss_signal.lost_within(SURB_DEGRADED_HOLD)
+    has_announced_surb_target(balancer)
+        && loss_signal.lost_within(SURB_DEGRADED_HOLD)
         && balancer.counterparty_refills()
         && estimator.saturating_diff() > current_keep_alive_surb_reserve(balancer)
 }
@@ -1837,9 +1850,11 @@ impl PixFillControl {
     ///
     /// A degraded report is a notification and is exempt from the data reserve, exactly as a normal one is; what
     /// stops degraded reports at the keep-alive reserve ([`keep_alive_surb_reserve`]) is the loss driver, which
-    /// leaves degraded mode once the stock is at or below it (see [`exit_forward_path_is_degraded`]). That holds on
-    /// PIX Sessions too. PIX fill itself is not affected by degradation: it keeps its own reserve
-    /// (`min_surb_reserve`) and is classified and admitted as it is outside degraded mode.
+    /// leaves degraded mode once the stock is at or below it (see [`exit_forward_path_is_degraded`]). A Session for
+    /// which the Exit holds no announced SURB target (`NoRateControl`) is never
+    /// degraded and keeps the normal period. That holds on PIX Sessions too. PIX fill itself is not affected by
+    /// degradation: it keeps its own reserve (`min_surb_reserve`) and is classified and admitted as it is outside
+    /// degraded mode.
     pub(crate) fn admit(&self) -> bool {
         self.admit_at(Instant::now())
     }
@@ -10480,6 +10495,98 @@ mod tests {
         Ok(())
     }
 
+    /// A Session for which the Exit holds no announced SURB target never goes degraded, however lossy its path,
+    /// however many SURBs it holds and however well its Entry reads: its keep-alive reserve is 0, so a degraded
+    /// report would have nothing to stop it short of the last SURB.
+    ///
+    /// A `NoRateControl` Session runs no balancer on the Exit, so none stores a target. (A rate-controlled Session
+    /// whose Entry announces none is given the balancer-rate fallback target, which the Exit cannot tell from a
+    /// real one, so it is not a no-target case.) The stock is far above any reserve a target would give.
+    #[test_log::test(tokio::test)]
+    async fn a_session_without_a_target_never_goes_degraded() -> anyhow::Result<()> {
+        let capabilities = Capability::Segmentation | Capability::NoRateControl;
+        let normal = Duration::from_secs(4);
+        let period = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+        let (mgr, mut msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            capabilities,
+            0,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(normal),
+                surb_degraded_notify_period: Some(period),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let (signal, control, estimator) = {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            anyhow::ensure!(
+                !has_announced_surb_target(&slot.surb_mgmt),
+                "fixture: the Exit must hold no target for this Session"
+            );
+            (
+                slot.exit_loss_signal
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a degraded period must publish a loss signal")?,
+                slot.pix_fill
+                    .get()
+                    .cloned()
+                    .context("an Exit Session with a notification period steers a fill control")?,
+                slot.surb_estimator.clone(),
+            )
+        };
+
+        timeout(Duration::from_secs(10), async {
+            while !control.notify_started() {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .context("the notification never started")?;
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        let _stock = hold_stock_at(&estimator, 1_000);
+        let _loss = lose_frames_continuously(signal, period / 4);
+
+        let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let _sampler = {
+            let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
+            AbortOnDrop(tokio::spawn(async move {
+                loop {
+                    if control.is_degraded() {
+                        ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }))
+        };
+
+        // Past the 500 ms the driver takes to act on what it sees, over several degraded periods.
+        let window = Duration::from_millis(2_500);
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(1_000)).await;
+        let reports = level_reports_during(&mut msg_rx, pseudonym, window).await;
+        assert!(
+            !ever_degraded.load(std::sync::atomic::Ordering::Relaxed),
+            "a Session with no announced target must never be degraded"
+        );
+        assert!(
+            reports.len() <= 1,
+            "with no target the Session reports at the normal period ({normal:?}), at most once in {window:?}: \
+             {reports:?}"
+        );
+
+        assert!(mgr.close_session(&pseudonym));
+        Ok(())
+    }
+
     /// The Exit's SURB-level reports follow what the Exit has seen of its Entry, for every kind of
     /// Session and every kind of Entry.
     ///
@@ -10675,8 +10782,10 @@ mod tests {
                     held > 0,
                     "fixture: the Entry must have delivered SURBs for a report to be sent on"
                 );
+                // A degraded case holds no announced target, so it keeps the normal period (four seconds), whose
+                // first report may fall past the window: only the cadence is asserted for it, below.
                 anyhow::ensure!(
-                    !levels.is_empty(),
+                    degraded || !levels.is_empty(),
                     "{entry:?} holds {held} SURB(s) of the Exit and refills it, yet no level report arrived over \
                      {REPORT_WINDOW:?}"
                 );
@@ -10690,7 +10799,7 @@ mod tests {
                 } else {
                     // No balancer: the report is the Exit's own count, and every report spent one.
                     assert_eq!(
-                        Some(held),
+                        (!levels.is_empty()).then_some(held),
                         levels.first().copied(),
                         "a NoRateControl Session reports the SURBs it holds, not its balancer's unwritten zero: \
                          {levels:?}"
@@ -10701,11 +10810,14 @@ mod tests {
                     );
                 }
                 if degraded {
-                    // At the normal period (four seconds) the window holds one report at most.
+                    // Every degraded case here has no announced target on the Exit (`announced` is 0 and the
+                    // Session is `NoRateControl`), so it never degrades: at the normal period (four seconds)
+                    // the window holds one report at most, however lossy the path.
+                    assert_eq!(0, announced, "fixture: a degraded case holds no announced target");
                     assert!(
-                        levels.len() >= 2,
-                        "a Session losing frames reports at the degraded period, which fits twice in \
-                         {REPORT_WINDOW:?}: {levels:?}"
+                        levels.len() <= 1,
+                        "a Session without an announced target keeps the normal period while losing frames, which \
+                         fits once in {REPORT_WINDOW:?}: {levels:?}"
                     );
                 }
             }
