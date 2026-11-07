@@ -15778,11 +15778,9 @@ mod tests {
             ..Default::default()
         });
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -15794,10 +15792,12 @@ mod tests {
 
         let drops_before = crate::counters::start_protocol_send_drop_count();
         let mut saw_full = false;
-        for _ in 0..(capacity + 1) {
+        // Cheapest way through `try_send` without letting the processor drain: a keep-alive for a
+        // registered Session. Fill the queue, then drop until the rate-limited WARN is due.
+        for _ in 0..(capacity + FULL_QUEUE_WARN_INTERVAL + 1) {
             let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
-            if let DispatchResult::Dropped(DropReason::StartQueueFull) = outcome {
-                saw_full = true;
+            saw_full |= matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull));
+            if saw_full && crate::counters::start_protocol_send_drop_count().is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
                 break;
             }
         }
@@ -15809,6 +15809,53 @@ mod tests {
         assert!(
             crate::counters::start_protocol_send_drop_count() > drops_before,
             "a queue-full drop must be counted"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The rate-limited WARN is only due every `FULL_QUEUE_WARN_INTERVAL` drops, so the count is
+    /// seeded here rather than left to whatever other tests happened to leave behind.
+    #[test_log::test(tokio::test)]
+    async fn a_full_start_queue_warns_once_per_interval() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            maximum_sessions: 1,
+            ..Default::default()
+        });
+
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let capacity = start_protocol_channel_capacity(&mgr.cfg);
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        // Fill the queue so the next send is the one that drops.
+        for _ in 0..capacity {
+            mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
+        }
+
+        // Put the counter one below a multiple so this drop is the WARN, whatever ran before.
+        crate::counters::START_PROTOCOL_SEND_DROPS
+            .store(FULL_QUEUE_WARN_INTERVAL - 1, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            crate::counters::start_protocol_send_drop_count(),
+            FULL_QUEUE_WARN_INTERVAL - 1,
+            "the seed must land one below the interval"
+        );
+        let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
+        assert_eq!(
+            crate::counters::start_protocol_send_drop_count(),
+            FULL_QUEUE_WARN_INTERVAL,
+            "the seeded drop must be the one that crosses the interval"
+        );
+        assert!(
+            matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull)),
+            "the queue must be full at this point, got {outcome:?}"
         );
 
         sender.close_channel();
@@ -15954,11 +16001,9 @@ mod tests {
     async fn a_flood_of_ssa_requests_for_unknown_pseudonyms_must_not_starve_a_live_session() -> anyhow::Result<()> {
         let mgr: TestManager = SessionManager::new(Default::default());
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -16029,11 +16074,9 @@ mod tests {
     {
         let mgr: TestManager = SessionManager::new(Default::default());
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -16084,11 +16127,9 @@ mod tests {
     async fn ssa_commits_and_initiation_replies_are_admitted_only_for_local_state() -> anyhow::Result<()> {
         let mgr: TestManager = SessionManager::new(Default::default());
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -16221,11 +16262,9 @@ mod tests {
     async fn keep_alives_and_session_errors_naming_another_session_are_ignored() -> anyhow::Result<()> {
         let mgr: TestManager = SessionManager::new(Default::default());
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
