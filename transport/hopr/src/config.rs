@@ -1055,9 +1055,11 @@ pub struct SessionGlobalConfig {
     /// the reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
     /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
     /// reserve, and the normal period resumes within three seconds and one poll of the last loss. A
-    /// Session that
-    /// loses frames only occasionally therefore spends a few extra SURBs of its buffer around each
-    /// loss and nothing otherwise.
+    /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
+    /// around each loss and nothing otherwise.
+    ///
+    /// The same holds on a PIX Session: its degraded reports stop at the keep-alive reserve too. PIX
+    /// fill itself is unaffected by degradation and keeps its own reserve.
     ///
     /// Default is 1 second. Set to `null` to disable; minimum is 1 second, and a value at or above
     /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) reports no faster, so it is
