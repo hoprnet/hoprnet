@@ -88,16 +88,6 @@ impl FrameLossSignal {
     }
 }
 
-// A per-Session signal is a handle, not a value: two Sessions never share one, and a config that
-// carries a different signal is a config for a different Session.
-impl PartialEq for FrameLossSignal {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other)
-    }
-}
-
-impl Eq for FrameLossSignal {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

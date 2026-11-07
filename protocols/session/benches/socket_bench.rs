@@ -28,6 +28,7 @@ pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>
         "alice",
         alice,
         SessionSocketConfig::default(),
+        None,
         #[cfg(feature = "telemetry")]
         NoopTracker,
     )
@@ -45,6 +46,7 @@ pub async fn bob_receive_data(data: Vec<u8>, mut recv_data: Vec<u8>) -> Vec<u8> 
         "bob",
         DuplexIO::from((futures::io::sink(), Cursor::new(data))),
         SessionSocketConfig::default(),
+        None,
         #[cfg(feature = "telemetry")]
         NoopTracker,
     )

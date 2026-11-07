@@ -568,7 +568,7 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
 }
 
 /// Configures the Session protocol socket over HOPR.
-#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {
     /// Capabilities of the Session protocol socket.
     ///
@@ -601,12 +601,6 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
-    /// Live frame loss of the socket, for a reader that has to react within seconds.
-    ///
-    /// See [`SessionSocketConfig::loss_signal`]. Exit-side and `None` everywhere else: the Exit is
-    /// the side that reports faster while its forward path is degraded.
-    #[serde(skip)]
-    pub exit_loss_signal: Option<Arc<FrameLossSignal>>,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -646,7 +640,7 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
@@ -654,9 +648,10 @@ impl HoprSession {
     /// (`None` leaves it unpaced); `surb_mgmt` gives the window its anti-grief down-only SURB ceiling.
     /// The entry (sending) side passes `Some(..)` for it; sites without them pass `None`.
     ///
-    /// A frame loss signal, where one is installed, travels on
-    /// [`HoprSessionConfig::exit_loss_signal`] — the Exit's handle on the frames it failed to
-    /// reassemble, see [`SessionSocketConfig::loss_signal`].
+    /// `loss_signal` is the Exit's handle on the frames its socket fails to reassemble: the socket
+    /// stamps it at every loss, so the Exit can react within seconds. It reaches only the sockets of
+    /// Sessions with [`Capability::Segmentation`] (a raw Session has no frames to lose); `None`
+    /// records nothing.
     #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(
@@ -667,6 +662,7 @@ impl HoprSession {
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
         flow_control: Option<FlowControlConfig>,
+        loss_signal: Option<Arc<FrameLossSignal>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -738,7 +734,6 @@ impl HoprSession {
                 // that is never coming and holds everything already received behind it. The
                 // sessions that need this bound most are exactly the ones flow control excludes.
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
-                loss_signal: cfg.exit_loss_signal.clone(),
                 ..Default::default()
             };
 
@@ -800,6 +795,7 @@ impl HoprSession {
                     transport,
                     ack_state,
                     socket_cfg,
+                    loss_signal,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?;
@@ -828,6 +824,7 @@ impl HoprSession {
                     id,
                     transport,
                     socket_cfg,
+                    loss_signal,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
                 )?)
@@ -1315,6 +1312,7 @@ mod tests {
                 max_window_size: SESSION_MTU,
                 ..Default::default()
             }),
+            None,
         )?;
         let frame = vec![7u8; SESSION_MTU];
         session.write_all(&frame).await?;
@@ -1413,13 +1411,13 @@ mod tests {
         Ok(())
     }
 
-    /// A `HoprSessionConfig` carrying a loss signal reaches the socket, and the socket records into it.
+    /// A loss signal passed to `new_with_surb_state` reaches the socket, and the socket records into it.
     ///
     /// This is the seam the Exit relies on: the manager creates the signal per Exit Session, hands it
-    /// through the config, and the socket stamps it on every frame it fails to reassemble. A segment
+    /// to the Session constructor, and the socket stamps it on every frame it fails to reassemble. A segment
     /// whose frame never completes is exactly that — the frame expires incomplete.
     #[test_log::test(tokio::test)]
-    async fn a_configs_loss_signal_records_the_frames_the_socket_fails_to_reassemble() -> anyhow::Result<()> {
+    async fn a_passed_loss_signal_records_the_frames_the_socket_fails_to_reassemble() -> anyhow::Result<()> {
         use hopr_protocol_session::types::{Segment, SeqIndicator, SessionMessage};
 
         let id: SessionId = HoprPseudonym::random();
@@ -1433,13 +1431,13 @@ mod tests {
                 // Three segments per frame, of which only the first ever arrives.
                 frame_mtu: 3 * SESSION_MTU,
                 frame_timeout: Duration::from_millis(100),
-                exit_loss_signal: Some(signal.clone()),
                 ..Default::default()
             },
             (futures::sink::drain(), rx),
             None,
             None,
             None,
+            Some(signal.clone()),
         )?;
 
         assert_eq!(0, signal.lost_total(), "nothing lost before anything arrived");
