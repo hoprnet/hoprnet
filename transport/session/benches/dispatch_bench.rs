@@ -290,7 +290,7 @@ fn make_manager_without_session() -> (
 
 /// Benchmark: dispatching a Start protocol message.
 ///
-/// Exercises the `start_protocol_tx.try_send()` path — and, since the Exit's Start-protocol
+/// Exercises the lane's `try_send()` path — and, since the Exit's Start-protocol
 /// traffic is credited to the Entry's `returned_packets`, the session lookup that credit needs.
 ///
 /// # Why three ids and not one
@@ -381,7 +381,7 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
 /// `dispatch_message` runs every Start message through
 /// `start_message_is_for_local_state` before enqueueing it, dropping with
 /// `DropReason::StaleStartMessage` anything naming no local Session state. The filter exists
-/// because Start messages share one bounded worker pool, and several of its handlers park a
+/// because Start control messages share one bounded worker pool, and several of its handlers park a
 /// worker on state a bogus message will never have — `handle_ssa_request` waits up to a second
 /// for a Session slot a random pseudonym never gets. Before the filter, ~110 concurrent bogus
 /// requests occupied every handler and the bounded Start queue then dropped all traffic behind
@@ -494,6 +494,33 @@ pub fn dispatch_start_protocol_filter(c: &mut Criterion) {
         group.bench_function("keep_alive_registered", |b| {
             b.iter(|| {
                 let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
+            });
+        });
+
+        drop(std::mem::ManuallyDrop::into_inner(msg_rx));
+        drop(std::mem::ManuallyDrop::into_inner(sn_rx));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    }
+
+    // `StartSession`: always passes the filter, so this measures the routing decision the lane split
+    // adds on top of the filter. The lane itself is pinned by
+    // `a_start_session_flood_must_not_fill_the_control_lane`, which a misroute makes fail.
+    {
+        let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
+        let initiator = HoprPseudonym::random();
+        let in_data = make_start_protocol_data();
+
+        assert!(
+            matches!(
+                manager.dispatch_message(initiator, in_data.clone()),
+                Ok(DispatchResult::Processed)
+            ),
+            "fixture must take the StartSession arm: StartSession is admitted unconditionally"
+        );
+
+        group.bench_function("start_session", |b| {
+            b.iter(|| {
+                let _ = manager.dispatch_message(initiator, in_data.clone()).ok();
             });
         });
 
