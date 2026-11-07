@@ -554,6 +554,11 @@ const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
 /// (session initiations, establishments, errors, keep-alives).
 const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 
+/// How many drops of a full queue may pass between two `warn!` lines.
+///
+/// Warning per drop would reproduce the per-packet log spam these quiet drops exist to remove.
+const FULL_QUEUE_WARN_INTERVAL: usize = 256;
+
 /// Ceiling on the per-session term of [`start_protocol_channel_capacity`].
 ///
 /// A session contributes to this channel only while its Start exchange is in flight — a handful of
@@ -2074,13 +2079,12 @@ impl Drop for SessionSlotGuard<'_> {
     }
 }
 
-/// Why an inbound session data packet was dropped without being delivered.
+/// Why an inbound packet was dropped without being delivered.
 ///
-/// All three are ordinary consequences of a session tearing down or being briefly overwhelmed, not
-/// faults: a departing counterparty leaves packets in flight that arrive after its slot's sink is
-/// gone or after the slot itself is deregistered. They are reported as a [`DispatchResult::Dropped`]
-/// outcome rather than an `Err` precisely so the caller does not log them at `ERROR` — the loud
-/// teardown-race spam this distinction exists to remove.
+/// All of these are ordinary consequences of a session tearing down, of transient backpressure, or
+/// of a peer sending traffic that is undecodable or names no local state. Reported as a
+/// [`DispatchResult::Dropped`] outcome rather than an `Err` so the caller logs them quietly instead
+/// of at `ERROR`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DropReason {
     /// The slot is still registered but its data sink (receiver) has been dropped
@@ -2099,6 +2103,12 @@ pub enum DropReason {
     /// about someone else's Session. Rejected at dispatch, before it can occupy a shared handler;
     /// benign, and quiet for the same reason the others are.
     StaleStartMessage,
+    /// A Start-tagged packet that failed to decode. Anyone can send these for free, so the volume
+    /// must never become the log.
+    MalformedStartMessage,
+    /// The bounded Start-protocol processing queue was full (`TrySendError::Full`): backpressure,
+    /// not a teardown.
+    StartQueueFull,
 }
 
 /// Indicates the result of processing a message.
@@ -6124,7 +6134,19 @@ where
             // the shared Start-protocol worker pool — several handlers park a worker on state such
             // a message never has — and the bounded queue then fills, dropping every message behind
             // it.
-            let msg = HoprStartProtocol::try_from(in_data.data)?;
+            //
+            // A decode failure is a quiet drop: anyone can send a Start-tagged packet for free.
+            let msg = match HoprStartProtocol::try_from(in_data.data) {
+                Ok(msg) => msg,
+                Err(error) => {
+                    trace!(%pseudonym, %error, "dropping malformed Start protocol message");
+                    crate::counters::SESSION_MALFORMED_START_MESSAGES
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_DISPATCHED_MSGS.increment_by(&["dropped_malformed_start"], 1);
+                    return Ok(DispatchResult::Dropped(DropReason::MalformedStartMessage));
+                }
+            };
 
             if !self.start_message_is_for_local_state(&pseudonym, &msg) {
                 // Quiet on purpose: a peer spraying Start messages for pseudonyms we never issued
@@ -6140,13 +6162,32 @@ where
             // and what the packet did to the SURB store.
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
-                start_protocol_tx
-                    .try_send((pseudonym, msg, in_data.packet_info, unbooked))
-                    .map_err(|error| {
+                match start_protocol_tx.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
+                    Ok(()) => {}
+                    // Backpressure, not a fault: rate-limited so a sustained flood cannot become
+                    // per-packet log spam.
+                    Err(crossfire::TrySendError::Full(_)) => {
+                        let prev = crate::counters::START_PROTOCOL_SEND_DROPS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        if prev.is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
+                            warn!(
+                                %pseudonym,
+                                total_start_queue_full_drops = prev + 1,
+                                "Start protocol queue full, dropping message (backpressure)"
+                            );
+                        }
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_DISPATCHED_MSGS.increment_by(&["dropped_start_queue_full"], 1);
+                        return Ok(DispatchResult::Dropped(DropReason::StartQueueFull));
+                    }
+                    // A closed queue means the manager is shutting down, which is a real fault.
+                    Err(crossfire::TrySendError::Disconnected(_)) => {
                         crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        error!(%error, "failed to send Start protocol message to processing task");
-                        SessionManagerError::other(error)
-                    })?;
+                        return Err(
+                            SessionManagerError::other(anyhow::anyhow!("Start protocol queue is closed")).into(),
+                        );
+                    }
+                }
             } else {
                 return Err(SessionManagerError::NotStarted.into());
             }
@@ -6158,11 +6199,6 @@ where
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
             // This is traffic that belongs to one of the Sessions
             let session_id = pseudonym;
-
-            // How often a sustained inbox-full condition is allowed to log. Backpressure can
-            // affect every packet on the hot path, so warning per drop would reproduce exactly
-            // the ERROR spam this dispatch was rewritten to avoid — warn once per interval instead.
-            const SESSION_INBOX_FULL_WARN_INTERVAL: usize = 256;
 
             return if let Some(session_slot) = self.sessions.get(&session_id) {
                 trace!(%session_id, "received data for a registered session");
@@ -6199,7 +6235,7 @@ where
                     Err(crossfire::TrySendError::Full(_)) => {
                         let prev =
                             crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        if prev.is_multiple_of(SESSION_INBOX_FULL_WARN_INTERVAL) {
+                        if prev.is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
                             warn!(%session_id, total_inbox_full_drops = prev + 1, "session inbox full, dropping data (backpressure)");
                         }
                         #[cfg(all(feature = "telemetry", not(test)))]
@@ -13926,13 +13962,15 @@ mod tests {
     }
 
     /// The undecodable half of the same regression: the decode runs after the credit, so a
-    /// Start-tagged packet that fails to parse must still have credited the return SURB it spent.
+    /// Start-tagged packet that fails to parse must still have credited the return SURB it spent —
+    /// and must be a quiet counted drop, since anyone can send one for free.
     #[test_log::test(tokio::test)]
     async fn an_undecodable_start_packet_should_still_credit_the_returned_packets() -> anyhow::Result<()> {
         let mgr: TestManager = SessionManager::new(Default::default());
         let pseudonym = HoprPseudonym::random();
         let _rx = entry_slot_with_closed_gate(&mgr, pseudonym)?;
         let before = returned_packets_of(&mgr, pseudonym);
+        let malformed_before = crate::counters::session_malformed_start_message_count();
 
         // Start-protocol tag, but a payload that parses to no Start-protocol message.
         let mut undecodable = session_data_packet(b"not a start message")?;
@@ -13940,13 +13978,114 @@ mod tests {
 
         let result = mgr.dispatch_message(pseudonym, undecodable);
         assert!(
-            result.is_err(),
-            "the fixture must actually fail to decode this packet, got {result:?}"
+            matches!(result, Ok(DispatchResult::Dropped(DropReason::MalformedStartMessage))),
+            "a Start-tagged packet that fails to decode must be a quiet drop, got {result:?}"
+        );
+        assert!(
+            crate::counters::session_malformed_start_message_count() > malformed_before,
+            "the malformed Start message must be counted"
         );
         assert_eq!(
             before + 1,
             returned_packets_of(&mgr, pseudonym),
             "a packet that cannot be decoded has already consumed its return SURB"
+        );
+
+        Ok(())
+    }
+
+    /// A full Start queue is backpressure, not a fault: it must be a quiet counted drop rather than
+    /// the per-packet `ERROR` the transport logs for a dispatch `Err`.
+    ///
+    /// Deterministic only on the default current-thread runtime: the filling loop has no `.await`,
+    /// so the processor task is never polled and the queue cannot drain underneath it.
+    #[test_log::test(tokio::test)]
+    async fn a_full_start_queue_should_be_a_backpressure_drop() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            maximum_sessions: 1,
+            ..Default::default()
+        });
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        // Fill the queue to its capacity without letting the processor drain it: a keep-alive for a
+        // registered Session is the cheapest message that reaches `try_send`.
+        let capacity = start_protocol_channel_capacity(&mgr.cfg);
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        let drops_before = crate::counters::start_protocol_send_drop_count();
+        let mut saw_full = false;
+        for _ in 0..(capacity + 1) {
+            let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
+            if let DispatchResult::Dropped(DropReason::StartQueueFull) = outcome {
+                saw_full = true;
+                break;
+            }
+        }
+
+        assert!(
+            saw_full,
+            "filling the Start queue past its capacity must produce a quiet StartQueueFull drop"
+        );
+        assert!(
+            crate::counters::start_protocol_send_drop_count() > drops_before,
+            "a queue-full drop must be counted"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// A dispatch before `start()` is a programming error, not a benign drop: the queue is unset and
+    /// the caller must see it as `Err`.
+    #[test_log::test(tokio::test)]
+    async fn dispatching_a_start_message_before_start_is_an_error() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        let result = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::NotStarted))
+            ),
+            "an unstarted manager must report NotStarted, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A closed Start queue means the manager is shutting down, which is a real fault: `Err`, and
+    /// counted, but never a silent drop.
+    #[test_log::test(tokio::test)]
+    async fn a_closed_start_queue_is_an_error_not_a_drop() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        // Install a queue whose receiver is already dropped, so every `try_send` is `Disconnected`.
+        type Msg = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
+        let (lane, rx) = crossfire::mpsc::bounded_blocking_async::<Msg>(4);
+        drop(rx);
+        let _ = mgr.start_protocol_tx.set(lane);
+
+        let drops_before = crate::counters::start_protocol_send_drop_count();
+        let result = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
+        assert!(
+            result.is_err(),
+            "a closed queue must surface as Err so the fault is visible, got {result:?}"
+        );
+        assert!(
+            crate::counters::start_protocol_send_drop_count() > drops_before,
+            "a closed-queue failure must still be counted"
         );
 
         Ok(())
