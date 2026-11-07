@@ -836,7 +836,8 @@ mod tests {
             for cost in through {
                 assert!(
                     cost / (cost + best_around) < 1e-6,
-                    "{hops} hop(s): a relay none of whose loopbacks returned must draw a negligible share, got {cost} against {best_around}"
+                    "{hops} hop(s): a relay none of whose loopbacks returned must draw a negligible share, got {cost} \
+                     against {best_around}"
                 );
             }
         }
