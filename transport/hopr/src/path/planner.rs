@@ -104,14 +104,16 @@ pub struct PathPlannerConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_ack_rate: f64,
-    /// Minimum share of the loopbacks over an edge, in the last 60 s, that must return for its first
-    /// relay to keep its weight in path selection.
+    /// Rate below which the first relay of a path is starved in path selection, when what travels over
+    /// its edge says it is dead.
     ///
     /// A relay that rejects our packets still answers pings and signs an ack for every packet, so its
-    /// ack rate stays healthy; only the loopbacks show that nothing gets through. A relay below this
-    /// share is starved to a negligible weight, not removed, so it keeps being probed and can
-    /// recover. The default is a tiny positive, so only a relay none of whose loopbacks returned is
-    /// starved. `0.0` turns it off. Must be finite and in `0.0..=1.0`.
+    /// ack rate stays healthy. Two witnesses are read: the share of loopbacks over the edge that
+    /// returned in the last 60 s, and how well real traffic over it came back. Either one at or
+    /// above this rate keeps the relay, so probes that failed while traffic went through do not
+    /// starve it. A starved relay drops to a negligible weight and is not removed, so it keeps being
+    /// probed and can recover. The default is a tiny positive, so only a relay with nothing
+    /// returning is starved. `0.0` turns it off. Must be finite and in `0.0..=1.0`.
     #[default(f64::EPSILON)]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_loopback_rate: f64,
