@@ -1060,6 +1060,10 @@ pub struct SessionGlobalConfig {
     /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
     /// around each loss and nothing otherwise.
     ///
+    /// While the frames stall, the forward path is dark: the reports are all the Entry hears, and the Exit
+    /// sends one every 100 ms, as long as this period is set (a fixed cadence, bounded by the same reserve).
+    /// A Session of single-segment frames never stalls, so it only ever reports at this period.
+    ///
     /// A Session for which the Exit has no announced SURB target (a `NoRateControl` Session, which runs no
     /// balancer on the Exit) never reports at this period; it keeps the normal one.
     ///
