@@ -1058,6 +1058,9 @@ pub struct SessionGlobalConfig {
     /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
     /// around each loss and nothing otherwise.
     ///
+    /// A Session for which the Exit has no announced SURB target (a `NoRateControl` Session, which runs no
+    /// balancer on the Exit) never reports at this period; it keeps the normal one.
+    ///
     /// The same holds on a PIX Session: its degraded reports stop at the keep-alive reserve too. PIX
     /// fill itself is unaffected by degradation and keeps its own reserve.
     ///
