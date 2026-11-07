@@ -640,14 +640,18 @@ impl RaceHistory {
     /// Comparing the latest reply with the *oldest* overdue race instead lets one stale race, or the
     /// replies already past the relayer when it died, hold a verdict back until that race expires, up
     /// to a minute.
-    fn is_black_hole(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> bool {
+    ///
+    /// Returns those replies, by SURB, empty while the relayer cannot be judged at all; whether they
+    /// make it a black hole is up to [`explain_away`], which sets aside the ones a relayer already
+    /// judged dead explains.
+    fn unanswered(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> Vec<HoprSurbId> {
         let own = self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max);
         // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
         // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
         let usual = match (self.usual_margin(), fallback_usual) {
             (Some(usual), _) => usual,
             (None, Some(fallback)) => own.max(fallback),
-            (None, None) => return false,
+            (None, None) => return Vec::new(),
         };
         let grace = Duration::from_secs_f64(usual);
         // Home through it: a race it settled, or any reply through it. A reply in the normal order
@@ -655,17 +659,58 @@ impl RaceHistory {
         // undid the revival such a reply makes at the very next flush.
         let latest_home = self.finished().map(|race| race.at).max().max(self.last_home);
         let now = Instant::now();
-        let unanswered = self
-            .open
-            .values()
-            .filter_map(|race| race.at.checked_add(grace))
+        self.open
+            .iter()
+            .filter_map(|(surb, race)| race.at.checked_add(grace).map(|due| (*surb, due)))
             // Due, and overdue while others delivered (see above)...
-            .filter(|due| *due < now && last_reply.is_some_and(|reply| reply > *due))
+            .filter(|(_, due)| *due < now && last_reply.is_some_and(|reply| reply > *due))
             // ...and nothing home through it since it fell due.
-            .filter(|due| latest_home.is_none_or(|home| home < *due))
-            .count();
-        unanswered >= MIN_RACES
+            .filter(|(_, due)| latest_home.is_none_or(|home| home < *due))
+            .map(|(surb, _)| surb)
+            .collect()
     }
+}
+
+/// Of the relayers whose overdue replies would make them black holes, those whose lateness no other
+/// one explains.
+///
+/// A reply out late counts against every relayer on its leg that its partner's leg does not share,
+/// since a race cannot tell which of them held it. With a leg's relayers drawn from many, the
+/// relayers on legs through a dead one collected its overdue replies too, and were judged dead with
+/// it: on a cluster, an innocent relayer was judged dead in two of every three runs that killed one
+/// (48 of 72) once the paths were spread over every first relayer, against one in four before.
+///
+/// A dead relayer is on all the legs that failed through it, an innocent one only on those it
+/// shares with it, so the dead one has the most. They are taken in that order: one is a black hole
+/// if at least [`MIN_RACES`] of its unanswered replies are on legs through no relayer already taken,
+/// and every reply out on a leg through it is then explained. Two relayers dead at once are both
+/// taken while each has replies the other does not explain; one that only ever sat on legs through
+/// the other cannot be told from an innocent one, and waits until those legs are gone.
+fn explain_away(
+    mut suspects: Vec<(OffchainPublicKey, Vec<HoprSurbId>, Vec<HoprSurbId>)>,
+) -> std::collections::HashSet<OffchainPublicKey> {
+    suspects.sort_by(|a, b| {
+        b.1.len()
+            .cmp(&a.1.len())
+            .then_with(|| a.0.to_string().cmp(&b.0.to_string()))
+    });
+    let mut explained: std::collections::HashSet<HoprSurbId> = std::collections::HashSet::new();
+    let mut black_holes = std::collections::HashSet::new();
+    for (relayer, unanswered, open) in suspects {
+        let own = unanswered.iter().filter(|surb| !explained.contains(*surb)).count();
+        if own >= MIN_RACES {
+            black_holes.insert(relayer);
+            explained.extend(open);
+        } else {
+            tracing::debug!(
+                %relayer,
+                unanswered = unanswered.len(),
+                own,
+                "overdue replies explained by a relayer judged dead on their legs"
+            );
+        }
+    }
+    black_holes
 }
 
 /// A relayer's standing in its races: median margin behind its partners, that median's
@@ -877,7 +922,9 @@ impl RelayerHealth {
             .iter()
             .filter_map(|entry| entry.usual_margin())
             .max_by(f64::total_cmp);
-        let mut black_holes = std::collections::HashSet::new();
+        // Relayers whose overdue replies would make them black holes: their unanswered replies, and every
+        // reply still out on a leg through them.
+        let mut suspects: Vec<(OffchainPublicKey, Vec<HoprSurbId>, Vec<HoprSurbId>)> = Vec::new();
         for mut entry in self.relayers.iter_mut() {
             // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
             // a health that low until it proves otherwise, rather than being forgiven by expiry.
@@ -894,10 +941,12 @@ impl RelayerHealth {
                 open
             });
             entry.races.extend(lost);
-            if entry.is_black_hole(last_reply, fallback_usual) {
-                black_holes.insert(*entry.key());
+            let unanswered = entry.unanswered(last_reply, fallback_usual);
+            if unanswered.len() >= MIN_RACES {
+                suspects.push((*entry.key(), unanswered, entry.open.keys().copied().collect()));
             }
         }
+        let black_holes = explain_away(suspects);
         self.dead.retain(|relayer| {
             let still = black_holes.contains(relayer);
             if still {
@@ -1867,6 +1916,111 @@ mod tests {
             judged_dead(&health.refresh(4)).is_empty(),
             "only new verdicts are reported"
         );
+        Ok(())
+    }
+
+    /// Opens one overdue race per leg, each against a home leg through `healthy` alone.
+    fn overdue_legs(health: &RelayerHealth, legs: &[&[OffchainPublicKey]], first_seed: u8, healthy: OffchainPublicKey) {
+        for (i, relayers) in legs.iter().enumerate() {
+            health.open_race(
+                &leg(relayers),
+                surb_id(first_seed + i as u8),
+                &leg(&[healthy]),
+                ROUND_TRIP,
+            );
+        }
+    }
+
+    fn backdate_all_open(health: &RelayerHealth, at: Instant) {
+        for mut history in health.relayers.iter_mut() {
+            history.open.values_mut().for_each(|race| race.at = at);
+        }
+    }
+
+    fn sorted(mut relayers: Vec<OffchainPublicKey>) -> Vec<OffchainPublicKey> {
+        relayers.sort_by_key(|relayer| relayer.to_string());
+        relayers
+    }
+
+    /// The relayers on legs through a dead one collect its overdue replies. One that sat on three of
+    /// them would be a black hole of its own; the dead one, on all of them, explains its lateness.
+    #[test]
+    fn a_relayer_on_the_legs_of_a_dead_one_should_not_be_judged_dead_with_it() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [dead, innocent, other, healthy] = [(); 4].map(|_| key());
+        let [l1, l2, l3, l4] = [(); 4].map(|_| key());
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        overdue_legs(
+            &health,
+            &[
+                &[innocent, dead, l1],
+                &[innocent, dead, l2],
+                &[innocent, dead, l3],
+                &[other, dead, l4],
+            ],
+            1,
+            healthy,
+        );
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+
+        assert_eq!(vec![dead], judged_dead(&health.refresh(4)));
+        assert!(
+            !health.is_dead(&innocent),
+            "three overdue replies, all on legs through the dead one"
+        );
+        Ok(())
+    }
+
+    /// Two relayers dead at once, on legs of their own: neither explains the other.
+    #[test]
+    fn two_relayers_dead_on_separate_legs_should_both_be_judged_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [first, second, healthy] = [(); 3].map(|_| key());
+        let [a1, a2, a3, a4, b1, b2, b3] = [(); 7].map(|_| key());
+        settled_since(&health, first, ago(Duration::from_secs(10))?, jitter(0));
+        overdue_legs(
+            &health,
+            &[&[first, a1], &[first, a2], &[first, a3], &[first, a4]],
+            1,
+            healthy,
+        );
+        overdue_legs(&health, &[&[second, b1], &[second, b2], &[second, b3]], 10, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+
+        assert_eq!(sorted(vec![first, second]), sorted(judged_dead(&health.refresh(4))));
+        Ok(())
+    }
+
+    /// A relayer on a dead one's legs that has three overdue replies on legs of its own is judged on
+    /// those: only the replies the dead one explains are set aside.
+    #[test]
+    fn a_relayer_on_a_dead_ones_legs_should_still_be_judged_on_its_own_overdue_replies() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [dead, also, healthy] = [(); 3].map(|_| key());
+        let [v, w, x, y, z1, z2, z3] = [(); 7].map(|_| key());
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        overdue_legs(
+            &health,
+            &[
+                &[dead, also],
+                &[dead, also],
+                &[dead, v],
+                &[dead, w],
+                &[dead, x],
+                &[dead, y],
+                &[also, z1],
+                &[also, z2],
+                &[also, z3],
+            ],
+            1,
+            healthy,
+        );
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+
+        assert_eq!(sorted(vec![dead, also]), sorted(judged_dead(&health.refresh(4))));
         Ok(())
     }
 
