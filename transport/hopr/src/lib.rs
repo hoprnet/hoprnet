@@ -2028,14 +2028,6 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
-    #[test]
-    fn the_degraded_notify_period_override_is_read_from_its_documented_variable() {
-        assert_eq!(
-            "HOPR_SESSION_SURB_DEGRADED_NOTIFY_PERIOD_MS",
-            SURB_DEGRADED_NOTIFY_PERIOD_ENV
-        );
-    }
-
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.
     ///

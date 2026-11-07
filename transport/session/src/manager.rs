@@ -320,7 +320,7 @@ fn has_announced_surb_target(balancer: &BalancerStateValues) -> bool {
 ///   races. While frames do not reassemble, no reply goes out, and the Entry's only remaining evidence is this report.
 ///   Without loss there is nothing to report faster about.
 /// * **The Entry reads the reports.** As [`PixFillControl::admit`] decides anyway, but also here: a report to an Entry
-///   with no balancer spends a SURB to say nothing, and reporting one per second to it would do so fourteen times as
+///   with no balancer spends a SURB to say nothing, and reporting one per second to it would do so fifteen times as
 ///   often.
 /// * **The Exit holds an announced SURB target.** Without one (a `NoRateControl` Session, which stores none) the
 ///   Session never degrades and keeps the normal period: there is no reserve to budget the reports against.
