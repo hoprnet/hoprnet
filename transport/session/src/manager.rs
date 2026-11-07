@@ -1579,7 +1579,10 @@ impl PixFillControl {
             session_id,
             controller,
             notify_period,
-            degraded_notify_period,
+            // Normalized rather than asserted, so the invariant holds by construction: a degraded
+            // period with no normal one would make the notification run at the degraded cadence for
+            // the Session's whole life, which is not what "report faster while degraded" means.
+            degraded_notify_period: degraded_notify_period.filter(|_| notify_period.is_some()),
             // Clamped rather than trusted: a `SessionManager` can be built from a config that never
             // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
             // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
@@ -1604,6 +1607,8 @@ impl PixFillControl {
     /// configured: `None` there means the operator wants one cadence whatever the path is doing.
     fn period(&self, state: &PixFillState) -> Option<Duration> {
         if state.degraded {
+            // `PixFillControl::new` only keeps a degraded period alongside a normal one, so this
+            // shortens the cadence the Session would have had rather than giving it one.
             self.degraded_notify_period.or(self.notify_period)
         } else {
             self.notify_period
@@ -2695,7 +2700,7 @@ pub struct SessionManagerConfig {
     /// within the last three seconds, its Entry has shown it reads the reports, and its SURB stock is
     /// above the keep-alive reserve, the Exit reports this often instead. The cost is bounded by
     /// both the hold and the reserve: at most one SURB per report, never into the reserve, and the
-    /// normal period resumes within three seconds of the last loss.
+    /// normal period resumes within three seconds and one poll of the last loss.
     ///
     /// `None` disables it. A value at or above [`surb_balance_notify_period`](Self::surb_balance_notify_period)
     /// is treated as disabled, since it would report no faster; so is a value on a Session with no
@@ -10069,10 +10074,12 @@ mod tests {
             "a whole forward path reports at the normal period"
         );
 
-        // Loss now, kept alive for the whole window as a continuously faulty path would. The window
-        // is two and a half degraded periods, so the degraded cadence has room to show two reports
-        // where the normal period cannot fit even one.
-        let loss_window = degraded * 5 / 2;
+        // Loss now, kept alive for the whole window as a continuously faulty path would. The window is
+        // four degraded periods, so the degraded cadence has room for several reports where the normal
+        // period (four times the degraded one) cannot fit even two. The margin is deliberate: entering
+        // degraded mode can lag by one poll and the rate limiter releases a packet up to one chunk
+        // late, so a two-and-a-half-period window left the second report on the edge of it.
+        let loss_window = degraded * 4;
         let lossy = async {
             let deadline = tokio::time::Instant::now() + loss_window;
             while tokio::time::Instant::now() < deadline {
@@ -10164,6 +10171,27 @@ mod tests {
         assert_eq!(
             None, mgr.cfg.surb_degraded_notify_period,
             "`None` stays `None`: the operator switched the fast cadence off"
+        );
+    }
+
+    /// A degraded period is normalized away when there is no normal period to speed up.
+    ///
+    /// The pair is only meaningful together: without a normal period the notification would otherwise
+    /// run at the degraded cadence for the Session's whole life, which is a different feature.
+    #[test]
+    fn a_degraded_period_without_a_normal_one_is_normalized_away() {
+        let control = fill_control_degraded(None, Some(Duration::from_secs(1)), 1, 10);
+        control.start_notify();
+        control.set_degraded(true);
+        assert_eq!(
+            None,
+            control.period(&control.state.lock()),
+            "there is no normal period for the degraded one to shorten"
+        );
+        assert_eq!(
+            FillRate::ZERO,
+            control.effective_rate(),
+            "and so nothing to report: the degraded period must not conjure a notification"
         );
     }
 

@@ -1054,7 +1054,8 @@ pub struct SessionGlobalConfig {
     /// While the Session has lost a frame within the last three seconds, its Entry has shown it reads
     /// the reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
     /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
-    /// reserve, and the normal period resumes within three seconds of the last loss. A Session that
+    /// reserve, and the normal period resumes within three seconds and one poll of the last loss. A
+    /// Session that
     /// loses frames only occasionally therefore spends a few extra SURBs of its buffer around each
     /// loss and nothing otherwise.
     ///
