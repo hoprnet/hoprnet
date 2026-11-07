@@ -1583,6 +1583,22 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
+    fn min_loopback_rate_defaults_to_a_tiny_positive_and_validates_as_a_unit_interval() {
+        let defaults = crate::path::PathPlannerConfig::default();
+        assert!(
+            defaults.min_loopback_rate > 0.0 && defaults.min_loopback_rate < 1e-6,
+            "only a relay none of whose loopbacks returned is starved by default"
+        );
+
+        for (rate, valid) in [("0.0", true), ("0.5", true), ("1.5", false), ("-0.1", false)] {
+            let json = format!(r#"{{ "path_planner": {{ "min_loopback_rate": {rate} }} }}"#);
+            let cfg: HoprProtocolConfig = serde_json::from_str(&json).expect("it parses");
+            assert_eq!(valid, cfg.validate().is_ok(), "min_loopback_rate {rate}");
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
     fn path_planner_weights_are_reachable_from_serialized_config() {
         let json = r#"{
             "path_planner": {

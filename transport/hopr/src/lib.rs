@@ -405,6 +405,7 @@ where
             planner_config.max_cached_paths,
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
+            planner_config.min_loopback_rate,
             planner_config.min_paths_anonymity_floor,
         );
 

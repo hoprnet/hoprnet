@@ -411,6 +411,7 @@ pub struct HoprGraphPathSelector<G> {
     max_paths: usize,
     edge_penalty: f64,
     min_ack_rate: f64,
+    min_loopback_rate: f64,
     anonymity_floor: usize,
 }
 
@@ -431,6 +432,7 @@ where
     /// * `max_paths` – maximum number of candidate paths to return per query.
     /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
     /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
+    /// * `min_loopback_rate` – share of recent loopbacks over an edge below which its relay is starved.
     /// * `anonymity_floor` – minimum candidate count below which no latency-based pruning occurs.
     pub fn new(
         me: OffchainPublicKey,
@@ -438,6 +440,7 @@ where
         max_paths: usize,
         edge_penalty: f64,
         min_ack_rate: f64,
+        min_loopback_rate: f64,
         anonymity_floor: usize,
     ) -> Self {
         Self {
@@ -446,6 +449,7 @@ where
             max_paths,
             edge_penalty,
             min_ack_rate,
+            min_loopback_rate,
             anonymity_floor,
         }
     }
@@ -481,6 +485,7 @@ where
                 finished_length,
                 self.edge_penalty,
                 self.min_ack_rate,
+                self.min_loopback_rate,
                 ticket_face_value,
             ),
             ticket_face_value,
@@ -564,7 +569,13 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    inner: EdgeValueFn::forward(
+                        length,
+                        self.edge_penalty,
+                        self.min_ack_rate,
+                        self.min_loopback_rate,
+                        ticket_face_value,
+                    ),
                     ticket_face_value,
                 },
             );
@@ -601,7 +612,13 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    inner: EdgeValueFn::returning(
+                        length,
+                        self.edge_penalty,
+                        self.min_ack_rate,
+                        self.min_loopback_rate,
+                        ticket_face_value,
+                    ),
                     ticket_face_value,
                 },
             );
@@ -681,6 +698,7 @@ mod tests {
             max_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
+            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         )
     }
@@ -728,6 +746,101 @@ mod tests {
         mark_edge_full(&graph, &dest, &hop);
         mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
+    }
+
+    /// An edge that pings and has a funded channel, with no loopback evidence yet.
+    fn mark_edge_unlooped(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                1000u64,
+            ))));
+        });
+    }
+
+    /// A relay that rejects our packets still answers pings and acks, so the first edge to it reads
+    /// healthy everywhere except in the loopbacks routed through it, none of which return.
+    #[tokio::test]
+    async fn a_first_relay_whose_loopbacks_never_return_should_be_starved_for_one_to_three_hops() -> anyhow::Result<()>
+    {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad = pubkey(&SECRET_2);
+        let m1 = pubkey(&SECRET_3);
+        let m2 = pubkey(&SECRET_4);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        let graph = ChannelGraph::new(me);
+        for node in [good, bad, m1, m2, dest] {
+            graph.add_node(node);
+        }
+        // me → good|bad → dest (1 hop), → m1 → dest (2 hops), → m1 → m2 → dest (3 hops)
+        for (src, dst) in [
+            (good, dest),
+            (bad, dest),
+            (good, m1),
+            (bad, m1),
+            (m1, dest),
+            (m1, m2),
+            (m2, dest),
+            (me, good),
+        ] {
+            graph.add_edge(&src, &dst)?;
+            mark_edge_full(&graph, &src, &dst);
+        }
+        graph.add_edge(&me, &bad)?;
+        mark_edge_unlooped(&graph, &me, &bad);
+
+        let selector = test_selector(me, graph.clone(), 50);
+        let values = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
+            let paths = selector.select_path(me, dest, hops).context("forward path")?;
+            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
+            Ok((
+                through.into_iter().map(|pwm| pwm.cost).collect(),
+                around.into_iter().map(|pwm| pwm.cost).collect(),
+            ))
+        };
+
+        for hops in 1..=3 {
+            let (through, around) = values(hops)?;
+            assert!(
+                !through.is_empty() && !around.is_empty(),
+                "{hops} hop(s): routes through and around the relay must both exist before any loop is seen"
+            );
+        }
+
+        // 5 loops through the relay, none returned.
+        graph.upsert_edge(&me, &bad, |obs| {
+            for _ in 0..5 {
+                obs.record(EdgeWeightType::Intermediate(Err(())));
+            }
+        });
+        // A fresh selector: the paths are cached per query, and the cache must not hide the change.
+        let selector = test_selector(me, graph, 50);
+        let values = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
+            let paths = selector.select_path(me, dest, hops).context("forward path")?;
+            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
+            Ok((
+                through.into_iter().map(|pwm| pwm.cost).collect(),
+                around.into_iter().map(|pwm| pwm.cost).collect(),
+            ))
+        };
+
+        for hops in 1..=3 {
+            let (through, around) = values(hops)?;
+            let best_around = around.iter().copied().fold(0.0, f64::max);
+            assert!(best_around > 0.0, "{hops} hop(s): the honest relay must stay routable");
+            for cost in through {
+                assert!(
+                    cost / (cost + best_around) < 1e-6,
+                    "{hops} hop(s): a relay none of whose loopbacks returned must draw a negligible share, got {cost} against {best_around}"
+                );
+            }
+        }
+        Ok(())
     }
 
     #[tokio::test]
