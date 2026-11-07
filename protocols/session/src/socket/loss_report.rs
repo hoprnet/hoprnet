@@ -123,6 +123,21 @@ impl FrameLossReport {
         self.report_if_due();
     }
 
+    /// A segment of `frame_id` arrived and was not a duplicate: the live signal's stall detection
+    /// follows it, if there is a signal.
+    pub fn segment_received(&self, frame_id: u32) {
+        if let Some(signal) = &self.loss_signal {
+            signal.segment_received(frame_id);
+        }
+    }
+
+    /// A frame completed its reassembly, which ends a stall of the live signal, if there is one.
+    pub fn frame_reassembled(&self) {
+        if let Some(signal) = &self.loss_signal {
+            signal.frame_completed();
+        }
+    }
+
     /// Records a loss into the live signal, if there is one.
     ///
     /// Only the two loss events call this: a duplicate segment is delivery, not loss.

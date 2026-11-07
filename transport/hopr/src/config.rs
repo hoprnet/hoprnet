@@ -1051,10 +1051,12 @@ pub struct SessionGlobalConfig {
     /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), 15 s by default, the verdict
     /// waits 12 to 28 s for it instead of the ~11 s an intact path gives.
     ///
-    /// While the Session has lost a frame within the last three seconds, its Entry has shown it reads
-    /// the reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
+    /// While the Session has lost a frame within the last three seconds, or its frames stalled within
+    /// them (segments of two frames arriving and neither completing for a second, which shows a dark
+    /// forward path seconds before its first frame times out), its Entry has shown it reads the
+    /// reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
     /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
-    /// reserve, and the normal period resumes within three seconds and one poll of the last loss. A
+    /// reserve, and the normal period resumes within three seconds and one poll of the last loss or stall. A
     /// Session that loses frames only occasionally therefore spends a few extra SURBs of its buffer
     /// around each loss and nothing otherwise.
     ///

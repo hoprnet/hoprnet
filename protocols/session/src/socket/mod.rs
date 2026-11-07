@@ -173,7 +173,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
     ///
     /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
     /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
-    /// seconds; the per-window log summary is too coarse for that. `None` records nothing.
+    /// seconds; the per-window log summary is too coarse for that. It also follows every segment and
+    /// every reassembled frame, so that it can tell frames that stall before any of them is lost.
+    /// `None` records nothing.
     pub fn new_stateless<T, I>(
         id: I,
         transport: T,
@@ -251,6 +253,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                                 lr1.duplicate_segment();
                                 false
                             } else {
+                                lr1.segment_received(s.frame_id);
                                 true
                             }
                         })
@@ -275,6 +278,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 let _span = stage2_span.enter();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
+                        lr2.frame_reassembled();
                         #[cfg(feature = "telemetry")]
                         s2.frame_completed();
                         Some(OrderedFrame(frame))
@@ -346,7 +350,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     ///
     /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
     /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
-    /// seconds; the per-window log summary is too coarse for that. `None` records nothing.
+    /// seconds; the per-window log summary is too coarse for that. It also follows every segment and
+    /// every reassembled frame, so that it can tell frames that stall before any of them is lost.
+    /// `None` records nothing.
     pub fn new<T>(
         transport: T,
         mut state: S,
@@ -480,6 +486,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                                 lr1.duplicate_segment();
                                 false
                             } else {
+                                lr1.segment_received(s.frame_id);
                                 true
                             }
                         })
@@ -508,6 +515,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 .entered();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
+                        lr2.frame_reassembled();
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
                             log_state_update_error(&error, "frame complete state update failed");
                         }
