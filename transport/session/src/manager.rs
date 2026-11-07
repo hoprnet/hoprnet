@@ -11184,6 +11184,33 @@ mod tests {
         );
     }
 
+    /// A degraded switch after a drain cannot bring the notification back.
+    ///
+    /// `enter_drain` clears `notify_started`, and nothing re-sets it, so the period the switch picks
+    /// is never consulted again: `set_degraded` re-derives a rate that is fill's alone. The driver
+    /// stops on `is_draining`, but this pins the control's own side of the race.
+    #[test]
+    fn a_degraded_switch_cannot_revive_a_drained_notification() {
+        let control = fill_control_degraded(Some(Duration::from_secs(60)), Some(Duration::from_secs(1)), 1, 10);
+        control.start_notify();
+        control.set_degraded(true);
+        assert_eq!(
+            FillRate::once_per(Duration::from_secs(1)),
+            control.effective_rate(),
+            "precondition: a degraded report is the stream's only producer"
+        );
+
+        assert!(control.enter_drain());
+        control.set_degraded(true);
+        assert_eq!(
+            FillRate::ZERO,
+            control.effective_rate(),
+            "a drain silences the notification, and a degraded switch must not bring it back"
+        );
+        control.set_degraded(false);
+        assert_eq!(FillRate::ZERO, control.effective_rate());
+    }
+
     /// A degraded mode switch changes nothing about fill, and nothing about what the notification is.
     ///
     /// Fill above the notification rate is still classified as fill in either mode, still bounded by
