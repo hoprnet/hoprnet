@@ -10431,12 +10431,37 @@ mod tests {
         let _first = originated_during(&mut msg_rx, Duration::from_millis(1_500)).await;
 
         let window = Duration::from_millis(2_500);
+        // Sampled across the window rather than read once at its end: every degraded report spends a SURB and
+        // the stock holder refills on a 5 ms sleep, so under load the stock can sit at the reserve for a poll and
+        // switch degraded mode off for a moment. One SURB above the reserve, "was degraded at some point" is what
+        // holds; at the reserve, never.
+        let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let sampler = {
+            let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
+            AbortOnDrop(tokio::spawn(async move {
+                loop {
+                    if control.is_degraded() {
+                        ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }))
+        };
         let reports = level_reports_during(&mut msg_rx, pseudonym, window).await;
-        assert_eq!(
-            degraded,
-            control.is_degraded(),
-            "with the stock {above_reserve} SURB(s) above the reserve of {reserve}"
-        );
+        drop(sampler);
+        let ever_degraded = ever_degraded.load(std::sync::atomic::Ordering::Relaxed);
+        if degraded {
+            assert!(
+                ever_degraded,
+                "with the stock {above_reserve} SURB(s) above the reserve of {reserve} the Session must have been \
+                 degraded at some point in {window:?}"
+            );
+        } else {
+            assert!(
+                !ever_degraded && !control.is_degraded(),
+                "with the stock at the reserve of {reserve} the Session must never be degraded"
+            );
+        }
         if degraded {
             assert!(
                 reports.len() >= 2,
