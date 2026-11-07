@@ -137,8 +137,8 @@ pub fn session_malformed_start_message_count() -> usize {
 /// was full, or the manager was shutting down (`try_send` failed).
 ///
 /// Distinct from [`SESSION_STALE_START_MESSAGES`]: these named real local state and were lost to
-/// backpressure rather than to the admission filter. Before the filter existed this was the counter
-/// the DoS drove.
+/// backpressure or to shutdown rather than to the admission filter. Before the filter existed this
+/// was the counter the DoS drove.
 pub static START_PROTOCOL_SEND_DROPS: AtomicUsize = AtomicUsize::new(0);
 
 /// Returns the cumulative Start-protocol queue-drop count.

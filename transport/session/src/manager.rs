@@ -2334,8 +2334,9 @@ impl Drop for SessionSlotGuard<'_> {
 /// Why an inbound packet was dropped without being delivered.
 ///
 /// All of these are ordinary consequences of a session tearing down, of transient backpressure, or
-/// of a peer sending something undecodable. Reported as a [`DispatchResult::Dropped`] outcome rather
-/// than an `Err` so the caller logs them quietly instead of at `ERROR`.
+/// of a peer sending traffic that is undecodable or names no local state. Reported as a
+/// [`DispatchResult::Dropped`] outcome rather than an `Err` so the caller logs them quietly instead
+/// of at `ERROR`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DropReason {
     /// The slot is still registered but its data sink (receiver) has been dropped
@@ -15811,6 +15812,54 @@ mod tests {
         );
 
         sender.close_channel();
+        Ok(())
+    }
+
+    /// A dispatch before `start()` is a programming error, not a benign drop: the queue is unset and
+    /// the caller must see it as `Err`.
+    #[test_log::test(tokio::test)]
+    async fn dispatching_a_start_message_before_start_is_an_error() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        let result = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::NotStarted))
+            ),
+            "an unstarted manager must report NotStarted, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A closed Start queue means the manager is shutting down, which is a real fault: `Err`, and
+    /// counted, but never a silent drop.
+    #[test_log::test(tokio::test)]
+    async fn a_closed_start_queue_is_an_error_not_a_drop() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        // Install a queue whose receiver is already dropped, so every `try_send` is `Disconnected`.
+        type Msg = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
+        let (lane, rx) = crossfire::mpsc::bounded_blocking_async::<Msg>(4);
+        drop(rx);
+        let _ = mgr.start_protocol_tx.set(lane);
+
+        let drops_before = crate::counters::start_protocol_send_drop_count();
+        let result = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
+        assert!(
+            result.is_err(),
+            "a closed queue must surface as Err so the fault is visible, got {result:?}"
+        );
+        assert!(
+            crate::counters::start_protocol_send_drop_count() > drops_before,
+            "a closed-queue failure must still be counted"
+        );
+
         Ok(())
     }
 
