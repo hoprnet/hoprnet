@@ -4332,8 +4332,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5521c74b022c255d71df222a319506606910d0edc2611c972606b540368056d"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1112-nest-tracing-spans-by-module-so-context-propagates#55495f1432098d63b097667470d13bf0d556dfdc"
 dependencies = [
  "anyhow",
  "bimap",

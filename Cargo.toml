@@ -233,3 +233,7 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+[patch.crates-io]
+# Traversal spans from hopr-impls #62, including transitive graph consumers.
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls.git", branch = "feature/core-1112-nest-tracing-spans-by-module-so-context-propagates" }

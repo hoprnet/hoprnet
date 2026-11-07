@@ -24,9 +24,12 @@ use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
 };
-use tracing::Instrument;
+use tracing::{Instrument, instrument::WithSubscriber};
 
-use crate::PeerProtocolCounterRegistry;
+use crate::{
+    PeerProtocolCounterRegistry,
+    trace_context::{ContextSender, ContextSink, WithContext},
+};
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
@@ -170,7 +173,8 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
     counters: PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
-    AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppOut: futures::Stream + Send + 'static,
+    AppOut::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
     E: PacketEncoder + Send + Sync + 'static,
     WOut: futures::Sink<(PeerId, Bytes), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
@@ -180,7 +184,14 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
         // so that encoded packets are emitted in submission order, preserving session frame sequence.
         // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
-        .map(|(routing, data)| {
+        .map(|message| {
+            let crate::trace_context::WithContext {
+                value: (routing, data),
+                span,
+            } = message.into();
+            let encode_span = tracing::debug_span!(parent: &span, "transport.encode", peer = tracing::field::Empty);
+            let span_fields = encode_span.clone();
+            let span = if encode_span.is_disabled() { span } else { encode_span };
             let encoder = encoder.clone();
             let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
@@ -207,6 +218,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                 .await
                 {
                     Ok(Ok(Ok(packet))) => {
+                        span_fields.record("peer", packet.next_hop.to_peerid_str());
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["sent"]);
                         counters.get_or_create(&packet.next_hop).record_message_sent();
@@ -228,21 +240,17 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                                 #[cfg(all(feature = "telemetry", not(test)))]
                                 METRIC_SHARE_INSERT_FAILURES.increment();
                                 tracing::error!(
-                                    next_hop = packet.next_hop.to_peerid_str(),
                                     ack_challenge = %packet.ack_challenge,
                                     ssa_poly_id = ?spi,
                                     %error,
                                     "failed to insert encrypted share into the exit acknowledgement processor"
                                 );
                             } else {
-                                tracing::trace!(
-                                    next_hop = packet.next_hop.to_peerid_str(),
-                                    "inserted new encrypted share into the exit acknowledgement processor"
-                                );
+                                tracing::trace!("inserted new encrypted share into the exit acknowledgement processor");
                             }
                         }
 
-                        tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
+                        tracing::trace!("protocol message out");
                         Some((packet.next_hop.into(), packet.data))
                     }
                     Ok(Ok(Err(error))) => {
@@ -261,6 +269,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                     }
                 }
             }
+            .instrument(span)
         })
         .buffered(concurrency)
         .filter_map(futures::future::ready)
@@ -318,6 +327,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     let ack_outgoing_failure = ack_outgoing;
     let ticket_proc_success = ticket_proc;
     let ticket_events_unack = ticket_events.clone();
+    futures::pin_mut!(app_incoming);
 
     let res = wire_incoming
         // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
@@ -325,25 +335,38 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
         // Concurrent decode on rayon is preserved; only the output ordering guarantee changes.
         // Out-of-order delivery was the root cause of session reassembler/sequencer discards.
         .map(move |(peer, data)| {
+            let span = tracing::debug_span!(
+                parent: None,
+                "transport.receive",
+                %peer,
+                packet_id = crate::trace_context::next_packet_id(),
+                next_hop = tracing::field::Empty,
+                session_id = tracing::field::Empty
+            );
+            let output_span = span.clone();
             let decoder = decoder.clone();
             let mut ack_outgoing_failure = ack_outgoing_failure.clone();
             let mut ticket_events_reject = ticket_events.clone();
 
-            tracing::trace!(%peer, "protocol message in");
-
             async move {
+                tracing::trace!("protocol message in");
                 match hopr_utils::parallelize::cpu::spawn_decode_blocking(move || decoder.decode(peer, data), "packet_decode")
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(Ok(packet))) => {
-                        tracing::trace!(%peer, ?packet, "successfully decoded incoming packet");
-                        Some(packet)
+                        if let IncomingPacket::Final(packet) = &packet {
+                            output_span.record("session_id", tracing::field::display(packet.sender));
+                        } else if let IncomingPacket::Forwarded(packet) = &packet {
+                            output_span.record("next_hop", packet.next_hop.to_peerid_str());
+                        }
+                        tracing::trace!(?packet, "successfully decoded incoming packet");
+                        Some(WithContext { value: packet, span: output_span })
                     },
                     Ok(Ok(Err(IncomingPacketError::Undecodable(error)))) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
-                        tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
+                        tracing::trace!(%error, "not sending ack back on undecodable packet - possible adversarial behavior");
 
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_REJECTED_COUNT.increment(&["undecodable"]);
@@ -424,7 +447,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         None
                     }
                 }
-            }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
+            }.instrument(tracing::debug_span!(parent: &span, "incoming_packet_decode")).instrument(span)
         })
         .buffered(concurrency)
         .filter_map(futures::future::ready)
@@ -432,14 +455,15 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
         // the handles it actually needs. `futures::future::Either` lets us return three
         // distinct async blocks from one closure without boxing.
         // FuturesOrdered: preserve decode-stage order so session segments reach the socket in sequence.
-        .map(move |packet| {
-            match packet {
+        .map(move |WithContext { value: packet, span }| {
+            let output_span = span.clone();
+            let processing = match packet {
                 IncomingPacket::Acknowledgement(ack) => {
                     let mut ack_incoming = ack_incoming.clone();
                     let counters = counters.clone();
                     Either::Left(async move {
                         let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
-                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), num_acks = received_acks.len(), "incoming acknowledgements");
+                        tracing::trace!(num_acks = received_acks.len(), "incoming acknowledgements");
                         counters.get_or_create(&previous_hop).record_acks_received(received_acks.len() as u64);
 
                         ack_incoming
@@ -464,7 +488,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             info,
                             ..
                         } = *final_packet;
-                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "incoming final packet");
+                        tracing::trace!("incoming final packet");
 
                         // Send acknowledgement back
                         ack_outgoing_success
@@ -477,7 +501,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["received"]);
 
-                        Some((sender, plain_text, info))
+                        Some(WithContext { value: (sender, plain_text, info), span: output_span })
                     }))
                 }
                 IncomingPacket::Forwarded(fwd_packet) => {
@@ -543,11 +567,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         }
 
                         // First, relay the packet to the next hop
-                        tracing::trace!(
-                            previous_hop = previous_hop.to_peerid_str(),
-                            next_hop = next_hop.to_peerid_str(),
-                            "forwarding packet to the next hop"
-                        );
+                        tracing::trace!("forwarding packet to the next hop");
 
                         match wire_outgoing.send((next_hop.into(), data)).await {
                             Ok(()) => {
@@ -563,7 +583,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         }
 
                         // Send acknowledgement back
-                        tracing::trace!(previous_hop = previous_hop.to_peerid_str(), "acknowledging forwarded packet back");
+                        tracing::trace!("acknowledging forwarded packet back");
                         ack_outgoing_success
                             .send((previous_hop, Some(ack_key_prev_hop)))
                             .await
@@ -574,16 +594,19 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         None
                     }))
                 }
-            }
+            };
+            processing.instrument(tracing::debug_span!(parent: &span, "transport.process")).instrument(span)
         })
         .buffered(concurrency)
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
-                .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data.as_ref())
+                .and_then(|WithContext { value: (sender, data, aux_info), span }| {
+                    let _entered = span.enter();
+                    ApplicationData::try_from(data.as_ref())
                     .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                     .ok()
-                    .map(|data| (sender, ApplicationDataIn {
+                    .map(|data| WithContext { value: (sender, ApplicationDataIn {
                         data,
                         packet_info: IncomingPacketInfo {
                             signals_from_sender: aux_info.packet_signals,
@@ -591,10 +614,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             num_evicted_surbs: aux_info.num_evicted_surbs,
                             min_return_path_hops: aux_info.min_return_path_hops,
                         }
-                    })))
+                    }), span: span.clone() })
+                })
         ))
         .map(Ok)
-        .forward_to_timeout(app_incoming)
+        .forward_to_timeout(ContextSink::new(app_incoming))
         .in_current_span()
         .await;
 
@@ -619,19 +643,22 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     packet_key: OffchainKeypair,
     wire_outgoing: WOut,
 ) where
-    AckOut: futures::Stream<Item = (OffchainPublicKey, Option<HalfKey>)> + Send + 'static,
+    AckOut: futures::Stream + Send + 'static,
+    AckOut::Item: Into<WithContext<(OffchainPublicKey, Option<HalfKey>)>> + Send,
     E: PacketEncoder + Sync + Send + 'static,
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
 {
     ack_outgoing
-        .map(move |(destination, maybe_ack_key)| {
+        .map(move |message| {
+            let WithContext { value: (destination, maybe_ack_key), span } = message.into();
+            let _entered = span.enter();
             let packet_key = packet_key.clone();
             // Sign acknowledgement with the given half-key or generate a signed random one
             let ack = maybe_ack_key
                 .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
                 .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
-            (destination, ack)
+            (destination, WithContext { value: ack, span: span.clone() })
         })
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
@@ -643,16 +670,13 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
         // underlying allocation, leaving us with only the per-group Vec<Ack> to allocate
         // (which downstream consumes as owned values).
         .scan(
-            halfbrown::HashMap::<OffchainPublicKey, Vec<VerifiedAcknowledgement>, ahash::RandomState>::with_capacity_and_hasher(
+            halfbrown::HashMap::<OffchainPublicKey, Vec<WithContext<VerifiedAcknowledgement>>, ahash::RandomState>::with_capacity_and_hasher(
                 cfg.ack_grouping_capacity,
                 ahash::RandomState::default(),
             ),
             |groups, buffered_acks| {
                 for (dst, ack) in buffered_acks {
-                    groups
-                        .entry(dst)
-                        .and_modify(|v| v.push(ack))
-                        .or_insert_with(|| vec![ack]);
+                    groups.entry(dst).or_default().push(ack);
                 }
                 tracing::trace!(
                     num_groups = groups.len(),
@@ -667,6 +691,11 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
         .for_each_concurrent(
             cfg.ack_output_concurrency.filter(|&n| n > 0).unwrap_or(DEFAULT_ACK_OUTPUT_CONCURRENCY),
             move |(destination, acks)| {
+                let span = tracing::debug_span!(parent: None, "outgoing_ack_batch", peer = destination.to_peerid_str());
+                for ack in &acks {
+                    span.follows_from(&ack.span);
+                }
+                let acks = acks.into_iter().map(|ack| ack.value).collect::<Vec<_>>();
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
                 async move {
@@ -697,7 +726,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                         tracing::error!(%error, "failed to flush acknowledgements batch to the transport layer");
                     }
                     tracing::trace!("acknowledgements out");
-                }.instrument(tracing::debug_span!("outgoing_ack_batch", peer = destination.to_peerid_str()))
+                }.instrument(span)
             }
         )
         .in_current_span()
@@ -721,7 +750,8 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
     concurrency: usize,
 ) where
     S: PixSpec,
-    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+    AckIn: futures::Stream + Send + 'static,
+    AckIn::Item: Into<WithContext<(OffchainPublicKey, Vec<Acknowledgement>)>> + Send,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
     SEvt: futures::Sink<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
@@ -730,15 +760,19 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
     // `threshold` share verifications (an EC multi-scalar multiplication each), so processing
     // batches one at a time would serialize all PIX recovery on a dedicated Exit node.
     ack_incoming
-        .for_each_concurrent(concurrency, move |(peer, acks)| {
+        .for_each_concurrent(concurrency, move |message| {
+            let WithContext {
+                value: (peer, acks),
+                span,
+            } = message.into();
             let exit_proc = exit_proc.clone();
             let exit_proc_check = exit_proc.clone();
             let mut recovered_ssa = recovered_ssa.clone();
             async move {
-                tracing::trace!(%peer, num = acks.len(), "received acknowledgements");
+                tracing::trace!(num = acks.len(), "received acknowledgements");
 
                 if !exit_proc_check.has_pending_shares(&peer) {
-                    tracing::trace!(%peer, "no pending pix shares, skipping acknowledgement");
+                    tracing::trace!("no pending pix shares, skipping acknowledgement");
                     return;
                 }
 
@@ -767,6 +801,8 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
                     }
                 }
             }
+            .instrument(tracing::debug_span!(parent: &span, "incoming_ack_batch"))
+            .instrument(span)
         })
         .in_current_span()
         .await;
@@ -786,11 +822,14 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
 /// `SendError(disconnected)`.
 async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
 where
-    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+    AckIn: futures::Stream + Send + 'static,
+    AckIn::Item: Into<WithContext<(OffchainPublicKey, Vec<Acknowledgement>)>> + Send,
 {
     ack_incoming
-        .for_each(move |(peer, acks)| {
-            tracing::trace!(%peer, num = acks.len(), "received acknowledgements (drained, not processed)");
+        .for_each(move |message| {
+            let WithContext { value: (_, acks), span } = message.into();
+            let _entered = span.enter();
+            tracing::trace!(num = acks.len(), "received acknowledgements (drained, not processed)");
             futures::future::ready(())
         })
         .in_current_span()
@@ -810,7 +849,8 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     recovered_ssa: SEvt,
     concurrency: usize,
 ) where
-    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+    AckIn: futures::Stream + Send + 'static,
+    AckIn::Item: Into<WithContext<(OffchainPublicKey, Vec<Acknowledgement>)>> + Send,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
@@ -819,7 +859,11 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     SEvt::Error: std::error::Error,
 {
     ack_incoming
-        .for_each_concurrent(concurrency, move |(peer, acks)| {
+        .for_each_concurrent(concurrency, move |message| {
+            let WithContext {
+                value: (peer, acks),
+                span,
+            } = message.into();
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             let exit_proc = exit_ack_proc.clone();
@@ -935,7 +979,8 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                     }
                 }
             }
-            .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
+            .instrument(tracing::debug_span!(parent: &span, "incoming_ack_batch"))
+            .instrument(span)
         })
         .in_current_span()
         .await;
@@ -1093,7 +1138,8 @@ where
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     let mut processes = AbortableList::default();
 
@@ -1106,22 +1152,20 @@ where
         lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
-    let (outgoing_ack_tx, outgoing_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(
-        OffchainPublicKey,
-        Option<HalfKey>,
-    )>(cfg.ack_config.ack_out_buffer_size);
+    let (outgoing_ack_tx, outgoing_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<
+        WithContext<(OffchainPublicKey, Option<HalfKey>)>,
+    >(cfg.ack_config.ack_out_buffer_size);
 
-    let (incoming_ack_tx, incoming_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(
-        OffchainPublicKey,
-        Vec<Acknowledgement>,
-    )>(cfg.ack_config.ticket_ack_buffer_size);
+    let (incoming_ack_tx, incoming_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<
+        WithContext<(OffchainPublicKey, Vec<Acknowledgement>)>,
+    >(cfg.ack_config.ticket_ack_buffer_size);
 
     // Attach timeouts to all Sinks so that the pipelines are not blocked when
     // some channel is not being timely processed
     let (wire_out, wire_in) = (wire_msg.0.with_timeout(QUEUE_SEND_TIMEOUT), wire_msg.1);
     let (app_out, app_in) = (api.0.with_timeout(QUEUE_SEND_TIMEOUT), api.1);
-    let incoming_ack_tx = incoming_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
-    let outgoing_ack_tx = outgoing_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
+    let incoming_ack_tx = ContextSender::new(incoming_ack_tx).with_timeout(QUEUE_SEND_TIMEOUT);
+    let outgoing_ack_tx = ContextSender::new(outgoing_ack_tx).with_timeout(QUEUE_SEND_TIMEOUT);
     let ticket_events = ticket_events.with_timeout(QUEUE_SEND_TIMEOUT);
     let ssa_events = ssa_events.with_timeout(QUEUE_SEND_TIMEOUT);
 
@@ -1162,6 +1206,7 @@ where
                 output_concurrency
             )
             .in_current_span()
+            .with_current_subscriber()
         ),
     );
 
@@ -1179,6 +1224,7 @@ where
                 input_concurrency,
             )
             .in_current_span()
+            .with_current_subscriber()
         ),
     );
 
@@ -1187,6 +1233,7 @@ where
         hopr_utils::spawn_as_abortable!(
             start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, cfg.ack_config, packet_key.clone(), wire_out,)
                 .in_current_span()
+                .with_current_subscriber()
         ),
     );
 
@@ -1210,6 +1257,7 @@ where
                         ack_input_concurrency,
                     )
                     .in_current_span()
+                    .with_current_subscriber()
                 ),
             );
         }
@@ -1228,6 +1276,7 @@ where
                         ack_input_concurrency,
                     )
                     .in_current_span()
+                    .with_current_subscriber()
                 ),
             );
         }
@@ -1238,7 +1287,11 @@ where
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+                hopr_utils::spawn_as_abortable!(
+                    start_drain_incoming_ack_pipeline(incoming_ack_rx)
+                        .in_current_span()
+                        .with_current_subscriber()
+                ),
             );
         }
     }
@@ -1250,8 +1303,365 @@ where
 mod tests {
     use futures::channel::mpsc;
     use hopr_api::types::crypto_random::Randomizable;
+    use hopr_crypto_packet::prelude::PacketSignals;
 
     use super::*;
+
+    /// Observe the span from inside the real encoding worker without requiring valid SPHINX packets.
+    struct ContextTestEncoder {
+        dispatch: tracing::Dispatch,
+        next_hop: Option<OffchainPublicKey>,
+    }
+
+    #[cfg(feature = "tracing-context")]
+    struct ContextTestDecoder {
+        dispatch: tracing::Dispatch,
+        peer: OffchainPublicKey,
+        sessions: [HoprPseudonym; 2],
+    }
+
+    #[cfg(feature = "tracing-context")]
+    impl PacketDecoder for ContextTestDecoder {
+        type Error = std::io::Error;
+
+        fn decode(&self, _: PeerId, data: Bytes) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+            let marker = data.first().copied().ok_or_else(|| {
+                IncomingPacketError::Undecodable(std::io::Error::other("missing context-test marker"))
+            })?;
+            tracing::dispatcher::with_default(&self.dispatch, || {
+                tracing::debug!(marker, "actual decoder context");
+            });
+            if marker < 2 {
+                let data = ApplicationData::new(1234u64, vec![marker])
+                    .map_err(|error| IncomingPacketError::Undecodable(std::io::Error::other(error)))?;
+                Ok(IncomingPacket::Final(Box::new(IncomingFinalPacket {
+                    packet_tag: Default::default(),
+                    previous_hop: self.peer,
+                    sender: self.sessions[usize::from(marker)],
+                    replied_on_surb: None,
+                    plain_text: data.to_bytes(),
+                    ack_key: HalfKey::default(),
+                    info: Default::default(),
+                })))
+            } else if marker == 2 {
+                Ok(IncomingPacket::Acknowledgement(Box::new(
+                    IncomingAcknowledgementPacket {
+                        packet_tag: Default::default(),
+                        previous_hop: self.peer,
+                        received_acks: vec![VerifiedAcknowledgement::random(&OffchainKeypair::random()).leak()],
+                    },
+                )))
+            } else {
+                Err(IncomingPacketError::Undecodable(std::io::Error::other(
+                    "context-test decode failure",
+                )))
+            }
+        }
+    }
+
+    #[cfg(feature = "tracing-context")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[serial_test::serial(routing_logs)]
+    async fn incoming_packets_should_keep_context_through_decode_dispatch_and_ack_queues() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let logs = crate::tests::support::Logs::default();
+        logs.with_cpu_subscriber(logs.subscriber(tracing::Level::DEBUG), async {
+            let peer = *OffchainKeypair::random().public();
+            let sessions = [HoprPseudonym::random(), HoprPseudonym::random()];
+            let dispatch = tracing::dispatcher::get_default(Clone::clone);
+            let decoder = std::sync::Arc::new(ContextTestDecoder {
+                dispatch: dispatch.clone(),
+                peer,
+                sessions,
+            });
+            let (app_tx, app_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(4);
+            let (ack_tx, ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(4);
+            start_incoming_packet_pipeline(
+                (
+                    futures::sink::drain(),
+                    futures::stream::iter((0u8..4).map(move |marker| (PeerId::from(peer), Bytes::from(vec![marker])))),
+                ),
+                decoder,
+                std::sync::Arc::new(ScriptedTicketProc::resolving_nothing()),
+                futures::sink::drain(),
+                (futures::sink::drain(), ContextSender::new(ack_tx)),
+                ContextSender::new(app_tx).with_timeout(QUEUE_SEND_TIMEOUT),
+                PeerProtocolCounterRegistry::default(),
+                2,
+            )
+            .await;
+            let messages = app_rx.collect::<Vec<_>>().await;
+            assert_eq!(
+                messages.len(),
+                2,
+                "failed decode and acknowledgements must not reach the app"
+            );
+            for (index, message) in messages.into_iter().enumerate() {
+                assert_eq!(message.value.0, sessions[index]);
+                assert_eq!(message.value.1.data.plain_text.as_ref(), [index as u8]);
+                async {
+                    tracing::debug!(index, "received session dispatch");
+                }
+                .instrument(message.span)
+                .await;
+            }
+            let acknowledgements = ack_rx.collect::<Vec<_>>().await;
+            assert_eq!(acknowledgements.len(), 1);
+            let tickets = ScriptedTicketProc {
+                outcome: std::sync::Arc::new(move || {
+                    tracing::dispatcher::with_default(&dispatch, || {
+                        tracing::debug!("actual acknowledgement worker context");
+                    });
+                    Ok(Vec::new())
+                }),
+                calls: Default::default(),
+            };
+            start_relay_incoming_ack_pipeline(
+                futures::stream::iter(acknowledgements),
+                futures::sink::drain(),
+                std::sync::Arc::new(tickets),
+                std::sync::Arc::new(ScriptedExitProc::new(|| Ok(vec![])).never_pending()),
+                futures::sink::drain(),
+                2,
+            )
+            .await;
+
+            let decoded = logs.records("actual decoder context");
+            assert_eq!(decoded.len(), 4);
+            assert!(
+                decoded
+                    .iter()
+                    .all(|record| record.ancestry == ["transport.receive", "incoming_packet_decode"])
+            );
+            let workers = logs.records("actual acknowledgement worker context");
+            assert_eq!(workers.len(), 1);
+            assert_eq!(
+                workers[0].ancestry,
+                ["transport.receive", "transport.process", "incoming_ack_batch"]
+            );
+            assert!(!workers[0].fields.contains_key("peer"));
+            let output = logs.output();
+            let worker = output
+                .lines()
+                .find(|line| line.contains("actual acknowledgement worker context"))
+                .context("missing acknowledgement worker output")?;
+            assert!(
+                worker.contains("packet_id=") && worker.contains(&peer.to_peerid_str()),
+                "{worker}"
+            );
+            for (index, id) in sessions.iter().enumerate() {
+                let line = output
+                    .lines()
+                    .find(|line| line.contains("received session dispatch") && line.contains(&format!("index={index}")))
+                    .context("missing session dispatch output")?;
+                assert!(line.contains(&id.to_string()) && line.contains("packet_id="), "{line}");
+                assert!(!line.contains(&sessions[1 - index].to_string()), "{line}");
+            }
+            anyhow::Ok(())
+        })?
+    }
+
+    impl PacketEncoder for ContextTestEncoder {
+        type Error = std::io::Error;
+
+        fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
+            &self,
+            data: T,
+            _: ResolvedTransportRouting<HoprSurb>,
+            _: S,
+            _: Option<u8>,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            // Production uses a global subscriber; install this test's scoped one on the worker.
+            tracing::dispatcher::with_default(&self.dispatch, || {
+                let marker = data.as_ref().last().copied();
+                tracing::debug!(?marker, "actual encoder context");
+            });
+            if let Some(next_hop) = self.next_hop {
+                Ok(OutgoingPacket {
+                    next_hop,
+                    ack_challenge: HalfKeyChallenge::default(),
+                    encrypted_pix_share: None,
+                    data: Bytes::copy_from_slice(data.as_ref()),
+                    minted_surbs: Vec::new(),
+                })
+            } else {
+                Err(std::io::Error::other("context test stops after encoding entry"))
+            }
+        }
+
+        fn encode_acknowledgements(
+            &self,
+            acks: &[VerifiedAcknowledgement],
+            _: &OffchainPublicKey,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            tracing::dispatcher::with_default(&self.dispatch, || {
+                tracing::debug!(count = acks.len(), "actual acknowledgement encoder context");
+            });
+            Ok(OutgoingPacket {
+                next_hop: self
+                    .next_hop
+                    .ok_or_else(|| std::io::Error::other("missing acknowledgement destination"))?,
+                ack_challenge: HalfKeyChallenge::default(),
+                encrypted_pix_share: None,
+                data: Bytes::new(),
+                minted_surbs: Vec::new(),
+            })
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[serial_test::serial(routing_logs)]
+    async fn acknowledgement_batches_should_link_all_packets_without_changing_grouping() -> anyhow::Result<()> {
+        let logs = crate::tests::support::Logs::default();
+        logs.with_cpu_subscriber(logs.subscriber(tracing::Level::DEBUG), async {
+            let key = OffchainKeypair::random();
+            let peer = *key.public();
+            let messages = ["packet.one", "packet.two"];
+            let spans = [
+                tracing::debug_span!("packet.one", packet_id = 1),
+                tracing::debug_span!("packet.two", packet_id = 2),
+            ];
+            let input = spans
+                .into_iter()
+                .map(move |span| WithContext {
+                    value: (peer, Some(HalfKey::default())),
+                    span,
+                })
+                .collect::<Vec<_>>();
+            let (wire_tx, wire_rx) = mpsc::channel(4);
+            start_outgoing_ack_pipeline(
+                futures::stream::iter(input),
+                std::sync::Arc::new(ContextTestEncoder {
+                    dispatch: tracing::dispatcher::get_default(Clone::clone),
+                    next_hop: Some(peer),
+                }),
+                AcknowledgementPipelineConfig::default(),
+                key,
+                wire_tx,
+            )
+            .await;
+            assert_eq!(
+                wire_rx.collect::<Vec<_>>().await.len(),
+                1,
+                "same-peer acknowledgements must stay batched"
+            );
+            let encoded = logs.records("actual acknowledgement encoder context");
+            assert_eq!(encoded.len(), 1);
+            assert_eq!(encoded[0].fields["count"], "2");
+            assert_eq!(encoded[0].ancestry, ["outgoing_ack_batch"]);
+            for cause in messages {
+                assert!(logs.causes().contains(&("outgoing_ack_batch", cause)));
+            }
+            anyhow::Ok(())
+        })?
+    }
+
+    #[rstest::rstest]
+    #[case(true, false, false)]
+    #[case(false, false, false)]
+    #[case(true, true, false)]
+    #[case(true, false, true)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[serial_test::serial(routing_logs)]
+    async fn outgoing_encoder_should_enter_each_queued_messages_session(
+        #[case] succeeds: bool,
+        #[case] wire_closed: bool,
+        #[case] filtered: bool,
+    ) -> anyhow::Result<()> {
+        use anyhow::Context as _;
+
+        use crate::{tests::support::Logs, trace_context::WithContext};
+
+        let logs = Logs::default();
+        let subscriber = logs.subscriber_disabling_spans(
+            tracing::Level::DEBUG,
+            if filtered { &["transport.encode"] } else { &[] },
+        );
+        logs.with_cpu_subscriber(subscriber, async {
+            let mut input = Vec::new();
+            // A single packet makes cancellation after a wire error deterministic.
+            let markers: &[u8] = if wire_closed { &[11] } else { &[11, 22] };
+            for &marker in markers {
+                let span = tracing::debug_span!("session", session_id = marker);
+                let data = ApplicationDataOut::with_no_packet_info(ApplicationData::new(1234u64, vec![marker])?);
+                let path = hopr_api::types::internal::path::ValidatedPath::direct(
+                    *OffchainKeypair::random().public(),
+                    ChainKeypair::random().public().to_address(),
+                );
+                input.push(WithContext {
+                    value: (ResolvedTransportRouting::forward_only(path), data),
+                    span,
+                });
+            }
+            let next_hop = *OffchainKeypair::random().public();
+            let encoder = std::sync::Arc::new(ContextTestEncoder {
+                dispatch: tracing::dispatcher::get_default(Clone::clone),
+                next_hop: succeeds.then_some(next_hop),
+            });
+            let counters = PeerProtocolCounterRegistry::default();
+            let (wire_tx, wire_rx) = mpsc::channel(2);
+            let wire_rx = (!wire_closed).then_some(wire_rx);
+            start_outgoing_packet_pipeline(
+                futures::stream::iter(input),
+                encoder,
+                None::<NopExitAcknowledgementShareProcessor>,
+                wire_tx.with_timeout(QUEUE_SEND_TIMEOUT),
+                counters.clone(),
+                2,
+            )
+            .await;
+            let delivered = if let Some(wire_rx) = wire_rx {
+                wire_rx.collect::<Vec<_>>().await
+            } else {
+                Vec::new()
+            };
+            assert_eq!(
+                delivered.len(),
+                if succeeds && !wire_closed { markers.len() } else { 0 }
+            );
+            assert_eq!(
+                counters.get_or_create(&next_hop).take_sent(),
+                if succeeds { markers.len() as u64 } else { 0 }
+            );
+            for ((peer, data), marker) in delivered.iter().zip([11u8, 22]) {
+                assert_eq!(*peer, PeerId::from(next_hop));
+                assert_eq!(
+                    data.last(),
+                    Some(&marker),
+                    "encoded messages must retain submission order"
+                );
+            }
+            let events = logs.records("actual encoder context");
+            assert_eq!(events.len(), markers.len());
+            for event in events {
+                assert_eq!(
+                    event.ancestry,
+                    if filtered {
+                        vec!["session"]
+                    } else {
+                        vec!["session", "transport.encode"]
+                    }
+                );
+            }
+            let output = logs.output();
+            for marker in markers {
+                let line = output
+                    .lines()
+                    .find(|line| {
+                        line.contains("actual encoder context") && line.contains(&format!("marker=Some({marker})"))
+                    })
+                    .context("missing encoding record")?;
+                assert!(line.contains(&format!("session_id={marker}")), "wrong session: {line}");
+            }
+            assert_eq!(
+                logs.records("long-running background task finished with error").len(),
+                usize::from(wire_closed),
+                "wire failures must terminate the pipeline with an error: {output}"
+            );
+            anyhow::Ok(())
+        })?
+    }
 
     /// A ticket processor whose error type is the real [`HoprProtocolError`], so the metric-label
     /// mapping can be exercised on both branches. `NoopTicketProcessor` cannot serve here: its

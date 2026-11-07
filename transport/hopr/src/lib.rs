@@ -28,6 +28,11 @@ pub mod protocol;
 pub mod testing;
 
 mod multiaddrs;
+/// Context propagation for locally originated packets.
+pub mod trace_context;
+
+/// Outgoing application sender retaining the originating tracing context.
+pub type HoprMessageSender = trace_context::ContextSender<(DestinationRouting, ApplicationDataOut)>;
 
 #[cfg(feature = "capture")]
 mod capture;
@@ -105,7 +110,7 @@ use hopr_utils::{
     runtime::AbortableList,
 };
 pub use multiaddr::Protocol;
-use tracing::{debug, warn};
+use tracing::{Instrument, debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
@@ -253,7 +258,7 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<CrossfireSink<(DestinationRouting, ApplicationDataOut)>>;
+type HoprSessionManager = SessionManager<HoprMessageSender>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -558,10 +563,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -607,10 +609,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -646,10 +645,7 @@ where
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -691,10 +687,7 @@ where
         on_incoming_session: Option<Sender<IncomingSession>>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -707,8 +700,10 @@ where
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
-        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
-            bounded_sink_channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
         // -- transport medium
 
@@ -838,8 +833,10 @@ where
             capacity = msg_protocol_bidirectional_channel_capacity,
             "creating protocol bidirectional channel"
         );
-        let (tx_from_protocol, rx_from_protocol) =
-            bounded_sink_channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+        let (tx_from_protocol, rx_from_protocol) = bounded_sink_channel::<
+            trace_context::WithContext<(HoprPseudonym, ApplicationDataIn)>,
+        >(msg_protocol_bidirectional_channel_capacity);
+        let tx_from_protocol = trace_context::ContextSender::new(tx_from_protocol);
 
         // === START === cover traffic control
         // Allocate a cover traffic tag from the session telemetry partition to avoid
@@ -852,9 +849,9 @@ where
 
         // filter out the known cover traffic not to lose processing time with it
         // The allocated tag is moved into the closure to keep it alive for the transport lifetime.
-        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| {
+        let rx_from_protocol = rx_from_protocol.filter_map(move |message| {
             let _keep_alive = &cover_traffic_allocated_tag;
-            async move { (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data)) }
+            futures::future::ready((message.value.1.data.application_tag != cover_traffic_tag).then_some(message))
         });
 
         // prepare a cover traffic stream
@@ -864,7 +861,10 @@ where
             let data = &RANDOM_DATA[start..start + 100];
 
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
-                Some((routing, ApplicationDataOut::with_no_packet_info(data)))
+                Some(trace_context::WithContext {
+                    value: (routing, ApplicationDataOut::with_no_packet_info(data)),
+                    span: tracing::debug_span!(parent: None, "cover_traffic"),
+                })
             } else {
                 tracing::error!("failed to construct cover traffic packet");
                 None
@@ -899,7 +899,7 @@ where
                 .filter(|&n| n > 0)
                 .unwrap_or(avail)
         };
-        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage(
+        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage_with_context(
             merged_unresolved_output_data,
             move |size_hint, max_surbs, unresolved| {
                 let path_planner = path_planner.clone();
@@ -1250,9 +1250,31 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             hopr_utils::spawn_as_abortable!(async move {
-                probe_classifier
-                    .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
-                    .filter_map(move |(pseudonym, data)| {
+                rx_from_protocol
+                    .filter_map(move |message| {
+                        let classifier = probe_classifier.clone();
+                        let push = unresolved_routing_msg_tx_for_task.clone();
+                        let output_span = message.span.clone();
+                        async move {
+                            match classifier.classify(push, message.value.0, message.value.1).await {
+                                hopr_transport_probe::ProbeDispatch::Consumed => None,
+                                hopr_transport_probe::ProbeDispatch::Passthrough(pseudonym, data) => {
+                                    Some(trace_context::WithContext {
+                                        value: (pseudonym, data),
+                                        span: output_span,
+                                    })
+                                }
+                            }
+                        }
+                        .instrument(message.span)
+                    })
+                    .filter_map(move |message| {
+                        let trace_context::WithContext {
+                            value: (pseudonym, data),
+                            span,
+                        } = message;
+                        let _entered = span.enter();
+                        let _dispatch = tracing::debug_span!("session.dispatch").entered();
                         hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
@@ -1288,10 +1310,13 @@ where
                                 None
                             }
                         };
+                        drop(_dispatch);
+                        drop(_entered);
                         async move {
                             hopr_utils::runtime::prelude::consume_budget().await;
                             result
                         }
+                        .instrument(span)
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {
@@ -1984,6 +2009,159 @@ mod pix_recovery_event_tests {
 
 #[cfg(test)]
 mod tests {
+    pub(crate) mod support {
+        //! Capture structured records and formatted ancestry using the same subscriber.
+        //!
+        //! Tests asserting routing event counts use `serial_test::serial(routing_logs)` to isolate
+        //! subscriber registration and its process-wide callsite cache from other capture tests.
+
+        use std::{collections::BTreeMap, io::Write, sync::Arc};
+
+        use parking_lot::Mutex;
+        use test_log::tracing_subscriber::{self as subscriber, Layer, layer::SubscriberExt, registry::LookupSpan};
+        use tracing::{Subscriber, field::Visit};
+
+        #[derive(Default)]
+        struct Fields(BTreeMap<String, String>);
+
+        impl Visit for Fields {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                self.0.insert(field.name().into(), format!("{value:?}"));
+            }
+
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                self.0.insert(field.name().into(), value.into());
+            }
+        }
+
+        pub(crate) struct Record {
+            pub fields: BTreeMap<String, String>,
+            pub ancestry: Vec<&'static str>,
+        }
+
+        #[derive(Clone, Default)]
+        pub(crate) struct Logs {
+            events: Arc<Mutex<Vec<Record>>>,
+            output: Arc<Mutex<Vec<u8>>>,
+            causes: Arc<Mutex<Vec<(&'static str, &'static str)>>>,
+        }
+
+        impl Logs {
+            pub fn with_cpu_subscriber<F>(
+                &self,
+                subscriber: impl Subscriber + Send + Sync + 'static,
+                future: F,
+            ) -> anyhow::Result<F::Output>
+            where
+                F: std::future::Future + Send,
+                F::Output: Send,
+            {
+                use tracing::instrument::WithSubscriber;
+
+                let dispatch = tracing::Dispatch::new(subscriber);
+                let worker_dispatch = dispatch.clone();
+                // Keep the scoped dispatcher installed through utility task/span destruction, not just
+                // the decoder callback. Production workers use the process-wide subscriber.
+                let pool = hopr_utils::parallelize::cpu::rayon::ThreadPoolBuilder::new()
+                    .num_threads(2)
+                    .spawn_handler(move |thread| {
+                        let dispatch = worker_dispatch.clone();
+                        std::thread::Builder::new()
+                            .spawn(move || tracing::dispatcher::with_default(&dispatch, || thread.run()))
+                            .map(|_| ())
+                    })
+                    .build()?;
+                let runtime = tokio::runtime::Handle::current();
+                Ok(tokio::task::block_in_place(|| {
+                    pool.install(|| runtime.block_on(future.with_subscriber(dispatch)))
+                }))
+            }
+
+            pub fn subscriber(&self, level: tracing::Level) -> impl Subscriber + Send + Sync + 'static {
+                self.subscriber_disabling_spans(level, &[])
+            }
+
+            pub fn subscriber_disabling_spans(
+                &self,
+                level: tracing::Level,
+                disabled_spans: &'static [&'static str],
+            ) -> impl Subscriber + Send + Sync + 'static {
+                let output = self.output.clone();
+                subscriber::registry()
+                    .with(self.clone())
+                    .with(
+                        subscriber::fmt::layer()
+                            .with_ansi(false)
+                            .without_time()
+                            .with_writer(move || Writer(output.clone())),
+                    )
+                    // Scoped test subscribers run concurrently with different filters. Check the active
+                    // subscriber on each event rather than caching a callsite's interest at a fixed level.
+                    .with(subscriber::filter::dynamic_filter_fn(move |metadata, _| {
+                        *metadata.level() <= level && !(metadata.is_span() && disabled_spans.contains(&metadata.name()))
+                    }))
+            }
+
+            pub fn records(&self, message: &str) -> Vec<Record> {
+                self.events
+                    .lock()
+                    .iter()
+                    .filter(|event| event.fields.get("message").is_some_and(|value| value == message))
+                    .map(|event| Record {
+                        fields: event.fields.clone(),
+                        ancestry: event.ancestry.clone(),
+                    })
+                    .collect()
+            }
+
+            pub fn output(&self) -> String {
+                String::from_utf8_lossy(&self.output.lock()).into_owned()
+            }
+
+            pub fn causes(&self) -> Vec<(&'static str, &'static str)> {
+                self.causes.lock().clone()
+            }
+        }
+
+        impl<S: Subscriber + for<'a> LookupSpan<'a>> Layer<S> for Logs {
+            fn on_follows_from(
+                &self,
+                span: &tracing::span::Id,
+                follows: &tracing::span::Id,
+                ctx: subscriber::layer::Context<'_, S>,
+            ) {
+                if let (Some(span), Some(cause)) = (ctx.span(span), ctx.span(follows)) {
+                    self.causes.lock().push((span.name(), cause.name()));
+                }
+            }
+
+            fn on_event(&self, event: &tracing::Event<'_>, ctx: subscriber::layer::Context<'_, S>) {
+                let mut fields = Fields::default();
+                event.record(&mut fields);
+                let ancestry = ctx
+                    .event_scope(event)
+                    .map_or_else(Vec::new, |scope| scope.from_root().map(|span| span.name()).collect());
+                self.events.lock().push(Record {
+                    fields: fields.0,
+                    ancestry,
+                });
+            }
+        }
+
+        struct Writer(Arc<Mutex<Vec<u8>>>);
+
+        impl Write for Writer {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+    }
+
     use std::sync::{
         Arc,
         atomic::{AtomicU64, Ordering},

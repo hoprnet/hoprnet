@@ -36,7 +36,7 @@ use hopr_protocol_start::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::AbortableList;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
@@ -2701,11 +2701,14 @@ impl SurbsStored {
 // see `refuse_pix_over_direct_return_path`. What the packet did to the SURB store travels too, taken
 // before the conversion into a `HoprStartProtocol` consumes the data it is counted from: the part
 // dispatch could not book itself, which is all of it only for an opening that creates its Session.
-type StartProtocolMsgSink = Arc<
-    OnceLock<
-        crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored)>>,
-    >,
->;
+type StartProtocolMessage = (
+    HoprPseudonym,
+    HoprStartProtocol,
+    IncomingPacketInfo,
+    SurbsStored,
+    tracing::Span,
+);
+type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<StartProtocolMessage>>>>;
 
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
 #[derive(Clone)]
@@ -4090,75 +4093,81 @@ where
         let myself = self.clone();
         let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
             "session_start_protocol_processor",
-            start_protocol_rx.into_stream().for_each_concurrent(
-                Some(self.cfg.maximum_sessions + 10),
-                move |(pseudonym, protocol_msg, packet_info, stored)| {
-                    let myself = myself.clone();
-                    async move {
-                        let result = match protocol_msg {
-                            HoprStartProtocol::StartSession(session_req) => {
-                                match myself
-                                    .refuse_pix_over_direct_return_path(
-                                        pseudonym,
-                                        &session_req,
-                                        packet_info.min_return_path_hops,
-                                    )
-                                    .await
-                                {
-                                    Ok(false) => {
-                                        let opened =
-                                            myself.handle_incoming_session_initiation(pseudonym, session_req).await;
-                                        // The opening's SURBs are in the pseudonym's ring already, promoted
-                                        // into the admitted class with it, but arrived before the Session
-                                        // existed, so dispatch could not book them. Without them the Exit's
-                                        // estimate starts, and stays, below what the ring holds. What the
-                                        // ring lost as they arrived is not this Session's to book: its
-                                        // estimate never counted that stock, which a newer generation
-                                        // superseded from an earlier Session under the pseudonym, and an
-                                        // opening's few SURBs do not overflow a ring on their own.
-                                        if opened.is_ok()
-                                            && let Some(slot) = myself.sessions.get(&pseudonym)
-                                        {
-                                            let _ = book_start_message_surbs(
-                                                &slot,
-                                                &pseudonym,
-                                                SurbsStored { evicted: 0, ..stored },
-                                            );
+            start_protocol_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(self.cfg.maximum_sessions + 10),
+                    move |(pseudonym, protocol_msg, packet_info, stored, span)| {
+                        let myself = myself.clone();
+                        async move {
+                            let result = match protocol_msg {
+                                HoprStartProtocol::StartSession(session_req) => {
+                                    match myself
+                                        .refuse_pix_over_direct_return_path(
+                                            pseudonym,
+                                            &session_req,
+                                            packet_info.min_return_path_hops,
+                                        )
+                                        .await
+                                    {
+                                        Ok(false) => {
+                                            let opened =
+                                                myself.handle_incoming_session_initiation(pseudonym, session_req).await;
+                                            // The opening's SURBs are in the pseudonym's ring already, promoted
+                                            // into the admitted class with it, but arrived before the Session
+                                            // existed, so dispatch could not book them. Without them the Exit's
+                                            // estimate starts, and stays, below what the ring holds. What the
+                                            // ring lost as they arrived is not this Session's to book: its
+                                            // estimate never counted that stock, which a newer generation
+                                            // superseded from an earlier Session under the pseudonym, and an
+                                            // opening's few SURBs do not overflow a ring on their own.
+                                            if opened.is_ok()
+                                                && let Some(slot) = myself.sessions.get(&pseudonym)
+                                            {
+                                                let _ = book_start_message_surbs(
+                                                    &slot,
+                                                    &pseudonym,
+                                                    SurbsStored { evicted: 0, ..stored },
+                                                );
+                                            }
+                                            opened
                                         }
-                                        opened
+                                        refused => refused.map(|_| ()),
                                     }
-                                    refused => refused.map(|_| ()),
                                 }
-                            }
-                            HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
-                            HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(pseudonym, error_type).await
-                            }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
-                            HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                myself.handle_ssa_commit(pseudonym, client_commit_msg).await
-                            }
-                            HoprStartProtocol::SsaRequest(server_commit_msg) => {
-                                myself.handle_ssa_request(pseudonym, server_commit_msg).await
-                            }
-                        };
+                                HoprStartProtocol::SessionEstablished(est) => {
+                                    myself.handle_session_established(est).await
+                                }
+                                HoprStartProtocol::SessionError(error_type) => {
+                                    myself.handle_session_error(pseudonym, error_type).await
+                                }
+                                HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
+                                HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                    myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                                }
+                                HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                                    myself.handle_ssa_request(pseudonym, server_commit_msg).await
+                                }
+                            };
 
-                        match result {
-                            Ok(()) => {}
-                            // Dropped on purpose and not a fault: the request lock, the successor
-                            // gate (early or under-served), the stale-index check and a repeat whose
-                            // interrupted publication could not be finished all refuse this way. The
-                            // handler has already logged the first occurrence of a gate or stale
-                            // refusal at the level it deserves, and the peer re-asks — which can
-                            // succeed for all of them but a stale request.
-                            Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
-                                tracing::debug!(%reason, "Start protocol message not admitted");
+                            match result {
+                                Ok(()) => {}
+                                // Dropped on purpose and not a fault: the request lock, the successor
+                                // gate (early or under-served), the stale-index check and a repeat whose
+                                // interrupted publication could not be finished all refuse this way. The
+                                // handler has already logged the first occurrence of a gate or stale
+                                // refusal at the level it deserves, and the peer re-asks — which can
+                                // succeed for all of them but a stale request.
+                                Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
+                                    tracing::debug!(%reason, "Start protocol message not admitted");
+                                }
+                                Err(error) => tracing::error!(%error, "failed to process Start protocol message"),
                             }
-                            Err(error) => tracing::error!(%error, "failed to process Start protocol message"),
                         }
+                        .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
                     }
-                }
-            )
+                )
+                .with_current_subscriber()
         );
 
         Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
@@ -6141,7 +6150,7 @@ where
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 start_protocol_tx
-                    .try_send((pseudonym, msg, in_data.packet_info, unbooked))
+                    .try_send((pseudonym, msg, in_data.packet_info, unbooked, tracing::Span::current()))
                     .map_err(|error| {
                         crate::counters::START_PROTOCOL_SEND_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         error!(%error, "failed to send Start protocol message to processing task");
@@ -14023,6 +14032,46 @@ mod tests {
             ssa_request_for(1),
             [],
         )))
+    }
+
+    #[test]
+    fn start_protocol_queue_should_retain_the_dispatch_context() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use test_log::tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+        tracing::subscriber::with_default(
+            test_log::tracing_subscriber::registry().with(LevelFilter::DEBUG),
+            || -> anyhow::Result<()> {
+                let mgr: TestManager = SessionManager::new(Default::default());
+                let (tx, rx) = crossfire::mpsc::bounded_blocking_async(1);
+                mgr.start_protocol_tx
+                    .set(tx)
+                    .map_err(|_| anyhow::anyhow!("installing test Start queue"))?;
+                let id = HoprPseudonym::random();
+                let _session_rx = mgr.pre_populate_session_with_receiver(
+                    id,
+                    DestinationRouting::Forward {
+                        destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                        pseudonym: Some(id),
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: None,
+                    },
+                );
+                let span = tracing::debug_span!("session", session_id = %id);
+                let expected = span.id();
+                {
+                    let _entered = span.enter();
+                    assert!(matches!(
+                        mgr.dispatch_message(id, ssa_request_packet(id)?)?,
+                        DispatchResult::Processed
+                    ));
+                }
+                let (queued_id, _, _, _, queued_span) = rx.try_recv().context("receiving the Start message")?;
+                assert_eq!(queued_id, id);
+                assert_eq!(queued_span.id(), expected);
+                Ok(())
+            },
+        )
     }
 
     /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.

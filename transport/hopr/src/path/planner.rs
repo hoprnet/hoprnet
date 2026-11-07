@@ -15,7 +15,7 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use parking_lot::Mutex;
-use tracing::trace;
+use tracing::Instrument;
 use validator::{Validate, ValidationError};
 
 use super::{
@@ -490,6 +490,7 @@ where
     /// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
     /// what that means — a fill turns it into `PathNotFound`, a refresh drops the existing entry.
     /// `Err` is reserved for a selector that actually failed.
+    #[tracing::instrument(name = "planner.rebuild_candidates", level = "trace", skip_all)]
     async fn rebuild(
         &self,
         src_key: OffchainPublicKey,
@@ -501,6 +502,7 @@ where
         // Dead relayers are pruned by the traversal itself, and stalled ones cost less there: the SURB
         // telemetry records their health in the graph.
         let candidates = self.selector.select_path(src_key, dest_key, hops)?;
+        let discovered = candidates.len();
 
         let chain_resolver = ChainPathResolver::from(resolver);
         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
@@ -530,6 +532,19 @@ where
             }
         });
 
+        tracing::debug!(
+            discovered,
+            validated = valid_paths.len(),
+            rejected = discovered - valid_paths.len(),
+            outcome = if discovered == 0 {
+                "no paths discovered"
+            } else if valid_paths.is_empty() {
+                "no valid paths"
+            } else {
+                "completed"
+            },
+            "candidate validation"
+        );
         if valid_paths.is_empty() {
             return Ok(None);
         }
@@ -652,7 +667,19 @@ async fn put_if_unchanged(
             })
         })
         .await;
-    matches!(written, moka::ops::compute::CompResult::ReplacedWith(_))
+    if let moka::ops::compute::CompResult::ReplacedWith(entry) = written {
+        tracing::debug!(
+            source = %key.0,
+            destination = %key.1,
+            hops = key.2,
+            candidates = entry.value().len(),
+            kind = "background-refresh",
+            "candidate set installed"
+        );
+        true
+    } else {
+        false
+    }
 }
 
 async fn drop_if_unchanged(
@@ -803,7 +830,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(name = "planner.resolve_path", level = "trace", skip_all)]
     async fn resolve_path(
         &self,
         source: NodeId,
@@ -832,7 +859,7 @@ where
             }
 
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, "resolving zero-hop direct path");
+                tracing::trace!(hops = 0, "resolving zero-hop direct path");
                 let resolver = ChainPathResolver::from(&self.paths.resolver);
                 ValidatedPath::new(source, vec![destination], &resolver).await?
             }
@@ -877,7 +904,7 @@ where
             hopr_api::types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
-        trace!(%path, "validated resolved path");
+        tracing::trace!(%path, "validated resolved path");
         Ok(path)
     }
 
@@ -887,7 +914,7 @@ where
     /// Single-path callers draw with `pick_one`; batch callers (see
     /// [`PathPlanner::resolve_diverse_return_paths`]) work over the collection directly, paying one
     /// cache lookup instead of one per path.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(name = "planner.cached_paths", level = "trace", skip_all)]
     async fn cached_paths(
         &self,
         source: NodeId,
@@ -895,7 +922,7 @@ where
         hops: hopr_api::types::primitive::bounded::BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
     ) -> Result<PlannerCacheValue> {
         let hops_usize: usize = hops.into();
-        trace!(hops = hops_usize, "resolving path via planner cache");
+        tracing::trace!(hops = hops_usize, "resolving path via planner cache");
 
         let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
         let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
@@ -906,7 +933,7 @@ where
 
         self.cache
             .try_get_with(cache_key, async move {
-                trace!(hops = hops_usize, "path cache miss, querying selector");
+                tracing::trace!(hops = hops_usize, "path cache miss, querying selector");
                 let (weighted, diversity) =
                     paths
                         .rebuild(src_key, dest_key, hops_usize, "fill")
@@ -947,6 +974,7 @@ where
     /// not how many were rebuilt. Callers use this to decide whether the re-plan achieved anything
     /// worth acting on, and on a healthy graph a rebuild always succeeds, so counting rebuilds
     /// would answer "something moved" every time.
+    #[tracing::instrument(name = "planner.recompute_paths", level = "trace", skip_all)]
     pub async fn recompute_paths_from(&self, source: &OffchainPublicKey) -> usize {
         // 0-hop entries name a direct route with nothing to re-weight, exactly as in the sweep.
         let keys = self
@@ -968,7 +996,8 @@ where
                 // Through `and_compute_with`, like the background refresh's `put_if_unchanged`: moka
                 // serialises only compute calls on a key, so a plain insert here could land between
                 // the refresh's read and write and be overwritten by the older entry it rebuilt.
-                self.cache
+                let installed = self
+                    .cache
                     .entry(key)
                     .and_compute_with(|previous| {
                         if let Some(previous) = previous {
@@ -977,6 +1006,18 @@ where
                         futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
                     })
                     .await;
+                if let moka::ops::compute::CompResult::Inserted(entry)
+                | moka::ops::compute::CompResult::ReplacedWith(entry) = installed
+                {
+                    tracing::debug!(
+                        source = %src_key,
+                        destination = %dest_key,
+                        hops,
+                        candidates = entry.value().len(),
+                        kind = "recompute",
+                        "candidate set installed"
+                    );
+                }
                 // The recompute always installs, so its diversity transition always applies.
                 self.paths.apply_diversity("recompute", diversity);
                 if shifted {
@@ -1003,7 +1044,7 @@ where
     ///
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(name = "planner.resolve_diverse_return_paths", level = "trace", skip_all)]
     async fn resolve_diverse_return_paths(
         &self,
         destination: NodeId,
@@ -1102,7 +1143,7 @@ where
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
     ///
     /// Returns the resolved routing and, for `Return` variants, the number of remaining SURBs.
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(name = "planner.resolve_routing", level = "trace", skip_all)]
     pub async fn resolve_routing(
         &self,
         size_hint: usize,
@@ -1144,7 +1185,7 @@ where
                     let generation = self.surb_store.current_generation(&resolved_pseudonym);
 
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
-                    trace!(
+                    tracing::trace!(
                         %destination,
                         %num_possible_surbs,
                         data_len = size_hint,
@@ -1170,7 +1211,7 @@ where
                     (vec![], None)
                 };
 
-                trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+                tracing::trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
                 Ok((
                     ResolvedTransportRouting::Forward {
@@ -1224,6 +1265,7 @@ where
             let paths = paths.clone();
             async move { paths.sweep(&cache).await }
         })
+        .instrument(tracing::debug_span!(parent: None, "planner.background_refresh"))
     }
 }
 
@@ -3009,7 +3051,149 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn installation_events_should_report_only_committed_cache_updates() -> anyhow::Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        let (planner, _) = two_relayer_return_planner();
+        let key = (pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1);
+        let logs = crate::tests::support::Logs::default();
+        async {
+            let hops = 1.try_into()?;
+            let paths = futures::future::try_join_all(
+                (0..8).map(|_| planner.cached_paths(NodeId::Offchain(key.0), NodeId::Offchain(key.1), hops)),
+            )
+            .await?;
+            assert!(paths.iter().all(|path| Arc::ptr_eq(path, &paths[0])));
+            assert!(logs.records("candidate set installed").is_empty());
+            let hit = planner
+                .cached_paths(NodeId::Offchain(key.0), NodeId::Offchain(key.1), 1.try_into()?)
+                .await?;
+            assert!(Arc::ptr_eq(&hit, &paths[0]));
+            assert_eq!(
+                logs.records("candidate set installed").len(),
+                0,
+                "hits must not report an installation"
+            );
+
+            planner.recompute_paths_from(&key.0).await;
+            let replacement = planner.cache.get(&key).await.context("recomputed entry")?;
+            assert!(!put_if_unchanged(&planner.cache, key, &paths[0], paths[0].clone()).await);
+            assert_eq!(
+                logs.records("candidate set installed").len(),
+                1,
+                "a stale refresh must not report an installation"
+            );
+            let rebuilt = Arc::new(hopr_utils::statistics::WeightedCollection::new(
+                replacement.iter().cloned().collect(),
+            ));
+            assert!(put_if_unchanged(&planner.cache, key, &replacement, rebuilt).await);
+            let events = logs.records("candidate set installed");
+            assert_eq!(
+                events
+                    .iter()
+                    .map(|event| event.fields["kind"].as_str())
+                    .collect::<Vec<_>>(),
+                ["recompute", "background-refresh"]
+            );
+            for event in events {
+                assert!(event.fields.contains_key("source"));
+                assert!(event.fields.contains_key("destination"));
+                assert_eq!(event.fields["hops"], "1");
+                assert_eq!(event.fields["candidates"], replacement.len().to_string());
+            }
+            anyhow::Ok(())
+        }
+        .with_subscriber(logs.subscriber(tracing::Level::DEBUG))
+        .await
+    }
+
     // ── composite weight helpers ──────────────────────────────────────────────
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn routing_children_should_inherit_the_session_without_repeating_its_fields() -> anyhow::Result<()> {
+        use tracing::{Instrument, instrument::WithSubscriber};
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = crate::tests::support::Logs::default();
+        async {
+            let session = tracing::debug_span!("session", session_id = 123);
+            async {
+                planner
+                    .resolve_path(
+                        NodeId::Offchain(pubkey(&SECRET_DEST)),
+                        NodeId::Offchain(pubkey(&SECRET_ME)),
+                        RoutingOptions::Hops(1.try_into()?),
+                    )
+                    .await?;
+                anyhow::Ok(())
+            }
+            .instrument(session)
+            .await
+        }
+        .with_subscriber(logs.subscriber(tracing::Level::TRACE))
+        .await?;
+
+        let records = logs.records("graph traversal completed");
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            records[0].ancestry,
+            [
+                "session",
+                "planner.resolve_path",
+                "planner.cached_paths",
+                "planner.rebuild_candidates",
+                "selector.select_paths",
+                "graph.simple_paths"
+            ]
+        );
+        assert!(!records[0].fields.contains_key("session_id"));
+        let output = logs.output();
+        let line = output
+            .lines()
+            .find(|line| line.contains("graph traversal completed"))
+            .context("missing formatted graph record")?;
+        assert!(line.contains("session_id=123"), "{line}");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn filtered_routing_spans_should_not_modify_the_caller() -> anyhow::Result<()> {
+        use tracing::{Instrument, instrument::WithSubscriber};
+
+        let (planner, _) = two_relayer_return_planner();
+        let logs = crate::tests::support::Logs::default();
+        async {
+            async {
+                planner
+                    .resolve_path(
+                        NodeId::Offchain(pubkey(&SECRET_DEST)),
+                        NodeId::Offchain(pubkey(&SECRET_ME)),
+                        RoutingOptions::Hops(1.try_into()?),
+                    )
+                    .await?;
+                tracing::trace!("caller fields retained");
+                anyhow::Ok(())
+            }
+            .instrument(tracing::debug_span!("caller", direction = "caller-direction"))
+            .await
+        }
+        .with_subscriber(logs.subscriber_disabling_spans(
+            tracing::Level::TRACE,
+            &["planner.cached_paths", "selector.select_paths"],
+        ))
+        .await?;
+        let output = logs.output();
+        let line = output
+            .lines()
+            .find(|line| line.contains("caller fields retained"))
+            .context("missing caller record")?;
+        assert!(line.contains("direction=\"caller-direction\""), "{line}");
+        Ok(())
+    }
 
     fn default_weighting() -> WeightingParams {
         WeightingParams {
