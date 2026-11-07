@@ -233,3 +233,9 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+# TEMPORARY (GNO-1183): hopr-api 5.1.0 and hopr-network-graph 0.10.1 are not published yet. Drop this block,
+# and repin both, once hoprnet/hopr-api#158 and hoprnet/hopr-impls#78 are released.
+[patch.crates-io]
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "kauki/fix/graph/first-hop-loopback-gate" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/graph/loopback-first-hop-evidence" }

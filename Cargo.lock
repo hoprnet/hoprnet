@@ -4166,9 +4166,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa64c5a401c0c7db4ad9a0688d11e59bc4566f92c0661e8ef97e4008816509ad"
+version = "5.1.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Ffix%2Fgraph%2Ffirst-hop-loopback-gate#c90432df87d4f678ee2b179e068ffd71935aa889"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4331,9 +4330,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5521c74b022c255d71df222a319506606910d0edc2611c972606b540368056d"
+version = "0.10.1"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=kauki%2Ffix%2Fgraph%2Floopback-first-hop-evidence#62295986034f17b2ab092368a0b4eb7f0d8d3a5e"
 dependencies = [
  "anyhow",
  "bimap",
