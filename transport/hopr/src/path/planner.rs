@@ -1023,6 +1023,10 @@ where
     /// HoprSurb::SIZE`, a handful at most), so K was capped by it whatever the configuration said,
     /// while each packet re-drew independently regardless. Tempering has no such ceiling.
     ///
+    /// Neither spreads anything the candidates do not offer: the selector searches each first
+    /// relayer's paths separately (`compute_paths_spread`), so a pool names every first relayer
+    /// the graph allows rather than the one or two a single depth-first search reached first.
+    ///
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
     #[tracing::instrument(level = "trace", skip(self))]
