@@ -5585,12 +5585,25 @@ where
             let driver = hopr_utils::spawn_as_abortable!(async move {
                 // The normal start path is kept: until the one-shot delay has turned the notification
                 // on there is no period to be faster than, so the driver waits for it rather than
-                // counting the same period out again from its own start.
-                while !driver_control.notify_started() {
+                // counting the same period out again from its own start. A drain clears
+                // `notify_started` for good, so that is also where the driver stops waiting — there is
+                // no notification left for it to be faster than.
+                loop {
+                    if driver_control.is_draining() {
+                        return;
+                    }
+                    if driver_control.notify_started() {
+                        break;
+                    }
                     hopr_utils::runtime::prelude::sleep(SURB_DEGRADED_POLL).await;
                 }
                 let mut degraded = false;
                 loop {
+                    // A drain silences the notification outright, and the driver holds a clone of the
+                    // control for as long as it runs: stop rather than outlive the stream it steers.
+                    if driver_control.is_draining() {
+                        return;
+                    }
                     let next = exit_forward_path_is_degraded(&loss_signal, &surb_estimator, &surb_mgmt);
                     if next != degraded {
                         debug!(
