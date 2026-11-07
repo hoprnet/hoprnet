@@ -241,6 +241,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
+        // The reordering the reassembler and the sequencer both see, which sizes the gap wait.
+        let reorder = cfg.adapt_gap_wait.then(crate::processing::SharedReorder::default);
+        let reorder_s1 = reorder.clone();
+
         // Debug tracing spans for individual pipeline stages
         let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
         let stage2_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
@@ -265,6 +269,19 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
                                 tracing::trace!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                // A segment of a frame whose gap was given up: it never completes, so this
+                                // is the only place to learn the wait was too short for it.
+                                if let Some(reorder) = reorder_s1.as_ref() {
+                                    let now = std::time::Instant::now();
+                                    if let Some(late) = reorder.late(s.frame_id, now) {
+                                        tracing::debug!(
+                                            frame_id = s.frame_id,
+                                            late_ms = late.as_millis() as u64,
+                                            "segment came after its frame's gap was given up"
+                                        );
+                                        reorder.record(now, late);
+                                    }
+                                }
                                 lr1.duplicate_segment();
                                 false
                             } else {
@@ -287,7 +304,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Reassemble the segments into frames
-            .reassembler(cfg.frame_timeout, cfg.capacity)
+            .reassembler_sharing(cfg.frame_timeout, cfg.capacity, reorder.clone())
             // Discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
                 let _span = stage2_span.enter();
@@ -308,13 +325,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer_with(crate::processing::SequencerConfig {
-                max_wait: cfg.frame_timeout,
-                capacity: cfg.capacity,
-                max_item_age: cfg.max_frame_age,
-                max_frames_behind_gap: cfg.max_frames_behind_gap,
-                adapt_to_reordering: cfg.adapt_gap_wait,
-            })
+            .sequencer_sharing(
+                crate::processing::SequencerConfig {
+                    max_wait: cfg.frame_timeout,
+                    capacity: cfg.capacity,
+                    max_item_age: cfg.max_frame_age,
+                    max_frames_behind_gap: cfg.max_frames_behind_gap,
+                    adapt_to_reordering: cfg.adapt_gap_wait,
+                },
+                reorder,
+            )
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -1704,6 +1724,9 @@ mod tests {
                 frame_size: FRAME_SIZE,
                 frame_timeout: FRAME_TIMEOUT,
                 max_frames_behind_gap,
+                // The count bound alone: should the network ever reorder, the time bound would
+                // take its place and the witness below would stop witnessing.
+                adapt_gap_wait: false,
                 ..Default::default()
             },
             None,
@@ -1761,6 +1784,159 @@ mod tests {
             elapsed >= Duration::from_secs(3),
             "the unbounded path is what the fix removes; it must still be observable here, took {elapsed:?}"
         );
+        Ok(())
+    }
+
+    /// Every 10-byte read of a stateless receiver, with when it completed.
+    type StatelessReads = tokio::task::JoinHandle<Vec<(std::time::Instant, [u8; 10])>>;
+
+    /// Opens a stateless receiver over an in-memory transport, read continuously as a Session's
+    /// reader does (so each segment is taken in when it arrives): every 10-byte read with when it
+    /// completed, until the transport closes.
+    fn stateless_reader(adapt_gap_wait: bool) -> anyhow::Result<(StatelessReads, tokio::io::DuplexStream)> {
+        use futures::AsyncReadExt;
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let mut socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            transport.compat(),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: Duration::from_secs(3),
+                adapt_gap_wait,
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let reader = tokio::spawn(async move {
+            let mut buf = [0u8; 10];
+            let mut reads = Vec::new();
+            while socket.read_exact(&mut buf).await.is_ok() {
+                reads.push((std::time::Instant::now(), buf));
+            }
+            reads
+        });
+        Ok((reader, remote))
+    }
+
+    /// Sends frames `ids` whole, each as two segments `spread` apart, the frames 750 ms apart.
+    async fn send_whole_frames(
+        remote: &mut tokio::io::DuplexStream,
+        ids: std::ops::RangeInclusive<u32>,
+        spread: Duration,
+    ) -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+        for id in ids {
+            remote.write_all(&raw_segment(id, 0, 2, b"half-")).await?;
+            tokio::time::sleep(spread).await;
+            remote.write_all(&raw_segment(id, 1, 2, b"half-")).await?;
+            tokio::time::sleep(Duration::from_millis(750).saturating_sub(spread)).await;
+        }
+        Ok(())
+    }
+
+    /// How long frame `before + 2` waits behind lost frame `before + 1`, after `before` frames whose
+    /// segments arrived 200 ms apart.
+    async fn time_held_behind_a_lost_frame_of_several_segments(
+        adapt_gap_wait: bool,
+        before: u32,
+    ) -> anyhow::Result<Duration> {
+        use tokio::io::AsyncWriteExt;
+
+        let (reader, mut remote) = stateless_reader(adapt_gap_wait)?;
+        send_whole_frames(&mut remote, 1..=before, Duration::from_millis(200)).await?;
+
+        let started = std::time::Instant::now();
+        remote.write_all(&raw_segment(before + 2, 0, 2, b"after")).await?;
+        remote.write_all(&raw_segment(before + 2, 1, 2, b"-lost")).await?;
+        tokio::time::sleep(Duration::from_millis(3500)).await;
+        drop(remote);
+
+        let reads = reader.await?;
+        anyhow::ensure!(reads.len() == before as usize + 1, "{} reads", reads.len());
+        let (at, last) = reads
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("the frame after the lost one"))?;
+        anyhow::ensure!(last == b"after-lost", "the frame after the lost one");
+        Ok(at.duration_since(started))
+    }
+
+    /// Frames of several segments rarely arrive out of order, so the sequencer alone would see no
+    /// reordering to size its wait by. The spread of a frame's own segments is the spread of the
+    /// paths, and bounds how far frames can arrive apart: 200 ms, so once eight frames over six
+    /// seconds have shown it, a lost frame holds the next for about 400 ms instead of the whole 3 s
+    /// frame timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_hold_frames_behind_a_lost_one_for_twice_the_spread_of_its_segments()
+    -> anyhow::Result<()> {
+        let held = time_held_behind_a_lost_frame_of_several_segments(true, 8).await?;
+        assert!(held >= Duration::from_millis(380), "{held:?}");
+        assert!(held < Duration::from_millis(1500), "{held:?}");
+        Ok(())
+    }
+
+    /// The witness: with the adaptation off, the same loss holds the next frame for the whole frame
+    /// timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_without_the_adaptive_gap_wait_should_hold_frames_for_the_frame_timeout()
+    -> anyhow::Result<()> {
+        let held = time_held_behind_a_lost_frame_of_several_segments(false, 8).await?;
+        assert!(held >= Duration::from_millis(2950), "{held:?}");
+        Ok(())
+    }
+
+    /// One frame says little about the paths a Session will take: a frame lost right after it still
+    /// holds the next for the whole frame timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_wait_the_whole_timeout_before_it_has_seen_enough_reordering() -> anyhow::Result<()>
+    {
+        let held = time_held_behind_a_lost_frame_of_several_segments(true, 1).await?;
+        assert!(held >= Duration::from_millis(2950), "{held:?}");
+        Ok(())
+    }
+
+    /// A frame given up while its last segment was still on the way never completes: the segment is
+    /// dropped as already seen. Noticing it there is what lengthens a wait that was too short.
+    #[test_log::test(tokio::test)]
+    async fn a_segment_after_its_frames_gap_was_given_up_should_lengthen_the_wait() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let (reader, mut remote) = stateless_reader(true)?;
+        // Eight frames over six seconds, 100 ms between their segments: a 250 ms wait.
+        send_whole_frames(&mut remote, 1..=8, Duration::from_millis(100)).await?;
+
+        // Frame 9's second segment comes 700 ms after its first: frame 9 is given up after 250 ms ...
+        remote.write_all(&raw_segment(9, 0, 2, b"late-")).await?;
+        remote.write_all(&raw_segment(10, 0, 2, b"ten-h")).await?;
+        remote.write_all(&raw_segment(10, 1, 2, b"alf-x")).await?;
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        // ... and its segment, coming now, lengthens the wait to about 2 x 700 ms.
+        remote.write_all(&raw_segment(9, 1, 2, b"frame")).await?;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Frame 11 is lost; frame 12 waits the longer wait.
+        let started = std::time::Instant::now();
+        remote.write_all(&raw_segment(12, 0, 2, b"twelv")).await?;
+        remote.write_all(&raw_segment(12, 1, 2, b"e-end")).await?;
+        tokio::time::sleep(Duration::from_millis(3500)).await;
+        drop(remote);
+
+        let reads = reader.await?;
+        assert!(
+            !reads.iter().any(|(_, buf)| buf == b"late-frame"),
+            "a frame given up is not delivered late"
+        );
+        let (at, last) = reads.last().ok_or_else(|| anyhow::anyhow!("frames delivered"))?;
+        assert_eq!(b"twelve-end", last);
+        let held = at.duration_since(started);
+        assert!(
+            held >= Duration::from_millis(1200),
+            "the late segment must lengthen the wait: {held:?}"
+        );
+        assert!(held < Duration::from_millis(2500), "{held:?}");
         Ok(())
     }
 
