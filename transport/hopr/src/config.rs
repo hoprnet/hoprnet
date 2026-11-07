@@ -880,13 +880,21 @@ fn default_max_managed_sessions() -> usize {
 
 /// Transport-layer default for the SURB balance notification period; this is the effective default
 /// for [`SessionGlobalConfig::surb_balance_notify_period`] (15s). It deliberately overrides the
-/// lower-level fallback in `SessionManagerConfig` (whose own field default is 60s) with a tighter
-/// 15s cadence, so the Entry's dead-reckoned estimate of the Exit's SURB buffer is corrected often
+/// lower-level fallback in `SessionManagerConfig` (whose own field default is `None`) with a 15s
+/// cadence, so the Entry's dead-reckoned estimate of the Exit's SURB buffer is corrected often
 /// enough to keep the SURB balancer from under-producing (and starving the Exit) under drift,
 /// without the per-session keep-alive overhead of the previous 2s cadence. The 1s floor is enforced
 /// downstream by `SessionManager::new` (`MIN_SURB_BUFFER_NOTIFICATION_PERIOD`).
 fn default_session_surb_balance_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(15))
+}
+
+/// Transport-layer default for the Exit's degraded notification period: 1s.
+///
+/// Fast enough to corroborate a dead-relayer verdict inside the 15s test gate from a 15s base
+/// cadence, and no faster than the floor `SessionManager::new` enforces anyway.
+fn default_session_surb_degraded_notify_period() -> Option<Duration> {
+    Some(Duration::from_secs(1))
 }
 
 fn default_session_max_frames_behind_gap() -> Option<usize> {
@@ -928,6 +936,16 @@ fn validate_surb_balance_notify_period(value: &Duration) -> Result<(), Validatio
     } else {
         Err(ValidationError::new(
             "SURB balance notify period must be at least 1 second",
+        ))
+    }
+}
+
+fn validate_surb_degraded_notify_period(value: &Duration) -> Result<(), ValidationError> {
+    if *value >= Duration::from_secs(1) {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "SURB degraded notify period must be at least 1 second",
         ))
     }
 }
@@ -1024,6 +1042,35 @@ pub struct SessionGlobalConfig {
         )
     )]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// How often the Exit reports its SURB buffer level while the Session's forward path is degraded.
+    ///
+    /// The Entry's dead-relayer verdict is corroborated by replies coming home after the relayer went
+    /// quiet. When the forward path is dark, the data frames never reassemble at the Exit, so no echo
+    /// reply goes out and the Exit's SURB-level report is the only reply left — at
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), 15 s by default, the verdict
+    /// waits 12 to 28 s for it instead of the ~11 s an intact path gives.
+    ///
+    /// While the Session has lost a frame within the last three seconds, its Entry has shown it reads
+    /// the reports, and its SURB stock is above the keep-alive reserve, the Exit reports this often
+    /// instead. The extra traffic is bounded by both: at most one SURB per report, never into the
+    /// reserve, and the normal period resumes within three seconds of the last loss. A Session that
+    /// loses frames only occasionally therefore spends a few extra SURBs of its buffer around each
+    /// loss and nothing otherwise.
+    ///
+    /// Default is 1 second. Set to `null` to disable; minimum is 1 second, and a value at or above
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) reports no faster, so it is
+    /// treated as disabled.
+    #[validate(custom(function = "validate_surb_degraded_notify_period"))]
+    #[default(default_session_surb_degraded_notify_period())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "default_session_surb_degraded_notify_period",
+            with = "humantime_serde::option"
+        )
+    )]
+    pub surb_degraded_notify_period: Option<Duration>,
 
     /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
     ///
@@ -2229,6 +2276,60 @@ mod tests {
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
+    }
+
+    // --- surb_degraded_notify_period tests ---
+
+    #[test]
+    fn surb_degraded_notify_period_defaults_to_one_second() {
+        let cfg = SessionGlobalConfig::default();
+        assert_eq!(
+            Some(Duration::from_secs(1)),
+            cfg.surb_degraded_notify_period,
+            "the fast cadence must be on by default, or a dark forward path keeps the 15 s wait"
+        );
+        // And it is faster than the normal period it degrades from, which is what makes it useful.
+        assert!(
+            cfg.surb_degraded_notify_period < cfg.surb_balance_notify_period,
+            "the degraded period must report faster than the normal one"
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_degraded_notify_period_null_disables_it() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_degraded_notify_period: null").context("null must parse")?;
+        assert_eq!(None, cfg.surb_degraded_notify_period);
+        assert!(cfg.validate().is_ok(), "disabling the degraded period is valid");
+        Ok(())
+    }
+
+    #[test]
+    fn surb_degraded_notify_period_below_the_floor_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            surb_degraded_notify_period: Some(Duration::from_millis(999)),
+            ..Default::default()
+        };
+        assert!(
+            cfg.validate().is_err(),
+            "the same 1 s floor as the normal period applies"
+        );
+
+        let at_floor = SessionGlobalConfig {
+            surb_degraded_notify_period: Some(Duration::from_secs(1)),
+            ..Default::default()
+        };
+        assert!(at_floor.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_degraded_notify_period_parses_humantime() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_degraded_notify_period: 2s").context("a humantime period must parse")?;
+        assert_eq!(Some(Duration::from_secs(2)), cfg.surb_degraded_notify_period);
+        Ok(())
     }
 
     #[test]

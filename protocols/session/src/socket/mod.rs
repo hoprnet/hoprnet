@@ -2,6 +2,7 @@
 
 pub mod ack_state;
 mod loss_report;
+pub mod loss_signal;
 pub mod state;
 
 /// Contains socket statistics types.
@@ -18,6 +19,7 @@ use std::{
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use loss_report::{FRAME_LOSS_REPORT_INTERVAL, FrameLossReport};
+use loss_signal::FrameLossSignal;
 use state::{SocketComponents, SocketState, Stateless};
 use tracing::{Instrument, instrument};
 #[cfg(feature = "telemetry")]
@@ -35,7 +37,7 @@ use crate::{
 };
 
 /// Configuration object for [`SessionSocket`].
-#[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct SessionSocketConfig {
     /// The maximum size of a frame on the read/write interface of the [`SessionSocket`].
     ///
@@ -111,6 +113,16 @@ pub struct SessionSocketConfig {
     /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
     #[default(None)]
     pub max_frames_behind_gap: Option<usize>,
+    /// Live frame loss this socket records into, for a reader that has to react within seconds.
+    ///
+    /// The socket already counts loss for its per-window log summary (see `loss_report`), but that
+    /// window is 30 s wide: a reader deciding on it would learn about a lost frame half a minute
+    /// late, and keep reacting to one that stopped. This signal is stamped at every loss and never
+    /// reset, so a reader can ask whether loss happened in, say, the last three seconds.
+    ///
+    /// `None` (the default) records nothing, which is every socket whose loss nobody acts on.
+    #[default(None)]
+    pub loss_signal: Option<Arc<FrameLossSignal>>,
 }
 
 /// Logs a failed update of the socket state.
@@ -210,7 +222,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
         // Dropped frames are counted and reported once per window, not logged one by one
-        let loss_report = Arc::new(FrameLossReport::new(&id, FRAME_LOSS_REPORT_INTERVAL));
+        let loss_report = Arc::new(FrameLossReport::with_signal(
+            &id,
+            FRAME_LOSS_REPORT_INTERVAL,
+            cfg.loss_signal.clone(),
+        ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
         // Debug tracing spans for individual pipeline stages
@@ -426,7 +442,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
         // Dropped frames are counted and reported once per window, not logged one by one
-        let loss_report = Arc::new(FrameLossReport::new(state.session_id(), FRAME_LOSS_REPORT_INTERVAL));
+        let loss_report = Arc::new(FrameLossReport::with_signal(
+            state.session_id(),
+            FRAME_LOSS_REPORT_INTERVAL,
+            cfg.loss_signal.clone(),
+        ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
         // Pipeline OUT: Packets incoming from Downstream
@@ -804,14 +824,14 @@ mod tests {
             let mut sender = SessionSocket::<MTU, _>::new_stateless(
                 "alice",
                 alice,
-                cfg,
+                cfg.clone(),
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
             let mut receiver = SessionSocket::<MTU, _>::new_stateless(
                 "bob",
                 bob,
-                cfg,
+                cfg.clone(),
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
@@ -846,14 +866,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -903,14 +923,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -951,14 +971,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1021,14 +1041,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1081,14 +1101,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1136,14 +1156,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1185,14 +1205,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
             "alice",
             alice,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
             "bob",
             bob,
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1254,14 +1274,14 @@ mod tests {
         let mut alice_socket = SessionSocket::<MTU, _>::new(
             alice,
             AcknowledgementState::new("alice", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(
             bob,
             AcknowledgementState::new("bob", ack_cfg),
-            sock_cfg,
+            sock_cfg.clone(),
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1369,6 +1389,109 @@ mod tests {
             insta::assert_yaml_snapshot!(bob_tracker);
         }
 
+        Ok(())
+    }
+
+    /// A loss signal on the receive side records the frames that were lost, and nothing else.
+    ///
+    /// The Exit is the side that reports on loss, so the signal is what the receiver must fill. Both
+    /// socket kinds do: a frame that expired incomplete and a sequencer discard are the two loss
+    /// events, and a duplicate segment is delivery.
+    ///
+    /// The duplicate is produced by the same drop that causes the loss: frame 1 never completes, so
+    /// the sender's retransmission of its first segment arrives after the frame was discarded and is
+    /// filtered as already seen.
+    #[test_log::test(tokio::test)]
+    async fn a_loss_signal_records_the_frames_that_were_lost() -> anyhow::Result<()> {
+        for stateless in [true, false] {
+            let (alice, bob) = setup_alice_bob::<MTU>(
+                FaultyNetworkConfig {
+                    avg_delay: Duration::from_millis(10),
+                    ids_to_drop: HashSet::from_iter([0_usize]),
+                    ..Default::default()
+                },
+                None,
+                None,
+            );
+
+            let signal = Arc::new(FrameLossSignal::new());
+            let bob_cfg = SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: Duration::from_millis(300),
+                max_frames_behind_gap: Some(1),
+                loss_signal: Some(signal.clone()),
+                ..Default::default()
+            };
+            let alice_cfg = SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            };
+
+            let mut alice_socket = if stateless {
+                SessionSocket::<MTU, _>::new_stateless(
+                    "alice",
+                    alice,
+                    alice_cfg,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            } else {
+                SessionSocket::<MTU, _>::new(
+                    alice,
+                    Stateless::<MTU>::new("alice"),
+                    alice_cfg,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            };
+            let mut bob_socket = if stateless {
+                SessionSocket::<MTU, _>::new_stateless(
+                    "bob",
+                    bob,
+                    bob_cfg,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            } else {
+                SessionSocket::<MTU, _>::new(
+                    bob,
+                    Stateless::<MTU>::new("bob"),
+                    bob_cfg,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            };
+
+            assert_eq!(0, signal.lost_total(), "nothing was lost before a frame went out");
+
+            let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+            alice_socket
+                .write_all(&data)
+                .timeout(futures_time::time::Duration::from_secs(2))
+                .await??;
+            alice_socket.flush().await?;
+
+            // Everything except the lost first frame.
+            let mut received = vec![0u8; DATA_SIZE - FRAME_SIZE];
+            bob_socket
+                .read_exact(&mut received)
+                .timeout(futures_time::time::Duration::from_secs(20))
+                .await??;
+            assert_eq!(&data[FRAME_SIZE..], &received, "stateless={stateless}");
+
+            assert!(
+                signal.lost_within(Duration::from_secs(30)),
+                "the frame that never completed must be recorded as recent loss (stateless={stateless})"
+            );
+            assert_eq!(
+                1,
+                signal.lost_total(),
+                "one lost frame is one loss, however many segments of it arrived (stateless={stateless})"
+            );
+
+            alice_socket.close().await?;
+            bob_socket.close().await?;
+        }
         Ok(())
     }
 

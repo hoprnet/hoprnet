@@ -487,6 +487,14 @@ where
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(|ms| Some(Duration::from_millis(ms)))
                 .unwrap_or(cfg.session.surb_balance_notify_period),
+            // The floor is `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, enforced once in `SessionManager::new`.
+            // A period at or above the normal one reports no faster, and `spawn_exit_keep_alive`
+            // treats it as disabled rather than switching between two equal cadences.
+            surb_degraded_notify_period: std::env::var("HOPR_SESSION_SURB_DEGRADED_NOTIFY_PERIOD_MS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(|ms| Some(Duration::from_millis(ms)))
+                .unwrap_or(cfg.session.surb_degraded_notify_period),
             surb_target_notify: cfg.session.surb_target_notify,
             maximum_sessions: cfg.session.maximum_managed_sessions,
             pix_config: cfg.incoming_session_pix_config.clone(),
