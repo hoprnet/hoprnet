@@ -244,6 +244,26 @@ jobs:
           command: |
             nix build -L .#docs
 
+  entity-fence:
+    name: Entity fence
+    # Stage 3, same rule as build-library: it needs the checks and tests to be green first, and
+    # `!failure()` keeps a docs-only run from being skipped by a skipped dependency.
+    needs: [changes, checks, check-allowed-dependencies, tests]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.code == 'true' }}
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Build every entity and verify the fence
+        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        with:
+          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          command: |
+            nix build -L .#library-client .#library-relay .#library-edge-exit .#library-raw-exit
+            nix develop -c bash scripts/check-entity-fencing.sh
+
   # Single aggregate merge gate: green only if every other job in this run
   # succeeded. Mark THIS one as the required check in the branch ruleset, so
   # adding, renaming, or removing a job never needs a ruleset change
@@ -262,6 +282,7 @@ jobs:
       - tests
       - benchmarks
       - build-library
+      - entity-fence
       - docs
     runs-on: depot-ubuntu-24.04
     permissions: {}
@@ -277,4 +298,4 @@ jobs:
           # So their skip is allowed only for a docs-only change; a code
           # change still has to run all three. A failed stage also skips the
           # later stages, but the failed job itself reds the gate.
-          allowed-skips: ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label, benchmarks, tests, build-library, docs' }}
+          allowed-skips: ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label, benchmarks, tests, build-library, entity-fence, docs' }}

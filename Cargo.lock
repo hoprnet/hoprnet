@@ -4236,6 +4236,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-client"
+version = "0.1.0"
+dependencies = [
+ "hopr-lib",
+]
+
+[[package]]
 name = "hopr-crypto-packet"
 version = "2.2.0"
 dependencies = [
@@ -4278,6 +4285,13 @@ dependencies = [
  "smart-default",
  "tracing",
  "validator",
+]
+
+[[package]]
+name = "hopr-edge-exit"
+version = "0.1.0"
+dependencies = [
+ "hopr-lib",
 ]
 
 [[package]]
@@ -4486,6 +4500,13 @@ dependencies = [
  "serde_cbor_2",
  "strum",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "hopr-relay"
+version = "0.1.0"
+dependencies = [
+ "hopr-lib",
 ]
 
 [[package]]

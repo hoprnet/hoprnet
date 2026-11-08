@@ -76,7 +76,21 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = ["pix-bjj", "transport-announce-quic"]
+# Entity sets. Each selects exactly one node role, compiled in and fenced down into the components:
+#
+# * `client`  — a source/entry node: establishes Sessions, relays nothing, admits none.
+# * `relay`   — a pure relay: full ticket and acknowledgement processing, no Session stack.
+# * `exit`    — the relaying exit: `relay` with the Session server, so it accepts and terminates
+#               Sessions. This is the "exit" entity of the node split.
+# * `raw-exit` — the non-relaying exit: the Session server without ticket processing.
+#
+# The sets are additive like every Cargo feature, so a build takes exactly one of them. `default`
+# carries `relay`, which is what the workspace and its tests build today.
+client = ["session-client", "hopr-transport/entry"]
+relay = ["hopr-transport/relay"]
+exit = ["relay", "session-server", "hopr-transport/exit"]
+raw-exit = ["session-server", "hopr-transport/exit"]
+default = ["pix-bjj", "transport-announce-quic", "relay"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
 # Overrides `pix-bjj`, giving Ethereum deposit addresses that a plain transfer can reach.
@@ -116,9 +130,11 @@ serde = [
   "hopr-utils/serde",
   "hopr-transport/serde",
 ]
-session-client = ["hopr-api/node-session-client"]
+session-client = ["hopr-api/node-session-client", "hopr-transport/session-client"]
 explicit-path = ["session-client"]
-session-server = ["hopr-api/node-session-server"]
+# An Exit establishes Sessions on its return path, and one manager serves both directions, so the
+# server side carries the client side with it.
+session-server = ["session-client", "hopr-api/node-session-server", "hopr-transport/session-server"]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
 # === utility features ===
@@ -130,8 +146,8 @@ utils_parallel = [] # utility parallelization functionality
 profiling = ["dep:pprof"]
 
 testing = [
-  "session-server",
-  "session-client",
+  "client",
+  "exit",
   "runtime-tokio",
   "dep:bytesize",
   "dep:hex-literal",
@@ -197,7 +213,11 @@ hopr-utils = { workspace = true, features = [
   "parallelize-rayon",
   "platform",
 ] }
-hopr-transport = { workspace = true }
+# `default-features = false` so the entity features below are the only way a role gets compiled in:
+# a default-on role in `hopr-transport` would come back for every build and silently undo the fence.
+# The two defaults it drops, `pix-bjj` and `p2p-announce-quic`, are forwarded by this crate's own
+# `pix-bjj` and `transport-announce-quic` features, both of which are in `default`.
+hopr-transport = { workspace = true, default-features = false }
 
 hopr-ticket-manager = { workspace = true, optional = true }
 hopr-transport-p2p = { workspace = true, optional = true }

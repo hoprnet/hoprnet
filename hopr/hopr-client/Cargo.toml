@@ -1,0 +1,35 @@
+[package]
+name = "hopr-client"
+description = "The HOPR client entity: a source node that establishes Sessions and relays nothing"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+# Internal facade: it is built from this workspace and shipped through the binary that depends on
+# it, so it has no release lifecycle of its own yet (see the entity versioning follow-up).
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+doctest = false
+
+[features]
+default = ["pix-bjj", "transport-announce-quic"]
+# The PIX curve is a network-wide build invariant, so the facade forwards the choice rather than
+# fixing it here. See `hopr-lib`'s feature comments.
+pix-bjj = ["hopr-lib/pix-bjj"]
+pix-secp256k1 = ["hopr-lib/pix-secp256k1"]
+transport-announce-quic = ["hopr-lib/transport-announce-quic"]
+telemetry = ["hopr-lib/telemetry"]
+runtime-tokio = ["hopr-lib/runtime-tokio"]
+serde = ["hopr-lib/serde"]
+testing = ["hopr-lib/testing"]
+explicit-path = ["hopr-lib/explicit-path"]
+profiling = ["hopr-lib/profiling"]
+
+[dependencies]
+hopr-lib = { workspace = true, default-features = false, features = ["client"] }
