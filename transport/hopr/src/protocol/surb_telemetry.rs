@@ -2027,12 +2027,12 @@ mod tests {
         Ok(())
     }
 
-    /// A live relayer on every leg of two dead ones collects the overdue replies of both, more than
-    /// either has. A reply home through it after they fell due answers its races, and both dead ones
-    /// are judged; without one, one dead relayer explains the lateness as well as two, and the fewest
-    /// are taken: it is judged in their place, the limitation [`explain_away`] states.
-    #[test]
-    fn a_relayer_shared_by_two_dead_ones_should_be_cleared_only_by_a_reply_through_it() -> anyhow::Result<()> {
+    /// Two dead relayers, `first` and `second`, behind a live relayer, `shared`, on every leg of both,
+    /// so that `shared` collects the overdue replies of both, more than either has: who is judged
+    /// dead, with a reply home through `shared` after they fell due or without one, and the three.
+    fn judged_behind_a_shared_relayer(
+        reply_through_shared: bool,
+    ) -> anyhow::Result<(Vec<OffchainPublicKey>, [OffchainPublicKey; 3])> {
         let [shared, first, second, healthy] = [(); 4].map(|_| key());
         let [a1, a2, a3, b1, b2, b3] = [(); 6].map(|_| key());
         let legs: [&[OffchainPublicKey]; 6] = [
@@ -2043,28 +2043,35 @@ mod tests {
             &[shared, second, b2],
             &[shared, second, b3],
         ];
-        let overdue = |reply_through_shared: bool| -> anyhow::Result<Vec<OffchainPublicKey>> {
-            let health = RelayerHealth::default();
-            settled_since(&health, first, ago(Duration::from_secs(10))?, jitter(0));
-            overdue_legs(&health, &legs, 1, healthy);
-            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
-            if reply_through_shared {
-                health.note_home(&leg(&[shared, healthy]));
-            }
-            health.record_reply();
-            Ok(sorted(judged_dead(&health.refresh(4))))
-        };
+        let health = RelayerHealth::default();
+        settled_since(&health, first, ago(Duration::from_secs(10))?, jitter(0));
+        overdue_legs(&health, &legs, 1, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        if reply_through_shared {
+            health.note_home(&leg(&[shared, healthy]));
+        }
+        health.record_reply();
+        Ok((sorted(judged_dead(&health.refresh(4))), [shared, first, second]))
+    }
 
-        assert_eq!(
-            sorted(vec![first, second]),
-            overdue(true)?,
-            "a reply home through the shared relayer clears it, and both dead ones are judged"
-        );
-        assert_eq!(
-            vec![shared],
-            overdue(false)?,
-            "with nothing home through it, the shared relayer is taken for both"
-        );
+    /// A reply home through the shared relayer after the replies fell due answers its races, so it is
+    /// no suspect, and both dead ones are judged.
+    #[test]
+    fn a_relayer_shared_by_two_dead_ones_should_be_cleared_by_a_reply_through_it() -> anyhow::Result<()> {
+        let (judged, [_, first, second]) = judged_behind_a_shared_relayer(true)?;
+        assert_eq!(sorted(vec![first, second]), judged);
+        Ok(())
+    }
+
+    /// A known limitation, which [`explain_away`] states: with nothing home through the shared
+    /// relayer, one dead relayer explains the lateness as well as two, the fewest are taken, and the
+    /// shared one is judged in their place. This pins the outcome as it is, not as it should be: an
+    /// `explain_away` that tells the two dead ones apart here changes this test and regresses
+    /// nothing.
+    #[test]
+    fn a_relayer_shared_by_two_dead_ones_is_judged_in_their_place_as_a_known_limitation() -> anyhow::Result<()> {
+        let (judged, [shared, ..]) = judged_behind_a_shared_relayer(false)?;
+        assert_eq!(vec![shared], judged);
         Ok(())
     }
 
