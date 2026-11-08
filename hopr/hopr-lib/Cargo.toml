@@ -84,8 +84,9 @@ capture = ["hopr-transport/capture"]
 #               Sessions. This is the "exit" entity of the node split.
 # * `raw-exit` — the non-relaying exit: the Session server without ticket processing.
 #
-# The sets are additive like every Cargo feature, so a build takes exactly one of them. `default`
-# carries `relay`, which is what the workspace and its tests build today.
+# Like every Cargo feature the sets are additive, so nothing in Cargo stops a build from enabling
+# several of them (the `testing` utility feature below enables two); a node build still takes
+# exactly one. `default` carries `relay`, which is what the workspace and its tests build today.
 client = ["session-client", "hopr-transport/entry"]
 relay = ["hopr-transport/relay"]
 exit = ["relay", "session-server", "hopr-transport/exit"]
