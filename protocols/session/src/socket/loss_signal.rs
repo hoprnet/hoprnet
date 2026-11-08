@@ -40,6 +40,18 @@ use std::{
 /// Shared between the socket that observes the loss and whatever wants to react to it. Recording is
 /// two relaxed atomic operations on the loss path, so an observer that never asks costs nothing
 /// beyond them.
+///
+/// # One writer, any readers
+///
+/// The readers, [`lost_within`](Self::lost_within), [`lost_total`](Self::lost_total) and
+/// [`stalled_for`](Self::stalled_for), may be called from anywhere at any time. The writers,
+/// [`segment_received`](Self::segment_received), [`frame_completed`](Self::frame_completed) and
+/// [`record`](Self::record), must be called by one writer at a time. The stall state is three atomics
+/// that a writer updates one after another, and `segment_received` decides from one of them before it
+/// updates the next, so two writers interleaving could leave a stall that no frame matches, reported
+/// until the next completion or loss. A socket calls all three from its one sequentially polled stream
+/// chain, which is that single writer. A reader that catches a writer midway sees a stall begin or end
+/// one update late, no worse.
 #[derive(Debug)]
 pub struct FrameLossSignal {
     /// The instant the millisecond stamps below count from.
