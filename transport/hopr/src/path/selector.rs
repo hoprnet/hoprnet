@@ -428,6 +428,48 @@ where
     }
 }
 
+/// How many times [`search_share`] searches one first relayer's continuations at most.
+///
+/// Each search asks for twice as many as the last, so the last asks for eight times the share,
+/// and all of them together find fewer paths than twice the last.
+const SHARE_SEARCHES: u32 = 4;
+
+/// One first relayer's continuations for its share of the pool.
+///
+/// The single traversal from the source never returns to it; one that starts past it can, and
+/// those continuations are dropped. They must not take the places of the ones that avoid the
+/// source, so while too few of the paths a search found avoid it, the search is asked again for
+/// twice as many. The traversal shuffles each node's edges, so every search is a fresh draw that
+/// keeps what it found first.
+///
+/// Returns the paths of the first search that found `share` avoiding the source, or every
+/// continuation there is, or else those of the last of [`SHARE_SEARCHES`] searches. Doubling
+/// bounds the work where nearly every continuation runs through the source, as in a subtree that
+/// reaches the destination only past it: such a share stays short rather than paying a search per
+/// continuation.
+fn search_share<P>(share: usize, through_src: impl Fn(&P) -> bool, mut search: impl FnMut(usize) -> Vec<P>) -> Vec<P> {
+    let mut limit = share;
+    let mut searches = 1;
+    loop {
+        let found = search(limit);
+        let avoiding = found.iter().filter(|path| !through_src(path)).count();
+        if found.len() < limit || avoiding >= share {
+            return found;
+        }
+        if searches == SHARE_SEARCHES {
+            tracing::debug!(
+                share,
+                limit,
+                avoiding,
+                "share left short: most continuations run through the source"
+            );
+            return found;
+        }
+        searches += 1;
+        limit = limit.saturating_mul(2);
+    }
+}
+
 /// Candidate paths from `src` to `dest`, spread evenly over `src`'s first relayers.
 ///
 /// The traversal is depth-first and `take` keeps the paths it finds first, so a single traversal
@@ -505,21 +547,8 @@ where
                     },
                 )
             };
-            // The single traversal never returns to `src`; one that starts past it can, and those
-            // continuations are dropped below. They must not take the places of the ones that avoid
-            // `src`, so the depth-first search, which returns the same paths in the same order
-            // whatever its limit, is asked again for as many more as ran through `src`, until `share`
-            // avoid it or the subtree runs out. Each round asks for more than the last.
-            let mut limit = share;
-            let found = loop {
-                let found = continuations(limit);
-                let through_src = found.iter().filter(|(rest, ..)| rest.contains(src)).count();
-                if found.len() < limit || found.len() - through_src >= share {
-                    break found;
-                }
-                limit = share + through_src;
-            };
-            found
+            // The continuations through `src` are dropped below; see `search_share`.
+            search_share(share, |(rest, ..)| rest.contains(src), continuations)
                 .into_iter()
                 .filter_map(move |(rest, _, metrics)| {
                     if metrics.cost <= 0.0 || rest.contains(src) {
@@ -2457,6 +2486,55 @@ mod tests {
         assert_eq!(4, cut_short.len());
         assert_eq!(4, first_relayers(&cut_short).len());
         Ok(())
+    }
+
+    /// A subtree whose every continuation runs through the source, however large: four searches,
+    /// each for twice as many as the last, and the share stays empty.
+    #[test]
+    fn a_share_search_should_stop_after_its_last_doubling() {
+        let mut limits = Vec::new();
+        let found = search_share(
+            3,
+            |through_src: &bool| *through_src,
+            |limit| {
+                limits.push(limit);
+                vec![true; limit]
+            },
+        );
+        assert_eq!(vec![3, 6, 12, 24], limits);
+        assert!(found.iter().all(|through_src| *through_src), "nothing to keep");
+    }
+
+    /// The search stops at the first that found enough continuations avoiding the source, and at
+    /// one that found every continuation there is.
+    #[test]
+    fn a_share_search_should_stop_once_enough_avoid_the_source_or_the_subtree_runs_out() {
+        // Every other continuation runs through the source: 2 of 4 avoid it, then 4 of 8.
+        let mut limits = Vec::new();
+        let found = search_share(
+            4,
+            |through_src: &bool| *through_src,
+            |limit| {
+                limits.push(limit);
+                (0..limit).map(|i| i % 2 == 0).collect()
+            },
+        );
+        assert_eq!(vec![4, 8], limits);
+        assert_eq!(4, found.iter().filter(|through_src| !**through_src).count());
+
+        // Five continuations, three through the source: the second search finds all five.
+        let subtree = [true, false, true, false, true];
+        let mut limits = Vec::new();
+        let found = search_share(
+            4,
+            |through_src: &bool| *through_src,
+            |limit| {
+                limits.push(limit);
+                subtree.iter().copied().take(limit).collect()
+            },
+        );
+        assert_eq!(vec![4, 8], limits);
+        assert_eq!(subtree.to_vec(), found);
     }
 
     /// The selector searches both directions spread over first relayers (pruning off, so the
