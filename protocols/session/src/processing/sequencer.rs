@@ -423,8 +423,9 @@ pub trait SequencerExt: futures::Stream {
     }
 
     /// As [`SequencerExt::sequencer_with`], adapting the gap wait to a window of reordering that
-    /// others record into as well (the Session's reassembler), if `reorder` is given and
-    /// [`SequencerConfig::adapt_to_reordering`] set.
+    /// others record into as well (the Session's reassembler) when
+    /// [`SequencerConfig::adapt_to_reordering`] is set; with `reorder` `None`, the window holds this
+    /// sequencer's own samples alone.
     fn sequencer_sharing(self, cfg: SequencerConfig, reorder: Option<SharedReorder>) -> Sequencer<Self>
     where
         Self::Item: Ord + PartialOrd<FrameId>,
