@@ -850,7 +850,7 @@ impl RelayerHealth {
     }
 
     /// A reply came home over `leg`: every relayer on it delivered. This is what "home since" means for
-    /// a black hole (see [`RaceHistory::is_black_hole`]), whether or not the reply settled a race.
+    /// a black hole (see [`RaceHistory::unanswered`]), whether or not the reply settled a race.
     fn note_home(&self, leg: &ReturnRelayers) {
         let now = Instant::now();
         for relayer in relayers_of(leg) {
