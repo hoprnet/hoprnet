@@ -4167,7 +4167,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "5.1.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=kauki%2Ffix%2Fgraph%2Ffirst-hop-loopback-gate#74224b0585373b27c711b862f33ae31f6a53938f"
+source = "git+https://github.com/hoprnet/hopr-api?branch=ronnyesterluss%2Fgno-1183-genuine-ack-witness#d27173a389b2641431589e6032b086d14b4a33c8"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4331,7 +4331,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.10.1"
-source = "git+https://github.com/hoprnet/hopr-impls?branch=kauki%2Ffix%2Fgraph%2Floopback-first-hop-evidence#3573d28aeebe3bbf9a94fe6b53d00faa30f6ebb8"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=ronnyesterluss%2Fgno-1183-genuine-ack-witness#c7ad88b6292d4a647de91b5af1f39114db579a9c"
 dependencies = [
  "anyhow",
  "bimap",
@@ -7331,7 +7331,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7371,7 +7371,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7384,7 +7384,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 

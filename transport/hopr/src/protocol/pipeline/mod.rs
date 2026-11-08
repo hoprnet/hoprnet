@@ -181,6 +181,10 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
         // so that encoded packets are emitted in submission order, preserving session frame sequence.
         // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
         .map(|(routing, data)| {
+            let next_hop_relays = matches!(
+                &routing,
+                ResolvedTransportRouting::Forward { forward_path, .. } if forward_path.num_hops() > 1
+            );
             let encoder = encoder.clone();
             let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
@@ -209,7 +213,11 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                     Ok(Ok(Ok(packet))) => {
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["sent"]);
-                        counters.get_or_create(&packet.next_hop).record_message_sent();
+                        let next_hop_counters = counters.get_or_create(&packet.next_hop);
+                        next_hop_counters.record_message_sent();
+                        if next_hop_relays {
+                            next_hop_counters.record_relayed_message_sent(packet.ack_challenge);
+                        }
 
                         // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
                         // and the packet contains a non-empty encrypted partial SSA share (it is therefore an RP
@@ -440,7 +448,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Either::Left(async move {
                         let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
                         tracing::trace!(previous_hop = previous_hop.to_peerid_str(), num_acks = received_acks.len(), "incoming acknowledgements");
-                        counters.get_or_create(&previous_hop).record_acks_received(received_acks.len() as u64);
+                        let previous_hop_counters = counters.get_or_create(&previous_hop);
+                        previous_hop_counters.record_acks_received(received_acks.len() as u64);
+                        previous_hop_counters.record_genuine_acks(&previous_hop, &received_acks);
 
                         ack_incoming
                             .send((previous_hop, received_acks))

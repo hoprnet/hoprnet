@@ -2,6 +2,7 @@ mod common;
 
 use std::time::Duration;
 
+use anyhow::Context;
 use common::{
     PEERS, PEERS_CHAIN, emulate_channel_communication, make_outgoing_packets, peer_setup_for_with_counters,
     random_packets_of_count, resolve_mock_path,
@@ -10,14 +11,18 @@ use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt;
 use hopr_api::{
     graph::{
-        NetworkGraphWrite,
-        traits::{EdgeObservableWrite, EdgeWeightType},
+        NetworkGraphView, NetworkGraphWrite,
+        traits::{EdgeImmediateProtocolObservable, EdgeObservableRead, EdgeObservableWrite, EdgeWeightType},
     },
-    types::{crypto::prelude::*, internal::errors::PathError},
+    types::{
+        crypto::prelude::*,
+        crypto_random::Randomizable,
+        internal::{errors::PathError, prelude::VerifiedAcknowledgement},
+    },
 };
 use hopr_network_graph::ChannelGraph;
 use hopr_transport::{
-    PeerProtocolCounterRegistry,
+    ConformanceReport, PeerProtocolCounterRegistry,
     path::{HoprGraphPathSelector, PathPlannerConfig, PathPlannerError, traits::PathSelector},
 };
 use serial_test::serial;
@@ -176,13 +181,19 @@ fn one_hop_cluster(
 
 /// Record a drained conformance report onto the `src -> peer` edges, exactly as the counter-flush
 /// task in `lib.rs` does.
-fn apply_conformance_report(graph: &ChannelGraph, src: &OffchainPublicKey, report: &[(OffchainPublicKey, u64, u64)]) {
-    for (peer, num_packets, num_acks) in report {
-        graph.upsert_edge(src, peer, |obs| {
+fn apply_conformance_report(graph: &ChannelGraph, src: &OffchainPublicKey, report: &[ConformanceReport]) {
+    for report in report {
+        graph.upsert_edge(src, &report.peer, |obs| {
             obs.record(EdgeWeightType::ImmediateProtocolConformance {
-                num_packets: *num_packets,
-                num_acks: *num_acks,
+                num_packets: report.sent,
+                num_acks: report.acks,
             });
+            if report.relayed > 0 || report.genuine_acks > 0 {
+                obs.record(EdgeWeightType::RelayedProtocolConformance {
+                    num_relayed: report.relayed,
+                    num_genuine_acks: report.genuine_acks,
+                });
+            }
         });
     }
 }
@@ -194,10 +205,7 @@ fn apply_conformance_report(graph: &ChannelGraph, src: &OffchainPublicKey, repor
 /// The ordering is driven by polls, not by racing two timers, as in the `protocol::counters` unit
 /// tests: a stalled executor could otherwise poll the drain past its grace before the acks are
 /// recorded, and the graced report would read none.
-async fn cold_burst_report(
-    relay: &OffchainPublicKey,
-    grace: Duration,
-) -> anyhow::Result<Vec<(OffchainPublicKey, u64, u64)>> {
+async fn cold_burst_report(relay: &OffchainPublicKey, grace: Duration) -> anyhow::Result<Vec<ConformanceReport>> {
     let registry = PeerProtocolCounterRegistry::default();
     let counters = registry.get_or_create(relay);
     for _ in 0..10 {
@@ -263,6 +271,131 @@ async fn a_cold_burst_flush_decides_whether_the_one_hop_route_survives() -> anyh
     assert!(
         selector.select_path(me, dest, 1).is_ok(),
         "the grace keeps the relay above min_ack_rate, so the 1-hop route survives"
+    );
+
+    Ok(())
+}
+
+/// 0-hop packets must not count as relayed; 1-hop packets and their genuine acks must.
+#[serial]
+#[test_log::test(tokio::test)]
+async fn only_relayed_packets_and_their_genuine_acks_feed_the_genuine_ack_counters() -> anyhow::Result<()> {
+    let packet_count = 3;
+    let (wire_apis, mut apis, _ticket_channels, _processes, counters) = peer_setup_for_with_counters(3).await?;
+    tokio::task::spawn(emulate_channel_communication(wire_apis));
+
+    let zero_hop = resolve_mock_path(
+        PEERS_CHAIN[0].public().to_address(),
+        vec![PEERS_CHAIN[1].public().to_address()],
+    )
+    .await?;
+    let out_msgs = make_outgoing_packets(&random_packets_of_count(packet_count), zero_hop);
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+    (&mut apis[1].1)
+        .take(packet_count)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT))
+        .await?;
+
+    let one_hop = resolve_mock_path(
+        PEERS_CHAIN[0].public().to_address(),
+        PEERS_CHAIN[1..3].iter().map(|k| k.public().to_address()).collect(),
+    )
+    .await?;
+    let out_msgs = make_outgoing_packets(&random_packets_of_count(packet_count), one_hop);
+    apis[0].0.send_all(&mut futures::stream::iter(out_msgs).map(Ok)).await?;
+    (&mut apis[2].1)
+        .take(packet_count)
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TIMEOUT))
+        .await?;
+
+    let relay = *PEERS[1].public();
+    let report = counters[0].drain_settled(Duration::from_secs(1)).await;
+    let report = report
+        .iter()
+        .find(|report| report.peer == relay)
+        .context("the relay must be reported")?;
+    assert_eq!(
+        report.sent,
+        2 * packet_count as u64,
+        "every packet still counts as sent"
+    );
+    assert_eq!(
+        report.relayed, packet_count as u64,
+        "only the 1-hop packets count as relayed"
+    );
+    assert_eq!(
+        report.genuine_acks, packet_count as u64,
+        "only their acks count as genuine"
+    );
+
+    Ok(())
+}
+
+/// Report for `packet_count` relayed packets, acked genuinely or with random acks.
+fn relay_ack_report(relay_key: &OffchainKeypair, packet_count: usize, relay_rejects: bool) -> Vec<ConformanceReport> {
+    let registry = PeerProtocolCounterRegistry::default();
+    let counters = registry.get_or_create(relay_key.public());
+
+    let mut acks = Vec::new();
+    for _ in 0..packet_count {
+        let half_key = HalfKey::random();
+        let challenge = half_key.to_challenge().expect("random half key has a challenge");
+        counters.record_message_sent();
+        counters.record_relayed_message_sent(challenge);
+        let ack = if relay_rejects {
+            VerifiedAcknowledgement::random(relay_key)
+        } else {
+            VerifiedAcknowledgement::new(half_key, relay_key)
+        };
+        acks.push(ack.leak());
+    }
+    counters.record_acks_received(acks.len() as u64);
+    counters.record_genuine_acks(relay_key.public(), &acks);
+
+    futures::executor::block_on(registry.drain_settled(Duration::ZERO))
+}
+
+fn best_path_cost(
+    selector: &HoprGraphPathSelector<ChannelGraph>,
+    me: OffchainPublicKey,
+    dest: OffchainPublicKey,
+) -> f64 {
+    selector
+        .select_path(me, dest, 1)
+        .map(|paths| paths.iter().map(|path| path.cost).fold(0.0, f64::max))
+        .unwrap_or(0.0)
+}
+
+/// A relay answering with random acks keeps its ack rate but is starved by its genuine-ack rate.
+#[serial]
+#[test_log::test(tokio::test)]
+async fn a_relay_answering_with_random_acks_is_starved_despite_its_ack_rate() -> anyhow::Result<()> {
+    let me = *PEERS[0].public();
+    let relay = *PEERS[1].public();
+    let dest = *PEERS[2].public();
+
+    let (rejecting_graph, rejecting_selector) = one_hop_cluster(me, relay, dest);
+    apply_conformance_report(&rejecting_graph, &me, &relay_ack_report(&PEERS[1], 20, true));
+    let ack_rate = rejecting_graph
+        .edge(&me, &relay)
+        .and_then(|obs| obs.immediate_qos().and_then(|imm| imm.ack_rate()))
+        .context("the relay edge must have an ack rate")?;
+    assert!(
+        ack_rate >= PathPlannerConfig::default().min_ack_rate,
+        "random acks keep the plain ack rate up, got {ack_rate}"
+    );
+
+    let (honest_graph, honest_selector) = one_hop_cluster(me, relay, dest);
+    apply_conformance_report(&honest_graph, &me, &relay_ack_report(&PEERS[1], 20, false));
+
+    let rejecting = best_path_cost(&rejecting_selector, me, dest);
+    let honest = best_path_cost(&honest_selector, me, dest);
+    assert!(honest > 0.0, "an honest relay stays a first hop");
+    assert!(
+        rejecting < honest * 1e-6,
+        "a rejecting relay must be starved: {rejecting} against {honest}"
     );
 
     Ok(())

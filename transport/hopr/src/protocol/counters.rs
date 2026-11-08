@@ -1,25 +1,74 @@
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
 
 use dashmap::DashMap;
-use hopr_api::types::crypto::types::OffchainPublicKey;
+use hopr_api::types::{
+    crypto::types::{HalfKeyChallenge, OffchainPublicKey},
+    internal::prelude::Acknowledgement,
+};
+
+/// Outlasts the counter flush grace, so a late genuine ack still matches.
+const EXPECTED_ACK_TTL: Duration = Duration::from_secs(30);
+const EXPECTED_ACK_CAPACITY: u64 = 65_536;
 
 /// Minimal atomic counters for per-peer protocol conformance tracking.
 ///
 /// Tracks the number of messages sent and acknowledgments received for a
 /// single peer. All operations are lock-free using relaxed atomic ordering.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PeerProtocolCounters {
     messages_sent: AtomicU64,
     acks_received: AtomicU64,
+    relayed_sent: AtomicU64,
+    genuine_acks_received: AtomicU64,
+    /// Set by the first relayed packet, so peers we never relay through skip ack verification.
+    awaits_genuine_acks: AtomicBool,
+    expected_acks: moka::sync::Cache<HalfKeyChallenge, ()>,
+}
+
+impl Default for PeerProtocolCounters {
+    fn default() -> Self {
+        Self {
+            messages_sent: AtomicU64::new(0),
+            acks_received: AtomicU64::new(0),
+            relayed_sent: AtomicU64::new(0),
+            genuine_acks_received: AtomicU64::new(0),
+            awaits_genuine_acks: AtomicBool::new(false),
+            expected_acks: moka::sync::Cache::builder()
+                .time_to_live(EXPECTED_ACK_TTL)
+                .max_capacity(EXPECTED_ACK_CAPACITY)
+                .build(),
+        }
+    }
 }
 
 impl PeerProtocolCounters {
+    /// Record a packet this peer must relay, remembering the challenge its ack has to solve.
+    pub fn record_relayed_message_sent(&self, ack_challenge: HalfKeyChallenge) {
+        self.relayed_sent.fetch_add(1, Ordering::Relaxed);
+        self.expected_acks.insert(ack_challenge, ());
+        self.awaits_genuine_acks.store(true, Ordering::Relaxed);
+    }
+
+    /// Count the acks that solve a remembered challenge; a rejecting relay's random ack solves none.
+    pub fn record_genuine_acks(&self, peer: &OffchainPublicKey, acks: &[Acknowledgement]) {
+        if !self.awaits_genuine_acks.load(Ordering::Relaxed) {
+            return;
+        }
+        let verified = Acknowledgement::verify_batch(acks.iter().map(|ack| (*peer, *ack)));
+        let genuine = verified
+            .into_iter()
+            .filter_map(|ack| ack.ok()?.ack_key_share().to_challenge().ok())
+            .filter(|challenge| self.expected_acks.remove(challenge).is_some())
+            .count() as u64;
+        self.genuine_acks_received.fetch_add(genuine, Ordering::Relaxed);
+    }
+
     /// Record that a message was sent to this peer.
     #[inline]
     pub fn record_message_sent(&self) {
@@ -57,6 +106,28 @@ impl PeerProtocolCounters {
     pub fn take(&self) -> (u64, u64) {
         (self.take_sent(), self.take_acks())
     }
+
+    /// Swap the relayed-packet counter to 0, returning the accumulated value.
+    pub fn take_relayed(&self) -> u64 {
+        self.relayed_sent.swap(0, Ordering::Relaxed)
+    }
+
+    /// Swap the genuine-ack counter to 0, returning the accumulated value.
+    pub fn take_genuine_acks(&self) -> u64 {
+        self.genuine_acks_received.swap(0, Ordering::Relaxed)
+    }
+}
+
+/// One peer's counts for one conformance report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConformanceReport {
+    pub peer: OffchainPublicKey,
+    pub sent: u64,
+    pub acks: u64,
+    /// Packets sent to the peer for it to relay.
+    pub relayed: u64,
+    /// Acks solving the challenge of a relayed packet.
+    pub genuine_acks: u64,
 }
 
 /// Thread-safe registry of per-peer protocol conformance counters.
@@ -98,14 +169,22 @@ impl PeerProtocolCounterRegistry {
     /// while it waits loses them from every report. The acknowledgments are only taken after the
     /// grace and stay counted. The flush task is only dropped when the transport stops.
     ///
-    /// Returns `(peer, msgs_sent, acks_received)` for non-zero entries, like [`Self::drain`].
-    pub async fn drain_settled(&self, ack_grace: Duration) -> Vec<(OffchainPublicKey, u64, u64)> {
+    /// Returns a report for every peer with a non-zero count; relayed packets settle like sent ones.
+    pub async fn drain_settled(&self, ack_grace: Duration) -> Vec<ConformanceReport> {
         // Each peer's counters are held through the grace, so its acks are taken without a second
         // lookup. Collected before the await: no map guard may be held across it.
         let pending = self
             .inner
             .iter()
-            .map(|entry| (*entry.key(), entry.value().clone(), entry.value().take_sent()))
+            .map(|entry| {
+                let counters = entry.value();
+                (
+                    *entry.key(),
+                    counters.clone(),
+                    counters.take_sent(),
+                    counters.take_relayed(),
+                )
+            })
             .collect::<Vec<_>>();
 
         if !ack_grace.is_zero() {
@@ -114,9 +193,16 @@ impl PeerProtocolCounterRegistry {
 
         pending
             .into_iter()
-            .filter_map(|(peer, counters, sent)| {
-                let received = counters.take_acks();
-                (sent > 0 || received > 0).then_some((peer, sent, received))
+            .filter_map(|(peer, counters, sent, relayed)| {
+                let report = ConformanceReport {
+                    peer,
+                    sent,
+                    acks: counters.take_acks(),
+                    relayed,
+                    genuine_acks: counters.take_genuine_acks(),
+                };
+                let has_counts = report.sent > 0 || report.acks > 0 || report.relayed > 0 || report.genuine_acks > 0;
+                has_counts.then_some(report)
             })
             .collect()
     }
@@ -281,9 +367,9 @@ mod tests {
         counters.record_acks_received(10);
         let drained = drained.await;
 
-        let (_, sent, received) = drained.first().context("the peer must be reported")?;
+        let report = drained.first().context("the peer must be reported")?;
         assert_eq!(
-            (*sent, *received),
+            (report.sent, report.acks),
             (10, 10),
             "acknowledgments arriving within the grace must be credited"
         );
@@ -309,12 +395,18 @@ mod tests {
         counters.record_message_sent();
         counters.record_message_sent();
         let first = first.await;
-        let (_, sent, _) = first.first().context("the peer must be reported")?;
-        assert_eq!(*sent, 1, "only the packet sent before the grace belongs to this report");
+        let report = first.first().context("the peer must be reported")?;
+        assert_eq!(
+            report.sent, 1,
+            "only the packet sent before the grace belongs to this report"
+        );
 
         let second = registry.drain_settled(Duration::ZERO).await;
-        let (_, sent, _) = second.first().context("the carried packets must be reported")?;
-        assert_eq!(*sent, 2, "packets sent during the grace must be reported next time");
+        let report = second.first().context("the carried packets must be reported")?;
+        assert_eq!(
+            report.sent, 2,
+            "packets sent during the grace must be reported next time"
+        );
         Ok(())
     }
 

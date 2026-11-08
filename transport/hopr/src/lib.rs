@@ -109,7 +109,10 @@ use tracing::{debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
-pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
+pub use crate::{
+    config::HoprProtocolConfig,
+    protocol::{ConformanceReport, PeerProtocolCounterRegistry},
+};
 use crate::{
     config::PixGlobalConfig,
     constants::SESSION_INITIATION_TIMEOUT_BASE,
@@ -1105,15 +1108,26 @@ where
                 let ack_grace = counter_flush_ack_grace(flush_interval);
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(flush_interval));
                 while ticks.next().await.is_some() {
-                    for (peer, num_packets, num_acks) in flush_counters.drain_settled(ack_grace).await {
+                    for report in flush_counters.drain_settled(ack_grace).await {
                         tracing::trace!(
-                            %peer,
-                            num_packets,
-                            num_acks,
+                            peer = %report.peer,
+                            num_packets = report.sent,
+                            num_acks = report.acks,
+                            num_relayed = report.relayed,
+                            num_genuine_acks = report.genuine_acks,
                             "flushing protocol conformance counters"
                         );
-                        flush_graph.upsert_edge(&flush_me, &peer, |obs| {
-                            obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
+                        flush_graph.upsert_edge(&flush_me, &report.peer, |obs| {
+                            obs.record(EdgeWeightType::ImmediateProtocolConformance {
+                                num_packets: report.sent,
+                                num_acks: report.acks,
+                            });
+                            if report.relayed > 0 || report.genuine_acks > 0 {
+                                obs.record(EdgeWeightType::RelayedProtocolConformance {
+                                    num_relayed: report.relayed,
+                                    num_genuine_acks: report.genuine_acks,
+                                });
+                            }
                         });
                     }
                 }
