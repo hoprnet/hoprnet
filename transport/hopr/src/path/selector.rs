@@ -491,23 +491,37 @@ where
     let mut per_first = firsts
         .into_iter()
         .map(|(first, after_first)| {
-            graph
-                .simple_paths(
+            let continuations = |limit| {
+                graph.simple_paths(
                     &first,
                     dest,
                     length.get() - 1,
-                    Some(share),
+                    Some(limit),
                     ContinuedValueFn {
                         value_fn: value_fn.clone(),
-                        initial: after_first,
+                        initial: after_first.clone(),
                         min: min.clone(),
                         offset: 1,
                     },
                 )
+            };
+            // The single traversal never returns to `src`; one that starts past it can, and those
+            // continuations are dropped below. They must not take the places of the ones that avoid
+            // `src`, so the depth-first search, which returns the same paths in the same order
+            // whatever its limit, is asked again for as many more as ran through `src`, until `share`
+            // avoid it or the subtree runs out. Each round asks for more than the last.
+            let mut limit = share;
+            let found = loop {
+                let found = continuations(limit);
+                let through_src = found.iter().filter(|(rest, ..)| rest.contains(src)).count();
+                if found.len() < limit || found.len() - through_src >= share {
+                    break found;
+                }
+                limit = share + through_src;
+            };
+            found
                 .into_iter()
                 .filter_map(move |(rest, _, metrics)| {
-                    // The single traversal never returns to `src`; one that starts past it has to
-                    // be kept from doing so.
                     if metrics.cost <= 0.0 || rest.contains(src) {
                         return None;
                     }
@@ -518,12 +532,15 @@ where
                     tracing::trace!(?path, cost = metrics.cost, "evaluating candidate path");
                     Some(PathWithMetrics::from((metrics, path)))
                 })
+                .take(share)
                 .collect::<Vec<_>>()
                 .into_iter()
         })
         .collect::<Vec<_>>();
 
-    let mut spread = Vec::with_capacity(take);
+    // Sized by what the searches found: `take` is a configured bound, not a size.
+    let found = per_first.iter().map(|paths| paths.len()).sum::<usize>();
+    let mut spread = Vec::with_capacity(take.min(found));
     while spread.len() < take {
         let before = spread.len();
         for paths in per_first.iter_mut() {
@@ -2307,10 +2324,12 @@ mod tests {
     #[rstest::rstest]
     #[case::forward(true)]
     #[case::returning(false)]
-    fn a_spread_pool_should_name_every_first_relayer_where_one_traversal_named_two(#[case] forward: bool) {
+    fn a_spread_pool_should_name_every_first_relayer_where_one_traversal_named_two(
+        #[case] forward: bool,
+    ) -> anyhow::Result<()> {
         let (me, dest, relays, graph) = mesh_graph(7, |_| 1000);
         let (src, dst) = if forward { (me, dest) } else { (dest, me) };
-        let length = std::num::NonZeroUsize::new(4).unwrap();
+        let length = std::num::NonZeroUsize::new(4).context("non-zero")?;
 
         let single = compute_paths(&graph, &src, &dst, length, 50, metrics_fn(&graph, length, forward));
         assert!(
@@ -2332,6 +2351,7 @@ mod tests {
             let distinct = p.path.iter().collect::<std::collections::HashSet<_>>();
             assert_eq!(p.path.len(), distinct.len(), "a path must be simple: {:?}", p.path);
         }
+        Ok(())
     }
 
     /// Every path the spread search returns is one the single traversal returns, valued the same:
@@ -2388,13 +2408,55 @@ mod tests {
 
     /// Fewer candidates than first relayers still take one path from each relayer they can.
     #[test]
-    fn a_spread_pool_cut_short_should_keep_distinct_first_relayers() {
+    fn a_spread_pool_cut_short_should_keep_distinct_first_relayers() -> anyhow::Result<()> {
         let (me, dest, _, graph) = mesh_graph(7, |_| 1000);
-        let length = std::num::NonZeroUsize::new(3).unwrap();
+        let length = std::num::NonZeroUsize::new(3).context("non-zero")?;
 
         let spread = compute_paths_spread(&graph, &dest, &me, length, 4, metrics_fn(&graph, length, false));
         assert_eq!(4, spread.len());
         assert_eq!(4, first_relayers(&spread).len());
+        Ok(())
+    }
+
+    /// A first relayer's continuations can run back through the source, which the single traversal
+    /// never returns, and they must not take the place of those that do not. Every relayer here links
+    /// back to the source, so each first relayer's three-hop subtree holds 6 continuations through it
+    /// beside its 30 good ones; each share is smaller than either.
+    #[rstest::rstest]
+    #[case::forward(true)]
+    #[case::returning(false)]
+    fn a_spread_pool_should_fill_each_share_with_paths_that_avoid_the_source(
+        #[case] forward: bool,
+    ) -> anyhow::Result<()> {
+        let (me, dest, relays, graph) = mesh_graph(7, |_| 1000);
+        let (src, dst) = if forward { (me, dest) } else { (dest, me) };
+        let length = std::num::NonZeroUsize::new(4).context("non-zero")?;
+
+        let per_relayer = 2;
+        let take = per_relayer * relays.len();
+        let spread = compute_paths_spread(&graph, &src, &dst, length, take, metrics_fn(&graph, length, forward));
+        assert!(
+            spread.iter().all(|p| !p.path.contains(&src)),
+            "a path must not run back through its source"
+        );
+        assert_eq!(
+            take,
+            spread.len(),
+            "every share filled with paths that avoid the source"
+        );
+        for relayer in &relays {
+            assert_eq!(
+                per_relayer,
+                spread.iter().filter(|p| p.path.first() == Some(relayer)).count(),
+                "each first relayer keeps its whole share"
+            );
+        }
+
+        // Fewer candidates than first relayers: one from each relayer the pool has room for.
+        let cut_short = compute_paths_spread(&graph, &src, &dst, length, 4, metrics_fn(&graph, length, forward));
+        assert_eq!(4, cut_short.len());
+        assert_eq!(4, first_relayers(&cut_short).len());
+        Ok(())
     }
 
     /// The selector searches both directions spread over first relayers (pruning off, so the
