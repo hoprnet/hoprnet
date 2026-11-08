@@ -436,33 +436,27 @@ const SHARE_SEARCHES: u32 = 4;
 
 /// One first relayer's continuations for its share of the pool.
 ///
-/// The single traversal from the source never returns to it; one that starts past it can, and
-/// those continuations are dropped. They must not take the places of the ones that avoid the
-/// source, so while too few of the paths a search found avoid it, the search is asked again for
-/// twice as many. The traversal shuffles each node's edges, so every search is a fresh draw that
-/// keeps what it found first.
+/// Some continuations are unusable and dropped from the share: those of no value, and those that
+/// run through the source, which the single traversal from the source never returns but one that
+/// starts past it can. They must not take the places of usable ones, so while too few of the paths
+/// a search found are usable, the search is asked again for twice as many. The traversal shuffles
+/// each node's edges, so every search is a fresh draw that keeps what it found first.
 ///
-/// Returns the paths of the first search that found `share` avoiding the source, or every
-/// continuation there is, or else those of the last of [`SHARE_SEARCHES`] searches. Doubling
-/// bounds the work where nearly every continuation runs through the source, as in a subtree that
-/// reaches the destination only past it: such a share stays short rather than paying a search per
-/// continuation.
-fn search_share<P>(share: usize, through_src: impl Fn(&P) -> bool, mut search: impl FnMut(usize) -> Vec<P>) -> Vec<P> {
+/// Returns the paths of the first search that found `share` usable, or every continuation there
+/// is, or else those of the last of [`SHARE_SEARCHES`] searches. Doubling bounds the work where
+/// nearly every continuation is unusable, as in a subtree that reaches the destination only past
+/// the source: such a share stays short rather than paying a search per continuation.
+fn search_share<P>(share: usize, unusable: impl Fn(&P) -> bool, mut search: impl FnMut(usize) -> Vec<P>) -> Vec<P> {
     let mut limit = share;
     let mut searches = 1;
     loop {
         let found = search(limit);
-        let avoiding = found.iter().filter(|path| !through_src(path)).count();
-        if found.len() < limit || avoiding >= share {
+        let usable = found.iter().filter(|path| !unusable(path)).count();
+        if found.len() < limit || usable >= share {
             return found;
         }
         if searches == SHARE_SEARCHES {
-            tracing::debug!(
-                share,
-                limit,
-                avoiding,
-                "share left short: most continuations run through the source"
-            );
+            tracing::debug!(share, limit, usable, "share left short: most continuations unusable");
             return found;
         }
         searches += 1;
@@ -547,8 +541,11 @@ where
                     },
                 )
             };
-            // The continuations through `src` are dropped below; see `search_share`.
-            search_share(share, |(rest, ..)| rest.contains(src), continuations)
+            // The continuations of no value or through `src` are dropped below; see `search_share`.
+            let unusable = |(rest, _, metrics): &(Vec<OffchainPublicKey>, _, PathCostWithMetrics)| {
+                metrics.cost <= 0.0 || rest.contains(src)
+            };
+            search_share(share, unusable, continuations)
                 .into_iter()
                 .filter_map(move |(rest, _, metrics)| {
                     if metrics.cost <= 0.0 || rest.contains(src) {
@@ -2488,46 +2485,46 @@ mod tests {
         Ok(())
     }
 
-    /// A subtree whose every continuation runs through the source, however large: four searches,
-    /// each for twice as many as the last, and the share stays empty.
+    /// A subtree whose every continuation is unusable, however large: four searches, each for twice
+    /// as many as the last, and the share stays empty.
     #[test]
     fn a_share_search_should_stop_after_its_last_doubling() {
         let mut limits = Vec::new();
         let found = search_share(
             3,
-            |through_src: &bool| *through_src,
+            |unusable: &bool| *unusable,
             |limit| {
                 limits.push(limit);
                 vec![true; limit]
             },
         );
         assert_eq!(vec![3, 6, 12, 24], limits);
-        assert!(found.iter().all(|through_src| *through_src), "nothing to keep");
+        assert!(found.iter().all(|unusable| *unusable), "nothing to keep");
     }
 
-    /// The search stops at the first that found enough continuations avoiding the source, and at
-    /// one that found every continuation there is.
+    /// The search stops at the first that found enough usable continuations, and at one that found
+    /// every continuation there is.
     #[test]
-    fn a_share_search_should_stop_once_enough_avoid_the_source_or_the_subtree_runs_out() {
-        // Every other continuation runs through the source: 2 of 4 avoid it, then 4 of 8.
+    fn a_share_search_should_stop_once_enough_are_usable_or_the_subtree_runs_out() {
+        // Every other continuation is unusable: 2 of 4 are usable, then 4 of 8.
         let mut limits = Vec::new();
         let found = search_share(
             4,
-            |through_src: &bool| *through_src,
+            |unusable: &bool| *unusable,
             |limit| {
                 limits.push(limit);
                 (0..limit).map(|i| i % 2 == 0).collect()
             },
         );
         assert_eq!(vec![4, 8], limits);
-        assert_eq!(4, found.iter().filter(|through_src| !**through_src).count());
+        assert_eq!(4, found.iter().filter(|unusable| !**unusable).count());
 
-        // Five continuations, three through the source: the second search finds all five.
+        // Five continuations, three unusable: the second search finds all five.
         let subtree = [true, false, true, false, true];
         let mut limits = Vec::new();
         let found = search_share(
             4,
-            |through_src: &bool| *through_src,
+            |unusable: &bool| *unusable,
             |limit| {
                 limits.push(limit);
                 subtree.iter().copied().take(limit).collect()
@@ -2535,6 +2532,81 @@ mod tests {
         );
         assert_eq!(vec![4, 8], limits);
         assert_eq!(subtree.to_vec(), found);
+    }
+
+    /// A zero edge penalty leaves a path of no value where it applies without a floor: a last hop
+    /// with nothing observed on it, forward, or with no ack rate, on return. Such a path is dropped
+    /// and must not take the place of one of value. Every first relayer here reaches the destination
+    /// over 6 probed relayers and 6 relayers whose last hop is like that, so half its continuations
+    /// are of no value, and each share is as large as the other half.
+    #[rstest::rstest]
+    #[case::forward(true)]
+    #[case::returning(false)]
+    fn a_spread_pool_should_fill_each_share_with_paths_of_value(#[case] forward: bool) -> anyhow::Result<()> {
+        let (me, dest, relays, graph) = mesh_graph(7, |_| 1000);
+        // Ack rates where the value functions apply them, on the edge from me forward and on the
+        // edge to me on return: without one, a zero penalty leaves every path of no value.
+        for r in &relays {
+            for (a, b) in [(me, *r), (*r, me)] {
+                graph.upsert_edge(&a, &b, |obs| {
+                    obs.record(EdgeWeightType::ImmediateProtocolConformance {
+                        num_packets: 100,
+                        num_acks: 100,
+                    });
+                });
+            }
+        }
+        for _ in 0..6 {
+            let unprobed = *OffchainKeypair::random().public();
+            graph.add_node(unprobed);
+            // Funded from every probed relayer, so these continuations are found.
+            for r in &relays {
+                graph.add_edge(r, &unprobed)?;
+                graph.upsert_edge(r, &unprobed, |obs| {
+                    obs.record(EdgeWeightType::Connected(true));
+                    obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                        1000 * 100,
+                    ))));
+                });
+            }
+            // On to the destination with nothing observed, and to me connected with no ack rate.
+            graph.add_edge(&unprobed, &dest)?;
+            graph.add_edge(&unprobed, &me)?;
+            graph.upsert_edge(&unprobed, &me, |obs| obs.record(EdgeWeightType::Connected(true)));
+        }
+        let (src, dst) = if forward { (me, dest) } else { (dest, me) };
+        let length = std::num::NonZeroUsize::new(3).context("non-zero")?;
+        let no_penalty = || {
+            let (cfg, face) = (PathPlannerConfig::default(), graph.ticket_face_value());
+            MetricsValueFn {
+                inner: if forward {
+                    EdgeValueFn::forward(length, 0.0, cfg.min_ack_rate, face)
+                } else {
+                    EdgeValueFn::returning(length, 0.0, cfg.min_ack_rate, face)
+                },
+                ticket_face_value: face,
+            }
+        };
+        let take = 6 * relays.len();
+        let (of_value, of_no_value): (Vec<_>, Vec<_>) = graph
+            .simple_paths(&src, &dst, length.get(), None, no_penalty())
+            .into_iter()
+            .partition(|(.., metrics)| metrics.cost > 0.0);
+        assert_eq!(
+            take,
+            of_value.len(),
+            "the probed relayers carry 6 paths of value per first relayer"
+        );
+        assert_eq!(
+            take,
+            of_no_value.len(),
+            "the unprobed relayers carry as many of no value"
+        );
+
+        let spread = compute_paths_spread(&graph, &src, &dst, length, take, no_penalty());
+        assert!(spread.iter().all(|p| p.cost > 0.0), "a path of no value is dropped");
+        assert_eq!(take, spread.len(), "every share filled with paths of value");
+        Ok(())
     }
 
     /// The selector searches both directions spread over first relayers (pruning off, so the
