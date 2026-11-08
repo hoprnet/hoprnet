@@ -1102,7 +1102,9 @@ where
         processes.insert(
             HoprTransportProcess::CounterFlush,
             hopr_utils::spawn_as_abortable!(async move {
-                use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
+                use hopr_api::graph::traits::{
+                    EdgeImmediateProtocolObservable, EdgeObservableWrite, EdgeProtocolObservable, EdgeWeightType,
+                };
 
                 // The grace sits inside the interval, so consecutive reports stay one interval apart.
                 let ack_grace = counter_flush_ack_grace(flush_interval);
@@ -1129,6 +1131,22 @@ where
                                 });
                             }
                         });
+                        let relayed_through = report.relayed > 0 || report.genuine_acks > 0;
+                        if relayed_through && let Some(observed) = flush_graph.edge(&flush_me, &report.peer) {
+                            // One line per first hop and flush: the starvation gate's inputs (GNO-1183).
+                            let immediate = observed.immediate_qos();
+                            let intermediate = observed.intermediate_qos();
+                            tracing::debug!(
+                                peer = %report.peer,
+                                num_relayed = report.relayed,
+                                num_genuine_acks = report.genuine_acks,
+                                genuine_ack_rate = ?immediate.and_then(|i| i.genuine_ack_rate()),
+                                ack_rate = ?immediate.and_then(|i| i.ack_rate()),
+                                loopback_rate = ?intermediate.and_then(|i| i.loopback_rate()),
+                                traffic_rate = ?intermediate.and_then(|i| i.traffic_rate()),
+                                "first-hop genuine-ack witness"
+                            );
+                        }
                     }
                 }
             }),
