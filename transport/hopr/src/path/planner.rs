@@ -104,20 +104,6 @@ pub struct PathPlannerConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_ack_rate: f64,
-    /// Rate below which a relay is starved in path selection, when what travels over its edge says it
-    /// is dead. Every edge but the last of a path is judged: in a forward path each edge into a relay,
-    /// in a return path each edge before the one into `me`. A direct route has no relay to judge.
-    ///
-    /// A relay that rejects our packets still answers pings and signs an ack for every packet, so its
-    /// ack rate stays healthy. Two witnesses are read: the share of loopbacks over the edge that
-    /// returned in the last 60 s, and how well real traffic over it came back. Either one at or
-    /// above this rate keeps the relay, so probes that failed while traffic went through do not
-    /// starve it. A starved relay drops to a negligible weight and is not removed, so it keeps being
-    /// probed and can recover. The default is a tiny positive, so only a relay with nothing
-    /// returning is starved. `0.0` turns it off. Must be finite and in `0.0..=1.0`.
-    #[default(f64::EPSILON)]
-    #[validate(custom(function = "validate_unit_interval"))]
-    pub min_loopback_rate: f64,
     /// Candidate count below which no latency-based pruning occurs.
     ///
     /// When fewer paths than this value are found, the selector returns all of them
@@ -1645,7 +1631,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
@@ -1706,7 +1691,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
 
@@ -1761,7 +1745,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
 
@@ -1809,7 +1792,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
 
@@ -1852,7 +1834,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
@@ -1897,7 +1878,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
@@ -2022,7 +2002,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
@@ -2076,7 +2055,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
@@ -2138,7 +2116,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
@@ -2184,7 +2161,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
@@ -2239,7 +2215,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
@@ -2281,7 +2256,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
@@ -2332,7 +2306,6 @@ mod tests {
             cfg.max_cached_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         );
         let resolvable_peers = [(a, a_addr()), (b, b_addr()), (dest, dest_addr())]

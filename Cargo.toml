@@ -140,7 +140,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "5.1.0" }
+hopr-api = { version = "5.0.0" }
 hopr-types = { version = "5.0.0", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.19.0", default-features = false }
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
@@ -234,8 +234,7 @@ similar.opt-level = 3
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 
-# TEMPORARY (GNO-1183): hopr-api 5.1.0 and hopr-network-graph 0.10.1 are not published yet. Drop this block,
-# and repin both, once hoprnet/hopr-api#158 and hoprnet/hopr-impls#78 are released.
+# TEMPORARY (GNO-1183): hopr-network-graph 0.10.1 is not published yet. Drop this block, and repin the crate,
+# once hoprnet/hopr-impls#78 is released.
 [patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "kauki/fix/graph/first-hop-loopback-gate" }
 hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/graph/loopback-first-hop-evidence" }

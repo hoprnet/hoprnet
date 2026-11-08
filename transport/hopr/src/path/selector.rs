@@ -402,8 +402,8 @@ where
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
 /// appropriate cost function:
-/// - forward path (`src == me`): [`EdgeValueFn::forward_gated`]
-/// - return path (`dest == me`): [`EdgeValueFn::returning_gated`]
+/// - forward path (`src == me`): [`EdgeValueFn::forward`]
+/// - return path (`dest == me`): [`EdgeValueFn::returning`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
@@ -411,7 +411,6 @@ pub struct HoprGraphPathSelector<G> {
     max_paths: usize,
     edge_penalty: f64,
     min_ack_rate: f64,
-    min_loopback_rate: f64,
     anonymity_floor: usize,
 }
 
@@ -432,7 +431,6 @@ where
     /// * `max_paths` – maximum number of candidate paths to return per query.
     /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
     /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
-    /// * `min_loopback_rate` – share of recent loopbacks over an edge below which its relay is starved.
     /// * `anonymity_floor` – minimum candidate count below which no latency-based pruning occurs.
     pub fn new(
         me: OffchainPublicKey,
@@ -440,7 +438,6 @@ where
         max_paths: usize,
         edge_penalty: f64,
         min_ack_rate: f64,
-        min_loopback_rate: f64,
         anonymity_floor: usize,
     ) -> Self {
         Self {
@@ -449,13 +446,12 @@ where
             max_paths,
             edge_penalty,
             min_ack_rate,
-            min_loopback_rate,
             anonymity_floor,
         }
     }
 
     /// Extended forward path search: find shorter paths using
-    /// [`EdgeValueFn::forward_without_self_loopback_gated`] and append `dest` to each one.
+    /// [`EdgeValueFn::forward_without_self_loopback`] and append `dest` to each one.
     ///
     /// This handles the case where the last edge (relay -> dest) has no graph edge
     /// (e.g. no payment channel) but the path planner can still assume the last hop
@@ -481,11 +477,10 @@ where
         // edges, but cost them against the finished length.
         let finished_length = shorter_length.saturating_add(1);
         let value_fn = MetricsValueFn {
-            inner: EdgeValueFn::forward_without_self_loopback_gated(
+            inner: EdgeValueFn::forward_without_self_loopback(
                 finished_length,
                 self.edge_penalty,
                 self.min_ack_rate,
-                self.min_loopback_rate,
                 ticket_face_value,
             ),
             ticket_face_value,
@@ -569,13 +564,7 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::forward_gated(
-                        length,
-                        self.edge_penalty,
-                        self.min_ack_rate,
-                        self.min_loopback_rate,
-                        ticket_face_value,
-                    ),
+                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
                     ticket_face_value,
                 },
             );
@@ -586,7 +575,7 @@ where
                 "[forward] phase 1 candidates"
             );
 
-            // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback_gated
+            // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback
             // for (length - 1) edges and assume the last hop can be done by anybody.
             if found.len() < self.max_paths
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
@@ -612,13 +601,7 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::returning_gated(
-                        length,
-                        self.edge_penalty,
-                        self.min_ack_rate,
-                        self.min_loopback_rate,
-                        ticket_face_value,
-                    ),
+                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
                     ticket_face_value,
                 },
             );
@@ -698,7 +681,6 @@ mod tests {
             max_paths,
             cfg.edge_penalty,
             cfg.min_ack_rate,
-            cfg.min_loopback_rate,
             cfg.min_paths_anonymity_floor,
         )
     }
@@ -727,6 +709,17 @@ mod tests {
         });
     }
 
+    /// An edge that pings and has a funded channel, with no loopback evidence yet.
+    fn mark_edge_unlooped(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                1000u64,
+            ))));
+        });
+    }
+
     // Helper: build a bidirectional 2-hop graph: me ↔ hop ↔ dest.
     fn two_hop_graph() -> (OffchainPublicKey, OffchainPublicKey, OffchainPublicKey, ChannelGraph) {
         let me = pubkey(&SECRET_0);
@@ -746,17 +739,6 @@ mod tests {
         mark_edge_full(&graph, &dest, &hop);
         mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
-    }
-
-    /// An edge that pings and has a funded channel, with no loopback evidence yet.
-    fn mark_edge_unlooped(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        graph.upsert_edge(src, dst, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
-                1000u64,
-            ))));
-        });
     }
 
     /// A relay that rejects our packets still answers pings and acks, so the first edge to it reads
@@ -854,10 +836,6 @@ mod tests {
 
     /// On a return path `dest → relay → me`, the edge into the relay is judged and the edge into `me`
     /// is not: a relay that rejects packets shows it on the first, and the last leads to the receiver.
-    ///
-    /// This pins which edge is judged. It does not prove the gate: with no earlier success, the edge's own
-    /// score is already zero. The gate on return edges is pinned where the window can be aged, in
-    /// `hopr-api` (`EdgeValueFn::returning_gated`) and in the `hopr-network-graph` end-to-end tests.
     #[tokio::test]
     async fn a_return_relay_should_be_starved_only_by_failed_loopbacks_on_the_edge_into_it() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
@@ -912,6 +890,99 @@ mod tests {
             into_me > 1e-3,
             "failed loopbacks on the edge into `me` must not starve the relay, got a share of {into_me}"
         );
+        Ok(())
+    }
+
+    /// A relay that rejects our packets answers fast, so after the value function starves it, a latency-ordered
+    /// pruning must not hand its slots to the starved paths. Layered graph of three relays per layer, every layer
+    /// pair connected, and the dead relay in layer `position` being the one the failed loopbacks are on.
+    /// Healthy paths outnumber the anonymity floor, so none of the kept paths may go through the dead relay.
+    #[tokio::test]
+    async fn a_fast_dead_relay_should_not_keep_a_slot_after_pruning_for_zero_to_three_hops_in_both_directions()
+    -> anyhow::Result<()> {
+        const FLOOR: usize = 2;
+        let me = pubkey(&[1; 32]);
+        let dest = pubkey(&[2; 32]);
+        let relay = |layer: usize, index: usize| pubkey(&[10 + (layer * 3 + index) as u8; 32]);
+
+        // 0 hops has no relay to judge: the direct route stays.
+        for direction in ["forward", "return"] {
+            let graph = ChannelGraph::new(me);
+            graph.add_node(dest);
+            let (src, dst) = if direction == "forward" { (me, dest) } else { (dest, me) };
+            graph.add_edge(&src, &dst)?;
+            mark_edge_full(&graph, &src, &dst);
+            let paths = test_selector(me, graph, 50)
+                .select_path(src, dst, 0)
+                .context("direct path")?;
+            assert_eq!(paths.len(), 1, "{direction}, 0 hops: the direct route must stay");
+        }
+
+        let mut failures = Vec::new();
+        for direction in ["forward", "return"] {
+            for hops in 1..=3usize {
+                for position in 1..=hops {
+                    let graph = ChannelGraph::new(me);
+                    // A node always knows the ticket price, and without it no path counts as fully measured.
+                    graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
+                    graph.add_node(dest);
+                    for layer in 1..=hops {
+                        for index in 0..3 {
+                            graph.add_node(relay(layer, index));
+                        }
+                    }
+                    // Layer 0 is the sender, layer `hops + 1` the receiver.
+                    let (sender, receiver) = if direction == "forward" { (me, dest) } else { (dest, me) };
+                    let dead = relay(position, 0);
+                    let node = |layer: usize, index: usize| match layer {
+                        0 => sender,
+                        l if l == hops + 1 => receiver,
+                        l => relay(l, index),
+                    };
+                    for layer in 0..=hops {
+                        for from in 0..if layer == 0 { 1 } else { 3 } {
+                            for to in 0..if layer == hops { 1 } else { 3 } {
+                                let (src, dst) = (node(layer, from), node(layer + 1, to));
+                                graph.add_edge(&src, &dst)?;
+                                if dst == dead {
+                                    mark_edge_unlooped(&graph, &src, &dst);
+                                } else {
+                                    mark_edge_full(&graph, &src, &dst);
+                                }
+                            }
+                        }
+                    }
+                    // The dead relay answers faster than the healthy ones, and none of its loops return.
+                    for from in 0..if position == 1 { 1 } else { 3 } {
+                        graph.upsert_edge(&node(position - 1, from), &dead, |obs| {
+                            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(5))));
+                            for _ in 0..5 {
+                                obs.record(EdgeWeightType::Intermediate(Err(())));
+                            }
+                        });
+                    }
+
+                    let selector = HoprGraphPathSelector::new(
+                        me,
+                        graph,
+                        50,
+                        PathPlannerConfig::default().edge_penalty,
+                        PathPlannerConfig::default().min_ack_rate,
+                        FLOOR,
+                    );
+                    let kept = selector.select_path(sender, receiver, hops).context("pruned paths")?;
+                    let through_dead = kept.iter().filter(|pwm| pwm.path.contains(&dead)).count();
+                    if kept.is_empty() || through_dead > 0 {
+                        failures.push(format!(
+                            "{direction}, {hops} hop(s), dead relay in position {position}: {through_dead} of {} kept \
+                             paths run through the dead relay",
+                            kept.len()
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
         Ok(())
     }
 

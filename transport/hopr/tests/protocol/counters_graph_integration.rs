@@ -168,7 +168,6 @@ fn one_hop_cluster(
         4,
         cfg.edge_penalty,
         cfg.min_ack_rate,
-        cfg.min_loopback_rate,
         cfg.min_paths_anonymity_floor,
     );
     (graph, selector)
