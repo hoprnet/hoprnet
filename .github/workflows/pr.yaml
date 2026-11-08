@@ -299,5 +299,4 @@ jobs:
           # change still has to run all three. A failed stage also skips the
           # later stages, but the failed job itself reds the gate.
           allowed-skips: >-
-            ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label,
-            benchmarks, tests, build-library, entity-fence, docs' }}
+            ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label, benchmarks, tests, build-library, entity-fence, docs' }}
