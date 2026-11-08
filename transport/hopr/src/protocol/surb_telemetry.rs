@@ -686,14 +686,17 @@ impl RaceHistory {
 /// and every reply out on a leg through it is then explained. Two relayers dead at once are both
 /// taken while each has replies the other does not explain; one that only ever sat on legs through
 /// the other cannot be told from an innocent one, and waits until those legs are gone.
+///
+/// The fewest relayers that explain the overdue replies are taken, so the reverse also holds: a live
+/// relayer whose every leg ran through relayers that died collects all their overdue replies, more
+/// than any of them has, and is taken in their place, one dead relayer explaining the lateness as well
+/// as two. That takes a live relayer with nothing delivered through it since: one that also sits on a
+/// leg that delivers has its overdue replies answered (see [`RaceHistory::unanswered`]) and is no
+/// suspect. Ties of equal counts go by key.
 fn explain_away(
     mut suspects: Vec<(OffchainPublicKey, Vec<HoprSurbId>, Vec<HoprSurbId>)>,
 ) -> std::collections::HashSet<OffchainPublicKey> {
-    suspects.sort_by(|a, b| {
-        b.1.len()
-            .cmp(&a.1.len())
-            .then_with(|| a.0.to_string().cmp(&b.0.to_string()))
-    });
+    suspects.sort_by_cached_key(|(relayer, unanswered, _)| (std::cmp::Reverse(unanswered.len()), relayer.to_string()));
     let mut explained: std::collections::HashSet<HoprSurbId> = std::collections::HashSet::new();
     let mut black_holes = std::collections::HashSet::new();
     for (relayer, unanswered, open) in suspects {
@@ -2021,6 +2024,47 @@ mod tests {
         health.record_reply();
 
         assert_eq!(sorted(vec![dead, also]), sorted(judged_dead(&health.refresh(4))));
+        Ok(())
+    }
+
+    /// A live relayer on every leg of two dead ones collects the overdue replies of both, more than
+    /// either has. A reply home through it after they fell due answers its races, and both dead ones
+    /// are judged; without one, one dead relayer explains the lateness as well as two, and the fewest
+    /// are taken: it is judged in their place, the limitation [`explain_away`] states.
+    #[test]
+    fn a_relayer_shared_by_two_dead_ones_should_be_cleared_only_by_a_reply_through_it() -> anyhow::Result<()> {
+        let [shared, first, second, healthy] = [(); 4].map(|_| key());
+        let [a1, a2, a3, b1, b2, b3] = [(); 6].map(|_| key());
+        let legs: [&[OffchainPublicKey]; 6] = [
+            &[shared, first, a1],
+            &[shared, first, a2],
+            &[shared, first, a3],
+            &[shared, second, b1],
+            &[shared, second, b2],
+            &[shared, second, b3],
+        ];
+        let overdue = |reply_through_shared: bool| -> anyhow::Result<Vec<OffchainPublicKey>> {
+            let health = RelayerHealth::default();
+            settled_since(&health, first, ago(Duration::from_secs(10))?, jitter(0));
+            overdue_legs(&health, &legs, 1, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            if reply_through_shared {
+                health.note_home(&leg(&[shared, healthy]));
+            }
+            health.record_reply();
+            Ok(sorted(judged_dead(&health.refresh(4))))
+        };
+
+        assert_eq!(
+            sorted(vec![first, second]),
+            overdue(true)?,
+            "a reply home through the shared relayer clears it, and both dead ones are judged"
+        );
+        assert_eq!(
+            vec![shared],
+            overdue(false)?,
+            "with nothing home through it, the shared relayer is taken for both"
+        );
         Ok(())
     }
 
