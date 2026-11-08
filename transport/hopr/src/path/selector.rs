@@ -402,8 +402,8 @@ where
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
 /// appropriate cost function:
-/// - forward path (`src == me`): [`EdgeValueFn::forward`]
-/// - return path (`dest == me`): [`EdgeValueFn::returning`]
+/// - forward path (`src == me`): [`EdgeValueFn::forward_gated`]
+/// - return path (`dest == me`): [`EdgeValueFn::returning_gated`]
 #[derive(Clone)]
 pub struct HoprGraphPathSelector<G> {
     me: OffchainPublicKey,
@@ -455,7 +455,7 @@ where
     }
 
     /// Extended forward path search: find shorter paths using
-    /// [`EdgeValueFn::forward_without_self_loopback`] and append `dest` to each one.
+    /// [`EdgeValueFn::forward_without_self_loopback_gated`] and append `dest` to each one.
     ///
     /// This handles the case where the last edge (relay -> dest) has no graph edge
     /// (e.g. no payment channel) but the path planner can still assume the last hop
@@ -481,7 +481,7 @@ where
         // edges, but cost them against the finished length.
         let finished_length = shorter_length.saturating_add(1);
         let value_fn = MetricsValueFn {
-            inner: EdgeValueFn::forward_without_self_loopback(
+            inner: EdgeValueFn::forward_without_self_loopback_gated(
                 finished_length,
                 self.edge_penalty,
                 self.min_ack_rate,
@@ -569,7 +569,7 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::forward(
+                    inner: EdgeValueFn::forward_gated(
                         length,
                         self.edge_penalty,
                         self.min_ack_rate,
@@ -586,7 +586,7 @@ where
                 "[forward] phase 1 candidates"
             );
 
-            // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback
+            // Phase 2: if not enough paths, do an extended search with EdgeValueFn::forward_without_self_loopback_gated
             // for (length - 1) edges and assume the last hop can be done by anybody.
             if found.len() < self.max_paths
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
@@ -612,7 +612,7 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::returning(
+                    inner: EdgeValueFn::returning_gated(
                         length,
                         self.edge_penalty,
                         self.min_ack_rate,
