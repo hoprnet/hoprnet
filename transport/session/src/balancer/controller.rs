@@ -610,6 +610,17 @@ impl BalancerStateValues {
         self
     }
 
+    /// Test hook: as if the counterparty had been heard again `ago` ago, by a report or a packet that was
+    /// no reply. Takes the epoch [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
+    #[cfg(test)]
+    pub(crate) fn heard_again_ago(self, ago: Duration) -> Self {
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
+        self.stamp(&self.last_heard, at);
+        self
+    }
+
     /// Stamps `slot` with `at`, never moving it back.
     fn stamp(&self, slot: &AtomicU64, at: std::time::Instant) {
         let ms = u64::try_from(at.saturating_duration_since(self.epoch.0).as_millis()).unwrap_or(u64::MAX - 1);
@@ -2630,50 +2641,57 @@ mod tests {
     /// degraded Exit reports once a second, so nothing is ever silent long enough for it — and what
     /// the Entry reads is the Exit's real level, which is a better input for its balancer than the
     /// sustain's guess that the return path is gone.
-    #[test_log::test]
+    ///
+    /// Every case is the same dark forward path, so that only the reports differ: without them it is
+    /// a silence (the negative control), with one in the last second it is not, and one older than
+    /// the grace no longer holds the sustain off.
+    #[test]
     fn reports_every_second_keep_the_entry_out_of_the_silence_sustain() {
-        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(small_target_config());
+        // The forward path went dark 10 s ago: the reply stream stopped then, and data has been going
+        // out unanswered since 8 s ago.
+        let dark = || {
+            gate_state(100, 200)
+                .last_heard_ago(Duration::from_secs(10))
+                .sending_since_ago(Duration::from_secs(8))
+        };
 
-        // A healthy stretch, so that the state has both a reply stream and data going out to lose.
-        for _ in 0..5 {
-            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
-        }
+        let unreported = dark();
+        unreported.note_sent();
         assert!(
-            state.last_heard.load(std::sync::atomic::Ordering::Relaxed) > 0,
-            "the Entry must have heard the Exit before a silence can be judged"
+            unreported.silence_sustain(),
+            "fixture: without the reports, the same dark forward path must be a silence"
         );
 
-        // The forward path goes dark: no more replies come home, and data keeps going out. Only the
-        // Exit's degraded reports arrive, one a second — which is what keeps the Entry out of the
-        // sustain, so the balancer's own ticks record nothing.
-        let deadline = std::time::Instant::now() + SILENCE_SUSTAIN_AFTER * 2;
-        let mut data_packets = 0;
-        while std::time::Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(100));
-            data_packets += 1;
-            state.note_sent();
-            // Each pass of this loop is 200 ms, so every fifth is one report a second.
-            if data_packets % 5 == 0 {
-                // One report a second: the Exit's degraded cadence.
-                state.observe_reported_level(500);
-            }
-            std::thread::sleep(Duration::from_millis(100));
-            balancer.update();
-            assert!(
-                !state.silence_sustain(),
-                "a report a second is not a silence, so the Entry must not sustain on its own"
-            );
-        }
-        assert!(
-            data_packets >= 20,
-            "fixture: the data has to go out for longer than the sustain's grace to prove anything"
-        );
-
-        // And the level the Entry holds is the Exit's own, not a sustain-driven guess.
+        // A report comes in: the Entry reads the Exit's level, and the data after it starts a new run.
+        let reported = dark();
+        reported.observe_reported_level(500);
+        reported.note_sent();
+        assert!(!reported.silence_sustain(), "a report has just come in");
         assert_eq!(
             500,
-            state.buffer_level(),
+            reported.buffer_level(),
             "the Entry must track the Exit's reports while the forward path is dark"
+        );
+
+        // Just before the next report, a second after the last: the data since the last one has been
+        // going out for under a second, well inside the grace.
+        let between_reports = dark()
+            .heard_again_ago(Duration::from_secs(1))
+            .sending_since_ago(Duration::from_millis(990));
+        between_reports.note_sent();
+        assert!(
+            !between_reports.silence_sustain(),
+            "a report a second is not a silence, so the Entry must not sustain on its own"
+        );
+
+        // A report older than the grace no longer holds the sustain off: it is the cadence that does.
+        let stale_report = dark()
+            .heard_again_ago(SILENCE_SUSTAIN_AFTER + Duration::from_secs(1))
+            .sending_since_ago(SILENCE_SUSTAIN_AFTER + Duration::from_millis(990));
+        stale_report.note_sent();
+        assert!(
+            stale_report.silence_sustain(),
+            "data unanswered for longer than the grace since the last report is a silence"
         );
     }
 
