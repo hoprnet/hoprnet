@@ -194,6 +194,27 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
         return candidates;
     }
 
+    // A starved relay rejects fast, so a latency sort would keep it over healthy paths (GNO-1183).
+    let best_cost = candidates.iter().map(|p| p.cost).fold(0.0, f64::max);
+    let starved_below = best_cost * STARVED_COST_FRACTION;
+    let (mut starved, healthy): (Vec<_>, Vec<_>) = candidates.into_iter().partition(|p| p.cost < starved_below);
+
+    let mut result = prune_measured_first(healthy, floor, hops);
+    starved.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
+    let open_slots = floor.saturating_sub(result.len());
+    result.extend(starved.into_iter().take(open_slots));
+    result
+}
+
+/// Cost share of the best candidate below which a path counts as starved; a starved edge is 1e-9 of its value.
+const STARVED_COST_FRACTION: f64 = 1e-6;
+
+/// The latency-ordered, measured-first pruning of [`prune_for_consistency`], over non-starved candidates only.
+fn prune_measured_first(candidates: Vec<PathWithMetrics>, floor: usize, hops: usize) -> Vec<PathWithMetrics> {
+    if candidates.len() <= floor {
+        return candidates;
+    }
+
     let fully_measured =
         |p: &PathWithMetrics| p.total_latency_ms.is_some() && (hops == 0 || p.fundable_tickets_floor.is_some());
 
@@ -1640,6 +1661,42 @@ mod tests {
             !has_missing_balance,
             "path without capacity floor must be pruned when fully-measured paths fill the floor"
         );
+    }
+
+    #[test]
+    fn prune_for_consistency_should_keep_healthy_paths_over_faster_starved_ones() {
+        let starved = |latency| PathWithMetrics {
+            cost: 1e-10,
+            ..make_path_via(latency as u8, latency)
+        };
+        let candidates = vec![
+            starved(10),
+            starved(11),
+            starved(12),
+            make_path_via(20, 70),
+            make_path_via(21, 80),
+            make_path_via(22, 90),
+        ];
+
+        let result = prune_for_consistency(candidates, 3, 1);
+        let costs: Vec<f64> = result.iter().map(|p| p.cost).collect();
+        assert!(
+            costs.iter().all(|cost| *cost > 1e-6),
+            "starved paths must not displace healthy ones: {costs:?}"
+        );
+    }
+
+    #[test]
+    fn prune_for_consistency_should_fill_the_floor_with_starved_paths_when_healthy_ones_run_out() {
+        let starved = |latency| PathWithMetrics {
+            cost: 1e-10,
+            ..make_path_via(latency as u8, latency)
+        };
+        let candidates = vec![starved(10), starved(11), starved(12), make_path_via(20, 70)];
+
+        let result = prune_for_consistency(candidates, 3, 1);
+        assert_eq!(result.len(), 3, "the floor is still filled");
+        assert!(result[0].cost > 1e-6, "the healthy path comes first");
     }
 
     #[test]
