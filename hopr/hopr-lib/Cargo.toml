@@ -130,11 +130,18 @@ serde = [
   "hopr-utils/serde",
   "hopr-transport/serde",
 ]
-session-client = ["hopr-api/node-session-client", "hopr-transport/session-client"]
+session-client = [
+  "hopr-api/node-session-client",
+  "hopr-transport/session-client",
+]
 explicit-path = ["session-client"]
 # An Exit establishes Sessions on its return path, and one manager serves both directions, so the
 # server side carries the client side with it.
-session-server = ["session-client", "hopr-api/node-session-server", "hopr-transport/session-server"]
+session-server = [
+  "session-client",
+  "hopr-api/node-session-server",
+  "hopr-transport/session-server",
+]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 
 # === utility features ===

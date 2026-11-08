@@ -12,21 +12,19 @@
 //! The re-exports below are the whole surface an exit binary is expected to need. The role scoping
 //! is not maintained by hand: [`builder`] only carries the build methods the compiled role has.
 
-pub use hopr_lib::{
-    Abortable, AbortableList, Hopr, HoprKeys, HoprTransportIO, IdentityRetrievalModes, MIN_NATIVE_BALANCE, SESSION_MTU,
-    SUGGESTED_NATIVE_BALANCE, api, builder, config, constants, errors, exports, mixer, utils,
-};
-
-// The Session server side: what the exit is started with, and the Sessions it terminates.
+// The exit builds Sessions in both directions, so it carries the client API and the explicit-path
+// configuration, plus the server handle below that callers start it from.
 #[cfg(feature = "explicit-path")]
 #[allow(deprecated)]
 pub use hopr_lib::HoprSessionClientExplicitPathConfig;
-pub use hopr_lib::api::node::HoprSessionServer;
 #[cfg(feature = "telemetry")]
 pub use hopr_lib::collect_hopr_metrics;
 pub use hopr_lib::{
-    FlowControlConfig, HopRouting, HoprSession, HoprSessionClientConfig, HoprSessionConfigurator, InvalidPixParams,
-    LOCAL_PIX_SUITE, PixParams, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+    Abortable, AbortableList, FlowControlConfig, HopRouting, Hopr, HoprKeys, HoprSession, HoprSessionClientConfig,
+    HoprSessionConfigurator, HoprTransportIO, IdentityRetrievalModes, InvalidPixParams, LOCAL_PIX_SUITE,
+    MIN_NATIVE_BALANCE, PixParams, SESSION_MTU, SUGGESTED_NATIVE_BALANCE, SessionCapabilities, SessionCapability,
+    SessionTarget, SurbBalancerConfig, api, api::node::HoprSessionServer, builder, config, constants, errors, exports,
+    mixer, utils,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_lib::{prepare_tokio_runtime, transfer_session, transfer_session_datagram};

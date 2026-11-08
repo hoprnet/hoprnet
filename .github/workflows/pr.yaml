@@ -298,4 +298,6 @@ jobs:
           # So their skip is allowed only for a docs-only change; a code
           # change still has to run all three. A failed stage also skips the
           # later stages, but the failed job itself reds the gate.
-          allowed-skips: ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label, benchmarks, tests, build-library, entity-fence, docs' }}
+          allowed-skips: >-
+            ${{ needs.changes.outputs.code == 'true' && 'validate-pr-title, label, benchmarks' || 'validate-pr-title, label,
+            benchmarks, tests, build-library, entity-fence, docs' }}
