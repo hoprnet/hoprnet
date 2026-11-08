@@ -852,6 +852,69 @@ mod tests {
         Ok(())
     }
 
+    /// On a return path `dest → relay → me`, the edge into the relay is judged and the edge into `me`
+    /// is not: a relay that rejects packets shows it on the first, and the last leads to the receiver.
+    ///
+    /// This pins which edge is judged. It does not prove the gate: with no earlier success, the edge's own
+    /// score is already zero. The gate on return edges is pinned where the window can be aged, in
+    /// `hopr-api` (`EdgeValueFn::returning_gated`) and in the `hopr-network-graph` end-to-end tests.
+    #[tokio::test]
+    async fn a_return_relay_should_be_starved_only_by_failed_loopbacks_on_the_edge_into_it() -> anyhow::Result<()> {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad = pubkey(&SECRET_2);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        // The failed edge of `bad`, and the share `bad` draws against `good` afterwards.
+        let share_of_bad = |failed: (OffchainPublicKey, OffchainPublicKey)| -> anyhow::Result<f64> {
+            let graph = ChannelGraph::new(me);
+            for node in [good, bad, dest] {
+                graph.add_node(node);
+            }
+            for (src, dst) in [(dest, good), (good, me), (dest, bad), (bad, me)] {
+                graph.add_edge(&src, &dst)?;
+                if (src, dst) == failed {
+                    // No loop returned over this edge, so the 5 below are all it has seen.
+                    mark_edge_unlooped(&graph, &src, &dst);
+                } else {
+                    mark_edge_full(&graph, &src, &dst);
+                }
+            }
+            graph.upsert_edge(&failed.0, &failed.1, |obs| {
+                for _ in 0..5 {
+                    obs.record(EdgeWeightType::Intermediate(Err(())));
+                }
+            });
+
+            let paths = test_selector(me, graph, 50)
+                .select_path(dest, me, 1)
+                .context("return path")?;
+            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
+            let cost = |paths: Vec<PathWithMetrics>| paths.into_iter().map(|pwm| pwm.cost).fold(0.0, f64::max);
+            let (through, around) = (cost(through), cost(around));
+            assert!(
+                through > 0.0 && around > 0.0,
+                "both relays must stay candidates: through {through}, around {around}"
+            );
+            Ok(through / (through + around))
+        };
+
+        let into_relay = share_of_bad((dest, bad))?;
+        assert!(
+            into_relay < 1e-6,
+            "failed loopbacks on the edge into the relay must starve it, got a share of {into_relay}"
+        );
+
+        let into_me = share_of_bad((bad, me))?;
+        assert!(
+            into_me > 1e-3,
+            "failed loopbacks on the edge into `me` must not starve the relay, got a share of {into_me}"
+        );
+        Ok(())
+    }
+
     #[tokio::test]
     async fn unreachable_dest_should_return_error() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
