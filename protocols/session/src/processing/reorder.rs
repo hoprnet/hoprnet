@@ -61,6 +61,9 @@ struct ReorderWindow {
     /// How many samples were recorded, per second of the memory: when its first sample came, and
     /// how many came within the second after it.
     counts: VecDeque<(Instant, u32)>,
+    /// When the latest sample was recorded: the samples in the memory span from the first of
+    /// [`counts`](Self::counts) to this.
+    last: Option<Instant>,
     abandoned: VecDeque<(FrameId, Instant)>,
 }
 
@@ -75,13 +78,17 @@ impl ReorderWindow {
         }
     }
 
-    /// Whether the samples in the memory are enough to size the wait by.
-    fn seen_enough(&self, now: Instant) -> bool {
+    /// Whether the samples in the memory are enough to size the wait by: [`MIN_SAMPLES`] of them,
+    /// the first and the latest [`MIN_OBSERVATION`] apart. It is the span of the samples that counts,
+    /// not the age of the oldest: samples that all came in the first second of a Session that then
+    /// went quiet span that second, however long ago it was.
+    fn seen_enough(&self) -> bool {
         self.counts.iter().map(|(_, count)| *count).sum::<u32>() >= MIN_SAMPLES
             && self
                 .counts
                 .front()
-                .is_some_and(|(first, _)| now.saturating_duration_since(*first) >= MIN_OBSERVATION)
+                .zip(self.last)
+                .is_some_and(|((first, _), last)| last.saturating_duration_since(*first) >= MIN_OBSERVATION)
     }
 }
 
@@ -103,13 +110,14 @@ impl SharedReorder {
             Some((second, count)) if now.saturating_duration_since(*second) < Duration::from_secs(1) => *count += 1,
             _ => window.counts.push_back((now, 1)),
         }
+        window.last = window.last.max(Some(now));
     }
 
     /// How long to wait on a gap: see [`ReorderWindow`].
     pub(crate) fn wait(&self, now: Instant, max_wait: Duration) -> Duration {
         let mut window = self.0.lock();
         window.forget_before(now);
-        if !window.seen_enough(now) {
+        if !window.seen_enough() {
             return max_wait;
         }
         window
@@ -142,9 +150,11 @@ impl SharedReorder {
         let first = now
             .checked_sub(MIN_OBSERVATION + Duration::from_secs(1))
             .expect("monotonic clock older than the observation");
-        let step = MIN_OBSERVATION / (MIN_SAMPLES - 1);
         for i in 0..MIN_SAMPLES {
-            window.record(first + step * i, Duration::from_millis(1));
+            window.record(
+                first + MIN_OBSERVATION * i / (MIN_SAMPLES - 1),
+                Duration::from_millis(1),
+            );
         }
         window
     }
@@ -176,15 +186,18 @@ mod tests {
     /// A window that has seen [`MIN_SAMPLES`] shallow samples spread over [`MIN_OBSERVATION`],
     /// ending at the returned instant.
     fn warmed(window: &SharedReorder, start: Instant) -> Instant {
-        let step = MIN_OBSERVATION / (MIN_SAMPLES - 1);
         for i in 0..MIN_SAMPLES {
-            window.record(start + step * i, Duration::from_millis(1));
+            window.record(
+                start + MIN_OBSERVATION * i / (MIN_SAMPLES - 1),
+                Duration::from_millis(1),
+            );
         }
         start + MIN_OBSERVATION
     }
 
     /// The first samples say little about the paths a Session will take: until enough of them span
-    /// enough time, the wait stays at `max_wait`, however shallow they are.
+    /// enough time, the wait stays at `max_wait`, however shallow they are and however long ago they
+    /// came.
     #[test]
     fn the_wait_should_stay_at_max_wait_until_enough_samples_span_enough_time() {
         let window = SharedReorder::default();
@@ -199,6 +212,11 @@ mod tests {
             window.wait(start + Duration::from_secs(1), max_wait),
             "many, but within a second"
         );
+        assert_eq!(
+            max_wait,
+            window.wait(start + MIN_OBSERVATION, max_wait),
+            "many, and long ago, but all within a second: a Session that went quiet"
+        );
 
         let few = SharedReorder::default();
         few.record(start, Duration::from_millis(20));
@@ -209,6 +227,7 @@ mod tests {
             "long enough, but too few"
         );
 
+        window.record(start + MIN_OBSERVATION, Duration::from_millis(20));
         assert_eq!(
             REORDER_FLOOR,
             window.wait(start + MIN_OBSERVATION, max_wait),
@@ -286,10 +305,11 @@ mod tests {
             );
         }
         assert!(window.0.lock().deepest.len() <= 8, "{}", window.0.lock().deepest.len());
-        assert_eq!(
-            Duration::from_millis(1200),
-            window.wait(start + MIN_OBSERVATION, max_wait)
-        );
+        // A shallow sample well past the observation, so that the samples span it before and after
+        // the deep one is forgotten.
+        let spanned = start + MIN_OBSERVATION + Duration::from_secs(2);
+        window.record(spanned, Duration::from_millis(1));
+        assert_eq!(Duration::from_millis(1200), window.wait(spanned, max_wait));
 
         // Once the deep one is past the memory, the next deepest takes over.
         let later = start + Duration::from_millis(10) + REORDER_MEMORY + Duration::from_millis(1);
