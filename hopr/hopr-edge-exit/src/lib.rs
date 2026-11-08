@@ -19,6 +19,10 @@
 pub use hopr_lib::HoprSessionClientExplicitPathConfig;
 #[cfg(feature = "telemetry")]
 pub use hopr_lib::collect_hopr_metrics;
+// The Session copy helpers a binary needs to move data through an established Session.
+pub use hopr_lib::exports::transport::session::{transfer_session, transfer_session_datagram};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_lib::prepare_tokio_runtime;
 pub use hopr_lib::{
     Abortable, AbortableList, FlowControlConfig, HopRouting, Hopr, HoprKeys, HoprSession, HoprSessionClientConfig,
     HoprSessionConfigurator, HoprTransportIO, IdentityRetrievalModes, InvalidPixParams, LOCAL_PIX_SUITE,
@@ -26,5 +30,3 @@ pub use hopr_lib::{
     SessionTarget, SurbBalancerConfig, api, api::node::HoprSessionServer, builder, config, constants, errors, exports,
     mixer, utils,
 };
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_lib::{prepare_tokio_runtime, transfer_session, transfer_session_datagram};
