@@ -600,7 +600,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
         let this = self.project();
         let _entered = this.span.enter();
         let _poll = tracing::trace_span!("SessionSocket::poll_close").entered();
-        let _ = this.state.stop();
+        if let Err(error) = this.state.stop() {
+            tracing::debug!(%error, "state.stop on SessionSocket close failed");
+        }
         this.upstream_frames_in.as_mut().poll_close(cx)
     }
 }
