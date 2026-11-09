@@ -31,7 +31,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -62,7 +62,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
           disable-sudo: true
           egress-policy: audit
@@ -128,7 +128,7 @@ jobs:
       contents: read
     steps:
       - name: Validate Cargo dependencies
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@ff4c0b7afc400ee6cf217841dc576f8a1289bcc0 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -141,7 +141,7 @@ jobs:
     name: Check
     # Stage 1: with check-allowed-dependencies and changes.
     needs: changes
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-checks-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@061b4579c870b0fdc008f5ff07a3a500e4fede50 # workflow-checks-v2
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       lint_command: "nix build -L .#workspace-clippy"
@@ -160,7 +160,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # Codecov OIDC upload in the coverage jobs
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@f5b2ab89bc1e5a46840275389bb9acf97847576a # workflow-tests-v6
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       # Coverage runs the same nextest selection as test-unit and test-integration
@@ -213,7 +213,7 @@ jobs:
     # (`enabled` is false); !failure() still stops it after a failed stage.
     needs: [changes, checks, check-allowed-dependencies, tests]
     if: ${{ !cancelled() && !failure() }}
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@d23d783b4ebb814a010815eaccd0bd0337687997 # build-library-v3
     permissions:
       contents: read
       id-token: write
@@ -237,7 +237,7 @@ jobs:
       contents: read
     steps:
       - name: Build docs
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@ff4c0b7afc400ee6cf217841dc576f8a1289bcc0 # nix-action-v1
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
