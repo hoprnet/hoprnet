@@ -512,7 +512,7 @@ where
         };
         let candidates = weighted.iter().count() as f64;
         for (index, ((vp, w), pwm)) in weighted.iter().zip(path_metrics.iter()).enumerate() {
-            tracing::debug!(
+            tracing::trace!(
                 kind,
                 set_id,
                 index,
@@ -3053,7 +3053,7 @@ mod tests {
     #[case(tracing::Level::TRACE, true)]
     #[tokio::test]
     #[serial_test::serial(routing_logs)]
-    async fn return_draw_details_should_require_trace_logging(
+    async fn return_candidates_and_draw_details_should_require_trace_logging(
         #[case] level: tracing::Level,
         #[case] expect_details: bool,
     ) -> anyhow::Result<()> {
@@ -3079,7 +3079,9 @@ mod tests {
         );
         let before = logs.records("drawing return paths from tempered weights");
         let after = logs.records("drew return paths");
+        let candidates = logs.records("weighted candidate path");
         if expect_details {
+            assert_eq!(candidates.len(), 2, "TRACE must retain the candidate dictionary");
             assert_eq!(before.len(), 1);
             assert_eq!(after.len(), 1);
             assert_eq!(before[0].fields["count"], "2");
@@ -3096,6 +3098,7 @@ mod tests {
             assert_eq!(after[0].fields["of_candidates"], "2");
             assert_eq!(after[0].fields["distinct_relayers"], distinct.to_string());
         } else {
+            assert!(candidates.is_empty(), "per-candidate weights must not appear at DEBUG");
             assert!(before.is_empty(), "per-packet draw details must not appear at DEBUG");
             assert!(after.is_empty(), "per-packet draw results must not appear at DEBUG");
         }
