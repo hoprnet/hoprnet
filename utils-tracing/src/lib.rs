@@ -57,7 +57,9 @@ impl<T> From<T> for WithContext<T> {
     }
 }
 
-/// Restores each message's span while polling a downstream sink.
+/// Restores message context while sending values and completing downstream I/O.
+/// Readiness uses the caller's context. The last message's span is retained across pending
+/// flush/close polls and released when either operation completes successfully.
 pub struct ContextSink<S> {
     inner: S,
     span: tracing::Span,
@@ -81,7 +83,6 @@ where
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.get_mut();
-        let _entered = this.span.enter();
         Pin::new(&mut this.inner).poll_ready(cx)
     }
 
@@ -95,14 +96,26 @@ where
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.get_mut();
-        let _entered = this.span.enter();
-        Pin::new(&mut this.inner).poll_flush(cx)
+        let poll = {
+            let _entered = this.span.enter();
+            Pin::new(&mut this.inner).poll_flush(cx)
+        };
+        if matches!(poll, Poll::Ready(Ok(()))) {
+            this.span = tracing::Span::none();
+        }
+        poll
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.get_mut();
-        let _entered = this.span.enter();
-        Pin::new(&mut this.inner).poll_close(cx)
+        let poll = {
+            let _entered = this.span.enter();
+            Pin::new(&mut this.inner).poll_close(cx)
+        };
+        if matches!(poll, Poll::Ready(Ok(()))) {
+            this.span = tracing::Span::none();
+        }
+        poll
     }
 }
 
@@ -165,6 +178,144 @@ mod tests {
     use hopr_utils::network_types::crossfire_sink::bounded_sink_channel;
 
     use super::*;
+
+    #[derive(Default)]
+    struct ObservedSink {
+        events: Vec<(&'static str, Option<tracing::span::Id>)>,
+        received: Vec<u8>,
+        pending: bool,
+    }
+
+    impl ObservedSink {
+        fn observe(&mut self, operation: &'static str) {
+            self.events.push((operation, tracing::Span::current().id()));
+        }
+
+        fn poll_io(&mut self, operation: &'static str) -> Poll<Result<(), std::convert::Infallible>> {
+            self.observe(operation);
+            if std::mem::take(&mut self.pending) {
+                Poll::Pending
+            } else {
+                Poll::Ready(Ok(()))
+            }
+        }
+    }
+
+    impl Sink<u8> for ObservedSink {
+        type Error = std::convert::Infallible;
+
+        fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.get_mut().observe("ready");
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(self: Pin<&mut Self>, item: u8) -> Result<(), Self::Error> {
+            let this = self.get_mut();
+            this.observe("send");
+            this.received.push(item);
+            Ok(())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.get_mut().poll_io("flush")
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.get_mut().poll_io("close")
+        }
+    }
+
+    #[test]
+    fn sink_readiness_should_use_the_caller_context_instead_of_the_previous_message() -> anyhow::Result<()> {
+        tracing::subscriber::with_default(test_log::tracing_subscriber::registry(), || {
+            let previous = tracing::debug_span!("previous_packet");
+            let previous_id = previous.id();
+            let caller = tracing::debug_span!("next_caller");
+            let mut sink = ContextSink::new(ObservedSink::default());
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            assert_eq!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Ready(Ok(())));
+            Pin::new(&mut sink).start_send(WithContext::new(42, previous))?;
+            caller.in_scope(|| {
+                assert_eq!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Ready(Ok(())));
+            });
+            assert!(previous_id.is_some(), "fixture needs an active message span");
+            assert!(caller.id().is_some(), "fixture needs an active caller span");
+            assert_eq!(sink.inner.received, [42]);
+            assert_eq!(
+                sink.inner.events,
+                [("ready", None), ("send", previous_id), ("ready", caller.id())]
+            );
+            anyhow::Ok(())
+        })
+    }
+
+    #[test]
+    fn completed_io_should_release_the_last_message_span_while_the_sink_stays_alive() -> anyhow::Result<()> {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        use test_log::tracing_subscriber::{self as subscriber, layer::SubscriberExt};
+
+        struct Closures(Arc<AtomicUsize>);
+        impl<S: tracing::Subscriber> subscriber::Layer<S> for Closures {
+            fn on_close(&self, _: tracing::span::Id, _: subscriber::layer::Context<'_, S>) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        for closing in [false, true] {
+            let closed = Arc::new(AtomicUsize::new(0));
+            let subscriber = subscriber::registry().with(Closures(closed.clone()));
+            tracing::subscriber::with_default(subscriber, || {
+                use anyhow::Context as _;
+
+                let message_span = tracing::debug_span!("in_flight_packet");
+                let message_id = message_span.id().context("fixture needs an active span")?;
+                let mut sink = ContextSink::new(ObservedSink {
+                    pending: true,
+                    ..Default::default()
+                });
+                let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+                let operation = if closing { "close" } else { "flush" };
+                let poll_io = |sink: &mut ContextSink<ObservedSink>, cx: &mut Context<'_>| {
+                    if closing {
+                        Pin::new(sink).poll_close(cx)
+                    } else {
+                        Pin::new(sink).poll_flush(cx)
+                    }
+                };
+                assert_eq!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Ready(Ok(())));
+                Pin::new(&mut sink).start_send(WithContext::new(42, message_span))?;
+                assert_eq!(closed.load(Ordering::Relaxed), 0);
+                assert_eq!(poll_io(&mut sink, &mut cx), Poll::Pending);
+                assert_eq!(closed.load(Ordering::Relaxed), 0, "pending I/O must retain context");
+                assert_eq!(poll_io(&mut sink, &mut cx), Poll::Ready(Ok(())));
+                assert_eq!(
+                    closed.load(Ordering::Relaxed),
+                    1,
+                    "completed {operation} must close the final span without dropping the sink"
+                );
+                let mut expected = vec![
+                    ("ready", None),
+                    ("send", Some(message_id.clone())),
+                    (operation, Some(message_id.clone())),
+                    (operation, Some(message_id)),
+                ];
+                if !closing {
+                    // Once flushed, empty I/O must not reuse the completed message's context.
+                    assert_eq!(Pin::new(&mut sink).poll_flush(&mut cx), Poll::Ready(Ok(())));
+                    assert_eq!(Pin::new(&mut sink).poll_close(&mut cx), Poll::Ready(Ok(())));
+                    expected.extend([("flush", None), ("close", None)]);
+                }
+                assert_eq!(sink.inner.received, [42]);
+                assert_eq!(sink.inner.events, expected);
+                anyhow::Ok(())
+            })?;
+        }
+        Ok(())
+    }
 
     #[test]
     fn disabled_context_should_keep_the_envelope_compact() {
