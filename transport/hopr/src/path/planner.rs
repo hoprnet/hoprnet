@@ -1058,9 +1058,9 @@ where
         // Distinct first relayers in the candidate pool: the return-relayer diversity actually
         // available for this destination. A value of 1 is the corroboration blind spot (a dead
         // relayer cannot be told from a quiet peer) — the same condition `PathBuilder::rebuild` WARNs
-        // on. This draw runs per-packet, so both sets below are built only when DEBUG is actually
+        // on. This draw runs per-packet, so both sets below are built only when TRACE is actually
         // recorded -- not on every call.
-        let log_relayer_diversity = tracing::enabled!(tracing::Level::DEBUG);
+        let log_relayer_diversity = tracing::enabled!(tracing::Level::TRACE);
         let candidate_relayers = log_relayer_diversity.then(|| {
             items
                 .iter()
@@ -1068,7 +1068,7 @@ where
                 .collect::<std::collections::HashSet<_>>()
         });
 
-        tracing::debug!(
+        tracing::trace!(
             %destination,
             count,
             candidates = items.len(),
@@ -1108,7 +1108,7 @@ where
                 .filter_map(|vp| vp.first())
                 .collect::<std::collections::HashSet<_>>()
         });
-        tracing::debug!(
+        tracing::trace!(
             %destination,
             drawn = drawn.len(),
             distinct_relayers = drawn_relayers.as_ref().map_or(0, |r| r.len()),
@@ -3046,6 +3046,60 @@ mod tests {
         }
         .with_subscriber(logs.subscriber(tracing::Level::DEBUG))
         .await
+    }
+
+    #[rstest::rstest]
+    #[case(tracing::Level::DEBUG, false)]
+    #[case(tracing::Level::TRACE, true)]
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn return_draw_details_should_require_trace_logging(
+        #[case] level: tracing::Level,
+        #[case] expect_details: bool,
+    ) -> anyhow::Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        let (planner, _) = two_relayer_return_planner();
+        // Keep callsite interest responsive to scoped subscribers used by concurrent tests.
+        let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let logs = crate::tests::support::Logs::default();
+        let drawn = planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(pubkey(&SECRET_DEST)),
+                RoutingOptions::Hops(1.try_into()?),
+                2,
+            )
+            .with_subscriber(logs.subscriber(level))
+            .await?;
+        assert_eq!(drawn.len(), 2);
+        assert_eq!(
+            logs.records("candidate validation").len(),
+            1,
+            "keep rebuild summaries at DEBUG"
+        );
+        let before = logs.records("drawing return paths from tempered weights");
+        let after = logs.records("drew return paths");
+        if expect_details {
+            assert_eq!(before.len(), 1);
+            assert_eq!(after.len(), 1);
+            assert_eq!(before[0].fields["count"], "2");
+            assert_eq!(before[0].fields["candidates"], "2");
+            assert_eq!(before[0].fields["distinct_relayers"], "2");
+            assert!(before[0].fields.contains_key("temper"));
+            assert!(before[0].fields.contains_key("exploration"));
+            let distinct = drawn
+                .iter()
+                .filter_map(|path| path.first())
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            assert_eq!(after[0].fields["drawn"], "2");
+            assert_eq!(after[0].fields["of_candidates"], "2");
+            assert_eq!(after[0].fields["distinct_relayers"], distinct.to_string());
+        } else {
+            assert!(before.is_empty(), "per-packet draw details must not appear at DEBUG");
+            assert!(after.is_empty(), "per-packet draw results must not appear at DEBUG");
+        }
+        Ok(())
     }
 
     /// Cached snapshots keep their dictionary identity; replacements and other planners get new IDs.
