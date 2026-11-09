@@ -206,7 +206,7 @@ hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
 
 [build-dependencies]
-toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
+toml_edit = { version = "0.25.19", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
