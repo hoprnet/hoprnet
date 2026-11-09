@@ -415,10 +415,7 @@ fn apply_diversity_transition(
     }
 }
 
-type RebuiltPaths = (
-    hopr_utils::statistics::WeightedCollection<ValidatedPath>,
-    Option<DiversityObservation>,
-);
+type RebuiltPaths = (CandidateSet, Option<DiversityObservation>);
 
 /// What a cache entry is rebuilt from, shared by the planner and its background sweep.
 struct PathBuilder<R, S> {
@@ -505,7 +502,7 @@ where
             return Ok(None);
         }
 
-        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+        let (set_id, weighted) = identify_candidates(hopr_utils::statistics::WeightedCollection::new(valid_paths));
         let total_wt = weighted.total_weight();
         // Return draws spend `exploration` of their picks uniformly, so log what a draw actually does.
         let exploration = if dest_key == me {
@@ -514,9 +511,11 @@ where
             0.0
         };
         let candidates = weighted.iter().count() as f64;
-        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+        for (index, ((vp, w), pwm)) in weighted.iter().zip(path_metrics.iter()).enumerate() {
             tracing::debug!(
                 kind,
+                set_id,
+                index,
                 destination = %dest_key,
                 hops,
                 path = %vp,
@@ -534,7 +533,7 @@ where
                 "weighted candidate path",
             );
         }
-        Ok(Some((weighted, diversity)))
+        Ok(Some(((set_id, weighted), diversity)))
     }
 
     fn apply_diversity(&self, kind: &str, diversity: Option<DiversityObservation>) {
@@ -597,7 +596,18 @@ fn weights_moved(
 /// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice. Resolving
 /// first makes lookup and insertion agree by construction.
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
-type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
+/// A dictionary key paired with the immutable collection it identifies. IDs do not order cache
+/// updates: pointer equality below remains the authority for rejecting stale refreshes.
+type CandidateSet = (u64, hopr_utils::statistics::WeightedCollection<ValidatedPath>);
+type PlannerCacheValue = Arc<CandidateSet>;
+
+/// Gives every rebuilt collection a new process-local ID before any dictionary records are emitted.
+/// All production rebuilds and test-created replacements use this constructor; cache hits reuse the
+/// pair through its Arc. The counter is shared across planners to keep their logs unambiguous.
+fn identify_candidates(paths: hopr_utils::statistics::WeightedCollection<ValidatedPath>) -> CandidateSet {
+    static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    (NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed), paths)
+}
 
 /// Writes `value` under `key` only if `swept` is still the entry cached there, returning whether it
 /// was.
@@ -628,7 +638,8 @@ async fn put_if_unchanged(
             source = %key.0,
             destination = %key.1,
             hops = key.2,
-            candidates = entry.value().len(),
+            candidates = entry.value().1.len(),
+            set_id = entry.value().0,
             kind = "background-refresh",
             "candidate set installed"
         );
@@ -836,14 +847,17 @@ where
                 // SURBs with it, and it probes nothing (a probation ends on a reply through the
                 // relayer, which only a return path carries). Tempered, a relayer on probation keeps
                 // about 3 % of a healthy one's weight, so the ordinary draw is gated too.
-                let mut weights = paths.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
+                let mut weights = paths.1.iter().map(|(_, weight)| *weight).collect::<Vec<_>>();
                 let drawn = if should_explore(self.paths.weighting.return_path_exploration) {
                     pick_exploring_index(&weights, || false)
                 } else {
                     gate_implausible(&mut weights);
                     pick_weighted_index(&weights)
                 }
-                .and_then(|i| paths.iter().nth(i))
+                .and_then(|i| {
+                    tracing::trace!(set_id = paths.0, index = i, direction = "forward", "candidate selected");
+                    paths.1.iter().nth(i)
+                })
                 .map(|(vp, _)| vp.clone());
                 drawn.ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(
@@ -957,7 +971,7 @@ where
                     .entry(key)
                     .and_compute_with(|previous| {
                         if let Some(previous) = previous {
-                            shifted = weights_moved(previous.value(), &weighted);
+                            shifted = weights_moved(&previous.value().1, &weighted.1);
                         }
                         futures::future::ready(moka::ops::compute::Op::Put(Arc::new(weighted)))
                     })
@@ -969,7 +983,8 @@ where
                         source = %src_key,
                         destination = %dest_key,
                         hops,
-                        candidates = entry.value().len(),
+                        candidates = entry.value().1.len(),
+                        set_id = entry.value().0,
                         kind = "recompute",
                         "candidate set installed"
                     );
@@ -1029,7 +1044,7 @@ where
         };
 
         let candidates = self.cached_paths(destination, me, hops).await?;
-        let items: Vec<&(ValidatedPath, f64)> = candidates.iter().collect();
+        let items: Vec<&(ValidatedPath, f64)> = candidates.1.iter().collect();
         let weights = items.iter().map(|(_, w)| *w).collect::<Vec<_>>();
 
         if weights.iter().all(|w| *w <= 0.0) {
@@ -1072,7 +1087,15 @@ where
                 } else {
                     pick_weighted_index(&weights)
                 }
-                .map(|i| items[i].0.clone())
+                .map(|i| {
+                    tracing::trace!(
+                        set_id = candidates.0,
+                        index = i,
+                        direction = "return",
+                        "candidate selected"
+                    );
+                    items[i].0.clone()
+                })
             })
             .collect::<Vec<_>>();
 
@@ -1985,8 +2008,8 @@ mod tests {
         let cached = planner.cache.get(&cache_key).await;
         assert!(cached.is_some(), "cache should be populated after first call");
         let paths = cached.unwrap();
-        assert!(!paths.is_empty(), "cached paths must be non-empty");
-        let (first_path, first_cost) = paths.iter().next().expect("at least one cached path");
+        assert!(!paths.1.is_empty(), "cached paths must be non-empty");
+        let (first_path, first_cost) = paths.1.iter().next().expect("at least one cached path");
         assert_eq!(first_path.num_hops(), 2, "path should have 2 hops [a, dest]");
         assert!(*first_cost > 0.0, "cost should be positive");
     }
@@ -2421,9 +2444,9 @@ mod tests {
             .iter()
             .find(|(k, _)| **k == key)
             .context("the filled entry should be iterable")?;
-        let rebuilt = Arc::new(hopr_utils::statistics::WeightedCollection::new(
-            swept.iter().cloned().collect(),
-        ));
+        let rebuilt = Arc::new(identify_candidates(hopr_utils::statistics::WeightedCollection::new(
+            swept.1.iter().cloned().collect(),
+        )));
 
         let wrote = put_if_unchanged(&planner.cache, key, &swept, rebuilt.clone()).await;
         assert!(wrote, "the rebuild of an unchanged entry must be written");
@@ -2728,8 +2751,9 @@ mod tests {
     /// This -- not the raw weight -- is what decides how much of a session's return stream rides on
     /// one relay, because the draw normalises over the collection.
     fn share_of(paths: &PlannerCacheValue, relayer: &OffchainPublicKey) -> f64 {
-        let total: f64 = paths.iter().map(|(_, w)| *w).sum();
+        let total: f64 = paths.1.iter().map(|(_, w)| *w).sum();
         let held: f64 = paths
+            .1
             .iter()
             .filter(|(vp, _)| vp.first() == Some(relayer))
             .map(|(_, w)| *w)
@@ -2739,7 +2763,7 @@ mod tests {
 
     /// The candidate paths as stable strings, weights discarded.
     fn candidate_set(paths: &PlannerCacheValue) -> std::collections::BTreeSet<String> {
-        paths.iter().map(|(vp, _)| vp.to_string()).collect()
+        paths.1.iter().map(|(vp, _)| vp.to_string()).collect()
     }
 
     /// Records `rounds` SURB round-trips on the edge, of which `observed` per round came back.
@@ -3000,9 +3024,9 @@ mod tests {
                 1,
                 "a stale refresh must not report an installation"
             );
-            let rebuilt = Arc::new(hopr_utils::statistics::WeightedCollection::new(
-                replacement.iter().cloned().collect(),
-            ));
+            let rebuilt = Arc::new(identify_candidates(hopr_utils::statistics::WeightedCollection::new(
+                replacement.1.iter().cloned().collect(),
+            )));
             assert!(put_if_unchanged(&planner.cache, key, &replacement, rebuilt).await);
             let events = logs.records("candidate set installed");
             assert_eq!(
@@ -3016,12 +3040,91 @@ mod tests {
                 assert!(event.fields.contains_key("source"));
                 assert!(event.fields.contains_key("destination"));
                 assert_eq!(event.fields["hops"], "1");
-                assert_eq!(event.fields["candidates"], replacement.len().to_string());
+                assert_eq!(event.fields["candidates"], replacement.1.len().to_string());
             }
             anyhow::Ok(())
         }
         .with_subscriber(logs.subscriber(tracing::Level::DEBUG))
         .await
+    }
+
+    /// Cached snapshots keep their dictionary identity; replacements and other planners get new IDs.
+    /// Every logged draw must reference the dictionary entry for the path actually returned.
+    #[test]
+    #[serial_test::serial(routing_logs)]
+    fn candidate_dictionary_should_correlate_cached_snapshots_and_actual_draws() -> anyhow::Result<()> {
+        let (planner, _) = two_relayer_return_planner();
+        let (forward_planner, _) = two_relayer_forward_planner();
+        // Keep multiple dispatchers registered: tracing-core's single-dispatcher fast path can
+        // cache a callsite as disabled when another test first uses it without a scoped subscriber.
+        let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let logs = crate::tests::support::Logs::default();
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        let subscriber = logs.subscriber(tracing::Level::TRACE);
+        let selected = tracing::subscriber::with_default(subscriber, || {
+            runtime.block_on(async {
+                let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+                let destination = NodeId::Offchain(pubkey(&SECRET_ME));
+                let first = planner.cached_paths(source, destination, 1.try_into()?).await?;
+                let dictionary_size = logs.records("weighted candidate path").len();
+                let hit = planner.cached_paths(source, destination, 1.try_into()?).await?;
+                assert!(Arc::ptr_eq(&first, &hit));
+                assert_eq!(logs.records("weighted candidate path").len(), dictionary_size);
+                let mut selected = planner
+                    .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 2)
+                    .await?
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                planner.recompute_paths_from(&pubkey(&SECRET_DEST)).await;
+                let replacement = planner.cached_paths(source, destination, 1.try_into()?).await?;
+                assert!(!Arc::ptr_eq(&first, &replacement));
+                selected.extend(
+                    planner
+                        .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 2)
+                        .await?
+                        .iter()
+                        .map(ToString::to_string),
+                );
+                for _ in 0..2 {
+                    selected.push(
+                        forward_planner
+                            .resolve_path(destination, source, RoutingOptions::Hops(1.try_into()?))
+                            .await?
+                            .to_string(),
+                    );
+                }
+                anyhow::Ok(selected)
+            })
+        })?;
+        let dictionary = logs.records("weighted candidate path");
+        let draws = logs.records("candidate selected");
+        assert_eq!(selected.len(), 6, "fixture must return the requested paths");
+        assert_eq!(
+            draws.len(),
+            6,
+            "each actual draw must have a dictionary reference: {}",
+            logs.output()
+        );
+        for (draw, selected) in draws.iter().zip(selected) {
+            let entry = dictionary
+                .iter()
+                .find(|entry| {
+                    entry.fields["set_id"] == draw.fields["set_id"] && entry.fields["index"] == draw.fields["index"]
+                })
+                .context("draw must reference a recorded dictionary entry")?;
+            assert_eq!(entry.fields["path"], selected);
+        }
+        let ids: std::collections::HashSet<_> = dictionary.iter().map(|entry| entry.fields["set_id"].clone()).collect();
+        assert_eq!(
+            ids.len(),
+            3,
+            "initial, replacement and other planner snapshots must be distinct"
+        );
+        assert_eq!(draws[0].fields["set_id"], draws[1].fields["set_id"]);
+        assert_ne!(draws[1].fields["set_id"], draws[2].fields["set_id"]);
+        assert_eq!(draws[4].fields["set_id"], draws[5].fields["set_id"]);
+        Ok(())
     }
 
     // ── composite weight helpers ──────────────────────────────────────────────

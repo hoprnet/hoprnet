@@ -32,6 +32,19 @@ Detailed module spans require a build that retains TRACE, such as a debug build.
 enables the detailed spans and their parent context. The workspace retains
 `release_max_level_debug`, so `RUST_LOG=trace` cannot restore TRACE spans in a release build.
 
+## Candidate dictionaries
+
+Each validated collection is paired with a fresh process-local `set_id` in the planner cache.
+The shared rebuild path allocates the pair once, so lazy fills, background refreshes and explicit
+recomputations all use the same allocation rule. Cache hits retain the pair through its `Arc`.
+IDs distinguish snapshots across planners; they are not cache versions or freshness checks, and
+reset on process restart. Pointer equality still decides whether a background refresh is stale.
+
+The candidate records map `(set_id, index)` to a path and its weight. TRACE `candidate selected`
+events reference that pair for actual forward and return draws, avoiding a separate copy of the
+path in those events. Capture dictionary records from the rebuild as well as subsequent draws;
+if logging starts after a cache fill, wait for a refresh to obtain its dictionary.
+
 ## Queue context and alternatives
 
 Each queued message carries a local span because the producer and consumer can run in different
