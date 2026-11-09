@@ -504,6 +504,15 @@ where
                 let mut candidate = path;
                 candidate.push(*dest);
 
+                // The missing last edge is assumed reachable only while the graph has no word on it. An
+                // edge it has measured dead (a score of exactly 0, which is how it reads a starved edge)
+                // is not missing, and adding the relay back would fill the floor with a path that
+                // delivers nothing, at a better cost than the healthy ones.
+                if let [.., relay, _] = candidate.as_slice()
+                    && self.graph.edge(relay, dest).and_then(|obs| obs.score()) == Some(0.0)
+                {
+                    return None;
+                }
 
                 if existing.iter().any(|pwm| pwm.path == candidate) {
                     return None;
@@ -802,7 +811,7 @@ mod tests {
     /// A relay that rejects our packets still answers pings and acks, so the first edge to it reads
     /// healthy everywhere except in the loopbacks routed through it, none of which return.
     #[tokio::test]
-    async fn a_first_relay_whose_loopbacks_never_return_should_be_starved_for_one_to_three_hops() -> anyhow::Result<()>
+    async fn a_first_relay_whose_loopbacks_never_return_should_be_excluded_for_one_to_three_hops() -> anyhow::Result<()>
     {
         let me = pubkey(&SECRET_0);
         let good = pubkey(&SECRET_1);
@@ -835,7 +844,7 @@ mod tests {
         mark_edge_unlooped(&graph, &me, &bad);
 
         let selector = test_selector(me, graph.clone(), 50);
-        let values = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
+        let costs = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
             let paths = selector.select_path(me, dest, hops).context("forward path")?;
             let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
             Ok((
@@ -845,49 +854,31 @@ mod tests {
         };
 
         for hops in 1..=3 {
-            let (through, around) = values(hops)?;
+            let (through, around) = costs(hops)?;
             assert!(
                 !through.is_empty() && !around.is_empty(),
-                "{hops} hop(s): routes through and around the relay must both exist before any loop is seen"
+                "{hops} hop(s): both relays must be candidates before any loop is seen"
             );
         }
 
-        // 5 loops through the relay, none returned.
+        // 5 loops through the first relay, none returned.
         graph.upsert_edge(&me, &bad, |obs| {
             for _ in 0..5 {
                 obs.record(EdgeWeightType::Intermediate(Err(())));
             }
         });
-        // A fresh selector: the paths are cached per query, and the cache must not hide the change.
-        let selector = test_selector(me, graph, 50);
-        let values = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
-            let paths = selector.select_path(me, dest, hops).context("forward path")?;
-            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
-            Ok((
-                through.into_iter().map(|pwm| pwm.cost).collect(),
-                around.into_iter().map(|pwm| pwm.cost).collect(),
-            ))
-        };
 
+        // Excluded from routing (RFC-0010 4.2.3, the active tier); probing still reaches it.
         for hops in 1..=3 {
-            let (through, around) = values(hops)?;
-            let best_around = around.iter().copied().fold(0.0, f64::max);
-            assert!(best_around > 0.0, "{hops} hop(s): the honest relay must stay routable");
+            let (through, around) = costs(hops)?;
             assert!(
-                !through.is_empty(),
-                "{hops} hop(s): a starved relay must stay a candidate, not disappear"
+                through.is_empty(),
+                "{hops} hop(s): a relay whose loops never return must not be a candidate, got {through:?}"
             );
-            for cost in through {
-                assert!(
-                    cost > 0.0,
-                    "{hops} hop(s): a starved relay must keep a positive weight, got {cost}"
-                );
-                assert!(
-                    cost / (cost + best_around) < 1e-6,
-                    "{hops} hop(s): a relay none of whose loopbacks returned must draw a negligible share, got {cost} \
-                     against {best_around}"
-                );
-            }
+            assert!(
+                !around.is_empty() && around.iter().all(|cost| *cost > 0.0),
+                "{hops} hop(s): the honest relay must stay routable"
+            );
         }
         Ok(())
     }
@@ -895,7 +886,7 @@ mod tests {
     /// On a return path `dest → relay → me`, the edge into the relay is judged and the edge into `me`
     /// is not: a relay that rejects packets shows it on the first, and the last leads to the receiver.
     #[tokio::test]
-    async fn a_return_relay_should_be_starved_only_by_failed_loopbacks_on_the_edge_into_it() -> anyhow::Result<()> {
+    async fn a_return_relay_should_be_excluded_when_loopbacks_fail_on_the_edge_into_it() -> anyhow::Result<()> {
         let me = pubkey(&SECRET_0);
         let good = pubkey(&SECRET_1);
         let bad = pubkey(&SECRET_2);
@@ -903,8 +894,8 @@ mod tests {
             "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
         ));
 
-        // The failed edge of `bad`, and the share `bad` draws against `good` afterwards.
-        let share_of_bad = |failed: (OffchainPublicKey, OffchainPublicKey)| -> anyhow::Result<f64> {
+        // Costs of the return paths through `bad` and around it, after loops failed over one edge of `bad`.
+        let costs = |failed: (OffchainPublicKey, OffchainPublicKey)| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
             let graph = ChannelGraph::new(me);
             for node in [good, bad, dest] {
                 graph.add_node(node);
@@ -912,7 +903,7 @@ mod tests {
             for (src, dst) in [(dest, good), (good, me), (dest, bad), (bad, me)] {
                 graph.add_edge(&src, &dst)?;
                 if (src, dst) == failed {
-                    // No loop returned over this edge, so the 5 below are all it has seen.
+                    // No loop returned over the edge, so the 5 below are all it has seen.
                     mark_edge_unlooped(&graph, &src, &dst);
                 } else {
                     mark_edge_full(&graph, &src, &dst);
@@ -923,30 +914,25 @@ mod tests {
                     obs.record(EdgeWeightType::Intermediate(Err(())));
                 }
             });
-
             let paths = test_selector(me, graph, 50)
                 .select_path(dest, me, 1)
                 .context("return path")?;
             let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
-            let cost = |paths: Vec<PathWithMetrics>| paths.into_iter().map(|pwm| pwm.cost).fold(0.0, f64::max);
-            let (through, around) = (cost(through), cost(around));
-            assert!(
-                through > 0.0 && around > 0.0,
-                "both relays must stay candidates: through {through}, around {around}"
-            );
-            Ok(through / (through + around))
+            Ok((
+                through.into_iter().map(|pwm| pwm.cost).collect(),
+                around.into_iter().map(|pwm| pwm.cost).collect(),
+            ))
         };
 
-        let into_relay = share_of_bad((dest, bad))?;
+        // A loop that fails blames the edge into the relay, and that is what excludes it.
+        let (through, around) = costs((dest, bad))?;
         assert!(
-            into_relay < 1e-6,
-            "failed loopbacks on the edge into the relay must starve it, got a share of {into_relay}"
+            through.is_empty(),
+            "a failed edge into the relay must exclude it, got {through:?}"
         );
-
-        let into_me = share_of_bad((bad, me))?;
         assert!(
-            into_me > 1e-3,
-            "failed loopbacks on the edge into `me` must not starve the relay, got a share of {into_me}"
+            !around.is_empty() && around.iter().all(|cost| *cost > 0.0),
+            "the honest relay must stay routable"
         );
         Ok(())
     }
