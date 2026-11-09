@@ -215,7 +215,9 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                 .await
                 {
                     Ok(Ok(Ok(packet))) => {
-                        span_fields.record("peer", packet.next_hop.to_peerid_str());
+                        if !span_fields.is_disabled() {
+                            span_fields.record("peer", packet.next_hop.to_peerid_str());
+                        }
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["sent"]);
                         counters.get_or_create(&packet.next_hop).record_message_sent();
@@ -353,7 +355,9 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     Ok(Ok(Ok(packet))) => {
                         if let IncomingPacket::Final(packet) = &packet {
                             output_span.record("session_id", tracing::field::display(packet.sender));
-                        } else if let IncomingPacket::Forwarded(packet) = &packet {
+                        } else if let IncomingPacket::Forwarded(packet) = &packet
+                            && !output_span.is_disabled()
+                        {
                             output_span.record("next_hop", packet.next_hop.to_peerid_str());
                         }
                         tracing::trace!(?packet, "successfully decoded incoming packet");
