@@ -541,16 +541,18 @@ where
                     },
                 )
             };
-            // The continuations of no value or through `src` are dropped below; see `search_share`.
+            // The continuations of no value or through `src`: `search_share` does not count them toward the
+            // share, and the pool drops them. One predicate for both, so the two cannot disagree.
             let unusable = |(rest, _, metrics): &(Vec<OffchainPublicKey>, _, PathCostWithMetrics)| {
                 metrics.cost <= 0.0 || rest.contains(src)
             };
             search_share(share, unusable, continuations)
                 .into_iter()
-                .filter_map(move |(rest, _, metrics)| {
-                    if metrics.cost <= 0.0 || rest.contains(src) {
+                .filter_map(move |continuation| {
+                    if unusable(&continuation) {
                         return None;
                     }
+                    let (rest, _, metrics) = continuation;
                     let mut path = Vec::with_capacity(rest.len() + 2);
                     path.push(first);
                     path.extend(rest);
