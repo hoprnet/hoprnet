@@ -6,7 +6,7 @@
 use std::{hint::black_box, time::Duration};
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use futures::{AsyncWriteExt, stream};
+use futures::{AsyncWriteExt, SinkExt, StreamExt, stream};
 use hopr_api::{
     OffchainPublicKey,
     graph::{
@@ -196,6 +196,47 @@ fn routing_tracing(c: &mut Criterion) {
             runtime
                 .block_on(session.write_all(black_box(&payload)))
                 .expect("session write")
+        });
+    });
+    // Isolate local envelope construction/drop and bounded queue delivery from routing and encoding.
+    // Each iteration drains its one queued value, so capacity cannot accumulate across iterations.
+    let (mut plain_sender, plain_receiver) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(1);
+    futures::pin_mut!(plain_receiver);
+    group.bench_function("plain_queue_roundtrip", |b| {
+        b.iter_custom(|iterations| {
+            runtime.block_on(
+                async {
+                    let started = std::time::Instant::now();
+                    for _ in 0..iterations {
+                        plain_sender.send(black_box(42u64)).await.expect("queue send");
+                        black_box(plain_receiver.next().await.expect("queue receive"));
+                    }
+                    started.elapsed()
+                }
+                .instrument(session_span.clone()),
+            )
+        });
+    });
+
+    // Context-envelope case: absent on the master baseline, which has no WithContext type.
+    let (mut context_sender, context_receiver) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(1);
+    futures::pin_mut!(context_receiver);
+    group.bench_function("context_queue_roundtrip", |b| {
+        b.iter_custom(|iterations| {
+            runtime.block_on(
+                async {
+                    let started = std::time::Instant::now();
+                    for _ in 0..iterations {
+                        context_sender
+                            .send(hopr_transport::trace_context::WithContext::from(black_box(42u64)))
+                            .await
+                            .expect("context queue send");
+                        black_box(context_receiver.next().await.expect("context queue receive"));
+                    }
+                    started.elapsed()
+                }
+                .instrument(session_span.clone()),
+            )
         });
     });
     group.finish();

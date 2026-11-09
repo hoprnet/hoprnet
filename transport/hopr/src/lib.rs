@@ -856,10 +856,10 @@ where
             let data = &RANDOM_DATA[start..start + 100];
 
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
-                Some(trace_context::WithContext {
-                    value: (routing, ApplicationDataOut::with_no_packet_info(data)),
-                    span: tracing::debug_span!(parent: None, "cover_traffic"),
-                })
+                Some(trace_context::WithContext::new(
+                    (routing, ApplicationDataOut::with_no_packet_info(data)),
+                    tracing::debug_span!(parent: None, "cover_traffic"),
+                ))
             } else {
                 tracing::error!("failed to construct cover traffic packet");
                 None
@@ -1249,25 +1249,20 @@ where
                     .filter_map(move |message| {
                         let classifier = probe_classifier.clone();
                         let push = unresolved_routing_msg_tx_for_task.clone();
-                        let output_span = message.span.clone();
+                        let (value, span) = message.into_parts();
+                        let output_span = span.clone();
                         async move {
-                            match classifier.classify(push, message.value.0, message.value.1).await {
+                            match classifier.classify(push, value.0, value.1).await {
                                 hopr_transport_probe::ProbeDispatch::Consumed => None,
                                 hopr_transport_probe::ProbeDispatch::Passthrough(pseudonym, data) => {
-                                    Some(trace_context::WithContext {
-                                        value: (pseudonym, data),
-                                        span: output_span,
-                                    })
+                                    Some(trace_context::WithContext::new((pseudonym, data), output_span))
                                 }
                             }
                         }
-                        .instrument(message.span)
+                        .instrument(span)
                     })
                     .filter_map(move |message| {
-                        let trace_context::WithContext {
-                            value: (pseudonym, data),
-                            span,
-                        } = message;
+                        let ((pseudonym, data), span) = message.into_parts();
                         let _entered = span.enter();
                         let _dispatch = tracing::debug_span!("session.dispatch").entered();
                         hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS

@@ -185,10 +185,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
         // so that encoded packets are emitted in submission order, preserving session frame sequence.
         // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
         .map(|message| {
-            let crate::trace_context::WithContext {
-                value: (routing, data),
-                span,
-            } = message.into();
+            let ((routing, data), span) = message.into().into_parts();
             let encode_span = tracing::debug_span!(parent: &span, "transport.encode", peer = tracing::field::Empty);
             let span_fields = encode_span.clone();
             let span = if encode_span.is_disabled() { span } else { encode_span };
@@ -360,7 +357,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             output_span.record("next_hop", packet.next_hop.to_peerid_str());
                         }
                         tracing::trace!(?packet, "successfully decoded incoming packet");
-                        Some(WithContext { value: packet, span: output_span })
+                        Some(WithContext::new(packet, output_span))
                     },
                     Ok(Ok(Err(IncomingPacketError::Undecodable(error)))) => {
                         // Do not send an ack back if the packet could not be decoded at all
@@ -455,7 +452,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
         // the handles it actually needs. `futures::future::Either` lets us return three
         // distinct async blocks from one closure without boxing.
         // FuturesOrdered: preserve decode-stage order so session segments reach the socket in sequence.
-        .map(move |WithContext { value: packet, span }| {
+        .map(move |message| {
+            let (packet, span) = message.into_parts();
             let output_span = span.clone();
             let processing = match packet {
                 IncomingPacket::Acknowledgement(ack) => {
@@ -501,7 +499,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["received"]);
 
-                        Some(WithContext { value: (sender, plain_text, info), span: output_span })
+                        Some(WithContext::new((sender, plain_text, info), output_span))
                     }))
                 }
                 IncomingPacket::Forwarded(fwd_packet) => {
@@ -601,12 +599,13 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
-                .and_then(|WithContext { value: (sender, data, aux_info), span }| {
+                .and_then(|message| {
+                    let ((sender, data, aux_info), span) = message.into_parts();
                     let _entered = span.enter();
                     ApplicationData::try_from(data.as_ref())
                     .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                     .ok()
-                    .map(|data| WithContext { value: (sender, ApplicationDataIn {
+                    .map(|data| WithContext::new((sender, ApplicationDataIn {
                         data,
                         packet_info: IncomingPacketInfo {
                             signals_from_sender: aux_info.packet_signals,
@@ -614,7 +613,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             num_evicted_surbs: aux_info.num_evicted_surbs,
                             min_return_path_hops: aux_info.min_return_path_hops,
                         }
-                    }), span: span.clone() })
+                    }), span.clone()))
                 })
         ))
         .map(Ok)
@@ -651,14 +650,14 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 {
     ack_outgoing
         .map(move |message| {
-            let WithContext { value: (destination, maybe_ack_key), span } = message.into();
+            let ((destination, maybe_ack_key), span) = message.into().into_parts();
             let _entered = span.enter();
             let packet_key = packet_key.clone();
             // Sign acknowledgement with the given half-key or generate a signed random one
             let ack = maybe_ack_key
                 .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
                 .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
-            (destination, WithContext { value: ack, span: span.clone() })
+            (destination, WithContext::new(ack, span.clone()))
         })
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
@@ -693,7 +692,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
             move |(destination, acks)| {
                 let span = tracing::debug_span!(parent: None, "outgoing_ack_batch", peer = destination.to_peerid_str());
                 for ack in &acks {
-                    span.follows_from(&ack.span);
+                    span.follows_from(ack.span());
                 }
                 let acks = acks.into_iter().map(|ack| ack.value).collect::<Vec<_>>();
                 let encoder = encoder.clone();
@@ -761,10 +760,7 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
     // batches one at a time would serialize all PIX recovery on a dedicated Exit node.
     ack_incoming
         .for_each_concurrent(concurrency, move |message| {
-            let WithContext {
-                value: (peer, acks),
-                span,
-            } = message.into();
+            let ((peer, acks), span) = message.into().into_parts();
             let exit_proc = exit_proc.clone();
             let exit_proc_check = exit_proc.clone();
             let mut recovered_ssa = recovered_ssa.clone();
@@ -827,7 +823,7 @@ where
 {
     ack_incoming
         .for_each(move |message| {
-            let WithContext { value: (_, acks), span } = message.into();
+            let ((_, acks), span) = message.into().into_parts();
             let _entered = span.enter();
             tracing::trace!(num = acks.len(), "received acknowledgements (drained, not processed)");
             futures::future::ready(())
@@ -860,10 +856,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
 {
     ack_incoming
         .for_each_concurrent(concurrency, move |message| {
-            let WithContext {
-                value: (peer, acks),
-                span,
-            } = message.into();
+            let ((peer, acks), span) = message.into().into_parts();
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             let exit_proc = exit_ack_proc.clone();
@@ -1403,7 +1396,7 @@ mod tests {
                 async {
                     tracing::debug!(index, "received session dispatch");
                 }
-                .instrument(message.span)
+                .instrument(message.into_parts().1)
                 .await;
             }
             let acknowledgements = ack_rx.collect::<Vec<_>>().await;
@@ -1524,10 +1517,7 @@ mod tests {
             ];
             let input = spans
                 .into_iter()
-                .map(move |span| WithContext {
-                    value: (peer, Some(HalfKey::default())),
-                    span,
-                })
+                .map(move |span| WithContext::new((peer, Some(HalfKey::default())), span))
                 .collect::<Vec<_>>();
             let (wire_tx, wire_rx) = mpsc::channel(4);
             start_outgoing_ack_pipeline(
@@ -1589,10 +1579,10 @@ mod tests {
                     *OffchainKeypair::random().public(),
                     ChainKeypair::random().public().to_address(),
                 );
-                input.push(WithContext {
-                    value: (ResolvedTransportRouting::forward_only(path), data),
+                input.push(WithContext::new(
+                    (ResolvedTransportRouting::forward_only(path), data),
                     span,
-                });
+                ));
             }
             let next_hop = *OffchainKeypair::random().public();
             let encoder = std::sync::Arc::new(ContextTestEncoder {

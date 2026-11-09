@@ -77,10 +77,7 @@ where
 {
     input
         .map(move |message| {
-            let crate::trace_context::WithContext {
-                value: (unresolved, mut data),
-                span,
-            } = message;
+            let ((unresolved, mut data), span) = message.into_parts();
             let request_span = tracing::debug_span!(
                 parent: &span,
                 "transport.send",
@@ -137,10 +134,7 @@ where
                             // re-reading a possibly-newer one after a concurrent re-plan.
                             info.surb_generation = generation;
                             trace!(?resolved, "resolved routing for packet");
-                            return Some(crate::trace_context::WithContext {
-                                value: (resolved, data),
-                                span: output_span,
-                            });
+                            return Some(crate::trace_context::WithContext::new((resolved, data), output_span));
                         }
                         Err(error) if error.is_surb() && std::time::Instant::now() >= deadline => {
                             hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
@@ -300,7 +294,7 @@ mod tests {
                     .await?;
                     anyhow::Ok(())
                 }
-                .instrument(message.span)
+                .instrument(message.into_parts().1)
                 .await?;
             }
             for event in logs

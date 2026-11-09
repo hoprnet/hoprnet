@@ -19,18 +19,36 @@ pub(crate) fn next_packet_id() -> u64 {
 #[derive(Debug)]
 pub struct WithContext<T> {
     pub(crate) value: T,
-    pub(crate) span: tracing::Span,
+    span: Option<Box<tracing::Span>>,
+}
+
+impl<T> WithContext<T> {
+    pub(crate) fn new(value: T, span: tracing::Span) -> Self {
+        Self {
+            value,
+            // Keep disabled messages compact and allocation-free. Active spans retain their
+            // subscriber and lifetime exactly as an inline Span would.
+            span: (!span.is_disabled()).then(|| Box::new(span)),
+        }
+    }
+
+    pub(crate) fn span(&self) -> &tracing::Span {
+        static DISABLED: tracing::Span = tracing::Span::none();
+        self.span.as_deref().unwrap_or(&DISABLED)
+    }
+
+    pub(crate) fn into_parts(self) -> (T, tracing::Span) {
+        (self.value, self.span.map_or_else(tracing::Span::none, |span| *span))
+    }
 }
 
 impl<T> From<T> for WithContext<T> {
     fn from(value: T) -> Self {
-        Self {
-            value,
-            #[cfg(feature = "tracing-context")]
-            span: tracing::Span::current(),
-            #[cfg(not(feature = "tracing-context"))]
-            span: tracing::Span::none(),
-        }
+        #[cfg(feature = "tracing-context")]
+        let span = tracing::Span::current();
+        #[cfg(not(feature = "tracing-context"))]
+        let span = tracing::Span::none();
+        Self::new(value, span)
     }
 }
 
@@ -63,9 +81,10 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: WithContext<T>) -> Result<(), Self::Error> {
         let this = self.get_mut();
-        this.span = item.span;
+        let (value, span) = item.into_parts();
+        this.span = span;
         let _entered = this.span.enter();
-        Pin::new(&mut this.inner).start_send(item.value)
+        Pin::new(&mut this.inner).start_send(value)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -140,6 +159,20 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn disabled_context_should_keep_the_envelope_compact() {
+        assert_eq!(
+            std::mem::size_of::<WithContext<u64>>(),
+            std::mem::size_of::<(u64, usize)>(),
+            "disabled spans must not occupy an inline Span in every queue slot"
+        );
+        let message = WithContext::new(42, tracing::Span::none());
+        assert!(message.span.is_none(), "disabled context must not allocate");
+        let (value, span) = message.into_parts();
+        assert_eq!(value, 42);
+        assert!(span.is_disabled());
+    }
+
     #[tokio::test]
     async fn sender_clones_should_share_capacity_and_return_rejected_values() -> anyhow::Result<()> {
         let (tx, rx) = bounded_sink_channel(1);
@@ -176,6 +209,13 @@ mod tests {
             let (tx, rx) = bounded_sink_channel(1);
             let mut tx = ContextSender::new(tx);
             let producer = tracing::debug_span!("producer");
+            assert!(!producer.is_disabled(), "fixture needs an active producer span");
+            // Explicit pipeline context is preserved even when automatic capture is disabled.
+            let explicit = WithContext::new(7u8, producer.clone());
+            assert!(explicit.span.is_some());
+            let (value, restored) = explicit.into_parts();
+            assert_eq!(value, 7);
+            assert_eq!(restored.id(), producer.id());
             let expected = if cfg!(feature = "tracing-context") {
                 producer.id()
             } else {
@@ -188,7 +228,7 @@ mod tests {
                 .await
                 .ok_or_else(|| anyhow::anyhow!("missing queued message"))?;
             assert_eq!(message.value, [42]);
-            assert_eq!(message.span.id(), expected);
+            assert_eq!(message.span().id(), expected);
             tx.close().await?;
             drop(tx);
             assert!(
