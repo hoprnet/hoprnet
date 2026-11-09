@@ -504,6 +504,7 @@ where
                 let mut candidate = path;
                 candidate.push(*dest);
 
+
                 if existing.iter().any(|pwm| pwm.path == candidate) {
                     return None;
                 }
@@ -739,6 +740,63 @@ mod tests {
         mark_edge_full(&graph, &dest, &hop);
         mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
+    }
+
+    /// The extended search that fills up the anonymity floor appends the destination to each relay it
+    /// finds without looking at the edge into it. A relay whose edge into the destination the graph has
+    /// judged dead must not come back through it: the floor is never a minimum to fabricate.
+    #[tokio::test]
+    async fn the_floor_should_not_bring_back_a_relay_whose_edge_into_the_destination_is_dead() -> anyhow::Result<()> {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad1 = pubkey(&SECRET_2);
+        let bad2 = pubkey(&SECRET_3);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        let graph = ChannelGraph::new(me);
+        for node in [good, bad1, bad2, dest] {
+            graph.add_node(node);
+        }
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
+        for relay in [good, bad1, bad2] {
+            graph.add_edge(&me, &relay)?;
+            mark_edge_full(&graph, &me, &relay);
+            graph.add_edge(&relay, &dest)?;
+        }
+        mark_edge_full(&graph, &good, &dest);
+        for bad in [bad1, bad2] {
+            mark_edge_unlooped(&graph, &bad, &dest);
+        }
+        // Loops over the edge into the destination: they return for `good`, never for the others.
+        for _ in 0..5 {
+            graph.upsert_edge(&good, &dest, |obs| {
+                obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(30))));
+            });
+            for bad in [bad1, bad2] {
+                graph.upsert_edge(&bad, &dest, |obs| {
+                    obs.record(EdgeWeightType::Intermediate(Err(())));
+                });
+            }
+        }
+
+        // Fewer routable candidates than the floor, so the extended search runs.
+        let selector = test_selector(me, graph.clone(), 8);
+        let paths = selector.select_path(me, dest, 1).context("forward path")?;
+
+        assert!(
+            paths.iter().any(|pwm| pwm.path.contains(&good)),
+            "the healthy relay must stay a candidate"
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|pwm| pwm.path.contains(&bad1) || pwm.path.contains(&bad2)),
+            "a relay whose edge into the destination is dead must not be added to fill the floor, got {} candidates",
+            paths.len()
+        );
+        Ok(())
     }
 
     /// A relay that rejects our packets still answers pings and acks, so the first edge to it reads

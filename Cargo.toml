@@ -237,4 +237,4 @@ ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 # TEMPORARY (GNO-1183): hopr-network-graph 0.10.1 is not published yet. Drop this block, and repin the crate,
 # once hoprnet/hopr-impls#78 is released.
 [patch.crates-io]
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/graph/loopback-first-hop-evidence" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/graph/exclude-starved-from-routing" }
