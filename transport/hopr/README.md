@@ -10,9 +10,11 @@ The application representing the entire physical transport functionality, includ
 
 ## Tracing benchmark
 
-On an Apple M4 Max, two release benchmark rounds (50 samples each) measured capacity-one queue
-round trips with compact span storage at 8.28 ns with INFO logging and 38.66 ns with DEBUG logging,
-down from 18.49 ns and 47.69 ns respectively. The added cost over a plain queue was 2.38 ns and
-32.75 ns; active spans require one allocation. These isolated measurements do not establish
-end-to-end throughput. Reproduce with `cargo bench -p hopr-transport --features testing,telemetry,runtime-tokio,serde --bench routing_tracing_bench --profile release`, setting
-`HOPR_BENCH_LOG=info` or `debug` (formatted output goes to a sink).
+Release benchmarks on an Apple M4 Max compared current `e5430c7987` against PR base master
+`900038bbe4` (three alternating rounds, 50 samples, INFO/DEBUG logs to a sink). Rebuilding 16
+candidates took 5.31% longer at INFO and 8.60% longer at DEBUG; some smaller routing/session
+differences changed direction across rounds. Base plain queue → current context queue times were
+5.92 → 8.65 ns at INFO and 5.86 → 37.53 ns at DEBUG. This comparison includes the graph dependency
+change and does not measure end-to-end throughput. Run
+`cargo bench -p hopr-transport --features testing,telemetry,runtime-tokio,serde --bench routing_tracing_bench --profile release`
+with `HOPR_BENCH_LOG=info` or `debug`.
