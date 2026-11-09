@@ -787,6 +787,7 @@ where
         self
     }
 
+    /// Report an outcome using canonical peer identity, retaining unresolved chain addresses.
     fn record_resolution(&self, source: NodeId, destination: NodeId, succeeded: bool) {
         if let Some(observer) = &self.observer {
             let (direction, peer) = if source == NodeId::Offchain(self.me) {
@@ -838,6 +839,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    /// Report the result of each forward resolution, including cache hits and failures.
     async fn resolve_path(
         &self,
         source: NodeId,
@@ -849,6 +851,7 @@ where
         result
     }
 
+    /// Resolve cached or newly selected paths while retaining validation and cache semantics.
     async fn resolve_path_inner(
         &self,
         source: NodeId,
@@ -1064,6 +1067,7 @@ where
         result
     }
 
+    /// Draw return paths from cached or rebuilt candidates while preserving path diversity.
     async fn resolve_diverse_return_paths_inner(
         &self,
         destination: NodeId,
@@ -3162,6 +3166,7 @@ mod tests {
         assert!(w_with <= w_without, "known capacity should not increase the weight");
     }
     #[tokio::test]
+    /// Verify canonical peer identities and the unresolved chain-address fallback in observer events.
     async fn observer_canonicalizes_chain_addresses_and_retains_unresolvable_destinations() -> anyhow::Result<()> {
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();
@@ -3198,6 +3203,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Report cached return batches and failed resolves without counting them as graph searches.
     async fn observer_sees_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();

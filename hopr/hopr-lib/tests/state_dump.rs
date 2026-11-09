@@ -20,6 +20,7 @@ use serde_json::Value;
 struct Capture(Arc<Mutex<Vec<Value>>>, Arc<std::sync::atomic::AtomicUsize>);
 struct Visitor<'a>(&'a Capture);
 impl tracing::field::Visit for Visitor<'_> {
+    /// Capture bounded decoded state records and optionally append raw payloads to a test file.
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         if field.name() == "state"
             && let Some(path) = std::env::var_os("HOPR_STATE_DUMP_TEST_OUTPUT")
@@ -52,6 +53,7 @@ impl tracing::Subscriber for Capture {
 
     fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
 
+    /// Collect INFO state records and print a bounded number of errors for failed test diagnosis.
     fn event(&self, event: &tracing::Event<'_>) {
         if *event.metadata().level() == tracing::Level::INFO {
             event.record(&mut Visitor(self));
@@ -69,6 +71,7 @@ impl tracing::Subscriber for Capture {
 }
 
 #[test]
+/// Check real producer records and disabled reporting in isolated processes for each node role.
 fn node_emits_bounded_info_state_with_real_producers_and_supports_disabling() -> anyhow::Result<()> {
     let Some(mode) = std::env::var_os("HOPR_STATE_DUMP_TEST_CHILD") else {
         for (mode, interval) in [("enabled", "5"), ("disabled", "0"), ("roles", "5")] {

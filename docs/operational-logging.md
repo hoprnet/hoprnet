@@ -25,6 +25,33 @@ read errors, timeouts, omitted detail and counter overflow. It is not an atomic 
 freshness-verified chain snapshot. Identities use the connector's JSON serialization;
 compare serialized identities rather than assuming a particular display format.
 
+For a network with 1,000 nodes and 50 edges per node, the record remains a bounded
+local-node summary; it does not serialize the entire 50,000-edge graph. At the
+32 KiB payload limit and the default 60-second interval, one node emits at most
+45 MiB/day or about 3.96 GiB over 90 days (129,600 records). Across 1,000 reporting
+nodes that is about 3.86 TiB over 90 days. These are payload-only upper bounds;
+JSON escaping, logger metadata and log shipping add overhead, while compression
+can reduce stored size. A shorter configured interval increases volume accordingly.
+
+The dump lives in the node's normal tracing output, using the application's log
+sink. This API adds no file, database, network endpoint, log shipping or retention
+policy. Operators choose collection, rotation and retention for those logs. For
+example, these are selected fields from the decoded `state` schema; the full record
+also includes node identity, timestamps, channel inventory and routing counters:
+
+```json
+{
+  "schema_version": 1,
+  "sequence": 1,
+  "safe_balance": { "status": "ok", "value": "1000000000000000000" },
+  "safe_allowance": { "status": "ok", "value": "2000000000000000000" },
+  "connected_peers": 50,
+  "announced_peers": { "status": "ok", "value": 1000 }
+}
+```
+
+The values above are illustrative, not measurements from a 1,000-node deployment.
+
 The transport does not depend on the state dump. It reports `TransportEvent`s (path
 resolves, graph searches, SURB mints and returns, probe outcomes) to an optional
 `TransportObserver`. The embedding application supplies a `StateDumpFactory` that

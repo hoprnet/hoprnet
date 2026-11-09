@@ -252,6 +252,7 @@ impl SurbRoundTripRegistry {
         self
     }
 
+    /// Notify the optional observer about minted SURBs independently of graph telemetry drains.
     fn record_minted(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
         self.record_expected(paths, count);
@@ -1506,6 +1507,7 @@ where
 {
     type Error = C::Error;
 
+    /// Decode a packet and record its reply SURB while keeping routine diagnostics at TRACE.
     fn decode(
         &self,
         sender: PeerId,
@@ -3430,6 +3432,7 @@ mod tests {
     }
 
     #[test]
+    /// Keep routine mint and path-pair traffic out of DEBUG while retaining aggregate INFO logs.
     fn routine_surb_traffic_should_not_emit_debug_per_mint_or_pair() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);
         let recorder = recorder(graph.clone());
@@ -3473,6 +3476,7 @@ mod tests {
 
         fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
 
+        /// Count aggregate INFO records and SURB-specific DEBUG records independently.
         fn event(&self, event: &tracing::Event<'_>) {
             if *event.metadata().level() == tracing::Level::INFO {
                 self.infos.fetch_add(1, Ordering::Relaxed);
@@ -3819,6 +3823,7 @@ mod tests {
         Ok(())
     }
     #[test]
+    /// Allow observer re-entry after the destination map guard has been released.
     fn observed_callback_can_access_the_destination_without_a_held_guard() {
         let (_, _, peers) = graph_with(1);
         let destination = peers[0];
@@ -3855,6 +3860,7 @@ mod tests {
     }
 
     #[test]
+    /// Retain aggregate reply counts for unknown destinations without inventing observer identities.
     fn observing_an_unknown_destination_keeps_counts_without_notifying() {
         let paths = ForwardAndReturnPath {
             forward: [0; 5],
@@ -3868,6 +3874,7 @@ mod tests {
     }
 
     #[test]
+    /// Keep observer counts independent of graph drains and count each matched reply only once.
     fn observed_surb_counts_are_independent_of_graph_drains_and_duplicate_replies() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));

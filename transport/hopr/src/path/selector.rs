@@ -1828,6 +1828,7 @@ mod tests {
     // every path the selector returns has capacity data on at least one edge, making
     // fundable_tickets_floor always Some for reachable paths.
     #[test]
+    /// Keep path ordering and equality based on cost regardless of diagnostic quality metadata.
     fn path_cost_equality_ignores_quality_metadata() {
         let cost = PathCostWithMetrics {
             cost: 0.5,
@@ -1848,6 +1849,7 @@ mod tests {
     }
 
     #[test]
+    /// Ensure TRACE-only diagnostics leave the selected candidate paths unchanged.
     fn trace_diagnostics_preserve_the_selected_candidates() -> anyhow::Result<()> {
         let (me, _, dest, graph) = two_hop_graph();
         let selector = test_selector(me, graph, MAX_PATHS);
@@ -1864,6 +1866,7 @@ mod tests {
     }
 
     #[test]
+    /// Report actual search phases, retained candidates and empty results to the observer.
     fn observer_sees_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
         let (me, _, dest, graph) = two_hop_graph();
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));

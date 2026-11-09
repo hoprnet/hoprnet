@@ -212,11 +212,9 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
     /// Configuration is validated before components are constructed. The observer is attached
     /// before transport starts; the reporting task starts after account readiness and is managed
     /// with the node's other tasks. No reporter is installed by default.
+    /// The factory may be set before component factories; its bounds are checked when building.
     #[cfg(feature = "state-dump")]
-    pub fn with_state_dump<NewDump: StateDumpFactory<Chain, Graph, Net>>(
-        self,
-        factory: NewDump,
-    ) -> HoprBuilderConfigured<Chain, Graph, Net, Ct, NewDump> {
+    pub fn with_state_dump<NewDump>(self, factory: NewDump) -> HoprBuilderConfigured<Chain, Graph, Net, Ct, NewDump> {
         HoprBuilderConfigured {
             ctx: self.ctx,
             state_dump_factory: factory,
@@ -525,6 +523,7 @@ fn log_network_information(
     );
 }
 
+/// Validate configuration, prepare the reporter and assemble components before account readiness.
 async fn pre_build_inner<Chain, Graph, Net, Ct, Dump>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -1351,6 +1350,7 @@ mod tests {
 
     #[cfg(feature = "state-dump")]
     #[test]
+    /// Register sections without collecting them, preserving names and shared callback state.
     fn state_dump_sections_are_lazy_and_keep_their_names_and_shared_state() -> anyhow::Result<()> {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1409,6 +1409,7 @@ mod tests {
 
     #[cfg(feature = "testing")]
     #[test]
+    /// Keep the startup record available even when configuration validation fails.
     fn startup_is_logged_before_invalid_configuration_is_rejected() -> anyhow::Result<()> {
         type TestBuilder = HoprBuilderConfigured<
             Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
@@ -1457,6 +1458,7 @@ mod tests {
     #[case::too_short("4", cfg!(not(feature = "state-dump")))]
     #[case::too_long("86401", cfg!(not(feature = "state-dump")))]
     #[case::malformed("invalid", cfg!(not(feature = "state-dump")))]
+    /// Validate reporter intervals only when the state-dump feature installs a reporter.
     fn state_dump_interval_validation_matches_the_feature(
         #[case] interval: &str,
         #[case] valid: bool,
@@ -1542,8 +1544,40 @@ mod tests {
         }
         Ok(())
     }
+    /// A factory specialized for the final components can be registered before those components.
     #[cfg(feature = "state-dump")]
     #[test]
+    fn state_dump_factory_can_be_set_before_component_factories() {
+        struct FinalComponentsOnly;
+
+        impl StateDumpFactory<u8, u16, u32> for FinalComponentsOnly {
+            fn create(
+                self,
+                _: u8,
+                _: u16,
+                _: u32,
+                _: Address,
+                _: crate::state_dump::StateDumpSections,
+            ) -> Option<crate::state_dump::StateDump> {
+                None
+            }
+        }
+
+        let configured: HoprBuilderConfigured<u8, u16, u32, (), FinalComponentsOnly> = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default())
+            .with_state_dump(FinalComponentsOnly)
+            .with_chain_api(|_| 1_u8)
+            .with_graph(|_| 2_u16)
+            .with_network(|_| Box::pin(async { unreachable!("this test does not start the network") }));
+        assert!(configured.chain_factory.is_some());
+        assert!(configured.graph_factory.is_some());
+        assert!(configured.network_factory.is_some());
+    }
+
+    #[cfg(feature = "state-dump")]
+    #[test]
+    /// Preserve registered sections as component setters change the builder types.
     fn state_dump_sections_survive_component_factory_changes() {
         let configured = HoprBuilder
             .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())

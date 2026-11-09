@@ -14,6 +14,7 @@ pub(crate) fn transport_observer(counters: IntervalCounters) -> TransportObserve
     Arc::new(move |event| record(&counters, event))
 }
 
+/// Translate each transport event into the companion collector counter operation.
 fn record(counters: &IntervalCounters, event: TransportEvent) {
     match event {
         TransportEvent::PathResolved {
@@ -47,6 +48,7 @@ fn record(counters: &IntervalCounters, event: TransportEvent) {
     }
 }
 
+/// Map the transport direction to the collector direction without changing its meaning.
 fn direction_of(direction: PathDirection) -> Direction {
     match direction {
         PathDirection::Forward => Direction::Forward,
@@ -54,6 +56,7 @@ fn direction_of(direction: PathDirection) -> Direction {
     }
 }
 
+/// Preserve returned and eligible candidate counts when adapting a search phase.
 fn phase_of(phase: PhaseCounts) -> PhaseOutcome {
     PhaseOutcome {
         returned: phase.returned,
@@ -83,11 +86,13 @@ where
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
     Net: NetworkView + Send + Sync + 'static,
 {
+    /// Validate and retain the environment configuration before constructing test components.
     fn prepare(&mut self) -> Result<(), HoprLibError> {
         self.config = Some(Config::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?);
         Ok(())
     }
 
+    /// Attach counters and named sections to a lazy collector, or disable it for a zero interval.
     fn create(
         self,
         chain: Chain,
@@ -121,6 +126,7 @@ mod tests {
     use super::*;
 
     #[test]
+    /// Verify that every event variant updates its matching collector counters.
     fn every_transport_event_reaches_the_counters() -> anyhow::Result<()> {
         let counters = IntervalCounters::default();
         let observer = transport_observer(counters.clone());
@@ -171,6 +177,7 @@ mod tests {
     }
 
     #[test]
+    /// Keep probe availability distinct from zero activity after interval counters reset.
     fn successful_events_and_idle_windows_preserve_probe_registration() -> anyhow::Result<()> {
         let counters = IntervalCounters::default();
         let observer = transport_observer(counters.clone());

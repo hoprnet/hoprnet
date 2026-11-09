@@ -595,6 +595,7 @@ mod tests {
     }
 
     impl NetworkGraphUpdate for PeerStore {
+        /// Store neighbor successes and timeouts in the test harness, ignoring loopback measurements.
         fn record_edge<N, P>(&self, telemetry: MeasurableEdge<N, P>)
         where
             N: hopr_api::graph::MeasurablePeer + Send + Clone,
@@ -676,6 +677,7 @@ mod tests {
         manual_probe_tx: futures::channel::mpsc::Sender<(OffchainPublicKey, PingQueryReplier)>,
     }
 
+    /// Run the probe harness without installing an observer.
     async fn test_with_probing<F, Fut>(cfg: ProbeConfig, store: PeerStore, test: F) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
@@ -684,6 +686,7 @@ mod tests {
         test_with_probing_observer(cfg, store, None, test).await
     }
 
+    /// Run probe producers and classifiers with an optional outcome observer and bounded test channels.
     async fn test_with_probing_observer<F, Fut>(
         cfg: ProbeConfig,
         store: PeerStore,
@@ -1172,6 +1175,7 @@ mod tests {
         0,
     )]
     #[tokio::test]
+    /// Check emitted probe SURB counts for configured path lengths and enabled probe modes.
     async fn probe_should_emit_with_expected_surb_count(
         #[case] strategy: TestProbeStrategy,
         #[case] expected_max_surbs: usize,
@@ -1311,6 +1315,7 @@ mod tests {
         Ok(())
     }
     #[tokio::test]
+    /// Report a neighbor timeout once and ignore a reply arriving after its probe expired.
     async fn observer_reports_actual_neighbor_expiry_once() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(10),

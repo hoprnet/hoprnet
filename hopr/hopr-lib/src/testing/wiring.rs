@@ -54,6 +54,7 @@ type FullyConfiguredBuilder<Chain> = crate::builder::HoprBuilderConfigured<
     TestStateDump,
 >;
 
+/// Assemble the emulated node factories and install the optional test reporter.
 fn make_builder<Chain>(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
