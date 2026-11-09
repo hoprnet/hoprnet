@@ -169,23 +169,17 @@ pub struct PathPlannerConfig {
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
     /// Loops over an edge from which the share that returned, not a single returned loop, decides whether
-    /// its relay delivers. Below it, one returned loop keeps the relay and none starves it. Few loops
-    /// cross an edge in a sparse network, so this stays small.
+    /// its relay delivers (handed to the graph through `ChannelGraph::with_starvation`). Below it, one returned loop
+    /// keeps the relay and none starves it. Few loops cross an edge in a sparse network, so this stays small.
     #[default = 3]
+    #[validate(range(min = 1))]
     pub min_loopbacks_for_rate: u32,
     /// Share of loops over an edge that must return, once there are `min_loopbacks_for_rate` of them, for
     /// its relay to stay routable. A relay dropping what it should forward still returns the odd loop, so
     /// this is never zero. In `(0.0, 1.0]`.
     #[default = 0.1]
+    #[validate(custom(function = "validate_loopback_return_rate"))]
     pub min_loopback_return_rate: f64,
-}
-
-impl PathPlannerConfig {
-    /// The thresholds the graph judges a relay's loops by, to be handed to
-    /// `ChannelGraph::with_starvation` by whoever builds the graph.
-    pub fn starvation_params(&self) -> hopr_network_graph::StarvationParams {
-        hopr_network_graph::StarvationParams::default()
-    }
 }
 
 /// Shortest accepted `refresh_period`. A zero period makes the sweep loop rebuild every cached
@@ -217,6 +211,16 @@ fn validate_refresh_within_ttl(cfg: &PathPlannerConfig) -> std::result::Result<(
         .into(),
     );
     Err(err)
+}
+
+/// A share of loops that must return, in `(0.0, 1.0]`: zero is met by any relay returning the odd loop, which
+/// is what a dropping relay does, so it would never starve one.
+fn validate_loopback_return_rate(value: f64) -> std::result::Result<(), ValidationError> {
+    if value.is_finite() && value > 0.0 && value <= 1.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new("value must be finite and in (0.0, 1.0]"))
+    }
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -1405,18 +1409,6 @@ mod tests {
         assert_eq!(cfg.min_loopbacks_for_rate, 3);
         assert_eq!(cfg.min_loopback_return_rate, 0.1);
         assert!(cfg.validate().is_ok());
-    }
-
-    #[test]
-    fn the_starvation_params_should_carry_the_configured_values() {
-        let cfg = PathPlannerConfig {
-            min_loopbacks_for_rate: 5,
-            min_loopback_return_rate: 0.3,
-            ..Default::default()
-        };
-        let params = cfg.starvation_params();
-        assert_eq!(params.min_loopbacks_for_rate, 5);
-        assert_eq!(params.min_return_rate, 0.3);
     }
 
     #[test]
