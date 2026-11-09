@@ -48,12 +48,6 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
-/// Additional diagnostic reads required when the `state-dump` feature is enabled.
-#[doc(hidden)]
-#[cfg(feature = "state-dump")]
-pub use hopr_chain_connector::state_dump::StateRead as StateDumpRead;
-#[cfg(feature = "state-dump")]
-use hopr_chain_connector::state_dump::{Collector, Config as StateDumpConfig, IntervalCounters};
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{
@@ -69,12 +63,14 @@ use crate::{
     config::HoprLibConfig, constants, helpers::BroadcastSenderSink,
 };
 
-/// No additional chain requirements when the `state-dump` feature is disabled.
+/// Internal builder bound when the state reporter integration is absent.
 #[doc(hidden)]
 #[cfg(not(feature = "state-dump"))]
-pub trait StateDumpRead {}
+pub trait StateDumpFactory<Chain, Graph, Net>: Send {}
 #[cfg(not(feature = "state-dump"))]
-impl<T: ?Sized> StateDumpRead for T {}
+impl<Chain, Graph, Net> StateDumpFactory<Chain, Graph, Net> for () {}
+#[cfg(feature = "state-dump")]
+pub use crate::state_dump::StateDumpFactory;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -105,8 +101,8 @@ type PeerDiscoveryRx =
 /// What `into_parts` hands to the shared build path: the configured builder, the two channels the
 /// transport is wired to, and the tasks already spawned for them. The admission sink is optional
 /// because a node built without a session server has nobody to ask.
-type BuildParts<Chain, Graph, Net, Ct> = (
-    HoprBuilderConfigured<Chain, Graph, Net, Ct>,
+type BuildParts<Chain, Graph, Net, Ct, Dump> = (
+    HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     futures::channel::mpsc::Sender<IncomingSession>,
     Option<hopr_transport::SessionAdmissionSink>,
     AbortableList<HoprLibProcess>,
@@ -177,6 +173,7 @@ impl HoprBuilderWithIdentity {
                 #[cfg(feature = "state-dump")]
                 state_dump_sections: Vec::new(),
             },
+            state_dump_factory: (),
             safe_and_module: None,
             chain_factory: None,
             graph_factory: None,
@@ -198,8 +195,9 @@ impl HoprBuilderWithIdentity {
 /// has the `build_edge` / `build_full` methods.
 ///
 /// When the feature is disabled, `build_edge` / `build_full` are available directly.
-pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
+pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     ctx: BuildCtx,
+    state_dump_factory: Dump,
     safe_and_module: Option<(Address, Address)>,
     chain_factory: Option<Factory<Chain>>,
     graph_factory: Option<Factory<Graph>>,
@@ -208,7 +206,29 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     peer_discovery_tx: CrossfireSink<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
 }
 
-impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
+impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump> {
+    /// Installs the embedding application's state reporter factory.
+    ///
+    /// Configuration is validated before components are constructed. The observer is attached
+    /// before transport starts; the reporting task starts after account readiness and is managed
+    /// with the node's other tasks. No reporter is installed by default.
+    #[cfg(feature = "state-dump")]
+    pub fn with_state_dump<NewDump: StateDumpFactory<Chain, Graph, Net>>(
+        self,
+        factory: NewDump,
+    ) -> HoprBuilderConfigured<Chain, Graph, Net, Ct, NewDump> {
+        HoprBuilderConfigured {
+            ctx: self.ctx,
+            state_dump_factory: factory,
+            safe_and_module: self.safe_and_module,
+            chain_factory: self.chain_factory,
+            graph_factory: self.graph_factory,
+            network_factory: self.network_factory,
+            ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
+        }
+    }
+
     /// Adds a named section to every periodic state dump record, for example the states of the
     /// strategies the embedding node runs. `section` is called once per record and must not block.
     ///
@@ -233,9 +253,10 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     pub fn with_chain_api<NewChain>(
         self,
         f: impl FnOnce(&BuildCtx) -> NewChain + Send + 'static,
-    ) -> HoprBuilderConfigured<NewChain, Graph, Net, Ct> {
+    ) -> HoprBuilderConfigured<NewChain, Graph, Net, Ct, Dump> {
         HoprBuilderConfigured {
             ctx: self.ctx,
+            state_dump_factory: self.state_dump_factory,
             safe_and_module: self.safe_and_module,
             chain_factory: Some(Box::new(f)),
             graph_factory: self.graph_factory,
@@ -249,9 +270,10 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     pub fn with_graph<NewGraph>(
         self,
         f: impl FnOnce(&BuildCtx) -> NewGraph + Send + 'static,
-    ) -> HoprBuilderConfigured<Chain, NewGraph, Net, Ct> {
+    ) -> HoprBuilderConfigured<Chain, NewGraph, Net, Ct, Dump> {
         HoprBuilderConfigured {
             ctx: self.ctx,
+            state_dump_factory: self.state_dump_factory,
             safe_and_module: self.safe_and_module,
             chain_factory: self.chain_factory,
             graph_factory: Some(Box::new(f)),
@@ -271,9 +293,10 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = Result<(NewNet, BoxedProcessFn), HoprLibError>> + Send>>
         + Send
         + 'static,
-    ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
+    ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct, Dump> {
         HoprBuilderConfigured {
             ctx: self.ctx,
+            state_dump_factory: self.state_dump_factory,
             safe_and_module: self.safe_and_module,
             chain_factory: self.chain_factory,
             graph_factory: self.graph_factory,
@@ -287,9 +310,10 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     pub fn with_cover_traffic<NewCt>(
         self,
         f: impl FnOnce(&BuildCtx) -> NewCt + Send + 'static,
-    ) -> HoprBuilderConfigured<Chain, Graph, Net, NewCt> {
+    ) -> HoprBuilderConfigured<Chain, Graph, Net, NewCt, Dump> {
         HoprBuilderConfigured {
             ctx: self.ctx,
+            state_dump_factory: self.state_dump_factory,
             safe_and_module: self.safe_and_module,
             chain_factory: self.chain_factory,
             graph_factory: self.graph_factory,
@@ -319,7 +343,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         + Send
         + Sync
         + 'static,
-    ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
+    ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct, Dump> {
         let incoming_session_capacity = self.ctx.cfg.incoming_session_capacity.max(1);
 
         let (session_tx, session_rx) = futures::channel::mpsc::channel::<IncomingSession>(incoming_session_capacity);
@@ -409,8 +433,8 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
 ///
 /// Only exists when the `session-server` feature is enabled.
 #[cfg(feature = "session-server")]
-pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = ()> {
-    inner: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
+pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
+    inner: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
     admission_tx: hopr_transport::SessionAdmissionSink,
     session_handle: hopr_utils::runtime::AbortHandle,
@@ -501,14 +525,15 @@ fn log_network_information(
     );
 }
 
-async fn pre_build_inner<Chain, Graph, Net, Ct>(
-    configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
+async fn pre_build_inner<Chain, Graph, Net, Ct, Dump>(
+    configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
     admission_tx: Option<hopr_transport::SessionAdmissionSink>,
     mut processes: AbortableList<HoprLibProcess>,
 ) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Dump: StateDumpFactory<Chain, Graph, Net>,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -522,14 +547,9 @@ where
     log_startup(&ctx);
     ctx.cfg.validate()?;
     #[cfg(feature = "state-dump")]
-    let state_dump_config = StateDumpConfig::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
+    let mut state_dump_factory = configured.state_dump_factory;
     #[cfg(feature = "state-dump")]
-    let state_dump_counters = state_dump_config.interval().map(|_| IntervalCounters::default());
-    #[cfg(feature = "state-dump")]
-    let transport_observer = state_dump_counters.clone().map(crate::state_dump::transport_observer);
-
-    #[cfg(not(feature = "state-dump"))]
-    let transport_observer = None;
+    state_dump_factory.prepare()?;
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
     tracing::info!(?network_tuning, "OS network tuning specs");
@@ -553,6 +573,19 @@ where
         .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);
 
     let (chain_id, transport_id) = (ctx.chain_key.clone(), ctx.packet_key.clone());
+
+    #[cfg(feature = "state-dump")]
+    let state_dump = state_dump_factory.create(
+        chain_api.clone(),
+        graph.clone(),
+        network.clone(),
+        ctx.cfg.safe_module.safe_address,
+        ctx.state_dump_sections,
+    );
+    #[cfg(feature = "state-dump")]
+    let transport_observer = state_dump.as_ref().and_then(|reporter| reporter.observer.clone());
+    #[cfg(not(feature = "state-dump"))]
+    let transport_observer = None;
 
     let transport_api = HoprTransport::new_with_observer(
         (&chain_id, &transport_id),
@@ -862,25 +895,10 @@ where
     }
 
     #[cfg(feature = "state-dump")]
-    if state_dump_config.interval().is_some() {
-        let collector = ctx.state_dump_sections.iter().fold(
-            Collector::new(
-                chain_api.clone(),
-                graph.clone(),
-                network.clone(),
-                safe_addr,
-                state_dump_config,
-            ),
-            |collector, (name, section)| {
-                let section = section.clone();
-                collector.with_section(name, move || section())
-            },
-        );
+    if let Some(reporter) = state_dump {
         processes.insert(
             HoprLibProcess::StateDump,
-            hopr_utils::spawn_as_abortable!(async move {
-                collector.run(state_dump_counters).await;
-            }),
+            hopr_utils::spawn_as_abortable!(reporter.process),
         );
     }
 
@@ -1252,9 +1270,10 @@ macro_rules! impl_build_methods {
 
 // When session-server is ON: build methods only on HoprBuilderWithSession
 #[cfg(feature = "session-server")]
-impl<Chain, Graph, Net, Ct> HoprBuilderWithSession<Chain, Graph, Net, Ct>
+impl<Chain, Graph, Net, Ct, Dump> HoprBuilderWithSession<Chain, Graph, Net, Ct, Dump>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Dump: StateDumpFactory<Chain, Graph, Net>,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1264,7 +1283,7 @@ where
 {
     impl_build_methods!();
 
-    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct> {
+    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct, Dump> {
         let mut processes = AbortableList::<HoprLibProcess>::default();
         processes.insert(HoprLibProcess::SessionServer, self.session_handle);
         processes.insert(HoprLibProcess::SessionAdmission, self.admission_handle);
@@ -1274,9 +1293,10 @@ where
 
 // When session-server is OFF: build methods directly on HoprBuilderConfigured
 #[cfg(not(feature = "session-server"))]
-impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct>
+impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Dump: StateDumpFactory<Chain, Graph, Net>,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1286,7 +1306,7 @@ where
 {
     impl_build_methods!();
 
-    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct> {
+    fn into_parts(self) -> BuildParts<Chain, Graph, Net, Ct, Dump> {
         let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
         let processes = AbortableList::<HoprLibProcess>::default();
         (self, tx, None, processes)
@@ -1406,6 +1426,7 @@ mod tests {
         // No component factory may be required or invoked before configuration validation.
         let configured = TestBuilder {
             ctx: builder.ctx,
+            state_dump_factory: (),
             safe_and_module: None,
             chain_factory: None,
             graph_factory: None,
@@ -1452,6 +1473,7 @@ mod tests {
                 .with_config(HoprLibConfig::default());
             let configured = TestBuilder {
                 ctx: builder.ctx,
+                state_dump_factory: (),
                 safe_and_module: None,
                 chain_factory: None,
                 graph_factory: None,
@@ -1459,6 +1481,8 @@ mod tests {
                 ct_factory: None,
                 peer_discovery_tx: builder.peer_discovery_tx,
             };
+            #[cfg(feature = "state-dump")]
+            let configured = configured.with_state_dump(crate::testing::state_dump::Factory::default());
             let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
             let error =
                 futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))

@@ -77,7 +77,7 @@ required-features = ["testing"]
 [features]
 capture = ["hopr-transport/capture"]
 # Opt-in periodic operational state snapshots and transport counters.
-state-dump = ["dep:hopr-chain-connector"]
+state-dump = ["dep:serde_json"]
 default = ["pix-bjj", "transport-announce-quic"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
@@ -144,6 +144,7 @@ testing = [
   "dep:hopr-transport-p2p",
   "dep:hopr-ct-full-network",
   "dep:hopr-network-graph",
+  "dep:hopr-chain-connector",
   "hopr-chain-connector/testing",
   "hopr-chain-connector/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
@@ -165,6 +166,7 @@ futures = { workspace = true }
 futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }
@@ -200,9 +202,10 @@ hopr-utils = { workspace = true, features = [
 ] }
 hopr-transport = { workspace = true }
 
+# Concrete components for the emulated-node testing feature only.
+hopr-chain-connector = { workspace = true, optional = true }
 hopr-ticket-manager = { workspace = true, optional = true }
 hopr-transport-p2p = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true, optional = true }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
 

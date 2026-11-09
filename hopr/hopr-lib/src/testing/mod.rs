@@ -13,6 +13,8 @@ pub mod dummies;
 pub mod fixtures;
 pub mod hopr;
 pub mod loadgen;
+#[cfg(feature = "state-dump")]
+pub(crate) mod state_dump;
 pub mod wiring;
 
 pub(crate) type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;
