@@ -45,7 +45,7 @@ fn make_builder<Chain>(
     config: HoprLibConfig,
     prober_cfg: hopr_ct_full_network::ProberConfig,
     chain_connector: Chain,
-) -> FullyConfiguredBuilder<Chain>
+) -> anyhow::Result<FullyConfiguredBuilder<Chain>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -60,13 +60,14 @@ where
         .with_starvation(hopr_network_graph::StarvationParams {
             min_loopbacks_for_rate: path_cfg.min_loopbacks_for_rate,
             min_return_rate: path_cfg.min_loopback_return_rate,
-        }),
+        })
+        .map_err(|e| anyhow::anyhow!("invalid loopback starvation config: {e}"))?,
     );
     let graph_for_ct = graph.clone();
     let safe_address = config.safe_module.safe_address;
     let module_address = config.safe_module.module_address;
 
-    HoprBuilder
+    Ok(HoprBuilder
         .with_identity(chain_key, packet_key)
         .with_config(config)
         .with_safe_module(&safe_address, &module_address)
@@ -93,7 +94,7 @@ where
         })
         .with_cover_traffic(move |ctx| {
             hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
-        })
+        }))
 }
 
 /// Builds an edge (entry/exit) HOPR node with a custom chain connector.
@@ -129,7 +130,7 @@ where
         config,
         probe_cfg.unwrap_or_default(),
         chain_connector,
-    );
+    )?;
 
     let node = builder.with_session_server(server).build_edge(ticket_factory).await?;
 
@@ -169,7 +170,7 @@ where
         config,
         probe_cfg.unwrap_or_default(),
         chain_connector,
-    );
+    )?;
 
     let node = builder
         .with_session_server(server)
@@ -215,7 +216,7 @@ where
         config,
         probe_cfg.unwrap_or_default(),
         chain_connector,
-    );
+    )?;
 
     let node = builder.with_session_server(server).build_entry(ticket_factory).await?;
 
@@ -258,7 +259,7 @@ where
         config,
         probe_cfg.unwrap_or_default(),
         chain_connector,
-    );
+    )?;
 
     let node = builder.with_session_server(server).build_exit(ticket_factory).await?;
 
