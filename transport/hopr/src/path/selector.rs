@@ -539,7 +539,7 @@ where
     /// in an async executor to avoid blocking the caller).
     #[tracing::instrument(
         name = "selector.select_paths", level = "trace", skip_all,
-        fields(src = %src, dest = %dest, hops, direction = if src == self.me { "forward" } else { "return" }),
+        fields(src = %src, dest = %dest, hops = hops, direction = if src == self.me { "forward" } else { "return" }),
         ret, err
     )]
     fn select_path(

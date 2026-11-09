@@ -3174,6 +3174,15 @@ mod tests {
             .find(|line| line.contains("graph traversal completed"))
             .context("missing formatted graph record")?;
         assert!(line.contains("session_id=123"), "{line}");
+        let selector_fields = line
+            .split_once("selector.select_paths{")
+            .and_then(|(_, fields)| fields.split_once('}'))
+            .map(|(fields, _)| fields)
+            .context("missing formatted selector span fields")?;
+        assert!(
+            selector_fields.split_whitespace().any(|field| field == "hops=1"),
+            "selector span must record the requested hop count: {line}"
+        );
         Ok(())
     }
 
