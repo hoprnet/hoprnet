@@ -549,6 +549,12 @@ pub struct TestNodeConfig {
     /// `None` (the default) uses the CPU-derived defaults. Set it to pin a node's decode/encode
     /// concurrency — e.g. `input_concurrency = Some(1)` to reproduce the pre-fix collapse.
     pub pipeline: Option<crate::exports::transport::protocol::PacketPipelineConfig>,
+    /// The Exit's SURB-level notification period, or `None` to disable the notification.
+    ///
+    /// Defaults to `None`, which disables EXIT→ENTRY SURB level notifications: with a period shorter
+    /// than `idle_timeout` each notification resets the moka TTI and breaks session expiration tests.
+    /// This is the override for tests that need the Exit's keep-alive stream to actually run.
+    pub surb_balance_notify_period: Option<Duration>,
 }
 
 impl Default for TestNodeConfig {
@@ -560,6 +566,7 @@ impl Default for TestNodeConfig {
             pix_global_config: None,
             transit_latency: None,
             pipeline: None,
+            surb_balance_notify_period: None,
         }
     }
 }
@@ -770,6 +777,7 @@ fn cluster_fixture_inner(
             let pix_global_config = configs[i].pix_global_config;
             let transit_latency = configs[i].transit_latency;
             let pipeline = configs[i].pipeline;
+            let surb_balance_notify_period = configs[i].surb_balance_notify_period;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -820,6 +828,7 @@ fn cluster_fixture_inner(
                         pix_global_config,
                         transit_latency,
                         pipeline,
+                        surb_balance_notify_period,
                     );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
@@ -1051,6 +1060,7 @@ where
                         cfg.pix_global_config,
                         cfg.transit_latency,
                         cfg.pipeline,
+                        cfg.surb_balance_notify_period,
                     );
 
                     let prober = Some(hopr_ct_full_network::ProberConfig {

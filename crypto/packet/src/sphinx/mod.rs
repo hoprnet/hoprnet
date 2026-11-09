@@ -37,10 +37,11 @@ mod surb;
 
 pub mod prelude {
     pub use super::{
+        derivation::derive_packet_tag,
         ec_groups::*,
         packet::{
-            ForwardedMetaPacket, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket, ProtocolKeyIdMapper,
-            SimpleBiMapper,
+            ForwardSecret, ForwardedMetaPacket, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket,
+            ProtocolKeyIdMapper, SimpleBiMapper,
         },
         routing::SphinxHeaderSpec,
         shared_keys::{SharedKeys, SharedSecret, SphinxSuite},

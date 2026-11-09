@@ -10,7 +10,8 @@ use hopr_utils::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
-    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError, tbf::TagBloomFilter,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, errors::HoprProtocolError,
+    replay_filter::TagReplayFilter,
 };
 
 /// Default [decoder](PacketDecoder) implementation for HOPR packets.
@@ -22,7 +23,7 @@ pub struct HoprDecoder<Chain, S, T> {
     chain_key: ChainKeypair,
     channels_dst: Hash,
     cfg: HoprCodecConfig,
-    tbf: parking_lot::Mutex<TagBloomFilter>,
+    replay_filter: TagReplayFilter,
 }
 
 impl<Chain, S, T> HoprDecoder<Chain, S, T>
@@ -48,8 +49,13 @@ where
             channels_dst,
             cfg,
             ticket_factory,
-            tbf: parking_lot::Mutex::new(Default::default()),
+            replay_filter: TagReplayFilter::new(&cfg.replay_filter),
         }
+    }
+
+    /// The replay filter, for tests and telemetry.
+    pub fn replay_filter(&self) -> &TagReplayFilter {
+        &self.replay_filter
     }
 
     #[tracing::instrument(skip(self, fwd), level = "debug", fields(path_pos = fwd.path_pos))]
@@ -188,16 +194,29 @@ where
             })
         })?;
 
-        // Phase 2: Sphinx packet decoding
+        // Phase 2: Sphinx decoding, with the replay filter consulted on the packet tag.
+        //
+        // The tag is derived from the shared secret, so it becomes available right after the elliptic-curve
+        // multiplication - before the header MAC, the payload permutation and the message parse. The filter is
+        // asked from inside the decode, which is what lets a replay skip that remaining work. The check runs
+        // first and records nothing; the commit runs once the header MAC has verified.
+        //
+        // Anybody can *compute* a tag, from the node's public key and an alpha of their choosing, so a tag is not
+        // by itself proof of anything. What costs a well-formed packet is getting one *recorded*: only a packet
+        // whose header MAC verifies reaches the commit. A packet that authenticates and then fails on our side is
+        // recorded too, which costs one slot.
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
         // Which of our SURBs this packet came back on, if any. Captured here because resolving the
         // opener is the only point that knows it; by the time the decoded packet exists the sender
         // id is gone.
+        // The opener is *peeked* here and removed below only once the reply has been delivered, so that a copy
+        // which loses a concurrent race cannot take the winner's decryption key with it.
         let replied_on_surb = std::cell::Cell::new(None);
+        let consumed_opener = std::cell::Cell::new(None);
         let packet = trace_timed!("sphinx_decode complete", {
-            HoprPacket::from_incoming(
+            HoprPacket::from_incoming_checked(
                 &data,
                 &self.packet_key,
                 previous_hop,
@@ -206,24 +225,41 @@ where
                     let opener = self.surb_store.find_reply_opener(p);
                     if opener.is_some() {
                         replied_on_surb.set(Some(p.surb_id()));
+                        consumed_opener.set(Some(*p));
                     }
                     opener
                 },
+                // Checked once the secret exists, so a replay skips the header MAC, the payload permutation and
+                // the message parse.
+                |tag| {
+                    let is_replay = self.replay_filter.contains(tag);
+                    if is_replay {
+                        tracing::debug!(%sender, "dropping packet - replay detected after the shared secret");
+                    }
+                    is_replay
+                },
+                // Committed once the header MAC and payload permutation have succeeded - the message/ticket parse
+                // follows - so a forged alpha costs a well-formed packet rather than just the node's public key.
+                // Reporting whether the tag was already present closes the race with a concurrent decode of the
+                // same packet.
+                |tag| {
+                    let is_replay = self.replay_filter.commit(tag);
+                    if is_replay {
+                        tracing::debug!(%sender, "dropping packet - replay detected while committing");
+                    }
+                    is_replay
+                },
             )
         })
-        .map_err(IncomingPacketError::undecodable)?;
+        .map_err(|error| match error {
+            hopr_crypto_packet::errors::PacketError::PacketReplay => IncomingPacketError::Replay(previous_hop.into()),
+            error => IncomingPacketError::undecodable(HoprProtocolError::from(error)),
+        })?;
 
-        // This is checked on both Final and Forwarded packets,
-        // Outgoing packets are not allowed to pass and are later reported as invalid state.
-        if let Some(tag) = packet.packet_tag() {
-            // This operation has run-time of ~10 nanoseconds,
-            // and therefore does not need to be invoked via spawn_blocking
-            if self.tbf.lock().check_and_set(tag) {
-                return Err(IncomingPacketError::ProcessingError(
-                    previous_hop.into(),
-                    HoprProtocolError::Replay,
-                ));
-            }
+        // The reply decoded, so its opener has done its job. Removing it only now means a concurrent copy that
+        // lost the tag race still found - and did not consume - the opener, so its own failure costs nothing.
+        if let Some(sender_id) = consumed_opener.get() {
+            self.surb_store.remove_reply_opener(&sender_id);
         }
 
         match packet {
@@ -250,7 +286,13 @@ where
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
                     let outcome = self.surb_store.insert_surbs(incoming.sender, incoming.surbs);
-                    info.num_evicted_surbs = outcome.evicted;
+                    // `num_surbs` above counts every SURB the packet carried, so everything that did
+                    // not stay in the store has to be booked as gone, or the Exit's level estimate
+                    // (`produced - consumed - evicted`) drifts above what the store holds. That is
+                    // the overflow, and also the stock a newer SURB generation wiped and the batch an
+                    // older one refused: after the Entry bumps the generation the Exit's whole stock
+                    // is gone, and its keep-alive must report that rather than the pre-wipe level.
+                    info.num_evicted_surbs = outcome.evicted + outcome.superseded;
 
                     // The tier split costs a second lookup and a lock, so take it only if the line below is
                     // going to be emitted.

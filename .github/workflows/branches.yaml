@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write # zizmor: ignore[excessive-permissions]
 
 concurrency:
   group: branches-${{ github.ref_name }}-${{ github.sha }}
@@ -17,6 +16,9 @@ concurrency:
 jobs:
   coverage:
     name: Coverage
+    permissions:
+      contents: read
+      id-token: write # Codecov OIDC upload
     uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
     with:
       source_branch: ${{ github.ref_name }}

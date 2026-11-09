@@ -3,6 +3,7 @@ mod encoder;
 
 pub use decoder::HoprDecoder;
 pub use encoder::{HoprEncoder, MAX_ACKNOWLEDGEMENTS_BATCH_SIZE};
+use validator::Validate as _;
 
 /// Configuration of [`HoprEncoder`] and [`HoprDecoder`].
 #[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
@@ -45,12 +46,21 @@ pub struct HoprCodecConfig {
         serde_as(as = "Option<serde_with::DisplayFromStr>")
     )]
     pub outgoing_win_prob: Option<hopr_api::types::internal::prelude::WinningProbability>,
+    /// Configuration of the packet replay filter used by [`HoprDecoder`].
+    ///
+    /// The filter is global across previous hops: the replay token names the packet, not the sender, so a replay
+    /// injected through a different peer is still caught. See [`ReplayFilterConfig`](crate::ReplayFilterConfig) for
+    /// the retention floor and the memory consequences of the two knobs.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub replay_filter: crate::ReplayFilterConfig,
 }
 
 impl PartialEq for HoprCodecConfig {
     fn eq(&self, other: &Self) -> bool {
         self.outgoing_ticket_price.eq(&other.outgoing_ticket_price)
             && self.min_incoming_ticket_price.eq(&other.min_incoming_ticket_price)
+            && self.replay_filter.eq(&other.replay_filter)
             && match (self.outgoing_win_prob, other.outgoing_win_prob) {
                 (Some(a), Some(b)) => a.approx_eq(&b),
                 (None, None) => true,
@@ -66,6 +76,8 @@ mod tests {
         atomic::{AtomicU64, Ordering},
     };
 
+    use anyhow::Context;
+    use bytes::Bytes;
     use hopr_api::types::{
         crypto::prelude::*,
         crypto_random::Randomizable,
@@ -109,6 +121,20 @@ mod tests {
         )
     }
 
+    /// A codec config for tests.
+    ///
+    /// The replay filter defaults to a 10-million-token generation, which allocates tens of megabytes per
+    /// decoder; the codec tests build several, so they use the smallest generation the config accepts.
+    pub fn test_codec_config() -> HoprCodecConfig {
+        HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                max_tracked_packets: crate::MIN_TRACKED_PACKETS,
+                ..Default::default()
+            },
+            ..HoprCodecConfig::default()
+        }
+    }
+
     pub fn create_decoder(receiver: &Node) -> TestDecoder {
         HoprDecoder::new(
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
@@ -116,7 +142,7 @@ mod tests {
             receiver.surb_store.clone(),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
-            HoprCodecConfig::default(),
+            test_codec_config(),
         )
     }
 
@@ -362,6 +388,215 @@ mod tests {
             .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
 
         f.sender_assert_reply(fwd_packet.data, resp)?;
+
+        Ok(())
+    }
+
+    /// A reply carries the SURB's alpha, so its replay token is fixed when the SURB was minted. Two replies over
+    /// two different SURBs must both be accepted, and the replay of one must be rejected - which is what keeps the
+    /// shared alpha of the SURB mechanism from looking like a replay to the filter.
+    #[tokio::test]
+    async fn surb_replies_should_be_distinct_but_replayable() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let pseudonym = HoprPseudonym::random();
+
+        // Ask for two SURBs, so the receiver can produce two distinct replies.
+        let out_packet = f.sender_encoder.encode_packet(
+            b"a message carrying surbs",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone(), f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)?;
+        let fwd_packet = fwd_packet
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+        f.receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet.data)?;
+
+        let first = f.surb_reply(pseudonym, b"first reply")?;
+        let second = f.surb_reply(pseudonym, b"second reply")?;
+
+        // The relay sees each reply, so its filter is where a legitimate reply must not look like a replay.
+        let forwarded_first = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), first.data.clone())?;
+        f.relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), second.data)?;
+
+        let forwarded_first = forwarded_first
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+
+        // Delivering the reply consumes its opener at the destination.
+        f.sender_assert_reply(forwarded_first.clone(), b"first reply")?;
+
+        // A duplicate must still be recognised as a replay there, rather than reported undecodable because the
+        // opener it needs is already gone.
+        let replayed_at_destination = f
+            .sender_decoder
+            .decode(f.relay.offchain_key.public().into(), forwarded_first);
+        assert!(
+            replayed_at_destination
+                .err()
+                .context("a duplicate reply must be rejected")?
+                .is_replay(),
+            "a duplicate reply must be a replay even though its opener was consumed"
+        );
+
+        // And the wire copy is caught at the relay as well.
+        let replayed = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), first.data);
+        assert!(
+            replayed.err().context("a replayed reply must be rejected")?.is_replay(),
+            "a replayed reply must be caught"
+        );
+
+        Ok(())
+    }
+
+    /// A packet that never authenticates must not consume the SURB reply opener it names. The opener lookup is a
+    /// removing read, so if it ran for a forged packet the genuine reply would find nothing and be lost.
+    #[tokio::test]
+    async fn a_forged_packet_should_not_consume_a_reply_opener() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let pseudonym = HoprPseudonym::random();
+
+        // One SURB out to the receiver, so the sender holds the opener that will decrypt the reply.
+        let out_packet = f.sender_encoder.encode_packet(
+            b"a message carrying a surb",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)
+            .context("relay must forward the packet carrying the surb")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+        f.receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet)
+            .context("receiver must accept the packet and store the surb")?;
+
+        // The reply leaves the receiver and is relayed back towards the sender, which is where its opener lives.
+        let reply = f.surb_reply(pseudonym, b"the genuine reply")?;
+        let reply_to_sender = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), reply.data)
+            .context("relay must forward the reply")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("reply is not forwarded"))?
+            .data
+            .clone();
+
+        // A forged copy of what the sender will receive: a valid alpha, so the tag is derivable and `is_replay`
+        // runs, but a corrupted header, so it never authenticates - and so must never reach the opener lookup.
+        const ALPHA_LEN: usize = 32;
+        let mut forged = reply_to_sender.to_vec();
+        forged[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+        let forged = Bytes::from(forged);
+
+        assert!(
+            f.sender_decoder
+                .decode(f.relay.offchain_key.public().into(), forged)
+                .err()
+                .context("a forged reply must be rejected")?
+                .is_undecodable(),
+            "a forged reply must not decode"
+        );
+
+        // The genuine reply must still decrypt at the sender, which it can only do if its opener survived.
+        f.sender_assert_reply(reply_to_sender, b"the genuine reply")?;
+
+        Ok(())
+    }
+
+    /// Two concurrent decodes of the *same reply* must deliver it, not consume each other's opener.
+    ///
+    /// The pipeline decodes on a pool, so both copies pass `is_replay`, both look the opener up, and only one of
+    /// them can win the tag race. If the lookup consumed the opener, the loser would fail and the winner would
+    /// then find nothing to decrypt with - losing a reply that arrived intact.
+    #[test]
+    fn concurrent_decodes_of_a_reply_should_still_deliver_it() -> anyhow::Result<()> {
+        let runtime = tokio::runtime::Runtime::new()?;
+        let f = runtime.block_on(PixTestFixture::new())?;
+        let pseudonym = HoprPseudonym::random();
+
+        let out_packet = f.sender_encoder.encode_packet(
+            b"a message carrying a surb",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)
+            .context("relay must forward the packet carrying the surb")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?
+            .data
+            .clone();
+        f.receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet)
+            .context("receiver must accept the packet and store the surb")?;
+
+        let reply = f.surb_reply(pseudonym, b"the genuine reply")?;
+        let reply_to_sender = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), reply.data)
+            .context("relay must forward the reply")?
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("reply is not forwarded"))?
+            .data
+            .clone();
+
+        // Both copies race through the sender's decoder, released together.
+        let sender_decoder = std::sync::Arc::new(create_decoder(&f.sender));
+        let relay_peer_id: PeerId = f.relay.offchain_key.public().into();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let outcomes: Vec<_> = std::thread::scope(|scope| {
+            let handles = (0..2)
+                .map(|_| {
+                    let (decoder, data, barrier) = (sender_decoder.clone(), reply_to_sender.clone(), barrier.clone());
+                    scope.spawn(move || {
+                        barrier.wait();
+                        decoder.decode(relay_peer_id, data)
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
+                .collect::<anyhow::Result<Vec<_>>>()
+        })?;
+
+        let delivered = outcomes.iter().filter(|o| o.is_ok()).count();
+        assert_eq!(1, delivered, "exactly one copy must be delivered; got {outcomes:?}");
+        assert!(
+            outcomes.iter().any(|o| matches!(o, Err(e) if e.is_replay())),
+            "the other copy must be recognised as a replay"
+        );
 
         Ok(())
     }
@@ -877,7 +1112,7 @@ mod tests {
 
         let result = decoder.decode(sender_peer_id, invalid_data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_undecodable());
+        assert!(result.err().context("must not decode")?.is_undecodable());
 
         Ok(())
     }
@@ -912,7 +1147,241 @@ mod tests {
         // Second decode with same packet should fail (replay)
         let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_processing_error());
+        assert!(
+            result.err().context("a duplicate must be rejected")?.is_replay(),
+            "a duplicate must be reported as a replay"
+        );
+
+        Ok(())
+    }
+
+    /// The replay check runs before the packet is decoded, so a replay whose remainder has been corrupted is
+    /// reported as a replay rather than as undecodable. This pins the ordering: if the check moved back after
+    /// `from_incoming`, this test would see `Undecodable` instead.
+    #[tokio::test]
+    async fn replay_should_be_detected_before_the_packet_is_decoded() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+
+        let encoder = create_encoder(&sender);
+        let decoder = create_decoder(&receiver);
+
+        let out_packet = encoder.encode_packet(
+            b"a message to replay",
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+            None,
+        )?;
+
+        let sender_peer_id: PeerId = sender.offchain_key.public().into();
+        decoder.decode(sender_peer_id, out_packet.data.clone())?;
+
+        // Keep the alpha, so the shared secret - and hence the tag - is still derivable, but destroy the routing
+        // header and payload after it, so the packet cannot be decoded any further. The replay must be caught from
+        // the tag, before the header MAC is checked.
+        const ALPHA_LEN: usize = 32;
+        let mut corrupted = out_packet.data.to_vec();
+        let header_start = ALPHA_LEN;
+        let header_end = header_start + hopr_crypto_packet::prelude::HoprPacket::SIZE / 2;
+        corrupted[header_start..header_end].fill(0xff);
+        let corrupted = Bytes::from(corrupted);
+
+        let result = decoder.decode(sender_peer_id, corrupted);
+        assert!(
+            result.err().context("a replay must be rejected")?.is_replay(),
+            "a replay must be caught from the tag, before the rest of the packet is decoded"
+        );
+
+        Ok(())
+    }
+
+    /// Random bytes must not enter the filter: the tag is only derived once the shared secret exists, so garbage is
+    /// rejected before the filter is consulted at all.
+    #[tokio::test]
+    async fn an_undecodable_packet_should_not_be_remembered() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+
+        let decoder = create_decoder(&receiver);
+        let sender_peer_id: PeerId = sender.offchain_key.public().into();
+
+        let garbage = Bytes::from(vec![0x42u8; hopr_crypto_packet::prelude::HoprPacket::SIZE]);
+
+        let first = decoder.decode(sender_peer_id, garbage.clone());
+        assert!(
+            first.err().context("random bytes must not decode")?.is_undecodable(),
+            "random bytes must not decode"
+        );
+        assert_eq!(
+            0,
+            decoder.replay_filter().count(),
+            "a failed decode must not enter the filter"
+        );
+
+        let second = decoder.decode(sender_peer_id, garbage);
+        assert!(
+            second
+                .err()
+                .context("the same garbage must be rejected")?
+                .is_undecodable(),
+            "the same garbage must be undecodable twice, not a replay the second time"
+        );
+
+        Ok(())
+    }
+
+    /// The decoder's own check-then-commit must let exactly one of two concurrent decodes of the same packet
+    /// through. Both threads pass the `contains` check before either commits, so this is the `commit` return value
+    /// that decides - the filter-level test alone would not catch a decoder that dropped it.
+    #[test]
+    fn concurrent_decodes_of_the_same_packet_should_yield_exactly_one_success() -> anyhow::Result<()> {
+        let runtime = tokio::runtime::Runtime::new()?;
+        let blokli_client = create_blokli_client()?;
+        let (sender, receiver) = runtime.block_on(async {
+            Ok::<_, anyhow::Error>((
+                create_node(0, &blokli_client).await.context("sender node")?,
+                create_node(1, &blokli_client).await.context("receiver node")?,
+            ))
+        })?;
+
+        let encoder = create_encoder(&sender);
+        let decoder = std::sync::Arc::new(create_decoder(&receiver));
+        let sender_peer_id: PeerId = sender.offchain_key.public().into();
+
+        // Several rounds, so a lost race in one round does not hide an always-broken commit.
+        for _ in 0..8 {
+            let out_packet = encoder.encode_packet(
+                b"a message decoded concurrently",
+                ResolvedTransportRouting::Forward {
+                    pseudonym: HoprPseudonym::random(),
+                    forward_path: ValidatedPath::direct(
+                        *receiver.offchain_key.public(),
+                        receiver.chain_key.public().to_address(),
+                    ),
+                    return_paths: vec![],
+                },
+                None,
+                None,
+            )?;
+
+            // Two OS threads released together: both pass `contains` before either commits, so only the `commit`
+            // return value can decide between them.
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+            let successes = std::thread::scope(|scope| {
+                let handles = (0..2)
+                    .map(|_| {
+                        let (decoder, data, barrier) = (decoder.clone(), out_packet.data.clone(), barrier.clone());
+                        scope.spawn(move || {
+                            barrier.wait();
+                            decoder.decode(sender_peer_id, data).is_ok()
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                handles
+                    .into_iter()
+                    .map(|h| h.join().map_err(|_| anyhow::anyhow!("decode must not panic")))
+                    .collect::<anyhow::Result<Vec<_>>>()
+                    .map(|joined| joined.into_iter().filter(|ok| *ok).count())
+            })?;
+
+            assert_eq!(1, successes, "exactly one concurrent decode may succeed");
+        }
+
+        Ok(())
+    }
+
+    /// A packet that fails its header MAC must not enter the filter. The tag is derivable from the node's public
+    /// key and the wire alpha alone, so were it committed before the MAC, any stranger could rotate the filter at
+    /// one elliptic-curve multiplication per token.
+    #[tokio::test]
+    async fn a_packet_failing_the_header_mac_should_not_enter_the_filter() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+
+        let encoder = create_encoder(&sender);
+        let out_packet = encoder.encode_packet(
+            b"a packet whose header will be damaged",
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+            None,
+        )?;
+
+        let decoder = create_decoder(&receiver);
+        let sender_peer_id: PeerId = OffchainKeypair::random().public().into();
+
+        // Keep the alpha, so the secret and the tag are derivable, but damage the header after it.
+        const ALPHA_LEN: usize = 32;
+        let mut forged = out_packet.data.to_vec();
+        forged[ALPHA_LEN..ALPHA_LEN + 64].fill(0xff);
+        let forged = Bytes::from(forged);
+
+        assert!(
+            decoder
+                .decode(sender_peer_id, forged)
+                .err()
+                .context("a damaged header must be rejected")?
+                .is_undecodable(),
+            "a damaged header must be undecodable, not a replay"
+        );
+        assert_eq!(
+            0,
+            decoder.replay_filter().count(),
+            "a packet that fails the header MAC must not be recorded"
+        );
+
+        Ok(())
+    }
+
+    /// The filter is global across previous hops: the token names the packet, not the sender, so replaying the same
+    /// bytes through a different peer must still be caught.
+    #[tokio::test]
+    async fn a_replay_should_be_detected_from_a_different_peer() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let other_sender = create_node(2, &blokli_client).await?;
+        let receiver = create_node(1, &blokli_client).await?;
+
+        let encoder = create_encoder(&sender);
+        let decoder = create_decoder(&receiver);
+
+        let out_packet = encoder.encode_packet(
+            b"a message to replay",
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(
+                    *receiver.offchain_key.public(),
+                    receiver.chain_key.public().to_address(),
+                ),
+                return_paths: vec![],
+            },
+            None,
+            None,
+        )?;
+
+        decoder.decode(sender.offchain_key.public().into(), out_packet.data.clone())?;
+        let result = decoder.decode(other_sender.offchain_key.public().into(), out_packet.data);
+
+        assert!(
+            result.err().context("a replay must be rejected")?.is_replay(),
+            "a replay must be caught regardless of which peer delivered it"
+        );
 
         Ok(())
     }
@@ -944,8 +1413,66 @@ mod tests {
 
         let result = decoder.decode(sender.offchain_key.public().into(), out_packet.data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().is_undecodable());
+        assert!(result.err().context("must not decode")?.is_undecodable());
 
+        Ok(())
+    }
+
+    /// The manual `PartialEq` is what the transport compares configs with, so a field it forgets is a field that
+    /// silently stops participating in equality. This pins the replay-filter field into it.
+    #[test]
+    fn codec_config_equality_should_include_the_replay_filter() {
+        let base = HoprCodecConfig::default();
+        assert_eq!(base, HoprCodecConfig::default());
+
+        let other = HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                max_tracked_packets: base.replay_filter.max_tracked_packets * 2,
+                ..base.replay_filter
+            },
+            ..base
+        };
+        assert_ne!(base, other, "a different replay capacity must make the configs unequal");
+
+        let other = HoprCodecConfig {
+            replay_filter: crate::ReplayFilterConfig {
+                shards: base.replay_filter.shards / 2,
+                ..base.replay_filter
+            },
+            ..base
+        };
+        assert_ne!(base, other, "a different shard count must make the configs unequal");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn the_replay_filter_config_should_round_trip_through_yaml() -> anyhow::Result<()> {
+        let doc = "replay_filter:\n  max_tracked_packets: 5000\n  shards: 8\n";
+        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc)?;
+
+        assert_eq!(5000, parsed.replay_filter.max_tracked_packets);
+        assert_eq!(8, parsed.replay_filter.shards);
+
+        let serialized = serde_saphyr::to_string(&parsed)?;
+        let reparsed: HoprCodecConfig = serde_saphyr::from_str(&serialized)?;
+        assert_eq!(parsed, reparsed);
+
+        // An omitted block must fall back to the defaults, not fail under `deny_unknown_fields`.
+        let omitted: HoprCodecConfig = serde_saphyr::from_str("outgoing_ticket_price: null\n")?;
+        assert_eq!(crate::ReplayFilterConfig::default(), omitted.replay_filter);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn an_invalid_replay_filter_config_should_be_rejected() -> anyhow::Result<()> {
+        let doc = "replay_filter:\n  max_tracked_packets: 10\n  shards: 3\n";
+        let parsed: HoprCodecConfig = serde_saphyr::from_str(doc).context("must deserialize")?;
+        assert!(
+            validator::Validate::validate(&parsed).is_err(),
+            "out-of-range capacity and a non-power-of-two shard count must fail validation"
+        );
         Ok(())
     }
 }

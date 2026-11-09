@@ -25,6 +25,16 @@ pub enum IncomingPacketError<E: std::error::Error> {
     /// Packet is decodable, but the ticket is invalid.
     #[error("packet from {0} is decodable, but the ticket is invalid: {1}")]
     InvalidTicket(Box<OffchainPublicKey>, TicketValidationError),
+    /// Packet is a replay of one already seen.
+    ///
+    /// Unlike [`IncomingPacketError::ProcessingError`], this comes from the replay token: usually detected before
+    /// the header MAC is verified, so the packet is unauthenticated, but also when a concurrent decode of the same
+    /// packet recorded the token first - and in that case the packet *has* authenticated. Either way it must not be
+    /// acknowledged: acknowledging an unauthenticated copy pays for a packet nobody has proved, and acknowledging
+    /// the authenticated loser re-pays for one whose original delivery was already acknowledged. Both would also
+    /// hide from the sender that its retransmission - which carries a fresh token - is the one to deliver.
+    #[error("packet from {0} is a replay")]
+    Replay(Box<OffchainPublicKey>),
 }
 
 impl<E: std::error::Error> IncomingPacketError<E> {
@@ -47,9 +57,6 @@ pub enum HoprProtocolError {
 
     #[error("channel {0} does not have at least {1} to create a ticket")]
     OutOfFunds(ChannelId, HoprBalance),
-
-    #[error("packet replay detected")]
-    Replay,
 
     #[error("failed to find channel {0} -> {1}")]
     ChannelNotFound(Address, Address),

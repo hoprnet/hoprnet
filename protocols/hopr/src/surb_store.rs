@@ -191,6 +191,13 @@ fn default_admitted_headroom_percent() -> u32 {
 /// (`enforce_pix` only makes it mandatory), so the option had no safe use — and what it was for is
 /// what the generation tag does.
 ///
+/// What FIFO gives up is that SURBs the sender replaced, because their return path broke, are spent
+/// before their replacements, so a dead relayer's SURBs are spent into the void until the buffer turns
+/// over. The sender makes up for it: when a relayer is judged dead it advances the session's SURB
+/// generation, and this side drops everything it holds on the next push (see "Generations" on the
+/// internal `SurbRingBuffer`). The sender's judgement of its relayers counts on this order as well: it
+/// reads a race between two SURBs minted together by the one a FIFO replier spends first.
+///
 /// This enum, and the [`SurbStoreConfig::pop_order`] field carrying it, remain only so that existing
 /// configurations (`pop_order: fifo`) and code naming [`SurbPopOrder::Fifo`] keep working; they are
 /// candidates for removal in a later major version. `pop_order: lifo` is rejected as an unknown
@@ -919,6 +926,22 @@ impl MemorySurbStore {
         self.invalidated_relayers.read().contains(relayer)
     }
 
+    /// Ceiling on how many SURBs the admitted ring for `pseudonym` can hold, or `None` when it holds
+    /// no admitted ring.
+    ///
+    /// Observability seam: the ceiling is what an announced target has to raise, since a Session
+    /// whose ring is too narrow loses SURBs — and, under PIX, the shares they carried — the moment the
+    /// Entry mints past it.
+    ///
+    /// Note this is a cache `get`, so it records recency on the admitted cache's LRU. Every live
+    /// Session holds a ring and the cache is sized for that census, so a read here cannot evict one;
+    /// it is only a diagnostic, not a hot path.
+    pub fn admitted_ring_ceiling(&self, pseudonym: &HoprPseudonym) -> Option<usize> {
+        self.admitted_surbs_per_pseudonym
+            .get(pseudonym)
+            .map(|ring| ring.capacity())
+    }
+
     /// Capacity for a newly created admitted ring, derived from the Session's announced SURB target.
     ///
     /// The target gets [`SurbStoreConfig::admitted_headroom_percent`] of headroom — the balancer aims
@@ -934,6 +957,44 @@ impl MemorySurbStore {
         }
         let headroom = expected_surbs.saturating_mul(100 + self.cfg.admitted_headroom_percent as usize) / 100;
         headroom.max(floor).min(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY))
+    }
+
+    /// Widens `pseudonym`'s admitted ring for an announced SURB target that changed mid-Session.
+    ///
+    /// [`admit`](SurbStore::admit) sizes the ring once, from the target in force at establishment,
+    /// and a peer may raise that target afterwards: the gnosis_vpn client ramps its balancer from a
+    /// ping tier to a main tier seconds into the Session and announces each step (see
+    /// gnosis/gnosis_vpn#739). Left alone, the ring keeps the first tier's ceiling while the Entry
+    /// mints toward the new one — every SURB past the ceiling is evicted on arrival, and under PIX so
+    /// is the share it carried, which is unrecoverable.
+    ///
+    /// The re-admission path already grows a ring in place (`SurbRingBuffer::raise_capacity` is a
+    /// `fetch_max`, so it only ever widens). This is that path, for a peer rather than a successor
+    /// Session: it mints no new admission number, so the `token` the Session already holds still
+    /// names this admission and its teardown retires it as before. A `token` that no longer names the
+    /// pseudonym's current admission is a no-op, for the same reason a stale retire is.
+    ///
+    /// `expected_surbs` is the *announced target*, not a ring size: the headroom, floor and ceiling
+    /// arithmetic is this store's, exactly as in [`admit`](SurbStore::admit).
+    pub fn raise_admitted_capacity(&self, pseudonym: &HoprPseudonym, token: u64, expected_surbs: usize) {
+        if token == 0 {
+            return;
+        }
+
+        let capacity = self.admitted_ring_capacity(expected_surbs);
+        self.admitted_surbs_per_pseudonym
+            .entry_by_ref(pseudonym)
+            .and_compute_with(|entry: Option<moka::Entry<HoprPseudonym, AdmittedRing>>| match entry {
+                // Only the admission the caller names may be widened, and the ring it holds is kept:
+                // this is a ceiling change, not a new admission, so no epoch is stamped and the
+                // resident SURBs stay where they are.
+                Some(entry) if entry.value().epoch() == token => {
+                    entry.value().raise_capacity(capacity);
+                    moka::ops::compute::Op::Nop
+                }
+                // No ring, or a successor's: nothing here is this caller's to widen.
+                _ => moka::ops::compute::Op::Nop,
+            });
     }
 
     /// SURBs held for `pseudonym` across both classes.
@@ -1027,6 +1088,10 @@ impl MemorySurbStore {
     /// It is also why only `admit` creates an admitted entry: an insert that minted one itself would
     /// have no admission number to stamp, and a ring stamped with the sentinel is one no retire ever
     /// removes.
+    ///
+    /// The outcome adds what the fold-in evicted and superseded to what the push did, as the quarantine
+    /// arm does: those SURBs were booked when their packets arrived, and the decoder can book their
+    /// leaving only from this outcome.
     fn push_into_admitted(
         &self,
         pseudonym: &HoprPseudonym,
@@ -1034,11 +1099,16 @@ impl MemorySurbStore {
         surbs: Vec<(HoprSurbId, HoprSurb)>,
         generation: u8,
     ) -> SurbInsertOutcome {
-        self.fold_quarantine_into(pseudonym, admitted);
+        let folded = self.fold_quarantine_into(pseudonym, admitted).unwrap_or_default();
 
         let outcome = admitted.push(surbs, generation);
         self.record_ring_overflow(&outcome);
-        outcome
+        SurbInsertOutcome {
+            retained: outcome.retained,
+            evicted: outcome.evicted + folded.evicted,
+            evicted_shares: outcome.evicted_shares + folded.evicted_shares,
+            superseded: outcome.superseded + folded.superseded,
+        }
     }
 
     /// Pushes a batch into `pseudonym`'s quarantine ring, creating the ring if it has none, and books
@@ -1197,6 +1267,8 @@ impl MemorySurbStore {
                     retained: self.ring_len(pseudonym),
                     evicted: surbs.len(),
                     evicted_shares: surbs.iter().filter(|(_, surb)| surb.ssa_index().is_some()).count(),
+                    // Refused whole and booked as `evicted` above; the generation rule took nothing.
+                    superseded: 0,
                 };
             }
         }
@@ -1214,6 +1286,7 @@ impl MemorySurbStore {
                 retained: folded.retained,
                 evicted: pushed.evicted + folded.evicted,
                 evicted_shares: pushed.evicted_shares + folded.evicted_shares,
+                superseded: pushed.superseded + folded.superseded,
             },
             // Nothing left to fold: `admit`'s own promotion, or a concurrent insert, already moved it.
             None => SurbInsertOutcome {
@@ -1356,6 +1429,7 @@ impl SurbStore for MemorySurbStore {
                 retained: self.ring_len(&pseudonym),
                 evicted: 0,
                 evicted_shares: 0,
+                superseded: 0,
             };
         };
 
@@ -1370,7 +1444,9 @@ impl SurbStore for MemorySurbStore {
         let dropped = mixed - surbs.len();
         if dropped > 0 {
             // A statement about the peer that minted the batch, not a local fault: `warn`, not
-            // `error`. These are not capacity pressure, so they stay out of the `evicted` count.
+            // `error`. These are not capacity pressure, so they stay out of the `evicted` count; they
+            // are `superseded` below, because the packet reported them as received and the Exit's flow
+            // estimate has to see that they never reached the store.
             tracing::warn!(
                 %pseudonym,
                 dropped,
@@ -1394,11 +1470,14 @@ impl SurbStore for MemorySurbStore {
         // An absent entry therefore means the pseudonym is not admitted (or was just retired), and the
         // batch belongs to the quarantine like any other unadmitted one — whose arm re-checks this
         // lookup after its push, for an `admit` that lands in between.
-        if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
-            return self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation);
-        }
-
-        self.insert_surbs_into_quarantine(&pseudonym, surbs, generation)
+        let mut outcome = if let Some(admitted) = self.admitted_surbs_per_pseudonym.get(&pseudonym) {
+            self.insert_surbs_into_admitted(&pseudonym, admitted, surbs, generation)
+        } else {
+            self.insert_surbs_into_quarantine(&pseudonym, surbs, generation)
+        };
+        // The mismatched ones above never entered the buffer either.
+        outcome.superseded += dropped;
+        outcome
     }
 
     fn tier_lens(&self, pseudonym: &HoprPseudonym) -> Option<(usize, usize)> {
@@ -1609,7 +1688,14 @@ impl SurbStore for MemorySurbStore {
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener> {
         self.pseudonym_openers
             .get(&sender_id.pseudonym())
-            .and_then(|cache| cache.remove(&sender_id.surb_id()))
+            .and_then(|cache| cache.get(&sender_id.surb_id()))
+    }
+
+    #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
+    fn remove_reply_opener(&self, sender_id: &HoprSenderId) {
+        if let Some(cache) = self.pseudonym_openers.get(&sender_id.pseudonym()) {
+            cache.invalidate(&sender_id.surb_id());
+        }
     }
 
     fn current_generation(&self, pseudonym: &HoprPseudonym) -> u8 {
@@ -1918,15 +2004,24 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 
+    /// The ceiling on how many SURBs this buffer retains.
+    pub fn capacity(&self) -> usize {
+        self.capacity.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Raises this buffer's ceiling to at least `to` retained SURBs, never lowering it.
     ///
-    /// Called when a pseudonym is re-admitted: [`SurbStore::admit`] keeps the resident ring rather than
-    /// replacing it (a `Put` of a fresh ring would trip the admitted cache's `Replaced` listener and be
-    /// booked as an eviction the ring never suffered), but the successor Session may have announced a
-    /// larger SURB target than its predecessor. Without this the resident ring would keep the
-    /// predecessor's smaller ceiling for the successor's whole lifetime, and once its balancer filled
-    /// past it, `push` would evict — losing PIX shares permanently, with nothing but an `evicted` count
-    /// to show for it.
+    /// Two callers raise a ceiling, and both are about a target the ring was not sized for:
+    ///
+    /// * [`SurbStore::admit`], when a pseudonym is re-admitted. It keeps the resident ring rather than replacing it (a
+    ///   `Put` of a fresh ring would trip the admitted cache's `Replaced` listener and be booked as an eviction the
+    ///   ring never suffered), but the successor Session may have announced a larger SURB target than its predecessor.
+    /// * [`MemorySurbStore::raise_admitted_capacity`], when a live peer raises its announced target mid-Session and
+    ///   says so in a keep-alive.
+    ///
+    /// Without this the resident ring would keep the smaller ceiling for the Session's whole
+    /// lifetime, and once its balancer filled past it, `push` would evict — losing PIX shares
+    /// permanently, with nothing but an `evicted` count to show for it.
     ///
     /// The raise is monotone on purpose. Narrowing on a re-admission would strand SURBs a live Session
     /// may already have inserted and would make the ceiling depend on admission order; `fetch_max`
@@ -1993,18 +2088,23 @@ impl<S> SurbRingBuffer<S> {
     /// all, since dropping a SURB is otherwise indistinguishable from a clean insert.
     /// It counts *capacity* overflow only: SURBs dropped because a newer generation superseded them
     /// were already unusable, and reporting them as pressure would ask the creator to slow down
-    /// because it re-planned its own return path.
+    /// because it re-planned its own return path. They are reported separately, as
+    /// [`superseded`](SurbInsertOutcome::superseded): the whole of what a newer generation cleared, or
+    /// the whole of an older-generation batch that was refused. The caller that tracks what the buffer
+    /// holds adds the two, so that `retained` and its own count of what was received agree.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> SurbInsertOutcome
     where
         S: SurbShareInfo,
     {
         let mut inner = self.inner.lock();
+        let mut superseded = 0;
 
         match inner.generation {
             Some(current) if generation == current => {} // ordinary refill: append below
             Some(current) if generation_is_newer(generation, current) => {
                 // Return path changed: everything held is for the superseded path. Drop it wholesale
                 // so the newer batch is all that remains and the next reply uses the live path.
+                superseded = inner.len();
                 inner.clear();
                 inner.generation = Some(generation);
             }
@@ -2015,6 +2115,7 @@ impl<S> SurbRingBuffer<S> {
                     retained: inner.len(),
                     evicted: 0,
                     evicted_shares: 0,
+                    superseded: surbs.into_iter().count(),
                 };
             }
             None => inner.generation = Some(generation),
@@ -2052,6 +2153,7 @@ impl<S> SurbRingBuffer<S> {
             retained: inner.len(),
             evicted,
             evicted_shares,
+            superseded,
         }
     }
 
@@ -2492,7 +2594,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0)
         );
@@ -2500,7 +2603,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 4,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([3u8; 8], 0), ([4u8; 8], 0)], 0)
         );
@@ -2518,7 +2622,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "a 3-element push into a 2-slot buffer drops exactly one, and it carried no share"
@@ -2549,7 +2654,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([3u8; 8], 0)], 0)
         );
@@ -2557,7 +2663,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 2,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0)
         );
@@ -2567,7 +2674,9 @@ mod tests {
     /// creator re-planned its own return path. Counting them as evictions would report capacity
     /// pressure that does not exist, and the count feeds the eviction summary (and the
     /// counterparty-facing `num_evicted_surbs`) that exists to flag over-production. The same holds for
-    /// a late older-generation batch, which is discarded without ever entering the buffer.
+    /// a late older-generation batch, which is discarded without ever entering the buffer. They are
+    /// not lost to the caller's bookkeeping, though: `superseded` carries the number, so that the
+    /// Exit's flow estimate can book the wipe.
     #[test]
     fn surb_ring_buffer_should_not_count_superseded_generations_as_evictions() {
         let rb = SurbRingBuffer::new(2);
@@ -2578,26 +2687,36 @@ mod tests {
         );
 
         // A newer generation clears the full buffer before inserting: two SURBs go, none of them to
-        // capacity pressure.
+        // capacity pressure, and both are reported as superseded.
         assert_eq!(
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 2
             },
             rb.push([([3u8; 8], 0)], 1),
-            "a supersede-and-clear is not an overflow"
+            "a supersede-and-clear is not an overflow, but the wiped stock is reported"
         );
 
-        // A late batch from the superseded generation is dropped whole, again without overflowing.
+        // A late batch from the superseded generation is dropped whole, again without overflowing;
+        // the whole batch is reported as superseded, and the buffer is untouched.
         assert_eq!(
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 2
             },
             rb.push([([4u8; 8], 0), ([5u8; 8], 0)], 0),
-            "a discarded older-generation batch is not an overflow"
+            "a discarded older-generation batch is not an overflow, but its size is reported"
+        );
+
+        // An ordinary refill at the current generation supersedes nothing.
+        assert_eq!(
+            0,
+            rb.push([([6u8; 8], 0)], 1).superseded,
+            "an equal generation appends and supersedes nothing"
         );
     }
 
@@ -3110,6 +3229,11 @@ mod tests {
             "a mismatched SURB is not capacity pressure and must not be reported as eviction"
         );
         assert_eq!(0, outcome.evicted_shares, "and it cannot have cost a share either");
+        assert_eq!(
+            2, outcome.superseded,
+            "the generation-0 SURB the batch wiped and the mismatched one it refused are both gone from the buffer, \
+             though the packet reported both of its SURBs as received"
+        );
 
         let found = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
@@ -3152,7 +3276,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 3,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([share_surb(1)?, plain_surb(2)?, share_surb(3)?], 0)
         );
@@ -3161,7 +3286,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 3,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([share_surb(4)?], 0),
             "the share-less SURB goes, not the older share, so no share is lost"
@@ -3184,7 +3310,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([plain_surb(3)?], 0)
         );
@@ -3205,7 +3332,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 1
+                evicted_shares: 1,
+                superseded: 0
             },
             rb.push([share_surb(3)?], 0)
         );
@@ -3227,7 +3355,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             rb.push([plain_surb(1)?, share_surb(2)?, share_surb(3)?], 0)
         );
@@ -3237,7 +3366,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 2,
                 evicted: 2,
-                evicted_shares: 1
+                evicted_shares: 1,
+                superseded: 0
             },
             rb.push([plain_surb(4)?, share_surb(5)?], 0)
         );
@@ -3793,7 +3923,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill)
         );
@@ -3803,7 +3934,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 1,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![share.clone()])
         );
@@ -3813,7 +3945,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 2,
-                evicted_shares: 2
+                evicted_shares: 2,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![share.clone(); 2])
         );
@@ -3823,7 +3956,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: capacity,
                 evicted: 3,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, vec![plain; 3])
         );
@@ -4287,7 +4421,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: fill.len(),
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill),
             "the successor's larger target must have raised the ring's ceiling, not been left at the predecessor's"
@@ -4323,10 +4458,146 @@ mod tests {
             SurbInsertOutcome {
                 retained: fill.len(),
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             store.insert_surbs(pseudonym, fill),
             "a smaller successor target must not narrow the ceiling the predecessor already established"
+        );
+
+        Ok(())
+    }
+
+    /// An admitted insert that folds in a quarantine ring left by the race around `admit` reports what
+    /// the fold-in took: SURBs of an older generation the admitted ring refuses were booked when their
+    /// packets arrived, and only this outcome tells the decoder they left.
+    #[test]
+    fn the_admitted_arm_must_report_what_its_fold_in_superseded() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let _token = store.admit(&pseudonym, MIN_SURB_RB_CAPACITY);
+        let admitted = AdmittedRing::clone(
+            &store
+                .admitted_surbs_per_pseudonym
+                .get(&pseudonym)
+                .context("the Session's admitted entry must exist")?,
+        );
+        store.insert_surbs_into_admitted(
+            &pseudonym,
+            admitted.clone(),
+            vec![([1u8; 8], surb_via(relayer, DIRECT)?)],
+            1,
+        );
+
+        // An insert that routed to the quarantine just before `admit` left an older generation there.
+        store.push_into_quarantine(
+            &pseudonym,
+            vec![
+                ([2u8; 8], surb_via(relayer, DIRECT)?),
+                ([3u8; 8], surb_via(relayer, DIRECT)?),
+            ],
+            0,
+        );
+
+        let outcome =
+            store.insert_surbs_into_admitted(&pseudonym, admitted, vec![([4u8; 8], surb_via(relayer, DIRECT)?)], 1);
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: 2,
+                evicted: 0,
+                evicted_shares: 0,
+                superseded: 2
+            },
+            outcome,
+            "the two quarantined SURBs the newer generation refused were booked when they arrived, so their leaving \
+             must reach the decoder"
+        );
+        assert!(
+            store.quarantine_surbs.get(&pseudonym).is_none(),
+            "the fold-in drained the quarantine ring"
+        );
+        Ok(())
+    }
+
+    /// A Session that announces a *larger* target mid-life must get a ring wide enough to hold it.
+    ///
+    /// This is the gnosis_vpn-client shape (gnosis/gnosis_vpn#739): the client ramps its SURB
+    /// balancer target from a ping tier (688) to the main tier (~6,900) a few seconds after the
+    /// Session opens, and announces each step with a `BalancerTarget` keep-alive. `admit` ran once,
+    /// at establishment, off the *first* target — so the ring was sized for 688 and stayed there
+    /// while the Entry minted toward 6,900. Every SURB past the old ceiling was evicted, taking the
+    /// PIX share it carried with it, and the Exit then ran dry exactly when the deposit confirmed.
+    ///
+    /// The property: raising the announced target raises the resident ring's ceiling, in place, with
+    /// nothing held discarded — the same re-admission path a successor Session takes.
+    #[test]
+    fn a_raised_announced_target_must_widen_the_resident_ring() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        // The ping tier: 688 × 1.5 = 1,032 slots, which is what the exit held in the report.
+        let ping_target = 688;
+        let ping_capacity = store.admitted_ring_capacity(ping_target);
+        assert_eq!(1_032, ping_capacity, "fixture: the ping-tier ceiling");
+
+        let token = store.admit(&pseudonym, ping_target);
+
+        // The Entry ramps to its main tier and announces it. Before the fix the ring stayed at 1,032.
+        let main_target = 6_887;
+        store.raise_admitted_capacity(&pseudonym, token, main_target);
+
+        // A fill one SURB past the old ceiling but well inside the new one must be retained whole.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..(ping_capacity as u64 + 1))
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        assert_eq!(
+            SurbInsertOutcome {
+                retained: fill.len(),
+                evicted: 0,
+                evicted_shares: 0,
+                superseded: 0
+            },
+            store.insert_surbs(pseudonym, fill),
+            "a raised announcement must widen the ring past the target the Session was admitted with"
+        );
+
+        Ok(())
+    }
+
+    /// A raise must widen only the admission it names.
+    ///
+    /// A pseudonym is client-chosen and reusable, and a teardown's retire is deferred, so a
+    /// successor Session can be admitted on the same pseudonym while a stale announcement is still
+    /// in flight. Widening whatever ring is resident there would size the successor's ring from its
+    /// predecessor's ramp — and the reverse, a stale *smaller* target, is worse: the ceiling only
+    /// ever grows, so the smallest target ever named would win for good.
+    #[test]
+    fn a_raise_must_not_widen_a_successors_ring() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let stale = store.admit(&pseudonym, 200);
+        let successor = store.admit(&pseudonym, 200);
+        assert_ne!(stale, successor, "fixture: each admission mints its own number");
+
+        store.raise_admitted_capacity(&pseudonym, stale, 6_887);
+
+        // The predecessor's target would give a ring of 10,330; the successor's own 200 gives 300.
+        let fill: Vec<(HoprSurbId, HoprSurb)> = (0..301u64)
+            .map(|i| Ok((i.to_be_bytes(), surb_via(relayer, DIRECT)?)))
+            .collect::<anyhow::Result<_>>()?;
+        let outcome = store.insert_surbs(pseudonym, fill);
+        assert_eq!(
+            300, outcome.retained,
+            "a stale raise must leave the successor's ring at the successor's own ceiling"
+        );
+        assert_eq!(
+            1, outcome.evicted,
+            "and the SURB past that ceiling must be the only one dropped"
         );
 
         Ok(())
@@ -4366,7 +4637,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the batch must be retained in the admitted ring, not strained against the quarantine cap"
@@ -4565,7 +4837,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the batch must be retained, in the quarantine"
@@ -4603,7 +4876,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 0,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the outcome must report what the admitted ring holds once the batch is folded in"
@@ -4761,7 +5035,8 @@ mod tests {
             SurbInsertOutcome {
                 retained: 1,
                 evicted: 99,
-                evicted_shares: 0
+                evicted_shares: 0,
+                superseded: 0
             },
             outcome,
             "the drain must have freed room for the whole batch over several passes"

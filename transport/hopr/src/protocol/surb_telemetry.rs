@@ -12,17 +12,62 @@
 //! anything: the mint says what was expected, the reply says what was observed. Wrapping both codec
 //! halves keeps the SURB-to-path association private to this module, so nothing below has to carry
 //! a path identity it has no other use for.
+//!
+//! # Mitigations driven from here
+//!
+//! Each names its trigger, its effect, its setting and what it must not work against.
+//!
+//! - **Relayer health.** Trigger: a relayer losing reply races (two SURBs of one packet, different return paths) by
+//!   more than a round trip. Effect: its health in the graph scales every edge into it, so forward and return paths
+//!   through it are drawn less. Settings: `HoprProtocolConfig::latency_race_memory`,
+//!   `HoprProtocolConfig::relayer_health_weight` (`0` off). Must not fight: the return-path temper, which flattens it
+//!   along with path quality.
+//! - **Dead verdict.** Trigger: at least `MIN_RACES` replies trailing their partners by more than any race the relayer
+//!   settled, none home since, and a reply home through some relayer after the first of them fell due. A reply is
+//!   overdue only while others are delivering: a pause in the replier's stream, or an outage of every return relayer,
+//!   leaves nothing arriving and so nothing overdue, however long the replies stay out. A relayer that has settled too
+//!   few races to have a margin of its own borrows the bar of the best-measured relayer, raised to whatever its own
+//!   settled races measure, and none is judged while no relayer has one; its own races that expired open are booked as
+//!   lost and are not replies that came home, so they do not reset the clock. Effect: health `0`, the walk prunes it. A
+//!   verdict is lifted by a reply coming home through the relayer, not by time. Once no reply through it is out any
+//!   more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*: published at
+//!   `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration still does, and
+//!   that draw is the probe. A probe reply home through it revives it, to the health its lost races leave it, so
+//!   gradually; a probe that goes missing leaves it where it is, and one that is a black hole again goes back to dead
+//!   without a new SURB generation. Must not fight: common-mode outages, where no partner gets home and nothing is
+//!   judged.
+//! - **Invalid SURBs.** Trigger: a dead verdict, or probation. Effect: each session is told how many SURBs in its
+//!   counterparty's store run through that relayer; the balancer subtracts them from its level and sends replacements.
+//!   A lapsed verdict is only a timeout and the counterparty still holds the SURBs, probe SURBs included, so the
+//!   write-off outlives it; each written-off SURB counts as held only until `WRITE_OFF_HORIZON`, the time the
+//!   counterparty needs to spend it, and a reply through the relayer (which ends the probation) or the end of the
+//!   session ends the write-off sooner. A session's count is dropped when its SURB generation is advanced, though: the
+//!   wipe takes the SURBs it counted, and from then on it counts only the probes minted since. Must not fight: flow
+//!   control, which keeps the raw level so the replacements are not throttled.
+//! - **Fresh SURB generation.** Trigger: a dead verdict that held for a second flush (`VERDICT_CONFIRMATION`) reaching
+//!   a session for the first time, at most once per (session, relayer) while the relayer is known dead, and per
+//!   `REBUMP_COOLDOWN` after it is revived. Effect: the session's SURB generation advances, so the counterparty drops
+//!   its whole stock on its next push, the dead SURBs it cannot recognise along with the rest, and the balancer refills
+//!   from empty, paced; the session's write-off goes with the stock it counted. Probation is not a new verdict: a pair
+//!   bumped in this death is not bumped again until a reply revives the relayer, so one that dies again on probation
+//!   costs the session nothing more. Only stock advances a generation: a SURB minted after its relayer was already
+//!   known dead is a probe, written off without one, also in a session the wipe never reached. Must not fight: the
+//!   cooldown, since each advance costs the counterparty everything it holds, and a PIX cycle can absorb only so many
+//!   such losses.
+//! - **Lost neighbour.** Trigger: our own connection drops. Effect: re-plan only; the graph's connection status already
+//!   rejects that edge, so its SURBs are not invalidated.
 
 use std::{
+    collections::{HashMap, VecDeque},
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use bytes::Bytes;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use hopr_api::{
     graph::{ForwardAndReturnPath, MeasurableEdge, MeasurablePath, MeasurablePeer, NetworkGraphView, SurbTelemetry},
     types::{
@@ -36,16 +81,74 @@ use hopr_protocol_hopr::{IncomingPacket, IncomingPacketError, OutgoingPacket, Pa
 use crate::observer::{TransportEvent, TransportObserver};
 
 /// Slots in a [`PathId`], and therefore the longest leg that can be reported.
-const PATH_ID_SLOTS: usize = 5;
-/// Keep named destination diagnostics bounded even during widespread degradation.
-const MAX_DEBUG_DESTINATIONS: usize = 8;
+pub(crate) const PATH_ID_SLOTS: usize = 5;
 
-/// How long a minted SURB stays eligible to be observed coming back.
+/// How long a race stays open: a reply still out this long after its partner came home is lost.
 ///
-/// A SURB the replier never uses would otherwise sit in the pending map forever, so the expectation
-/// it raised is retired after this long. Generous relative to a round-trip, because expiring a SURB
-/// that is merely slow would count a success as a loss.
+/// Generous relative to a round-trip, because expiring a reply that is merely slow would count a
+/// success as a loss. It also sets the pace of everything measured from a verdict: the lapse into
+/// probation and the re-bump cooldown.
 const PENDING_SURB_TTL: Duration = Duration::from_secs(60);
+
+/// How long a minted SURB stays eligible to be matched with its reply.
+///
+/// Not [`PENDING_SURB_TTL`]: a FIFO replier spends its oldest SURB first, so a reply comes home on a
+/// SURB minted about `stock / reply rate` earlier — 128 s for the deployed 19 264-SURB stock at 150
+/// replies per second, and more for a quiet session. Expiring the association at the race timeout
+/// left every reply of such a session unmatched: no race, no reply evidence, no verdict and no
+/// SURB generation advance, while its Exit spent a dead relayer's SURBs into the void. The map holds
+/// what is outstanding at the counterparty, so its size is bounded by the stock and the loss rate,
+/// not by this horizon; [`MAX_PENDING_SURBS`] still bounds it.
+const PENDING_SURB_HORIZON: Duration = Duration::from_secs(15 * 60);
+const _: () = assert!(PENDING_SURB_HORIZON.as_secs() >= 10 * PENDING_SURB_TTL.as_secs());
+
+/// How long a SURB written off through a relayer known dead keeps counting as held by the
+/// counterparty, and therefore as invalid.
+///
+/// The counterparty spends what it holds within the time it takes its stock to turn over, after
+/// which a written-off SURB is gone and counting it on only makes the balancer over-produce.
+/// Counted for good, the probes through a relayer on probation grew the count without bound
+/// (26 per second at production dimensions: twice the target in 13 minutes, and the balancer at its
+/// ceiling within the hour). Two race timeouts cover the turnover at the production rate (48 s for
+/// the deployed stock at 400 replies a second) and most of it in a quiet Session (128 s at 150);
+/// what a slower Session's count misses is bounded by the probe rate limit, a probe a second.
+const WRITE_OFF_HORIZON: Duration = Duration::from_secs(2 * 60);
+
+/// How long after a relayer is revived, and no longer known dead, the session that was advanced for its
+/// verdict is not advanced again for it: twice [`PENDING_SURB_TTL`], counted from the revival.
+///
+/// While the relayer is known dead, dead or on probation, the pair is never advanced twice, however
+/// long that lasts: the mark of the advance stays until the relayer is revived by a reply, and every
+/// pass that still finds the relayer known dead moves its time on, so that the cooldown starts at the
+/// revival and not at the advance. This is the guard for what follows a revival: a reply that came
+/// home through the relayer ends the verdict, and a relayer that is still dead after all is judged
+/// dead anew, which must not cost the counterparty its whole stock a second time right after the
+/// revival, however long the death before it lasted.
+const REBUMP_COOLDOWN: Duration = Duration::from_secs(2 * 60);
+const _: () = assert!(REBUMP_COOLDOWN.as_secs() == 2 * PENDING_SURB_TTL.as_secs());
+
+/// The health published for a relayer on probation: a thousandth.
+///
+/// A relayer whose dead verdict has lapsed is not trusted again until a reply comes home through it.
+/// The graph scales every edge into it by this, so weighted selection draws it far less than a healthy
+/// relayer, while the planner's uniform exploration (`return_path_exploration`, 10 % by default) still
+/// draws it as a candidate: that draw is the probe, and a reply on it ends the probation. Not `0`, which
+/// the graph prunes, and nothing would ever probe a pruned relayer. After the `relayer_health_weight`
+/// exponent it stays at a few percent for weights of one half and up (a thousandth to the power one
+/// half is 3 %), and `0` switches it off with the rest of the health.
+const PROBATION_HEALTH: f64 = 1e-3;
+
+/// How long a dead verdict must have held before it is acted on: the write-off and the SURB generation
+/// advance wait for the next flush to find the relayer still dead.
+///
+/// The flush runs once a second (`surb_flush_interval`). A verdict reaches the graph at once, so the
+/// planner steers around the relayer from the same flush; but a relayer that is merely the slowest in
+/// its session's first seconds — judged against a bar borrowed from the fastest, with no history of its
+/// own — is revived by its own late replies a fraction of a second later, and a bump on that verdict
+/// wipes the counterparty's whole stock for nothing. Measured: one such wipe per ~7 scenario runs, always
+/// at cold start, always the same relayer. Waiting one flush costs a dead relayer one more second of
+/// replies into the void and costs a slow one nothing.
+const VERDICT_CONFIRMATION: Duration = Duration::from_millis(900);
 
 /// Expected/observed counts for one pair of legs, accumulated between flushes.
 ///
@@ -66,14 +169,6 @@ impl SurbRoundTripCounters {
         self.observed.fetch_add(count, Ordering::Relaxed);
     }
 
-    /// Reads both counts without resetting them.
-    fn peek(&self) -> (u64, u64) {
-        (
-            self.expected.load(Ordering::Relaxed),
-            self.observed.load(Ordering::Relaxed),
-        )
-    }
-
     /// Takes both counts, resetting them to zero.
     fn take(&self) -> (u64, u64) {
         (
@@ -90,86 +185,57 @@ impl SurbRoundTripCounters {
 /// packets a second -- reporting per event would contend the graph thousands of times a second.
 #[derive(Clone)]
 pub struct SurbRoundTripRegistry {
-    inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
-    /// Destination each pair of legs leads to, so a collapse can name what to re-plan.
     destinations: Arc<DashMap<ForwardAndReturnPath, OffchainPublicKey>>,
-    /// What each pair's recent flushes say about whether it still works.
-    silence: Arc<DashMap<ForwardAndReturnPath, Silence>>,
-    /// Flushes since each destination was last reported, so one is not re-planned repeatedly.
-    replanned: Arc<DashMap<OffchainPublicKey, u32>>,
-    /// Slot this node occupies, learned from the first pair recorded.
-    ///
-    /// A [`PathId`] is zero-padded with no length, and slot 0 is a legitimate index, so the end of
-    /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
-    /// reply leg terminates here. [`ME_SLOT_UNKNOWN`] means not yet known.
-    me_slot: Arc<AtomicU64>,
     observer: Option<TransportObserver>,
+    inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
+    /// Per-relayer health from reply races, published into the graph.
+    relayer_health: Arc<RelayerHealth>,
+    /// Every outstanding SURB, shared by both codec halves.
+    pending: PendingLegs,
+    /// Per session, SURBs written off because their return path runs through a relayer known dead, by
+    /// that relayer, even though the counterparty may still hold them. Kept while the relayer stays
+    /// known dead (a lapsed verdict only times out, the write-off outlives it), but dropped when the
+    /// session's generation is advanced: the counterparty drops the stock the count stood for, and
+    /// what is counted afterwards is only the SURBs through the relayer minted since, the probes.
+    /// Each entry is the instants its SURBs were written off, oldest first, aged out after
+    /// `WRITE_OFF_HORIZON`; the count is their number.
+    written_off: Arc<DashMap<HoprPseudonym, HashMap<OffchainPublicKey, VecDeque<Instant>>>>,
+    /// When a dead verdict last made [`write_off_dead`](Self::write_off_dead) report a session for a
+    /// relayer, so that the same pair is not reported again. Kept for as long as the relayer is known
+    /// dead, and for `REBUMP_COOLDOWN` after it is not, so a pair advanced in this death stays
+    /// advanced, and a quick re-death after a revival is not advanced again either.
+    bumped: Arc<DashMap<(HoprPseudonym, OffchainPublicKey), Instant>>,
+    /// The return legs of SURBs written off or wiped, for as long as a SURB is remembered.
+    ///
+    /// Writing a SURB off takes it out of `pending`, but the counterparty still holds it and may spend
+    /// it: the reply of a probe through a relayer on probation arrives after the write-off, and a
+    /// wiped stock is spent until the new generation reaches the counterparty. Recognising it here is
+    /// what lets a reply home lift the verdict or the probation of the relayers on its leg.
+    written_off_legs: moka::sync::Cache<HoprSurbId, ReturnRelayers>,
 }
 
-/// `me_slot` value meaning "this node's slot has not been learned yet".
-///
-/// Cannot collide with a real slot, unlike 0, which is both a legitimate index and what
-/// `AtomicU64::default()` would yield -- a derived `Default` would silently claim we sit in slot 0
-/// and make every reply leg look like it terminates at its padding.
-const ME_SLOT_UNKNOWN: u64 = u64::MAX;
+/// Memory bound only. An entry leaves the map when its reply comes home, so what the map holds is
+/// the stock outstanding at the counterparties plus the replies lost within
+/// [`PENDING_SURB_HORIZON`]: several deployed-size stocks.
+const MAX_PENDING_SURBS: u64 = 100_000;
 
 impl Default for SurbRoundTripRegistry {
     fn default() -> Self {
         Self {
             inner: Default::default(),
             destinations: Default::default(),
-            silence: Default::default(),
-            replanned: Default::default(),
-            me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
             observer: None,
+            relayer_health: Default::default(),
+            pending: pending_legs(MAX_PENDING_SURBS),
+            written_off: Default::default(),
+            bumped: Default::default(),
+            written_off_legs: moka::sync::Cache::builder()
+                .max_capacity(MAX_PENDING_SURBS)
+                .time_to_live(PENDING_SURB_HORIZON)
+                .build(),
         }
     }
 }
-
-/// Relayers carrying the reply leg: everything between the destination and ourselves.
-fn return_relayers(reply: &PathId, me_slot: u64) -> impl Iterator<Item = u64> + '_ {
-    reply.iter().skip(1).take_while(move |&&slot| slot != me_slot).copied()
-}
-
-/// Per-pair silence bookkeeping, carried between flushes.
-#[derive(Debug, Default, Clone, Copy)]
-struct Silence {
-    /// Consecutive flushes in which the pair minted SURBs and got nothing back.
-    runs: u32,
-    /// Whether a reply has ever come back over this pair.
-    ///
-    /// Load-bearing: it is what turns the signal from "silent" into "stopped working". A pair that
-    /// has never delivered may simply be too young -- a reply is credited to the flush it *arrives*
-    /// in, so the first flushes of a new pair legitimately show mints with no replies yet.
-    delivered: bool,
-}
-
-/// SURBs a pair must have minted in one flush before its silence counts as evidence.
-///
-/// Measured after a relayer was killed: the dead leg minted 2270 SURBs in the 5s that followed
-/// while returning none. A handful is noise; thousands is not.
-const MIN_EXPECTED_FOR_SILENCE: u64 = 20;
-
-/// Consecutive silent flushes before a pair that used to deliver is called dead.
-///
-/// Flushes are one second apart. Three was measured to be too few: it fired six times during
-/// healthy operation, once per flush, because a burst of mints can outrun its replies for a couple
-/// of seconds without anything being wrong. Five keeps detection well inside the fifteen-second
-/// budget -- the dead leg reads exactly zero from t+5s onward while its siblings keep returning.
-const SILENT_FLUSHES_BEFORE_DEGRADED: u32 = 5;
-
-/// Flushes a destination must wait before it can be re-planned again.
-///
-/// Silence accrues per pair of legs, but re-planning acts on the *destination*, and a destination
-/// carries several pairs at once. Re-arming each pair individually therefore still allows one
-/// destination to be re-planned every couple of seconds -- faster than a freshly chosen return path
-/// can be established and start delivering, so each re-plan destroys the candidate the previous one
-/// selected. Measured with the invalidation finally reaching the cache: fifteen re-plans during a
-/// thirty-second healthy baseline, which collapsed it from 100% to 0.1% arrival.
-///
-/// Long enough for a new path to prove itself (it needs [`SILENT_FLUSHES_BEFORE_DEGRADED`] flushes
-/// just to be judged), short enough to retry twice inside the recovery budget.
-const FLUSHES_BETWEEN_REPLANS: u32 = 8;
 
 impl std::fmt::Debug for SurbRoundTripRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -178,6 +244,7 @@ impl std::fmt::Debug for SurbRoundTripRegistry {
             .finish_non_exhaustive()
     }
 }
+
 impl SurbRoundTripRegistry {
     /// Report minted and returned SURBs to `observer`. Attach it before cloning this registry.
     pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
@@ -185,19 +252,9 @@ impl SurbRoundTripRegistry {
         self
     }
 
-    fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
-        self.inner.entry(paths).or_default().value().clone()
-    }
-
-    /// Tells the registry which slot is ours, so a leg's relayers can be told from its padding.
-    pub fn note_me_slot(&self, slot: u64) {
-        self.me_slot.store(slot, Ordering::Relaxed);
-    }
-
-    /// Records that `count` SURBs were minted over these legs and are expected back.
-    pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
+    fn record_minted(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
-        self.counters(paths).record_expected(count);
+        self.record_expected(paths, count);
         if let Some(observer) = &self.observer {
             observer(TransportEvent::Surb {
                 destination,
@@ -208,164 +265,209 @@ impl SurbRoundTripRegistry {
         }
     }
 
-    /// Destinations whose return path has been silent for long enough to act on.
+    /// Whether the reply of the SURB at `pair_index` in its packet says anything about its return path
+    /// when it races its partner's: only the SURB the replier spends first does, see
+    /// [`FIRST_SPENT_INDEX`].
     ///
-    /// Deliberately keyed on *no reply at all* rather than on a delivery rate. A rate cannot
-    /// separate these cases: measured immediately after a kill, a healthy leg read 0.089 while the
-    /// dead one read 0.123, and replies straddling a flush boundary push a healthy leg above 1.
-    /// Only sustained silence distinguishes them, and it does so within seconds.
+    /// The other one is spent after it, so its reply trails the first's by however long the replier
+    /// took to get to it, a pause in its reply stream included, and that says nothing about a relayer.
+    /// A race therefore opens only in the abnormal order, the later-spent SURB home while the
+    /// first-spent one is still out, and what it measures is lateness down to the return path. Judging
+    /// both would settle every pair in the normal order, and the largest inter-reply gap the replier
+    /// ever had would become the bar a reply must stay out longer than to count as overdue.
+    fn judges(&self, pair_index: usize) -> bool {
+        pair_index == FIRST_SPENT_INDEX
+    }
+
+    fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
+        self.inner.entry(paths).or_default().value().clone()
+    }
+
+    /// Records that `count` SURBs were minted over these legs and are expected back.
+    pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64) {
+        self.counters(paths).record_expected(count);
+    }
+
+    /// The per-relayer health, judged from reply races and published into the graph.
+    pub fn relayer_health(&self) -> Arc<RelayerHealth> {
+        self.relayer_health.clone()
+    }
+
+    /// Moves outstanding SURBs whose return path runs through a relayer judged dead, or on probation
+    /// after such a verdict, into the per-session write-off, and drops the write-off of relayers that
+    /// recovered.
     ///
-    /// The claim made is narrower than "this pair is silent": it is "this pair **used to deliver**
-    /// and has now stopped". Silence alone was measured to fire during healthy operation, because
-    /// a pair that has not yet returned its first reply is indistinguishable from a dead one.
-    pub fn degraded_destinations(&self) -> Vec<OffchainPublicKey> {
-        let mut degraded = Vec::new();
-
-        // Age the per-destination cooldowns once per flush, dropping those that have served out.
-        self.replanned.retain(|_, since| {
-            *since += 1;
-            *since < FLUSHES_BETWEEN_REPLANS
-        });
-
-        // Which destinations had *some* pair deliver in this flush.
-        //
-        // This is what makes silence mean anything. On its own, "minted and got nothing back" is
-        // produced identically by a dead relayer and by a peer with nothing to say -- keep-alives
-        // mint either way. Only a sibling pair still delivering to the same destination tells the
-        // two apart, and it does so without a threshold: if the peer had gone quiet, every pair
-        // would be silent together.
-        let delivering: std::collections::HashSet<OffchainPublicKey> = self
-            .inner
-            .iter()
-            .filter(|entry| entry.value().peek().1 > 0)
-            .filter_map(|entry| self.destinations.get(entry.key()).map(|d| *d))
-            .collect();
-
-        // Which relayers are demonstrably still carrying replies.
-        //
-        // A relayer that dies takes down every path through it and nothing else, so silence that
-        // correlates with one node is a dead relayer, while silence spread evenly over all of them
-        // is a quiet peer. Naming the node is also what lets the blame land on the edges that
-        // deserve it instead of on every edge the loop happened to touch.
-        // Without our own slot every leg's relayers are unknowable, and the corroboration step
-        // below is what keeps a quiet peer from being called a dead relay. Guessing here would
-        // trade a missed detection for a false one, so make no claim until the slot is known.
-        let me_slot = self.me_slot.load(Ordering::Relaxed);
-        if me_slot == ME_SLOT_UNKNOWN {
-            return degraded;
+    /// Only the SURBs through the relayer are written off, and only they are counted: the
+    /// counterparty's other SURBs are as good as ever until the caller supersedes the whole stock.
+    /// A relayer on probation is known dead all the same: the probes the planner's exploration sends
+    /// through it are written off like any other SURB through it.
+    ///
+    /// Returns the sessions a dead verdict reached for the first time, i.e. the ones for which a
+    /// relayer has SURBs outstanding that were not written off before. The counterparty cannot tell
+    /// which of the SURBs it holds run through the dead relayer, since it sees only their first hop,
+    /// so the caller advances each such session's SURB generation and the counterparty drops its
+    /// whole stock on the next push. The write-off of such a session is dropped at the end of the pass:
+    /// the wipe takes exactly the SURBs it counted, and the balancer's reset and paced refill replace
+    /// them, so counting them on would only make the balancer produce that many SURBs above the target
+    /// for good. The SURBs through the relayer minted after the wipe are written off anew on later
+    /// passes, and the count stays small and current.
+    ///
+    /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
+    /// this flush is written off and bumped at the next one, if it is still dead then.
+    ///
+    /// Only stock reports a session: a SURB minted through the relayer before it was judged dead, which
+    /// the counterparty may hold. One minted after is a probe the planner's exploration sent through a
+    /// relayer published at zero or on probation, and is written off without a report. That holds in
+    /// a session the wipe never reached too, one opened since or with nothing through the relayer at
+    /// the time, which has no mark for the pair: its first probe must not cost it its stock.
+    /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
+    /// revives it once per `REBUMP_COOLDOWN` from the revival: a verdict reached again inside either
+    /// is written off as usual but reports nothing.
+    pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
+        let health = &self.relayer_health;
+        for mut session in self.written_off.iter_mut() {
+            session.retain(|relayer, written_off_at| {
+                // Spent by the counterparty since, and gone with it: see `WRITE_OFF_HORIZON`.
+                while written_off_at
+                    .front()
+                    .is_some_and(|at| at.elapsed() > WRITE_OFF_HORIZON)
+                {
+                    written_off_at.pop_front();
+                }
+                health.is_known_dead(relayer) && !written_off_at.is_empty()
+            });
         }
-
-        let delivering_relayers: std::collections::HashSet<u64> = self
-            .inner
+        self.written_off.retain(|_, session| !session.is_empty());
+        // A mark stays while its relayer is known dead, its time moved on by every such pass, so that
+        // `REBUMP_COOLDOWN` runs from the revival however long the death lasted.
+        let pass = Instant::now();
+        self.bumped.retain(|(_, relayer), at| {
+            if health.is_known_dead(relayer) {
+                *at = pass;
+                true
+            } else {
+                at.elapsed() < REBUMP_COOLDOWN
+            }
+        });
+        if health.dead.is_empty() && health.probation.is_empty() {
+            return Vec::new();
+        }
+        // Only verdicts that held for a second flush act on the stock; see `VERDICT_CONFIRMATION`.
+        #[allow(clippy::type_complexity)]
+        let through_dead: Vec<(HoprSurbId, HoprPseudonym, OffchainPublicKey, ReturnRelayers, Instant)> = self
+            .pending
             .iter()
-            .filter(|entry| entry.value().peek().1 > 0)
-            .flat_map(|entry| return_relayers(&entry.key().reply, me_slot).collect::<Vec<_>>())
+            .filter_map(|(id, pending)| {
+                relayers_of(&pending.return_relayers)
+                    .find(|relayer| health.is_confirmed_dead(relayer))
+                    .map(|dead| (*id, pending.pseudonym, dead, pending.return_relayers, pending.minted_at))
+            })
             .collect();
-
-        // Destinations that used to deliver, have now gone silent, yet cannot be attributed because
-        // no sibling pair to them is delivering — the corroboration blind spot. Distinct from
-        // `degraded`: these are exactly the return paths that are failing but that the detector
-        // *cannot* act on (a single-relayer collapse looks identical to a quiet peer). Surfacing
-        // them is the diagnostic that was missing when this condition took the tunnel down.
-        let mut blind_spot: std::collections::HashSet<OffchainPublicKey> = std::collections::HashSet::new();
-
-        for entry in self.inner.iter() {
-            let paths = *entry.key();
-            let (expected, observed) = entry.value().peek();
-            let mut state = self.silence.entry(paths).or_default();
-
-            if observed > 0 {
-                // Delivering. Note that it ever worked, so future silence is meaningful.
-                state.delivered = true;
-                state.runs = 0;
+        let mut reached: Vec<HoprPseudonym> = Vec::new();
+        for (id, pseudonym, dead, return_relayers, minted_at) in through_dead {
+            // Remembered before it leaves `pending`, so that a reply decoded in between finds it in
+            // one of the two.
+            self.written_off_legs.insert(id, return_relayers);
+            self.pending.invalidate(&id);
+            let mut session = self.written_off.entry(pseudonym).or_default();
+            let first_for_pair = !session.contains_key(&dead);
+            session.entry(dead).or_default().push_back(Instant::now());
+            drop(session);
+            // A probe, not stock: see the docs above. Judged per SURB, and before the mark, so that a
+            // probe written off first leaves the stock SURBs of the same pass free to report the pair.
+            if health.known_dead_since(&dead).is_some_and(|since| minted_at >= since) {
+                tracing::trace!(
+                    %pseudonym,
+                    relayer = %dead,
+                    "probe through a relayer known dead, written off without a new SURB generation"
+                );
                 continue;
             }
-
-            if expected < MIN_EXPECTED_FOR_SILENCE {
-                // Too little went out to conclude anything. An idle pair is not a failing one.
-                state.runs = 0;
-                continue;
-            }
-
-            if !state.delivered {
-                // Never returned anything yet, so there is no "stopped" to observe -- only a pair
-                // too young to have been measured.
-                continue;
-            }
-
-            let Some(dest) = self.destinations.get(&paths).map(|d| *d) else {
-                continue;
-            };
-
-            // Corroboration: some other pair to this destination is still getting replies home, so
-            // the peer is demonstrably talking and this pair's silence is its own fault. The run
-            // resets when nothing corroborates, so `runs` counts consecutive flushes in which this
-            // pair was silent *while the peer was demonstrably answering elsewhere* -- not merely
-            // flushes in which it was quiet.
-            if !delivering.contains(&dest) {
-                // Used to deliver, now silent, and nothing else to this destination is answering:
-                // the blind spot. Cannot tell a dead return path from a peer with nothing to say.
-                blind_spot.insert(dest);
-                state.runs = 0;
-                continue;
-            }
-
-            // Sharpened: the peer is talking, and this pair carries at least one relayer that is
-            // not carrying replies anywhere else. Silence that every relayer shares is the peer
-            // being selective, not a relay failing.
-            if return_relayers(&paths.reply, me_slot).all(|r| delivering_relayers.contains(&r)) {
-                state.runs = 0;
-                continue;
-            }
-
-            state.runs += 1;
-            // Early warning: this pair used to deliver, is now silent, and a sibling to the same
-            // destination is still answering — so the silence is attributable and climbing toward a
-            // re-plan. Surfacing the run as it builds turns "suddenly re-planned" into a visible ramp.
-            tracing::trace!(
-                destination = %dest,
-                runs = state.runs,
-                threshold = SILENT_FLUSHES_BEFORE_DEGRADED,
-                expected,
-                "return pair silent while a sibling delivers; silence run climbing",
-            );
-            if state.runs >= SILENT_FLUSHES_BEFORE_DEGRADED {
-                // Re-arm rather than accumulate: re-planning the same destination on every
-                // subsequent flush churns its cached candidates instead of letting the new
-                // selection settle.
-                state.runs = 0;
-                // Only if this destination is not already serving out a cooldown: another of its
-                // pairs may have reported it moments ago, and re-planning again now would discard
-                // the candidate that re-plan just chose.
-                if !self.replanned.contains_key(&dest) {
+            if self.bumped.contains_key(&(pseudonym, dead)) {
+                if first_for_pair {
                     tracing::debug!(
-                        destination = %dest,
-                        runs = SILENT_FLUSHES_BEFORE_DEGRADED,
-                        "return path degraded: sustained silence corroborated by a delivering sibling; \
-                         marking destination for re-plan",
+                        %pseudonym,
+                        relayer = %dead,
+                        "SURB through a relayer already bumped for, written off without a new SURB generation"
                     );
-                    self.replanned.insert(dest, 0);
-                    degraded.push(dest);
+                }
+                continue;
+            }
+            self.bumped.insert((pseudonym, dead), Instant::now());
+            if !reached.contains(&pseudonym) {
+                reached.push(pseudonym);
+            }
+        }
+        // The wipe takes what was counted, whatever else was counted for the session in this pass.
+        for pseudonym in &reached {
+            self.written_off.remove(pseudonym);
+        }
+        if !reached.is_empty() {
+            // The wipe takes the session's whole stock, so it settles every relayer known dead now,
+            // not only the one each pending SURB was found under: a SURB names the first confirmed dead
+            // relayer on its path, and one judged in this same flush is not confirmed yet. Left out,
+            // such a relayer turns the first SURB through it after the wipe into a pair no wipe has
+            // covered, and that SURB is an exploring probe once the relayer is on probation: the
+            // generation advanced again for it, and the counterparty dropped a fresh stock of thousands
+            // over one SURB. SURBs through these relayers from now on are written off, as through any
+            // relayer already bumped for; a relayer that dies after this wipe still gets its own.
+            let now = Instant::now();
+            let known_dead: Vec<OffchainPublicKey> = health
+                .dead
+                .iter()
+                .map(|relayer| *relayer)
+                .chain(health.probation.iter().map(|relayer| *relayer))
+                .collect();
+            for pseudonym in &reached {
+                for relayer in &known_dead {
+                    self.bumped.entry((*pseudonym, *relayer)).or_insert(now);
                 }
             }
-        }
 
-        // One line per flush, only when there is something to say. `blind_spot` is the actionable
-        // gap: return paths demonstrably failing that the detector cannot re-plan for want of a
-        // corroborating sibling — raise return-relayer diversity (see the path selector) to close it.
-        if !degraded.is_empty() || !blind_spot.is_empty() {
-            tracing::debug!(
-                degraded = degraded.len(),
-                blind_spot = blind_spot.len(),
-                blind_spot_destinations = ?blind_spot.iter().take(MAX_DEBUG_DESTINATIONS).collect::<Vec<_>>(),
-                blind_spot_omitted = blind_spot.len().saturating_sub(MAX_DEBUG_DESTINATIONS),
-                delivering_destinations = delivering.len(),
-                delivering_relayers = delivering_relayers.len(),
-                "surb return-path degradation scan",
-            );
+            // The counterparty drops its whole stock on the first batch of the new generation, but it
+            // goes on spending that stock until the batch arrives. Taken out of `pending`, these SURBs
+            // cannot make a second relayer confirmed at a later flush look as if it still had a stock
+            // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
+            // that a reply spent in the meantime still proves its relayers alive: it can revive one
+            // judged dead in this same flush, whose verdict is not confirmed yet.
+            let wiped: Vec<(HoprSurbId, ReturnRelayers)> = self
+                .pending
+                .iter()
+                .filter(|(_, pending)| reached.contains(&pending.pseudonym))
+                .map(|(id, pending)| (*id, pending.return_relayers))
+                .collect();
+            for (id, return_relayers) in wiped {
+                self.written_off_legs.insert(id, return_relayers);
+                self.pending.invalidate(&id);
+            }
         }
+        reached
+    }
 
-        degraded
+    /// Per session, how many SURBs held by the counterparty cannot bring a reply home, and their share
+    /// of all it was handed that are still accounted for.
+    pub fn invalid(&self) -> HashMap<HoprPseudonym, (u64, f64)> {
+        if self.written_off.is_empty() {
+            return HashMap::new();
+        }
+        let mut outstanding: HashMap<HoprPseudonym, u64> = HashMap::new();
+        for (_, pending) in self.pending.iter() {
+            *outstanding.entry(pending.pseudonym).or_default() += 1;
+        }
+        self.written_off
+            .iter()
+            .map(|session| {
+                let count: u64 = session.values().map(|written_off_at| written_off_at.len() as u64).sum();
+                let total = count + outstanding.get(session.key()).copied().unwrap_or_default();
+                (*session.key(), (count, count as f64 / total.max(1) as f64))
+            })
+            .collect()
+    }
+
+    /// Drops the write-off and the re-bump cooldown of a session that no longer exists.
+    pub fn forget_session(&self, pseudonym: &HoprPseudonym) {
+        self.written_off.remove(pseudonym);
+        self.bumped.retain(|(session, _), _| session != pseudonym);
     }
 
     /// Records that `count` replies arrived over these legs.
@@ -411,19 +513,586 @@ pub fn no_path_slots() -> PathSlotResolver {
     Arc::new(|_| None)
 }
 
-/// Legs each outstanding SURB was minted over, shared between the two codec halves.
+/// The relayers of a reply leg, from the first after the replier to the last before us.
+pub(crate) type ReturnRelayers = [Option<OffchainPublicKey>; PATH_ID_SLOTS];
+
+/// What a minted SURB is remembered by until its reply comes home.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PendingSurb {
+    /// Legs the round-trip traverses, for the counts and graph attribution.
+    paths: ForwardAndReturnPath,
+    /// The session it was minted for.
+    pseudonym: HoprPseudonym,
+    /// Relayers the reply passes, any of which a late or missing reply implicates.
+    return_relayers: ReturnRelayers,
+    /// When this SURB and its partner were minted; both round-trips run from here.
+    minted_at: Instant,
+    /// The SURB minted in the same packet over another return path, which this one races.
+    partner: Option<HoprSurbId>,
+    /// Its position in the pair, `0` or `1`; see [`SurbRoundTripRegistry::judges`].
+    pair_index: usize,
+    /// The partner's relayers and when its reply came home, once it has.
+    partner_replied: Option<(ReturnRelayers, Instant)>,
+}
+
+/// What each outstanding SURB is remembered by, shared between the two codec halves.
 ///
 /// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
 /// shared by both. Giving each half its own leaves every lookup missing and silently discards the
 /// entire observation side of the metric.
-pub type PendingLegs = moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>;
+type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
 
 /// Builds the shared pending map, bounded by capacity and TTL.
-pub fn pending_legs(max_pending: u64) -> PendingLegs {
+fn pending_legs(max_pending: u64) -> PendingLegs {
     moka::sync::Cache::builder()
         .max_capacity(max_pending)
-        .time_to_live(PENDING_SURB_TTL)
+        .time_to_live(PENDING_SURB_HORIZON)
         .build()
+}
+
+/// Per-relayer health from reply races: two SURBs of one packet share mint time, forward path and
+/// store slot, so the gap between their replies is down to the return paths alone.
+#[derive(Debug, Default)]
+pub struct RelayerHealth {
+    relayers: DashMap<OffchainPublicKey, RaceHistory>,
+    /// Neighbours we lost our own connection to, to re-plan when one comes or goes.
+    lost_neighbours: DashSet<OffchainPublicKey>,
+    neighbours_changed: AtomicBool,
+    /// Relayers judged dead: black holes as of the last flush, published at `0`.
+    dead: DashSet<OffchainPublicKey>,
+    /// When each relayer in `dead` was judged, for `VERDICT_CONFIRMATION`. Removed with the relayer.
+    dead_since: DashMap<OffchainPublicKey, Instant>,
+    /// Relayers in `dead` whose verdict held for `VERDICT_CONFIRMATION`, and so is acted on. A verdict
+    /// that lapses before it is confirmed is withdrawn rather than put on probation: it never held.
+    confirmed: DashSet<OffchainPublicKey>,
+    /// Relayers whose dead verdict has lapsed without a reply coming home through them, published at
+    /// `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
+    probation: DashSet<OffchainPublicKey>,
+    /// When each relayer known dead was first judged dead in its current death, kept through probation
+    /// and any later verdict until a reply revives it. A SURB minted through it after that is a probe the
+    /// planner's exploration sent, not stock the counterparty held when it died; see
+    /// [`SurbRoundTripRegistry::write_off_dead`].
+    known_dead_since: DashMap<OffchainPublicKey, Instant>,
+    /// Health last handed to the graph, below `1.0` only.
+    published: DashMap<OffchainPublicKey, f64>,
+    /// When a reply last came home, through any relayer, for any session.
+    last_reply: LastReply,
+}
+
+/// When a reply last came home, kept in atomics: it is recorded for every reply, on the packet hot path.
+///
+/// Milliseconds since an epoch fixed at construction, plus one, so that `0` is "none yet".
+#[derive(Debug)]
+struct LastReply {
+    epoch: Instant,
+    since_epoch_ms_plus_one: AtomicU64,
+}
+
+impl Default for LastReply {
+    fn default() -> Self {
+        Self {
+            epoch: Instant::now(),
+            since_epoch_ms_plus_one: AtomicU64::new(0),
+        }
+    }
+}
+
+/// The position, in a pair of SURBs minted together, of the one the replier spends first: the first,
+/// as a replier spends its SURBs oldest first (FIFO is the only pop order, see
+/// `hopr_protocol_hopr::SurbPopOrder`).
+///
+/// Only that SURB's lateness is down to its return path. The other is spent right after it, so it
+/// trails the first-spent one by the replier's pace rather than by a relayer's fault. A race opens
+/// only when the later-spent SURB is home while the first-spent one is still out.
+///
+/// Share-first tiers can separate a pair even so: a SURB carrying a PIX share is spent before
+/// share-less ones, whatever their ages. See [`SurbRoundTripRegistry::judges`].
+const FIRST_SPENT_INDEX: usize = 0;
+
+/// One race as one of its relayers saw it.
+#[derive(Debug, Clone, Copy)]
+struct Race {
+    at: Instant,
+    /// Seconds this relayer finished after its partner, negative when before.
+    margin: f64,
+    /// Seconds the faster of the two replies took to come home.
+    winning_round_trip: f64,
+}
+
+impl Race {
+    /// Its reply never came home within the time a SURB is remembered.
+    fn lost(&self) -> bool {
+        self.margin >= PENDING_SURB_TTL.as_secs_f64()
+    }
+}
+
+#[derive(Debug, Default)]
+struct RaceHistory {
+    races: VecDeque<Race>,
+    /// Races whose partner is home while this relayer's reply is not, by the SURB still out. Each
+    /// counts as lost by at least the time since the partner came home.
+    open: HashMap<HoprSurbId, Race>,
+    /// How far back its races count, set when it is judged; zero until then.
+    memory: Duration,
+    /// When a reply last came home through this relayer, whether or not it settled a race.
+    last_home: Option<Instant>,
+}
+
+/// The fewest races whose median no single race decides.
+const MIN_RACES: usize = 3;
+
+impl RaceHistory {
+    fn forget_older_than(&mut self, memory: Duration) {
+        while self.races.len() > MIN_RACES && self.races.front().is_some_and(|race| race.at.elapsed() > memory) {
+            self.races.pop_front();
+        }
+    }
+
+    /// The races that settled, as opposed to those that expired open and were booked as lost.
+    fn finished(&self) -> impl Iterator<Item = &Race> {
+        self.races.iter().filter(|race| !race.lost())
+    }
+
+    /// How late a reply of this relayer usually is: the largest margin of its settled races, or `None`
+    /// until it has settled [`MIN_RACES`] of them, too few for the figure to mean anything.
+    fn usual_margin(&self) -> Option<f64> {
+        (self.finished().count() >= MIN_RACES)
+            .then(|| self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max))
+    }
+
+    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than its bar, and
+    /// nothing has come home through it since each of them fell due. The bar is the largest margin of
+    /// the races it finished, or, while it has finished too few, the borrowed one below.
+    ///
+    /// A reply is overdue only if a reply came home, through any relayer, after its grace ran out
+    /// (`last_reply`): the network was delivering while this relayer was not. Without that, nothing
+    /// tells a dead relayer from a pause. The replier's stream stops for a settle, a phase change or
+    /// idle, nothing is home for anybody during it, and a few replies lost at random before it would
+    /// pass for a verdict, each costing the session its whole stock. An outage of every return
+    /// relayer is likewise no verdict on any one of them. When the stream resumes an alive relayer
+    /// settles a race, which clears the condition below, while a dead one never does.
+    ///
+    /// A relayer that has settled fewer than [`MIN_RACES`] races has no margin of its own to go by,
+    /// and races settle only in the abnormal order, so a clean history is common. It borrows
+    /// `fallback_usual`, the bar of the best-measured relayer, raised to whatever its own settled races
+    /// measure (`own.max(fallback)`), and is not judged at all while no relayer has one. "Home through
+    /// it" is a race it settled or any reply over a leg it is on; the relayer's own races that expired
+    /// open and were booked as lost are not replies that came home, and must not reset the clock.
+    ///
+    /// Each overdue race is judged on its own: one that a reply through the relayer came home after is
+    /// answered, the relayer was delivering after the reply it lost, which was then lost at random.
+    /// Comparing the latest reply with the *oldest* overdue race instead lets one stale race, or the
+    /// replies already past the relayer when it died, hold a verdict back until that race expires, up
+    /// to a minute.
+    fn is_black_hole(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> bool {
+        let own = self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max);
+        // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
+        // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
+        let usual = match (self.usual_margin(), fallback_usual) {
+            (Some(usual), _) => usual,
+            (None, Some(fallback)) => own.max(fallback),
+            (None, None) => return false,
+        };
+        let grace = Duration::from_secs_f64(usual);
+        // Home through it: a race it settled, or any reply through it. A reply in the normal order
+        // settles no race, but it is the relayer delivering all the same; counting settled races alone
+        // undid the revival such a reply makes at the very next flush.
+        let latest_home = self.finished().map(|race| race.at).max().max(self.last_home);
+        let now = Instant::now();
+        let unanswered = self
+            .open
+            .values()
+            .filter_map(|race| race.at.checked_add(grace))
+            // Due, and overdue while others delivered (see above)...
+            .filter(|due| *due < now && last_reply.is_some_and(|reply| reply > *due))
+            // ...and nothing home through it since it fell due.
+            .filter(|due| latest_home.is_none_or(|home| home < *due))
+            .count();
+        unanswered >= MIN_RACES
+    }
+}
+
+/// A relayer's standing in its races: median margin behind its partners, that median's
+/// uncertainty, and the fastest round-trip among them.
+#[derive(Debug, Clone, Copy)]
+struct Judgement {
+    margin: f64,
+    uncertainty: f64,
+    fastest: f64,
+}
+
+impl Judgement {
+    /// Health from the relayer's lateness, `unit` being the fastest round-trip any relayer made:
+    /// lagging by less than that costs nothing.
+    fn health(&self, unit: f64) -> f64 {
+        unit / unit.max(self.margin - self.uncertainty)
+    }
+
+    /// The healths its races cannot tell apart: lateness within its uncertainty, or within a
+    /// round-trip, which healthy relayers differ by anyway.
+    fn indistinct(&self, unit: f64) -> std::ops::RangeInclusive<f64> {
+        let slack = self.uncertainty.max(unit);
+        unit / unit.max(self.margin + slack)..=unit / unit.max(self.margin - slack)
+    }
+}
+
+fn relayers_of(leg: &ReturnRelayers) -> impl Iterator<Item = OffchainPublicKey> + '_ {
+    leg.iter().flatten().copied()
+}
+
+impl RelayerHealth {
+    /// Records that the reply over `later` came home `by` after the one over `earlier`, which took
+    /// `winning_round_trip`, both on SURBs of one packet. Relayers on both legs cancel out.
+    pub(crate) fn record_race(
+        &self,
+        later: &ReturnRelayers,
+        later_surb: HoprSurbId,
+        earlier: &ReturnRelayers,
+        winning_round_trip: Duration,
+        by: Duration,
+    ) {
+        let (at, winning_round_trip) = (Instant::now(), winning_round_trip.as_secs_f64());
+        let race = |margin| Race {
+            at,
+            margin,
+            winning_round_trip,
+        };
+        for relayer in relayers_of(later) {
+            if let Some(mut history) = self.relayers.get_mut(&relayer) {
+                history.open.remove(&later_surb);
+            }
+            if !earlier.contains(&Some(relayer)) {
+                self.record(relayer, race(by.as_secs_f64()));
+            }
+        }
+        for relayer in relayers_of(earlier).filter(|relayer| !later.contains(&Some(*relayer))) {
+            self.record(relayer, race(-by.as_secs_f64()));
+        }
+    }
+
+    /// Records that the reply over `home` came home in `winning_round_trip` while `surb`, over
+    /// `waiting`, is still out.
+    pub(crate) fn open_race(
+        &self,
+        waiting: &ReturnRelayers,
+        surb: HoprSurbId,
+        home: &ReturnRelayers,
+        winning_round_trip: Duration,
+    ) {
+        let race = Race {
+            at: Instant::now(),
+            margin: 0.0,
+            winning_round_trip: winning_round_trip.as_secs_f64(),
+        };
+        for relayer in relayers_of(waiting).filter(|relayer| !home.contains(&Some(*relayer))) {
+            self.relayers.entry(relayer).or_default().open.insert(surb, race);
+        }
+    }
+
+    fn record(&self, relayer: OffchainPublicKey, race: Race) {
+        let mut history = self.relayers.entry(relayer).or_default();
+        history.races.push_back(race);
+        let memory = history.memory;
+        if !memory.is_zero() {
+            history.forget_older_than(memory);
+        }
+    }
+
+    /// Our own connection to a neighbour came or went.
+    pub fn set_neighbour_connected(&self, neighbour: OffchainPublicKey, connected: bool) {
+        let changed = if connected {
+            self.lost_neighbours.remove(&neighbour).is_some()
+        } else {
+            self.lost_neighbours.insert(neighbour)
+        };
+        if changed {
+            self.neighbours_changed.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Whether a neighbour came or went since the last call.
+    pub fn take_neighbour_change(&self) -> bool {
+        self.neighbours_changed.swap(false, Ordering::Relaxed)
+    }
+
+    /// Records that a reply came home now, through any relayer, for any session.
+    pub(crate) fn record_reply(&self) {
+        self.record_reply_at(Instant::now());
+    }
+
+    fn record_reply_at(&self, at: Instant) {
+        let ms = u64::try_from(at.saturating_duration_since(self.last_reply.epoch).as_millis()).unwrap_or(u64::MAX - 1);
+        self.last_reply
+            .since_epoch_ms_plus_one
+            .fetch_max(ms + 1, Ordering::Relaxed);
+    }
+
+    /// When a reply last came home, to millisecond resolution, or `None` if none has.
+    fn last_reply(&self) -> Option<Instant> {
+        let stored = self.last_reply.since_epoch_ms_plus_one.load(Ordering::Relaxed);
+        stored
+            .checked_sub(1)
+            .and_then(|ms| self.last_reply.epoch.checked_add(Duration::from_millis(ms)))
+    }
+
+    /// Whether the relayer is judged dead or on probation after such a verdict: its SURBs are written
+    /// off either way.
+    fn is_known_dead(&self, relayer: &OffchainPublicKey) -> bool {
+        self.dead.contains(relayer) || self.probation.contains(relayer)
+    }
+
+    /// Known dead and old enough to act on: on probation, or dead with a verdict that a flush at
+    /// least `VERDICT_CONFIRMATION` after it found still standing (`refresh` marks that, before any
+    /// re-plan of the same flush, so a slow re-plan cannot stand in for the second look).
+    fn is_confirmed_dead(&self, relayer: &OffchainPublicKey) -> bool {
+        self.probation.contains(relayer) || (self.dead.contains(relayer) && self.confirmed.contains(relayer))
+    }
+
+    /// A reply came home over `leg`: every relayer on it delivered. This is what "home since" means for
+    /// a black hole (see [`RaceHistory::is_black_hole`]), whether or not the reply settled a race.
+    fn note_home(&self, leg: &ReturnRelayers) {
+        let now = Instant::now();
+        for relayer in relayers_of(leg) {
+            // Only relayers with races can be black holes, and only they have a history.
+            if let Some(mut history) = self.relayers.get_mut(&relayer) {
+                history.last_home = Some(now);
+            }
+        }
+    }
+
+    /// Records a relayer entering `dead` now, which starts its death.
+    fn mark_dead(&self, relayer: OffchainPublicKey) {
+        let now = Instant::now();
+        self.dead.insert(relayer);
+        self.dead_since.insert(relayer, now);
+        self.known_dead_since.insert(relayer, now);
+    }
+
+    /// When the relayer's current death began, while it is known dead.
+    fn known_dead_since(&self, relayer: &OffchainPublicKey) -> Option<Instant> {
+        self.known_dead_since.get(relayer).map(|since| *since)
+    }
+
+    /// A reply came home over `leg`, so every relayer on it is delivering: any that was judged dead or
+    /// on probation is alive again. Its health is then what its races say, which still holds the ones
+    /// it lost, so it recovers gradually as they are forgotten.
+    fn revive_by_reply(&self, leg: &ReturnRelayers) {
+        for relayer in relayers_of(leg) {
+            // Looked up before it is taken out: this is on the path of every reply, and the sets are
+            // empty nearly always.
+            if !self.is_known_dead(&relayer) {
+                continue;
+            }
+            let was_dead = self.dead.remove(&relayer).is_some();
+            self.dead_since.remove(&relayer);
+            self.known_dead_since.remove(&relayer);
+            self.confirmed.remove(&relayer);
+            let was_on_probation = self.probation.remove(&relayer).is_some();
+            if was_dead || was_on_probation {
+                tracing::info!(%relayer, on_probation = was_on_probation, "relayer revived by a reply");
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn is_dead(&self, relayer: &OffchainPublicKey) -> bool {
+        self.dead.contains(relayer)
+    }
+
+    #[cfg(test)]
+    fn is_on_probation(&self, relayer: &OffchainPublicKey) -> bool {
+        self.probation.contains(relayer)
+    }
+
+    /// Re-judges every relayer once per flush; returns `(relayer, previous, current)` health changes for
+    /// the graph, dead being `0.0` and probation `PROBATION_HEALTH`. A race open longer than a SURB is
+    /// remembered counts as lost by that long. `memory`: margins a race is remembered for, `0` for dead,
+    /// on probation or healthy.
+    ///
+    /// A relayer is alive until it is a black hole, which makes it dead. Its verdict does not end with the
+    /// condition: once no overdue reply is out any more it goes on probation instead, and stays there
+    /// until a reply comes home through it (`revive_by_reply`). One on probation
+    /// that is a black hole again is dead again.
+    pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
+        let last_reply = self.last_reply();
+        // The bar of the best-measured relayer, for those with too short a history of their own.
+        let fallback_usual = self
+            .relayers
+            .iter()
+            .filter_map(|entry| entry.usual_margin())
+            .max_by(f64::total_cmp);
+        let mut black_holes = std::collections::HashSet::new();
+        for mut entry in self.relayers.iter_mut() {
+            // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
+            // a health that low until it proves otherwise, rather than being forgiven by expiry.
+            let mut lost = Vec::new();
+            entry.open.retain(|_, race| {
+                let open = race.at.elapsed() <= PENDING_SURB_TTL;
+                if !open {
+                    lost.push(Race {
+                        at: Instant::now(),
+                        margin: PENDING_SURB_TTL.as_secs_f64(),
+                        ..*race
+                    });
+                }
+                open
+            });
+            entry.races.extend(lost);
+            if entry.is_black_hole(last_reply, fallback_usual) {
+                black_holes.insert(*entry.key());
+            }
+        }
+        self.dead.retain(|relayer| {
+            let still = black_holes.contains(relayer);
+            if still {
+                // Still standing at a flush `VERDICT_CONFIRMATION` after it: from now on it is acted on.
+                if self
+                    .dead_since
+                    .get(relayer)
+                    .is_some_and(|since| since.elapsed() >= VERDICT_CONFIRMATION)
+                {
+                    self.confirmed.insert(*relayer);
+                }
+            } else if self.confirmed.remove(relayer).is_some() {
+                tracing::info!(%relayer, "dead verdict lapsed into probation");
+                self.dead_since.remove(relayer);
+                self.probation.insert(*relayer);
+            } else {
+                // Gone before the second look: the verdict never held, and nothing was written off or
+                // advanced for it, so there is nothing to probe either.
+                tracing::info!(%relayer, "dead verdict withdrawn before it was confirmed");
+                self.dead_since.remove(relayer);
+                self.known_dead_since.remove(relayer);
+            }
+            still
+        });
+        let back_from_probation: Vec<OffchainPublicKey> = self
+            .probation
+            .iter()
+            .filter(|relayer| black_holes.contains(relayer))
+            .map(|relayer| *relayer)
+            .collect();
+        for relayer in back_from_probation {
+            tracing::info!(%relayer, "relayer on probation judged dead again");
+            self.probation.remove(&relayer);
+            // Probation is a standing verdict already: no second flush to wait for.
+            self.dead.insert(relayer);
+            self.confirmed.insert(relayer);
+            self.dead_since.insert(
+                relayer,
+                Instant::now()
+                    .checked_sub(VERDICT_CONFIRMATION)
+                    .unwrap_or_else(Instant::now),
+            );
+        }
+        for relayer in black_holes {
+            if !self.is_known_dead(&relayer) {
+                tracing::info!(%relayer, "relayer judged dead");
+                self.mark_dead(relayer);
+            }
+        }
+
+        let judged: HashMap<OffchainPublicKey, Judgement> = self
+            .relayers
+            .iter()
+            .map(|entry| *entry.key())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .filter_map(|relayer| self.judge(&relayer, memory).map(|judgement| (relayer, judgement)))
+            .collect();
+        // A relayer gone from the paths races no more; its history only grows the map.
+        self.relayers.retain(|_, history| {
+            !history.open.is_empty()
+                || history
+                    .races
+                    .back()
+                    .is_some_and(|race| race.at.elapsed() <= history.memory.max(PENDING_SURB_TTL))
+        });
+        let unit = judged
+            .values()
+            .map(|judgement| judgement.fastest)
+            .min_by(f64::total_cmp);
+
+        let relayers: std::collections::HashSet<OffchainPublicKey> = judged
+            .keys()
+            .copied()
+            .chain(self.published.iter().map(|entry| *entry.key()))
+            .chain(self.dead.iter().map(|relayer| *relayer))
+            .chain(self.probation.iter().map(|relayer| *relayer))
+            .collect();
+
+        let mut changed = Vec::new();
+        for relayer in relayers {
+            let previous = self.published.get(&relayer).map_or(1.0, |health| *health);
+            let current = match (judged.get(&relayer), unit) {
+                _ if self.dead.contains(&relayer) => 0.0,
+                _ if self.probation.contains(&relayer) => PROBATION_HEALTH,
+                (Some(judgement), Some(unit)) if memory > 0 => {
+                    if previous > 0.0 && judgement.indistinct(unit).contains(&previous) {
+                        continue;
+                    }
+                    judgement.health(unit)
+                }
+                _ => 1.0,
+            };
+            if current == previous {
+                continue;
+            }
+            if current < 1.0 {
+                self.published.insert(relayer, current);
+            } else {
+                self.published.remove(&relayer);
+            }
+            changed.push((relayer, previous, current));
+        }
+        changed
+    }
+
+    /// Margin, its uncertainty and fastest round-trip. Races are remembered for `memory` times
+    /// margin plus spread, so the window scales with the relayer.
+    fn judge(&self, relayer: &OffchainPublicKey, memory: u32) -> Option<Judgement> {
+        let mut history = self.relayers.get_mut(relayer)?;
+        let remembered = history.memory;
+        let recent = |race: &Race| remembered.is_zero() || race.at.elapsed() <= remembered;
+        let still_out = history.open.values().filter(|race| recent(race)).map(|race| Race {
+            margin: race.at.elapsed().as_secs_f64(),
+            ..*race
+        });
+        let races: Vec<Race> = history
+            .races
+            .iter()
+            .rev()
+            .enumerate()
+            .take_while(|(i, race)| *i < MIN_RACES || recent(race))
+            .map(|(_, race)| *race)
+            .chain(still_out)
+            .collect();
+        if races.len() < MIN_RACES {
+            return None;
+        }
+        let mut margins: Vec<f64> = races.iter().map(|race| race.margin).collect();
+        let margin = median(&mut margins);
+        let spread = median(&mut margins.iter().map(|m| (m - margin).abs()).collect::<Vec<_>>());
+        history.memory = Duration::from_secs_f64(f64::from(memory) * (margin.abs() + spread));
+        let memory = history.memory;
+        history.forget_older_than(memory);
+
+        let fastest = races
+            .iter()
+            .map(|race| race.winning_round_trip)
+            .fold(f64::INFINITY, f64::min);
+        Some(Judgement {
+            margin,
+            uncertainty: spread / (races.len() as f64).sqrt(),
+            fastest,
+        })
+    }
+}
+
+/// Lower median; `values` must not be empty.
+fn median(values: &mut [f64]) -> f64 {
+    values.sort_unstable_by(f64::total_cmp);
+    values[(values.len() - 1) / 2]
 }
 
 /// Reads path slots out of a network graph.
@@ -546,11 +1215,6 @@ where
 
     {
         // One aggregate line per interval rather than one per pair of legs.
-        //
-        // DIAGNOSTIC: at `info` while the recovery gap is under investigation. This is the pair of
-        // numbers that separates "the counterparty never got SURBs" from "it got them, replied, and
-        // the replies did not arrive" -- the two explanations left for a return path carrying
-        // packets while the application receives almost nothing. Drop back to `debug` once settled.
         tracing::info!(
             legs,
             expected = total_expected,
@@ -558,6 +1222,70 @@ where
             "surb round-trip flush tick"
         );
     }
+}
+
+/// Re-judges relayer health, records what changed in the graph, and re-plans when it or a neighbour
+/// changed, before writing off the SURBs of relayers judged dead. Recording precedes the re-plan, so
+/// the re-plan already avoids them; the write-off follows it, so the refill goes over new paths.
+///
+/// Returns the sessions whose SURB generation the caller should advance, as reported by
+/// [`SurbRoundTripRegistry::write_off_dead`].
+pub async fn refresh_relayer_health<G, F>(
+    registry: &SurbRoundTripRegistry,
+    graph: &G,
+    memory: u32,
+    weight: f64,
+    replan: impl FnOnce() -> F,
+) -> Vec<HoprPseudonym>
+where
+    G: hopr_api::graph::NetworkGraphUpdate,
+    F: std::future::Future<Output = ()>,
+{
+    let health = &registry.relayer_health;
+    let changed = health.refresh(memory);
+    // The verdicts themselves are logged where they are reached, in `refresh`.
+    for (relayer, previous, current) in &changed {
+        tracing::debug!(%relayer, previous, current, "relayer health changed");
+    }
+    // Every judged relayer on every flush, not only the changes: the graph keeps health on edges, and
+    // an edge added since the last change would otherwise carry none.
+    let healths: Vec<(OffchainPublicKey, f64)> = health
+        .published
+        .iter()
+        .map(|entry| (*entry.key(), *entry.value()))
+        .chain(
+            changed
+                .iter()
+                .filter(|(.., current)| *current >= 1.0)
+                .map(|(relayer, _, current)| (*relayer, *current)),
+        )
+        .map(|(relayer, health)| (relayer, health.powf(weight)))
+        .collect();
+    if !healths.is_empty() {
+        graph.record_nodes_health(&healths);
+    }
+    if health.take_neighbour_change() || !changed.is_empty() {
+        replan().await;
+    }
+    registry.write_off_dead()
+}
+
+/// The invalid SURBs to hand each session this tick: every current mark, re-applied so a session
+/// opened since picks it up, and `(0, 0.0)` for sessions whose mark has gone.
+pub fn invalid_updates(
+    previous: &HashMap<HoprPseudonym, (u64, f64)>,
+    current: &HashMap<HoprPseudonym, (u64, f64)>,
+) -> Vec<(HoprPseudonym, (u64, f64))> {
+    current
+        .iter()
+        .map(|(session, invalid)| (*session, *invalid))
+        .chain(
+            previous
+                .keys()
+                .filter(|session| !current.contains_key(session))
+                .map(|session| (*session, (0, 0.0))),
+        )
+        .collect()
 }
 
 /// Wraps a codec so the SURBs it mints and consumes are counted per pair of legs.
@@ -570,11 +1298,6 @@ pub struct SurbTelemetryCodec<C> {
     me: OffchainPublicKey,
     slots: PathSlotResolver,
     registry: SurbRoundTripRegistry,
-    /// Legs each outstanding SURB was minted over.
-    ///
-    /// Bounded by capacity and TTL rather than by replies arriving, so a peer that never replies
-    /// cannot grow it without limit. Shared with the other codec half -- see [`PendingLegs`].
-    pending: PendingLegs,
 }
 
 impl<C: std::fmt::Debug> std::fmt::Debug for SurbTelemetryCodec<C> {
@@ -589,19 +1312,12 @@ impl<C: std::fmt::Debug> std::fmt::Debug for SurbTelemetryCodec<C> {
 
 impl<C> SurbTelemetryCodec<C> {
     /// Wraps `inner`, resolving path slots with `slots` and accumulating into `registry`.
-    pub fn new(
-        inner: C,
-        me: OffchainPublicKey,
-        slots: PathSlotResolver,
-        registry: SurbRoundTripRegistry,
-        pending: PendingLegs,
-    ) -> Self {
+    pub fn new(inner: C, me: OffchainPublicKey, slots: PathSlotResolver, registry: SurbRoundTripRegistry) -> Self {
         Self {
             inner,
             me,
             slots,
             registry,
-            pending,
         }
     }
 
@@ -611,9 +1327,9 @@ impl<C> SurbTelemetryCodec<C> {
     /// them.
     fn on_minted(&self, routing: &ResolvedTransportRouting<HoprSurb>, minted: &[HoprSurbId]) {
         let ResolvedTransportRouting::Forward {
+            pseudonym,
             forward_path,
             return_paths,
-            ..
         } = routing
         else {
             return;
@@ -624,10 +1340,6 @@ impl<C> SurbTelemetryCodec<C> {
             return;
         };
 
-        if let Some(slot) = (self.slots)(&self.me) {
-            self.registry.note_me_slot(slot);
-        }
-
         tracing::trace!(
             minted = minted.len(),
             return_paths = return_paths.len(),
@@ -635,26 +1347,130 @@ impl<C> SurbTelemetryCodec<C> {
             "surb mint seen by telemetry"
         );
 
-        for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
-            let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
-            let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
-                tracing::trace!(reply_hops = reply.len(), "surb round-trip legs did not resolve");
+        let replies: Vec<Vec<OffchainPublicKey>> = return_paths
+            .iter()
+            .map(|return_path| return_path.transport_path().iter().copied().collect())
+            .collect();
+        // A reply leg is `[R, ..., me]`: everything before us is a relayer a late or missing reply
+        // implicates. A direct reply has none.
+        let return_relayers: Vec<ReturnRelayers> = replies
+            .iter()
+            .map(|reply| {
+                let mut relayers = [None; PATH_ID_SLOTS];
+                for (slot, relayer) in relayers.iter_mut().zip(&reply[..reply.len().saturating_sub(1)]) {
+                    *slot = Some(*relayer);
+                }
+                relayers
+            })
+            .collect();
+        let partners = race_partners(minted, &return_relayers);
+        let minted_at = Instant::now();
+
+        for (i, surb_id) in minted.iter().enumerate().take(replies.len()) {
+            let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &replies[i]) else {
+                tracing::trace!(reply_hops = replies[i].len(), "surb round-trip legs did not resolve");
                 continue;
             };
 
-            self.registry.record_expected(paths, 1, destination);
-            self.pending.insert(*surb_id, paths);
+            self.registry.record_minted(paths, 1, destination);
+            self.registry.pending.insert(
+                *surb_id,
+                PendingSurb {
+                    paths,
+                    pseudonym: *pseudonym,
+                    return_relayers: return_relayers[i],
+                    minted_at,
+                    partner: partners[i],
+                    pair_index: i % 2,
+                    partner_replied: None,
+                },
+            );
         }
     }
 
-    /// Credits the legs a reply came back on.
+    /// Credits the legs a reply came back on, and settles its race once the partner's is home too.
     fn on_replied(&self, surb_id: &HoprSurbId) {
+        let health = &self.registry.relayer_health;
+        // Only a reply on a SURB we minted gets here (its opener resolved), so whatever it says about
+        // its legs, it is the network delivering: including one whose association has gone.
+        health.record_reply();
         // A SURB is single-use, so the association is consumed with it.
-        match self.pending.remove(surb_id) {
-            Some(paths) => self.registry.record_observed(paths, 1),
-            None => tracing::trace!("reply on a surb with no pending legs"),
+        let Some(pending) = self.registry.pending.remove(surb_id) else {
+            // Written off because its relayer was judged dead, or wiped with its Session's stock, and
+            // spent by the counterparty all the same: a probe through a relayer on probation arrives
+            // like this, and so does a SURB spent before the new generation reached the counterparty.
+            // Its legs are not credited, the expectation was written off with it, but it proves its
+            // relayers are delivering.
+            if let Some(leg) = self.registry.written_off_legs.remove(surb_id) {
+                health.note_home(&leg);
+                health.revive_by_reply(&leg);
+            } else {
+                tracing::trace!("reply on a surb with no pending legs");
+            }
+            return;
+        };
+        self.registry.record_observed(pending.paths, 1);
+
+        // Every relayer on its leg is delivering: a dead verdict or probation on one of them ends.
+        health.note_home(&pending.return_relayers);
+        health.revive_by_reply(&pending.return_relayers);
+        // Only a SURB the replier's pop order makes attributable settles: the other may have waited in
+        // the replier's store.
+        if let Some((partner_relayers, partner_home)) = pending.partner_replied {
+            if !self.registry.judges(pending.pair_index) {
+                return;
+            }
+            health.record_race(
+                &pending.return_relayers,
+                *surb_id,
+                &partner_relayers,
+                partner_home.duration_since(pending.minted_at),
+                partner_home.elapsed(),
+            );
+        } else if let Some(partner) = pending.partner {
+            // Atomic, so a partner consumed by a concurrent decode is not brought back.
+            let home = Instant::now();
+            let updated = self
+                .registry
+                .pending
+                .entry(partner)
+                .and_compute_with(|current| match current {
+                    Some(current) => {
+                        let mut waiting = current.into_value();
+                        waiting.partner_replied = Some((pending.return_relayers, home));
+                        moka::ops::compute::Op::Put(waiting)
+                    }
+                    None => moka::ops::compute::Op::Nop,
+                });
+            if let moka::ops::compute::CompResult::ReplacedWith(waiting) = updated {
+                if !self.registry.judges(waiting.value().pair_index) {
+                    return;
+                }
+                health.open_race(
+                    &waiting.value().return_relayers,
+                    partner,
+                    &pending.return_relayers,
+                    home.duration_since(pending.minted_at),
+                );
+            }
         }
     }
+}
+
+/// The SURB each one races: its neighbour in mint order (first with second, third with fourth),
+/// when both return over relayers and not over the same ones.
+fn race_partners(minted: &[HoprSurbId], return_relayers: &[ReturnRelayers]) -> Vec<Option<HoprSurbId>> {
+    (0..minted.len())
+        .map(|i| {
+            let neighbour = i ^ 1;
+            match (return_relayers.get(i), return_relayers.get(neighbour)) {
+                (Some(own), Some(other)) if own[0].is_some() && other[0].is_some() && own != other => {
+                    minted.get(neighbour).copied()
+                }
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 impl<C> PacketEncoder for SurbTelemetryCodec<C>
@@ -715,7 +1531,7 @@ where
 mod tests {
     use anyhow::Context;
     use hopr_api::{
-        graph::NetworkGraphWrite,
+        graph::{EdgeObservableRead, NetworkGraphWrite},
         types::{
             crypto::{
                 crypto_traits::Randomizable,
@@ -731,13 +1547,7 @@ mod tests {
     /// The trait impls are pass-throughs, so the tests drive the attribution logic directly.
     fn recorder(graph: ChannelGraph) -> SurbTelemetryCodec<()> {
         let me = *graph.identity();
-        SurbTelemetryCodec::new(
-            (),
-            me,
-            path_slots_of(graph),
-            SurbRoundTripRegistry::default(),
-            pending_legs(128),
-        )
+        SurbTelemetryCodec::new((), me, path_slots_of(graph), SurbRoundTripRegistry::default())
     }
 
     fn surb_id(seed: u8) -> HoprSurbId {
@@ -771,19 +1581,1696 @@ mod tests {
 
     #[test]
     fn drain_should_take_the_counts_and_leave_the_entry_empty() {
-        let (_graph, _me, peers) = graph_with(1);
-        let registry = registry_at_slot_zero();
+        let registry = SurbRoundTripRegistry::default();
         let paths = ForwardAndReturnPath {
             forward: [0, 1, 0, 0, 0],
             reply: [1, 0, 0, 0, 0],
         };
 
-        registry.record_expected(paths, 3, peers[0]);
+        registry.record_expected(paths, 3);
         registry.record_observed(paths, 2);
 
         assert_eq!(vec![(paths, 3, 2)], registry.drain());
         // Counts belong to the interval that produced them, so a second flush must not re-report.
         assert!(registry.drain().is_empty());
+    }
+
+    /// A few to a few dozen milliseconds: what healthy relayers win or lose a race by.
+    fn jitter(i: u64) -> Duration {
+        Duration::from_millis(5 + i * 7 % 40)
+    }
+
+    /// The round-trip of the faster reply in the races below.
+    const ROUND_TRIP: Duration = Duration::from_millis(200);
+
+    fn key() -> OffchainPublicKey {
+        *OffchainKeypair::random().public()
+    }
+
+    fn leg(relayers: &[OffchainPublicKey]) -> ReturnRelayers {
+        let mut leg = [None; PATH_ID_SLOTS];
+        for (slot, relayer) in leg.iter_mut().zip(relayers) {
+            *slot = Some(*relayer);
+        }
+        leg
+    }
+
+    fn margins_of(health: &RelayerHealth, relayer: &OffchainPublicKey) -> Vec<f64> {
+        health
+            .relayers
+            .get(relayer)
+            .map(|history| history.races.iter().map(|race| race.margin).collect())
+            .unwrap_or_default()
+    }
+
+    fn open_races_of(health: &RelayerHealth, relayer: &OffchainPublicKey) -> usize {
+        health.relayers.get(relayer).map_or(0, |history| history.open.len())
+    }
+
+    fn ago(by: Duration) -> anyhow::Result<Instant> {
+        Instant::now().checked_sub(by).context("monotonic clock too young")
+    }
+
+    fn settled_since(health: &RelayerHealth, relayer: OffchainPublicKey, at: Instant, margin: Duration) {
+        for _ in 0..MIN_RACES {
+            health.record(
+                relayer,
+                Race {
+                    at,
+                    margin: margin.as_secs_f64(),
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+        }
+    }
+
+    fn backdate_open(health: &RelayerHealth, relayer: OffchainPublicKey, at: Instant) {
+        if let Some(mut history) = health.relayers.get_mut(&relayer) {
+            history.open.values_mut().for_each(|race| race.at = at);
+        }
+    }
+
+    /// Each relayer's health after one flush, `1.0` for one never reported below it.
+    fn health_after_flush(health: &RelayerHealth, relayers: &[OffchainPublicKey]) -> Vec<f64> {
+        health.refresh(4);
+        relayers
+            .iter()
+            .map(|relayer| health.published.get(relayer).map_or(1.0, |health| *health))
+            .collect()
+    }
+
+    fn judged_dead(changes: &[(OffchainPublicKey, f64, f64)]) -> Vec<OffchainPublicKey> {
+        changes
+            .iter()
+            .filter(|(_, previous, current)| *current == 0.0 && *previous > 0.0)
+            .map(|(relayer, ..)| *relayer)
+            .collect()
+    }
+
+    fn pending_to(relayers: &[OffchainPublicKey], partner: Option<HoprSurbId>, pair_index: usize) -> PendingSurb {
+        PendingSurb {
+            paths: ForwardAndReturnPath {
+                forward: [0; PATH_ID_SLOTS],
+                reply: [0; PATH_ID_SLOTS],
+            },
+            pseudonym: *SESSION,
+            return_relayers: leg(relayers),
+            minted_at: Instant::now(),
+            partner,
+            pair_index,
+            partner_replied: None,
+        }
+    }
+
+    static SESSION: std::sync::LazyLock<HoprPseudonym> = std::sync::LazyLock::new(HoprPseudonym::random);
+
+    /// A relayer judged dead long enough ago for the verdict to be confirmed (see `VERDICT_CONFIRMATION`),
+    /// the way most tests here want it: the verdict itself is not what they test.
+    fn judge_dead(health: &RelayerHealth, relayer: OffchainPublicKey) {
+        health.dead.insert(relayer);
+        health.dead_since.insert(
+            relayer,
+            Instant::now()
+                .checked_sub(VERDICT_CONFIRMATION + Duration::from_millis(1))
+                .expect("monotonic clock too young"),
+        );
+        health.confirmed.insert(relayer);
+    }
+
+    /// Backdates every standing verdict past `VERDICT_CONFIRMATION` and confirms it, as the flush after
+    /// it would find it.
+    fn confirm_verdicts(health: &RelayerHealth) {
+        for mut since in health.dead_since.iter_mut() {
+            *since.value_mut() = Instant::now()
+                .checked_sub(VERDICT_CONFIRMATION + Duration::from_millis(1))
+                .expect("monotonic clock too young");
+        }
+        for relayer in health.dead.iter() {
+            health.confirmed.insert(*relayer);
+        }
+    }
+
+    fn open_since(health: &RelayerHealth, relayer: OffchainPublicKey, count: u8, since: Instant) {
+        for seed in 1..=count {
+            health.relayers.entry(relayer).or_default().open.insert(
+                surb_id(seed),
+                Race {
+                    at: since,
+                    margin: 0.0,
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+        }
+    }
+
+    #[test]
+    fn a_relayer_losing_its_races_by_seconds_should_lose_its_weight() {
+        let health = RelayerHealth::default();
+        let [fast, also_fast, stalled] = [(); 3].map(|_| key());
+        for i in 0..40 {
+            let (winner, loser) = if i % 2 == 0 {
+                (fast, also_fast)
+            } else {
+                (also_fast, fast)
+            };
+            health.record_race(&leg(&[loser]), surb_id(0), &leg(&[winner]), ROUND_TRIP, jitter(i));
+            health.record_race(
+                &leg(&[stalled]),
+                surb_id(0),
+                &leg(&[winner]),
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            );
+        }
+
+        let factors = health_after_flush(&health, &[fast, also_fast, stalled]);
+        assert_eq!(
+            &[1.0, 1.0],
+            &factors[..2],
+            "trading wins by milliseconds is not a stall"
+        );
+        assert!(
+            factors[2] < 0.1,
+            "a relayer fifteen round-trips late must lose its weight, got {}",
+            factors[2]
+        );
+    }
+
+    /// The relayers both legs share see the same delay, so the race blames only the ones that differ.
+    #[test]
+    fn a_stalled_middle_relayer_should_take_the_blame_not_its_neighbours() {
+        let health = RelayerHealth::default();
+        let [entry, stalled, healthy, exit, other_entry, other_exit] = [(); 6].map(|_| key());
+        for i in 0..40 {
+            if i % 2 == 0 {
+                health.record_race(
+                    &leg(&[entry, stalled, exit]),
+                    surb_id(0),
+                    &leg(&[entry, healthy, exit]),
+                    ROUND_TRIP,
+                    Duration::from_secs(3) + jitter(i),
+                );
+            } else {
+                health.record_race(
+                    &leg(&[other_entry, healthy, other_exit]),
+                    surb_id(0),
+                    &leg(&[entry, healthy, exit]),
+                    ROUND_TRIP,
+                    jitter(i),
+                );
+            }
+        }
+
+        let factors = health_after_flush(&health, &[stalled, entry, healthy, exit, other_entry, other_exit]);
+        assert!(
+            factors[0] < 0.1,
+            "the stalled relayer must lose its weight, got {}",
+            factors[0]
+        );
+        assert_eq!(&[1.0; 5], &factors[1..], "its neighbours on that path are not to blame");
+    }
+
+    #[test]
+    fn a_relayer_lagging_by_less_than_a_round_trip_should_keep_its_weight() {
+        let health = RelayerHealth::default();
+        let [near, far] = [(); 2].map(|_| key());
+        for i in 0..40 {
+            health.record_race(
+                &leg(&[far]),
+                surb_id(0),
+                &leg(&[near]),
+                ROUND_TRIP,
+                Duration::from_millis(150) + jitter(i) / 10,
+            );
+        }
+
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[near, far]));
+    }
+
+    #[test]
+    fn a_relayer_with_too_few_races_should_stay_neutral() {
+        let health = RelayerHealth::default();
+        let [fast, young] = [(); 2].map(|_| key());
+        for _ in 1..MIN_RACES {
+            health.record_race(
+                &leg(&[young]),
+                surb_id(0),
+                &leg(&[fast]),
+                ROUND_TRIP,
+                Duration::from_secs(3),
+            );
+        }
+
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[fast, young]));
+    }
+
+    #[test]
+    fn a_recovered_relayer_should_regain_its_weight_once_its_late_races_are_forgotten() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [fast, recovered] = [(); 2].map(|_| key());
+        let long_ago = Instant::now()
+            .checked_sub(Duration::from_secs(60))
+            .context("monotonic clock younger than a minute")?;
+        for i in 0..20 {
+            health.record(
+                recovered,
+                Race {
+                    at: long_ago,
+                    margin: 3.0 + jitter(i).as_secs_f64(),
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+        }
+        assert!(
+            health_after_flush(&health, &[fast, recovered])[1] < 0.1,
+            "precondition: judged stalled"
+        );
+
+        for i in 0..20 {
+            let (later, earlier) = if i % 2 == 0 {
+                (fast, recovered)
+            } else {
+                (recovered, fast)
+            };
+            health.record_race(&leg(&[later]), surb_id(0), &leg(&[earlier]), ROUND_TRIP, jitter(i));
+        }
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[fast, recovered]));
+        Ok(())
+    }
+
+    /// A reply still out while its partner's is home has lost by at least that long already, so a
+    /// stall shows before the held replies finally arrive.
+    #[test]
+    fn a_reply_still_out_should_count_as_lost_by_at_least_its_wait() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [fast, also_fast, stalled] = [(); 3].map(|_| key());
+        for i in 0..20 {
+            health.record_race(&leg(&[also_fast]), surb_id(0), &leg(&[fast]), ROUND_TRIP, jitter(i));
+        }
+        health.record_race(&leg(&[stalled]), surb_id(0), &leg(&[fast]), ROUND_TRIP, jitter(0));
+        let partners_home = Instant::now()
+            .checked_sub(Duration::from_secs(2))
+            .context("monotonic clock younger than two seconds")?;
+        open_since(&health, stalled, 5, partners_home);
+
+        let factors = health_after_flush(&health, &[fast, also_fast, stalled]);
+        assert_eq!(&[1.0, 1.0], &factors[..2]);
+        assert!(
+            factors[2] < 0.2,
+            "replies two seconds overdue must cost the relayer its weight, got {}",
+            factors[2]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_relayer_whose_replies_stop_coming_home_should_be_judged_dead_everywhere() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [entry, black_hole, exit, healthy] = [(); 4].map(|_| key());
+        settled_since(&health, black_hole, ago(Duration::from_secs(10))?, jitter(0));
+        for seed in 1..=MIN_RACES as u8 {
+            health.open_race(
+                &leg(&[entry, black_hole, exit]),
+                surb_id(seed),
+                &leg(&[entry, healthy, exit]),
+                ROUND_TRIP,
+            );
+        }
+        backdate_open(&health, black_hole, ago(ROUND_TRIP * 2)?);
+        // The partners came home, through `healthy`: the network is delivering.
+        health.record_reply();
+
+        assert_eq!(vec![black_hole], judged_dead(&health.refresh(4)));
+        assert!(health.is_dead(&black_hole));
+        assert_eq!(
+            0,
+            open_races_of(&health, &entry),
+            "relayers on both legs are not to blame"
+        );
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "only new verdicts are reported"
+        );
+        Ok(())
+    }
+
+    /// A relayer that is always somewhat late has races open for that long as a matter of course;
+    /// only replies out longer than it usually takes count against it.
+    #[test]
+    fn replies_out_no_longer_than_usual_should_not_make_a_black_hole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let slow = key();
+        settled_since(&health, slow, ago(Duration::from_secs(5))?, Duration::from_millis(500));
+        let just_now = Instant::now()
+            .checked_sub(Duration::from_millis(200))
+            .context("monotonic clock younger than 200 ms")?;
+        open_since(&health, slow, MIN_RACES as u8, just_now);
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "out for less than its usual 500 ms"
+        );
+
+        let overdue = Instant::now()
+            .checked_sub(Duration::from_secs(2))
+            .context("monotonic clock younger than two seconds")?;
+        open_since(&health, slow, MIN_RACES as u8, overdue);
+        // Other relayers' replies are coming home meanwhile.
+        health.record_reply();
+        assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// Expiry alone proves nothing: replies that never came home count as races lost by the whole
+    /// time a SURB is remembered, so the relayer comes back at a sliver of health, not in full.
+    #[test]
+    fn a_dead_relayer_should_not_be_revived_to_full_health_by_expiry() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [black_hole, healthy] = [(); 2].map(|_| key());
+        let expired = Instant::now()
+            .checked_sub(PENDING_SURB_TTL + Duration::from_secs(1))
+            .context("monotonic clock younger than a SURB's lifetime")?;
+        settled_since(&health, healthy, Instant::now(), jitter(0));
+        settled_since(&health, black_hole, expired - Duration::from_secs(1), jitter(0));
+        open_since(&health, black_hole, 2 * MIN_RACES as u8, expired);
+
+        let [revived, _] = health_after_flush(&health, &[black_hole, healthy])[..] else {
+            anyhow::bail!("two relayers asked for");
+        };
+        assert!(!health.is_dead(&black_hole), "no reply is out any more");
+        assert!(revived < 0.01, "revived to a sliver only, got {revived}");
+        Ok(())
+    }
+
+    /// A relayer judged dead whose verdict then lapsed: the verdict is made, the flush after it finds it
+    /// standing, and after that no overdue reply through it is out any more.
+    fn put_on_probation(health: &RelayerHealth, relayer: OffchainPublicKey) -> anyhow::Result<()> {
+        settled_since(health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+        health.refresh(4);
+        anyhow::ensure!(health.is_dead(&relayer), "a black hole is judged dead");
+        confirm_verdicts(health);
+        backdate_open(health, relayer, ago(PENDING_SURB_TTL + Duration::from_secs(1))?);
+        health.refresh(4);
+        anyhow::ensure!(
+            health.is_on_probation(&relayer) && !health.is_dead(&relayer),
+            "the lapsed verdict leaves the relayer on probation"
+        );
+        Ok(())
+    }
+
+    fn published_health(health: &RelayerHealth, relayer: &OffchainPublicKey) -> f64 {
+        health.published.get(relayer).map_or(1.0, |health| *health)
+    }
+
+    /// Time alone does not lift a verdict: the condition lapses once nothing is out through the
+    /// relayer, and the relayer stays dead for all that matters (its health a sliver, its SURBs written
+    /// off) however many flushes pass, until a reply comes home through it. A reply through anybody else
+    /// is not that.
+    #[test]
+    fn a_dead_relayer_should_stay_dead_until_a_reply_comes_home_through_it() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let health = recorder.registry.relayer_health();
+        let [black_hole, healthy] = [(); 2].map(|_| key());
+        put_on_probation(&health, black_hole)?;
+
+        for _ in 0..5 {
+            health.refresh(4);
+            assert!(health.is_known_dead(&black_hole));
+            assert_eq!(PROBATION_HEALTH, published_health(&health, &black_hole));
+        }
+
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_to(&[healthy], None, 0));
+        recorder.on_replied(&surb_id(1));
+        health.refresh(4);
+        assert!(
+            health.is_known_dead(&black_hole),
+            "a reply through another relayer proves nothing"
+        );
+
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_to(&[healthy, black_hole], None, 0));
+        recorder.on_replied(&surb_id(2));
+        assert!(
+            !health.is_known_dead(&black_hole),
+            "a reply home through it ends the verdict, whatever else is on the leg"
+        );
+        Ok(())
+    }
+
+    /// The lapse is a step down from dead, not a way back up: the relayer is published at exactly
+    /// the probation health rather than at what its races would give it, and stays there.
+    #[test]
+    fn a_lapsed_verdict_should_put_the_relayer_on_probation_not_restore_its_health() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        assert_eq!(0.0, published_health(&health, &relayer));
+        confirm_verdicts(&health);
+
+        backdate_open(&health, relayer, ago(PENDING_SURB_TTL + Duration::from_secs(1))?);
+        let changes = health.refresh(4);
+        assert_eq!(
+            vec![(relayer, 0.0, PROBATION_HEALTH)],
+            changes,
+            "from dead to probation, in one step and by that much"
+        );
+        assert!(!health.is_dead(&relayer));
+        assert!(health.is_on_probation(&relayer));
+        assert_eq!(PROBATION_HEALTH, published_health(&health, &relayer));
+
+        assert!(health.refresh(4).is_empty(), "nothing moves it from there");
+        assert_eq!(PROBATION_HEALTH, published_health(&health, &relayer));
+        Ok(())
+    }
+
+    /// A probe is a SURB the counterparty spends over a relayer on probation, which the registry has
+    /// already written off by the time it does; its reply still ends the probation, to the health the
+    /// relayer's races give it, and that is a sliver while they hold the lost ones.
+    #[rstest::rstest]
+    #[case::probe_written_off_already(true)]
+    #[case::probe_still_pending(false)]
+    fn a_probe_reply_should_revive_a_relayer(#[case] written_off_first: bool) -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let health = recorder.registry.relayer_health();
+        let relayer = key();
+        put_on_probation(&health, relayer)?;
+        // What a relayer that died has left once its settled races are forgotten: the replies it lost.
+        if let Some(mut history) = health.relayers.get_mut(&relayer) {
+            history.races.retain(Race::lost);
+        }
+
+        // The verdict that put it on probation advanced the session; a probe is no first verdict.
+        recorder.registry.bumped.insert((*SESSION, relayer), Instant::now());
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(7), pending_to(&[relayer], None, 0));
+        if written_off_first {
+            recorder.registry.write_off_dead();
+            assert!(
+                recorder.registry.pending.get(&surb_id(7)).is_none(),
+                "the probe is written off, and out of the pending map"
+            );
+            assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), recorder.registry.invalid());
+        }
+
+        recorder.on_replied(&surb_id(7));
+        assert!(!health.is_known_dead(&relayer), "alive again");
+
+        let changes = health.refresh(4);
+        let [(revived, previous, current)] = changes[..] else {
+            anyhow::bail!("one relayer's health moves, got {changes:?}");
+        };
+        assert_eq!((relayer, PROBATION_HEALTH), (revived, previous));
+        assert!(
+            current > PROBATION_HEALTH && current < 0.01,
+            "its lost races still hold it down: {current}"
+        );
+        recorder.registry.write_off_dead();
+        assert!(recorder.registry.invalid().is_empty(), "its SURBs work again");
+        Ok(())
+    }
+
+    /// A pair that was advanced stays so while the relayer is known dead, which is what holds a second
+    /// bump back, not the cooldown: with the cooldown out of the way, a relayer that is a black hole
+    /// again on probation still costs its sessions nothing.
+    #[test]
+    fn a_relayer_dying_again_on_probation_should_not_bump_the_session_again() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [relayer, measured] = [(); 2].map(|_| key());
+        // A relayer with a history of its own: once the races of the one on probation have expired it
+        // is the bar that one is overdue by.
+        settled_since(&health, measured, ago(Duration::from_secs(10))?, jitter(0));
+        settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+        registry.pending.insert(surb_id(1), pending_to(&[relayer], None, 0));
+        health.refresh(4);
+        assert!(health.is_dead(&relayer));
+        confirm_verdicts(&health);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the first verdict bumps");
+
+        backdate_open(&health, relayer, ago(PENDING_SURB_TTL + Duration::from_secs(1))?);
+        health.refresh(4);
+        assert!(health.is_on_probation(&relayer));
+
+        registry.pending.insert(surb_id(2), pending_to(&[relayer], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a probe on probation bumps nothing"
+        );
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "the first verdict's count went with the wipe, only the probe is counted"
+        );
+
+        for mut entry in registry.bumped.iter_mut() {
+            *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
+        }
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+        health.refresh(4);
+        assert!(health.is_dead(&relayer), "a black hole again, and so dead again");
+        assert!(!health.is_on_probation(&relayer));
+
+        registry.pending.insert(surb_id(3), pending_to(&[relayer], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the pair stayed bumped through the lapse, so this is no first verdict, cooldown or not"
+        );
+        assert_eq!(HashMap::from([(*SESSION, (2, 1.0))]), registry.invalid());
+        Ok(())
+    }
+
+    /// The wipe takes the SURBs the count stood for, so the count goes with it. Keeping it would make the
+    /// balancer hold the counterparty that many SURBs above its target for as long as the relayer stays
+    /// known dead, which can be for good. What is written off after the bump is the probes minted since.
+    #[test]
+    fn a_bumped_session_should_drop_the_written_off_count_of_the_wiped_stock() {
+        let registry = SurbRoundTripRegistry::default();
+        let dead = key();
+        for seed in 1..=3 {
+            registry.pending.insert(surb_id(seed), pending_to(&[dead], None, 0));
+        }
+        judge_dead(&registry.relayer_health, dead);
+
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the verdict bumps the session"
+        );
+        assert!(
+            registry.invalid().is_empty(),
+            "the three SURBs counted are gone with the stock they were in"
+        );
+
+        registry.pending.insert(surb_id(4), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the relayer is still dead, nothing more is bumped"
+        );
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "only the SURB minted through it since is written off"
+        );
+    }
+
+    /// Dead, then on probation for longer than the cooldown: a pair advanced in this death is not advanced
+    /// again however long that takes, so the cooldown guards only what follows a revival.
+    #[test]
+    fn a_pair_bumped_once_stays_bumped_while_the_relayer_is_known_dead() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let dead = key();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the verdict bumps");
+
+        health.dead.remove(&dead);
+        health.probation.insert(dead);
+        for mut entry in registry.bumped.iter_mut() {
+            *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
+        }
+        registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "on probation past the cooldown, the pair is still bumped"
+        );
+        assert_eq!(
+            1,
+            registry.bumped.len(),
+            "the mark outlives the cooldown while the relayer is known dead"
+        );
+
+        health.probation.remove(&dead);
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "and so it is when it dies again there"
+        );
+        Ok(())
+    }
+
+    /// A reply home through the relayer revives it, and from then on the cooldown guards a quick
+    /// re-death. Once it has run out, a relayer that dies again is a new verdict and bumps.
+    #[test]
+    fn a_revived_relayer_that_dies_again_after_the_cooldown_is_bumped_again() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let dead = key();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the verdict bumps");
+
+        registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
+        recorder.on_replied(&surb_id(2));
+        assert!(!health.is_known_dead(&dead), "revived by a reply");
+        registry.write_off_dead();
+        assert_eq!(
+            1,
+            registry.bumped.len(),
+            "the mark is kept for the cooldown after the revival"
+        );
+
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a quick re-death is inside the cooldown"
+        );
+
+        health.dead.remove(&dead);
+        for mut entry in registry.bumped.iter_mut() {
+            *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
+        }
+        registry.write_off_dead();
+        assert!(
+            registry.bumped.is_empty(),
+            "revived and past the cooldown, the mark is dropped"
+        );
+
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(4), pending_to(&[dead], None, 0));
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "a death after the cooldown is a new verdict"
+        );
+        Ok(())
+    }
+
+    /// Dead for longer than the cooldown, then revived: the cooldown runs from the revival and not from
+    /// the advance, so a quick re-death right after a long death costs the session nothing more.
+    #[test]
+    fn a_relayer_revived_after_a_long_death_should_be_guarded_from_its_revival() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let dead = key();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the verdict bumps");
+
+        // Dead for longer than the cooldown, with the flushes going on all along.
+        for mut entry in registry.bumped.iter_mut() {
+            *entry.value_mut() = ago(REBUMP_COOLDOWN + Duration::from_secs(1))?;
+        }
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "still dead, nothing more is bumped"
+        );
+
+        registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
+        recorder.on_replied(&surb_id(2));
+        assert!(!health.is_known_dead(&dead), "revived by a reply");
+        registry.write_off_dead();
+        assert_eq!(
+            1,
+            registry.bumped.len(),
+            "the mark is kept for the cooldown after the revival, however long the death before it"
+        );
+
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a quick re-death after a long death is inside the cooldown"
+        );
+        Ok(())
+    }
+
+    /// Only stock advances a generation. A session the wipe never reached has no mark for the dead
+    /// relayer, one opened since or one with nothing through it at the time, and its probes through the
+    /// relayer, while it is dead, on probation or dead again, are written off without costing it its
+    /// stock. Stock minted before the death still reports its session in the same pass as a probe.
+    #[test]
+    fn a_probe_should_not_bump_a_session_the_wipe_never_reached() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let dead = key();
+        let unreached = HoprPseudonym::random();
+        let probe_for = |pseudonym| PendingSurb {
+            pseudonym,
+            ..pending_to(&[dead], None, 0)
+        };
+
+        judge_dead(&health, dead);
+        health.known_dead_since.insert(dead, ago(Duration::from_secs(2))?);
+        registry.pending.insert(
+            surb_id(1),
+            PendingSurb {
+                minted_at: ago(Duration::from_secs(5))?,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        registry.pending.insert(surb_id(2), probe_for(*SESSION));
+        registry.pending.insert(surb_id(3), probe_for(unreached));
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the stock minted before the death bumps its session; the probes bump nothing"
+        );
+        assert!(
+            registry.invalid().contains_key(&unreached),
+            "the probe is written off all the same"
+        );
+
+        health.dead.remove(&dead);
+        health.confirmed.remove(&dead);
+        health.probation.insert(dead);
+        registry.pending.insert(surb_id(4), probe_for(unreached));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a probe through a relayer on probation"
+        );
+
+        health.probation.remove(&dead);
+        judge_dead(&health, dead);
+        registry.pending.insert(surb_id(5), probe_for(unreached));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "nor once the relayer is dead again: the death began before the probe"
+        );
+        Ok(())
+    }
+
+    /// A lost neighbour only re-plans the paths; its SURBs are not written off, as they work again
+    /// once it is back, and during an outage of every path no replacement could arrive anyway.
+    #[test]
+    fn a_lost_neighbour_should_not_write_off_its_surbs() {
+        let registry = SurbRoundTripRegistry::default();
+        let [neighbour, middle] = [(); 2].map(|_| key());
+        registry
+            .pending
+            .insert(surb_id(1), pending_to(&[middle, neighbour], None, 0));
+        registry
+            .pending
+            .insert(surb_id(2), pending_to(&[neighbour, middle], None, 0));
+        let health = &registry.relayer_health;
+
+        health.set_neighbour_connected(neighbour, false);
+        assert!(registry.invalid().is_empty());
+        assert!(!health.is_dead(&neighbour), "no verdict on the relayer itself");
+        assert!(health.take_neighbour_change());
+        assert!(!health.take_neighbour_change(), "a change is reported once");
+
+        health.set_neighbour_connected(neighbour, true);
+        assert!(registry.invalid().is_empty());
+        assert!(health.take_neighbour_change());
+    }
+
+    #[test]
+    fn settling_a_race_should_close_it() {
+        let health = RelayerHealth::default();
+        let [early, late] = [(); 2].map(|_| key());
+        health.open_race(&leg(&[late]), surb_id(1), &leg(&[early]), ROUND_TRIP);
+        health.record_race(&leg(&[late]), surb_id(1), &leg(&[early]), ROUND_TRIP, jitter(0));
+
+        assert_eq!(0, open_races_of(&health, &late));
+        assert_eq!(1, margins_of(&health, &late).len());
+    }
+
+    /// Health is measured against the fastest round-trip any relayer made, so relayers late
+    /// against a third keep their order.
+    #[test]
+    fn relayers_finishing_late_should_be_ordered_by_how_late() {
+        let health = RelayerHealth::default();
+        let [outsider, late, later] = [(); 3].map(|_| key());
+        for i in 0..20 {
+            health.record_race(
+                &leg(&[late]),
+                surb_id(0),
+                &leg(&[outsider]),
+                ROUND_TRIP,
+                Duration::from_secs(1) + jitter(i),
+            );
+            health.record_race(
+                &leg(&[later]),
+                surb_id(0),
+                &leg(&[outsider]),
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            );
+        }
+
+        let factors = health_after_flush(&health, &[late, later]);
+        assert!(1.0 > factors[0] && factors[0] > factors[1], "{factors:?}");
+    }
+
+    /// A health that moved within the uncertainty of the relayer's own races is noise; reporting it
+    /// would re-plan every path on every flush.
+    #[test]
+    fn a_health_within_its_own_uncertainty_should_not_be_reported_again() {
+        let health = RelayerHealth::default();
+        let [fast, stalled] = [(); 2].map(|_| key());
+        let mut race = |i| {
+            health.record_race(
+                &leg(&[stalled]),
+                surb_id(0),
+                &leg(&[fast]),
+                ROUND_TRIP,
+                Duration::from_secs(3) + jitter(i),
+            )
+        };
+        (0..20).for_each(&mut race);
+        assert_eq!(1, health.refresh(4).len(), "precondition: reported once stalled");
+
+        (20..24).for_each(&mut race);
+        assert!(health.refresh(4).is_empty());
+    }
+
+    /// Whatever two SURBs of one packet spent in the replier's store, they spent together, so only
+    /// the gap between their replies counts against the later one. The SURB that loses is the one the
+    /// replier spent first: it is home second, which is the abnormal order a race opens in.
+    #[test]
+    fn a_race_should_be_settled_by_the_gap_between_the_two_replies() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let [early, late] = [(); 2].map(|_| key());
+        let minted_at = Instant::now();
+        let first_spent = FIRST_SPENT_INDEX;
+        let pending_via = |relayer, partner| PendingSurb {
+            minted_at,
+            ..pending_to(
+                &[relayer],
+                Some(partner),
+                if relayer == late { first_spent } else { 1 - first_spent },
+            )
+        };
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_via(early, surb_id(2)));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_via(late, surb_id(1)));
+        let health = &recorder.registry.relayer_health;
+
+        recorder.on_replied(&surb_id(1));
+        assert!(
+            margins_of(health, &early).is_empty(),
+            "no race settled until both are home"
+        );
+        assert_eq!(
+            1,
+            open_races_of(health, &late),
+            "the reply still out is a race already being lost"
+        );
+        let mut waiting = recorder
+            .registry
+            .pending
+            .get(&surb_id(2))
+            .context("the late SURB is out")?;
+        let (relayers, home) = waiting.partner_replied.context("its partner is home")?;
+        waiting.partner_replied = Some((relayers, home.checked_sub(Duration::from_millis(20)).context("clock")?));
+        recorder.registry.pending.insert(surb_id(2), waiting);
+        recorder.on_replied(&surb_id(2));
+        assert_eq!(0, open_races_of(health, &late));
+
+        let lost_by = margins_of(health, &late);
+        assert_eq!(1, lost_by.len());
+        assert!(
+            lost_by[0] >= 0.02,
+            "the later reply loses by the gap, got {}",
+            lost_by[0]
+        );
+        assert_eq!(vec![-lost_by[0]], margins_of(health, &early));
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_surbs_should_be_counted_per_session_and_relative_to_what_is_outstanding() {
+        let registry = SurbRoundTripRegistry::default();
+        let [dead, alive] = [(); 2].map(|_| key());
+        let other = HoprPseudonym::random();
+        for (seed, relayer) in [(1, dead), (2, alive), (3, alive), (4, alive)] {
+            registry.pending.insert(surb_id(seed), pending_to(&[relayer], None, 0));
+        }
+        registry.pending.insert(
+            surb_id(5),
+            PendingSurb {
+                pseudonym: other,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        registry.write_off_dead();
+        assert!(registry.invalid().is_empty(), "nothing is dead yet");
+
+        // Both sessions were advanced for this relayer already, so what is counted is not wiped with them.
+        registry.bumped.insert((*SESSION, dead), Instant::now());
+        registry.bumped.insert((other, dead), Instant::now());
+        judge_dead(&registry.relayer_health, dead);
+        registry.write_off_dead();
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 0.25)), (other, (1, 1.0))]),
+            registry.invalid()
+        );
+    }
+
+    /// The counterparty holds dead SURBs long after we stop remembering them as pending, and a lapsed
+    /// verdict is only a timeout: the write-off ends when a reply through the relayer comes home.
+    #[test]
+    fn written_off_surbs_should_stay_invalid_until_a_reply_proves_their_relayer() {
+        let (graph, ..) = graph_with(1);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let [dead, alive] = [(); 2].map(|_| key());
+        for (seed, relayer) in [(1, dead), (2, alive)] {
+            registry.pending.insert(surb_id(seed), pending_to(&[relayer], None, 0));
+        }
+        // The session was advanced for this relayer already, so what is counted is not wiped with it.
+        registry.bumped.insert((*SESSION, dead), Instant::now());
+        judge_dead(&registry.relayer_health, dead);
+        registry.write_off_dead();
+
+        registry.pending.invalidate_all();
+        registry.pending.run_pending_tasks();
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "pending SURBs gone, the written-off one still counts"
+        );
+
+        // The verdict lapses: the relayer goes on probation, which is still known dead.
+        registry.relayer_health.dead.remove(&dead);
+        registry.relayer_health.probation.insert(dead);
+        registry.write_off_dead();
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "a lapsed verdict is no evidence of recovery"
+        );
+
+        registry.pending.insert(surb_id(4), pending_to(&[alive], None, 0));
+        recorder.on_replied(&surb_id(4));
+        registry.write_off_dead();
+        assert!(
+            !registry.invalid().is_empty(),
+            "a reply over another relayer proves nothing"
+        );
+
+        registry.pending.insert(surb_id(5), pending_to(&[dead], None, 0));
+        recorder.on_replied(&surb_id(5));
+        assert!(
+            !registry.relayer_health.is_known_dead(&dead),
+            "a reply through it ends the probation"
+        );
+        registry.write_off_dead();
+        assert!(
+            registry.invalid().is_empty(),
+            "a reply through it proves the relayer works again, and the next flush drops the write-off"
+        );
+
+        judge_dead(&registry.relayer_health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        registry.write_off_dead();
+        registry.forget_session(&SESSION);
+        assert!(registry.invalid().is_empty(), "a closed session is forgotten");
+    }
+
+    /// A verdict reaching a session is reported once, so that the caller advances its SURB generation
+    /// once. Only the SURBs through the dead relayer are written off: the generation advance takes the
+    /// counterparty's healthy ones along, but that is the counterparty's loss to report (and the
+    /// balancer's to reset), not a verdict about those SURBs.
+    #[test]
+    fn a_dead_verdict_should_bump_a_session_once_and_write_off_only_its_surbs_through_the_relayer() {
+        let registry = SurbRoundTripRegistry::default();
+        let [dead, alive] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        registry.pending.insert(surb_id(2), pending_to(&[alive], None, 0));
+        registry.pending.insert(surb_id(3), pending_to(&[alive], None, 0));
+        judge_dead(&registry.relayer_health, dead);
+
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the verdict reaches the session once"
+        );
+        registry.pending.run_pending_tasks();
+        assert!(
+            registry.pending.get(&surb_id(1)).is_none(),
+            "the SURB through the dead relayer is written off"
+        );
+        assert!(
+            registry.pending.get(&surb_id(2)).is_none() && registry.pending.get(&surb_id(3)).is_none(),
+            "the healthy two are not written off, but the wipe takes them all the same: they will never be spent, so \
+             they are no longer expected back"
+        );
+        assert!(
+            registry.invalid().is_empty(),
+            "the wipe takes the SURB that was counted, and the count goes with it"
+        );
+
+        registry.pending.insert(surb_id(4), pending_to(&[dead], None, 0));
+        registry.pending.insert(surb_id(5), pending_to(&[alive], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a standing verdict writes off what still routes through the relayer, but bumps nothing more"
+        );
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0 / 2.0))]),
+            registry.invalid(),
+            "one SURB of the two minted since the wipe runs through the dead relayer"
+        );
+
+        registry.relayer_health.dead.remove(&dead);
+        assert!(registry.write_off_dead().is_empty());
+        assert!(registry.invalid().is_empty(), "the write-off lapses with the verdict");
+    }
+
+    /// Two relayers judged dead in the same flush make one bump for the session, not two.
+    #[test]
+    fn two_dead_relayers_reaching_a_session_together_should_bump_it_once() {
+        let registry = SurbRoundTripRegistry::default();
+        let [dead, also_dead] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        registry.pending.insert(surb_id(2), pending_to(&[also_dead], None, 0));
+        judge_dead(&registry.relayer_health, dead);
+        judge_dead(&registry.relayer_health, also_dead);
+
+        assert_eq!(vec![*SESSION], registry.write_off_dead());
+        assert!(
+            registry.invalid().is_empty(),
+            "the bump took both counts with the stock"
+        );
+        assert_eq!(2, registry.bumped.len(), "both pairs are marked");
+    }
+
+    /// A relayer a reply came home through is alive again, and one that is still dead after all is judged
+    /// dead anew. Each bump costs the counterparty its whole stock, so the second verdict is written off
+    /// but not acted on within the cooldown. (Removing it from `dead` stands for the reply.) What follows
+    /// the cooldown is `a_revived_relayer_that_dies_again_after_the_cooldown_is_bumped_again`.
+    #[test]
+    fn a_verdict_refiring_within_the_cooldown_should_write_off_but_not_bump() {
+        let registry = SurbRoundTripRegistry::default();
+        let dead = key();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        judge_dead(&registry.relayer_health, dead);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the first verdict bumps");
+
+        registry.relayer_health.dead.remove(&dead);
+        assert!(registry.write_off_dead().is_empty());
+        assert!(
+            registry.invalid().is_empty(),
+            "nothing is written off for a relayer that recovered"
+        );
+
+        judge_dead(&registry.relayer_health, dead);
+        registry.pending.insert(surb_id(2), pending_to(&[dead], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the same pair, re-reached inside the cooldown, is not bumped again"
+        );
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "but the SURB through the relayer is written off all the same"
+        );
+    }
+
+    /// The cooldown is per pair: a second relayer judged dead for the same session is a new verdict.
+    #[test]
+    fn the_cooldown_should_hold_per_relayer() {
+        let registry = SurbRoundTripRegistry::default();
+        let [first, second] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[first], None, 0));
+        judge_dead(&registry.relayer_health, first);
+        assert_eq!(vec![*SESSION], registry.write_off_dead());
+
+        registry.pending.insert(surb_id(2), pending_to(&[second], None, 0));
+        judge_dead(&registry.relayer_health, second);
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "a different relayer is not covered by the first one's cooldown"
+        );
+    }
+
+    #[test]
+    fn forgetting_a_session_should_drop_its_cooldown() {
+        let registry = SurbRoundTripRegistry::default();
+        let dead = key();
+        let other = HoprPseudonym::random();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        registry.pending.insert(
+            surb_id(2),
+            PendingSurb {
+                pseudonym: other,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        judge_dead(&registry.relayer_health, dead);
+        let reached = registry.write_off_dead();
+        assert_eq!(2, reached.len());
+        assert_eq!(2, registry.bumped.len());
+
+        registry.forget_session(&SESSION);
+        assert_eq!(
+            vec![(other, dead)],
+            registry.bumped.iter().map(|entry| *entry.key()).collect::<Vec<_>>(),
+            "only the closed session's cooldown goes"
+        );
+
+        // A session of the same pseudonym that starts afresh is not held back by the old one's cooldown.
+        registry.relayer_health.dead.remove(&dead);
+        registry.write_off_dead();
+        judge_dead(&registry.relayer_health, dead);
+        registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        assert_eq!(vec![*SESSION], registry.write_off_dead());
+    }
+
+    #[test]
+    fn invalid_updates_should_reapply_every_mark_and_clear_the_vanished() {
+        let [kept, gone, new] = [(); 3].map(|_| HoprPseudonym::random());
+        let previous = HashMap::from([(kept, (5, 0.5)), (gone, (2, 0.1))]);
+        let current = HashMap::from([(kept, (5, 0.5)), (new, (1, 1.0))]);
+
+        let mut updates = invalid_updates(&previous, &current);
+        updates.sort_by_key(|(session, _)| *session);
+        let mut expected = vec![(kept, (5, 0.5)), (new, (1, 1.0)), (gone, (0, 0.0))];
+        expected.sort_by_key(|(session, _)| *session);
+        assert_eq!(expected, updates, "unchanged marks too, for sessions opened since");
+    }
+
+    /// The graph learns the verdict before the re-plan, so the re-plan avoids the relayer; the
+    /// write-off comes after, so the refill it triggers goes over the new paths.
+    #[tokio::test]
+    async fn a_dead_verdict_should_reach_the_graph_before_the_replan_and_the_write_off_after() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [dead] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        graph.add_edge(&me, &dead)?;
+        let registry = SurbRoundTripRegistry::default();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        let health = registry.relayer_health();
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+
+        let seen_at_replan = std::cell::Cell::new(None);
+        let first_flush = refresh_relayer_health(&registry, &graph, 4, 1.0, || async {
+            let edge_health = graph.edge(&me, &dead).and_then(|edge| edge.health());
+            seen_at_replan.set(Some((edge_health, registry.pending.get(&surb_id(1)).is_some())));
+        })
+        .await;
+
+        assert_eq!(
+            Some((Some(0.0), true)),
+            seen_at_replan.get(),
+            "the graph has the verdict, and the SURB is not written off yet"
+        );
+        assert!(
+            first_flush.is_empty() && registry.pending.get(&surb_id(1)).is_some(),
+            "the verdict acts on the graph at once, but on the stock only once the next flush confirms it"
+        );
+
+        // The next flush, a second later, finds the relayer still dead.
+        confirm_verdicts(&health);
+        let bumped = refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
+        assert!(
+            registry.pending.get(&surb_id(1)).is_none(),
+            "written off once confirmed: out of the pending map"
+        );
+        assert!(
+            registry.invalid().is_empty(),
+            "and the bump it led to took the count with the stock"
+        );
+        assert_eq!(
+            vec![*SESSION],
+            bumped,
+            "the session the verdict reached is handed back for its SURB generation to be advanced"
+        );
+        Ok(())
+    }
+
+    /// The graph keeps health on edges, so an edge added after a verdict gets it on the next flush.
+    #[tokio::test]
+    async fn an_edge_added_after_a_verdict_should_carry_it_from_the_next_flush() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [dead] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+        refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
+
+        graph.add_edge(&me, &dead)?;
+        refresh_relayer_health(&registry, &graph, 4, 1.0, || async {}).await;
+        assert_eq!(Some(0.0), graph.edge(&me, &dead).and_then(|edge| edge.health()));
+        Ok(())
+    }
+
+    /// What the health weight is applied to.
+    #[derive(Clone, Copy)]
+    enum Standing {
+        Judged,
+        Dead,
+        OnProbation,
+    }
+
+    /// Lagging two seconds behind 0.2 s round trips is judged health 0.1; dead is 0, probation a
+    /// thousandth. The weight is the exponent they are all raised to.
+    #[rstest::rstest]
+    #[case::as_judged(1.0, Standing::Judged, 0.1)]
+    #[case::harsher(2.0, Standing::Judged, 0.01)]
+    #[case::switched_off(0.0, Standing::Judged, 1.0)]
+    #[case::dead(1.0, Standing::Dead, 0.0)]
+    #[case::switched_off_for_the_dead(0.0, Standing::Dead, 1.0)]
+    #[case::on_probation(1.0, Standing::OnProbation, PROBATION_HEALTH)]
+    #[case::on_probation_tempered(0.5, Standing::OnProbation, 0.031_622_776_601_683_79)]
+    #[case::switched_off_for_probation(0.0, Standing::OnProbation, 1.0)]
+    #[tokio::test]
+    async fn the_health_weight_should_shape_what_the_graph_gets(
+        #[case] weight: f64,
+        #[case] standing: Standing,
+        #[case] recorded: f64,
+    ) -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [relayer] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        graph.add_edge(&me, &relayer)?;
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        match standing {
+            Standing::Judged => settled_since(&health, relayer, ago(Duration::from_secs(1))?, Duration::from_secs(2)),
+            Standing::Dead => {
+                settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+                open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+                health.record_reply();
+            }
+            Standing::OnProbation => put_on_probation(&health, relayer)?,
+        }
+        refresh_relayer_health(&registry, &graph, 4, weight, || async {}).await;
+
+        let on_edge = graph.edge(&me, &relayer).and_then(|edge| edge.health()).unwrap_or(1.0);
+        assert!((on_edge - recorded).abs() < 1e-9, "got {on_edge}");
+        Ok(())
+    }
+
+    /// The second SURB of a pair is home and the first is not. The replier spends the first first, so a
+    /// first that is out while the second is home is a race its relayer is losing, and the late reply
+    /// settles it against that relayer.
+    #[test]
+    fn a_first_surb_still_out_while_the_second_is_home_should_count_against_its_relayer() {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let [late, home] = [(); 2].map(|_| key());
+        let pending_via = |relayer, partner, pair_index| pending_to(&[relayer], Some(partner), pair_index);
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_via(late, surb_id(2), 0));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_via(home, surb_id(1), 1));
+
+        recorder.on_replied(&surb_id(2));
+        assert_eq!(1, open_races_of(&recorder.registry.relayer_health, &late));
+
+        recorder.on_replied(&surb_id(1));
+        assert!(
+            recorder
+                .registry
+                .relayer_health
+                .relayers
+                .get(&late)
+                .is_some_and(|history| !history.races.is_empty()),
+            "a late reply settles a race against its relayer"
+        );
+    }
+
+    /// Under FIFO the replier spends a pair's first SURB first. The first coming home and then the
+    /// second is the normal order, and says nothing about either relayer: the second trails by the
+    /// replier's pace. Only the second coming home while the first is still out is a race, and the
+    /// first's relayer loses it by however much later it gets there.
+    #[test]
+    fn under_fifo_the_first_surb_home_opens_no_race_and_the_second_home_first_does() {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let health = &recorder.registry.relayer_health;
+        let pending_via = |relayer, partner, pair_index| pending_to(&[relayer], Some(partner), pair_index);
+
+        // The normal order: first home, then second.
+        let [first, second] = [(); 2].map(|_| key());
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_via(first, surb_id(2), 0));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_via(second, surb_id(1), 1));
+        recorder.on_replied(&surb_id(1));
+        assert_eq!(0, open_races_of(health, &first));
+        assert_eq!(
+            0,
+            open_races_of(health, &second),
+            "the first coming home first opens no race on the second"
+        );
+        recorder.on_replied(&surb_id(2));
+        assert!(margins_of(health, &first).is_empty() && margins_of(health, &second).is_empty());
+
+        // The abnormal order: second home while the first is still out.
+        let [spent_first, spent_second] = [(); 2].map(|_| key());
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(3), pending_via(spent_first, surb_id(4), 0));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(4), pending_via(spent_second, surb_id(3), 1));
+        recorder.on_replied(&surb_id(4));
+        assert_eq!(
+            1,
+            open_races_of(health, &spent_first),
+            "the first is out while the second is home"
+        );
+        assert_eq!(0, open_races_of(health, &spent_second));
+        recorder.on_replied(&surb_id(3));
+        assert_eq!(
+            0,
+            open_races_of(health, &spent_first),
+            "and settled once it is home too"
+        );
+        assert_eq!(1, margins_of(health, &spent_first).len());
+        assert_eq!(1, margins_of(health, &spent_second).len());
+    }
+
+    /// A replier that pauses between the two replies of a pair (a settle, a phase change, idle) must not
+    /// raise the bar a reply has to stay out longer than to count as overdue. Under FIFO the pause falls
+    /// between the first-spent SURB and the second, the normal order, which settles no race; had it
+    /// settled one, the pause would have become the relayer's largest margin, and a dead relayer would
+    /// only read as overdue after that long.
+    #[test]
+    fn a_pause_in_the_repliers_stream_must_not_inflate_the_overdue_bar_under_fifo() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let health = &recorder.registry.relayer_health;
+        let [slow, other] = [(); 2].map(|_| key());
+        let pause = Duration::from_secs(10);
+
+        // Pairs replied in the normal order with ten seconds between the replies.
+        for pair in 0..MIN_RACES as u8 {
+            let (first, second) = (surb_id(1 + 2 * pair), surb_id(2 + 2 * pair));
+            recorder
+                .registry
+                .pending
+                .insert(first, pending_to(&[slow], Some(second), 0));
+            recorder
+                .registry
+                .pending
+                .insert(second, pending_to(&[other], Some(first), 1));
+            recorder.on_replied(&first);
+            let mut waiting = recorder
+                .registry
+                .pending
+                .get(&second)
+                .context("the second SURB is out")?;
+            let (relayers, home) = waiting.partner_replied.context("its partner is home")?;
+            waiting.partner_replied = Some((relayers, home.checked_sub(pause).context("clock")?));
+            recorder.registry.pending.insert(second, waiting);
+            recorder.on_replied(&second);
+        }
+        assert!(
+            margins_of(health, &slow).is_empty() && margins_of(health, &other).is_empty(),
+            "a pause between the replies of a pair settles no race"
+        );
+
+        // What the relayer's own races say: a margin of 50 ms. Then it dies, and its first-spent SURBs
+        // stay out for a second -- far short of the pause, long past its margin.
+        settled_since(health, slow, ago(Duration::from_secs(10))?, Duration::from_millis(50));
+        open_since(health, slow, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        assert_eq!(
+            vec![slow],
+            judged_dead(&health.refresh(4)),
+            "overdue after its normal margin, not after the pause"
+        );
+        Ok(())
+    }
+
+    /// After the replier drained old SURBs, round trips include a minute in its store; the bar must
+    /// stay at the margins, which that wait does not reach.
+    #[test]
+    fn time_waited_in_the_repliers_store_should_not_raise_the_bar_for_a_black_hole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        for _ in 0..MIN_RACES {
+            health.record(
+                relayer,
+                Race {
+                    at: ago(Duration::from_secs(10))?,
+                    margin: jitter(0).as_secs_f64(),
+                    winning_round_trip: 54.0,
+                },
+            );
+        }
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// Three first-spent replies lost at random, then the replier's stream pauses: nothing is home for
+    /// anybody, so nothing is overdue however long they stay out, and no verdict follows. When the
+    /// stream resumes through another relayer the same three are overdue, and now it is a verdict.
+    #[test]
+    fn three_lost_replies_and_a_pause_must_not_make_a_dead_verdict() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let victim = key();
+        settled_since(
+            &health,
+            victim,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(&health, victim, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty() && !health.is_dead(&victim),
+            "five seconds of silence with nothing home anywhere is a pause, not a verdict"
+        );
+
+        health.record_reply();
+        assert_eq!(
+            vec![victim],
+            judged_dead(&health.refresh(4)),
+            "a reply home through another relayer after they fell due makes them overdue"
+        );
+        Ok(())
+    }
+
+    /// A relayer that never settled a race has no margin of its own, and under the first-spent rule
+    /// races settle only in the abnormal order, so a clean history is common. It is judged against the
+    /// bar of the best-measured relayer rather than escaping every verdict.
+    #[test]
+    fn a_relayer_with_a_clean_history_can_still_be_judged_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [measured, newcomer] = [(); 2].map(|_| key());
+        settled_since(
+            &health,
+            measured,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(100),
+        );
+        open_since(&health, newcomer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+
+        assert_eq!(vec![newcomer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// A relayer's own expired races are booked as lost, at the moment they expire. They are not replies
+    /// that came home, so they must not make the next overdue replies look as if something settled
+    /// since.
+    #[test]
+    fn expired_open_races_must_not_mask_a_black_hole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, measured] = [(); 2].map(|_| key());
+        settled_since(
+            &health,
+            relayer,
+            ago(Duration::from_secs(70))?,
+            Duration::from_millis(50),
+        );
+        // Booking the expired races as lost also shortens the relayer's own memory to its few latest
+        // races, and the settled ones fall out of it. Its bar is then the best-measured relayer's,
+        // which is what the second verdict is made against.
+        settled_since(
+            &health,
+            measured,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(
+            &health,
+            relayer,
+            MIN_RACES as u8,
+            ago(PENDING_SURB_TTL + Duration::from_secs(5))?,
+        );
+        health.record_reply();
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "the races that expired are booked as lost, none is open any more"
+        );
+        assert_eq!(0, open_races_of(&health, &relayer));
+
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(1))?);
+        health.record_reply();
+        assert_eq!(
+            vec![relayer],
+            judged_dead(&health.refresh(4)),
+            "three more overdue replies, with the network delivering, are a verdict however the earlier ones ended"
+        );
+        Ok(())
+    }
+
+    /// With no margin history anywhere there is no bar to call a reply overdue by.
+    #[test]
+    fn without_any_margin_history_anywhere_nothing_is_judged_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(!health.is_dead(&relayer));
+        Ok(())
+    }
+
+    /// Every return relayer silent at once is no verdict on any one of them.
+    #[test]
+    fn a_total_return_outage_judges_no_relayer_dead() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let relayers = [(); 3].map(|_| key());
+        for relayer in relayers {
+            settled_since(
+                &health,
+                relayer,
+                ago(Duration::from_secs(10))?,
+                Duration::from_millis(50),
+            );
+            open_since(&health, relayer, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        }
+
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(relayers.iter().all(|relayer| !health.is_dead(relayer)));
+        Ok(())
+    }
+
+    /// A reply home before a race fell due says nothing about it: the corroboration has to come from
+    /// after its grace ran out.
+    #[test]
+    fn a_reply_home_before_a_race_fell_due_does_not_corroborate_it() -> anyhow::Result<()> {
+        let mut health = RelayerHealth::default();
+        health.last_reply.epoch = ago(Duration::from_secs(30))?;
+        let victim = key();
+        settled_since(
+            &health,
+            victim,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(50),
+        );
+        open_since(&health, victim, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+
+        health.record_reply_at(ago(Duration::from_secs(7))?);
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "the last reply home predates the races, so nothing was delivering while they were out"
+        );
+
+        health.record_reply_at(ago(Duration::from_secs(2))?);
+        assert_eq!(vec![victim], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// Two healthy relayers trading races by equal jitter both way stay at full health.
+    #[test]
+    fn symmetric_jitter_should_cost_neither_relayer() {
+        let health = RelayerHealth::default();
+        let [a, b] = [(); 2].map(|_| key());
+        for i in 0..20 {
+            let (later, earlier) = if i % 2 == 0 { (a, b) } else { (b, a) };
+            health.record_race(
+                &leg(&[later]),
+                surb_id(i as u8),
+                &leg(&[earlier]),
+                ROUND_TRIP,
+                jitter(i),
+            );
+        }
+        assert_eq!(vec![1.0, 1.0], health_after_flush(&health, &[a, b]));
+    }
+
+    #[test]
+    fn replies_out_without_settled_races_should_not_make_a_black_hole() {
+        let health = RelayerHealth::default();
+        let relayer = key();
+        open_since(&health, relayer, 5, Instant::now() - Duration::from_secs(5));
+
+        for _ in 0..2 {
+            assert!(judged_dead(&health.refresh(4)).is_empty());
+        }
+        assert!(!health.is_dead(&relayer));
+    }
+
+    #[test]
+    fn surbs_should_race_their_neighbour_only_over_another_return_path() {
+        let [a, b] = [(); 2].map(|_| key());
+        let ids = [surb_id(1), surb_id(2), surb_id(3)];
+
+        assert_eq!(
+            vec![Some(ids[1]), Some(ids[0]), None],
+            race_partners(&ids, &[leg(&[a]), leg(&[b]), leg(&[a])]),
+            "the odd one out has no partner"
+        );
+        assert_eq!(
+            vec![None, None],
+            race_partners(&ids[..2], &[leg(&[a, b]), leg(&[a, b])]),
+            "a path cannot race itself"
+        );
+        assert_eq!(
+            vec![None, None],
+            race_partners(&ids[..2], &[leg(&[]), leg(&[b])]),
+            "a direct reply has no relayer to blame"
+        );
+    }
+
+    /// Nothing assumes two SURBs per packet: more are raced in adjacent pairs.
+    #[test]
+    fn five_surbs_in_one_packet_should_race_in_adjacent_pairs() {
+        let [a, b] = [(); 2].map(|_| key());
+        let ids = [1, 2, 3, 4, 5].map(surb_id);
+        assert_eq!(
+            vec![Some(ids[1]), Some(ids[0]), Some(ids[3]), Some(ids[2]), None],
+            race_partners(&ids, &[leg(&[a]), leg(&[b]), leg(&[b]), leg(&[a]), leg(&[a])])
+        );
     }
 
     #[test]
@@ -943,53 +3430,6 @@ mod tests {
     }
 
     #[test]
-    fn uncorroborated_silence_emits_one_bounded_debug_summary_without_replanning() -> anyhow::Result<()> {
-        let count = MAX_DEBUG_DESTINATIONS + 3;
-        let (_graph, _me, peers) = graph_with(count);
-        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {})));
-        let logs = Arc::new(InfoCounter::default());
-        tracing::subscriber::with_default(logs.clone(), || {
-            for (index, destination) in peers.iter().enumerate() {
-                let slot = (index + 1) as u64;
-                let paths = ForwardAndReturnPath {
-                    forward: [0, slot, 0, 0, 0],
-                    reply: [slot, 0, 0, 0, 0],
-                };
-                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
-                registry.record_observed(paths, 1);
-            }
-            assert!(flush(&registry).is_empty());
-            for (index, destination) in peers.iter().enumerate() {
-                let slot = (index + 1) as u64;
-                let paths = ForwardAndReturnPath {
-                    forward: [0, slot, 0, 0, 0],
-                    reply: [slot, 0, 0, 0, 0],
-                };
-                registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, *destination);
-            }
-            assert!(
-                flush(&registry).is_empty(),
-                "silence without a delivering sibling cannot identify a dead path"
-            );
-        });
-        assert_eq!(logs.debugs.load(Ordering::Relaxed), 1);
-        let fields = logs.debug_fields.lock();
-        assert_eq!(fields.get("blind_spot"), Some(&count.to_string()));
-        assert_eq!(fields.get("blind_spot_omitted").map(String::as_str), Some("3"));
-        let destinations = fields
-            .get("blind_spot_destinations")
-            .context("bounded destination list")?;
-        assert_eq!(destinations.matches(", ").count() + 1, MAX_DEBUG_DESTINATIONS);
-        let debug = format!("{registry:?}");
-        assert!(debug.contains(&format!("pairs: {count}")));
-        assert!(
-            !debug.contains(&peers[0].to_string()),
-            "registry Debug output must stay bounded"
-        );
-        Ok(())
-    }
-
-    #[test]
     fn routine_surb_traffic_should_not_emit_debug_per_mint_or_pair() -> anyhow::Result<()> {
         let (graph, me, peers) = graph_with(1);
         let recorder = recorder(graph.clone());
@@ -1018,18 +3458,6 @@ mod tests {
     struct InfoCounter {
         infos: AtomicU64,
         debugs: AtomicU64,
-        debug_fields: parking_lot::Mutex<std::collections::BTreeMap<String, String>>,
-    }
-
-    struct DebugFields<'a>(&'a InfoCounter);
-
-    impl tracing::field::Visit for DebugFields<'_> {
-        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-            self.0
-                .debug_fields
-                .lock()
-                .insert(field.name().into(), format!("{value:?}"));
-        }
     }
 
     impl tracing::Subscriber for InfoCounter {
@@ -1053,7 +3481,6 @@ mod tests {
                 && event.metadata().target() == "hopr_transport::protocol::surb_telemetry"
             {
                 self.debugs.fetch_add(1, Ordering::Relaxed);
-                event.record(&mut DebugFields(self));
             }
         }
 
@@ -1069,11 +3496,10 @@ mod tests {
         // entire observation side. Every other test here drives one instance and cannot see it.
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let pending = pending_legs(128);
+        let registry = SurbRoundTripRegistry::default();
 
-        let minting = SurbTelemetryCodec::new((), me, path_slots_of(graph.clone()), registry.clone(), pending.clone());
-        let observing = SurbTelemetryCodec::new((), me, path_slots_of(graph), registry.clone(), pending);
+        let minting = SurbTelemetryCodec::new((), me, path_slots_of(graph.clone()), registry.clone());
+        let observing = SurbTelemetryCodec::new((), me, path_slots_of(graph), registry.clone());
 
         minting.on_minted(
             &ResolvedTransportRouting::Forward {
@@ -1094,532 +3520,6 @@ mod tests {
         Ok(())
     }
 
-    /// One flush interval, in the order the flush task runs it: detect, then drain.
-    ///
-    /// Draining matters to these tests -- without it a single reply stays visible forever and
-    /// silence can never be observed at all.
-    fn flush(registry: &SurbRoundTripRegistry) -> Vec<OffchainPublicKey> {
-        let degraded = registry.degraded_destinations();
-        registry.drain();
-        degraded
-    }
-
-    /// A registry that already knows its own slot.
-    ///
-    /// The `legs()`/`heartbeat()` fixtures put us in slot 0, which the live codec would learn from
-    /// the graph on the first mint. Stating it here keeps the fixtures' assumption explicit rather
-    /// than leaning on whatever the field happens to be initialised to.
-    fn registry_at_slot_zero() -> SurbRoundTripRegistry {
-        let registry = SurbRoundTripRegistry::default();
-        registry.note_me_slot(0);
-        registry
-    }
-
-    /// A pair that mints steadily and returns replies -- the healthy case.
-    fn deliver(registry: &SurbRoundTripRegistry, paths: ForwardAndReturnPath, destination: OffchainPublicKey) {
-        registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
-        registry.record_observed(paths, 1);
-    }
-
-    /// A pair that mints steadily and returns nothing.
-    fn mint_only(registry: &SurbRoundTripRegistry, paths: ForwardAndReturnPath, destination: OffchainPublicKey) {
-        registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
-    }
-
-    /// A sibling pair to the same destination that keeps answering.
-    ///
-    /// Silence is only actionable against a peer that is demonstrably still talking, so any test
-    /// of the silence logic has to keep one pair delivering or nothing can ever fire.
-    fn heartbeat() -> ForwardAndReturnPath {
-        ForwardAndReturnPath {
-            forward: [0, 3, 2, 0, 0],
-            reply: [2, 3, 0, 0, 0],
-        }
-    }
-
-    /// me(0) -> relay(1) -> dest(2), and back dest(2) -> relay(1) -> me(0).
-    ///
-    /// The reply leg carries a real intermediate relayer: a zero-hop return has no relay to blame,
-    /// so silence over it can never name one.
-    fn legs() -> ForwardAndReturnPath {
-        ForwardAndReturnPath {
-            forward: [0, 1, 2, 0, 0],
-            reply: [2, 1, 0, 0, 0],
-        }
-    }
-
-    /// Every relayer identity in a leg is read relative to our own slot, so until that slot is
-    /// known there is nothing to read them against.
-    ///
-    /// Regression: a derived `Default` initialised `me_slot` to 0, which is a legitimate slot
-    /// rather than a sentinel. A node that is not in slot 0 would then take the zero *padding* at
-    /// the end of every reply leg to be itself, mis-attributing the relayers each leg carries and
-    /// feeding the corroboration gate a set it never observed.
-    #[test]
-    fn silence_should_not_be_attributed_before_our_own_slot_is_known() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
-        let paths = legs();
-
-        // The exact sequence that names a destination once the slot is known (see the test below),
-        // run for longer than it would take, yields nothing while the slot is unknown.
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED + 2 {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            assert!(
-                flush(&registry).is_empty(),
-                "no relayer can be identified without our own slot, so nothing may be blamed"
-            );
-        }
-
-        // Learning the slot makes the same evidence actionable.
-        registry.note_me_slot(0);
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            assert!(flush(&registry).is_empty());
-        }
-        mint_only(&registry, paths, destination);
-        deliver(&registry, heartbeat(), destination);
-        assert_eq!(vec![destination], flush(&registry));
-
-        let _ = (graph, me);
-    }
-
-    #[test]
-    fn sustained_silence_should_name_the_destination_to_replan() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-
-        // First establish that the pair works. Silence only means something against that.
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-
-        // Then it goes quiet while still minting, with a sibling still answering to prove the
-        // peer is talking. One quiet interval is not a dead path, which is why the gate counts runs.
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            assert!(flush(&registry).is_empty());
-        }
-        mint_only(&registry, paths, destination);
-        deliver(&registry, heartbeat(), destination);
-        assert_eq!(vec![destination], flush(&registry));
-        let _ = (graph, me);
-    }
-
-    /// End-to-end through the extracted flush tick: a silent return path drives re-plan → refill and
-    /// marks the balancer's estimate stale — **while the balancer's SURB supply reads healthy**.
-    ///
-    /// This is the seam the component tests leave open: detection (`degraded_destinations`),
-    /// sequencing (`ReturnPathEpisodes::tick`) and the balancer's degraded flag are each tested in
-    /// isolation, but nothing wires the real registry through [`run_flush_tick`] into a real
-    /// [`BalancerStateValues`]. It also pins the incident's supply-vs-delivery separation
-    /// (assertion #3): the buffer sits *at target* the whole time, so the signal that fires is a
-    /// return-path *delivery* signal, not SURB-distress.
-    #[tokio::test]
-    async fn a_silent_return_path_drives_replan_then_refill_and_marks_the_balancer_stale() {
-        use hopr_transport_session::{BalancerStateValues, SurbBalancerConfig};
-
-        use crate::protocol::return_path_recovery::{RecoveryStep, ReturnPathEpisodes, run_flush_tick};
-
-        let (graph, _me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-        let grace = Duration::from_secs(10);
-        let mut episodes = ReturnPathEpisodes::new(grace);
-
-        // A session whose SURB *supply* is healthy: a target is set and the buffer sits at it. If the
-        // return-path signal fires against this, it cannot be a supply/distress signal.
-        let balancer = BalancerStateValues::new(SurbBalancerConfig {
-            target_surb_buffer_size: 1000,
-            sustain_on_return_path_loss: true,
-            ..Default::default()
-        });
-        balancer.buffer_level.store(1000, Ordering::Relaxed);
-        assert!(!balancer.is_disabled(), "precondition: SURB supply is enabled");
-        assert!(
-            !balancer.return_path_estimate_is_stale(),
-            "precondition: nothing has marked the return path yet"
-        );
-
-        let replans = std::cell::Cell::new(0usize);
-        let refills = std::cell::Cell::new(0usize);
-
-        // Establish the pair works; silence only means something against a pair that once delivered.
-        deliver(&registry, paths, destination);
-        let first = run_flush_tick(
-            &registry,
-            &graph,
-            0,
-            &mut episodes,
-            |_d| async {
-                replans.set(replans.get() + 1);
-                1usize
-            },
-            |_d| async {
-                refills.set(refills.get() + 1);
-                balancer.mark_return_path_degraded(grace);
-                1usize
-            },
-        )
-        .await;
-        assert!(first.is_empty(), "a freshly delivering pair is not degraded");
-        assert_eq!((replans.get(), refills.get()), (0, 0), "nothing to recover yet");
-
-        // Then it goes quiet while a sibling keeps answering, until the tick names it and recovers.
-        let mut steps = Vec::new();
-        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            steps = run_flush_tick(
-                &registry,
-                &graph,
-                0,
-                &mut episodes,
-                |_d| async {
-                    replans.set(replans.get() + 1);
-                    1usize
-                },
-                |_d| async {
-                    refills.set(refills.get() + 1);
-                    balancer.mark_return_path_degraded(grace);
-                    1usize
-                },
-            )
-            .await;
-            if !steps.is_empty() {
-                break;
-            }
-        }
-
-        // Re-plan happened first and, because it moved traffic, a refill followed — in that order.
-        assert!(
-            matches!(
-                steps.as_slice(),
-                [
-                    RecoveryStep::Replanned { destination: d1, moved: 1 },
-                    RecoveryStep::Refilled { destination: d2, sessions: 1 },
-                ] if *d1 == destination && *d2 == destination
-            ),
-            "expected re-plan then refill for the silent destination, got {steps:?}"
-        );
-        assert_eq!(refills.get(), 1, "exactly one refill, behind the re-plan");
-
-        // The refill marked the balancer: the estimate is now stale even though supply is healthy.
-        assert!(
-            balancer.return_path_estimate_is_stale(),
-            "the refill must mark the return path degraded"
-        );
-        assert!(
-            !balancer.is_disabled(),
-            "supply-vs-delivery: SURB supply is still healthy…"
-        );
-        assert_eq!(
-            balancer.buffer_level.load(Ordering::Relaxed),
-            1000,
-            "…the buffer never left its target — the signal is delivery, not distress"
-        );
-
-        // Recovery: a reply arrives, so detection stops naming the destination and no further
-        // recovery is driven.
-        deliver(&registry, paths, destination);
-        let recovered = run_flush_tick(
-            &registry,
-            &graph,
-            0,
-            &mut episodes,
-            |_d| async {
-                replans.set(replans.get() + 1);
-                1usize
-            },
-            |_d| async {
-                refills.set(refills.get() + 1);
-                balancer.mark_return_path_degraded(grace);
-                1usize
-            },
-        )
-        .await;
-        assert!(
-            recovered.is_empty(),
-            "once a reply arrives the return path is no longer named silent, got {recovered:?}"
-        );
-        assert_eq!(refills.get(), 1, "no second refill after the path recovered");
-    }
-
-    /// Several pairs lead to one destination, but re-planning acts on the destination.
-    ///
-    /// Regression: silence accrues per pair, so pairs re-armed independently and between them kept
-    /// re-planning the same destination every couple of seconds. With the invalidation finally
-    /// reaching the path cache, that destroyed each freshly chosen return path before it could
-    /// deliver -- a healthy baseline measured 0.1% arrival with fifteen re-plans inside it.
-    ///
-    /// The two pairs are staggered so they come due on *different* flushes; collapsing duplicates
-    /// within one flush was already handled and is not what failed.
-    #[test]
-    fn one_destination_should_not_be_replanned_again_while_a_new_path_is_settling() {
-        let (graph, me, peers) = graph_with(2);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-
-        let first = legs();
-        let second = ForwardAndReturnPath {
-            forward: [0, 4, 2, 0, 0],
-            reply: [2, 4, 0, 0, 0],
-        };
-        assert_ne!(
-            first, second,
-            "the two pairs must be distinct for this to test anything"
-        );
-
-        deliver(&registry, first, destination);
-        deliver(&registry, second, destination);
-        assert!(flush(&registry).is_empty());
-
-        // `first` goes quiet immediately; `second` keeps answering for three more flushes, so its
-        // own silence comes due well after the first re-plan.
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, first, destination);
-            deliver(&registry, second, destination);
-            assert!(flush(&registry).is_empty());
-        }
-        mint_only(&registry, first, destination);
-        deliver(&registry, second, destination);
-        assert_eq!(
-            vec![destination],
-            flush(&registry),
-            "the first silence must be acted on"
-        );
-
-        // Now both stay silent. Suppression still resets the pair's counter, so it comes due
-        // again and again; what must be bounded is how often the *destination* is acted on.
-        const WINDOW: u32 = 4 * SILENT_FLUSHES_BEFORE_DEGRADED;
-        let mut reports = 0;
-        for _ in 0..WINDOW {
-            mint_only(&registry, first, destination);
-            mint_only(&registry, second, destination);
-            deliver(&registry, heartbeat(), destination);
-            reports += flush(&registry).len();
-        }
-
-        // Two pairs coming due every five flushes would otherwise report roughly eight times in
-        // this window; measured in the cluster, fifteen re-plans in thirty flushes was enough to
-        // hold a healthy session at 0.1% arrival.
-        // An absolute bound, deliberately not derived from `FLUSHES_BETWEEN_REPLANS` -- a limit
-        // computed from the constant under test moves with it and can never fail. Suppression
-        // resets the pair, so it comes due every five flushes; the cooldown lets roughly every
-        // other one through, which over twenty flushes is at most three.
-        assert!(
-            reports <= 3,
-            "a destination must not be re-planned faster than a new path can settle: {reports} re-plans in {WINDOW} \
-             flushes"
-        );
-
-        let _ = (graph, me);
-    }
-
-    /// A relayer still carrying replies elsewhere is not the one at fault.
-    ///
-    /// A dead relayer takes down every path through it and nothing else, so blame belongs to a node
-    /// appearing only in silent legs. One demonstrably delivering on another pair is alive, and the
-    /// silence has some other cause -- selective traffic, or a fault further along the leg.
-    #[test]
-    fn a_relayer_still_delivering_elsewhere_should_not_be_blamed() {
-        let (graph, me, peers) = graph_with(3);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-
-        // Two distinct pairs sharing return relay 1, differing only in their forward leg.
-        let delivering = legs();
-        let silent = ForwardAndReturnPath {
-            forward: [0, 4, 2, 0, 0],
-            reply: [2, 1, 0, 0, 0],
-        };
-        assert_ne!(delivering, silent, "the pairs must be distinct keys");
-
-        deliver(&registry, silent, destination);
-        assert!(flush(&registry).is_empty());
-
-        // Relay 1 keeps carrying replies on the other pair, so it cannot be what is broken.
-        for _ in 0..(3 * SILENT_FLUSHES_BEFORE_DEGRADED) {
-            mint_only(&registry, silent, destination);
-            deliver(&registry, delivering, destination);
-            assert!(
-                flush(&registry).is_empty(),
-                "a relayer that is delivering elsewhere must not be blamed for this pair's silence"
-            );
-        }
-
-        let _ = (graph, me);
-    }
-
-    /// Silence spread over every relayer is the peer, not a relay.
-    #[test]
-    fn silence_on_every_relayer_should_blame_none_of_them() {
-        let (graph, me, peers) = graph_with(3);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-
-        let first = legs();
-        let second = heartbeat();
-
-        for _ in 0..5 {
-            deliver(&registry, first, destination);
-            deliver(&registry, second, destination);
-            assert!(flush(&registry).is_empty());
-        }
-
-        // Every relay goes quiet together: that is the counterparty, not a relay failure.
-        for _ in 0..(3 * SILENT_FLUSHES_BEFORE_DEGRADED) {
-            mint_only(&registry, first, destination);
-            mint_only(&registry, second, destination);
-            assert!(
-                flush(&registry).is_empty(),
-                "silence shared by every relayer names none of them"
-            );
-        }
-
-        let _ = (graph, me);
-    }
-
-    /// A peer that simply stops talking must not be mistaken for a dead relayer.
-    ///
-    /// This is the case that killed every absolute gate: after a busy stretch the counters look
-    /// exactly like a failing path -- SURBs still minted by keep-alives, nothing coming back. A
-    /// delivered-ever bool, a recency decay, a volume threshold and a ratio collapse all fire here.
-    /// Corroboration cannot, because when the peer goes quiet it goes quiet on *every* pair, so
-    /// there is never a sibling to corroborate against.
-    #[test]
-    fn a_peer_that_goes_quiet_should_not_be_mistaken_for_a_dead_return_path() {
-        let (graph, me, peers) = graph_with(2);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-
-        let first = legs();
-        let second = heartbeat();
-
-        // A busy stretch: both pairs carrying real return traffic.
-        for _ in 0..10 {
-            deliver(&registry, first, destination);
-            deliver(&registry, second, destination);
-            assert!(flush(&registry).is_empty());
-        }
-
-        // The application goes idle. Keep-alives keep minting on both pairs; the peer has nothing
-        // to say on either.
-        for _ in 0..(4 * SILENT_FLUSHES_BEFORE_DEGRADED) {
-            mint_only(&registry, first, destination);
-            mint_only(&registry, second, destination);
-            assert!(
-                flush(&registry).is_empty(),
-                "a quiet peer is not a dead return path, however long it stays quiet"
-            );
-        }
-
-        let _ = (graph, me);
-    }
-
-    #[test]
-    fn a_pair_that_never_delivered_should_never_be_called_degraded() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-
-        // Measured regression: silence alone fired six times during healthy operation, once per
-        // flush, on pairs whose replies had simply not landed yet. Minting hard and returning
-        // nothing *yet* is what a young pair looks like, not what a dead one looks like.
-        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED + 3 {
-            registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE * 10, destination);
-            assert!(
-                flush(&registry).is_empty(),
-                "a pair that has never returned a reply is too young to call dead"
-            );
-        }
-        let _ = (graph, me);
-    }
-
-    #[test]
-    fn a_single_reply_should_clear_the_silence() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            assert!(flush(&registry).is_empty());
-        }
-
-        // A path that delivers anything at all is not the failure this looks for, and the count
-        // starts over rather than resuming where it left off.
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            assert!(flush(&registry).is_empty());
-        }
-        let _ = (graph, me);
-    }
-
-    #[test]
-    fn a_degraded_pair_should_not_fire_again_on_the_next_flush() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-
-        deliver(&registry, paths, destination);
-        flush(&registry);
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            flush(&registry);
-        }
-        mint_only(&registry, paths, destination);
-        deliver(&registry, heartbeat(), destination);
-        assert_eq!(vec![destination], flush(&registry));
-
-        // Re-planning the same destination every second churns its cached candidates instead of
-        // letting the new selection settle, so the gate re-arms from zero.
-        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
-            mint_only(&registry, paths, destination);
-            deliver(&registry, heartbeat(), destination);
-            assert!(flush(&registry).is_empty());
-        }
-        let _ = (graph, me);
-    }
-
-    #[test]
-    fn an_idle_path_should_never_be_called_degraded() {
-        let (graph, me, peers) = graph_with(1);
-        let destination = peers[0];
-        let registry = registry_at_slot_zero();
-        let paths = legs();
-
-        deliver(&registry, paths, destination);
-        assert!(flush(&registry).is_empty());
-
-        // Below the evidence floor: a trickle that happens not to have returned yet says nothing,
-        // and treating it as failure would re-plan healthy paths during quiet periods.
-        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED + 2 {
-            registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE - 1, destination);
-            assert!(flush(&registry).is_empty());
-        }
-        let _ = (graph, me);
-    }
-
     #[test]
     fn a_reply_on_a_surb_we_never_minted_should_be_ignored() {
         let (graph, ..) = graph_with(1);
@@ -1629,13 +3529,305 @@ mod tests {
 
         assert!(recorder.registry.drain().is_empty());
     }
+
+    /// A verdict reaches the graph in the flush it is made, but the stock is touched only at the next
+    /// flush, and only if the relayer is still dead then.
+    #[test]
+    fn a_verdict_must_hold_for_a_second_flush_before_the_stock_is_touched() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [dead, other] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        settled_since(
+            &health,
+            other,
+            ago(Duration::from_secs(10))?,
+            Duration::from_millis(100),
+        );
+        open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+
+        assert_eq!(vec![dead], judged_dead(&health.refresh(4)), "the verdict is made");
+        assert!(health.is_dead(&dead));
+        assert!(
+            registry.write_off_dead().is_empty() && registry.pending.get(&surb_id(1)).is_some(),
+            "nothing is written off or bumped in the flush of the verdict"
+        );
+
+        confirm_verdicts(&health);
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the next flush finds the relayer still dead and acts"
+        );
+        assert!(registry.pending.get(&surb_id(1)).is_none());
+        Ok(())
+    }
+
+    /// The slowest relayer of a fresh session is judged against a bar borrowed from the fastest and
+    /// revived by its own late replies a moment later. That verdict must not cost the session a wipe.
+    #[test]
+    fn a_verdict_revived_before_the_second_flush_costs_no_wipe() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [slow, fast] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[slow], None, 0));
+        settled_since(&health, fast, ago(Duration::from_secs(10))?, Duration::from_millis(50));
+        open_since(&health, slow, MIN_RACES as u8, ago(Duration::from_millis(500))?);
+        health.record_reply();
+
+        assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
+        assert!(registry.write_off_dead().is_empty(), "not acted on yet");
+
+        // Its late replies come home before the next flush.
+        health.revive_by_reply(&[Some(slow), None, None, None, None]);
+        assert!(!health.is_known_dead(&slow));
+        confirm_verdicts(&health);
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "revived in time: no write-off, no bump"
+        );
+        assert!(registry.pending.get(&surb_id(1)).is_some());
+        assert!(registry.invalid().is_empty());
+        Ok(())
+    }
+
+    /// A reply home through a relayer revives it for good: the overdue races its earlier replies left
+    /// open are not a black hole any more once a reply has come home through it after them, whether
+    /// or not that reply settled a race.
+    #[test]
+    fn a_relayer_revived_by_a_reply_should_stay_alive_at_the_next_flush() -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let [slow, fast] = [(); 2].map(|_| key());
+        settled_since(&health, fast, ago(Duration::from_secs(10))?, Duration::from_millis(50));
+        for seed in 1..=3u8 {
+            registry
+                .pending
+                .insert(surb_id(seed), pending_to(&[slow], Some(surb_id(100 + seed)), 0));
+            health.open_race(&leg(&[slow]), surb_id(seed), &leg(&[fast]), ROUND_TRIP);
+        }
+        backdate_open(&health, slow, ago(Duration::from_millis(500))?);
+        health.record_reply();
+        health.refresh(4);
+        anyhow::ensure!(health.is_dead(&slow), "a black hole is judged dead");
+
+        // A reply in the normal order through it: it settles nothing, but it came home.
+        registry.pending.insert(surb_id(50), pending_to(&[slow], None, 0));
+        recorder.on_replied(&surb_id(50));
+        assert!(!health.is_known_dead(&slow), "revived by the reply");
+        health.refresh(4);
+        assert!(
+            !health.is_known_dead(&slow),
+            "the races left open before the reply are not a black hole after it"
+        );
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "and nothing is written off or advanced"
+        );
+        Ok(())
+    }
+
+    /// Each overdue race is judged on its own: a reply that came home through the relayer after one
+    /// old race fell due answers that race, not the ones that fell due after the reply. One stale race
+    /// left open by a reply lost at random must not hold back the verdict on a relayer that has since
+    /// gone silent until that race expires.
+    #[test]
+    fn a_stale_overdue_race_should_not_hold_back_the_verdict_on_a_relayer_gone_silent() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let silent = key();
+        settled_since(&health, silent, ago(Duration::from_secs(40))?, jitter(0));
+        // A reply lost at random long ago; its race stays open until a SURB is forgotten.
+        let stale = ago(Duration::from_secs(50))?;
+        health.relayers.entry(silent).or_default().open.insert(
+            surb_id(100),
+            Race {
+                at: stale,
+                margin: 0.0,
+                winning_round_trip: ROUND_TRIP.as_secs_f64(),
+            },
+        );
+        // The relayer delivered after that, then went silent.
+        if let Some(mut history) = health.relayers.get_mut(&silent) {
+            history.last_home = Some(ago(Duration::from_secs(20))?);
+        }
+        open_since(&health, silent, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        // Others are delivering meanwhile.
+        health.record_reply();
+
+        assert_eq!(vec![silent], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// A verdict that is gone at the flush meant to confirm it never held: it is withdrawn, not put on
+    /// probation, and it costs the session neither a write-off nor a SURB generation advance.
+    #[test]
+    fn a_verdict_that_lapses_before_it_is_confirmed_should_be_withdrawn() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [slow, fast] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[slow], None, 0));
+        settled_since(&health, fast, ago(Duration::from_secs(10))?, Duration::from_millis(50));
+        open_since(&health, slow, MIN_RACES as u8, ago(Duration::from_millis(500))?);
+        health.record_reply();
+        assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "not acted on in the flush of the verdict"
+        );
+
+        // The borrowed bar rises past the age of its open races: no longer a black hole.
+        settled_since(&health, fast, Instant::now(), Duration::from_secs(3));
+        health.refresh(4);
+        assert!(!health.is_known_dead(&slow), "withdrawn, neither dead nor on probation");
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "and nothing is written off or advanced"
+        );
+        assert!(
+            registry.pending.get(&surb_id(1)).is_some(),
+            "its SURB is still expected back"
+        );
+        Ok(())
+    }
+
+    /// A second relayer confirmed a flush after a bump finds the stock it ran through wiped already:
+    /// the SURBs minted before the bump are not a reason to advance again. SURBs minted through it
+    /// since are, because the counterparty holds them now.
+    #[test]
+    fn a_second_relayer_confirmed_after_a_bump_should_not_bump_for_the_wiped_stock() {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [first, second] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[first], None, 0));
+        registry.pending.insert(surb_id(2), pending_to(&[second], None, 0));
+        judge_dead(&health, first);
+        health.mark_dead(second);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the first bump");
+
+        confirm_verdicts(&health);
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the second relayer's SURB went with the first wipe"
+        );
+
+        registry.pending.insert(surb_id(3), pending_to(&[second], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "the wipe settled the second relayer too: a SURB through it minted since is written off, not a reason to \
+             drop the counterparty's fresh stock again"
+        );
+        assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), registry.invalid());
+    }
+
+    /// A wipe takes the Session's pending SURBs, but the counterparty spends its old stock until the
+    /// new generation reaches it. A reply on a wiped SURB still proves its relayers alive: a relayer
+    /// judged dead in the same flush, whose verdict is not confirmed yet, is revived by it instead of
+    /// being confirmed at the next flush and put on probation.
+    #[test]
+    fn a_reply_on_a_wiped_surb_should_revive_a_relayer_judged_in_the_same_flush() {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let [dead, straggler] = [(); 2].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        registry.pending.insert(surb_id(2), pending_to(&[straggler], None, 0));
+        judge_dead(&health, dead);
+        health.mark_dead(straggler);
+        assert_eq!(
+            vec![*SESSION],
+            registry.write_off_dead(),
+            "the confirmed verdict wipes the stock"
+        );
+        assert!(
+            registry.pending.get(&surb_id(2)).is_none(),
+            "the straggler's SURB went with the wipe"
+        );
+
+        recorder.on_replied(&surb_id(2));
+        assert!(
+            !health.is_known_dead(&straggler),
+            "a reply on a wiped SURB revives the relayer it came home through"
+        );
+        assert!(health.is_known_dead(&dead), "and only that one");
+    }
+
+    /// What a cluster run showed: three relayers judged dead around one flush, the session bumped once
+    /// the first verdict held, all three lapsing into probation a minute later, and then one exploring
+    /// probe through a relayer the first wipe had not recorded. That probe advanced the generation a
+    /// second time, the Exit dropped a stock of about 6900 SURBs it had just refilled, and the Entry's
+    /// believed level overshot to 3.6 x its target. A probe through a relayer the wipe already covered
+    /// is written off; it does not wipe the stock again.
+    #[test]
+    fn a_probe_through_a_relayer_the_wipe_covered_should_not_bump_again_after_it_lapses() {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let [first, second, third] = [(); 3].map(|_| key());
+        registry.pending.insert(surb_id(1), pending_to(&[first], None, 0));
+        judge_dead(&health, first);
+        health.mark_dead(second);
+        health.mark_dead(third);
+        assert_eq!(vec![*SESSION], registry.write_off_dead(), "the one bump");
+
+        confirm_verdicts(&health);
+        // The verdicts lapse into probation.
+        for relayer in [first, second, third] {
+            health.dead.remove(&relayer);
+            health.probation.insert(relayer);
+        }
+        registry.pending.insert(surb_id(2), pending_to(&[third], None, 0));
+        assert!(
+            registry.write_off_dead().is_empty(),
+            "a probe through a relayer the wipe covered must not advance the generation again"
+        );
+        assert_eq!(
+            HashMap::from([(*SESSION, (1, 1.0))]),
+            registry.invalid(),
+            "it is written off"
+        );
+    }
+
+    /// A written-off SURB counts as held by the counterparty only until it has spent it: the count of a
+    /// relayer that stays on probation does not grow for good.
+    #[test]
+    fn write_offs_should_age_out_once_the_counterparty_has_spent_them() -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let dead = key();
+        health.probation.insert(dead);
+        // Bumped already in this death, so the write-off is all that happens.
+        registry.bumped.insert((*SESSION, dead), Instant::now());
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        assert!(registry.write_off_dead().is_empty());
+        assert_eq!(HashMap::from([(*SESSION, (1, 1.0))]), registry.invalid());
+
+        for mut session in registry.written_off.iter_mut() {
+            for written_off_at in session.values_mut() {
+                for at in written_off_at.iter_mut() {
+                    *at = ago(WRITE_OFF_HORIZON + Duration::from_secs(1))?;
+                }
+            }
+        }
+        assert!(registry.write_off_dead().is_empty());
+        assert!(
+            registry.invalid().is_empty(),
+            "spent by the counterparty since, it is no longer counted"
+        );
+        Ok(())
+    }
     #[test]
     fn observed_callback_can_access_the_destination_without_a_held_guard() {
         let (_, _, peers) = graph_with(1);
         let destination = peers[0];
-        let paths = legs();
-        let registry = registry_at_slot_zero();
-        registry.record_expected(paths, 3, destination);
+        let paths = ForwardAndReturnPath {
+            forward: [0; 5],
+            reply: [0; 5],
+        };
+        let registry = SurbRoundTripRegistry::default();
+        registry.record_minted(paths, 3, destination);
         let destinations = registry.destinations.clone();
         let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let registry = registry.with_observer(Some(Arc::new({
@@ -1664,8 +3856,11 @@ mod tests {
 
     #[test]
     fn observing_an_unknown_destination_keeps_counts_without_notifying() {
-        let paths = legs();
-        let registry = registry_at_slot_zero().with_observer(Some(Arc::new(|_| {
+        let paths = ForwardAndReturnPath {
+            forward: [0; 5],
+            reply: [0; 5],
+        };
+        let registry = SurbRoundTripRegistry::default().with_observer(Some(Arc::new(|_| {
             panic!("unknown destinations must not notify the observer");
         })));
         registry.record_observed(paths, 2);

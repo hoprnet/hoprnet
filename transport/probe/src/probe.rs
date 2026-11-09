@@ -386,6 +386,7 @@ impl Probe {
                                                 max_surbs_in_packet: 1,
                                                 ..Default::default()
                                             }),
+                                            surb_refund: Default::default(),
                                         };
                                         let mut push_to_network = push_to_network.clone();
 
@@ -441,6 +442,7 @@ impl Probe {
                                                             max_surbs_in_packet: 0,
                                                             ..Default::default()
                                                         }),
+                                                        surb_refund: Default::default(),
                                                     },
                                                 ))
                                                 .await

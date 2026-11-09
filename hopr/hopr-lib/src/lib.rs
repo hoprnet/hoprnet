@@ -73,6 +73,11 @@ use hopr_api::{
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
 pub use hopr_transport::SESSION_MTU;
+/// Packet mixing API, re-exported so a consumer takes the mixer through `hopr-lib` alone instead of
+/// pinning `hopr-transport-mixer` as a separate dependency.
+///
+/// Both `hopr_lib::mixer` and `hopr_lib::exports::transport::mixer` name the same items.
+pub use hopr_transport::mixer;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
@@ -157,7 +162,10 @@ pub struct HoprSessionClientConfig {
     ///
     /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
     /// The value is bounded by the packet size and will saturate there.
-    /// The default `1` follows the balancer's target; values greater than `1` bypass that gate.
+    /// Every finite value follows the balancer's target: packets carry this many SURBs while the
+    /// counterparty is below its target and none once it is at or above it, so a value greater than `1`
+    /// cannot keep the counterparty more than one packet's SURBs above its target. Only `usize::MAX` is
+    /// not gated.
     /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
     /// configured, there will be no SURBs produced at all, making the traffic only possible in
     /// one direction.
