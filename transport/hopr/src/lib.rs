@@ -282,6 +282,11 @@ impl HoprSessionConfigurator {
     /// NOTE: This usually carries at least 2 SURBs on the HOPR protocol level and can be
     /// used for manual SURB balancing.
     ///
+    /// NOTE: The keep-alive is marked as a manual ping, so the other side does not take it for a sign
+    /// that this Session runs a SURB balancer: an Exit that receives it does not start its SURB-level
+    /// reports or the reserve it keeps for them. A Session without a SURB balancer can ping without
+    /// being sent reports it does not read. An Exit that predates the mark still starts them.
+    ///
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
     pub async fn ping(&self) -> errors::Result<()> {
@@ -487,7 +492,7 @@ where
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(|ms| Some(Duration::from_millis(ms)))
                 .unwrap_or(cfg.session.surb_balance_notify_period),
-            surb_target_notify: true,
+            surb_target_notify: cfg.session.surb_target_notify,
             maximum_sessions: cfg.session.maximum_managed_sessions,
             pix_config: cfg.incoming_session_pix_config.clone(),
             max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,
@@ -2159,6 +2164,7 @@ mod tests {
 
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+    use rstest::rstest;
 
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.
@@ -2288,6 +2294,53 @@ mod tests {
             "the retire must release the ring"
         );
 
+        Ok(())
+    }
+
+    /// A Session that announces the largest target the transport allows is admitted a full-size ring.
+    ///
+    /// The Exit gives a Session that announced no target exactly that figure
+    /// (`maximum_surb_buffer_size`, set from `surb_buffer_target_ceiling`), so this is the link that
+    /// makes such a Session's ring `rb_capacity` and not the few dozen SURBs the balancer's fallback
+    /// would give it: the ceiling is two thirds of the capacity, and the store's default headroom of
+    /// 50 % takes it back up. Integer division can leave it a SURB short.
+    ///
+    /// It pins the store arithmetic only. It calls `surb_buffer_target_ceiling` itself, so it would not
+    /// notice the transport ceasing to set `maximum_surb_buffer_size` from it: the session manager
+    /// config is built inline in `HoprTransport::new`, which has no seam small enough to test here.
+    #[rstest]
+    #[case::the_smallest_allowed(1_024)]
+    #[case::a_round_one(30_000)]
+    #[case::the_default(hopr_protocol_hopr::SurbStoreConfig::default().rb_capacity)]
+    #[test]
+    fn announcing_the_target_ceiling_admits_a_ring_of_the_full_capacity(
+        #[case] rb_capacity: usize,
+    ) -> anyhow::Result<()> {
+        use anyhow::Context;
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl, surb_buffer_target_ceiling};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig {
+                rb_capacity,
+                ..Default::default()
+            }),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+
+        admission.admit(&pseudonym, surb_buffer_target_ceiling(rb_capacity));
+        let ring = admission
+            .store
+            .admitted_ring_ceiling(&pseudonym)
+            .context("the admission must have installed a ring")?;
+
+        assert!(
+            ring <= rb_capacity && rb_capacity - ring <= 1,
+            "a Session announcing the target ceiling must get the whole {rb_capacity}-SURB capacity (to within a SURB \
+             of rounding), got a ring of {ring}"
+        );
         Ok(())
     }
 }

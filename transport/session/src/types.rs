@@ -537,8 +537,9 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
     /// Admits `pseudonym` into the store's admitted class, sized for `expected_surbs`, and returns
     /// the token naming this admission.
     ///
-    /// `expected_surbs` is the Session's announced SURB buffer target; the store owns the headroom
-    /// arithmetic and the floor, so a value of `0` (target unknown) still yields a usable ring.
+    /// `expected_surbs` is the Session's announced SURB buffer target, or the largest the node allows
+    /// when the Entry announced none; the store owns the headroom arithmetic and the floor, so a value
+    /// of `0` (target unknown) still yields a usable ring.
     /// Calling this twice for the same pseudonym must not discard what the admitted ring already
     /// holds, and invalidates the token the earlier admission returned.
     fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken;

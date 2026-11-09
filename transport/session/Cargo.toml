@@ -121,6 +121,7 @@ hopr-protocol-pix = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
+rstest = { workspace = true }
 test-log = { workspace = true }
 
 [package.metadata.cargo-machete]
