@@ -13279,6 +13279,118 @@ mod tests {
         )))
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn start_protocol_worker_should_preserve_session_ancestry_without_reentering_the_parent() -> anyhow::Result<()>
+    {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use test_log::tracing_subscriber::{
+            self as subscriber, filter::LevelFilter, layer::SubscriberExt, registry::LookupSpan,
+        };
+        use tracing::instrument::WithSubscriber;
+
+        struct WorkerEvents {
+            events: tokio::sync::mpsc::UnboundedSender<Vec<(&'static str, tracing::span::Id)>>,
+            session_enters: Arc<AtomicUsize>,
+        }
+
+        impl<S: tracing::Subscriber + for<'a> LookupSpan<'a>> subscriber::Layer<S> for WorkerEvents {
+            fn on_enter(&self, id: &tracing::span::Id, ctx: subscriber::layer::Context<'_, S>) {
+                if ctx.span(id).is_some_and(|span| span.name() == "session") {
+                    self.session_enters.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            fn on_event(&self, event: &tracing::Event<'_>, ctx: subscriber::layer::Context<'_, S>) {
+                if *event.metadata().level() != tracing::Level::ERROR {
+                    return;
+                }
+                let Some(scope) = ctx.event_scope(event) else {
+                    return;
+                };
+                let ancestry = scope
+                    .from_root()
+                    .map(|span| (span.name(), span.id()))
+                    .collect::<Vec<_>>();
+                // Capture the worker's result event after the individual handler has returned.
+                if ancestry
+                    .last()
+                    .is_some_and(|(name, _)| *name == "session.start_protocol")
+                {
+                    let _ = self.events.send(ancestry);
+                }
+            }
+        }
+
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel();
+        let session_enters = Arc::new(AtomicUsize::new(0));
+        let subscriber = subscriber::registry()
+            .with(WorkerEvents {
+                events: events_tx,
+                session_enters: session_enters.clone(),
+            })
+            .with(LevelFilter::DEBUG);
+        async {
+            let mgr: TestManager = SessionManager::new(Default::default());
+            let (sender, _outgoing) = futures::channel::mpsc::unbounded();
+            let handles = mgr.start(sender, futures::sink::drain(), None, None)?;
+            let mut expected_roots = Vec::new();
+            let mut session_receivers = Vec::new();
+            for _ in 0..2 {
+                let id = HoprPseudonym::random();
+                session_receivers.push(mgr.pre_populate_session_with_receiver(
+                    id,
+                    DestinationRouting::Forward {
+                        destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                        pseudonym: Some(id),
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: None,
+                    },
+                ));
+                let session = tracing::debug_span!("session", session_id = %id);
+                assert!(session.id().is_some(), "fixture needs an active session span");
+                // Without a PIX toolbox, the actual SSA handler returns UnsupportedMessage.
+                // Its worker then emits an error directly within session.start_protocol.
+                let packet = ssa_request_packet(id)?;
+                assert!(matches!(
+                    session.in_scope(|| mgr.dispatch_message(id, packet))?,
+                    DispatchResult::Processed
+                ));
+                expected_roots.push(session);
+            }
+            let received = timeout(Duration::from_secs(5), async {
+                let first = events_rx.recv().await.context("missing first worker event")?;
+                let second = events_rx.recv().await.context("missing second worker event")?;
+                anyhow::Ok([first, second])
+            })
+            .await;
+            for handle in handles {
+                handle.abort();
+            }
+            for ancestry in received.context("Start protocol worker did not process both messages")?? {
+                assert_eq!(
+                    ancestry.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+                    ["session", "session.start_protocol"]
+                );
+                let root = &ancestry.first().context("missing session root")?.1;
+                let index = expected_roots
+                    .iter()
+                    .position(|span| span.id().as_ref() == Some(root))
+                    .context("worker event must retain its own dispatch session")?;
+                expected_roots.remove(index);
+            }
+            assert!(expected_roots.is_empty());
+            assert_eq!(
+                session_enters.load(Ordering::Relaxed),
+                2,
+                "session roots should be entered only for dispatch, not again by the worker"
+            );
+            anyhow::Ok(())
+        }
+        .with_subscriber(subscriber)
+        .await
+    }
+
     #[test]
     fn start_protocol_queue_should_retain_the_dispatch_context() -> anyhow::Result<()> {
         use anyhow::Context;
