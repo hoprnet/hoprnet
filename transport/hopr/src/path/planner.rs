@@ -3048,6 +3048,7 @@ mod tests {
         .await
     }
 
+    /// Run with `--profile release` too, to detect compile-time ceilings on TRACE diagnostics.
     #[rstest::rstest]
     #[case(tracing::Level::DEBUG, false)]
     #[case(tracing::Level::TRACE, true)]

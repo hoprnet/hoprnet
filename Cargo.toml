@@ -138,7 +138,7 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
   "codec",
   "compat",
 ] }
-tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
+tracing = "0.1.44"
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
@@ -205,6 +205,14 @@ lto = "fat"
 panic = "abort"
 opt-level = 3
 strip = true
+
+# Published dependencies still enable tracing/release_max_level_debug. In tracing 0.1.44,
+# debug_assertions selects whether that release-only ceiling applies. Override only tracing
+# so operators can enable TRACE diagnostics while application crates keep release assertions off.
+# Downstream binary workspaces need the same top-level override while those dependencies remain.
+# Remove this workaround once dependency releases stop enabling the ceiling.
+[profile.release.package.tracing]
+debug-assertions = true
 
 # memory profiling profile — inherits release optimizations but preserves debug symbols
 # for jeprof symbol resolution
