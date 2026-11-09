@@ -48,7 +48,12 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
-use hopr_chain_connector::state_dump::{Collector, Config as StateDumpConfig, IntervalCounters, StateRead};
+/// Additional diagnostic reads required when the `state-dump` feature is enabled.
+#[doc(hidden)]
+#[cfg(feature = "state-dump")]
+pub use hopr_chain_connector::state_dump::StateRead as StateDumpRead;
+#[cfg(feature = "state-dump")]
+use hopr_chain_connector::state_dump::{Collector, Config as StateDumpConfig, IntervalCounters};
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{
@@ -61,11 +66,15 @@ use validator::Validate;
 
 use crate::{
     Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
-    config::HoprLibConfig,
-    constants,
-    helpers::BroadcastSenderSink,
-    state_dump::{SectionValue, StateDumpSection},
+    config::HoprLibConfig, constants, helpers::BroadcastSenderSink,
 };
+
+/// No additional chain requirements when the `state-dump` feature is disabled.
+#[doc(hidden)]
+#[cfg(not(feature = "state-dump"))]
+pub trait StateDumpRead {}
+#[cfg(not(feature = "state-dump"))]
+impl<T: ?Sized> StateDumpRead for T {}
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -84,6 +93,9 @@ lazy_static::lazy_static! {
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
 }
+
+#[cfg(feature = "state-dump")]
+use crate::state_dump::{SectionValue, StateDumpSection};
 
 const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 
@@ -114,6 +126,7 @@ pub struct BuildCtx {
     /// Node configuration.
     pub cfg: HoprLibConfig,
     peer_discovery_rx: PeerDiscoveryRx,
+    #[cfg(feature = "state-dump")]
     state_dump_sections: Vec<(&'static str, StateDumpSection)>,
 }
 
@@ -161,6 +174,7 @@ impl HoprBuilderWithIdentity {
                 packet_key: self.packet_key,
                 cfg,
                 peer_discovery_rx: Arc::new(parking_lot::Mutex::new(Some(peer_discovery_rx))),
+                #[cfg(feature = "state-dump")]
                 state_dump_sections: Vec::new(),
             },
             safe_and_module: None,
@@ -199,6 +213,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// strategies the embedding node runs. `section` is called once per record and must not block.
     ///
     /// Sections are ignored when the state dump is disabled (`HOPR_STATE_DUMP_INTERVAL=0`).
+    #[cfg(feature = "state-dump")]
     pub fn with_state_dump_section(
         mut self,
         name: &'static str,
@@ -493,7 +508,7 @@ async fn pre_build_inner<Chain, Graph, Net, Ct>(
     mut processes: AbortableList<HoprLibProcess>,
 ) -> Result<PreHopr<Chain, Graph, Net, Ct>, HoprLibError>
 where
-    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -506,9 +521,15 @@ where
     // First, so it is in the log even when the configuration or the chain fails below.
     log_startup(&ctx);
     ctx.cfg.validate()?;
+    #[cfg(feature = "state-dump")]
     let state_dump_config = StateDumpConfig::from_env().map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
+    #[cfg(feature = "state-dump")]
     let state_dump_counters = state_dump_config.interval().map(|_| IntervalCounters::default());
+    #[cfg(feature = "state-dump")]
     let transport_observer = state_dump_counters.clone().map(crate::state_dump::transport_observer);
+
+    #[cfg(not(feature = "state-dump"))]
+    let transport_observer = None;
 
     let network_tuning = crate::helpers::NetworkTuningReport::collect();
     tracing::info!(?network_tuning, "OS network tuning specs");
@@ -840,6 +861,7 @@ where
         processes.insert(HoprLibProcess::ChannelEvents, hopr_utils::spawn_as_abortable!(proc));
     }
 
+    #[cfg(feature = "state-dump")]
     if state_dump_config.interval().is_some() {
         let collector = ctx.state_dump_sections.iter().fold(
             Collector::new(
@@ -1232,7 +1254,7 @@ macro_rules! impl_build_methods {
 #[cfg(feature = "session-server")]
 impl<Chain, Graph, Net, Ct> HoprBuilderWithSession<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1254,7 +1276,7 @@ where
 #[cfg(not(feature = "session-server"))]
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct>
 where
-    Chain: HoprChainApi + StateRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
     Graph: HoprGraphApi<HoprNodeId = hopr_api::OffchainPublicKey> + Clone + Send + Sync + 'static,
     <Graph as hopr_api::graph::NetworkGraphTraverse>::Observed:
         hopr_api::graph::traits::EdgeObservableRead + Send + 'static,
@@ -1307,6 +1329,7 @@ mod tests {
         String::from_utf8(buffer.0.lock().clone()).context("logs should be UTF-8")
     }
 
+    #[cfg(feature = "state-dump")]
     #[test]
     fn state_dump_sections_are_lazy_and_keep_their_names_and_shared_state() -> anyhow::Result<()> {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1410,10 +1433,10 @@ mod tests {
     #[serial_test::serial(state_dump_env)]
     #[case::disabled("0", true)]
     #[case::enabled("5", true)]
-    #[case::too_short("4", false)]
-    #[case::too_long("86401", false)]
-    #[case::malformed("invalid", false)]
-    fn state_dump_interval_is_validated_before_component_factories(
+    #[case::too_short("4", cfg!(not(feature = "state-dump")))]
+    #[case::too_long("86401", cfg!(not(feature = "state-dump")))]
+    #[case::malformed("invalid", cfg!(not(feature = "state-dump")))]
+    fn state_dump_interval_validation_matches_the_feature(
         #[case] interval: &str,
         #[case] valid: bool,
     ) -> anyhow::Result<()> {
@@ -1495,6 +1518,7 @@ mod tests {
         }
         Ok(())
     }
+    #[cfg(feature = "state-dump")]
     #[test]
     fn state_dump_sections_survive_component_factory_changes() {
         let configured = HoprBuilder

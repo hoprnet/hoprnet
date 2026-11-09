@@ -1,7 +1,7 @@
 //! Connects the transport's events to the periodic state dump of `hopr-chain-connector`.
 //!
-//! The transport only reports [`TransportEvent`]s and knows nothing about the dump. This is the one
-//! place that knows both sides.
+//! The transport only reports [`TransportEvent`](hopr_transport::TransportEvent)s and knows nothing
+//! about the dump. This is the one place that knows both sides.
 use std::sync::Arc;
 
 pub use hopr_chain_connector::state_dump::SectionValue;

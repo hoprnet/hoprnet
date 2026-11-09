@@ -76,6 +76,8 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
+# Opt-in periodic operational state snapshots and transport counters.
+state-dump = ["dep:hopr-chain-connector"]
 default = ["pix-bjj", "transport-announce-quic"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
@@ -200,7 +202,7 @@ hopr-transport = { workspace = true }
 
 hopr-ticket-manager = { workspace = true, optional = true }
 hopr-transport-p2p = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true }
+hopr-chain-connector = { workspace = true, optional = true }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
 
@@ -253,4 +255,4 @@ ignored = ["humantime-serde"]
 
 [[test]]
 name = "state_dump"
-required-features = ["testing"]
+required-features = ["testing", "state-dump"]

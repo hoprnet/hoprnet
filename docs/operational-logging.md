@@ -1,7 +1,7 @@
 # Operational logging
 
-A configured Hopr node starts one managed periodic state reporter after account
-readiness. `HOPR_STATE_DUMP_INTERVAL` is integer seconds: default 60, `0` disables
+With the opt-in `hopr-lib/state-dump` Cargo feature enabled, a configured Hopr node
+starts one managed periodic state reporter after account readiness. `HOPR_STATE_DUMP_INTERVAL` is integer seconds: default 60, `0` disables
 reporting and producer counters, and enabled values must be 5–86400. Invalid values
 fail startup with a configuration error. The task is owned by the node's abortable
 process list and is cancelled with the other node tasks.
@@ -36,8 +36,8 @@ Probe counters register when probing starts and count matched replies or actual
 expiries; unknown/late replies do not count a second time. Unavailable inputs remain
 distinct from genuine zero activity.
 
-Custom chain implementations used with the node builder must implement the
-connector's error-preserving `StateRead` diagnostic interface. Custom transport
+With `state-dump` enabled, custom chain implementations used with the node builder
+must implement the connector's error-preserving `StateRead` diagnostic interface. Custom transport
 embedders can pass their own observer to `HoprTransport::new_with_observer`;
 `HoprTransport::new` reports nothing.
 
@@ -57,14 +57,17 @@ are capped at eight destinations, with an omitted count. TRACE requires a build 
 retains that static level.
 
 Connector and graph crates are sourced from the hopr-impls CORE-1168 Git branch;
-Cargo.lock pins the resolved revision. No sibling checkout is needed. The connector's
-`state_dump` module is always compiled; reporting is controlled at runtime by
-`HOPR_STATE_DUMP_INTERVAL`, with `0` disabling it. No `state-dump` Cargo feature is needed.
+Cargo.lock pins the resolved revision. No sibling checkout is needed. The `hopr-lib`
+`state_dump` integration is compiled only with the `hopr-lib/state-dump` feature,
+which is disabled by default. Without it, no reporter or counters are attached, the
+interval environment variable is ignored, and custom chains need no diagnostic
+`StateRead` implementation. With the feature enabled, `HOPR_STATE_DUMP_INTERVAL=0`
+disables reporting at runtime.
 When the companion crates are released, remove both `[patch.crates-io]` overrides
 (or pin a fixed `rev` after the companion PR merges) and update this source description.
 
-The `state_dump` integration test runs enabled/disabled configurations in isolated
-processes. It verifies real INFO records from an emulated node cluster with channel
+Run the `state_dump` integration test with `--features testing,state-dump`. It runs
+runtime enabled/disabled configurations in isolated processes. It verifies real INFO records from an emulated node cluster with channel
 inventory, a routed echo session, routing/search/SURB/probe activity, continuing
 periodic emission, and the payload budget. This complements unit tests for cache
 hits, failed searches, probe expiry and independent SURB counter windows. Live
