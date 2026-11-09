@@ -514,7 +514,7 @@ where
                     valid_paths.push((vp, selection_weight(&pwc, hops, weighting)));
                     path_metrics.push(pwc);
                 }
-                Err(e) => tracing::trace!(kind, error = %e, "path candidate failed validation"),
+                Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
             }
         }
 
