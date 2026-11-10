@@ -682,6 +682,11 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// Warning per drop would reproduce the per-packet log spam these quiet drops exist to remove.
 const FULL_QUEUE_WARN_INTERVAL: usize = 256;
 
+/// Whether the drop that saw `drops_so_far` prior full-queue drops is the one that logs.
+fn is_full_queue_warn_due(drops_so_far: usize) -> bool {
+    drops_so_far.is_multiple_of(FULL_QUEUE_WARN_INTERVAL)
+}
+
 /// Ceiling on the per-session term of [`start_protocol_channel_capacity`].
 ///
 /// A session contributes to this channel only while its Start exchange is in flight — a handful of
@@ -6529,7 +6534,7 @@ where
                     Err(crossfire::TrySendError::Full(_)) => {
                         let prev = crate::counters::START_PROTOCOL_SEND_DROPS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        if prev.is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
+                        if is_full_queue_warn_due(prev) {
                             warn!(
                                 %pseudonym,
                                 total_start_queue_full_drops = prev + 1,
@@ -6595,7 +6600,7 @@ where
                     Err(crossfire::TrySendError::Full(_)) => {
                         let prev =
                             crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        if prev.is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
+                        if is_full_queue_warn_due(prev) {
                             warn!(%session_id, total_inbox_full_drops = prev + 1, "session inbox full, dropping data (backpressure)");
                         }
                         #[cfg(all(feature = "telemetry", not(test)))]
@@ -15815,51 +15820,23 @@ mod tests {
         Ok(())
     }
 
-    /// The rate-limited WARN is only due every `FULL_QUEUE_WARN_INTERVAL` drops, so the count is
-    /// seeded here rather than left to whatever other tests happened to leave behind.
-    #[test_log::test(tokio::test)]
-    async fn a_full_start_queue_warns_once_per_interval() -> anyhow::Result<()> {
-        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
-            maximum_sessions: 1,
-            ..Default::default()
-        });
-
-        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
-        // it from being seen as closed.
-        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
-        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
-        mgr.start(sender.clone(), new_session_tx, None, None)?;
-
-        let capacity = start_protocol_channel_capacity(&mgr.cfg);
-        let live = HoprPseudonym::random();
-        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
-
-        // Fill the queue so the next send is the one that drops.
-        for _ in 0..capacity {
-            mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
-        }
-
-        // Put the counter one below a multiple so this drop is the WARN, whatever ran before.
-        crate::counters::START_PROTOCOL_SEND_DROPS
-            .store(FULL_QUEUE_WARN_INTERVAL - 1, std::sync::atomic::Ordering::Relaxed);
+    /// The WARN is due on the first drop of each interval, and only then.
+    ///
+    /// Pure, so it needs no dispatch and cannot race the process-global counter other tests bump.
+    #[test]
+    fn the_full_queue_warn_is_due_once_per_interval() {
+        let due: Vec<usize> = (0..=2 * FULL_QUEUE_WARN_INTERVAL)
+            .filter(|&prev| is_full_queue_warn_due(prev))
+            .collect();
         assert_eq!(
-            crate::counters::start_protocol_send_drop_count(),
-            FULL_QUEUE_WARN_INTERVAL - 1,
-            "the seed must land one below the interval"
-        );
-        let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
-        assert_eq!(
-            crate::counters::start_protocol_send_drop_count(),
-            FULL_QUEUE_WARN_INTERVAL,
-            "the seeded drop must be the one that crosses the interval"
+            due,
+            vec![0, FULL_QUEUE_WARN_INTERVAL, 2 * FULL_QUEUE_WARN_INTERVAL],
+            "the first drop and then one per interval must log"
         );
         assert!(
-            matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull)),
-            "the queue must be full at this point, got {outcome:?}"
+            !is_full_queue_warn_due(FULL_QUEUE_WARN_INTERVAL - 1),
+            "the drop just before an interval boundary must stay quiet"
         );
-
-        sender.close_channel();
-        Ok(())
     }
 
     /// A dispatch before `start()` is a programming error, not a benign drop: the queue is unset and
