@@ -52,9 +52,10 @@ use std::{
 /// until the next completion or loss. A socket calls all three from its one sequentially polled stream
 /// chain, which is that single writer. A reader that catches a writer midway sees a stall begin or end
 /// one update late, no worse.
-#[derive(Debug)]
+#[derive(Debug, smart_default::SmartDefault)]
 pub struct FrameLossSignal {
     /// The instant the millisecond stamps below count from.
+    #[default(Instant::now())]
     origin: Instant,
     /// When a frame was last lost, in milliseconds since [`origin`](Self::origin) plus one, so that
     /// `0` means "never". A sentinel rather than an `Option` in an atomic.
@@ -70,23 +71,10 @@ pub struct FrameLossSignal {
     stalled_since_ms: AtomicU64,
 }
 
-impl Default for FrameLossSignal {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FrameLossSignal {
     /// Creates a signal that has observed no loss yet.
     pub fn new() -> Self {
-        Self {
-            origin: Instant::now(),
-            last_loss_ms: AtomicU64::new(0),
-            lost_total: AtomicU64::new(0),
-            highest_frame_id: AtomicU32::new(0),
-            frames_started: AtomicU32::new(0),
-            stalled_since_ms: AtomicU64::new(0),
-        }
+        Self::default()
     }
 
     /// Milliseconds since [`origin`](Self::origin), plus one so that a stamp is never `0`.
@@ -161,11 +149,7 @@ impl FrameLossSignal {
     /// commonly stops because nothing comes back, and the frames' timeouts end the stall as a loss.
     pub fn stalled_for(&self, after: Duration) -> bool {
         let since = self.stalled_since_ms.load(Ordering::Relaxed);
-        if since == 0 {
-            return false;
-        }
-        let after = u64::try_from(after.as_millis()).unwrap_or(u64::MAX);
-        self.stamp().saturating_sub(since) >= after
+        since != 0 && self.stamp().saturating_sub(since) >= u64::try_from(after.as_millis()).unwrap_or(u64::MAX)
     }
 }
 
