@@ -35,11 +35,12 @@ default = ["pix-bjj", "p2p-announce-quic"]
 # for one role does not carry the packet processing of the others. None of them is a default: role
 # selection is the consumer's decision, and `hopr-lib` turns on exactly the role its entity needs.
 #
-# `relay` keeps the full ticket and incoming-acknowledgement pipeline. `entry` is a source node and
-# admits no incoming Sessions. `exit` is a destination node: it accepts incoming Sessions and keeps
-# the incoming-acknowledgement pipeline for PIX, but processes no tickets.
+# The three roles are the basic functional division: `edge` (a source node that admits no incoming
+# Sessions), `relay` (the full ticket and incoming-acknowledgement pipeline) and `exit` (a
+# destination node: it accepts incoming Sessions and keeps the acknowledgement pipeline for PIX, but
+# processes no tickets).
 relay = []
-entry = ["session-client"]
+edge = ["session-client"]
 exit = ["session-server"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
 # Session API. `session-server` implies `session-client` because both are served by one manager and
@@ -73,7 +74,7 @@ testing = [
   "dep:hopr-chain-connector",
   "dep:hopr-ticket-manager",
   "dep:tokio",
-  "entry",
+  "edge",
   "exit",
   "relay",
   "hopr-utils/runtime-tokio",

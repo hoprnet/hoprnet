@@ -318,15 +318,16 @@
 
             # One library build per entity. Each is the `hopr-lib` artifact a binary for that role
             # links, built from exactly that entity's feature set, so CI compiles the fence in every
-            # combination the entity documentation promises rather than only the default one.
+            # combination the entity documentation promises rather than only the default one. The
+            # basic division is edge <-> relay <-> exit, with `raw-exit` as the non-relaying exit.
             #
             # The PIX curve and the announcement transport are network-wide choices, not entity
             # ones, so each set states them explicitly here: the crate defaults carry them, and
             # `--no-default-features` would otherwise drop them.
-            library-client = rust-builder-local.callPackage nixLib.mkRustPackage (
+            library-edge = rust-builder-local.callPackage nixLib.mkRustPackage (
               libraryBuildArgs
               // {
-                cargoExtraArgs = "--no-default-features -F client,pix-bjj,transport-announce-quic";
+                cargoExtraArgs = "--no-default-features -F edge,pix-bjj,transport-announce-quic";
               }
             );
 
@@ -337,7 +338,7 @@
               }
             );
 
-            library-edge-exit = rust-builder-local.callPackage nixLib.mkRustPackage (
+            library-exit = rust-builder-local.callPackage nixLib.mkRustPackage (
               libraryBuildArgs
               // {
                 cargoExtraArgs = "--no-default-features -F exit,pix-bjj,transport-announce-quic";

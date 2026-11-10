@@ -261,7 +261,7 @@ jobs:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
-            nix build -L .#library-client .#library-relay .#library-edge-exit .#library-raw-exit
+            nix build -L .#library-edge .#library-relay .#library-exit .#library-raw-exit
             nix develop -c bash scripts/check-entity-fencing.sh
 
   # Single aggregate merge gate: green only if every other job in this run

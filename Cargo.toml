@@ -4,8 +4,8 @@ resolver = "2"
 
 members = [
   "crypto/packet",
-  "hopr/hopr-client",
-  "hopr/hopr-edge-exit",
+  "hopr/hopr-edge",
+  "hopr/hopr-exit",
   "hopr/hopr-lib",
   "hopr/hopr-relay",
   "protocols/app",

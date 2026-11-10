@@ -4236,13 +4236,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-client"
-version = "0.1.0"
-dependencies = [
- "hopr-lib",
-]
-
-[[package]]
 name = "hopr-crypto-packet"
 version = "2.2.0"
 dependencies = [
@@ -4288,7 +4281,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-edge-exit"
+name = "hopr-edge"
+version = "0.1.0"
+dependencies = [
+ "hopr-lib",
+]
+
+[[package]]
+name = "hopr-exit"
 version = "0.1.0"
 dependencies = [
  "hopr-lib",

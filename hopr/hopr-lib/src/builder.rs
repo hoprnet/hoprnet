@@ -6,7 +6,7 @@
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
 //! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for an entry/exit node or `build_full` for a relay node with ticket management.
+//! 5. **Build** — `build_edge` for the source edge, `build_relay` for a relay, `build_exit` for a non-relaying exit.
 //!
 //! # Example
 //!
@@ -194,9 +194,9 @@ impl HoprBuilderWithIdentity {
 ///
 /// When the `session-server` feature is enabled, `with_session_server`
 /// must be called before building — it returns a `HoprBuilderWithSession` which
-/// has the `build_edge` / `build_full` methods.
+/// has the `build_edge` / `build_relay` / `build_exit` methods.
 ///
-/// When the feature is disabled, `build_edge` / `build_full` are available directly.
+/// When the feature is disabled, `build_edge` / `build_relay` are available directly.
 pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     ctx: BuildCtx,
     safe_and_module: Option<(Address, Address)>,
@@ -287,7 +287,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// Attaches a session server for handling incoming sessions.
     ///
     /// Eagerly spawns the server task and returns a [`HoprBuilderWithSession`]
-    /// that has the `build_edge` / `build_full` methods.
+    /// that has the `build_edge` / `build_relay` / `build_exit` methods.
     ///
     /// Two tasks are spawned, not one, because the server is consulted at two different points in a
     /// Session's life. `admit` is asked while the peer's request is still being negotiated and no
@@ -390,7 +390,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
 // HoprBuilderWithSession — session server attached, ready to build
 // ---------------------------------------------------------------------------
 
-/// Builder with a session server attached. Has `build_edge` / `build_full`.
+/// Builder with a session server attached. Has `build_edge` / `build_relay` / `build_exit`.
 ///
 /// Only exists when the `session-server` feature is enabled.
 #[cfg(feature = "session-server")]
@@ -932,11 +932,10 @@ fn into_hopr<Chain, Graph, Net, TMgr>(
 
 macro_rules! impl_build_methods {
     () => {
-        /// Shared body of the source-node builds.
+        /// Body of the source-node build.
         ///
-        /// `build_edge` and `build_entry` used to be two copies of the same body that differed only
-        /// in a log line; both run the Entry transport role.
-        #[cfg(feature = "client")]
+        /// Shared, not duplicated: the entity is one role, so there is one body and one log line.
+        #[cfg(feature = "edge")]
         async fn build_source<TFact>(
             self,
             ticket_factory: TFact,
@@ -951,7 +950,7 @@ macro_rules! impl_build_methods {
             tracing::info!("{}", starting_log);
             let (socket, transport_processes) = pre
                 .transport_api
-                .run_entry(
+                .run_edge(
                     cover_traffic,
                     network,
                     network_process,
@@ -969,11 +968,11 @@ macro_rules! impl_build_methods {
             Ok(into_hopr(pre, processes, (), started_log))
         }
 
-        /// Builds an entry (source) [`Hopr`] node.
+        /// Builds an edge (source) [`Hopr`] node.
         ///
-        /// Entry nodes do not process tickets, do not have ticket manager state,
-        /// and do not accept incoming sessions. This is the `client` entity.
-        #[cfg(feature = "client")]
+        /// Edge nodes do not process tickets, do not have ticket manager state, and do not accept
+        /// incoming sessions. This is the `edge` entity.
+        #[cfg(feature = "edge")]
         pub async fn build_edge<TFact>(
             self,
             ticket_factory: TFact,
@@ -983,27 +982,8 @@ macro_rules! impl_build_methods {
         {
             self.build_source(
                 ticket_factory,
-                "starting transport for edge (entry) node",
+                "starting transport for edge node",
                 "EDGE NODE STARTED AND RUNNING",
-            )
-            .await
-        }
-
-        /// Builds an entry (source) [`Hopr`] node.
-        ///
-        /// Kept as a second name for [`Self::build_edge`]: both build the same Entry role.
-        #[cfg(feature = "client")]
-        pub async fn build_entry<TFact>(
-            self,
-            ticket_factory: TFact,
-        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
-        where
-            TFact: TicketFactory + Clone + Send + Sync + 'static,
-        {
-            self.build_source(
-                ticket_factory,
-                "starting transport for entry node",
-                "ENTRY NODE STARTED AND RUNNING",
             )
             .await
         }
@@ -1059,9 +1039,9 @@ macro_rules! impl_build_methods {
             Ok(into_hopr(pre, processes, (), "EXIT NODE STARTED AND RUNNING"))
         }
 
-        /// Builds a full (relay) [`Hopr`] node.
+        /// Builds a relay [`Hopr`] node.
         #[cfg(feature = "relay")]
-        pub async fn build_full<TMgr, TFact>(
+        pub async fn build_relay<TMgr, TFact>(
             self,
             ticket_manager: TMgr,
             ticket_factory: TFact,
@@ -1199,7 +1179,7 @@ macro_rules! impl_build_methods {
             spawn(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-            let hopr = into_hopr(pre, processes, ticket_manager, "FULL NODE STARTED AND RUNNING");
+            let hopr = into_hopr(pre, processes, ticket_manager, "RELAY NODE STARTED AND RUNNING");
 
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_HOPR_NODE_INFO.set(

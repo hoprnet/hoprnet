@@ -1,5 +1,5 @@
 [package]
-name = "hopr-edge-exit"
+name = "hopr-exit"
 description = "The HOPR exit entity: an Exit node that terminates Sessions and relays with full ticket processing"
 version = "0.1.0"
 edition.workspace = true

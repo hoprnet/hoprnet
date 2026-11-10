@@ -19,7 +19,7 @@ use crate::{
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
-pub type FullHopr<
+pub type RelayHopr<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
@@ -90,7 +90,7 @@ where
         })
 }
 
-/// Builds an edge (entry/exit) HOPR node with a custom chain connector.
+/// Builds an edge (source) HOPR node with a custom chain connector.
 pub async fn build_edge_with_chain<
     Chain,
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
@@ -130,8 +130,8 @@ where
     Ok(Arc::new(node))
 }
 
-/// Builds a full relay HOPR node with a custom chain connector.
-pub async fn build_full_with_chain<
+/// Builds a relay HOPR node with a custom chain connector.
+pub async fn build_relay_with_chain<
     Chain,
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
@@ -145,7 +145,7 @@ pub async fn build_full_with_chain<
     probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<FullHopr<Chain>>>
+) -> anyhow::Result<Arc<RelayHopr<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -167,51 +167,8 @@ where
 
     let node = builder
         .with_session_server(server)
-        .build_full(ticket_manager, ticket_factory)
+        .build_relay(ticket_manager, ticket_factory)
         .await?;
-
-    Ok(Arc::new(node))
-}
-
-/// Builds an entry HOPR node with a custom chain connector.
-///
-/// Entry nodes do not process tickets, do not have ticket manager state,
-/// and do not accept incoming sessions.
-pub async fn build_entry_with_chain<
-    Chain,
-    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
->(
-    chain_key: &ChainKeypair,
-    packet_key: &OffchainKeypair,
-    config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
-    chain_connector: Chain,
-    server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
-where
-    Chain: HoprChainApi + Clone + Send + Sync + 'static,
-{
-    if let Some(ref pcfg) = probe_cfg {
-        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
-    }
-
-    let ticket_factory = ticket_factory_from_chain(&chain_connector, RedbStore::new_temp()?)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
-
-    let builder = make_builder(
-        chain_key,
-        packet_key,
-        config,
-        probe_cfg.unwrap_or_default(),
-        chain_connector,
-    );
-
-    let node = builder.with_session_server(server).build_entry(ticket_factory).await?;
 
     Ok(Arc::new(node))
 }

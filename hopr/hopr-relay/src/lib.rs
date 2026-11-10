@@ -1,7 +1,8 @@
 //! The HOPR **relay** entity.
 //!
 //! A pure relay forwards packets and runs the full ticket and acknowledgement path, and nothing
-//! else: it is the `relay` feature set of [`hopr_lib`], which is what this crate is built with.
+//! else: it is the `relay` feature set of [`hopr_lib`], one leg of the edge <-> relay <-> exit
+//! division, which is what this crate is built with.
 //! The Session stack — client API, Session server, incoming-Session admission, and the Session
 //! manager's wiring — is behind a `cfg` in `hopr-lib` and `hopr-transport`, so a relay binary
 //! constructs none of it; the `hopr-transport-session` crate those types come from is still

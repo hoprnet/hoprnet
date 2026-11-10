@@ -8,7 +8,9 @@
 # requires `cargo check` to reject it.
 #
 # Usage: scripts/check-entity-fencing.sh [entity ...]
-#   Without arguments it checks every entity. Entities: client, relay, exit, raw-exit.
+#   Without arguments it checks every entity. Entities: edge, relay, exit, raw-exit — the basic
+#   division is edge <-> relay <-> exit, and `raw-exit` is the same Session server without the
+#   relay's ticket processing.
 #
 # The fixture crates live in a temporary directory and are their own workspaces, so they resolve
 # `hopr-lib` through the same path dependency this repository uses. They share the workspace target
@@ -84,20 +86,20 @@ expect_present() {
   echo "ok: hopr-lib builds with features [$features]"
 }
 
-check_client() {
-  # A pure client relays nothing and admits no Sessions.
-  expect_present client
-  expect_absent client "build_full" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilder::build_full; }'
-  expect_absent client "HoprTransport::run_relay" \
+check_edge() {
+  # An edge relays nothing and admits no Sessions.
+  expect_present edge
+  expect_absent edge "build_relay" \
+    'pub fn f() { let _ = hopr_lib::builder::HoprBuilder::build_relay; }'
+  expect_absent edge "HoprTransport::run_relay" \
     'pub fn f() { let _ = hopr_lib::exports::transport::HoprTransport::run_relay; }'
-  expect_absent client "HoprLibConfig::out_index_sync_period" \
+  expect_absent edge "HoprLibConfig::out_index_sync_period" \
     'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
-  expect_absent client "with_session_server" \
+  expect_absent edge "with_session_server" \
     'pub fn f() { let _ = hopr_lib::builder::HoprBuilderConfigured::with_session_server; }'
-  expect_absent client "HoprBuilderWithSession" \
+  expect_absent edge "HoprBuilderWithSession" \
     'pub fn f() -> Option<hopr_lib::builder::HoprBuilderWithSession> { None }'
-  expect_absent client "HoprLibConfig::incoming_session_capacity" \
+  expect_absent edge "HoprLibConfig::incoming_session_capacity" \
     'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { incoming_session_capacity: 1, ..Default::default() } }'
 }
 
@@ -116,7 +118,7 @@ check_relay() {
 
 check_exit() {
   # The relaying exit keeps both the relay's ticket path and the Session server, but still has no
-  # source-node role.
+  # source (edge) role.
   expect_present exit
   expect_absent exit "build_edge" \
     'pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_edge; }'
@@ -125,8 +127,8 @@ check_exit() {
 check_raw_exit() {
   # The raw exit is a Session server without ticket processing.
   expect_present raw-exit
-  expect_absent raw-exit "build_full" \
-    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_full; }'
+  expect_absent raw-exit "build_relay" \
+    'pub fn f() { let _ = hopr_lib::builder::HoprBuilderWithSession::build_relay; }'
   expect_absent raw-exit "HoprLibConfig::out_index_sync_period" \
     'pub fn f() -> hopr_lib::config::HoprLibConfig { hopr_lib::config::HoprLibConfig { out_index_sync_period: core::time::Duration::from_secs(1), ..Default::default() } }'
   expect_absent raw-exit "HoprTransport::run_relay" \
@@ -135,17 +137,17 @@ check_raw_exit() {
 
 entities=("$@")
 if [ ${#entities[@]} -eq 0 ]; then
-  entities=(client relay exit raw-exit)
+  entities=(edge relay exit raw-exit)
 fi
 
 for entity in "${entities[@]}"; do
   case "$entity" in
-  client) check_client ;;
+  edge) check_edge ;;
   relay) check_relay ;;
   exit) check_exit ;;
   raw-exit) check_raw_exit ;;
   *)
-    echo "unknown entity: $entity (expected one of client, relay, exit, raw-exit)" >&2
+    echo "unknown entity: $entity (expected one of edge, relay, exit, raw-exit)" >&2
     exit 2
     ;;
   esac

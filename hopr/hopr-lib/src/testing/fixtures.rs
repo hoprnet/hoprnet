@@ -831,7 +831,7 @@ fn cluster_fixture_inner(
                         surb_balance_notify_period,
                     );
 
-                    let instance = crate::testing::wiring::build_full_with_chain(
+                    let instance = crate::testing::wiring::build_relay_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -907,7 +907,7 @@ enum RawRoleNode {
         TestingConnector,
     ),
     Relay(
-        Arc<crate::testing::wiring::FullHopr<TestingConnector>>,
+        Arc<crate::testing::wiring::RelayHopr<TestingConnector>>,
         TestingConnector,
     ),
     Exit(
@@ -936,7 +936,7 @@ pub struct RoleClusterGuard {
 
 /// Builds a role-typed cluster with one Entry, N Relays, and one Exit.
 ///
-/// Each node is built with the correct transport role (`run_entry` / `run_relay` / `run_exit`).
+/// Each node is built with the correct transport role (`run_edge` / `run_relay` / `run_exit`).
 /// Entry and Exit nodes use `()` as their ticket manager (no ticket processing).
 /// Relay nodes use `SharedTicketManager` (full ticket processing).
 ///
@@ -1069,7 +1069,7 @@ where
                     });
 
                     let node: anyhow::Result<RawRoleNode> = if is_entry {
-                        let instance = crate::testing::wiring::build_entry_with_chain(
+                        let instance = crate::testing::wiring::build_edge_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,
@@ -1091,7 +1091,7 @@ where
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))
                     } else {
-                        let instance = crate::testing::wiring::build_full_with_chain(
+                        let instance = crate::testing::wiring::build_relay_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,

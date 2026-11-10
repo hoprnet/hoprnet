@@ -76,18 +76,20 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-# Entity sets. Each selects exactly one node role, compiled in and fenced down into the components:
+# Entity sets. The node split's basic functional division is `edge` <-> `relay` <-> `exit`, and each
+# set compiles in exactly one of those, fenced down into the components:
 #
-# * `client`  — a source/entry node: establishes Sessions, relays nothing, admits none.
+# * `edge`    — a source node: establishes Sessions, relays nothing, admits none.
 # * `relay`   — a pure relay: full ticket and acknowledgement processing, no Session stack.
 # * `exit`    — the relaying exit: `relay` with the Session server, so it accepts and terminates
-#               Sessions. This is the "exit" entity of the node split.
-# * `raw-exit` — the non-relaying exit: the Session server without ticket processing.
+#               Sessions.
+# * `raw-exit` — the non-relaying exit: the same Session server without the relay's ticket
+#               processing.
 #
 # Like every Cargo feature the sets are additive, so nothing in Cargo stops a build from enabling
 # several of them (the `testing` utility feature below enables two); a node build still takes
 # exactly one. `default` carries `relay`, which is what the workspace and its tests build today.
-client = ["session-client", "hopr-transport/entry"]
+edge = ["session-client", "hopr-transport/edge"]
 relay = ["hopr-transport/relay"]
 exit = ["relay", "session-server", "hopr-transport/exit"]
 raw-exit = ["session-server", "hopr-transport/exit"]
@@ -154,7 +156,7 @@ utils_parallel = [] # utility parallelization functionality
 profiling = ["dep:pprof"]
 
 testing = [
-  "client",
+  "edge",
   "exit",
   "runtime-tokio",
   "dep:bytesize",

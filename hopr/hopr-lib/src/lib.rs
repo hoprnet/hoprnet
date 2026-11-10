@@ -14,9 +14,9 @@
 //! choice.
 // A build that enables no entity feature has no node to assemble, so the pieces that exist only to
 // build one are unused by design. Only that combination is affected; consumers that build a node
-// enable one of `client`, `relay`, `exit` or `raw-exit`.
+// enable one of `edge`, `relay`, `exit` or `raw-exit`.
 #![cfg_attr(
-    not(any(feature = "client", feature = "relay", feature = "exit", feature = "raw-exit")),
+    not(any(feature = "edge", feature = "relay", feature = "exit", feature = "raw-exit")),
     allow(dead_code, unused_imports, unused_variables)
 )]
 

@@ -1,6 +1,6 @@
 [package]
-name = "hopr-client"
-description = "The HOPR client entity: a source node that establishes Sessions and relays nothing"
+name = "hopr-edge"
+description = "The HOPR edge entity: a source node that establishes Sessions and relays nothing"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -32,4 +32,4 @@ explicit-path = ["hopr-lib/explicit-path"]
 profiling = ["hopr-lib/profiling"]
 
 [dependencies]
-hopr-lib = { workspace = true, default-features = false, features = ["client"] }
+hopr-lib = { workspace = true, default-features = false, features = ["edge"] }
