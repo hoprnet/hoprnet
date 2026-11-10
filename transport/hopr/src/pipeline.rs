@@ -335,6 +335,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     /// Attaches the ticket events sink. Required for Relay nodes (see
     /// [`HoprPacketPipelineBuilder::build_for_relay`]); ignored by Entry and Exit nodes.
     #[must_use]
+    #[cfg(feature = "relay")]
     pub fn with_ticket_events<TEvt2>(
         self,
         ticket_events: TEvt2,
@@ -366,6 +367,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     /// Optional: when not called, the builder defaults to [`NopExitAcknowledgementShareProcessor`]
     /// and a draining sink ([`futures::sink::drain`]).
     #[must_use]
+    #[cfg(any(feature = "relay", feature = "exit"))]
     pub fn with_exit_ack_share_processing<A2, SEvt2>(
         self,
         exit_ack_proc: A2,
@@ -564,6 +566,7 @@ where
 }
 
 // Terminal: Relay
+#[cfg(feature = "relay")]
 impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
@@ -667,6 +670,7 @@ where
     /// Builds the pipeline configured for an Entry node.
     ///
     /// The incoming acknowledgement pipeline is not started; ticket events (if any) are ignored.
+    #[cfg(feature = "entry")]
     pub fn build_for_entry(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,
@@ -709,6 +713,7 @@ where
     ///
     /// The incoming acknowledgement pipeline is started but its acknowledgements are drained
     /// (never forwarded to a ticket processor); ticket events (if any) are ignored.
+    #[cfg(feature = "exit")]
     pub fn build_for_exit(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,

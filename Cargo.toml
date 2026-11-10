@@ -4,7 +4,10 @@ resolver = "2"
 
 members = [
   "crypto/packet",
+  "hopr/hopr-client",
+  "hopr/hopr-edge-exit",
   "hopr/hopr-lib",
+  "hopr/hopr-relay",
   "protocols/app",
   "protocols/hopr",
   "protocols/pix",
@@ -41,6 +44,7 @@ order = [
   "hopr-lib",
   "hopr-utils-session",
 ]
+# The entity facades are internal and unpublished, so they are not in the publish order above.
 
 [workspace.dependencies]
 ahash = "0.8.12"
@@ -148,7 +152,10 @@ hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 hopr-crypto-packet = { version = "2.1.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "5.0.0-rc.5", path = "hopr/hopr-lib" }
+# Defaults are off here so a consumer picks the entity: the facades below enable exactly one role
+# set, and a default carried by the workspace entry could not be turned off. `utils-session` and
+# the facades each state what they need.
+hopr-lib = { version = "5.0.0-rc.5", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.2.0", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "6.4.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
@@ -159,7 +166,11 @@ hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-feature
 hopr-protocol-session = { version = "1.3.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "3.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.10.0" }
-hopr-transport = { version = "0.52.0", path = "transport/hopr" }
+# Defaults are off in the workspace entry so a consumer can choose them: node roles and the PIX
+# curve are build-wide decisions, and a default that cannot be turned off makes the role fence
+# meaningless. Consumers that want them list them explicitly (`hopr-lib` forwards its own
+# `pix-bjj` and `transport-announce-quic` features).
+hopr-transport = { version = "0.52.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.34.0", path = "transport/session", default-features = false }

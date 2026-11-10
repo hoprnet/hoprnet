@@ -316,6 +316,41 @@
               }
             );
 
+            # One library build per entity. Each is the `hopr-lib` artifact a binary for that role
+            # links, built from exactly that entity's feature set, so CI compiles the fence in every
+            # combination the entity documentation promises rather than only the default one.
+            #
+            # The PIX curve and the announcement transport are network-wide choices, not entity
+            # ones, so each set states them explicitly here: the crate defaults carry them, and
+            # `--no-default-features` would otherwise drop them.
+            library-client = rust-builder-local.callPackage nixLib.mkRustPackage (
+              libraryBuildArgs
+              // {
+                cargoExtraArgs = "--no-default-features -F client,pix-bjj,transport-announce-quic";
+              }
+            );
+
+            library-relay = rust-builder-local.callPackage nixLib.mkRustPackage (
+              libraryBuildArgs
+              // {
+                cargoExtraArgs = "--no-default-features -F relay,pix-bjj,transport-announce-quic";
+              }
+            );
+
+            library-edge-exit = rust-builder-local.callPackage nixLib.mkRustPackage (
+              libraryBuildArgs
+              // {
+                cargoExtraArgs = "--no-default-features -F exit,pix-bjj,transport-announce-quic";
+              }
+            );
+
+            library-raw-exit = rust-builder-local.callPackage nixLib.mkRustPackage (
+              libraryBuildArgs
+              // {
+                cargoExtraArgs = "--no-default-features -F raw-exit,pix-bjj,transport-announce-quic";
+              }
+            );
+
             # Build all workspace benchmarks without running them; copies binaries to $out/bin
             bench-build =
               (rust-builder-local.callPackage nixLib.mkRustPackage (libraryBuildArgs // { buildBench = true; }))

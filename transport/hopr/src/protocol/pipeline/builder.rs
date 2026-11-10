@@ -268,6 +268,7 @@ where
     ///
     /// Panics if [`PacketPipelineBuilder::with_ticket_processing`] was not called before this method.
     #[must_use]
+    #[cfg(feature = "relay")]
     pub fn build_for_relay(self) -> AbortableList<PacketPipelineProcesses> {
         let ticket_proc = self
             .ticket_proc
@@ -312,6 +313,7 @@ where
     /// [`PacketPipelineBuilder::with_ticket_processing`] or
     /// [`PacketPipelineBuilder::with_exit_ack_share_processing`] is ignored.
     #[must_use]
+    #[cfg(feature = "entry")]
     pub fn build_for_entry(self) -> AbortableList<PacketPipelineProcesses> {
         run_packet_pipeline_inner(
             NodeType::Entry,
@@ -354,6 +356,7 @@ where
     /// Any ticket processor or ticket events sink previously set via
     /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
     #[must_use]
+    #[cfg(feature = "exit")]
     pub fn build_for_exit(self) -> AbortableList<PacketPipelineProcesses> {
         run_packet_pipeline_inner(
             NodeType::Exit,

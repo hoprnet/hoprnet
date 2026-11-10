@@ -12,6 +12,14 @@
 //!
 //! For most of the practical use cases, the `hoprd` application should be a preferable
 //! choice.
+// A build that enables no entity feature has no node to assemble, so the pieces that exist only to
+// build one are unused by design. Only that combination is affected; consumers that build a node
+// enable one of `client`, `relay`, `exit` or `raw-exit`.
+#![cfg_attr(
+    not(any(feature = "client", feature = "relay", feature = "exit", feature = "raw-exit")),
+    allow(dead_code, unused_imports, unused_variables)
+)]
+
 /// Helper functions.
 mod helpers;
 
@@ -276,16 +284,18 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
 pub(crate) enum HoprLibProcess {
     #[strum(to_string = "transport: {0}")]
     Transport(HoprTransportProcess),
+    #[cfg(feature = "session-server")]
     #[strum(to_string = "session server providing the exit node session stream functionality")]
-    #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionServer,
+    #[cfg(feature = "session-server")]
     #[strum(to_string = "session server deciding the terms incoming sessions are admitted on")]
-    #[allow(dead_code)] // constructed only with feature = "session-server"
     SessionAdmission,
     #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
+    #[cfg(feature = "relay")]
     #[strum(to_string = "on received ticket event (winning or rejected)")]
     TicketEvents,
+    #[cfg(feature = "relay")]
     #[strum(to_string = "neglecting tickets on closed channels")]
     ChannelClosureNeglect,
 }

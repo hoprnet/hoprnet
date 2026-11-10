@@ -12,6 +12,14 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
+// A build that enables none of the node role features has no packet pipeline to select, so the
+// wires that would have fed it are unused by construction. Only that combination is affected; any
+// real build enables one of `relay`, `entry` or `exit`.
+#![cfg_attr(
+    not(any(feature = "relay", feature = "entry", feature = "exit")),
+    allow(dead_code, unused_imports, unused_mut, unused_variables, unreachable_code)
+)]
+
 /// Configuration of the [crate::HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
@@ -41,6 +49,7 @@ use std::{
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender, stream::select_with_strategy};
+#[cfg(any(feature = "relay", feature = "exit"))]
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
     Multiaddr, PeerId,
@@ -69,6 +78,7 @@ pub use hopr_protocol_hopr::{MIN_TRACKED_PACKETS, MemorySurbStore, SurbStore};
 /// until deposits stop happening at runtime.
 pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
+#[cfg(any(feature = "relay", feature = "exit"))]
 use hopr_protocol_pix::ShareResolution;
 /// Packet mixing API, re-exported whole so a consumer of the transport object can configure and
 /// inspect the mixer without pinning `hopr-transport-mixer` itself.
@@ -82,10 +92,11 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_session as session;
-use hopr_transport_session::{
-    AdmissionToken, AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox,
-    SessionManager, SessionManagerConfig, SurbAdmissionControl,
-};
+#[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+use hopr_transport_session::HoprSessionInPixEvent;
+#[cfg(feature = "session-client")]
+use hopr_transport_session::{AdmissionToken, DispatchResult, SessionManagerConfig, SurbAdmissionControl};
+use hopr_transport_session::{AgreedSsaQuota, HoprSessionOutPixEvent, PixToolbox, SessionManager};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
     IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
@@ -129,7 +140,9 @@ use hopr_api::{
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
+#[cfg(any(feature = "relay", feature = "exit"))]
 use hopr_crypto_packet::HoprShareResolution;
+#[cfg(any(feature = "relay", feature = "exit"))]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
@@ -157,13 +170,16 @@ lazy_static::lazy_static! {
 /// traffic far exceeds the reverse, since the Exit then drains almost nothing — turned every
 /// overshot SURB into an immediate eviction of the oldest entry. Under PIX that is a lost SSA share,
 /// not just a lost SURB, because a share reaches the reconstructor only when its SURB is used.
+#[cfg(feature = "session-client")]
 const SURB_BUFFER_TARGET_NUMERATOR: usize = 2;
+#[cfg(feature = "session-client")]
 const SURB_BUFFER_TARGET_DENOMINATOR: usize = 3;
 
 /// Largest SURB buffer target a Session may request, given the ring buffer capacity backing it.
 ///
 /// Kept strictly below `rb_capacity` so the balancer has somewhere to overshoot into before the
 /// ring buffer starts overwriting. See [`SURB_BUFFER_TARGET_NUMERATOR`].
+#[cfg(feature = "session-client")]
 const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
     // Saturating rather than wrapping: an operator-supplied capacity is only range-validated at the
     // low end, and the multiplication would otherwise overflow on an absurd value.
@@ -178,10 +194,12 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
 /// component. It is pure delegation: the manager already knows when a Session becomes established
 /// and when it is torn down, and the store already owns the sizing and the idempotency, so the
 /// adapter adds no policy of its own.
+#[cfg(feature = "session-client")]
 struct StoreSurbAdmission {
     store: MemorySurbStore,
 }
 
+#[cfg(feature = "session-client")]
 impl SurbAdmissionControl for StoreSurbAdmission {
     fn admit(&self, pseudonym: &SessionId, expected_surbs: usize) -> AdmissionToken {
         AdmissionToken::from_raw(self.store.admit(pseudonym, expected_surbs))
@@ -253,12 +271,16 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
+///
+/// Named whether or not the session stack is compiled, so the wiring below can pass an absent
+/// manager as `None` instead of carrying two signatures.
 type HoprSessionManager = SessionManager<CrossfireSink<(DestinationRouting, ApplicationDataOut)>>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
 /// The configurator does not prevent the Session from being closed
 /// or the Session manager from being dropped.
+#[cfg(feature = "session-client")]
 #[derive(Debug, Clone)]
 pub struct HoprSessionConfigurator {
     id: SessionId,
@@ -266,6 +288,7 @@ pub struct HoprSessionConfigurator {
     smgr: std::sync::Weak<HoprSessionManager>,
 }
 
+#[cfg(feature = "session-client")]
 impl HoprSessionConfigurator {
     /// [`SessionId`] of the session this object can configure.
     pub fn id(&self) -> &SessionId {
@@ -345,6 +368,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     /// SURB round-trip counters and per-relayer health, shared with the planner.
     surb_round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
     my_multiaddresses: Vec<Multiaddr>,
+    #[cfg(feature = "session-client")]
     smgr: Arc<HoprSessionManager>,
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
@@ -458,6 +482,10 @@ where
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
         // literal, and `HoprTransport` has no way to reach its own `smgr` mid-construction.
+        //
+        // A build without the session stack never reaches this: the manager is the one object that
+        // owns every Session on the node, so nothing else references it either.
+        #[cfg(feature = "session-client")]
         let smgr = Arc::new(SessionManager::new(SessionManagerConfig {
             frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                 .ok()
@@ -502,6 +530,7 @@ where
         // not — land in the store's quarantine class and are capped and expired like any
         // unauthenticated peer's (hoprnet#8515). The `let _ =` matches the seam's contract: the
         // manager is freshly constructed here, so nothing can have set it yet.
+        #[cfg(feature = "session-client")]
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
         }));
@@ -511,6 +540,7 @@ where
         // scope. Violating it does not break the node — quarantine still resolves the SURBs — but
         // the excess Sessions would silently fall back to the 16-SURB cap, so it is surfaced loudly
         // rather than left to be diagnosed from eviction metrics later.
+        #[cfg(feature = "session-client")]
         if cfg.packet.surb_store.admitted_max_pseudonyms < cfg.session.maximum_managed_sessions {
             tracing::error!(
                 admitted_max_pseudonyms = cfg.packet.surb_store.admitted_max_pseudonyms,
@@ -529,6 +559,7 @@ where
             path_planner,
             surb_round_trips,
             my_multiaddresses,
+            #[cfg(feature = "session-client")]
             smgr,
             chain_api: resolver,
             session_telemetry_tag_allocator,
@@ -546,6 +577,7 @@ where
     ///
     /// The Relay node may also opt in to allow itself to use the PIX protocol by setting
     /// the `exit_ack_share` if it wishes to also act as an Exit node.
+    #[cfg(feature = "relay")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run_relay<T, TFact, Ct, PixEvt>(
         &self,
@@ -555,8 +587,8 @@ where
         ticket_events: T,
         ticket_factory: TFact,
         exit_ack_share: Option<PixEvt>,
-        on_incoming_session: Sender<IncomingSession>,
-        on_session_admission: Option<SessionAdmissionSink>,
+        #[cfg(feature = "session-client")] on_incoming_session: Sender<IncomingSession>,
+        #[cfg(feature = "session-client")] on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -572,6 +604,12 @@ where
         PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
+        #[cfg(feature = "session-client")]
+        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) =
+            (Some(on_incoming_session), on_session_admission);
+        #[cfg(not(feature = "session-client"))]
+        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) = (None, None);
+
         self.run_inner(
             protocol::NodeType::Relay,
             cover_traffic,
@@ -580,8 +618,8 @@ where
             ticket_events,
             ticket_factory,
             exit_ack_share,
-            Some(on_incoming_session),
-            on_session_admission,
+            session_wiring.0,
+            session_wiring.1,
         )
         .await
     }
@@ -593,6 +631,7 @@ where
     ///
     /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
     /// to decrypt PIX shares.
+    #[cfg(feature = "exit")]
     #[allow(
         clippy::too_many_arguments,
         reason = "each argument is a distinct wiring point supplied by hopr-lib"
@@ -604,8 +643,8 @@ where
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
-        on_incoming_session: Sender<IncomingSession>,
-        on_session_admission: Option<SessionAdmissionSink>,
+        #[cfg(feature = "session-client")] on_incoming_session: Sender<IncomingSession>,
+        #[cfg(feature = "session-client")] on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -619,6 +658,12 @@ where
         PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
+        #[cfg(feature = "session-client")]
+        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) =
+            (Some(on_incoming_session), on_session_admission);
+        #[cfg(not(feature = "session-client"))]
+        let session_wiring: (Option<Sender<IncomingSession>>, Option<SessionAdmissionSink>) = (None, None);
+
         self.run_inner(
             protocol::NodeType::Exit,
             cover_traffic,
@@ -627,8 +672,8 @@ where
             futures::sink::drain(),
             ticket_factory,
             pix_events,
-            Some(on_incoming_session),
-            on_session_admission,
+            session_wiring.0,
+            session_wiring.1,
         )
         .await
     }
@@ -638,6 +683,7 @@ where
     /// Entry nodes do not process tickets, do not start the incoming acknowledgement
     /// pipeline, and do not accept incoming sessions — therefore, they require neither a
     /// `ticket_events` sink nor an `on_incoming_session` channel.
+    #[cfg(feature = "entry")]
     pub async fn run_entry<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
@@ -706,6 +752,11 @@ where
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
+
+        // Only a relay feeds packets to a ticket processor; the other roles take the sink for
+        // signature symmetry and read nothing from it.
+        #[cfg(not(feature = "relay"))]
+        let _ = &ticket_events;
 
         let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
             bounded_sink_channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
@@ -976,14 +1027,15 @@ where
         // Entry nodes get a bare-bones PixToolbox (share_generator + dummy
         // reconstructor) to handle SsaRequest, but do not use the
         // reconstructor for SSA recovery.
-        let pix_toolbox = match (role, exit_ack_share) {
+        let pix_toolbox: Option<PixToolbox> = match (role, exit_ack_share) {
+            #[cfg(feature = "exit")]
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let (pix_tools, pipeline_builder) = wire_exit_pix(
                     pipeline_builder,
                     ssa_generator.clone(),
                     ssa_reconstructor(&self.cfg.pix)?,
                     ssa_events,
-                    self.smgr.clone(),
+                    self.session_manager(),
                     &mut processes,
                 );
 
@@ -991,6 +1043,7 @@ where
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
+            #[cfg(feature = "relay")]
             (protocol::NodeType::Relay, None) => {
                 // Pure relay nodes do not participate in PIX — do not create a
                 // PixToolbox so the SessionManager rejects UsePIX
@@ -999,6 +1052,7 @@ where
                 processes.extend_from(pipeline_processes);
                 None
             }
+            #[cfg(feature = "relay")]
             (protocol::NodeType::Relay, Some(ref ssa_events)) => {
                 // A relay that also acts as an Exit (has exit_ack_share) needs
                 // a full PixToolbox to handle the PIX handshake — the same wiring as the
@@ -1008,7 +1062,7 @@ where
                     ssa_generator.clone(),
                     ssa_reconstructor(&self.cfg.pix)?,
                     ssa_events,
-                    self.smgr.clone(),
+                    self.session_manager(),
                     &mut processes,
                 );
 
@@ -1016,6 +1070,7 @@ where
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
+            #[cfg(feature = "entry")]
             (protocol::NodeType::Entry, Some(ref ssa_events)) => {
                 // Entry nodes need a bare-bones PixToolbox (share_generator only)
                 // to handle incoming SsaRequest messages from the Exit.
@@ -1048,11 +1103,17 @@ where
                 processes.extend_from(pipeline_builder.build_for_entry());
                 Some(pix_tools)
             }
+            // Role combinations are decided at compile time, so in a single-role build the role
+            // arm above can already cover every value this one would match.
+            #[allow(unreachable_patterns)]
             (_, None) => {
                 // Nodes without pix_events sink (no PIX configured at all)
                 let pipeline_processes = match role {
+                    #[cfg(feature = "relay")]
                     protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
+                    #[cfg(feature = "exit")]
                     protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
+                    #[cfg(feature = "entry")]
                     protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
                 };
                 processes.extend_from(pipeline_processes);
@@ -1061,35 +1122,46 @@ where
         };
 
         // ── Ssmgr startup ─────────────────────────────────────────────────
-        // Entry nodes don't accept incoming sessions, relay/exit nodes do.
-        let smgr_start_res = if role != protocol::NodeType::Entry {
-            self.smgr.start(
-                unresolved_routing_msg_tx.clone(),
-                on_incoming_session.ok_or_else(|| {
-                    HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
-                })?,
-                pix_toolbox,
-                on_session_admission,
-            )
-        } else {
-            // An Entry establishes Sessions rather than admitting them, so there is nothing to ask
-            // about even if the caller installed a session server.
-            self.smgr.start(
-                unresolved_routing_msg_tx.clone(),
-                futures::sink::drain(),
-                pix_toolbox,
-                None,
-            )
-        };
+        // Sources (Entry) don't accept incoming sessions, relay/exit nodes do.
+        //
+        // Absent without the session stack: a role that cannot run a Session has nothing for the
+        // manager to admit or establish, so neither the manager nor its processes exist.
+        #[cfg(feature = "session-client")]
+        {
+            let smgr_start_res = if role.accepts_incoming_sessions() {
+                self.smgr.start(
+                    unresolved_routing_msg_tx.clone(),
+                    on_incoming_session.ok_or_else(|| {
+                        HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
+                    })?,
+                    pix_toolbox,
+                    on_session_admission,
+                )
+            } else {
+                // An Entry establishes Sessions rather than admitting them, so there is nothing to ask
+                // about even if the caller installed a session server.
+                self.smgr.start(
+                    unresolved_routing_msg_tx.clone(),
+                    futures::sink::drain(),
+                    pix_toolbox,
+                    None,
+                )
+            };
 
-        smgr_start_res
-            .map_err(|_| HoprTransportError::Api("failed to start session manager".into()))?
-            .into_iter()
-            .enumerate()
-            .map(|(i, jh)| (HoprTransportProcess::SessionsManagement(i + 1), jh))
-            .for_each(|(k, v)| {
-                processes.insert(k, v);
-            });
+            smgr_start_res
+                .map_err(|_| HoprTransportError::Api("failed to start session manager".into()))?
+                .into_iter()
+                .enumerate()
+                .map(|(i, jh)| (HoprTransportProcess::SessionsManagement(i + 1), jh))
+                .for_each(|(k, v)| {
+                    processes.insert(k, v);
+                });
+        }
+
+        // Without the session stack nothing consumes the pieces above; keep them out of the
+        // unused-variable warnings rather than gating every producer of them.
+        #[cfg(not(feature = "session-client"))]
+        let _ = (pix_toolbox, on_incoming_session, on_session_admission);
         // -- periodic counter flush
         let flush_counters = self.counters.clone();
         let flush_graph = self.graph.clone();
@@ -1123,6 +1195,7 @@ where
         tracing::info!(?role, "starting surb round-trip flush task");
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
+        #[cfg(feature = "session-client")]
         let surb_flush_smgr = self.smgr.clone();
         let surb_flush_planner = self.path_planner.clone();
         #[cfg(feature = "telemetry")]
@@ -1135,6 +1208,7 @@ where
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
+                #[cfg(feature = "session-client")]
                 let mut invalid = std::collections::HashMap::new();
                 while ticks.next().await.is_some() {
                     let now_ms = hopr_utils::platform::time::native::current_time()
@@ -1168,6 +1242,9 @@ where
                     // `REFILL_PACING_SECS`) the paths can carry. The session is asked first: a session
                     // the manager no longer knows is only forgotten, its generation is not advanced
                     // (that would leave a stray entry in the store and log a bump for a closed session).
+                    #[cfg(not(feature = "session-client"))]
+                    let _ = reached;
+                    #[cfg(feature = "session-client")]
                     for pseudonym in reached {
                         if !surb_flush_smgr.on_counterparty_surbs_wiped(&pseudonym) {
                             surb_round_trips.forget_session(&pseudonym);
@@ -1185,17 +1262,21 @@ where
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
                     // told how many of those it holds, to replace them.
-                    let current = surb_round_trips.invalid();
-                    for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
-                        if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
-                            surb_round_trips.forget_session(&session);
-                        } else if !invalid.contains_key(&session) {
-                            tracing::info!(%session, count, share, "marking SURBs that cannot bring a reply home invalid");
-                        } else if share == 0.0 {
-                            tracing::info!(%session, "clearing invalid SURBs");
+                    #[cfg(feature = "session-client")]
+                    {
+                        let current = surb_round_trips.invalid();
+                        for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current)
+                        {
+                            if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
+                                surb_round_trips.forget_session(&session);
+                            } else if !invalid.contains_key(&session) {
+                                tracing::info!(%session, count, share, "marking SURBs that cannot bring a reply home invalid");
+                            } else if share == 0.0 {
+                                tracing::info!(%session, "clearing invalid SURBs");
+                            }
                         }
+                        invalid = current;
                     }
-                    invalid = current;
                 }
             }),
         );
@@ -1245,6 +1326,7 @@ where
         // and actively drain the stream; see hopr-lib builder for the reference drain.
         let (on_incoming_data_tx, on_incoming_data_rx) =
             bounded_sink_channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
+        #[cfg(feature = "session-client")]
         let smgr = self.smgr.clone();
         let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(
@@ -1253,40 +1335,50 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
-                        hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-                        // try_send); it never blocks. However, the crossfire stream that feeds
-                        // this loop does not participate in tokio's cooperative budget, so
-                        // `future::ready` — which is always Poll::Ready — would let this task
-                        // monopolize its worker thread under a saturated inbound queue (Processed
-                        // items are filtered to None before the fold's tx.send().await, the only
-                        // other suspension point on the hot path). Calling consume_budget() here
-                        // integrates this loop into tokio's coop scheduler: it is a cheap
-                        // thread-local decrement on the fast path and only actually yields
-                        // (~every 128 polls) when the budget is exhausted, giving co-located
-                        // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
-                        let result = match smgr.dispatch_message(pseudonym, data) {
-                            Ok(DispatchResult::Processed) => {
-                                tracing::trace!("message dispatch completed");
-                                None
+                        #[cfg(feature = "session-client")]
+                        let result = {
+                            hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
+                            // try_send); it never blocks. However, the crossfire stream that feeds
+                            // this loop does not participate in tokio's cooperative budget, so
+                            // `future::ready` — which is always Poll::Ready — would let this task
+                            // monopolize its worker thread under a saturated inbound queue (Processed
+                            // items are filtered to None before the fold's tx.send().await, the only
+                            // other suspension point on the hot path). Calling consume_budget() here
+                            // integrates this loop into tokio's coop scheduler: it is a cheap
+                            // thread-local decrement on the fast path and only actually yields
+                            // (~every 128 polls) when the budget is exhausted, giving co-located
+                            // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
+                            match smgr.dispatch_message(pseudonym, data) {
+                                Ok(DispatchResult::Processed) => {
+                                    tracing::trace!("message dispatch completed");
+                                    None
+                                }
+                                Ok(DispatchResult::Unrelated(data)) => {
+                                    tracing::trace!("unrelated message dispatch completed");
+                                    Some(data)
+                                }
+                                // Benign drop: the session's sink has closed, its inbox is momentarily
+                                // full (backpressure), or the session is already deregistered. Counted
+                                // in the session manager and logged quietly here so a departing
+                                // counterparty cannot spam ERROR once per in-flight packet.
+                                Ok(DispatchResult::Dropped(reason)) => {
+                                    tracing::trace!(?reason, "dropped session packet");
+                                    None
+                                }
+                                Err(error) => {
+                                    tracing::error!(%error, "error while dispatching packet in the session manager");
+                                    None
+                                }
                             }
-                            Ok(DispatchResult::Unrelated(data)) => {
-                                tracing::trace!("unrelated message dispatch completed");
-                                Some(data)
-                            }
-                            // Benign drop: the session's sink has closed, its inbox is momentarily
-                            // full (backpressure), or the session is already deregistered. Counted
-                            // in the session manager and logged quietly here so a departing
-                            // counterparty cannot spam ERROR once per in-flight packet.
-                            Ok(DispatchResult::Dropped(reason)) => {
-                                tracing::trace!(?reason, "dropped session packet");
-                                None
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, "error while dispatching packet in the session manager");
-                                None
-                            }
+                        };
+                        // Without the session stack nothing owns a Session, so every packet is
+                        // unrelated and passes straight through to the caller.
+                        #[cfg(not(feature = "session-client"))]
+                        let result = {
+                            let _ = pseudonym;
+                            Some(data)
                         };
                         async move {
                             hopr_utils::runtime::prelude::consume_budget().await;
@@ -1349,6 +1441,11 @@ where
         }
     }
 
+    /// Opens an outgoing Session towards `destination`.
+    ///
+    /// Absent without the `session-client` feature: a node that does not run Sessions has nothing
+    /// to open one with.
+    #[cfg(feature = "session-client")]
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn new_session(
         &self,
@@ -1365,6 +1462,23 @@ where
                 smgr: Arc::downgrade(&self.smgr),
             },
         ))
+    }
+
+    /// The node's Session manager, when the session stack is compiled in.
+    ///
+    /// Only the roles that resolve PIX shares reach for it.
+    ///
+    /// PIX share resolution and the incoming-packet dispatch have a manager to talk to only on such
+    /// a build; the wiring around them takes `None` and forwards the upper-layer events anyway.
+    #[cfg(all(feature = "session-client", any(feature = "relay", feature = "exit")))]
+    fn session_manager(&self) -> Option<Arc<HoprSessionManager>> {
+        Some(self.smgr.clone())
+    }
+
+    /// The node's Session manager, absent because the session stack is not compiled in.
+    #[cfg(all(not(feature = "session-client"), any(feature = "relay", feature = "exit")))]
+    fn session_manager(&self) -> Option<Arc<HoprSessionManager>> {
+        None
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -1520,6 +1634,10 @@ where
 
 /// Maps a fully recovered SSA into the downstream event that carries the recovered deposit
 /// key to the withdrawal strategy.
+///
+/// Only a role that resolves PIX shares reaches this in production; the test below exercises the
+/// mapping on every build.
+#[cfg_attr(not(any(feature = "relay", feature = "exit")), allow(dead_code))]
 pub(crate) fn recovered_ssa_to_pix_event(
     rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
 ) -> PixEvent {
@@ -1535,6 +1653,7 @@ pub(crate) fn recovered_ssa_to_pix_event(
 /// channel, so a session whose supervisor is busy backpressures its sender. All sessions share this
 /// one stream, so dispatching sequentially would let one such session hold up PIX progress — and
 /// therefore the pipelined next-SSA request — for every other session on the node.
+#[cfg(any(feature = "relay", feature = "exit"))]
 const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
 
 /// Maps a [`HoprSessionOutPixEvent`] into the upper-layer [`PixEvent`] carrying the deposit
@@ -1582,21 +1701,34 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
 
 /// Notifies the [`SessionManager`] about a single PIX share resolution and returns the
 /// upper-layer [`PixEvent`] it produces, if any.
-async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: HoprShareResolution) -> Option<PixEvent> {
+#[cfg(any(feature = "relay", feature = "exit"))]
+async fn dispatch_share_resolution(
+    smgr: Option<Arc<HoprSessionManager>>,
+    resolution: HoprShareResolution,
+) -> Option<PixEvent> {
+    // No manager means nothing owns a Session, so the resolution has no one to be reported to.
+    #[cfg(not(feature = "session-client"))]
+    let _ = smgr;
     match resolution {
         ShareResolution::RecoveredSsa(ssa_recovery_event) => {
-            if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id))
-                .await
+            #[cfg(feature = "session-client")]
+            if let Some(smgr) = smgr.as_ref()
+                && let Err(error) = smgr
+                    .dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id))
+                    .await
             {
                 tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
             }
             Some(recovered_ssa_to_pix_event(&ssa_recovery_event))
         }
         ShareResolution::AlmostRecoveredSsa(ssa_id) => {
-            if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
-                .await
+            #[cfg(not(feature = "session-client"))]
+            let _ = ssa_id;
+            #[cfg(feature = "session-client")]
+            if let Some(smgr) = smgr.as_ref()
+                && let Err(error) = smgr
+                    .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+                    .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch early SSA recovery event to the SessionManager");
             }
@@ -1611,13 +1743,15 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 %peer, %ssa_id, observed_total,
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
-            if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
-                    ssa_id,
-                    observed_total,
-                    peer,
-                })
-                .await
+            #[cfg(feature = "session-client")]
+            if let Some(smgr) = smgr.as_ref()
+                && let Err(error) = smgr
+                    .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+                        ssa_id,
+                        observed_total,
+                        peer,
+                    })
+                    .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
@@ -1635,9 +1769,11 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
             );
-            if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))
-                .await
+            #[cfg(feature = "session-client")]
+            if let Some(smgr) = smgr.as_ref()
+                && let Err(error) = smgr
+                    .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))
+                    .await
             {
                 tracing::trace!(%error, ssa_id = %progress.ssa_id, "recovery progress for an unsupervised session");
             }
@@ -1670,6 +1806,7 @@ fn ssa_reconstructor(cfg: &PixGlobalConfig) -> errors::Result<Arc<hopr_protocol_
 /// The one-slot channel carries only wake-ups, never resolutions. A full channel therefore means a
 /// wake-up is already pending and can be safely coalesced; the resolutions themselves remain in the
 /// reconstructor until this stream or the acknowledgement fallback atomically takes them.
+#[cfg(any(feature = "relay", feature = "exit"))]
 fn commitment_resolution_stream(
     ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
 ) -> impl futures::Stream<Item = HoprShareResolution> + Send + 'static {
@@ -1710,13 +1847,14 @@ fn commitment_resolution_stream(
 /// The caller keeps the terminal, so this returns the builder rather than the built processes.
 /// Only the `exit_ack_proc` and `ssa_events` type parameters change; the rest pass through
 /// untouched, which is why none of them carry bounds here.
+#[cfg(any(feature = "relay", feature = "exit"))]
 #[allow(clippy::type_complexity)]
 fn wire_exit_pix<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, PixEvt>(
     pipeline_builder: HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt>,
     ssa_generator: Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
     ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
     ssa_events: &PixEvt,
-    smgr: Arc<HoprSessionManager>,
+    smgr: Option<Arc<HoprSessionManager>>,
     processes: &mut AbortableList<HoprTransportProcess>,
 ) -> (
     PixToolbox,
@@ -1771,10 +1909,11 @@ where
 /// phase and whose counters are absolute rather than incremental. Of the events belonging to one
 /// cycle exactly one advances it and the rest are recognised as stale, whatever order they arrive
 /// in.
+#[cfg(any(feature = "relay", feature = "exit"))]
 fn pix_event_stream(
     session_pix_events: impl futures::Stream<Item = HoprSessionOutPixEvent> + Send + 'static,
     ssa_share_resolutions: impl futures::Stream<Item = HoprShareResolution> + Send + 'static,
-    smgr: Arc<HoprSessionManager>,
+    smgr: Option<Arc<HoprSessionManager>>,
 ) -> impl futures::Stream<Item = PixEvent> + Send + 'static {
     session_pix_events.map(session_pix_event_to_pix_event).merge(
         ssa_share_resolutions
