@@ -168,6 +168,18 @@ pub struct PathPlannerConfig {
     #[default(Duration::from_secs(30))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
+    /// Loops over an edge from which the share that returned, not a single returned loop, decides whether
+    /// its relay delivers (handed to the graph through `ChannelGraph::with_starvation`). Below it, one returned loop
+    /// keeps the relay and none starves it. Few loops cross an edge in a sparse network, so this stays small.
+    #[default = 3]
+    #[validate(range(min = 1))]
+    pub min_loopbacks_for_rate: u32,
+    /// Share of loops over an edge that must return, once there are `min_loopbacks_for_rate` of them, for
+    /// its relay to stay routable. A relay dropping what it should forward still returns the odd loop, so
+    /// this is never zero. In `(0.0, 1.0]`.
+    #[default = 0.1]
+    #[validate(custom(function = "validate_loopback_return_rate"))]
+    pub min_loopback_return_rate: f64,
 }
 
 /// Shortest accepted `refresh_period`. A zero period makes the sweep loop rebuild every cached
@@ -199,6 +211,16 @@ fn validate_refresh_within_ttl(cfg: &PathPlannerConfig) -> std::result::Result<(
         .into(),
     );
     Err(err)
+}
+
+/// A share of loops that must return, in `(0.0, 1.0]`: zero is met by any relay returning the odd loop, which
+/// is what a dropping relay does, so it would never starve one.
+fn validate_loopback_return_rate(value: f64) -> std::result::Result<(), ValidationError> {
+    if value.is_finite() && value > 0.0 && value <= 1.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new("value must be finite and in (0.0, 1.0]"))
+    }
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -1443,6 +1465,39 @@ mod tests {
         ) -> std::result::Result<BoxStream<'a, ChannelEntry>, TestError> {
             Ok(Box::pin(stream::iter(self.channels.clone())))
         }
+    }
+
+    #[test]
+    fn the_loopback_verdict_should_default_to_three_loops_and_a_tenth() {
+        let cfg = PathPlannerConfig::default();
+        assert_eq!(cfg.min_loopbacks_for_rate, 3);
+        assert_eq!(cfg.min_loopback_return_rate, 0.1);
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn a_loopback_verdict_that_could_never_starve_a_relay_should_be_invalid() {
+        // A rate of zero is met by any relay returning the odd loop, which is what a dropping relay does.
+        for rate in [0.0, -0.1, 1.5, f64::NAN, f64::INFINITY] {
+            let cfg = PathPlannerConfig {
+                min_loopback_return_rate: rate,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "a return rate of {rate} must be rejected");
+        }
+        let cfg = PathPlannerConfig {
+            min_loopbacks_for_rate: 0,
+            ..Default::default()
+        };
+        assert!(
+            cfg.validate().is_err(),
+            "judging by the rate from zero loops must be rejected"
+        );
+        let cfg = PathPlannerConfig {
+            min_loopback_return_rate: 1.0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok(), "a relay may be asked to return every loop");
     }
 
     #[test]

@@ -4311,8 +4311,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.10.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bd1852424489abfe1c58bec954bbb83ad0f847507663d0620c6665e9643b858"
 dependencies = [
  "anyhow",
  "bimap",
@@ -10122,3 +10123,8 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "hopr-network-graph"
+version = "0.10.1"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
