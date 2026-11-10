@@ -504,6 +504,16 @@ where
                 let mut candidate = path;
                 candidate.push(*dest);
 
+                // The missing last edge is assumed reachable only while the graph has no word on it. An
+                // edge it has measured dead (a score of exactly 0, which is how it reads a starved edge)
+                // is not missing, and adding the relay back would fill the floor with a path that
+                // delivers nothing, at a better cost than the healthy ones.
+                if let [.., relay, _] = candidate.as_slice()
+                    && self.graph.edge(relay, dest).and_then(|obs| obs.score()) == Some(0.0)
+                {
+                    return None;
+                }
+
                 if existing.iter().any(|pwm| pwm.path == candidate) {
                     return None;
                 }
@@ -709,6 +719,17 @@ mod tests {
         });
     }
 
+    /// An edge that pings and has a funded channel, with no loopback evidence yet.
+    fn mark_edge_unlooped(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::Connected(true));
+            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                1000u64,
+            ))));
+        });
+    }
+
     // Helper: build a bidirectional 2-hop graph: me ↔ hop ↔ dest.
     fn two_hop_graph() -> (OffchainPublicKey, OffchainPublicKey, OffchainPublicKey, ChannelGraph) {
         let me = pubkey(&SECRET_0);
@@ -728,6 +749,285 @@ mod tests {
         mark_edge_full(&graph, &dest, &hop);
         mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
+    }
+
+    /// The extended search that fills up the anonymity floor appends the destination to each relay it
+    /// finds without looking at the edge into it. A relay whose edge into the destination the graph has
+    /// judged dead must not come back through it: the floor is never a minimum to fabricate.
+    #[tokio::test]
+    async fn the_floor_should_not_bring_back_a_relay_whose_edge_into_the_destination_is_dead() -> anyhow::Result<()> {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad1 = pubkey(&SECRET_2);
+        let bad2 = pubkey(&SECRET_3);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        let graph = ChannelGraph::new(me);
+        for node in [good, bad1, bad2, dest] {
+            graph.add_node(node);
+        }
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
+        for relay in [good, bad1, bad2] {
+            graph.add_edge(&me, &relay)?;
+            mark_edge_full(&graph, &me, &relay);
+            graph.add_edge(&relay, &dest)?;
+        }
+        mark_edge_full(&graph, &good, &dest);
+        for bad in [bad1, bad2] {
+            mark_edge_unlooped(&graph, &bad, &dest);
+        }
+        // Loops over the edge into the destination: they return for `good`, never for the others.
+        for _ in 0..5 {
+            graph.upsert_edge(&good, &dest, |obs| {
+                obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(30))));
+            });
+            for bad in [bad1, bad2] {
+                graph.upsert_edge(&bad, &dest, |obs| {
+                    obs.record(EdgeWeightType::Intermediate(Err(())));
+                });
+            }
+        }
+
+        // Fewer routable candidates than the floor, so the extended search runs.
+        let selector = test_selector(me, graph.clone(), 8);
+        let paths = selector.select_path(me, dest, 1).context("forward path")?;
+
+        assert!(
+            paths.iter().any(|pwm| pwm.path.contains(&good)),
+            "the healthy relay must stay a candidate"
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|pwm| pwm.path.contains(&bad1) || pwm.path.contains(&bad2)),
+            "a relay whose edge into the destination is dead must not be added to fill the floor, got {} candidates",
+            paths.len()
+        );
+        Ok(())
+    }
+
+    /// A relay that rejects our packets still answers pings and acks, so the first edge to it reads
+    /// healthy everywhere except in the loopbacks routed through it, none of which return.
+    #[tokio::test]
+    async fn a_first_relay_whose_loopbacks_never_return_should_be_excluded_for_one_to_three_hops() -> anyhow::Result<()>
+    {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad = pubkey(&SECRET_2);
+        let m1 = pubkey(&SECRET_3);
+        let m2 = pubkey(&SECRET_4);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        let graph = ChannelGraph::new(me);
+        for node in [good, bad, m1, m2, dest] {
+            graph.add_node(node);
+        }
+        // me → good|bad → dest (1 hop), → m1 → dest (2 hops), → m1 → m2 → dest (3 hops)
+        for (src, dst) in [
+            (good, dest),
+            (bad, dest),
+            (good, m1),
+            (bad, m1),
+            (m1, dest),
+            (m1, m2),
+            (m2, dest),
+            (me, good),
+        ] {
+            graph.add_edge(&src, &dst)?;
+            mark_edge_full(&graph, &src, &dst);
+        }
+        graph.add_edge(&me, &bad)?;
+        mark_edge_unlooped(&graph, &me, &bad);
+
+        let selector = test_selector(me, graph.clone(), 50);
+        let costs = |hops: usize| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
+            let paths = selector.select_path(me, dest, hops).context("forward path")?;
+            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
+            Ok((
+                through.into_iter().map(|pwm| pwm.cost).collect(),
+                around.into_iter().map(|pwm| pwm.cost).collect(),
+            ))
+        };
+
+        for hops in 1..=3 {
+            let (through, around) = costs(hops)?;
+            assert!(
+                !through.is_empty() && !around.is_empty(),
+                "{hops} hop(s): both relays must be candidates before any loop is seen"
+            );
+        }
+
+        // 5 loops through the first relay, none returned.
+        graph.upsert_edge(&me, &bad, |obs| {
+            for _ in 0..5 {
+                obs.record(EdgeWeightType::Intermediate(Err(())));
+            }
+        });
+
+        // Excluded from routing (RFC-0010 4.2.3, the active tier); probing still reaches it.
+        for hops in 1..=3 {
+            let (through, around) = costs(hops)?;
+            assert!(
+                through.is_empty(),
+                "{hops} hop(s): a relay whose loops never return must not be a candidate, got {through:?}"
+            );
+            assert!(
+                !around.is_empty() && around.iter().all(|cost| *cost > 0.0),
+                "{hops} hop(s): the honest relay must stay routable"
+            );
+        }
+        Ok(())
+    }
+
+    /// On a return path `dest → relay → me`, the edge into the relay is judged and the edge into `me`
+    /// is not: a relay that rejects packets shows it on the first, and the last leads to the receiver.
+    #[tokio::test]
+    async fn a_return_relay_should_be_excluded_when_loopbacks_fail_on_the_edge_into_it() -> anyhow::Result<()> {
+        let me = pubkey(&SECRET_0);
+        let good = pubkey(&SECRET_1);
+        let bad = pubkey(&SECRET_2);
+        let dest = pubkey(&hex!(
+            "b1c3ec2e9a3b1d5b7f0b5c3a8f3e0d6c4a2b1e0f9d8c7b6a59483726150f4e3d"
+        ));
+
+        // Costs of the return paths through `bad` and around it, after loops failed over one edge of `bad`.
+        let costs = |failed: (OffchainPublicKey, OffchainPublicKey)| -> anyhow::Result<(Vec<f64>, Vec<f64>)> {
+            let graph = ChannelGraph::new(me);
+            for node in [good, bad, dest] {
+                graph.add_node(node);
+            }
+            for (src, dst) in [(dest, good), (good, me), (dest, bad), (bad, me)] {
+                graph.add_edge(&src, &dst)?;
+                if (src, dst) == failed {
+                    // No loop returned over the edge, so the 5 below are all it has seen.
+                    mark_edge_unlooped(&graph, &src, &dst);
+                } else {
+                    mark_edge_full(&graph, &src, &dst);
+                }
+            }
+            graph.upsert_edge(&failed.0, &failed.1, |obs| {
+                for _ in 0..5 {
+                    obs.record(EdgeWeightType::Intermediate(Err(())));
+                }
+            });
+            let paths = test_selector(me, graph, 50)
+                .select_path(dest, me, 1)
+                .context("return path")?;
+            let (through, around): (Vec<_>, Vec<_>) = paths.into_iter().partition(|pwm| pwm.path.contains(&bad));
+            Ok((
+                through.into_iter().map(|pwm| pwm.cost).collect(),
+                around.into_iter().map(|pwm| pwm.cost).collect(),
+            ))
+        };
+
+        // A loop that fails blames the edge into the relay, and that is what excludes it.
+        let (through, around) = costs((dest, bad))?;
+        assert!(
+            through.is_empty(),
+            "a failed edge into the relay must exclude it, got {through:?}"
+        );
+        assert!(
+            !around.is_empty() && around.iter().all(|cost| *cost > 0.0),
+            "the honest relay must stay routable"
+        );
+        Ok(())
+    }
+
+    /// A relay that rejects our packets answers fast, so after the value function starves it, a latency-ordered
+    /// pruning must not hand its slots to the starved paths. Layered graph of three relays per layer, every layer
+    /// pair connected, and the dead relay in layer `position` being the one the failed loopbacks are on.
+    /// Healthy paths outnumber the anonymity floor, so none of the kept paths may go through the dead relay.
+    #[tokio::test]
+    async fn a_fast_dead_relay_should_not_keep_a_slot_after_pruning_for_zero_to_three_hops_in_both_directions()
+    -> anyhow::Result<()> {
+        const FLOOR: usize = 2;
+        let me = pubkey(&[1; 32]);
+        let dest = pubkey(&[2; 32]);
+        let relay = |layer: usize, index: usize| pubkey(&[10 + (layer * 3 + index) as u8; 32]);
+
+        // 0 hops has no relay to judge: the direct route stays.
+        for direction in ["forward", "return"] {
+            let graph = ChannelGraph::new(me);
+            graph.add_node(dest);
+            let (src, dst) = if direction == "forward" { (me, dest) } else { (dest, me) };
+            graph.add_edge(&src, &dst)?;
+            mark_edge_full(&graph, &src, &dst);
+            let paths = test_selector(me, graph, 50)
+                .select_path(src, dst, 0)
+                .context("direct path")?;
+            assert_eq!(paths.len(), 1, "{direction}, 0 hops: the direct route must stay");
+        }
+
+        let mut failures = Vec::new();
+        for direction in ["forward", "return"] {
+            for hops in 1..=3usize {
+                for position in 1..=hops {
+                    let graph = ChannelGraph::new(me);
+                    // A node always knows the ticket price, and without it no path counts as fully measured.
+                    graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
+                    graph.add_node(dest);
+                    for layer in 1..=hops {
+                        for index in 0..3 {
+                            graph.add_node(relay(layer, index));
+                        }
+                    }
+                    // Layer 0 is the sender, layer `hops + 1` the receiver.
+                    let (sender, receiver) = if direction == "forward" { (me, dest) } else { (dest, me) };
+                    let dead = relay(position, 0);
+                    let node = |layer: usize, index: usize| match layer {
+                        0 => sender,
+                        l if l == hops + 1 => receiver,
+                        l => relay(l, index),
+                    };
+                    for layer in 0..=hops {
+                        for from in 0..if layer == 0 { 1 } else { 3 } {
+                            for to in 0..if layer == hops { 1 } else { 3 } {
+                                let (src, dst) = (node(layer, from), node(layer + 1, to));
+                                graph.add_edge(&src, &dst)?;
+                                if dst == dead {
+                                    mark_edge_unlooped(&graph, &src, &dst);
+                                } else {
+                                    mark_edge_full(&graph, &src, &dst);
+                                }
+                            }
+                        }
+                    }
+                    // The dead relay answers faster than the healthy ones, and none of its loops return.
+                    for from in 0..if position == 1 { 1 } else { 3 } {
+                        graph.upsert_edge(&node(position - 1, from), &dead, |obs| {
+                            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(5))));
+                            for _ in 0..5 {
+                                obs.record(EdgeWeightType::Intermediate(Err(())));
+                            }
+                        });
+                    }
+
+                    let selector = HoprGraphPathSelector::new(
+                        me,
+                        graph,
+                        50,
+                        PathPlannerConfig::default().edge_penalty,
+                        PathPlannerConfig::default().min_ack_rate,
+                        FLOOR,
+                    );
+                    let kept = selector.select_path(sender, receiver, hops).context("pruned paths")?;
+                    let through_dead = kept.iter().filter(|pwm| pwm.path.contains(&dead)).count();
+                    if kept.is_empty() || through_dead > 0 {
+                        failures.push(format!(
+                            "{direction}, {hops} hop(s), dead relay in position {position}: {through_dead} of {} kept \
+                             paths run through the dead relay",
+                            kept.len()
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+        Ok(())
     }
 
     #[tokio::test]

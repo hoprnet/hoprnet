@@ -4309,9 +4309,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.10.0"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5521c74b022c255d71df222a319506606910d0edc2611c972606b540368056d"
+checksum = "1bd1852424489abfe1c58bec954bbb83ad0f847507663d0620c6665e9643b858"
 dependencies = [
  "anyhow",
  "bimap",

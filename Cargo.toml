@@ -170,7 +170,7 @@ hopr-chain-connector = { version = "0.31.0" }
 hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
 hopr-transport-p2p = { version = "0.14.0", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.9.0", default-features = false }
-hopr-network-graph = { version = "0.10.0", default-features = false }
+hopr-network-graph = { version = "0.10.3", default-features = false }
 
 [profile.dev]
 panic = "abort"
