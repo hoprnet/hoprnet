@@ -170,7 +170,7 @@ hopr-chain-connector = { version = "0.31.0" }
 hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
 hopr-transport-p2p = { version = "0.14.0", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.9.0", default-features = false }
-hopr-network-graph = { version = "0.10.1", default-features = false }
+hopr-network-graph = { version = "0.10.3", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -233,8 +233,3 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
-
-# TEMPORARY (GNO-1183): hopr-network-graph 0.10.1 is not published yet. Drop this block, and repin the crate,
-# once hoprnet/hopr-impls#78 is released.
-[patch.crates-io]
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "kauki/fix/graph/starvation-config" }
