@@ -147,6 +147,18 @@ pub fn start_protocol_send_drop_count() -> usize {
     START_PROTOCOL_SEND_DROPS.load(Ordering::Relaxed)
 }
 
+/// Cumulative count of control-lane Start-protocol messages lost to a full queue.
+///
+/// Split from [`START_PROTOCOL_SEND_DROPS`] because a lost `SsaCommit` is unrecoverable: a
+/// `StartSession` flood advancing the shared counter could otherwise hide it entirely.
+pub static START_CONTROL_SEND_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative control-lane queue-drop count.
+#[inline]
+pub fn start_control_send_drop_count() -> usize {
+    START_CONTROL_SEND_DROPS.load(Ordering::Relaxed)
+}
+
 /// Cumulative count of packets dropped by `forward_to_timeout(app_incoming)` at the ingress
 /// pipeline because `tx_from_protocol` was full for longer than `QUEUE_SEND_TIMEOUT` (50 ms).
 pub static APP_INCOMING_TIMEOUT_DROPS: AtomicUsize = AtomicUsize::new(0);

@@ -687,13 +687,10 @@ fn is_full_queue_warn_due(drops_so_far: usize) -> bool {
     drops_so_far.is_multiple_of(FULL_QUEUE_WARN_INTERVAL)
 }
 
-/// Ceiling on the per-session term of [`start_control_channel_capacity`].
+/// How many queued `StartSession`s may wait per handler.
 ///
-/// A session contributes to the session lane only while its Start exchange is in flight, so the
-/// depth tracks concurrent *handshakes*, not the total the node may manage. This capacity is
-/// *reserved* (`crossfire`'s array flavour pre-allocates every slot), and
-/// `maximum_sessions` validates up to 100 000.
-const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
+/// Two is enough to keep the pool fed without queuing work beyond a peer's initiation timeout.
+const START_SESSION_LANE_DEPTH_FACTOR: usize = 2;
 
 /// `StartSession` handlers allowed in hand at once.
 ///
@@ -703,7 +700,10 @@ const MAX_CONCURRENT_START_SESSIONS: usize = 256;
 
 /// Concurrent session-server admission waits, held below the lane size so a slow server refuses
 /// with `Busy` instead of parking every handler.
-const START_SESSION_ADMISSION_CONCURRENCY: usize = 64;
+///
+/// The session server bounds its own worker pool by the same figure: a permit is released when the
+/// transport stops waiting, not when `admit` returns, so the server needs its own bound.
+pub const START_SESSION_ADMISSION_CONCURRENCY: usize = 64;
 
 /// Capacity of the control Start protocol lane (every variant but `StartSession`).
 ///
@@ -749,11 +749,14 @@ fn start_control_channel_capacity(cfg: &SessionManagerConfig) -> usize {
         .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
 }
 
-/// Capacity of the `StartSession` lane: one message per handshake in flight, clamped as above.
-fn start_session_channel_capacity(cfg: &SessionManagerConfig) -> usize {
-    cfg.maximum_sessions
-        .min(MAX_CONCURRENT_START_EXCHANGES)
-        .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
+/// Capacity of the `StartSession` lane.
+///
+/// Sized from the handler pool, not from `maximum_sessions`: a queued `StartSession` is drained only
+/// as fast as a handler frees up, and each may park for `session_admission_timeout`. A lane sized by
+/// the session limit would queue minutes of work in front of the pool, so the peer long since gave
+/// up by the time it is handled.
+fn start_session_channel_capacity() -> usize {
+    (MAX_CONCURRENT_START_SESSIONS * START_SESSION_LANE_DEPTH_FACTOR).saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
 }
 
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
@@ -4360,7 +4363,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let (start_session_tx, start_session_rx) =
-            crossfire::mpsc::bounded_blocking_async(start_session_channel_capacity(&self.cfg));
+            crossfire::mpsc::bounded_blocking_async(start_session_channel_capacity());
         let _ = self.start_session_tx.set(start_session_tx);
 
         let (start_control_tx, start_control_rx) =
@@ -4446,10 +4449,9 @@ where
                     session_diag.wrap(|| {
                         let myself = myself.clone();
                         async move {
+                            // Routing puts only `StartSession` on this lane.
                             let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
-                                // Routing puts only `StartSession` on this lane.
-                                tracing::error!("non-StartSession message on the StartSession lane");
-                                return;
+                                unreachable!("only StartSession is routed to the session lane")
                             };
                             let result = match myself
                                 .refuse_pix_over_direct_return_path(
@@ -4522,10 +4524,9 @@ where
                                 HoprStartProtocol::SsaRequest(server_commit_msg) => {
                                     myself.handle_ssa_request(pseudonym, server_commit_msg).await
                                 }
+                                // Routing puts `StartSession` on the session lane.
                                 HoprStartProtocol::StartSession(_) => {
-                                    // Routing puts `StartSession` on the session lane.
-                                    tracing::error!("StartSession message on the control lane");
-                                    Ok(())
+                                    unreachable!("StartSession is never routed to the control lane")
                                 }
                             };
 
@@ -6604,7 +6605,8 @@ where
             // and what the packet did to the SURB store. `StartSession` parks on admission, so it
             // gets its own lane; a flood of it must not delay a live Session's control traffic.
             trace!("dispatching Start protocol message");
-            let lane = if matches!(msg, HoprStartProtocol::StartSession(_)) {
+            let is_session_lane = matches!(msg, HoprStartProtocol::StartSession(_));
+            let lane = if is_session_lane {
                 self.start_session_tx.get()
             } else {
                 self.start_control_tx.get()
@@ -6614,19 +6616,33 @@ where
                 match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
                     Ok(()) => {}
                     // Backpressure, not a fault: rate-limited so a sustained flood cannot become
-                    // per-packet log spam.
+                    // per-packet log spam. Control drops keep their own counter, so a StartSession
+                    // flood cannot hide a lost SsaCommit, which is unrecoverable.
                     Err(crossfire::TrySendError::Full(_)) => {
-                        let prev = crate::counters::START_PROTOCOL_SEND_DROPS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let counter = if is_session_lane {
+                            &crate::counters::START_PROTOCOL_SEND_DROPS
+                        } else {
+                            &crate::counters::START_CONTROL_SEND_DROPS
+                        };
+                        let prev = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         if is_full_queue_warn_due(prev) {
+                            let lane = if is_session_lane { "session" } else { "control" };
                             warn!(
                                 %pseudonym,
+                                lane,
                                 total_start_queue_full_drops = prev + 1,
-                                "Start protocol queue full, dropping message (backpressure)"
+                                "Start protocol lane full, dropping message (backpressure)"
                             );
                         }
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_DISPATCHED_MSGS.increment_by(&["dropped_start_queue_full"], 1);
+                        {
+                            let lane = if is_session_lane {
+                                "dropped_start_session_queue_full"
+                            } else {
+                                "dropped_start_control_queue_full"
+                            };
+                            METRIC_DISPATCHED_MSGS.increment_by(&[lane], 1);
+                        }
                         return Ok(DispatchResult::Dropped(DropReason::StartQueueFull));
                     }
                     // A closed queue means the manager is shutting down, which is a real fault.
@@ -14802,8 +14818,12 @@ mod tests {
 
         // Hold every permit for the duration of the attempt.
         let held: Vec<_> = (0..START_SESSION_ADMISSION_CONCURRENCY)
-            .map(|_| mgr.admission_permits.try_acquire().expect("permits must be free"))
-            .collect();
+            .map(|_| {
+                mgr.admission_permits
+                    .try_acquire()
+                    .context("permits must be free at the start of the test")
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         mgr.handle_incoming_session_initiation(
             HoprPseudonym::random(),
@@ -15926,14 +15946,14 @@ mod tests {
         let live = HoprPseudonym::random();
         let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
 
-        let drops_before = crate::counters::start_protocol_send_drop_count();
+        let drops_before = crate::counters::start_control_send_drop_count();
         let mut saw_full = false;
         // Cheapest way through `try_send` without letting the processor drain: a keep-alive for a
         // registered Session. Fill the queue, then drop until the rate-limited WARN is due.
         for _ in 0..(capacity + FULL_QUEUE_WARN_INTERVAL + 1) {
             let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
             saw_full |= matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull));
-            if saw_full && crate::counters::start_protocol_send_drop_count().is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
+            if saw_full && crate::counters::start_control_send_drop_count().is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
                 break;
             }
         }
@@ -15943,12 +15963,21 @@ mod tests {
             "filling the Start queue past its capacity must produce a quiet StartQueueFull drop"
         );
         assert!(
-            crate::counters::start_protocol_send_drop_count() > drops_before,
+            crate::counters::start_control_send_drop_count() > drops_before,
             "a queue-full drop must be counted"
         );
 
         sender.close_channel();
         Ok(())
+    }
+
+    /// Every Start-lane result reaches `report_start_result`, which must swallow the deliberate
+    /// `NotAdmitted` refusals quietly and log anything else as an error.
+    #[test]
+    fn start_results_are_reported_quietly_for_deliberate_refusals() {
+        report_start_result(Ok(()));
+        report_start_result(Err(SessionManagerError::NotAdmitted("early".into()).into()));
+        report_start_result(Err(TransportSessionError::Timeout));
     }
 
     /// The WARN is due on the first drop of each interval, and only then.
@@ -16181,11 +16210,9 @@ mod tests {
             ..Default::default()
         });
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -16193,7 +16220,7 @@ mod tests {
         let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
 
         // No `await` in this loop, so the session processor is never polled and its lane fills.
-        let session_capacity = start_session_channel_capacity(&mgr.cfg);
+        let session_capacity = start_session_channel_capacity();
         let mut filled = false;
         for i in 0..(session_capacity + 1) {
             let initiator = HoprPseudonym::random();
@@ -16233,11 +16260,9 @@ mod tests {
             ..Default::default()
         });
 
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
@@ -23196,40 +23221,20 @@ mod tests {
         assert!(capacity < 1_000_000, "capacity {capacity} is implausibly large");
     }
 
-    /// The session lane is one message per handshake, so it is sized by the session limit and by
-    /// nothing else — in particular not by `quota_range`.
+    /// The session lane is sized from the handler pool, not from the session limit: a queued
+    /// `StartSession` is drained only as fast as a handler frees up.
     #[test]
-    fn start_session_lane_is_sized_by_the_session_limit_only() {
-        let cfg = SessionManagerConfig::default();
+    fn start_session_lane_is_sized_from_the_handler_pool() {
         assert_eq!(
-            start_session_channel_capacity(&cfg),
-            cfg.maximum_sessions.min(MAX_CONCURRENT_START_EXCHANGES) + START_PROTOCOL_CHANNEL_RESERVE
+            start_session_channel_capacity(),
+            MAX_CONCURRENT_START_SESSIONS * START_SESSION_LANE_DEPTH_FACTOR + START_PROTOCOL_CHANNEL_RESERVE
         );
-
-        // A large accepted quota must not grow the lane.
-        let wide = SessionManagerConfig {
-            pix_config: IncomingSessionPixConfig {
-                quota_range: 0..=u64::MAX,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        assert_eq!(
-            start_session_channel_capacity(&wide),
-            start_session_channel_capacity(&cfg),
-            "quota_range must not size the StartSession lane"
+        const _: () = assert!(
+            MAX_CONCURRENT_START_SESSIONS > START_SESSION_ADMISSION_CONCURRENCY,
+            "the lane must hold more handlers than may wait on the server, or the permit caps it"
         );
-
-        // Nor must a session flood be able to grow the lane its own drops come from.
-        let huge = SessionManagerConfig {
-            maximum_sessions: 100_000,
-            ..Default::default()
-        };
-        assert_eq!(
-            start_session_channel_capacity(&huge),
-            MAX_CONCURRENT_START_EXCHANGES + START_PROTOCOL_CHANNEL_RESERVE,
-            "a large session limit must not grow the pre-allocated ring past the handshake ceiling"
-        );
+        // Well below the pre-allocation guard, whatever the operator configures elsewhere.
+        assert!(start_session_channel_capacity() < 1_000_000);
     }
 
     /// `quota_range` is operator-settable and the capacity it feeds is *reserved*, not merely
