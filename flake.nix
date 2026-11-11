@@ -296,7 +296,9 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  # `telemetry` is what compiles the dispatch metrics into the library; without it
+                  # the integration coverage of the Start drop paths cannot reach them.
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";
