@@ -36,14 +36,6 @@ pub enum ProbeDispatch {
     Passthrough(HoprPseudonym, ApplicationDataIn),
 }
 
-/// One completed probe, observed independently of graph telemetry.
-#[derive(Clone, Debug)]
-pub enum ProbeOutcome {
-    Neighbor { peer: NodeId, succeeded: bool },
-    Loopback { succeeded: bool },
-}
-type ProbeObserver = Arc<dyn Fn(ProbeOutcome) + Send + Sync>;
-
 /// Shared state used to classify incoming messages as probe or non-probe.
 ///
 /// Obtained from [`Probe::continuously_scan`]. Use [`filter_stream`](ProbeClassifierState::filter_stream)
@@ -54,7 +46,6 @@ pub struct ProbeClassifierState<G> {
     active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue>,
     active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
     network_graph: G,
-    observer: Option<ProbeObserver>,
 }
 
 impl<G> ProbeClassifierState<G>
@@ -65,11 +56,6 @@ where
     ///
     /// The `push_to_network` sink is used to send pong replies when the message is a Ping.
     /// Returns `Consumed` if the message was a probe, or `Passthrough` for all other messages.
-    #[tracing::instrument(
-        level = "trace",
-        skip_all,
-        fields(%pseudonym, tag = %in_data.data.application_tag)
-    )]
     pub async fn classify<T>(
         &self,
         mut push_to_network: T,
@@ -83,9 +69,8 @@ where
         let tag: Tag = in_data.data.application_tag;
 
         if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag).await {
-            if let Some(observer) = &self.observer {
-                observer(ProbeOutcome::Loopback { succeeded: true });
-            }
+            let span = tracing::trace_span!("loopback_probe_reply", %pseudonym, %tag);
+            let _entered = span.enter();
             tracing::trace!(%tag, "loopback probe successfully received");
             self.network_graph
                 .record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(
@@ -124,12 +109,8 @@ where
                             .remove(&(pseudonym, NeighborProbe::Ping(pong)))
                             .await
                         {
-                            if let Some(observer) = &self.observer {
-                                observer(ProbeOutcome::Neighbor {
-                                    peer: peer.as_ref().to_owned(),
-                                    succeeded: true,
-                                });
-                            }
+                            let span = tracing::trace_span!("neighbor_probe_reply", %peer, %pseudonym, nonce = const_hex::encode(pong));
+                            let _entered = span.enter();
                             let latency = current_time().as_unix_timestamp().saturating_sub(start);
 
                             if let NodeId::Offchain(opk) = peer.as_ref() {
@@ -198,23 +179,11 @@ pub struct Probe {
     cfg: ProbeConfig,
     /// Tag allocator for probing telemetry tags.
     tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
-    observer: Option<ProbeObserver>,
 }
 
 impl Probe {
     pub fn new(cfg: ProbeConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
-        Self {
-            cfg,
-            tag_allocator,
-            observer: None,
-        }
-    }
-
-    /// Observe completed probes without taking or resetting graph telemetry.
-    /// The callback must be cheap and must not block on asynchronous work.
-    pub fn with_observer(mut self, observer: impl Fn(ProbeOutcome) + Send + Sync + 'static) -> Self {
-        self.observer = Some(Arc::new(observer));
-        self
+        Self { cfg, tag_allocator }
     }
 
     /// The main function that assembles and starts the probing process.
@@ -244,8 +213,6 @@ impl Probe {
         let network_graph_internal_neighbor = network_graph.clone();
         let network_graph_internal_path = network_graph.clone();
         let timeout = self.cfg.timeout;
-        let neighbor_observer = self.observer.clone();
-        let path_observer = self.observer.clone();
         let active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue> =
             moka::future::Cache::builder()
                 .time_to_live(timeout)
@@ -261,7 +228,6 @@ impl Probe {
                             let (peer, _start, notifier) = v;
                             let span = tracing::trace_span!("neighbor_probe_expiry", %peer, pseudonym = %k.0);
                             let _entered = span.enter();
-                            if let Some(observer) = &neighbor_observer { observer(ProbeOutcome::Neighbor { peer: peer.as_ref().to_owned(), succeeded: false }); }
 
                             tracing::trace!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
                             if let Some(replier) = notifier {
@@ -309,9 +275,6 @@ impl Probe {
                             // If the eviction cause is expiration => record as a failed probe
                             let span = tracing::trace_span!("loopback_probe_expiry", %tag);
                             let _entered = span.enter();
-                            if let Some(observer) = &path_observer {
-                                observer(ProbeOutcome::Loopback { succeeded: false });
-                            }
                             let store = network_graph_internal_path.clone();
 
                             tracing::trace!(%tag, reason = "timeout", "loopback probe failed");
@@ -489,7 +452,6 @@ impl Probe {
             active_neighbor_probes: classifier_neighbor_probes,
             active_path_probes: classifier_path_probes,
             network_graph,
-            observer: self.observer,
         };
 
         (processes, classifier)
@@ -679,6 +641,132 @@ mod tests {
 
     type TestClassifier = ProbeClassifierState<PeerStore>;
 
+    /// Capture producer spans and the span depth at which each log message is emitted.
+    #[derive(Clone, Default)]
+    struct ProbeLogs {
+        spans: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+        messages: Arc<parking_lot::Mutex<Vec<(String, usize)>>>,
+        depth: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    struct MessageVisitor(String);
+
+    impl tracing::field::Visit for MessageVisitor {
+        /// Extract the message field without coupling the assertion to logger formatting.
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            if field.name() == "message" {
+                self.0 = format!("{value:?}");
+            }
+        }
+    }
+
+    impl tracing::Subscriber for ProbeLogs {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, attrs: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            let mut spans = self.spans.lock();
+            spans.push(attrs.metadata().name());
+            tracing::span::Id::from_u64(spans.len() as u64)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            let mut message = MessageVisitor(String::new());
+            event.record(&mut message);
+            self.messages
+                .lock()
+                .push((message.0, self.depth.load(std::sync::atomic::Ordering::Relaxed)));
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {
+            self.depth.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        fn exit(&self, _: &tracing::span::Id) {
+            self.depth.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    /// Ordinary packets create no probe span; matched replies log inside their producer span.
+    fn probe_reply_logs_stay_in_the_producer_span() -> anyhow::Result<()> {
+        let logs = ProbeLogs::default();
+        tracing::subscriber::with_default(logs.clone(), || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?
+                .block_on(async {
+                    let store = PeerStore {
+                        me: *OFFCHAIN_KEYPAIR.public(),
+                        get_peers: Arc::new(RwLock::new(VecDeque::new())),
+                        on_finished: Arc::new(RwLock::new(Vec::new())),
+                    };
+                    let classifier = ProbeClassifierState {
+                        active_neighbor_probes: moka::future::Cache::new(1),
+                        active_path_probes: moka::future::Cache::new(1),
+                        network_graph: store.clone(),
+                    };
+                    let pseudonym = HoprPseudonym::random();
+                    let ordinary = ApplicationDataIn {
+                        data: ApplicationData::new(Tag::MAX, b"ordinary")?,
+                        packet_info: Default::default(),
+                    };
+                    assert!(matches!(
+                        classifier.classify(futures::sink::drain(), pseudonym, ordinary).await,
+                        ProbeDispatch::Passthrough(..)
+                    ));
+                    assert!(
+                        logs.spans.lock().is_empty(),
+                        "ordinary packets must not create probe spans"
+                    );
+
+                    let nonce = [7; NeighborProbe::NONCE_SIZE];
+                    classifier
+                        .active_neighbor_probes
+                        .insert(
+                            (pseudonym, NeighborProbe::Ping(nonce)),
+                            (
+                                Box::new(NodeId::Offchain(NEIGHBOURS[0])),
+                                current_time().as_unix_timestamp(),
+                                None,
+                            ),
+                        )
+                        .await;
+                    classifier
+                        .classify(
+                            futures::sink::drain(),
+                            pseudonym,
+                            ApplicationDataIn {
+                                data: Message::Probe(NeighborProbe::Pong(nonce)).try_into()?,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await;
+                    assert_eq!(&*logs.spans.lock(), &["neighbor_probe_reply"]);
+                    assert!(
+                        logs.messages
+                            .lock()
+                            .iter()
+                            .any(|(message, depth)| { message == "probe successful" && *depth == 1 })
+                    );
+                    assert_eq!(
+                        store
+                            .on_finished
+                            .read()
+                            .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?
+                            .len(),
+                        1
+                    );
+                    anyhow::Ok(())
+                })
+        })
+    }
+
     struct TestInterface {
         probe_classifier: TestClassifier,
         from_probing_to_network_rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
@@ -686,22 +774,8 @@ mod tests {
         manual_probe_tx: futures::channel::mpsc::Sender<(OffchainPublicKey, PingQueryReplier)>,
     }
 
-    /// Run the probe harness without installing an observer.
+    /// Run probe producers and classifiers with bounded test channels.
     async fn test_with_probing<F, Fut>(cfg: ProbeConfig, store: PeerStore, test: F) -> anyhow::Result<()>
-    where
-        Fut: std::future::Future<Output = anyhow::Result<()>>,
-        F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-    {
-        test_with_probing_observer(cfg, store, None, test).await
-    }
-
-    /// Run probe producers and classifiers with an optional outcome observer and bounded test channels.
-    async fn test_with_probing_observer<F, Fut>(
-        cfg: ProbeConfig,
-        store: PeerStore,
-        observer: Option<ProbeObserver>,
-        test: F,
-    ) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
@@ -720,8 +794,7 @@ mod tests {
             .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
             .expect("probing allocator should exist");
 
-        let mut probe = Probe::new(cfg, probing_allocator);
-        probe.observer = observer;
+        let probe = Probe::new(cfg, probing_allocator);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
@@ -1214,9 +1287,7 @@ mod tests {
             .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
             .expect("probing allocator should exist");
 
-        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
-        let observed = events.clone();
-        let probe = Probe::new(cfg, probing_allocator).with_observer(move |event| observed.lock().push(event));
+        let probe = Probe::new(cfg, probing_allocator);
 
         let (from_probing_to_network_tx, mut from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
@@ -1233,7 +1304,7 @@ mod tests {
         // the loopback case, and we push to `manual_probe_tx` below for the neighbor case.
         let is_manual = matches!(strategy, TestProbeStrategy::ManualNeighbor);
         let (jhs, classifier) = probe
-            .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store)
+            .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store.clone())
             .await;
 
         if is_manual {
@@ -1309,23 +1380,22 @@ mod tests {
         classifier.active_neighbor_probes.run_pending_tasks().await;
         classifier.active_path_probes.run_pending_tasks().await;
         jhs.abort_all();
-        let events = events.lock();
-        assert_eq!(
-            events.len(),
-            1,
-            "a duplicate reply or eviction after success must not count another outcome"
-        );
         if is_manual {
-            assert!(matches!(&events[0], ProbeOutcome::Neighbor { peer, succeeded }
-                if *peer == NodeId::Offchain(NEIGHBOURS[0]) && *succeeded == reply));
-        } else {
-            assert!(matches!(&events[0], ProbeOutcome::Loopback { succeeded } if *succeeded == reply));
+            let outcomes = store
+                .on_finished
+                .read()
+                .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?;
+            assert_eq!(outcomes.len(), 1, "duplicate replies must not update the graph twice");
+            assert_eq!(outcomes[0].0, NEIGHBOURS[0]);
+            assert_eq!(outcomes[0].1.is_ok(), reply);
         }
+        assert_eq!(classifier.active_neighbor_probes.entry_count(), 0);
+        assert_eq!(classifier.active_path_probes.entry_count(), 0);
         Ok(())
     }
     #[tokio::test]
-    /// Report a neighbor timeout once and ignore a reply arriving after its probe expired.
-    async fn observer_reports_actual_neighbor_expiry_once() -> anyhow::Result<()> {
+    /// A timed-out neighbor probe notifies its caller and updates the graph exactly once.
+    async fn neighbor_expiry_updates_the_graph_once() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(10),
             interval: std::time::Duration::ZERO,
@@ -1336,32 +1406,27 @@ mod tests {
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
-        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
-        let observed = events.clone();
-        test_with_probing_observer(
-            cfg,
-            store,
-            Some(Arc::new(move |event| observed.lock().push(event))),
-            move |iface: TestInterface| async move {
-                let mut manual = iface.manual_probe_tx;
-                let (tx, mut rx) = futures::channel::mpsc::channel(8);
-                manual.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
-                // Consume the outbound packet without returning a pong.
-                let mut outbound = iface.from_probing_to_network_rx;
-                tokio::time::timeout(std::time::Duration::from_secs(2), outbound.next()).await?;
-                tokio::time::sleep(cfg.timeout * 2).await;
-                iface.probe_classifier.active_neighbor_probes.run_pending_tasks().await;
-                let result = tokio::time::timeout(std::time::Duration::from_secs(2), rx.next()).await?;
-                assert!(matches!(result, Some(Err(()))));
-                Ok(())
-            },
-        )
+        test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
+            let mut manual = iface.manual_probe_tx;
+            let (tx, mut rx) = futures::channel::mpsc::channel(8);
+            manual.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+            // Consume the outbound packet without returning a pong.
+            let mut outbound = iface.from_probing_to_network_rx;
+            tokio::time::timeout(std::time::Duration::from_secs(2), outbound.next()).await?;
+            tokio::time::sleep(cfg.timeout * 2).await;
+            iface.probe_classifier.active_neighbor_probes.run_pending_tasks().await;
+            let result = tokio::time::timeout(std::time::Duration::from_secs(2), rx.next()).await?;
+            assert!(matches!(result, Some(Err(()))));
+            Ok(())
+        })
         .await?;
-        assert_eq!(events.lock().len(), 1);
-        assert!(matches!(
-            &events.lock()[0],
-            ProbeOutcome::Neighbor { succeeded: false, .. }
-        ));
+        let outcomes = store
+            .on_finished
+            .read()
+            .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?;
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].0, NEIGHBOURS[0]);
+        assert!(outcomes[0].1.is_err());
         Ok(())
     }
 }

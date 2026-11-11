@@ -197,20 +197,11 @@ fn node_emits_bounded_info_state_with_real_producers_and_supports_disabling() ->
             let returned = ours
                 .iter()
                 .any(|r| r["routing"]["value"]["surb_totals"]["returned"].as_u64().unwrap_or(0) > 0);
-            let probes = ours.iter().any(|r| {
-                r["routing"]["value"]["probes"]["neighbor"]["succeeded"]
-                    .as_u64()
-                    .unwrap_or(0)
-                    + r["routing"]["value"]["probes"]["neighbor"]["timed_out"]
-                        .as_u64()
-                        .unwrap_or(0)
-                    > 0
-            });
             let complete = ours.iter().rev().find(|r| {
                 r["channels"]["status"] == "ok"
                     && r["channels"]["value"]["total"].as_u64() == Some(expected_channels as u64)
             });
-            if resolutions && searches && minted && returned && probes && complete.is_some() {
+            if resolutions && searches && minted && returned && complete.is_some() {
                 let record = complete.context("complete channel section matching source inventory")?;
                 ensure!(record["safe_balance"]["status"] == "ok");
                 ensure!(record["safe_allowance"]["status"] == "ok");
@@ -219,7 +210,10 @@ fn node_emits_bounded_info_state_with_real_producers_and_supports_disabling() ->
                 ensure!(record["channels"]["value"]["peers"]["total"].as_u64().unwrap_or(0) >= 1);
                 ensure!(record["connected_peers"].as_u64().unwrap_or(0) >= 1);
                 ensure!(record["announced_peers"]["value"] == 2);
-                ensure!(record["routing"]["value"]["probes"].is_object());
+                ensure!(
+                    record["routing"]["value"]["probes"].is_null(),
+                    "probe outcomes stay in producer logs"
+                );
                 for record in &records {
                     ensure!(serde_json::to_vec(&record)?.len() <= hopr_chain_connector::state_dump::MAX_SNAPSHOT_BYTES);
                 }

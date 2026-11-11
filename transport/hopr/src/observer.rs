@@ -5,7 +5,6 @@
 use std::sync::Arc;
 
 use hopr_api::{OffchainPublicKey, graph::ForwardAndReturnPath, types::internal::NodeId};
-pub use hopr_transport_probe::ProbeOutcome;
 
 /// Whether a path carries packets to a destination, or replies back from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,8 +44,6 @@ pub enum TransportEvent {
         minted: u64,
         returned: u64,
     },
-    /// A neighbor or loopback probe finished.
-    Probe(ProbeOutcome),
 }
 
 /// Receives [`TransportEvent`]s. It is called on the packet path, so it must be cheap and must not

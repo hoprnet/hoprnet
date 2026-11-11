@@ -18,8 +18,8 @@ jq 'select(.fields.event == "node_state") | .fields.state | fromjson' node.jsonl
 
 The record contains exact Safe balance/allowance, source-visible local channel and
 funding summaries, connected/announced/open-channel peer counts, destination and
-search-phase health, sibling forward/reply SURB counts, and neighbor/loopback probe
-outcomes. The connector caps the JSON payload at 32 KiB, excluding the logger
+search-phase health and sibling forward/reply SURB counts. The connector caps the
+JSON payload at 32 KiB, excluding the logger
 wrapper. It reads adjacent local channels in batches and preserves partial results,
 read errors, timeouts, omitted detail and counter overflow. It is not an atomic or
 freshness-verified chain snapshot. These logs contain peer-linkable traffic metadata. Operators should restrict access
@@ -55,7 +55,7 @@ also includes node identity, timestamps, channel inventory and routing counters:
 The values above are illustrative, not measurements from a 1,000-node deployment.
 
 The transport does not depend on the state dump. It reports `TransportEvent`s (path
-resolves, graph searches, SURB mints and returns, probe outcomes) to an optional
+resolves, graph searches, SURB mints and returns) to an optional
 `TransportObserver`. The embedding application supplies a `StateDumpFactory` that
 connects these events to its counters and returns a lazy `StateDump` task. The
 connector-backed adapter in [the test wiring](../../hopr/hopr-lib/src/testing/state_dump.rs)
@@ -67,9 +67,11 @@ results. Return-path batches count once per batch. Known destinations normalize 
 offchain keys; an unresolved chain address remains a chain identity. SURB producers
 record mint/return events independently of the graph's telemetry drain. Returns may
 cross interval boundaries, so minted/returned counts are not delivery probabilities.
-Probe counters register when probing starts and count matched replies or actual
-expiries; unknown/late replies do not count a second time. Unavailable inputs remain
-distinct from genuine zero activity.
+Probe outcomes are recorded only by the probe producer in its local logs and graph
+telemetry; they are not forwarded to the periodic state dump. The companion schema
+therefore leaves its optional probe counters unavailable rather than reporting zero.
+Unknown or late replies do not update graph telemetry twice. Unavailable inputs
+remain distinct from genuine zero activity.
 
 `hopr-lib` requires only the chain interfaces from `hopr-api`, even with
 `state-dump` enabled. The application owns any additional reads its collector
@@ -98,8 +100,10 @@ DEBUG retains bounded weighted-collection summaries on cache rebuild (up to eigh
 path/weight pairs, total weight, candidate count and omitted count), aggregate cache
 updates and actionable degradation transitions. Probe replies and expiry callbacks
 retain producer-local TRACE spans with pseudonym/tag or peer context; the periodic
-record aggregates outcomes across those spans and supplements the local events. SURB
-flushes retain one aggregate INFO event per active interval. Named blind-spot details
+record excludes probe outcomes; no observer or central counter receives them. Reply
+spans are created only for matched probes, so ordinary application messages do not
+create probe spans. SURB flushes retain one aggregate INFO event per active interval.
+Named blind-spot details
 are capped at eight destinations, with an omitted count. TRACE requires a build that
 retains that static level.
 
@@ -124,7 +128,8 @@ the companion release remains a prerequisite for publishing dependent crates.
 Run the `state_dump` integration test with `--features testing,state-dump`. It runs
 runtime enabled/disabled configurations in isolated processes. It verifies real INFO
 records from an emulated node cluster with channel
-inventory, a routed echo session, routing/search/SURB/probe activity, continuing
-periodic emission, and the payload budget. This complements unit tests for cache
-hits, failed searches, probe expiry and independent SURB counter windows. Live
-production CPU and log-volume measurements remain rollout validation.
+inventory, a routed echo session, routing/search/SURB activity and absent probe
+counters, continuing periodic emission, and the payload budget. This complements
+unit tests for cache hits, failed searches, producer-local probe expiry and
+independent SURB counter windows. Live production CPU and log-volume measurements
+remain rollout validation.

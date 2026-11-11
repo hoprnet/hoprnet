@@ -343,7 +343,6 @@ pub struct HoprTransport<Chain, Graph, Net> {
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
     chain_api: Chain,
-    observer: Option<TransportObserver>,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<OnceLock<Net>>,
     graph: Graph,
@@ -537,7 +536,6 @@ where
             my_multiaddresses,
             smgr,
             chain_api: resolver,
-            observer: None,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
@@ -545,15 +543,14 @@ where
         })
     }
 
-    /// Attach a path, search, SURB and probe observer before starting transport.
+    /// Attach a path, search and SURB observer before starting transport.
     /// Cloned planner state is detached so existing users keep their observer.
     pub fn with_observer(mut self, observer: TransportObserver) -> Self {
         self.path_planner.configure_selector(|selector| {
             *selector = selector.clone().with_observer(observer.clone());
         });
         self.path_planner = self.path_planner.with_observer(observer.clone());
-        self.surb_round_trips = self.surb_round_trips.with_observer(observer.clone());
-        self.observer = Some(observer);
+        self.surb_round_trips = self.surb_round_trips.with_observer(observer);
         self
     }
 
@@ -1230,10 +1227,7 @@ where
             crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
         let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
-        let mut probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
-        if let Some(observer) = self.observer.clone() {
-            probe = probe.with_observer(move |outcome| observer(TransportEvent::Probe(outcome)));
-        }
+        let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
 
         let (probing_processes, probe_classifier) = probe
             .continuously_scan(

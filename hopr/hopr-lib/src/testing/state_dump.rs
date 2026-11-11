@@ -4,13 +4,11 @@ use std::sync::Arc;
 use hopr_chain_connector::state_dump::{Direction, IntervalCounters, PhaseOutcome, SearchOutcome, SurbCounts};
 use hopr_transport::{
     TransportEvent, TransportObserver,
-    observer::{PathDirection, PhaseCounts, ProbeOutcome},
+    observer::{PathDirection, PhaseCounts},
 };
 
 /// An observer that records the transport's events in `counters`.
 pub(crate) fn transport_observer(counters: IntervalCounters) -> TransportObserver {
-    // The transport always runs the prober, so an idle window reports zero probes, not "unknown".
-    counters.enable_probes();
     Arc::new(move |event| record(&counters, event))
 }
 
@@ -43,8 +41,6 @@ fn record(counters: &IntervalCounters, event: TransportEvent) {
             minted,
             returned,
         } => counters.surb(destination, paths, SurbCounts { minted, returned }),
-        TransportEvent::Probe(ProbeOutcome::Neighbor { peer, succeeded }) => counters.neighbor_probe(peer, succeeded),
-        TransportEvent::Probe(ProbeOutcome::Loopback { succeeded }) => counters.loopback_probe(succeeded),
     }
 }
 
@@ -117,7 +113,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use hopr_api::{
         graph::ForwardAndReturnPath,
         types::{crypto::prelude::*, internal::NodeId, primitive::prelude::Address},
@@ -160,25 +155,19 @@ mod tests {
             minted: 4,
             returned: 1,
         });
-        observer(TransportEvent::Probe(ProbeOutcome::Neighbor {
-            peer: destination,
-            succeeded: false,
-        }));
-        observer(TransportEvent::Probe(ProbeOutcome::Loopback { succeeded: true }));
 
         let snapshot = counters.take_snapshot();
         assert_eq!(snapshot.totals.failed, 1);
         assert_eq!((snapshot.totals.searches, snapshot.totals.empty_searches), (1, 1));
         assert_eq!((snapshot.totals.phase1_returned, snapshot.totals.phase2_runs), (3, 1));
         assert_eq!((snapshot.surb_totals.minted, snapshot.surb_totals.returned), (4, 1));
-        let probes = snapshot.probes.context("probes are enabled with the observer")?;
-        assert_eq!((probes.neighbor.timed_out, probes.loopback.succeeded), (1, 1));
+        assert!(snapshot.probes.is_none(), "probe reporting stays in the producer");
         Ok(())
     }
 
     #[test]
-    /// Keep probe availability distinct from zero activity after interval counters reset.
-    fn successful_events_and_idle_windows_preserve_probe_registration() -> anyhow::Result<()> {
+    /// Keep probe outcomes out of state dumps, including idle intervals.
+    fn successful_events_and_idle_windows_do_not_register_probe_counters() -> anyhow::Result<()> {
         let counters = IntervalCounters::default();
         let observer = transport_observer(counters.clone());
         let destination = NodeId::Chain(Address::from([2; 20]));
@@ -197,27 +186,18 @@ mod tests {
             phase2: None,
             retained: 1,
         });
-        observer(TransportEvent::Probe(ProbeOutcome::Neighbor {
-            peer: destination,
-            succeeded: true,
-        }));
-        observer(TransportEvent::Probe(ProbeOutcome::Loopback { succeeded: false }));
         let snapshot = counters.take_snapshot();
         assert_eq!(snapshot.totals.succeeded, 1);
         assert_eq!(snapshot.totals.failed, 0);
         assert_eq!(snapshot.totals.searches, 1);
         assert_eq!(snapshot.totals.empty_searches, 0);
         assert_eq!(snapshot.totals.phase2_runs, 0);
-        let probes = snapshot.probes.context("registered probes")?;
-        assert_eq!(probes.neighbor.succeeded, 1);
-        assert_eq!(probes.loopback.timed_out, 1);
+        assert!(snapshot.probes.is_none(), "probe reporting stays in the producer");
 
         let idle = counters.take_snapshot();
         assert_eq!(idle.totals.succeeded, 0);
         assert_eq!(idle.totals.searches, 0);
-        let probes = idle.probes.context("registration survives the interval reset")?;
-        assert_eq!(probes.neighbor.succeeded, 0);
-        assert_eq!(probes.loopback.timed_out, 0);
+        assert!(idle.probes.is_none(), "idle intervals must not invent probe counters");
         Ok(())
     }
 }
