@@ -4,10 +4,9 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    # nix-lib is the anchor for the heavy pins: nixpkgs, nixpkgs-unstable, rust-overlay and crane
-    # come from its lock, so every hoprnet flake on the same nix-lib release evaluates against the
-    # same revisions and shares one set of store paths. To bump them, point nix-lib.url at the new
-    # release tag, then run `nix flake update nix-lib`.
+    # The heavy pins (nixpkgs, nixpkgs-unstable, rust-overlay and crane) come from nix-lib's
+    # lock. To bump them, point nix-lib.url at the new release tag, then run
+    # `nix flake update nix-lib`.
     nix-lib.url = "github:hoprnet/nix-lib/v2.1.7";
     nixpkgs.follows = "nix-lib/nixpkgs";
     nixpkgs-unstable.follows = "nix-lib/nixpkgs-unstable";
