@@ -43,7 +43,7 @@ fn make_builder<Chain>(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
-    prober_cfg: hopr_ct_full_network::ProberConfig,
+    prober_cfg: hopr_ct_full_network::EgressConfig,
     chain_connector: Chain,
 ) -> anyhow::Result<FullyConfiguredBuilder<Chain>>
 where
@@ -109,7 +109,7 @@ pub async fn build_edge_with_chain<
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
@@ -149,7 +149,7 @@ pub async fn build_full_with_chain<
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
 ) -> anyhow::Result<Arc<FullHopr<Chain>>>
@@ -195,7 +195,7 @@ pub async fn build_entry_with_chain<
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
@@ -238,7 +238,7 @@ pub async fn build_exit_with_chain<
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
     config: HoprLibConfig,
-    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
