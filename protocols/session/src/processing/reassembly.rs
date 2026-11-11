@@ -13,9 +13,12 @@ use tracing::instrument;
 
 use crate::{
     errors::SessionError,
-    processing::types::{
-        FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
-        FrameMapVacantEntry,
+    processing::{
+        reorder::SharedReorder,
+        types::{
+            FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
+            FrameMapVacantEntry,
+        },
     },
     protocol::{Frame, FrameId, Segment},
 };
@@ -67,10 +70,12 @@ pub struct Reassembler<S, M> {
     max_age: Duration,
     capacity: usize,
     last_expiration: Option<Instant>,
+    /// Where the time a frame of several segments took to arrive whole is recorded, if anywhere.
+    reorder: Option<SharedReorder>,
 }
 
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
-    fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
+    fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize, reorder: Option<SharedReorder>) -> Self {
         Self {
             inner,
             timer: futures_time::task::sleep(
@@ -83,6 +88,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
             last_expiration: None,
             max_age,
             capacity,
+            reorder,
         }
     }
 
@@ -153,6 +159,12 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                             .observe(builder.created.elapsed().as_millis() as f64);
 
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
+                                        // Its segments were sent together and took different paths:
+                                        // how far apart they arrived is the spread of those paths.
+                                        if let Some(reorder) = this.reorder.as_ref() {
+                                            let now = Instant::now();
+                                            reorder.record(now, now.duration_since(builder.created));
+                                        }
                                         return Poll::Ready(Some(e.finalize().try_into()));
                                     }
                                 }
@@ -216,12 +228,27 @@ pub trait ReassemblerExt: futures::Stream<Item = Segment> {
     where
         Self: Sized,
     {
+        self.reassembler_sharing(timeout, capacity, None)
+    }
+
+    /// As [`ReassemblerExt::reassembler`], recording into `reorder` how long each frame of several
+    /// segments took from its first segment to its last.
+    fn reassembler_sharing(
+        self,
+        timeout: Duration,
+        capacity: usize,
+        reorder: Option<SharedReorder>,
+    ) -> Reassembler<Self, FrameHashMap>
+    where
+        Self: Sized,
+    {
         // FrameHashMap is much faster than a FrameDashMap used in a FrameInspector
         Reassembler::new(
             self,
             FrameHashMap::with_capacity(FrameInspector::INCOMPLETE_FRAME_RATIO * capacity + 1),
             timeout,
             capacity,
+            reorder,
         )
     }
 
@@ -239,7 +266,7 @@ pub trait ReassemblerExt: futures::Stream<Item = Segment> {
     where
         Self: Sized,
     {
-        Reassembler::new(self, inspector.0.clone(), timeout, capacity)
+        Reassembler::new(self, inspector.0.clone(), timeout, capacity, None)
     }
 }
 
