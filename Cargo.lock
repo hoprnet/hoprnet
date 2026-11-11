@@ -4144,9 +4144,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "5.0.0"
+version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa64c5a401c0c7db4ad9a0688d11e59bc4566f92c0661e8ef97e4008816509ad"
+checksum = "e318135827d2b0838d5da8f53cf4cad7eb2117fcda288c154656cf9b5ec16d8b"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4156,6 +4156,7 @@ dependencies = [
  "futures-concurrency",
  "hopr-types",
  "libp2p-identity",
+ "num_enum",
  "serde",
  "serde_bytes",
  "strum",
@@ -4183,8 +4184,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.31.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?rev=e4066d24b14c988e01f93f8482650a23d27b382b#e4066d24b14c988e01f93f8482650a23d27b382b"
+version = "0.32.0"
+source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#8b33798980d1ec3e912a30c9e9d9df73ab29d4e6"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4204,7 +4205,6 @@ dependencies = [
  "petgraph",
  "postcard",
  "redb",
- "serde",
  "serde_json",
  "smart-default",
  "tempfile",
@@ -7316,7 +7316,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7356,7 +7356,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7369,7 +7369,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "windows-sys 0.61.2",
 ]
 

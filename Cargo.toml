@@ -164,7 +164,7 @@ hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.34.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.31.1" }
+hopr-chain-connector = { version = "0.32.0" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
@@ -236,4 +236,4 @@ ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 
 [patch.crates-io]
 # CORE-1168 / hopr-impls#76: remove with the temporary CI exception after publication.
-hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "e4066d24b14c988e01f93f8482650a23d27b382b" }
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", branch = "feature/core-1168-periodic-compact-state-dump-reduce-debug-cardinality-for" }
