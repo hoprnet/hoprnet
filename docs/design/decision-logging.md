@@ -116,14 +116,14 @@ transport construction. It returns the observer and a lazy reporting future, or
 adapter implements the interval behavior described above; applications can supply
 their own reporter without implementing any connector-specific chain trait.
 
-The test adapter uses `hopr-chain-connector` 0.31.1 from the pinned hopr-impls
-revision `e4066d24b14c988e01f93f8482650a23d27b382b`. `hopr-network-graph` 0.10.3
-comes from crates.io; there is no graph Git override. The connector's temporary
-CORE-1168 dependency-policy exception expires on 25 November 2026. Before that date,
-publish the companion connector and remove its Git patch and CI exception, then
-regenerate Cargo.lock and run the dependency gate without an exception. This
-workspace patch does not make the unpublished connector available to external consumers;
-the companion release remains a prerequisite for publishing dependent crates.
+The workspace resolves `hopr-chain-connector` 0.32.0 from the CORE-1168 hopr-impls
+branch; Cargo.lock records the selected revision. `hopr-network-graph` 0.10.3 comes
+from crates.io; there is no graph Git override. No CI exception is installed for
+the connector patch. Before merging, use a published connector release containing
+the companion changes, remove its Git patch, regenerate Cargo.lock and run the
+dependency gate. The workspace patch does not make the unpublished connector
+available to external consumers; the companion release remains a prerequisite for
+publishing dependent crates.
 
 Run the `state_dump` integration test with `--features testing,state-dump`. It runs
 runtime enabled/disabled configurations in isolated processes. It verifies real INFO
