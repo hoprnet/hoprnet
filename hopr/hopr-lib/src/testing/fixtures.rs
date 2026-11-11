@@ -835,7 +835,7 @@ fn cluster_fixture_inner(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
-                        Some(hopr_ct_full_network::ProberConfig {
+                        Some(hopr_ct_full_network::EgressConfig {
                             interval: std::time::Duration::from_secs(3),
                             ..Default::default()
                         }), // moderate setting to allow probing without saturating relay traffic
@@ -1063,7 +1063,7 @@ where
                         cfg.surb_balance_notify_period,
                     );
 
-                    let prober = Some(hopr_ct_full_network::ProberConfig {
+                    let prober = Some(hopr_ct_full_network::EgressConfig {
                         interval: std::time::Duration::from_secs(3),
                         ..Default::default()
                     });
