@@ -235,5 +235,5 @@ similar.opt-level = 3
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
 
 [patch.crates-io]
-hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", branch = "feature/core-1168-periodic-compact-state-dump-reduce-debug-cardinality-for" }
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls.git", branch = "feature/core-1168-periodic-compact-state-dump-reduce-debug-cardinality-for" }
+# CORE-1168 / hopr-impls#76: remove with the temporary CI exception after publication.
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", rev = "e4066d24b14c988e01f93f8482650a23d27b382b" }

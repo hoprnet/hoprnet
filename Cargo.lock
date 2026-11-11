@@ -4184,7 +4184,7 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.31.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"
+source = "git+https://github.com/hoprnet/hopr-impls.git?rev=e4066d24b14c988e01f93f8482650a23d27b382b#e4066d24b14c988e01f93f8482650a23d27b382b"
 dependencies = [
  "ahash",
  "anyhow",
@@ -10123,8 +10123,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "hopr-network-graph"
-version = "0.10.1"
-source = "git+https://github.com/hoprnet/hopr-impls.git?branch=feature%2Fcore-1168-periodic-compact-state-dump-reduce-debug-cardinality-for#e4066d24b14c988e01f93f8482650a23d27b382b"

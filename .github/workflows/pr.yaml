@@ -132,10 +132,16 @@ jobs:
         with:
           source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          # CORE-1168: pinned companion hopr-impls#76; remove after connector publication.
+          # The checker fails closed when this exception expires on 2026-11-25 (UTC).
           command: |
             nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
               uv run --project .ci/no-git-dependencies \
-              python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py
+              python -m unittest discover -s .ci/no-git-dependencies/tests
+            nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
+              uv run --project .ci/no-git-dependencies \
+              python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py \
+                --allow hopr-chain-connector --allow-until 2026-11-25
 
   checks:
     name: Check

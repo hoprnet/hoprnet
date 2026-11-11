@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import sys
 from pathlib import Path
 
@@ -41,7 +42,21 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Crate name allowed to use git-based dependencies. Can be repeated.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--allow-until",
+        help="UTC expiry date (YYYY-MM-DD) required for a temporary --allow exception.",
+    )
+    args = parser.parse_args()
+    if args.allowed_crates or args.allow_until:
+        if not args.allowed_crates or not args.allow_until:
+            parser.error("temporary exceptions require both --allow and --allow-until")
+        try:
+            expires = datetime.strptime(args.allow_until, "%Y-%m-%d").date()
+        except ValueError:
+            parser.error("--allow-until must be a date in YYYY-MM-DD format")
+        if datetime.now(timezone.utc).date() >= expires:
+            parser.error(f"dependency exception expired on {args.allow_until}; publish the companion and remove it")
+    return args
 
 
 def workspace_cargo_tomls(root: Path) -> list[Path]:
