@@ -1,4 +1,4 @@
-# Operational logging
+# Decision logging
 
 With the opt-in `hopr-lib/state-dump` Cargo feature enabled, install a reporter via
 `HoprBuilderConfigured::with_state_dump`. The node starts its managed reporting
@@ -22,7 +22,9 @@ search-phase health, sibling forward/reply SURB counts, and neighbor/loopback pr
 outcomes. The connector caps the JSON payload at 32 KiB, excluding the logger
 wrapper. It reads adjacent local channels in batches and preserves partial results,
 read errors, timeouts, omitted detail and counter overflow. It is not an atomic or
-freshness-verified chain snapshot. Identities use the connector's JSON serialization;
+freshness-verified chain snapshot. These logs contain peer-linkable traffic metadata. Operators should restrict access
+and choose retention accordingly before shipping them to external log services.
+Identities use the connector's JSON serialization;
 compare serialized identities rather than assuming a particular display format.
 
 For a network with 1,000 nodes and 50 edges per node, the record remains a bounded
@@ -56,7 +58,7 @@ The transport does not depend on the state dump. It reports `TransportEvent`s (p
 resolves, graph searches, SURB mints and returns, probe outcomes) to an optional
 `TransportObserver`. The embedding application supplies a `StateDumpFactory` that
 connects these events to its counters and returns a lazy `StateDump` task. The
-connector-backed adapter in [the test wiring](../hopr/hopr-lib/src/testing/state_dump.rs)
+connector-backed adapter in [the test wiring](../../hopr/hopr-lib/src/testing/state_dump.rs)
 shows how to use the companion collector and its `IntervalCounters`. Successful
 resolves and SURB counts never wait for the counters'
 lock; when it is busy they are counted in the totals and overflow only. Resolver
@@ -73,7 +75,7 @@ distinct from genuine zero activity.
 `state-dump` enabled. The application owns any additional reads its collector
 needs; the companion collector uses the connector's error-preserving `StateRead`
 interface. Custom transport embedders can pass an observer directly to
-`HoprTransport::new_with_observer`; `HoprTransport::new` reports nothing.
+`HoprTransport::new(...)? .with_observer(observer)`; the constructor alone reports nothing.
 
 The embedding node can add up to four named sections to every record with
 `HoprBuilderConfigured::with_state_dump_section`, for example the states of its
@@ -82,10 +84,21 @@ once per record and capped at 2 KiB. Underfunded outgoing channels are listed by
 (up to sixteen, lowest balance first); incoming channels are funded by their
 counterparty and are not counted as underfunded.
 
+A section name is the JSON object key that identifies the producer, not a logging
+level or metric label. For example, an embedding application can register
+`with_state_dump_section("strategies", strategy_state_observer)` and read its
+value under `sections.strategies` in the decoded record. Names let independently
+registered application observers coexist without flattening or colliding with the
+collector's fields. The callback is lazy and is not called when reporting is disabled.
+
 Routine probe ping/pong, expiry, path resolution, selector candidates/search failures,
 return-path draws, SURB mint/decode and per-pair round-trip details use TRACE. Relayer
 sets used only for path diagnostics are also computed only when TRACE is enabled.
-DEBUG retains aggregate cache updates and actionable degradation transitions. SURB
+DEBUG retains bounded weighted-collection summaries on cache rebuild (up to eight
+path/weight pairs, total weight, candidate count and omitted count), aggregate cache
+updates and actionable degradation transitions. Probe replies and expiry callbacks
+retain producer-local TRACE spans with pseudonym/tag or peer context; the periodic
+record aggregates outcomes across those spans and supplements the local events. SURB
 flushes retain one aggregate INFO event per active interval. Named blind-spot details
 are capped at eight destinations, with an omitted count. TRACE requires a build that
 retains that static level.
@@ -99,9 +112,14 @@ transport construction. It returns the observer and a lazy reporting future, or
 adapter implements the interval behavior described above; applications can supply
 their own reporter without implementing any connector-specific chain trait.
 
-The companion connector and graph remain test dependencies sourced from the hopr-impls
-CORE-1168 Git branch; Cargo.lock pins their revision. Remove the workspace Git
-patches when the companion crates are released.
+The test adapter uses `hopr-chain-connector` 0.31.1 from the pinned hopr-impls
+revision `e4066d24b14c988e01f93f8482650a23d27b382b`. `hopr-network-graph` 0.10.3
+comes from crates.io; there is no graph Git override. The connector's temporary
+CORE-1168 dependency-policy exception expires on 25 November 2026. Before that date,
+publish the companion connector and remove its Git patch and CI exception, then
+regenerate Cargo.lock and run the dependency gate without an exception. This
+workspace patch does not make the unpublished connector available to external consumers;
+the companion release remains a prerequisite for publishing dependent crates.
 
 Run the `state_dump` integration test with `--features testing,state-dump`. It runs
 runtime enabled/disabled configurations in isolated processes. It verifies real INFO
