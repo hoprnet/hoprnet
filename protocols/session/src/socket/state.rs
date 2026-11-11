@@ -324,6 +324,7 @@ mod tests {
             alice,
             CloneableMockState::new(alice_state, "alice"),
             cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -331,6 +332,7 @@ mod tests {
             bob,
             CloneableMockState::new(bob_state, "bob"),
             cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;

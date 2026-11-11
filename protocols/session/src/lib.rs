@@ -48,6 +48,7 @@ pub use socket::telemetry::{NoopTracker, SessionMessageDiscriminants, SessionTel
 pub use socket::{
     SessionSocket, SessionSocketConfig,
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
+    loss_signal::FrameLossSignal,
     state::{SocketComponents, SocketState, Stateless},
 };
 
@@ -103,11 +104,11 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     {
         #[cfg(feature = "telemetry")]
         {
-            SessionSocket::new(self, ack, cfg, NoopTracker)
+            SessionSocket::new(self, ack, cfg, None, NoopTracker)
         }
         #[cfg(not(feature = "telemetry"))]
         {
-            SessionSocket::new(self, ack, cfg)
+            SessionSocket::new(self, ack, cfg, None)
         }
     }
 
@@ -122,11 +123,11 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
     {
         #[cfg(feature = "telemetry")]
         {
-            SessionSocket::new_stateless(id, self, cfg, NoopTracker)
+            SessionSocket::new_stateless(id, self, cfg, None, NoopTracker)
         }
         #[cfg(not(feature = "telemetry"))]
         {
-            SessionSocket::new_stateless(id, self, cfg)
+            SessionSocket::new_stateless(id, self, cfg, None)
         }
     }
 }
