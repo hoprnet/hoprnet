@@ -27,8 +27,8 @@ pub use hopr_utils::network_types::types::*;
 pub use manager::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult,
     DropReason, IncomingSessionPixConfig, MAX_ASSUMED_SESSION_PACKET_RATE, MAX_OVERLAPPING_BATCHES, MAX_SSA_BATCH_SIZE,
-    MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, cycle_budget_for,
-    max_cycle_budget_for_quota, validate_incoming_session_pix_config,
+    MIN_SURB_BUFFER_DURATION, PixToolbox, START_SESSION_ADMISSION_CONCURRENCY, SessionManager, SessionManagerConfig,
+    cycle_budget_for, max_cycle_budget_for_quota, validate_incoming_session_pix_config,
 };
 pub use supervision::{FillRate, PixFillConfig, SupervisorConfig, validate_pix_supervision};
 /// The supervisor state machine and its event/action vocabulary, for `benches/supervisor_bench.rs`,

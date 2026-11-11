@@ -687,29 +687,36 @@ fn is_full_queue_warn_due(drops_so_far: usize) -> bool {
     drops_so_far.is_multiple_of(FULL_QUEUE_WARN_INTERVAL)
 }
 
-/// Ceiling on the per-session term of [`start_protocol_channel_capacity`].
+/// How many queued `StartSession`s may wait per handler.
 ///
-/// A session contributes to this channel only while its Start exchange is in flight — a handful of
-/// messages between initiation and establishment — after which it is silent apart from PIX, which
-/// the commitment term already covers. So the queue depth tracks concurrent *handshakes*, not the
-/// total number of sessions the node may manage, and `maximum_managed_sessions` (validated up to
-/// 100 000) is the wrong quantity to size a pre-allocated ring from.
-const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
+/// Two is enough to keep the pool fed without queuing work beyond a peer's initiation timeout.
+const START_SESSION_LANE_DEPTH_FACTOR: usize = 2;
 
-/// Capacity of the Start protocol ingress channel.
+/// `StartSession` handlers allowed in hand at once.
 ///
-/// This channel is fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow
-/// **drops** the message. For most Start messages that is recoverable, but a dropped `SsaCommit`
-/// is not: there is no NACK or retransmission, so the corresponding coefficient cell stays empty
-/// forever, the commitment never completes, every subsequent share fails to verify, and the cycle
-/// dies on the supervisor's `max_deposit_wait` deadline.
+/// Mirrors `incoming_session_capacity` in `hopr-lib` (256), the other bound on a handshake; that
+/// figure is not reachable from [`SessionManagerConfig`].
+const MAX_CONCURRENT_START_SESSIONS: usize = 256;
+
+/// Concurrent session-server admission waits, held below the lane size so a slow server refuses
+/// with `Busy` instead of parking every handler.
 ///
-/// PIX changed this channel's load from roughly one message per session to the *entire* commitment
-/// set of an SSA cycle, chunked into packet-sized messages, plus a reserve for ordinary Start
-/// traffic. Batching multiplies that: an Exit may ask for up to
-/// [`ssas_per_request`](crate::SupervisorConfig::ssas_per_request) SSAs at once and gets that many
-/// cycles' commitment sets back-to-back, all landing here, so the per-cycle term is scaled by the
-/// configured maximum even when dynamic admission selects less for a particular Session.
+/// The session server bounds its own worker pool by the same figure: a permit is released when the
+/// transport stops waiting, not when `admit` returns, so the server needs its own bound.
+pub const START_SESSION_ADMISSION_CONCURRENCY: usize = 64;
+
+/// Capacity of the control Start protocol lane (every variant but `StartSession`).
+///
+/// Fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow **drops** the
+/// message. For most Start messages that is recoverable, but a dropped `SsaCommit` is not: there is
+/// no NACK or retransmission, so the coefficient cell stays empty forever, the commitment never
+/// completes, and the cycle dies on the supervisor's `max_deposit_wait` deadline. It therefore keeps
+/// the whole PIX commitment term.
+///
+/// PIX load is the *entire* commitment set of an SSA cycle, chunked into packet-sized messages.
+/// Batching multiplies it: an Exit may ask for up to
+/// [`ssas_per_request`](crate::SupervisorConfig::ssas_per_request) SSAs at once, so the per-cycle
+/// term is scaled by the configured maximum even when dynamic admission selects less.
 ///
 /// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
@@ -719,23 +726,19 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 /// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
 ///   quota says. It therefore bounds the commitments a cycle can ever deliver.
 ///
-/// Clamping to the second matters because this capacity is *reserved*, not merely enforced:
-/// `crossfire`'s array flavour pre-allocates every slot when the channel is built. An
-/// operator-settable `quota_range` feeding an unclamped derivation is an allocation with no upper
-/// bound — at `quota_range.end() = 1e13` it asks for 77 GB. Over-provisioning is still the safe
-/// direction within the clamp, and the surviving margin is large: the default dimensions burst
-/// ≈ 160 messages against a capacity term of ≈ 648.
+/// Clamping to the second matters because this capacity is *reserved*: an operator-settable
+/// `quota_range` feeding an unclamped derivation is an allocation with no upper bound — at
+/// `quota_range.end() = 1e13` it asks for 77 GB. At the default dimensions the commitments reach
+/// the [`MAX_POLYS_PER_SSA`] ceiling, so the capacity term is the resulting burst plus
+/// `START_PROTOCOL_CHANNEL_RESERVE`: the margin over the burst is the reserve itself.
 ///
 /// The batch factor is bounded by [`MAX_SSA_BATCH_SIZE`] for the same allocation reason, and is
-/// clamped here rather than being taken on trust from the config, so that callers which build a
-/// `SessionManagerConfig` without going through [`SessionManager::new`] cannot inflate it.
+/// clamped here rather than taken on trust from the config, so callers that build a
+/// [`SessionManagerConfig`] without going through [`SessionManager::new`] cannot inflate it.
 ///
-/// The session term is clamped for the same reason. `maximum_managed_sessions` validates up to
-/// 100 000, and one slot holds a `(HoprPseudonym, HoprStartProtocol)` sized by the enum's largest
-/// variant, so an operator raising the session limit would silently buy a multi-megabyte startup
-/// allocation. Ordinary Start traffic is one message per session *in flight*, not one per session
-/// the node will ever manage, so [`MAX_CONCURRENT_START_EXCHANGES`] is the honest bound.
-fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
+/// Deliberately **not** sized by `maximum_sessions`: that quantity sizes the session lane, where a
+/// `StartSession` flood's own drops are taken, and this lane is the one a flood must not touch.
+fn start_control_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     let max_commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
     let ssas_per_request = cfg.pix_config.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u64;
@@ -743,8 +746,17 @@ fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
     usize::try_from(max_commit_msgs.saturating_mul(ssas_per_request))
         .unwrap_or(usize::MAX)
-        .saturating_add(cfg.maximum_sessions.min(MAX_CONCURRENT_START_EXCHANGES))
         .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
+}
+
+/// Capacity of the `StartSession` lane.
+///
+/// Sized from the handler pool, not from `maximum_sessions`: a queued `StartSession` is drained only
+/// as fast as a handler frees up, and each may park for `session_admission_timeout`. A lane sized by
+/// the session limit would queue minutes of work in front of the pool, so the peer long since gave
+/// up by the time it is handled.
+fn start_session_channel_capacity() -> usize {
+    (MAX_CONCURRENT_START_SESSIONS * START_SESSION_LANE_DEPTH_FACTOR).saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
 }
 
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
@@ -2363,7 +2375,7 @@ pub enum DropReason {
     /// A Start-tagged packet that failed to decode. Anyone can send these for free, so the volume
     /// must never become the log.
     MalformedStartMessage,
-    /// The bounded Start-protocol processing queue was full (`TrySendError::Full`): backpressure,
+    /// The bounded Start-protocol processing lane was full (`TrySendError::Full`): backpressure,
     /// not a teardown.
     StartQueueFull,
 }
@@ -2460,7 +2472,7 @@ impl IncomingSessionPixConfig {
     ///
     /// The configured [`quota_range`](Self::quota_range) is an envelope, not a default: it is what
     /// [`validate_incoming_session_pix_config`] checked the deadlines and memory ceiling against,
-    /// and what [`start_protocol_channel_capacity`] sized a preallocated ring from, both once at
+    /// and what [`start_control_channel_capacity`] sized a preallocated ring from, both once at
     /// startup. So a decision's range is *intersected* with it rather than replacing it — a Session
     /// may be held to less than the node advertises, never to more than it was configured to
     /// honour. An operator wanting a wider class configures a wider envelope and narrows the rest.
@@ -2988,11 +3000,8 @@ impl SurbsStored {
 // see `refuse_pix_over_direct_return_path`. What the packet did to the SURB store travels too, taken
 // before the conversion into a `HoprStartProtocol` consumes the data it is counted from: the part
 // dispatch could not book itself, which is all of it only for an opening that creates its Session.
-type StartProtocolMsgSink = Arc<
-    OnceLock<
-        crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored)>>,
-    >,
->;
+type StartMessage = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
+type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<StartMessage>>>>;
 
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
 #[derive(Clone)]
@@ -3362,7 +3371,10 @@ pub struct SessionManager<S> {
     // Keeps track of Session initiations requests on the Client side.
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
-    start_protocol_tx: StartProtocolMsgSink,
+    /// `StartSession` only: the lane that may park on admission.
+    start_session_tx: StartProtocolMsgSink,
+    /// Every other Start variant: the lane a session flood must never delay.
+    start_control_tx: StartProtocolMsgSink,
     /// Authoritative session count for admission control.
     /// Incremented atomically inside `allocate_session_slot` before the cache insertion,
     /// and decremented at every removal path (explicit close, eviction, guard rollback).
@@ -3440,6 +3452,9 @@ pub struct SessionManager<S> {
     /// [`set_surb_admission`](Self::set_surb_admission) exists and why a missed call is observable
     /// in the store's own admission metrics rather than silent here.
     surb_admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
+    /// Permits for concurrent session-server admission waits, so a slow server refuses with `Busy`
+    /// instead of parking every `StartSession` handler.
+    admission_permits: Arc<hopr_utils::runtime::prelude::Semaphore>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -3447,7 +3462,8 @@ impl<S> Clone for SessionManager<S> {
         Self {
             session_initiations: self.session_initiations.clone(),
             session_notifiers: self.session_notifiers.clone(),
-            start_protocol_tx: self.start_protocol_tx.clone(),
+            start_session_tx: self.start_session_tx.clone(),
+            start_control_tx: self.start_control_tx.clone(),
             active_sessions: self.active_sessions.clone(),
             live_cycle_bytes: self.live_cycle_bytes.clone(),
             sessions: self.sessions.clone(),
@@ -3459,6 +3475,7 @@ impl<S> Clone for SessionManager<S> {
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
             surb_admission: self.surb_admission.clone(),
+            admission_permits: self.admission_permits.clone(),
         }
     }
 }
@@ -3590,6 +3607,22 @@ fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: 
     #[cfg(not(feature = "telemetry"))]
     let _ = session_id;
     true
+}
+
+/// Shared result handling for both Start lanes.
+fn report_start_result(result: errors::Result<()>) {
+    match result {
+        Ok(()) => {}
+        // Dropped on purpose and not a fault: the request lock, the successor gate (early or
+        // under-served), the stale-index check and a repeat whose interrupted publication could not
+        // be finished all refuse this way. The handler has already logged the first occurrence at
+        // the level it deserves, and the peer re-asks — which can succeed for all of them but a
+        // stale request.
+        Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
+            tracing::debug!(%reason, "Start protocol message not admitted");
+        }
+        Err(error) => tracing::error!(%error, "failed to process Start protocol message"),
+    }
 }
 
 /// Books an incoming packet's SURBs into the Exit's flow estimator.
@@ -4226,7 +4259,8 @@ where
                 .build(),
             pix_toolbox,
             session_notifiers: Arc::new(OnceLock::new()),
-            start_protocol_tx: Arc::new(OnceLock::new()),
+            start_session_tx: Arc::new(OnceLock::new()),
+            start_control_tx: Arc::new(OnceLock::new()),
             active_sessions,
             live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
@@ -4243,6 +4277,9 @@ where
                 .build(),
             admission_tx: Arc::new(OnceLock::new()),
             surb_admission: surb_admission_in_struct,
+            admission_permits: Arc::new(hopr_utils::runtime::prelude::Semaphore::new(
+                START_SESSION_ADMISSION_CONCURRENCY,
+            )),
         }
     }
 
@@ -4325,9 +4362,13 @@ where
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (start_protocol_tx, start_protocol_rx) =
-            crossfire::mpsc::bounded_blocking_async(start_protocol_channel_capacity(&self.cfg));
-        let _ = self.start_protocol_tx.set(start_protocol_tx);
+        let (start_session_tx, start_session_rx) =
+            crossfire::mpsc::bounded_blocking_async(start_session_channel_capacity());
+        let _ = self.start_session_tx.set(start_session_tx);
+
+        let (start_control_tx, start_control_rx) =
+            crossfire::mpsc::bounded_blocking_async(start_control_channel_capacity(&self.cfg));
+        let _ = self.start_control_tx.set(start_control_tx);
 
         let myself = self.clone();
         let closure_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -4389,82 +4430,119 @@ where
                 .await;
         });
 
-        // Begin processing of Start protocol messages
+        // Process Start protocol messages. Two lanes: `StartSession` parks on admission and gets its
+        // own pool, so a flood of it cannot starve the control traffic of live Sessions.
         let myself = self.clone();
-        let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
-            "session_start_protocol_processor",
-            start_protocol_rx.into_stream().for_each_concurrent(
-                Some(self.cfg.maximum_sessions + 10),
+        let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_start_session_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let ah_start_session = hopr_utils::spawn_as_abortable_named!(
+            "session_start_session_processor",
+            start_session_rx.into_stream().for_each_concurrent(
+                Some(MAX_CONCURRENT_START_SESSIONS),
                 move |(pseudonym, protocol_msg, packet_info, stored)| {
                     let myself = myself.clone();
-                    async move {
-                        let result = match protocol_msg {
-                            HoprStartProtocol::StartSession(session_req) => {
-                                match myself
-                                    .refuse_pix_over_direct_return_path(
-                                        pseudonym,
-                                        &session_req,
-                                        packet_info.min_return_path_hops,
-                                    )
-                                    .await
-                                {
-                                    Ok(false) => {
-                                        let opened =
-                                            myself.handle_incoming_session_initiation(pseudonym, session_req).await;
-                                        // The opening's SURBs are in the pseudonym's ring already, promoted
-                                        // into the admitted class with it, but arrived before the Session
-                                        // existed, so dispatch could not book them. Without them the Exit's
-                                        // estimate starts, and stays, below what the ring holds. What the
-                                        // ring lost as they arrived is not this Session's to book: its
-                                        // estimate never counted that stock, which a newer generation
-                                        // superseded from an earlier Session under the pseudonym, and an
-                                        // opening's few SURBs do not overflow a ring on their own.
-                                        if opened.is_ok()
-                                            && let Some(slot) = myself.sessions.get(&pseudonym)
-                                        {
-                                            let _ = book_start_message_surbs(
-                                                &slot,
-                                                &pseudonym,
-                                                SurbsStored { evicted: 0, ..stored },
-                                            );
-                                        }
-                                        opened
+                    let session_diag = session_diag.clone();
+                    session_diag.wrap(|| {
+                        let myself = myself.clone();
+                        async move {
+                            // Routing puts only `StartSession` on this lane.
+                            let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
+                                unreachable!("only StartSession is routed to the session lane")
+                            };
+                            let result = match myself
+                                .refuse_pix_over_direct_return_path(
+                                    pseudonym,
+                                    &session_req,
+                                    packet_info.min_return_path_hops,
+                                )
+                                .await
+                            {
+                                Ok(false) => {
+                                    let opened =
+                                        myself.handle_incoming_session_initiation(pseudonym, session_req).await;
+                                    // The opening's SURBs are in the pseudonym's ring already, promoted
+                                    // into the admitted class with it, but arrived before the Session
+                                    // existed, so dispatch could not book them. Without them the Exit's
+                                    // estimate starts, and stays, below what the ring holds. What the
+                                    // ring lost as they arrived is not this Session's to book: its
+                                    // estimate never counted that stock, which a newer generation
+                                    // superseded from an earlier Session under the pseudonym, and an
+                                    // opening's few SURBs do not overflow a ring on their own.
+                                    if opened.is_ok()
+                                        && let Some(slot) = myself.sessions.get(&pseudonym)
+                                    {
+                                        let _ = book_start_message_surbs(
+                                            &slot,
+                                            &pseudonym,
+                                            SurbsStored { evicted: 0, ..stored },
+                                        );
                                     }
-                                    refused => refused.map(|_| ()),
+                                    opened
                                 }
-                            }
-                            HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
-                            HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(pseudonym, error_type).await
-                            }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
-                            HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                myself.handle_ssa_commit(pseudonym, client_commit_msg).await
-                            }
-                            HoprStartProtocol::SsaRequest(server_commit_msg) => {
-                                myself.handle_ssa_request(pseudonym, server_commit_msg).await
-                            }
-                        };
+                                refused => refused.map(|_| ()),
+                            };
 
-                        match result {
-                            Ok(()) => {}
-                            // Dropped on purpose and not a fault: the request lock, the successor
-                            // gate (early or under-served), the stale-index check and a repeat whose
-                            // interrupted publication could not be finished all refuse this way. The
-                            // handler has already logged the first occurrence of a gate or stale
-                            // refusal at the level it deserves, and the peer re-asks — which can
-                            // succeed for all of them but a stale request.
-                            Err(TransportSessionError::Manager(SessionManagerError::NotAdmitted(reason))) => {
-                                tracing::debug!(%reason, "Start protocol message not admitted");
-                            }
-                            Err(error) => tracing::error!(%error, "failed to process Start protocol message"),
+                            report_start_result(result);
                         }
-                    }
+                    })
                 }
             )
         );
 
-        Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
+        let myself = self.clone();
+        let control_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_start_control_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let ah_start_control = hopr_utils::spawn_as_abortable_named!(
+            "session_start_control_processor",
+            start_control_rx.into_stream().for_each_concurrent(
+                Some(self.cfg.maximum_sessions + 10),
+                move |(pseudonym, protocol_msg, _packet_info, _stored)| {
+                    let myself = myself.clone();
+                    let control_diag = control_diag.clone();
+                    control_diag.wrap(|| {
+                        let myself = myself.clone();
+                        async move {
+                            let result = match protocol_msg {
+                                HoprStartProtocol::SessionEstablished(est) => {
+                                    myself.handle_session_established(est).await
+                                }
+                                HoprStartProtocol::SessionError(error_type) => {
+                                    myself.handle_session_error(pseudonym, error_type).await
+                                }
+                                HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
+                                HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                    myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                                }
+                                HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                                    myself.handle_ssa_request(pseudonym, server_commit_msg).await
+                                }
+                                // Routing puts `StartSession` on the session lane.
+                                HoprStartProtocol::StartSession(_) => {
+                                    unreachable!("StartSession is never routed to the control lane")
+                                }
+                            };
+
+                            report_start_result(result);
+                        }
+                    })
+                }
+            )
+        );
+
+        Ok(vec![
+            ah_closure_notifications,
+            ah_session_expiration,
+            ah_start_session,
+            ah_start_control,
+        ])
     }
 
     /// Check if [`start`](SessionManager::start) has been called and the instance is running.
@@ -6401,7 +6479,7 @@ where
 
     /// Whether a Start-protocol message names Session state this node actually holds.
     ///
-    /// Start messages share one bounded worker pool, and several handlers park a worker on state a
+    /// Start control messages share one bounded worker pool, and several handlers park a worker on state a
     /// bogus message will never have — `handle_ssa_request` waits up to a second for a Session slot
     /// a random pseudonym never gets. Deciding admission here, where the session lookup is already
     /// being done, keeps those messages off the pool entirely.
@@ -6496,7 +6574,7 @@ where
 
             // Decode once, then decide locally whether anything on this node could handle it.
             // Without this check a peer spraying Start messages for pseudonyms it invented occupies
-            // the shared Start-protocol worker pool — several handlers park a worker on state such
+            // the Start-protocol worker pool — several handlers park a worker on state such
             // a message never has — and the bounded queue then fills, dropping every message behind
             // it.
             //
@@ -6524,25 +6602,47 @@ where
             }
 
             // This is a Start protocol message, so we send it to the handler, with the packet info
-            // and what the packet did to the SURB store.
+            // and what the packet did to the SURB store. `StartSession` parks on admission, so it
+            // gets its own lane; a flood of it must not delay a live Session's control traffic.
             trace!("dispatching Start protocol message");
-            if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
-                match start_protocol_tx.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
+            let is_session_lane = matches!(msg, HoprStartProtocol::StartSession(_));
+            let lane = if is_session_lane {
+                self.start_session_tx.get()
+            } else {
+                self.start_control_tx.get()
+            };
+
+            if let Some(lane) = lane {
+                match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
                     Ok(()) => {}
                     // Backpressure, not a fault: rate-limited so a sustained flood cannot become
-                    // per-packet log spam.
+                    // per-packet log spam. Control drops keep their own counter, so a StartSession
+                    // flood cannot hide a lost SsaCommit, which is unrecoverable.
                     Err(crossfire::TrySendError::Full(_)) => {
-                        let prev = crate::counters::START_PROTOCOL_SEND_DROPS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let counter = if is_session_lane {
+                            &crate::counters::START_PROTOCOL_SEND_DROPS
+                        } else {
+                            &crate::counters::START_CONTROL_SEND_DROPS
+                        };
+                        let prev = counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         if is_full_queue_warn_due(prev) {
+                            let lane = if is_session_lane { "session" } else { "control" };
                             warn!(
                                 %pseudonym,
+                                lane,
                                 total_start_queue_full_drops = prev + 1,
-                                "Start protocol queue full, dropping message (backpressure)"
+                                "Start protocol lane full, dropping message (backpressure)"
                             );
                         }
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_DISPATCHED_MSGS.increment_by(&["dropped_start_queue_full"], 1);
+                        {
+                            let lane = if is_session_lane {
+                                "dropped_start_session_queue_full"
+                            } else {
+                                "dropped_start_control_queue_full"
+                            };
+                            METRIC_DISPATCHED_MSGS.increment_by(&[lane], 1);
+                        }
                         return Ok(DispatchResult::Dropped(DropReason::StartQueueFull));
                     }
                     // A closed queue means the manager is shutting down, which is a real fault.
@@ -6771,6 +6871,17 @@ where
             None => request,
         };
 
+        // A permit bounds how many requests may be in flight at the server at once, so a slow server
+        // makes the excess wait here rather than in its own queue. The two waits below share one
+        // deadline, so a request the node spent on queuing is left that much less for the round trip
+        // and answers `Busy` — a transient failure the peer retries.
+        let deadline = futures_time::time::Instant::now() + self.cfg.session_admission_timeout.into();
+        let Ok(_permit) = self.admission_permits.acquire().timeout(deadline).await else {
+            // Any peer can trigger this, so it must not become the log at one line per refusal.
+            debug!(%session_id, "session admission is saturated; refusing the session as busy");
+            return Err(StartErrorReason::Busy);
+        };
+
         // `try_send` rather than an awaited send: waiting for room in the queue would hold this
         // initiation past the peer's own timeout, and the queue being full is exactly the condition
         // the bound exists to report.
@@ -6783,10 +6894,7 @@ where
             return Err(StartErrorReason::Busy);
         }
 
-        match reply_rx
-            .timeout(futures_time::time::Duration::from(self.cfg.session_admission_timeout))
-            .await
-        {
+        match reply_rx.timeout(deadline).await {
             Ok(Ok(Ok(decision))) => Ok(decision),
             Ok(Ok(Err(error))) => {
                 debug!(%session_id, %error, "the session server refused this session's target");
@@ -14005,7 +14113,7 @@ mod tests {
     }
 
     /// Verifies the `HoprStartProtocol::SessionError` match arm (line 689) in the
-    /// `session_start_protocol_processor` task by calling `handle_session_error` directly.
+    /// `session_start_control_processor` task by calling `handle_session_error` directly.
     ///
     /// When a `SessionError` message is delivered while a `new_session` call is awaiting,
     /// `handle_session_error` retrieves the pending challenge from `session_initiations`,
@@ -14692,6 +14800,49 @@ mod tests {
         assert_eq!(err.reason, StartErrorReason::Busy);
         assert_eq!(mgr.num_active_sessions(), 0);
 
+        sender.close_channel();
+        transport.await??;
+        Ok(())
+    }
+
+    /// With every admission permit taken, an initiation is refused `Busy` instead of reaching the
+    /// server and parking there for its whole deadline.
+    ///
+    /// Deterministic by construction: the permits are held directly, so no timing is involved.
+    #[test_log::test(tokio::test)]
+    async fn admission_without_a_free_permit_is_refused_as_busy() -> anyhow::Result<()> {
+        let (admission, mut rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(16);
+        let (mgr, sender, transport, err_rx, _incoming) =
+            started_manager_admitting_small_params(1..=small_params_quota(), false, Some(admission))?;
+
+        // Hold every permit for the duration of the attempt.
+        let held: Vec<_> = (0..START_SESSION_ADMISSION_CONCURRENCY)
+            .map(|_| {
+                mgr.admission_permits
+                    .try_acquire()
+                    .context("permits must be free at the start of the test")
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                ..pix_offer()
+            },
+        )
+        .await?;
+
+        let err = err_rx.await.context("the refusal never reached the entry")?;
+        assert_eq!(err.reason, StartErrorReason::Busy);
+        assert!(
+            rx.try_recv().is_err(),
+            "a refused initiation must not reach the session server"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        drop(held);
         sender.close_channel();
         transport.await??;
         Ok(())
@@ -15789,20 +15940,20 @@ mod tests {
         let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
         mgr.start(sender.clone(), new_session_tx, None, None)?;
 
-        // Fill the queue to its capacity without letting the processor drain it: a keep-alive for a
-        // registered Session is the cheapest message that reaches `try_send`.
-        let capacity = start_protocol_channel_capacity(&mgr.cfg);
+        // Fill the control lane to its capacity without letting the processor drain it: a keep-alive
+        // for a registered Session is the cheapest control message that reaches `try_send`.
+        let capacity = start_control_channel_capacity(&mgr.cfg);
         let live = HoprPseudonym::random();
         let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
 
-        let drops_before = crate::counters::start_protocol_send_drop_count();
+        let drops_before = crate::counters::start_control_send_drop_count();
         let mut saw_full = false;
         // Cheapest way through `try_send` without letting the processor drain: a keep-alive for a
         // registered Session. Fill the queue, then drop until the rate-limited WARN is due.
         for _ in 0..(capacity + FULL_QUEUE_WARN_INTERVAL + 1) {
             let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
             saw_full |= matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull));
-            if saw_full && crate::counters::start_protocol_send_drop_count().is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
+            if saw_full && crate::counters::start_control_send_drop_count().is_multiple_of(FULL_QUEUE_WARN_INTERVAL) {
                 break;
             }
         }
@@ -15812,12 +15963,21 @@ mod tests {
             "filling the Start queue past its capacity must produce a quiet StartQueueFull drop"
         );
         assert!(
-            crate::counters::start_protocol_send_drop_count() > drops_before,
+            crate::counters::start_control_send_drop_count() > drops_before,
             "a queue-full drop must be counted"
         );
 
         sender.close_channel();
         Ok(())
+    }
+
+    /// Every Start-lane result reaches `report_start_result`, which must swallow the deliberate
+    /// `NotAdmitted` refusals quietly and log anything else as an error.
+    #[test]
+    fn start_results_are_reported_quietly_for_deliberate_refusals() {
+        report_start_result(Ok(()));
+        report_start_result(Err(SessionManagerError::NotAdmitted("early".into()).into()));
+        report_start_result(Err(TransportSessionError::Timeout));
     }
 
     /// The WARN is due on the first drop of each interval, and only then.
@@ -15867,11 +16027,11 @@ mod tests {
         let live = HoprPseudonym::random();
         let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
 
-        // Install a queue whose receiver is already dropped, so every `try_send` is `Disconnected`.
-        type Msg = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
-        let (lane, rx) = crossfire::mpsc::bounded_blocking_async::<Msg>(4);
+        // Install the control lane with its receiver already dropped, so every `try_send` is
+        // `Disconnected`.
+        let (lane, rx) = crossfire::mpsc::bounded_blocking_async::<StartMessage>(4);
         drop(rx);
-        let _ = mgr.start_protocol_tx.set(lane);
+        let _ = mgr.start_control_tx.set(lane);
 
         let drops_before = crate::counters::start_protocol_send_drop_count();
         let result = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
@@ -16032,6 +16192,105 @@ mod tests {
             send_drops_before,
             crate::counters::start_protocol_send_drop_count(),
             "the keep-alive must not have been dropped at try_send either"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// A `StartSession` flood cannot fill the lane that live Sessions' control traffic uses.
+    ///
+    /// The test must actually saturate the session lane, and it must be the *session* lane: with
+    /// `maximum_sessions: 1` the session lane holds `1 + START_PROTOCOL_CHANNEL_RESERVE` messages,
+    /// far fewer than one shared lane would.
+    #[test_log::test(tokio::test)]
+    async fn a_start_session_flood_must_not_fill_the_control_lane() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            maximum_sessions: 1,
+            ..Default::default()
+        });
+
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        // No `await` in this loop, so the session processor is never polled and its lane fills.
+        let session_capacity = start_session_channel_capacity();
+        let mut filled = false;
+        for i in 0..(session_capacity + 1) {
+            let initiator = HoprPseudonym::random();
+            let outcome = mgr.dispatch_message(
+                initiator,
+                start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                    challenge: MIN_CHALLENGE + i as u64,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: HoprSessionCapabilities::empty(),
+                    additional_data: 0,
+                }))?,
+            )?;
+            filled |= matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull));
+        }
+        assert!(
+            filled,
+            "the fixture must actually fill the session lane, or it proves nothing about the split"
+        );
+
+        // The control lane must be untouched by that flood: it still has room for real traffic.
+        let kept_alive = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?);
+        assert!(
+            matches!(kept_alive, Ok(DispatchResult::Processed)),
+            "the live Session's keep-alive must still reach the control lane while the session lane is full, got \
+             {kept_alive:?}"
+        );
+
+        sender.close_channel();
+        Ok(())
+    }
+
+    /// The converse: a saturated control lane must not stop a `StartSession` from being dispatched.
+    #[test_log::test(tokio::test)]
+    async fn a_full_control_lane_must_not_refuse_a_start_session() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(SessionManagerConfig {
+            maximum_sessions: 1,
+            ..Default::default()
+        });
+
+        // No Session is admitted here, so the notifier is never used; holding the receiver keeps
+        // it from being seen as closed.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        let (sender, _handle) = mock_packet_planning(MockMsgSender::new());
+        mgr.start(sender.clone(), new_session_tx, None, None)?;
+
+        let live = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(live, DestinationRouting::Return(live.into()));
+
+        // No `await`, so the control processor is never polled and its lane fills.
+        let control_capacity = start_control_channel_capacity(&mgr.cfg);
+        let mut filled = false;
+        for _ in 0..(control_capacity + 1) {
+            let outcome = mgr.dispatch_message(live, keep_alive_packet_signalling(live, PacketSignals::default())?)?;
+            filled |= matches!(outcome, DispatchResult::Dropped(DropReason::StartQueueFull));
+        }
+        assert!(filled, "the fixture must actually fill the control lane");
+
+        let initiator = HoprPseudonym::random();
+        let dispatched = mgr.dispatch_message(
+            initiator,
+            start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities::empty(),
+                additional_data: 0,
+            }))?,
+        )?;
+        assert!(
+            matches!(dispatched, DispatchResult::Processed),
+            "a StartSession must still dispatch while the control lane is full, got {dispatched:?}"
         );
 
         sender.close_channel();
@@ -22932,35 +23191,25 @@ mod tests {
         Ok(())
     }
 
-    /// The Start protocol ingress channel must be sized for the worst-case commitment burst of a
-    /// single SSA cycle, not for the number of sessions.
+    /// The control lane must be sized for the worst-case commitment burst of a single SSA cycle.
     ///
     /// A dropped `SsaCommit` is unrecoverable — there is no retransmission — so the queue has to
     /// absorb the whole commitment set a cycle can deliver, capped by the polynomial ceiling
     /// `check_pix_params` enforces.
     #[test]
-    fn start_protocol_channel_is_sized_for_the_worst_case_commitment_burst() {
+    fn start_control_lane_is_sized_for_the_worst_case_commitment_burst() {
         let cfg = SessionManagerConfig::default();
-        let capacity = start_protocol_channel_capacity(&cfg);
+        let capacity = start_control_channel_capacity(&cfg);
 
         // Number of commitments implied by the largest quota this node accepts, clamped by the
         // number of polynomials it would actually admit.
         let commitments = (*cfg.pix_config.quota_range.end() / PIX_QUOTA_BYTES_PER_SHARE).min(MAX_POLYS_PER_SSA as u64);
         let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
 
-        assert!(
-            capacity >= min_expected + cfg.maximum_sessions,
-            "capacity {capacity} must cover the {min_expected}-message commitment burst plus room for {} concurrent \
-             session setups",
-            cfg.maximum_sessions
-        );
-
-        // The commitment burst must be the term that was added, not incidental slack: the old
-        // sizing was `maximum_sessions + 10` and carried no PIX component at all.
         assert_eq!(
             min_expected,
-            capacity - cfg.maximum_sessions - START_PROTOCOL_CHANNEL_RESERVE,
-            "the PIX commitment burst must be an explicit component of the capacity"
+            capacity - START_PROTOCOL_CHANNEL_RESERVE,
+            "the PIX commitment burst must be the only variable component of the control lane"
         );
         assert!(
             min_expected > 0,
@@ -22972,6 +23221,22 @@ mod tests {
         assert!(capacity < 1_000_000, "capacity {capacity} is implausibly large");
     }
 
+    /// The session lane is sized from the handler pool, not from the session limit: a queued
+    /// `StartSession` is drained only as fast as a handler frees up.
+    #[test]
+    fn start_session_lane_is_sized_from_the_handler_pool() {
+        assert_eq!(
+            start_session_channel_capacity(),
+            MAX_CONCURRENT_START_SESSIONS * START_SESSION_LANE_DEPTH_FACTOR + START_PROTOCOL_CHANNEL_RESERVE
+        );
+        const _: () = assert!(
+            MAX_CONCURRENT_START_SESSIONS > START_SESSION_ADMISSION_CONCURRENCY,
+            "the lane must hold more handlers than may wait on the server, or the permit caps it"
+        );
+        // Well below the pre-allocation guard, whatever the operator configures elsewhere.
+        assert!(start_session_channel_capacity() < 1_000_000);
+    }
+
     /// `quota_range` is operator-settable and the capacity it feeds is *reserved*, not merely
     /// enforced — `crossfire`'s array flavour pre-allocates every slot. So the derivation must be
     /// bounded independently of the configured quota.
@@ -22980,7 +23245,7 @@ mod tests {
     /// the whole unit test binary with an allocation failure rather than failing one assertion. The
     /// sizing test above never caught it because it only exercises the default config.
     #[test]
-    fn start_protocol_channel_capacity_is_bounded_for_any_quota_range() {
+    fn start_control_lane_capacity_is_bounded_for_any_quota_range() {
         // The commitment term saturates once the quota admits more commitments than there are
         // polynomials, so this is the largest value it can ever take.
         let saturated = (MAX_POLYS_PER_SSA as u64).div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
@@ -22993,33 +23258,20 @@ mod tests {
                 },
                 ..Default::default()
             };
-            let capacity = start_protocol_channel_capacity(&cfg);
 
             assert_eq!(
-                capacity,
-                saturated + cfg.maximum_sessions + START_PROTOCOL_CHANNEL_RESERVE,
+                start_control_channel_capacity(&cfg),
+                saturated + START_PROTOCOL_CHANNEL_RESERVE,
                 "quota_range end {quota_end} must not grow the commitment term past the polynomial ceiling"
             );
         }
-
-        // The session term is reserved for exactly the same reason, and `maximum_managed_sessions`
-        // validates up to 100 000 — so it needs its own ceiling, not just the commitment one.
-        let cfg = SessionManagerConfig {
-            maximum_sessions: 100_000,
-            ..Default::default()
-        };
-        assert_eq!(
-            start_protocol_channel_capacity(&cfg),
-            saturated + MAX_CONCURRENT_START_EXCHANGES + START_PROTOCOL_CHANNEL_RESERVE,
-            "a large session limit must not grow the pre-allocated ring past the handshake ceiling"
-        );
 
         // The batch factor is reserved too: a batch of N draws N cycles' commitment sets into this
         // one channel, and a dropped `SsaCommit` is unrecoverable. It must scale the commitment term
         // and nothing else, and must itself be bounded by `MAX_SSA_BATCH_SIZE` even when the config
         // was never clamped by `SessionManager::new`.
         let batched = |ssas_per_request| {
-            start_protocol_channel_capacity(&SessionManagerConfig {
+            start_control_channel_capacity(&SessionManagerConfig {
                 pix_config: IncomingSessionPixConfig {
                     quota_range: 0..=u64::MAX,
                     supervision: SupervisorConfig {
@@ -23031,11 +23283,10 @@ mod tests {
                 ..Default::default()
             })
         };
-        let unbatched = SessionManagerConfig::default();
         for ssas_per_request in [1, 2, MAX_SSA_BATCH_SIZE] {
             assert_eq!(
                 batched(ssas_per_request),
-                saturated * ssas_per_request + unbatched.maximum_sessions + START_PROTOCOL_CHANNEL_RESERVE,
+                saturated * ssas_per_request + START_PROTOCOL_CHANNEL_RESERVE,
                 "the commitment term must scale with ssas_per_request = {ssas_per_request}"
             );
         }
