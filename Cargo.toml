@@ -78,7 +78,8 @@ futures = { version = "0.3.34", default-features = false, features = [
 ] }
 futures-concurrency = "7.7.1"
 futures-time = "3.1.0"
-futures-timer = "3.0.4"
+# futures-timer 3.0.4 pulls gloo-timers 0.4, which needs js-sys >= 0.3.91, while libp2p-swarm 0.48.0 pins wasm-bindgen-futures = 0.4.58 (js-sys = 0.3.85)
+futures-timer = "3.0.3"
 halfbrown = "0.4.0"
 hashbrown = "0.17.1"
 hex-literal = "1.1.0"
@@ -87,14 +88,14 @@ humantime-serde = "1.1.1"
 indexmap = { version = "2.14.2" }
 insta = { version = "1.48.0", features = ["yaml", "redactions"] }
 lazy_static = "1.5.0"
-libp2p = { version = "0.56.0", default-features = false }
+libp2p = { version = "0.57.1", default-features = false }
 mimalloc = { version = "0.1.52", default-features = false, features = [
   "secure",
 ] }
 mockall = "0.15.0"
 moka = { version = "0.12.16", features = ["future", "sync"] }
 more-asserts = "0.3.1"
-multiaddr = "0.18.2"
+multiaddr = "0.19.1"
 oas3 = "0.22.0"
 opentelemetry-prometheus-text-exporter = { version = "0.3" }
 opentelemetry_sdk = { version = "0.32.1" }
@@ -140,9 +141,9 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "5.0.0" }
-hopr-types = { version = "5.0.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.19.1", default-features = false }
+hopr-api = { version = "7.0.0" }
+hopr-types = { version = "7.0.0", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.20.0", default-features = false }
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 
 hopr-crypto-packet = { version = "2.1.0", path = "crypto/packet", default-features = false, features = [
@@ -158,19 +159,19 @@ hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-feature
 ] }
 hopr-protocol-session = { version = "1.7.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "3.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.10.0" }
+hopr-ticket-manager = { version = "0.11.0" }
 hopr-transport = { version = "0.53.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.35.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.31.0" }
+hopr-chain-connector = { version = "0.32.0" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
-hopr-transport-p2p = { version = "0.14.0", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.9.0", default-features = false }
-hopr-network-graph = { version = "0.10.3", default-features = false }
+hopr-session-server-forwarder = { version = "0.8.0", default-features = false }
+hopr-transport-p2p = { version = "0.15.0", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.11.0", default-features = false }
+hopr-network-graph = { version = "0.12.0", default-features = false }
 
 [profile.dev]
 panic = "abort"
