@@ -2,6 +2,7 @@
 
 pub mod ack_state;
 mod loss_report;
+pub mod loss_signal;
 pub mod state;
 
 /// Contains socket statistics types.
@@ -18,6 +19,7 @@ use std::{
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use loss_report::{FRAME_LOSS_REPORT_INTERVAL, FrameLossReport};
+use loss_signal::FrameLossSignal;
 use state::{SocketComponents, SocketState, Stateless};
 use tracing::{Instrument, instrument::WithSubscriber};
 #[cfg(feature = "telemetry")]
@@ -111,6 +113,21 @@ pub struct SessionSocketConfig {
     /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
     #[default(None)]
     pub max_frames_behind_gap: Option<usize>,
+    /// Wait on a missing frame only as long as the reordering the Session has shown supports:
+    /// twice the deepest of the last minute, at least 250 ms, at most [`Self::frame_timeout`],
+    /// and all of it before any reordering is seen. Stateless sockets only.
+    ///
+    /// Head-of-line bound by time where [`Self::max_frames_behind_gap`] bounds by count. The frame
+    /// timeout is sized for the worst a deployment may see, and a Session without retransmission
+    /// that loses a frame holds everything behind it for that long, waiting for something that is
+    /// never coming. Measured on a cluster after a forward relayer died: the Exit's first
+    /// complete frames waited the whole 3 s behind frames lost before the path was replaced. A
+    /// frame that arrives after its gap was given up lengthens the wait again. A reliable socket
+    /// keeps the whole timeout, since a retransmission can still fill the gap.
+    ///
+    /// Default is true.
+    #[default(true)]
+    pub adapt_gap_wait: bool,
 }
 
 /// Logs a failed update of the socket state.
@@ -170,10 +187,17 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
     ///
     /// Note that this results in a faster socket than if created via [`SessionSocket::new`] with
     /// [`Stateless`]. This is because the frame inspector does not need to be instantiated.
+    ///
+    /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
+    /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
+    /// seconds; the per-window log summary is too coarse for that. It also follows every segment and
+    /// every reassembled frame, so that it can tell frames that stall before any of them is lost.
+    /// `None` records nothing.
     pub fn new_stateless<T, I>(
         id: I,
         transport: T,
         cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
         #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
@@ -214,8 +238,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
         // Dropped frames are counted and reported once per window, not logged one by one
-        let loss_report = Arc::new(FrameLossReport::new(&id, FRAME_LOSS_REPORT_INTERVAL));
+        let loss_report = Arc::new(FrameLossReport::with_signal(
+            &id,
+            FRAME_LOSS_REPORT_INTERVAL,
+            loss_signal,
+        ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
+
+        // The reordering the reassembler and the sequencer both see, which sizes the gap wait.
+        let reorder = cfg.adapt_gap_wait.then(crate::processing::SharedReorder::default);
+        let reorder_s1 = reorder.clone();
 
         // Debug tracing spans for individual pipeline stages
         let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly");
@@ -241,9 +273,23 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
                                 tracing::trace!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                // A segment of a frame whose gap was given up: it never completes, so this
+                                // is the only place to learn the wait was too short for it.
+                                if let Some(reorder) = reorder_s1.as_ref() {
+                                    let now = std::time::Instant::now();
+                                    if let Some(late) = reorder.late(s.frame_id, now) {
+                                        tracing::debug!(
+                                            frame_id = s.frame_id,
+                                            late_ms = late.as_millis() as u64,
+                                            "segment came after its frame's gap was given up"
+                                        );
+                                        reorder.record(now, late);
+                                    }
+                                }
                                 lr1.duplicate_segment();
                                 false
                             } else {
+                                lr1.segment_received(s.frame_id);
                                 true
                             }
                         })
@@ -261,12 +307,13 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Reassemble the segments into frames
-            .reassembler(cfg.frame_timeout, cfg.capacity)
+            .reassembler_sharing(cfg.frame_timeout, cfg.capacity, reorder.clone())
             // Discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
                 let _span = stage2_span.enter();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
+                        lr2.frame_reassembled();
                         #[cfg(feature = "telemetry")]
                         s2.frame_completed();
                         Some(OrderedFrame(frame))
@@ -281,12 +328,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer_with(crate::processing::SequencerConfig {
-                max_wait: cfg.frame_timeout,
-                capacity: cfg.capacity,
-                max_item_age: cfg.max_frame_age,
-                max_frames_behind_gap: cfg.max_frames_behind_gap,
-            })
+            .sequencer_sharing(
+                crate::processing::SequencerConfig {
+                    max_wait: cfg.frame_timeout,
+                    capacity: cfg.capacity,
+                    max_item_age: cfg.max_frame_age,
+                    max_frames_behind_gap: cfg.max_frames_behind_gap,
+                    adapt_to_reordering: cfg.adapt_gap_wait,
+                },
+                reorder,
+            )
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -336,10 +387,17 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     /// Creates a stateful socket with frame inspection capabilities - suitable for communication
     /// requiring TCP-like delivery guarantees.
+    ///
+    /// `loss_signal`, when given, is stamped at every frame the socket loses (a frame that expired
+    /// incomplete or a sequencer discard, never a duplicate), for a reader that has to react within
+    /// seconds; the per-window log summary is too coarse for that. It also follows every segment and
+    /// every reassembled frame, so that it can tell frames that stall before any of them is lost.
+    /// `None` records nothing.
     pub fn new<T>(
         transport: T,
         mut state: S,
         cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
         #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
     ) -> Result<Self, SessionError>
     where
@@ -428,7 +486,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
         // Dropped frames are counted and reported once per window, not logged one by one
-        let loss_report = Arc::new(FrameLossReport::new(state.session_id(), FRAME_LOSS_REPORT_INTERVAL));
+        let loss_report = Arc::new(FrameLossReport::with_signal(
+            state.session_id(),
+            FRAME_LOSS_REPORT_INTERVAL,
+            loss_signal,
+        ));
         let (lr1, lr2, lr3) = (loss_report.clone(), loss_report.clone(), loss_report);
 
         // Pipeline OUT: Packets incoming from Downstream
@@ -458,6 +520,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                                 lr1.duplicate_segment();
                                 false
                             } else {
+                                lr1.segment_received(s.frame_id);
                                 true
                             }
                         })
@@ -481,6 +544,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 let _span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing").entered();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
+                        lr2.frame_reassembled();
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
                             log_state_update_error(&error, "frame complete state update failed");
                         }
@@ -503,6 +567,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 capacity: cfg.capacity,
                 max_item_age: cfg.max_frame_age,
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                // A retransmission can still fill the gap, so it is waited out in full.
+                adapt_to_reordering: false,
             })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
@@ -708,6 +774,7 @@ mod tests {
                         "malformed",
                         transport.compat(),
                         SessionSocketConfig::default(),
+                        None,
                         #[cfg(feature = "telemetry")]
                         NoopTracker,
                     )?
@@ -716,6 +783,7 @@ mod tests {
                         transport.compat(),
                         Stateless::<MTU>::new("malformed"),
                         SessionSocketConfig::default(),
+                        None,
                         #[cfg(feature = "telemetry")]
                         NoopTracker,
                     )?
@@ -752,6 +820,7 @@ mod tests {
             alice,
             Stateless::<MTU>::new("alice"),
             SessionSocketConfig::default(),
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -799,6 +868,7 @@ mod tests {
                 "alice",
                 alice,
                 cfg,
+                None,
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
@@ -806,6 +876,7 @@ mod tests {
                 "bob",
                 bob,
                 cfg,
+                None,
                 #[cfg(feature = "telemetry")]
                 NoopTracker,
             )?;
@@ -841,6 +912,7 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -848,6 +920,7 @@ mod tests {
             "bob",
             bob,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -898,6 +971,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -905,6 +979,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -946,6 +1021,7 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -953,6 +1029,7 @@ mod tests {
             "bob",
             bob,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1016,6 +1093,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1023,6 +1101,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1076,6 +1155,7 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1083,6 +1163,7 @@ mod tests {
             "bob",
             bob,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1131,6 +1212,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1138,6 +1220,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1180,6 +1263,7 @@ mod tests {
             "alice",
             alice,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1187,6 +1271,7 @@ mod tests {
             "bob",
             bob,
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1249,6 +1334,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1256,6 +1342,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             sock_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1324,6 +1411,7 @@ mod tests {
             "alice",
             alice,
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -1331,6 +1419,7 @@ mod tests {
             "bob",
             bob,
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1366,6 +1455,231 @@ mod tests {
         Ok(())
     }
 
+    /// A sequencer discard is recorded into the loss signal, on both socket kinds.
+    ///
+    /// The network drops the one segment of frame 1, so that frame never arrives at all and the
+    /// sequencer gives up on the gap once later frames have arrived behind it (`max_frames_behind_gap`).
+    /// That is the discard event. Both kinds run with a state that does not retransmit (`Stateless`),
+    /// so the lost frame is not recovered and there is no retransmitted duplicate here; the duplicate
+    /// case has its own test, which feeds one in directly.
+    #[test_log::test(tokio::test)]
+    async fn a_sequencer_discard_is_recorded_by_both_socket_kinds() -> anyhow::Result<()> {
+        for stateless in [true, false] {
+            let (alice, bob) = setup_alice_bob::<MTU>(
+                FaultyNetworkConfig {
+                    avg_delay: Duration::from_millis(10),
+                    ids_to_drop: HashSet::from_iter([0_usize]),
+                    ..Default::default()
+                },
+                None,
+                None,
+            );
+
+            let signal = Arc::new(FrameLossSignal::new());
+            let bob_cfg = SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: Duration::from_millis(300),
+                max_frames_behind_gap: Some(1),
+                ..Default::default()
+            };
+            let alice_cfg = SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            };
+
+            let mut alice_socket = if stateless {
+                SessionSocket::<MTU, _>::new_stateless(
+                    "alice",
+                    alice,
+                    alice_cfg,
+                    None,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            } else {
+                SessionSocket::<MTU, _>::new(
+                    alice,
+                    Stateless::<MTU>::new("alice"),
+                    alice_cfg,
+                    None,
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            };
+            let mut bob_socket = if stateless {
+                SessionSocket::<MTU, _>::new_stateless(
+                    "bob",
+                    bob,
+                    bob_cfg,
+                    Some(signal.clone()),
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            } else {
+                SessionSocket::<MTU, _>::new(
+                    bob,
+                    Stateless::<MTU>::new("bob"),
+                    bob_cfg,
+                    Some(signal.clone()),
+                    #[cfg(feature = "telemetry")]
+                    NoopTracker,
+                )?
+            };
+
+            assert_eq!(0, signal.lost_total(), "nothing was lost before a frame went out");
+
+            let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+            alice_socket
+                .write_all(&data)
+                .timeout(futures_time::time::Duration::from_secs(2))
+                .await??;
+            alice_socket.flush().await?;
+
+            // Everything except the lost first frame.
+            let mut received = vec![0u8; DATA_SIZE - FRAME_SIZE];
+            bob_socket
+                .read_exact(&mut received)
+                .timeout(futures_time::time::Duration::from_secs(20))
+                .await??;
+            assert_eq!(&data[FRAME_SIZE..], &received, "stateless={stateless}");
+
+            assert!(
+                signal.lost_within(Duration::from_secs(30)),
+                "the discarded frame must be recorded as recent loss (stateless={stateless})"
+            );
+            assert_eq!(
+                1,
+                signal.lost_total(),
+                "one discarded frame is one loss (stateless={stateless})"
+            );
+
+            alice_socket.close().await?;
+            bob_socket.close().await?;
+        }
+        Ok(())
+    }
+
+    /// One raw segment message, as it arrives off the wire.
+    fn raw_segment(frame_id: u32, seq_idx: u8, segments: u8, data: &[u8]) -> Vec<u8> {
+        use crate::protocol::{Segment, SeqIndicator};
+
+        Vec::from(SessionMessage::<MTU>::Segment(Segment {
+            frame_id,
+            seq_idx,
+            seq_flags: SeqIndicator::new_with_flags(segments, false),
+            data: data.to_vec().into_boxed_slice(),
+        }))
+    }
+
+    /// Opens the receive side of either socket kind over an in-memory transport, recording into `signal`.
+    ///
+    /// `reliable` is the real [`ReliableSocket`](crate::ReliableSocket) with an [`AcknowledgementState`], which
+    /// requests the missing segments of an incomplete frame, not the stateless one.
+    fn open_raw_receiver(
+        reliable: bool,
+        frame_timeout: Duration,
+        signal: &Arc<FrameLossSignal>,
+    ) -> anyhow::Result<(Box<dyn futures::io::AsyncRead + Send + Unpin>, tokio::io::DuplexStream)> {
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            frame_timeout,
+            ..Default::default()
+        };
+        let socket: Box<dyn futures::io::AsyncRead + Send + Unpin> = if reliable {
+            Box::new(SessionSocket::<MTU, _>::new(
+                transport.compat(),
+                AcknowledgementState::<MTU>::new("bob", AcknowledgementStateConfig::default()),
+                cfg,
+                Some(signal.clone()),
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?)
+        } else {
+            Box::new(SessionSocket::<MTU, _>::new_stateless(
+                "bob",
+                transport.compat(),
+                cfg,
+                Some(signal.clone()),
+                #[cfg(feature = "telemetry")]
+                NoopTracker,
+            )?)
+        };
+        Ok((socket, remote))
+    }
+
+    /// A frame that expires incomplete is recorded, on the stateless and on the reliable socket alike.
+    ///
+    /// Only the first of the frame's two segments ever arrives, so the reassembler gives up on the
+    /// frame when its timeout runs out. The reliable socket asks for the missing segment meanwhile (into
+    /// the transport nobody reads), which does not change that it is lost.
+    #[test_log::test(tokio::test)]
+    async fn a_frame_that_expires_incomplete_is_recorded_by_both_socket_kinds() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+            assert_eq!(0, signal.lost_total(), "nothing lost yet (reliable={reliable})");
+
+            remote.write_all(&raw_segment(1, 0, 2, b"first half")).await?;
+
+            // Nothing is ever delivered; the read only gives the reassembler time to expire the frame.
+            let mut buf = [0u8; 64];
+            let _ = tokio::time::timeout(Duration::from_millis(800), socket.read(&mut buf)).await;
+
+            assert!(
+                signal.lost_within(Duration::from_secs(30)),
+                "the incomplete frame must be recorded as recent loss (reliable={reliable})"
+            );
+            assert_eq!(
+                1,
+                signal.lost_total(),
+                "one incomplete frame is one loss (reliable={reliable})"
+            );
+        }
+        Ok(())
+    }
+
+    /// A duplicate segment is delivery, not loss, on both socket kinds.
+    ///
+    /// Frame 1 is delivered whole and read, which makes it the last emitted frame; its segment then
+    /// arrives a second time, which is the duplicate the socket filters as already seen, and frame 2
+    /// behind it still comes through. Nothing was lost, so the signal stays empty.
+    #[test_log::test(tokio::test)]
+    async fn a_duplicate_segment_is_not_recorded_by_either_socket_kind() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        for reliable in [false, true] {
+            let signal = Arc::new(FrameLossSignal::new());
+            let (mut socket, mut remote) = open_raw_receiver(reliable, Duration::from_millis(100), &signal)?;
+
+            let first = raw_segment(1, 0, 1, b"frame one");
+            remote.write_all(&first).await?;
+            let mut buf = [0u8; 9];
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await??;
+            assert_eq!(b"frame one", &buf, "reliable={reliable}");
+
+            // The duplicate: the same segment of a frame that has already been emitted.
+            remote.write_all(&first).await?;
+            remote.write_all(&raw_segment(2, 0, 1, b"frame two")).await?;
+            tokio::time::timeout(Duration::from_secs(2), socket.read_exact(&mut buf)).await??;
+            assert_eq!(b"frame two", &buf, "reliable={reliable}");
+
+            // Give any frame timeout the duplicate might have started a chance to run out.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            assert_eq!(
+                0,
+                signal.lost_total(),
+                "a duplicate is not a loss (reliable={reliable})"
+            );
+            assert!(!signal.lost_within(Duration::from_secs(30)), "reliable={reliable}");
+        }
+        Ok(())
+    }
+
     /// Drives the head-of-line case end to end over the real socket pipeline.
     ///
     /// Segment 0 is dropped, so frame 1 can never be completed, and the sender is deliberately
@@ -1393,6 +1707,7 @@ mod tests {
                 frame_size: FRAME_SIZE,
                 ..Default::default()
             },
+            None,
             #[cfg(feature = "telemetry")]
             TestTelemetryTracker::default(),
         )?;
@@ -1403,8 +1718,12 @@ mod tests {
                 frame_size: FRAME_SIZE,
                 frame_timeout: FRAME_TIMEOUT,
                 max_frames_behind_gap,
+                // The count bound alone: should the network ever reorder, the time bound would
+                // take its place and the witness below would stop witnessing.
+                adapt_gap_wait: false,
                 ..Default::default()
             },
+            None,
             #[cfg(feature = "telemetry")]
             TestTelemetryTracker::default(),
         )?;
@@ -1462,6 +1781,159 @@ mod tests {
         Ok(())
     }
 
+    /// Every 10-byte read of a stateless receiver, with when it completed.
+    type StatelessReads = tokio::task::JoinHandle<Vec<(std::time::Instant, [u8; 10])>>;
+
+    /// Opens a stateless receiver over an in-memory transport, read continuously as a Session's
+    /// reader does (so each segment is taken in when it arrives): every 10-byte read with when it
+    /// completed, until the transport closes.
+    fn stateless_reader(adapt_gap_wait: bool) -> anyhow::Result<(StatelessReads, tokio::io::DuplexStream)> {
+        use futures::AsyncReadExt;
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let (transport, remote) = tokio::io::duplex(1 << 20);
+        let mut socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            transport.compat(),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: Duration::from_secs(3),
+                adapt_gap_wait,
+                ..Default::default()
+            },
+            None,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let reader = tokio::spawn(async move {
+            let mut buf = [0u8; 10];
+            let mut reads = Vec::new();
+            while socket.read_exact(&mut buf).await.is_ok() {
+                reads.push((std::time::Instant::now(), buf));
+            }
+            reads
+        });
+        Ok((reader, remote))
+    }
+
+    /// Sends frames `ids` whole, each as two segments `spread` apart, the frames 750 ms apart.
+    async fn send_whole_frames(
+        remote: &mut tokio::io::DuplexStream,
+        ids: std::ops::RangeInclusive<u32>,
+        spread: Duration,
+    ) -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+        for id in ids {
+            remote.write_all(&raw_segment(id, 0, 2, b"half-")).await?;
+            tokio::time::sleep(spread).await;
+            remote.write_all(&raw_segment(id, 1, 2, b"half-")).await?;
+            tokio::time::sleep(Duration::from_millis(750).saturating_sub(spread)).await;
+        }
+        Ok(())
+    }
+
+    /// How long frame `before + 2` waits behind lost frame `before + 1`, after `before` frames whose
+    /// segments arrived 200 ms apart.
+    async fn time_held_behind_a_lost_frame_of_several_segments(
+        adapt_gap_wait: bool,
+        before: u32,
+    ) -> anyhow::Result<Duration> {
+        use tokio::io::AsyncWriteExt;
+
+        let (reader, mut remote) = stateless_reader(adapt_gap_wait)?;
+        send_whole_frames(&mut remote, 1..=before, Duration::from_millis(200)).await?;
+
+        let started = std::time::Instant::now();
+        remote.write_all(&raw_segment(before + 2, 0, 2, b"after")).await?;
+        remote.write_all(&raw_segment(before + 2, 1, 2, b"-lost")).await?;
+        tokio::time::sleep(Duration::from_millis(3500)).await;
+        drop(remote);
+
+        let reads = reader.await?;
+        anyhow::ensure!(reads.len() == before as usize + 1, "{} reads", reads.len());
+        let (at, last) = reads
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("the frame after the lost one"))?;
+        anyhow::ensure!(last == b"after-lost", "the frame after the lost one");
+        Ok(at.duration_since(started))
+    }
+
+    /// Frames of several segments rarely arrive out of order, so the sequencer alone would see no
+    /// reordering to size its wait by. The spread of a frame's own segments is the spread of the
+    /// paths, and bounds how far frames can arrive apart: 200 ms, so once eight frames over six
+    /// seconds have shown it, a lost frame holds the next for about 400 ms instead of the whole 3 s
+    /// frame timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_hold_frames_behind_a_lost_one_for_twice_the_spread_of_its_segments()
+    -> anyhow::Result<()> {
+        let held = time_held_behind_a_lost_frame_of_several_segments(true, 8).await?;
+        assert!(held >= Duration::from_millis(380), "{held:?}");
+        assert!(held < Duration::from_millis(1500), "{held:?}");
+        Ok(())
+    }
+
+    /// The witness: with the adaptation off, the same loss holds the next frame for the whole frame
+    /// timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_without_the_adaptive_gap_wait_should_hold_frames_for_the_frame_timeout()
+    -> anyhow::Result<()> {
+        let held = time_held_behind_a_lost_frame_of_several_segments(false, 8).await?;
+        assert!(held >= Duration::from_millis(2950), "{held:?}");
+        Ok(())
+    }
+
+    /// One frame says little about the paths a Session will take: a frame lost right after it still
+    /// holds the next for the whole frame timeout.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_wait_the_whole_timeout_before_it_has_seen_enough_reordering() -> anyhow::Result<()>
+    {
+        let held = time_held_behind_a_lost_frame_of_several_segments(true, 1).await?;
+        assert!(held >= Duration::from_millis(2950), "{held:?}");
+        Ok(())
+    }
+
+    /// A frame given up while its last segment was still on the way never completes: the segment is
+    /// dropped as already seen. Noticing it there is what lengthens a wait that was too short.
+    #[test_log::test(tokio::test)]
+    async fn a_segment_after_its_frames_gap_was_given_up_should_lengthen_the_wait() -> anyhow::Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let (reader, mut remote) = stateless_reader(true)?;
+        // Eight frames over six seconds, 100 ms between their segments: a 250 ms wait.
+        send_whole_frames(&mut remote, 1..=8, Duration::from_millis(100)).await?;
+
+        // Frame 9's second segment comes 700 ms after its first: frame 9 is given up after 250 ms ...
+        remote.write_all(&raw_segment(9, 0, 2, b"late-")).await?;
+        remote.write_all(&raw_segment(10, 0, 2, b"ten-h")).await?;
+        remote.write_all(&raw_segment(10, 1, 2, b"alf-x")).await?;
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        // ... and its segment, coming now, lengthens the wait to about 2 x 700 ms.
+        remote.write_all(&raw_segment(9, 1, 2, b"frame")).await?;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Frame 11 is lost; frame 12 waits the longer wait.
+        let started = std::time::Instant::now();
+        remote.write_all(&raw_segment(12, 0, 2, b"twelv")).await?;
+        remote.write_all(&raw_segment(12, 1, 2, b"e-end")).await?;
+        tokio::time::sleep(Duration::from_millis(3500)).await;
+        drop(remote);
+
+        let reads = reader.await?;
+        assert!(
+            !reads.iter().any(|(_, buf)| buf == b"late-frame"),
+            "a frame given up is not delivered late"
+        );
+        let (at, last) = reads.last().ok_or_else(|| anyhow::anyhow!("frames delivered"))?;
+        assert_eq!(b"twelve-end", last);
+        let held = at.duration_since(started);
+        assert!(
+            held >= Duration::from_millis(1200),
+            "the late segment must lengthen the wait: {held:?}"
+        );
+        assert!(held < Duration::from_millis(2500), "{held:?}");
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn stateful_socket_unidirectional_should_should_not_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(
@@ -1495,6 +1967,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1502,6 +1975,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?;
@@ -1570,6 +2044,7 @@ mod tests {
             "alice",
             alice,
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             alice_tracker.clone(),
         )?;
@@ -1577,6 +2052,7 @@ mod tests {
             "bob",
             bob,
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             bob_tracker.clone(),
         )?;
@@ -1666,6 +2142,7 @@ mod tests {
             alice,
             AcknowledgementState::new("alice", ack_cfg),
             alice_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?
@@ -1675,6 +2152,7 @@ mod tests {
             bob,
             AcknowledgementState::new("bob", ack_cfg),
             bob_cfg,
+            None,
             #[cfg(feature = "telemetry")]
             NoopTracker,
         )?

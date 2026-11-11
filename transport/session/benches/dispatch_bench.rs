@@ -290,7 +290,7 @@ fn make_manager_without_session() -> (
 
 /// Benchmark: dispatching a Start protocol message.
 ///
-/// Exercises the `start_protocol_tx.try_send()` path — and, since the Exit's Start-protocol
+/// Exercises the lane's `try_send()` path — and, since the Exit's Start-protocol
 /// traffic is credited to the Entry's `returned_packets`, the session lookup that credit needs.
 ///
 /// # Why three ids and not one
@@ -381,7 +381,7 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
 /// `dispatch_message` runs every Start message through
 /// `start_message_is_for_local_state` before enqueueing it, dropping with
 /// `DropReason::StaleStartMessage` anything naming no local Session state. The filter exists
-/// because Start messages share one bounded worker pool, and several of its handlers park a
+/// because Start control messages share one bounded worker pool, and several of its handlers park a
 /// worker on state a bogus message will never have — `handle_ssa_request` waits up to a second
 /// for a Session slot a random pseudonym never gets. Before the filter, ~110 concurrent bogus
 /// requests occupied every handler and the bounded Start queue then dropped all traffic behind
@@ -422,11 +422,13 @@ pub fn dispatch_start_protocol_filter(c: &mut Criterion) {
             make_ssa_request_data as fn(SessionId) -> ApplicationDataIn,
         ),
         ("keep_alive_registered", make_keep_alive_data),
+        ("start_session", |_| make_start_protocol_data()),
     ] {
         let manager: SessionManager<BenchSink> = SessionManager::new(SessionManagerConfig::default());
         let mut drain = manager.benchmark_start_queue(BATCH).expect("install benchmark queue");
         let id = SessionId::random();
-        let _session_rx = manager.pre_populate_session_with_receiver(id, forward_routing(id));
+        let _session_rx =
+            (name != "start_session").then(|| manager.pre_populate_session_with_receiver(id, forward_routing(id)));
         let input = message(id);
         group.bench_function(name, |b| {
             b.iter_custom(|iterations| {

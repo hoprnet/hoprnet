@@ -168,6 +168,18 @@ pub struct PathPlannerConfig {
     #[default(Duration::from_secs(30))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub max_plausible_loopback_rtt: Duration,
+    /// Loops over an edge from which the share that returned, not a single returned loop, decides whether
+    /// its relay delivers (handed to the graph through `ChannelGraph::with_starvation`). Below it, one returned loop
+    /// keeps the relay and none starves it. Few loops cross an edge in a sparse network, so this stays small.
+    #[default = 3]
+    #[validate(range(min = 1))]
+    pub min_loopbacks_for_rate: u32,
+    /// Share of loops over an edge that must return, once there are `min_loopbacks_for_rate` of them, for
+    /// its relay to stay routable. A relay dropping what it should forward still returns the odd loop, so
+    /// this is never zero. In `(0.0, 1.0]`.
+    #[default = 0.1]
+    #[validate(custom(function = "validate_loopback_return_rate"))]
+    pub min_loopback_return_rate: f64,
 }
 
 /// Shortest accepted `refresh_period`. A zero period makes the sweep loop rebuild every cached
@@ -199,6 +211,16 @@ fn validate_refresh_within_ttl(cfg: &PathPlannerConfig) -> std::result::Result<(
         .into(),
     );
     Err(err)
+}
+
+/// A share of loops that must return, in `(0.0, 1.0]`: zero is met by any relay returning the odd loop, which
+/// is what a dropping relay does, so it would never starve one.
+fn validate_loopback_return_rate(value: f64) -> std::result::Result<(), ValidationError> {
+    if value.is_finite() && value > 0.0 && value <= 1.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new("value must be finite and in (0.0, 1.0]"))
+    }
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -1057,6 +1079,10 @@ where
     /// HoprSurb::SIZE`, a handful at most), so K was capped by it whatever the configuration said,
     /// while each packet re-drew independently regardless. Tempering has no such ceiling.
     ///
+    /// Neither spreads anything the candidates do not offer: the selector searches each first
+    /// relayer's paths separately (`compute_paths_spread`), so a pool names every first relayer
+    /// the graph allows rather than the one or two a single depth-first search reached first.
+    ///
     /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
     /// those fall back to plain repeated resolution.
     #[tracing::instrument(name = "planner.resolve_diverse_return_paths", level = "trace", skip_all)]
@@ -1444,6 +1470,39 @@ mod tests {
         ) -> std::result::Result<BoxStream<'a, ChannelEntry>, TestError> {
             Ok(Box::pin(stream::iter(self.channels.clone())))
         }
+    }
+
+    #[test]
+    fn the_loopback_verdict_should_default_to_three_loops_and_a_tenth() {
+        let cfg = PathPlannerConfig::default();
+        assert_eq!(cfg.min_loopbacks_for_rate, 3);
+        assert_eq!(cfg.min_loopback_return_rate, 0.1);
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn a_loopback_verdict_that_could_never_starve_a_relay_should_be_invalid() {
+        // A rate of zero is met by any relay returning the odd loop, which is what a dropping relay does.
+        for rate in [0.0, -0.1, 1.5, f64::NAN, f64::INFINITY] {
+            let cfg = PathPlannerConfig {
+                min_loopback_return_rate: rate,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "a return rate of {rate} must be rejected");
+        }
+        let cfg = PathPlannerConfig {
+            min_loopbacks_for_rate: 0,
+            ..Default::default()
+        };
+        assert!(
+            cfg.validate().is_err(),
+            "judging by the rate from zero loops must be rejected"
+        );
+        let cfg = PathPlannerConfig {
+            min_loopback_return_rate: 1.0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok(), "a relay may be asked to return every loop");
     }
 
     #[test]
@@ -3298,19 +3357,24 @@ mod tests {
         .await?;
 
         let records = logs.records("graph traversal completed");
-        assert_eq!(records.len(), 1);
-        assert_eq!(
-            records[0].ancestry,
-            [
-                "session",
-                "planner.resolve_path",
-                "planner.cached_paths",
-                "planner.rebuild_candidates",
-                "selector.select_paths",
-                "graph.simple_paths"
-            ]
-        );
-        assert!(!records[0].fields.contains_key("session_id"));
+        assert!(!records.is_empty(), "routing must perform a graph traversal");
+        // The selector can run multiple traversals while spreading candidates across relayers.
+        // Check the context of every query instead of assuming one particular search strategy.
+        for record in &records {
+            let (traversal, parents) = record.ancestry.split_last().context("missing graph traversal span")?;
+            assert!(matches!(*traversal, "graph.simple_paths" | "graph.simple_paths_from"));
+            assert_eq!(
+                parents,
+                [
+                    "session",
+                    "planner.resolve_path",
+                    "planner.cached_paths",
+                    "planner.rebuild_candidates",
+                    "selector.select_paths"
+                ]
+            );
+            assert!(!record.fields.contains_key("session_id"));
+        }
         let output = logs.output();
         let line = output
             .lines()

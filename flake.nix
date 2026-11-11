@@ -4,11 +4,14 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-26.05";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
-    rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.24.0";
-    nix-lib.url = "github:hoprnet/nix-lib/main";
+    # The heavy pins (nixpkgs, nixpkgs-unstable, rust-overlay and crane) come from nix-lib's
+    # lock. To bump them, point nix-lib.url at the new release tag, then run
+    # `nix flake update nix-lib`.
+    nix-lib.url = "github:hoprnet/nix-lib/v2.1.7";
+    nixpkgs.follows = "nix-lib/nixpkgs";
+    nixpkgs-unstable.follows = "nix-lib/nixpkgs-unstable";
+    rust-overlay.follows = "nix-lib/rust-overlay";
+    crane.follows = "nix-lib/crane";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
@@ -19,15 +22,10 @@
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
-    nix-lib.inputs.nixpkgs.follows = "nixpkgs";
     nix-lib.inputs.flake-utils.follows = "flake-utils";
-    nix-lib.inputs.crane.follows = "crane";
     nix-lib.inputs.flake-parts.follows = "flake-parts";
-    nix-lib.inputs.rust-overlay.follows = "rust-overlay";
     nix-lib.inputs.treefmt-nix.follows = "treefmt-nix";
-    nix-lib.inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     hopli.inputs.flake-utils.follows = "flake-utils";
     hopli.inputs.flake-parts.follows = "flake-parts";
@@ -296,7 +294,9 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  # `telemetry` is what compiles the dispatch metrics into the library; without it
+                  # the integration coverage of the Start drop paths cannot reach them.
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";
@@ -440,7 +440,8 @@
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
-              cargo-release
+              # From unstable: cargo-release 1.1.7 needs rustc 1.97, release-26.05 ships 1.95.
+              pkgs-unstable.cargo-release
               cargo-shear
               cargo-insta
               cargo-nextest
@@ -492,7 +493,8 @@
               google-cloud-sdk
               pkgs-unstable.cargo-audit
               cargo-machete
-              cargo-release
+              # From unstable: cargo-release 1.1.7 needs rustc 1.97, release-26.05 ships 1.95.
+              pkgs-unstable.cargo-release
               cargo-shear
               graphviz
               swagger-codegen3

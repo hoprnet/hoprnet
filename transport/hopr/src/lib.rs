@@ -214,6 +214,21 @@ fn counter_flush_ack_grace(flush_interval: Duration) -> Duration {
     flush_interval / COUNTER_FLUSH_ACK_GRACE_DIVISOR
 }
 
+/// The environment variable that overrides `session.surb_degraded_notify_period`, in milliseconds.
+const SURB_DEGRADED_NOTIFY_PERIOD_ENV: &str = "HOPR_SESSION_SURB_DEGRADED_NOTIFY_PERIOD_MS";
+
+/// The Exit's degraded SURB notification period: `raw` (the environment override) when it parses as
+/// milliseconds, the configured one otherwise.
+///
+/// The floor is `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`, enforced once in `SessionManager::new`. A period at or
+/// above the normal one reports no faster, and `spawn_exit_keep_alive` treats it as disabled rather than
+/// switching between two equal cadences.
+fn surb_degraded_notify_period_override(raw: Option<&str>, configured: Option<Duration>) -> Option<Duration> {
+    raw.and_then(|s| s.parse::<u64>().ok())
+        .map(|ms| Some(Duration::from_millis(ms)))
+        .unwrap_or(configured)
+}
+
 /// Reads the packet key out of an Ed25519 [`PeerId`]'s multihash.
 ///
 /// This used to be CPU-intensive - it decompressed the curve point - and was served from a
@@ -492,6 +507,10 @@ where
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(|ms| Some(Duration::from_millis(ms)))
                 .unwrap_or(cfg.session.surb_balance_notify_period),
+            surb_degraded_notify_period: surb_degraded_notify_period_override(
+                std::env::var(SURB_DEGRADED_NOTIFY_PERIOD_ENV).ok().as_deref(),
+                cfg.session.surb_degraded_notify_period,
+            ),
             surb_target_notify: cfg.session.surb_target_notify,
             maximum_sessions: cfg.session.maximum_managed_sessions,
             pix_config: cfg.incoming_session_pix_config.clone(),
@@ -2165,6 +2184,22 @@ mod tests {
     use futures::StreamExt;
     use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
     use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::unset(None, Some(Duration::from_secs(1)), Some(Duration::from_secs(1)))]
+    #[case::override_wins(Some("2500"), Some(Duration::from_secs(1)), Some(Duration::from_millis(2500)))]
+    #[case::override_enables_a_disabled_period(Some("3000"), None, Some(Duration::from_secs(3)))]
+    #[case::unparsable_falls_back(Some("soon"), Some(Duration::from_secs(1)), Some(Duration::from_secs(1)))]
+    #[case::unparsable_keeps_disabled(Some(""), None, None)]
+    fn the_degraded_notify_period_env_override_wins_when_it_parses(
+        #[case] raw: Option<&str>,
+        #[case] configured: Option<Duration>,
+        #[case] expected: Option<Duration>,
+    ) {
+        assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
+    }
 
     /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
     /// the tokio worker thread under a continuously saturated inbound stream.
