@@ -247,8 +247,8 @@ impl std::fmt::Debug for SurbRoundTripRegistry {
 
 impl SurbRoundTripRegistry {
     /// Report minted and returned SURBs to `observer`. Attach it before cloning this registry.
-    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
-        self.observer = observer;
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.observer = Some(observer);
         self
     }
 
@@ -3835,7 +3835,7 @@ mod tests {
         registry.record_minted(paths, 3, destination);
         let destinations = registry.destinations.clone();
         let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
-        let registry = registry.with_observer(Some(Arc::new({
+        let registry = registry.with_observer(Arc::new({
             let calls = calls.clone();
             move |event| {
                 // A nonblocking write detects the regression without hanging the test runner.
@@ -3853,7 +3853,7 @@ mod tests {
                 ));
                 calls.fetch_add(1, Ordering::Relaxed);
             }
-        })));
+        }));
         registry.record_observed(paths, 2);
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert_eq!(registry.drain(), vec![(paths, 3, 2)]);
@@ -3866,9 +3866,9 @@ mod tests {
             forward: [0; 5],
             reply: [0; 5],
         };
-        let registry = SurbRoundTripRegistry::default().with_observer(Some(Arc::new(|_| {
+        let registry = SurbRoundTripRegistry::default().with_observer(Arc::new(|_| {
             panic!("unknown destinations must not notify the observer");
-        })));
+        }));
         registry.record_observed(paths, 2);
         assert_eq!(registry.drain(), vec![(paths, 0, 2)]);
     }
@@ -3879,10 +3879,10 @@ mod tests {
         let (graph, me, peers) = graph_with(1);
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let mut recorder = recorder(graph);
-        recorder.registry = recorder.registry.with_observer(Some(Arc::new({
+        recorder.registry = recorder.registry.with_observer(Arc::new({
             let events = events.clone();
             move |event| events.lock().push(event)
-        })));
+        }));
         let surbs = |events: &mut Vec<TransportEvent>| -> (u64, u64, Vec<OffchainPublicKey>) {
             events
                 .drain(..)

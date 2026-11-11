@@ -457,8 +457,8 @@ where
     }
 
     /// Report graph searches to `observer`. Attach it before the selector is shared.
-    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
-        self.observer = observer;
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.observer = Some(observer);
         self
     }
 
@@ -2170,10 +2170,10 @@ mod tests {
     fn observer_sees_real_search_phases_and_empty_searches() -> anyhow::Result<()> {
         let (me, _, dest, graph) = two_hop_graph();
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
-        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS, 0.5, 0.5, 0).with_observer(Some(Arc::new({
+        let selector = HoprGraphPathSelector::new(me, graph, MAX_PATHS, 0.5, 0.5, 0).with_observer(Arc::new({
             let events = events.clone();
             move |event| events.lock().push(event)
-        })));
+        }));
         selector.select_path(me, dest, 1)?;
         assert!(selector.select_path(pubkey(&SECRET_4), me, 1).is_err());
 

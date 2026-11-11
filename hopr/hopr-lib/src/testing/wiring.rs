@@ -21,15 +21,13 @@ use crate::{
 #[cfg(not(feature = "state-dump"))]
 type TestStateDump = ();
 
+/// Disabled reporters require only the chain interface already needed by the test builder.
+#[doc(hidden)]
+#[cfg(not(feature = "state-dump"))]
+pub use hopr_chain_connector::api::HoprChainApi as StateDumpRead;
 #[doc(hidden)]
 #[cfg(feature = "state-dump")]
 pub use hopr_chain_connector::state_dump::StateRead as StateDumpRead;
-/// Test connectors need no diagnostic reads when reporting is disabled.
-#[doc(hidden)]
-#[cfg(not(feature = "state-dump"))]
-pub trait StateDumpRead {}
-#[cfg(not(feature = "state-dump"))]
-impl<T: ?Sized> StateDumpRead for T {}
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 

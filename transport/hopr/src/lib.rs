@@ -391,18 +391,6 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
-        Self::new_with_observer(identity, resolver, graph, my_multiaddresses, cfg, None)
-    }
-
-    /// Build transport that reports path, SURB and probe events to `observer`.
-    pub fn new_with_observer(
-        identity: (&ChainKeypair, &OffchainKeypair),
-        resolver: Chain,
-        graph: Graph,
-        my_multiaddresses: Vec<Multiaddr>,
-        cfg: HoprProtocolConfig,
-        observer: Option<TransportObserver>,
-    ) -> errors::Result<Self> {
         // Validated at the constructor boundary, because this is the boundary. The shared node
         // builder does validate before all four of its build methods reach here, but this function is
         // `pub`, and a direct caller then skips every relational check on the way in — including
@@ -424,8 +412,7 @@ where
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
             planner_config.min_paths_anonymity_floor,
-        )
-        .with_observer(observer.clone());
+        );
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
@@ -465,16 +452,14 @@ where
 
         // The race telemetry reads a reply's lateness by the SURB a replier spends first, which FIFO, the
         // only pop order, makes the older of the two.
-        let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::default().with_observer(observer.clone());
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
             resolver.clone(),
             selector,
             planner_config,
-        )
-        .with_observer(observer.clone());
+        );
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -552,12 +537,24 @@ where
             my_multiaddresses,
             smgr,
             chain_api: resolver,
-            observer,
+            observer: None,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
         })
+    }
+
+    /// Attach a path, search, SURB and probe observer before starting transport.
+    /// Cloned planner state is detached so existing users keep their observer.
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.path_planner.configure_selector(|selector| {
+            *selector = selector.clone().with_observer(observer.clone());
+        });
+        self.path_planner = self.path_planner.with_observer(observer.clone());
+        self.surb_round_trips = self.surb_round_trips.with_observer(observer.clone());
+        self.observer = Some(observer);
+        self
     }
 
     /// Execute all processes of the [`HoprTransport`] object as a **Relay** node.

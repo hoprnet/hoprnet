@@ -20,16 +20,8 @@ use serde_json::Value;
 struct Capture(Arc<Mutex<Vec<Value>>>, Arc<std::sync::atomic::AtomicUsize>);
 struct Visitor<'a>(&'a Capture);
 impl tracing::field::Visit for Visitor<'_> {
-    /// Capture bounded decoded state records and optionally append raw payloads to a test file.
+    /// Capture bounded decoded state records.
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        if field.name() == "state"
-            && let Some(path) = std::env::var_os("HOPR_STATE_DUMP_TEST_OUTPUT")
-        {
-            use std::io::Write;
-            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                let _ = writeln!(file, "{value:?}");
-            }
-        }
         if field.name() == "state"
             && let Ok(value) = serde_json::from_str::<Value>(&format!("{value:?}"))
         {

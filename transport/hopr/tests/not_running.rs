@@ -71,14 +71,14 @@ async fn an_observer_does_not_invent_events_before_transport_runs() -> anyhow::R
     let (offchain, chain_key) = &PEER_KEYS[0];
     let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
     let observed = events.clone();
-    let transport = TestTransport::new_with_observer(
+    let transport = TestTransport::new(
         (chain_key, offchain),
         stubs::StubChain::new(offchain, chain_key),
         ChannelGraph::new(*offchain.public()),
         Vec::new(),
         HoprProtocolConfig::default(),
-        Some(Arc::new(move |event| observed.lock().push(event))),
-    )?;
+    )?
+    .with_observer(Arc::new(move |event| observed.lock().push(event)));
     assert!(transport.listening_multiaddresses().await.is_empty());
     assert!(transport.ping(PEER_KEYS[1].0.public()).await.is_err());
     assert!(

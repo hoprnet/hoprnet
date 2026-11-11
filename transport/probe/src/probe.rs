@@ -65,6 +65,11 @@ where
     ///
     /// The `push_to_network` sink is used to send pong replies when the message is a Ping.
     /// Returns `Consumed` if the message was a probe, or `Passthrough` for all other messages.
+    #[tracing::instrument(
+        level = "trace",
+        skip_all,
+        fields(%pseudonym, tag = %in_data.data.application_tag)
+    )]
     pub async fn classify<T>(
         &self,
         mut push_to_network: T,
@@ -254,6 +259,8 @@ impl Probe {
                             // If the eviction cause is expiration => record as a failed probe
                             let store = network_graph_internal_neighbor.clone();
                             let (peer, _start, notifier) = v;
+                            let span = tracing::trace_span!("neighbor_probe_expiry", %peer, pseudonym = %k.0);
+                            let _entered = span.enter();
                             if let Some(observer) = &neighbor_observer { observer(ProbeOutcome::Neighbor { peer: peer.as_ref().to_owned(), succeeded: false }); }
 
                             tracing::trace!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
@@ -300,6 +307,8 @@ impl Probe {
                           -> moka::notification::ListenerFuture {
                         if matches!(cause, moka::notification::RemovalCause::Expired) {
                             // If the eviction cause is expiration => record as a failed probe
+                            let span = tracing::trace_span!("loopback_probe_expiry", %tag);
+                            let _entered = span.enter();
                             if let Some(observer) = &path_observer {
                                 observer(ProbeOutcome::Loopback { succeeded: false });
                             }

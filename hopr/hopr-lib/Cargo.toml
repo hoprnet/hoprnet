@@ -213,7 +213,6 @@ hopr-network-graph = { workspace = true, optional = true }
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
-serde_json = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
 insta = { workspace = true }

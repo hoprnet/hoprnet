@@ -487,6 +487,7 @@ type RebuiltPaths = (
 );
 
 /// What a cache entry is rebuilt from, shared by the planner and its background sweep.
+#[derive(Clone)]
 struct PathBuilder<R, S> {
     resolver: R,
     selector: S,
@@ -558,6 +559,26 @@ where
 
         let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
         let total_wt = weighted.total_weight();
+        // Cache rebuilds are the useful DEBUG boundary; per-draw details remain at TRACE.
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            const MAX_LOGGED_CANDIDATES: usize = 8;
+            let candidates = weighted
+                .iter()
+                .take(MAX_LOGGED_CANDIDATES)
+                .map(|(path, weight)| (path.to_string(), *weight))
+                .collect::<Vec<_>>();
+            tracing::debug!(
+                kind,
+                source = %src_key,
+                destination = %dest_key,
+                hops,
+                total_weight = total_wt,
+                candidate_count = weighted.len(),
+                omitted = weighted.len().saturating_sub(MAX_LOGGED_CANDIDATES),
+                ?candidates,
+                "rebuilt weighted path collection",
+            );
+        }
         // Return draws spend `exploration` of their picks uniformly, so log what a draw actually does.
         let exploration = if dest_key == me {
             weighting.return_path_exploration
@@ -804,9 +825,18 @@ where
     }
 
     /// Report path resolves to `observer`. Attach it before the planner is shared.
-    pub fn with_observer(mut self, observer: Option<TransportObserver>) -> Self {
-        self.observer = observer;
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.observer = Some(observer);
         self
+    }
+
+    /// Configure the owned selector without changing existing planner clones.
+    pub(crate) fn configure_selector(&mut self, configure: impl FnOnce(&mut S))
+    where
+        R: Clone,
+        S: Clone,
+    {
+        configure(&mut Arc::make_mut(&mut self.paths).selector);
     }
 
     /// Report an outcome using canonical peer identity, retaining unresolved chain addresses.
@@ -3225,10 +3255,10 @@ mod tests {
     async fn observer_canonicalizes_chain_addresses_and_retains_unresolvable_destinations() -> anyhow::Result<()> {
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();
-        let planner = planner.with_observer(Some(Arc::new({
+        let planner = planner.with_observer(Arc::new({
             let events = events.clone();
             move |event| events.lock().push(event)
-        })));
+        }));
         let me = NodeId::Offchain(planner.me);
         planner
             .resolve_path(me, NodeId::Chain(dest_addr()), RoutingOptions::Hops(0.try_into()?))
@@ -3262,10 +3292,10 @@ mod tests {
     async fn observer_sees_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
         let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let (planner, _) = two_relayer_return_planner();
-        let planner = planner.with_observer(Some(Arc::new({
+        let planner = planner.with_observer(Arc::new({
             let events = events.clone();
             move |event| events.lock().push(event)
-        })));
+        }));
         let source = NodeId::Offchain(pubkey(&SECRET_DEST));
         for _ in 0..2 {
             planner
