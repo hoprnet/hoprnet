@@ -25,9 +25,9 @@ jobs:
       contents: write
     steps:
       - name: Build docs
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # nix-action-v2.0.0
         with:
-          source_branch: ${{ github.event.pull_request.base.ref }}
+          repo_sha: ${{ github.event.pull_request.merge_commit_sha }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             nix build -L .#docs

@@ -54,7 +54,9 @@ jobs:
 
   label:
     name: Add labels
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # Fork PRs get a read-only token and cannot write labels; stay green so the gate passes.
+    continue-on-error: true
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
@@ -128,9 +130,9 @@ jobs:
       contents: read
     steps:
       - name: Validate Cargo dependencies
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # nix-action-v2.0.0
         with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
@@ -141,9 +143,9 @@ jobs:
     name: Check
     # Stage 1: with check-allowed-dependencies and changes.
     needs: changes
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-checks-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-checks-v3.0.0
     with:
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       lint_command: "nix build -L .#workspace-clippy"
       lint: ${{ needs.changes.outputs.code == 'true' }}
       deps: ${{ needs.changes.outputs.code == 'true' }}
@@ -160,9 +162,9 @@ jobs:
     permissions:
       contents: read
       id-token: write # Codecov OIDC upload in the coverage jobs
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-tests-v7.0.0
     with:
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       # Coverage runs the same nextest selection as test-unit and test-integration
       # (--lib / --test '*' with identical features and profile), so the plain
       # test jobs would run every test twice. Nightly stays: other toolchain.
@@ -184,14 +186,13 @@ jobs:
     name: Benchmarks
     # Stage 3: `tests` itself waits for the stage 1 jobs.
     needs: [tests]
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       checks: write
       pull-requests: write
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@c06be87b06af5bfcc48d98ebe95787c994e2d2c0 # workflow-benchmark-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-benchmarks-v3.0.0
     with:
-      source_branch: ${{ github.event.pull_request.head.ref }}
+      repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
       # Benchmarks disabled for now — flip the should_build to true
@@ -213,12 +214,12 @@ jobs:
     # (`enabled` is false); !failure() still stops it after a failed stage.
     needs: [changes, checks, check-allowed-dependencies, tests]
     if: ${{ !cancelled() && !failure() }}
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # build-library-v4.0.0
     permissions:
       contents: read
       id-token: write
     with:
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       version_type: pr
       architecture: x86_64-linux
       runner: depot-ubuntu-24.04-4
@@ -237,9 +238,9 @@ jobs:
       contents: read
     steps:
       - name: Build docs
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # nix-action-v2.0.0
         with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             nix build -L .#docs
@@ -271,7 +272,7 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
           # validate-pr-title and label run on pull_request only; benchmarks
-          # also skips for fork PRs. `tests`, `build-library` and `docs` are
+          # also skips for fork PRs (the workflow skips them itself). `tests`, `build-library` and `docs` are
           # gated on `changes.outputs.code`; when every inner job of a
           # reusable workflow skips, the caller job reports skipped as well.
           # So their skip is allowed only for a docs-only change; a code
