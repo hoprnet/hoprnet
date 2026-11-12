@@ -10,6 +10,11 @@ ignore = [
   "RUSTSEC-2026-0489", # hickory-proto: panic on a single-quote SVCB/HTTPS parameter value
   "RUSTSEC-2026-0490", # hickory-proto: zone-file lexer panics on tokens of 4096+ characters
   "RUSTSEC-2026-0491", # hickory-proto: memory amplification from DNS header record counts
+  "RUSTSEC-2026-0504", # hickory-proto: inverted NSEC3 comparison in DNSSEC validation; no fixed upstream release available
+  "RUSTSEC-2026-0505", # hickory-proto: NSEC3 owner names not checked against the zone; no fixed upstream release available
+  "RUSTSEC-2026-0511", # hickory-proto: NXDOMAIN accepted for a proven empty non-terminal; no fixed upstream release available
+  "RUSTSEC-2026-0512", # hickory-proto: DNSSEC validation accepted an unrelated signed RRset as the answer; no fixed upstream release available
+  "RUSTSEC-2026-0514", # hickory-resolver: lookup returned records that failed DNSSEC validation; fix (>=0.26.2) requires a libp2p major upgrade
   "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained, pulled by alloy-sol-macro 1.6.0 and aquamarine 0.6.0; validator_derive uses proc-macro-error3, not this crate
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
