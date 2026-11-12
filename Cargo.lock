@@ -4263,19 +4263,18 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.10.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "344e82a1e789dfe44edfaa1ad483effdfdda1b67133db0af008b8273bff6a75c"
+checksum = "105dbbbaddcff05658a073b40b849658a8cc91d47513cc8fcfcfc28b6713d035"
 dependencies = [
  "anyhow",
  "cfg-if",
  "futures",
  "futures-time",
  "hopr-api 5.1.0",
- "hopr-network-graph",
+ "hopr-network-graph 0.10.3",
  "hopr-utilities 0.19.1",
  "smart-default",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -4299,7 +4298,7 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-lib",
- "hopr-network-graph",
+ "hopr-network-graph 0.11.1",
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
@@ -4327,6 +4326,27 @@ dependencies = [
  "toml_edit",
  "tracing",
  "validator",
+]
+
+[[package]]
+name = "hopr-network-graph"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bd1852424489abfe1c58bec954bbb83ad0f847507663d0620c6665e9643b858"
+dependencies = [
+ "anyhow",
+ "bimap",
+ "futures",
+ "hopr-api 5.1.0",
+ "hopr-utilities 0.19.1",
+ "indexmap 2.14.2",
+ "lazy_static",
+ "parking_lot 0.12.5",
+ "petgraph",
+ "rand 0.10.3",
+ "smallvec",
+ "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]
@@ -4537,7 +4557,7 @@ dependencies = [
  "hopr-api 5.1.0",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-network-graph",
+ "hopr-network-graph 0.11.1",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
  "hopr-protocol-pix",
