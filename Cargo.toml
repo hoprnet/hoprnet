@@ -169,7 +169,7 @@ hopr-chain-connector = { version = "0.32.0" }
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
 hopr-transport-p2p = { version = "0.14.1", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.10.0", default-features = false }
+hopr-ct-full-network = { version = "0.9.0", default-features = false }
 hopr-network-graph = { version = "0.11.1", default-features = false }
 
 [profile.dev]
