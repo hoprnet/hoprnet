@@ -168,9 +168,9 @@ hopr-chain-connector = { version = "0.32.0" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
-hopr-transport-p2p = { version = "0.14.0", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.9.0", default-features = false }
-hopr-network-graph = { version = "0.10.3", default-features = false }
+hopr-transport-p2p = { version = "0.14.1", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.10.0", default-features = false }
+hopr-network-graph = { version = "0.11.1", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -233,7 +233,3 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
-
-[patch.crates-io]
-# CORE-1168 / hopr-impls#76: remove the Git patch after publication.
-hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls.git", branch = "feature/core-1168-periodic-compact-state-dump-reduce-debug-cardinality-for" }
