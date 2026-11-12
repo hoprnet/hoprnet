@@ -2326,7 +2326,19 @@ mod tests {
         }
         for (src, dst) in [(dest, a), (a, me), (dest, b), (b, me)] {
             graph.add_edge(&src, &dst).expect("edge should be addable");
-            mark_edge_full(&graph, &src, &dst);
+            // These return edges have SURB delivery evidence but no returning loopbacks.
+            // Graph 0.12 trusts successful loops over delayed SURBs, so recording loops here
+            // would prevent the recompute tests from modelling a delivery-rate collapse.
+            graph.upsert_edge(&src, &dst, |obs| {
+                use hopr_api::graph::traits::EdgeWeightType;
+                obs.record(EdgeWeightType::Connected(true));
+                obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
+                obs.record(EdgeWeightType::Balance(Some(1000u64.into())));
+                obs.record(EdgeWeightType::SurbRoundTrips {
+                    expected: 1_000,
+                    observed: 1_000,
+                });
+            });
         }
 
         let cfg = PathPlannerConfig {
