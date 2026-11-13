@@ -25383,6 +25383,97 @@ mod tests {
         Ok(())
     }
 
+    /// A PIX Session's hold is labelled `pix=true`, and a session with no gate `pix=false`: the label
+    /// comes from the egress gate the Session was built with, so an operator can tell a PIX Session's
+    /// hold from the non-PIX backpressure a rate-controlled Session relies on.
+    #[tokio::test]
+    async fn a_hold_is_labelled_by_whether_the_session_runs_pix() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        // The flag is all that distinguishes them here: the hold itself does not depend on the gate.
+        let pix = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, true)
+            .context("the stock is below the reserve")?;
+        let plain = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        drop((pix, plain));
+
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/true"),
+            "a Session with an egress gate is labelled `pix=true`"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/true"),
+            "and its duration lands on the same label"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "a Session without one is labelled `pix=false`"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and likewise for its duration"
+        );
+        Ok(())
+    }
+
+    /// The egress path takes the label from the gate it was given: a Session that carries one is
+    /// `pix=true`, the same Session without one is `pix=false`. This is the single site that derives
+    /// it, so a wrong derivation would mislabel every hold.
+    #[tokio::test]
+    async fn exit_data_egress_labels_the_hold_from_its_gate() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        // At the reserve, so the packet is held; one more SURB releases it.
+        estimator
+            .produced
+            .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
+
+        // An unfunded-but-admitting gate: the first packet is served from the predeposit budget.
+        let gate = ServiceGate::new(10, 10);
+        let (tx, _forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut with_pix = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer.clone(),
+            Some(gate),
+            true,
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { with_pix.send(item).await });
+        // Give the spawned send a turn so the hold episode is created before the stock rises.
+        tokio::time::sleep(SURB_RESERVE_POLL / 4).await;
+        // The hold is open: one episode on the `true` label, none on `false`.
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/true"),
+            "a Session with a gate must label its hold `pix=true`"
+        );
+        assert_eq!(0, probe::get("surb_reserve_holds/episodes/false"));
+
+        // Refill so the packet goes on and the spawn finishes.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), sending).await???;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/true"),
+            "and close it on the same label"
+        );
+        Ok(())
+    }
+
     /// A packet held across many polling intervals is one episode, not one per poll: the counter
     /// measures held packets, and the duration is recorded once when the hold ends.
     #[tokio::test]
@@ -25577,14 +25668,8 @@ mod tests {
 
         // One gate-block episode on a strict-prepay gate, released so it closes too.
         let gate = ServiceGate::new(0, 10);
-        let permit = acquire_egress_permit(
-            Some(gate.clone()),
-            DestinationRouting::Return(HoprPseudonym::random().into()),
-            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
-                SESSION_APPLICATION_TAG,
-                b"payload".as_slice(),
-            )?),
-        );
+        let (routing, data) = data_packet()?;
+        let permit = acquire_egress_permit(Some(gate.clone()), routing, data);
         gate.release_service();
         timeout(Duration::from_secs(5), permit)
             .await

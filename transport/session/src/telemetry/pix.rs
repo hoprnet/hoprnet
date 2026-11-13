@@ -63,11 +63,12 @@
 //! both are labelled by `pix` = `true\|false`, so a PIX Session's hold is separable from the
 //! non-PIX backpressure a rate-controlled Session relies on, and neither is labelled by a Session.
 //! The `hopr_surb_*` prefix is load-bearing and not the `hopr_session_surb_*` of the surrounding
-//! per-Session instruments: an unprefixed family reaches `/metrics` under *every* hoprd
-//! configuration, whereas `hopr_session_*` is diverted to the OTLP-only provider once a
-//! `hopr_session` interval override is configured (see the prefix note above), and an operator
-//! alerting on an SURB shortage dashboards `/metrics`. A packet above the reserve creates no
-//! episode; a packet held across many polling intervals creates one, not one per poll.
+//! per-Session instruments: `hopr_session_*` is diverted to the OTLP-only provider once a
+//! `hopr_session` interval override is configured (see the prefix note above), whereas
+//! `hopr_surb_*` is never diverted and keeps its Prometheus reader — so it reaches `/metrics`
+//! under every configuration, and an operator alerting on an SURB shortage dashboards it there.
+//! A packet above the reserve creates no episode; a packet held across many polling intervals
+//! creates one, not one per poll.
 //!
 //! Do not confuse it with `hopr_pix_fill_backoff_total{reason="surb_reserve"}`, which is already in
 //! this module's table: that counts *keep-alives the Exit withheld from its own PIX fill schedule*,

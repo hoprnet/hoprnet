@@ -58,7 +58,7 @@ HOPRD_METRIC_EXPORT_INTERVAL=15000,hopr_session=1000
 
 - Session telemetry metrics are exported via OTLP (`hopr_session_*`).
 - When a `hopr_session` prefix override is configured in `HOPRD_METRIC_EXPORT_INTERVAL` — which the
-  examples below recommend — they are not exposed by the Prometheus `/metrics` endpoint either. Without such an
+  examples above recommend — they are not exposed by the Prometheus `/metrics` endpoint either. Without such an
   override no prefix provider exists for them, and they fall through to the default provider, which does have the
   Prometheus reader.
 
@@ -81,7 +81,9 @@ which subsystem raised it.
 One PIX-adjacent pair deliberately sits outside this section: `hopr_surb_reserve_holds_total` and
 `hopr_surb_reserve_hold_seconds`, the Exit data held by the SURB keep-alive reserve. The hold runs before the PIX
 gate, so it also covers rate-controlled Sessions without PIX, and it is not labelled by a Session — so it belongs
-on the `hopr_surb_*` node-level family and **does** appear on `/metrics`. It is the counterpart to
+on the `hopr_surb_*` node-level family and **does** appear on `/metrics` under every configuration: unlike
+`hopr_session_*`, a `hopr_surb_*` prefix is never given the OTLP-only provider, so a `hopr_surb` interval override
+would change its export cadence but not take it off `/metrics`. It is the counterpart to
 `hopr_pix_gate_blocks_total`, not another spelling of it. Both are labelled by `pix` = `true|false` (whether the
 Session runs a PIX gate), a closed set, so a PIX Session's hold is separable from the non-PIX case.
 

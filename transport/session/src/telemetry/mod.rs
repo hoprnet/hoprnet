@@ -611,6 +611,7 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
     use hopr_protocol_session::SessionTelemetryTracker;
 
@@ -665,41 +666,29 @@ mod tests {
     /// pass an episode whose clock never ran. Counts and sums are process-wide, so the assertions
     /// are lower bounds rather than exact figures; a fresh label value keeps them meaningful.
     #[test]
-    fn surb_reserve_hold_metrics_are_exported_with_labels_and_observations() {
+    fn surb_reserve_hold_metrics_are_exported_with_labels_and_observations() -> anyhow::Result<()> {
         surb::record_surb_reserve_hold(true);
         surb::record_surb_reserve_hold(true);
         surb::record_surb_reserve_hold_duration(true, 0.25);
 
-        let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("must gather metrics")?;
 
-        let holds = text
-            .lines()
-            .find(|line| line.starts_with("hopr_surb_reserve_holds_total{pix=\"true\"} "))
-            .and_then(|line| line.rsplit(' ').next())
-            .and_then(|value| value.parse::<f64>().ok())
-            .expect("the counter must be exported under the closed `pix` label");
+        let holds = series_value(&text, "hopr_surb_reserve_holds_total{pix=\"true\"}")
+            .context("the counter must be exported under the closed `pix` label")?;
         assert!(
             holds >= 2.0,
             "the counter must have counted both holds, not merely exist: was {holds}"
         );
 
-        let sum = text
-            .lines()
-            .find(|line| line.starts_with("hopr_surb_reserve_hold_seconds_sum{pix=\"true\"} "))
-            .and_then(|line| line.rsplit(' ').next())
-            .and_then(|value| value.parse::<f64>().ok())
-            .expect("the histogram's sum must be exported under the `pix` label");
+        let sum = series_value(&text, "hopr_surb_reserve_hold_seconds_sum{pix=\"true\"}")
+            .context("the histogram's sum must be exported under the `pix` label")?;
         assert!(
             sum >= 0.25,
             "the observed duration must reach the histogram, not be swallowed on the way: sum was {sum}"
         );
 
-        let count = text
-            .lines()
-            .find(|line| line.starts_with("hopr_surb_reserve_hold_seconds_count{pix=\"true\"} "))
-            .and_then(|line| line.rsplit(' ').next())
-            .and_then(|value| value.parse::<f64>().ok())
-            .expect("the histogram's count must be exported");
+        let count = series_value(&text, "hopr_surb_reserve_hold_seconds_count{pix=\"true\"}")
+            .context("the histogram's count must be exported")?;
         assert!(count >= 1.0, "an episode must be observed, not merely declared");
 
         assert!(
@@ -707,6 +696,14 @@ mod tests {
                 && !text.contains("hopr_surb_reserve_hold_seconds_count{pix=\"true\",session_id"),
             "neither may be labelled by a Session: the hold is a node-level pressure signal"
         );
+        Ok(())
+    }
+
+    /// The value of the `series` line of a Prometheus text exposition, parsed as a number.
+    fn series_value(text: &str, series: &str) -> Option<f64> {
+        text.lines()
+            .find_map(|line| line.strip_prefix(series)?.strip_prefix(' '))
+            .and_then(|value| value.parse::<f64>().ok())
     }
 
     /// Attaches balancer data to a fresh Session and returns the pieces a gauge test drives.

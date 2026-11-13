@@ -7,11 +7,17 @@
 //!
 //! # Why `hopr_surb_*` and not `hopr_session_surb_*`
 //!
-//! `hopr-types`' `meter_for_metric` routes an instrument to a meter provider by *name prefix*. Once
-//! a `hopr_session` interval override is configured in `HOPRD_METRIC_EXPORT_INTERVAL` — which
-//! `OTLP.md` recommends — hoprd gives `hopr_session_*` an OTLP-only provider, so those series do not
-//! reach the Prometheus `/metrics` endpoint. An operator alerting on an SURB shortage reads
-//! `/metrics`, and an unprefixed family reaches it under every configuration, so these two carry the
+//! `hopr-types`' `meter_for_metric` routes an instrument to a meter provider by *name prefix*, and
+//! hoprd builds one provider per prefix configured in `HOPRD_METRIC_EXPORT_INTERVAL`. Such a
+//! provider always gets the OTLP reader; it gets the Prometheus reader too **unless** its prefix
+//! starts with `hopr_session`. So once a `hopr_session` interval override is configured — which
+//! `OTLP.md` recommends — `hopr_session_*` series stop reaching `/metrics`, while every other
+//! prefix keeps reaching it.
+//!
+//! An operator alerting on an SURB shortage reads `/metrics`, and the `hopr_surb_*` prefix is never
+//! diverted to the OTLP-only provider: it reaches `/metrics` under every configuration. A
+//! `hopr_surb` interval override would give these two their own provider rather than the default
+//! one, and therefore their own export cadence, but not a different exporter set. They carry the
 //! prefix the rest of the node-level SURB metrics already use (`hopr_surb_balancer_*`,
 //! `hopr_surb_store_*`).
 //!
