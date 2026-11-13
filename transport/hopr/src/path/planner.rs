@@ -3289,8 +3289,10 @@ mod tests {
 
     /// Cached snapshots keep their dictionary identity; replacements and other planners get new IDs.
     /// Every logged draw must reference the dictionary entry for the path actually returned.
-    #[test]
+    // Expand the proc macro before `test`: the pinned nightly otherwise crashes while
+    // tokenizing the compiler-generated test entrypoint attribute.
     #[serial_test::serial(routing_logs)]
+    #[test]
     fn candidate_dictionary_should_correlate_cached_snapshots_and_actual_draws() -> anyhow::Result<()> {
         let (planner, _) = two_relayer_return_planner();
         let (forward_planner, _) = two_relayer_forward_planner();

@@ -1507,6 +1507,101 @@ mod tests {
         }
     }
 
+    /// Each role starts all four workers, delivers application data and drains acknowledgements appropriately.
+    #[cfg(feature = "tracing-context")]
+    #[rstest::rstest]
+    #[case::entry(NodeType::Entry)]
+    #[case::exit(NodeType::Exit)]
+    #[case::relay(NodeType::Relay)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[serial_test::serial(routing_logs)]
+    async fn packet_workers_deliver_messages_and_process_acks_for_their_role(
+        #[case] role: NodeType,
+    ) -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let logs = crate::tests::support::Logs::default();
+        logs.with_cpu_subscriber(logs.subscriber(tracing::Level::DEBUG), async {
+            let key = OffchainKeypair::random();
+            let peer = *key.public();
+            let session = HoprPseudonym::random();
+            let dispatch = tracing::dispatcher::get_default(Clone::clone);
+            let (wire_tx, wire_rx) = mpsc::channel(8);
+            let (app_tx, app_rx) = mpsc::channel(8);
+            let (ssa_tx, ssa_rx) = mpsc::channel(8);
+            let tickets = ScriptedTicketProc::resolving_nothing();
+            let ssa_id = SsaId::new(session, 1.try_into()?);
+            let shares = ScriptedExitProc::new(move || Ok(vec![HoprShareResolution::AlmostRecoveredSsa(ssa_id)]));
+            let outgoing = ApplicationDataOut::with_no_packet_info(ApplicationData::new(1234u64, vec![9])?);
+            let expected_outgoing = outgoing.data.to_bytes();
+            let path = hopr_api::types::internal::path::ValidatedPath::direct(
+                peer,
+                ChainKeypair::random().public().to_address(),
+            );
+            let processes = run_packet_pipeline_inner(
+                role,
+                key,
+                (
+                    wire_tx,
+                    futures::stream::iter([0u8, 2].map(|marker| (peer.into(), Bytes::from(vec![marker])))),
+                ),
+                (
+                    ContextTestEncoder {
+                        dispatch: dispatch.clone(),
+                        next_hop: Some(peer),
+                    },
+                    ContextTestDecoder {
+                        dispatch,
+                        peer,
+                        sessions: [session, HoprPseudonym::random()],
+                    },
+                ),
+                tickets.clone(),
+                shares.clone(),
+                futures::sink::drain(),
+                ssa_tx,
+                PacketPipelineConfig::default(),
+                (
+                    app_tx,
+                    futures::stream::iter([(ResolvedTransportRouting::forward_only(path), outgoing)]),
+                ),
+                PeerProtocolCounterRegistry::default(),
+            );
+            for worker in [
+                PacketPipelineProcesses::MsgIn,
+                PacketPipelineProcesses::MsgOut,
+                PacketPipelineProcesses::AckIn,
+                PacketPipelineProcesses::AckOut,
+            ] {
+                assert!(processes.contains(&worker), "missing worker {worker:?} for {role:?}");
+            }
+            let (app, wire, resolutions) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                futures::join!(
+                    app_rx.collect::<Vec<_>>(),
+                    wire_rx.collect::<Vec<_>>(),
+                    ssa_rx.collect::<Vec<_>>()
+                )
+            })
+            .await
+            .context("all workers must drain finite input and close their outputs")?;
+            assert_eq!(app.len(), 1);
+            assert_eq!(app[0].0, session);
+            assert_eq!(app[0].1.data.plain_text.as_ref(), [0]);
+            assert!(
+                wire.iter().any(
+                    |(target, bytes)| *target == PeerId::from(peer) && bytes.as_ref() == expected_outgoing.as_ref()
+                )
+            );
+            assert_eq!(tickets.calls(), usize::from(role == NodeType::Relay));
+            assert_eq!(shares.calls(), usize::from(role != NodeType::Entry));
+            assert_eq!(resolutions.len(), usize::from(role != NodeType::Entry));
+            if role != NodeType::Entry {
+                assert_eq!(resolutions[0], HoprShareResolution::AlmostRecoveredSsa(ssa_id));
+            }
+            anyhow::Ok(())
+        })?
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[serial_test::serial(routing_logs)]
     async fn acknowledgement_batches_should_link_all_packets_without_changing_grouping() -> anyhow::Result<()> {

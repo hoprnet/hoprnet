@@ -272,6 +272,94 @@ pub enum HoprTransportProcess {
     Capture,
 }
 
+/// Classifies probes and dispatches session traffic while retaining each packet's context.
+/// Unrelated data reaches the application sink; a closed sink does not stop ingress.
+async fn dispatch_incoming_messages<G, In, Out>(
+    rx_from_protocol: In,
+    probe_classifier: hopr_transport_probe::ProbeClassifierState<G>,
+    unresolved_routing_msg_tx_for_task: HoprMessageSender,
+    smgr: Arc<HoprSessionManager>,
+    on_incoming_data_tx: Out,
+) where
+    G: NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    In: futures::Stream<Item = trace_context::WithContext<(HoprPseudonym, ApplicationDataIn)>>,
+    Out: futures::Sink<ApplicationDataIn> + Unpin,
+{
+    rx_from_protocol
+        .filter_map(move |message| {
+            let classifier = probe_classifier.clone();
+            let push = unresolved_routing_msg_tx_for_task.clone();
+            let (value, span) = message.into_parts();
+            let output_span = span.clone();
+            async move {
+                match classifier.classify(push, value.0, value.1).await {
+                    hopr_transport_probe::ProbeDispatch::Consumed => None,
+                    hopr_transport_probe::ProbeDispatch::Passthrough(pseudonym, data) => {
+                        Some(trace_context::WithContext::new((pseudonym, data), output_span))
+                    }
+                }
+            }
+            .instrument(span)
+        })
+        .filter_map(move |message| {
+            let ((pseudonym, data), span) = message.into_parts();
+            let _entered = span.enter();
+            let _dispatch = tracing::debug_span!("session.dispatch").entered();
+            hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
+            // try_send); it never blocks. However, the crossfire stream that feeds
+            // this loop does not participate in tokio's cooperative budget, so
+            // `future::ready` — which is always Poll::Ready — would let this task
+            // monopolize its worker thread under a saturated inbound queue (Processed
+            // items are filtered to None before the fold's tx.send().await, the only
+            // other suspension point on the hot path). Calling consume_budget() here
+            // integrates this loop into tokio's coop scheduler: it is a cheap
+            // thread-local decrement on the fast path and only actually yields
+            // (~every 128 polls) when the budget is exhausted, giving co-located
+            // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
+            let result = match smgr.dispatch_message(pseudonym, data) {
+                Ok(DispatchResult::Processed) => {
+                    tracing::trace!("message dispatch completed");
+                    None
+                }
+                Ok(DispatchResult::Unrelated(data)) => {
+                    tracing::trace!("unrelated message dispatch completed");
+                    Some(data)
+                }
+                // Benign drop: the session's sink has closed, its inbox is momentarily
+                // full (backpressure), or the session is already deregistered. Counted
+                // in the session manager and logged quietly here so a departing
+                // counterparty cannot spam ERROR once per in-flight packet.
+                Ok(DispatchResult::Dropped(reason)) => {
+                    tracing::trace!(?reason, "dropped session packet");
+                    None
+                }
+                Err(error) => {
+                    tracing::error!(%error, "error while dispatching packet in the session manager");
+                    None
+                }
+            };
+            drop(_dispatch);
+            drop(_entered);
+            async move {
+                hopr_utils::runtime::prelude::consume_budget().await;
+                result
+            }
+            .instrument(span)
+        })
+        .fold(on_incoming_data_tx, |mut tx, data| async move {
+            if tx.send(data).await.is_err() {
+                tracing::error!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "incoming-data channel disconnected — dropping unrelated packet; \
+                     HoprSocket must be consumed or drained by the caller"
+                );
+            }
+            tx
+        })
+        .await;
+}
+
 /// HOPR protocol specific instantiation of the SessionManager.
 type HoprSessionManager = SessionManager<HoprMessageSender>;
 
@@ -1269,80 +1357,14 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             hopr_utils::spawn_as_abortable!(async move {
-                rx_from_protocol
-                    .filter_map(move |message| {
-                        let classifier = probe_classifier.clone();
-                        let push = unresolved_routing_msg_tx_for_task.clone();
-                        let (value, span) = message.into_parts();
-                        let output_span = span.clone();
-                        async move {
-                            match classifier.classify(push, value.0, value.1).await {
-                                hopr_transport_probe::ProbeDispatch::Consumed => None,
-                                hopr_transport_probe::ProbeDispatch::Passthrough(pseudonym, data) => {
-                                    Some(trace_context::WithContext::new((pseudonym, data), output_span))
-                                }
-                            }
-                        }
-                        .instrument(span)
-                    })
-                    .filter_map(move |message| {
-                        let ((pseudonym, data), span) = message.into_parts();
-                        let _entered = span.enter();
-                        let _dispatch = tracing::debug_span!("session.dispatch").entered();
-                        hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-                        // try_send); it never blocks. However, the crossfire stream that feeds
-                        // this loop does not participate in tokio's cooperative budget, so
-                        // `future::ready` — which is always Poll::Ready — would let this task
-                        // monopolize its worker thread under a saturated inbound queue (Processed
-                        // items are filtered to None before the fold's tx.send().await, the only
-                        // other suspension point on the hot path). Calling consume_budget() here
-                        // integrates this loop into tokio's coop scheduler: it is a cheap
-                        // thread-local decrement on the fast path and only actually yields
-                        // (~every 128 polls) when the budget is exhausted, giving co-located
-                        // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
-                        let result = match smgr.dispatch_message(pseudonym, data) {
-                            Ok(DispatchResult::Processed) => {
-                                tracing::trace!("message dispatch completed");
-                                None
-                            }
-                            Ok(DispatchResult::Unrelated(data)) => {
-                                tracing::trace!("unrelated message dispatch completed");
-                                Some(data)
-                            }
-                            // Benign drop: the session's sink has closed, its inbox is momentarily
-                            // full (backpressure), or the session is already deregistered. Counted
-                            // in the session manager and logged quietly here so a departing
-                            // counterparty cannot spam ERROR once per in-flight packet.
-                            Ok(DispatchResult::Dropped(reason)) => {
-                                tracing::trace!(?reason, "dropped session packet");
-                                None
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, "error while dispatching packet in the session manager");
-                                None
-                            }
-                        };
-                        drop(_dispatch);
-                        drop(_entered);
-                        async move {
-                            hopr_utils::runtime::prelude::consume_budget().await;
-                            result
-                        }
-                        .instrument(span)
-                    })
-                    .fold(on_incoming_data_tx, |mut tx, data| async move {
-                        if tx.send(data).await.is_err() {
-                            tracing::error!(
-                                task = %HoprTransportProcess::SessionsManagement(0),
-                                "incoming-data channel disconnected — dropping unrelated packet; \
-                                 HoprSocket must be consumed or drained by the caller"
-                            );
-                        }
-                        tx
-                    })
-                    .await;
+                dispatch_incoming_messages(
+                    rx_from_protocol,
+                    probe_classifier,
+                    unresolved_routing_msg_tx_for_task,
+                    smgr,
+                    on_incoming_data_tx,
+                )
+                .await;
                 tracing::warn!(
                     task = %HoprTransportProcess::SessionsManagement(0),
                     "long-running background task finished"
@@ -2023,6 +2045,8 @@ mod pix_recovery_event_tests {
 
 #[cfg(test)]
 mod tests {
+    mod dispatch;
+
     pub(crate) mod support {
         //! Capture structured records and formatted ancestry using the same subscriber.
         //!
@@ -2176,13 +2200,6 @@ mod tests {
         }
     }
 
-    use std::sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    };
-
-    use futures::StreamExt;
-    use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
     use rstest::rstest;
 
     use super::*;
@@ -2201,84 +2218,6 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
-    /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
-    /// the tokio worker thread under a continuously saturated inbound stream.
-    ///
-    /// ### Background
-    ///
-    /// The inbound dispatch loop (`transport/hopr/src/lib.rs`) drives:
-    ///
-    /// ```text
-    /// rx_from_protocol (crossfire, no coop budget)
-    ///   → filter_stream
-    ///   → filter_map(sync dispatch_message + consume_budget().await)
-    ///   → fold(tx.send().await)          ← only fires for Unrelated items
-    /// ```
-    ///
-    /// On the `Processed` hot path (common case), items become `None` and are filtered
-    /// out before the `fold`'s `tx.send().await`, so the only suspension point is the
-    /// `consume_budget()` call inside `filter_map`.
-    ///
-    /// ### What this test proves
-    ///
-    /// On a `current_thread` runtime (single worker, fully cooperative scheduling) a tight
-    /// stream loop that never returns `Poll::Pending` starves every other spawned task until
-    /// the stream is drained.  By replacing `future::ready(result)` with an `async` block
-    /// that calls `consume_budget().await` before returning, we give the scheduler a chance
-    /// to preempt the loop every ≈128 polls.  The "canary" task — a plain `yield_now` loop —
-    /// *must* make forward progress while the dispatch stream is draining for the fix to be
-    /// considered effective.
-    ///
-    /// Reverting the `consume_budget().await` to `future::ready(result)` will make this
-    /// test fail: the canary will never be scheduled and its counter will remain 0.
-    #[tokio::test(flavor = "current_thread")]
-    async fn sessions_management_dispatch_loop_yields_to_scheduler() {
-        // N large enough to trigger ≥1 genuine yield (budget = 128 per reset).
-        const N: usize = 1_000;
-
-        // Canary: counts how many times it was scheduled during the dispatch run.
-        let counter = Arc::new(AtomicU64::new(0));
-        let counter_clone = counter.clone();
-        let canary = spawn(async move {
-            loop {
-                counter_clone.fetch_add(1, Ordering::Relaxed);
-                yield_now().await;
-            }
-        });
-
-        // Dispatch loop — same shape as the fixed SessionsManagement(0) hot path:
-        //   sync compute → consume_budget().await → None (Processed path)
-        let unrelated_count = futures::stream::iter(0..N)
-            .filter_map(|_item| {
-                // Dispatch result computed synchronously (no clone); budget consumed async.
-                let result: Option<()> = None; // every item is "Processed"
-                async move {
-                    consume_budget().await;
-                    result
-                }
-            })
-            .fold(0u64, |acc, _| async move { acc + 1 })
-            .await;
-
-        assert_eq!(
-            unrelated_count, 0,
-            "all Processed items should be filtered out by filter_map"
-        );
-
-        // The canary must have been scheduled at least once while the dispatch loop ran.
-        // If consume_budget() is removed and future::ready() is used instead, the loop
-        // never returns Poll::Pending on the current_thread executor and this assertion fails.
-        let progress = counter.load(Ordering::Relaxed);
-        assert!(
-            progress > 0,
-            "canary task made no forward progress during the {N}-item dispatch run (counter = {progress}); the \
-             dispatch loop is monopolizing the executor thread — ensure filter_map returns `async move {{ \
-             consume_budget().await; result }}` rather than `future::ready(result)`"
-        );
-
-        canary.abort();
-        canary.await.ok();
-    }
     /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
     ///
     /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:

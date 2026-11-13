@@ -16332,6 +16332,55 @@ mod tests {
         )
     }
 
+    /// The benchmark queue uses real dispatch: independent bounded lanes, reusable drains and closed-queue errors.
+    #[test]
+    fn benchmark_start_queue_drains_both_lanes_and_preserves_backpressure() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let mut drain = mgr.benchmark_start_queue(1)?;
+        assert_eq!(drain(), 0);
+        assert!(
+            mgr.benchmark_start_queue(1).is_err(),
+            "queues can only be installed once"
+        );
+        let id = HoprPseudonym::random();
+        let _session_rx = mgr.pre_populate_session_with_receiver(
+            id,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(id),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let opening = || -> anyhow::Result<_> {
+            start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                challenge: StartChallenge::MAX,
+                target: SessionTarget::UdpStream(hopr_utils::network_types::prelude::SealedHost::Plain(
+                    std::net::SocketAddr::from(([127, 0, 0, 1], 1234)).into(),
+                )),
+                capabilities: HoprSessionCapabilities::try_from(0u8)?,
+                additional_data: 0,
+            }))
+        };
+        for _ in 0..2 {
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(mgr.dispatch_message(id, packet)?, DispatchResult::Processed));
+            }
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(
+                    mgr.dispatch_message(id, packet)?,
+                    DispatchResult::Dropped(DropReason::StartQueueFull)
+                ));
+            }
+            assert_eq!(drain(), 2, "each lane contributes one message");
+            assert_eq!(drain(), 0, "draining must remove messages exactly once");
+        }
+        drop(drain);
+        assert!(mgr.dispatch_message(id, opening()?).is_err());
+        assert!(mgr.dispatch_message(id, ssa_request_packet(id)?).is_err());
+        Ok(())
+    }
+
     /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
     ///
     /// Before the admission filter, every one of these reached the shared Start-protocol worker
@@ -16590,7 +16639,7 @@ mod tests {
         let established_challenge = MIN_CHALLENGE;
         let error_challenge = MIN_CHALLENGE + 1;
         let unknown_challenge = MIN_CHALLENGE + 2;
-        let _receivers = [established_challenge, error_challenge]
+        let receivers = [established_challenge, error_challenge]
             .into_iter()
             .map(|challenge| {
                 let (tx, rx): (
@@ -16688,6 +16737,23 @@ mod tests {
             );
         }
 
+        // Admission alone does not prove the background control worker delivered either reply.
+        let established_reply = timeout(Duration::from_secs(2), receivers[0].recv())
+            .await
+            .context("establishment worker must deliver its reply")??;
+        assert!(matches!(
+            established_reply,
+            Ok(StartEstablished { orig_challenge, session_id })
+                if orig_challenge == established_challenge && session_id == replier
+        ));
+        let error_reply = timeout(Duration::from_secs(2), receivers[1].recv())
+            .await
+            .context("error worker must deliver its reply")??;
+        assert!(matches!(
+            error_reply,
+            Err(StartErrorType { identifier: ErrorIdentifier::Challenge(challenge), reason: StartErrorReason::Unknown })
+                if challenge == error_challenge
+        ));
         sender.close_channel();
         Ok(())
     }
