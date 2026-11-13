@@ -598,11 +598,14 @@ mod tests {
     }
 
     #[test]
-    fn aggregates_are_exported_through_hopr_metrics() {
+    fn aggregates_are_exported_through_hopr_metrics() -> anyhow::Result<()> {
+        use anyhow::Context;
+
         add_sessions_active(PixGateMode::Funded, 3);
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
         add_ssa_requests_resent(2);
+        set_held_shares(3);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
         add_egress_packets(PixGateMode::Predeposit, 7);
@@ -617,7 +620,7 @@ mod tests {
         record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
         add_sessions_stalled(PixStallCause::ShareStarved, 1);
 
-        let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("gathering registered metrics")?;
 
         // Only the *presence* of a series with the right label is asserted, not its value: the
         // registry is process-wide and shared with every other test in this binary, so an exact
@@ -627,6 +630,7 @@ mod tests {
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
             "hopr_pix_ssa_requests_resent_total",
+            "hopr_pix_held_shares",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
             "hopr_pix_cycle_bytes_reserved_total",
@@ -646,5 +650,6 @@ mod tests {
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }
+        Ok(())
     }
 }
