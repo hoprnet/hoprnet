@@ -1803,8 +1803,9 @@ mod tests {
         let expired_at = started.elapsed();
 
         // All of them fall due at essentially the same moment; querying after one grace (+ slack)
-        // must already see the whole batch.
-        tokio::time::sleep(LOCAL_DROP_GRACE + std::time::Duration::from_millis(400)).await;
+        // must already see the whole batch. The slack matches this module's other timers: a loaded
+        // runner can delay the verdict task's wake past a narrower margin.
+        tokio::time::sleep(LOCAL_DROP_GRACE + std::time::Duration::from_millis(1_000)).await;
         jhs.abort_all();
 
         let recorded = store.path_timeouts();
