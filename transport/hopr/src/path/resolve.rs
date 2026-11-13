@@ -36,6 +36,13 @@ const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_milli
 /// packet a slower or reliable session would still have made use of, so it errs long and leaves the
 /// tightening to whoever knows the traffic.
 ///
+/// This does not bound a loopback probe's local-drop budget, because a probe is forward-routed and
+/// only the `Return` arm of [`PathPlanner::resolve_routing`] can starve for SURBs (see
+/// [hoprnet/hoprnet#8661]). A probe's budget is instead `ProbeConfig::timeout` plus the probe's own
+/// verdict grace, against the encode stage's `PACKET_ENCODING_TIMEOUT`; `ProbeConfig` validates a
+/// floor on the timeout for exactly that reason.
+///
+/// [`PathPlanner::resolve_routing`]: super::PathPlanner::resolve_routing
 /// [cfg]: crate::protocol::PacketPipelineConfig::surb_resolution_wait
 pub(crate) const DEFAULT_SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
 

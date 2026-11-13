@@ -1,7 +1,29 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+/// Floor under [`ProbeConfig::timeout`].
+///
+/// A loopback probe's tag lives for `timeout`, and a local-drop verdict is held for
+/// [`LOCAL_DROP_GRACE`](crate::probe) beyond it while the outgoing pipeline reports a drop. The
+/// longest such report is the encode stage's 5 s ceiling, so a tag shorter than 2 s could expire
+/// before a drop arrives and be recorded as a relay timeout for a packet that never left the node
+/// (hoprnet/hoprnet#8661). 2 s + 3 s keeps the second of the two above the 5 s ceiling.
+const MIN_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 fn validate_interval_ge_timeout(config: &ProbeConfig) -> Result<(), validator::ValidationError> {
+    if config.timeout < MIN_PROBE_TIMEOUT {
+        let mut err = validator::ValidationError::new("timeout_below_floor");
+        err.message = Some(
+            format!(
+                "probe timeout ({:?}) must be >= {MIN_PROBE_TIMEOUT:?} so a locally dropped loopback probe is not \
+                 recorded as a relay timeout",
+                config.timeout
+            )
+            .into(),
+        );
+        return Err(err);
+    }
+
     if config.interval < config.timeout {
         let mut err = validator::ValidationError::new("interval_less_than_timeout");
         err.message = Some(
@@ -136,5 +158,36 @@ mod tests {
             ..Default::default()
         };
         assert!(config.validate().is_ok());
+    }
+
+    /// The timeout floor keeps a loopback tag alive long enough for every local-drop site to report
+    /// before the tag could expire and read as a relay timeout (hoprnet/hoprnet#8661). Below it,
+    /// configuration is rejected rather than silently degrading the probe's guarantee.
+    #[test]
+    fn a_probe_timeout_below_the_floor_should_be_rejected() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: MIN_PROBE_TIMEOUT - std::time::Duration::from_millis(1),
+            interval: std::time::Duration::from_secs(5),
+            ..Default::default()
+        };
+        let err = cfg.validate().err().context("expected validation error")?;
+        // A schema-level validator, so the error is reported under `__all__` rather than a field.
+        anyhow::ensure!(
+            err.errors().contains_key("__all__"),
+            "expected the timeout-floor error, got: {err}"
+        );
+        Ok(())
+    }
+
+    /// Exactly the floor is accepted: it is the shortest timeout the guarantee holds under.
+    #[test]
+    fn a_probe_timeout_at_the_floor_should_be_accepted() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: MIN_PROBE_TIMEOUT,
+            interval: std::time::Duration::from_secs(5),
+            ..Default::default()
+        };
+        cfg.validate().context("the floor must be accepted")?;
+        Ok(())
     }
 }

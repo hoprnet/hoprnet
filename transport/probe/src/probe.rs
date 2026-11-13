@@ -355,24 +355,35 @@ impl Probe {
                 }));
 
         // Turns the eviction listener's expiry hand-offs into graph verdicts off the cache's
-        // maintenance path. Each waits `LOCAL_DROP_GRACE` before recording, so a drop that is
-        // reported after the tag's TTL can settle its probe first.
+        // maintenance path. A batch waits `LOCAL_DROP_GRACE` together before recording, so a drop
+        // reported after the tags' TTL can settle its probe first. Batched rather than one grace per
+        // probe: expiries arrive in bulk whenever a burst of probes is dropped, and a per-probe
+        // sleep would delay the N-th verdict by N graces — minutes, against the graph's 60 s
+        // windows. The verdicts are independent, so their order within a batch does not matter.
         let network_graph_internal_path_verdicts = network_graph_internal_path;
         let mut path_verdict_rx = path_verdict_rx;
         processes.insert(
             HoprProbeProcess::PathVerdicts,
             hopr_utils::spawn_as_abortable_named!("probe_path_verdicts", async move {
                 use futures::StreamExt;
-                while let Some((tag, path, probe)) = path_verdict_rx.next().await {
-                    hopr_utils::runtime::prelude::sleep(LOCAL_DROP_GRACE).await;
-                    if probe.is_settled() {
-                        tracing::debug!(%tag, reason = "settled before expiry was recorded", "loopback probe");
-                        continue;
+                while let Some(first) = path_verdict_rx.next().await {
+                    // Everything already queued joins this batch, at no extra grace.
+                    let mut batch = vec![first];
+                    while let Ok(next) = path_verdict_rx.try_recv() {
+                        batch.push(next);
                     }
-                    tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
-                    network_graph_internal_path_verdicts.record_edge::<NeighborTelemetry, PathTelemetry>(
-                        hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(path))),
-                    );
+
+                    hopr_utils::runtime::prelude::sleep(LOCAL_DROP_GRACE).await;
+                    for (tag, path, probe) in batch {
+                        if probe.is_settled() {
+                            tracing::debug!(%tag, reason = "settled before expiry was recorded", "loopback probe");
+                            continue;
+                        }
+                        tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
+                        network_graph_internal_path_verdicts.record_edge::<NeighborTelemetry, PathTelemetry>(
+                            hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(path))),
+                        );
+                    }
                 }
                 tracing::warn!(
                     task = "transport (probe - path verdicts)",
@@ -509,16 +520,23 @@ impl Probe {
                                                 move || {
                                                     // Settle first: a deferred verdict reads this flag.
                                                     probe.settle();
-                                                    // Remove only *our own* entry. A tag is recycled as soon
-                                                    // as an entry leaves the cache, so this tag may now
-                                                    // belong to a later probe; that one must survive.
-                                                    let ours =
-                                                        active_path_probes_for_drop.get(&tag).is_some_and(|current| {
-                                                            current.telemetry.id == probe.telemetry.id
+                                                    // Remove only *our own* entry, atomically. A tag is recycled
+                                                    // as soon as an entry leaves the cache, so by the time this
+                                                    // runs the value may belong to a later probe on the same tag —
+                                                    // and that one must survive. `and_compute_with` serializes
+                                                    // per key, so the compare-and-remove cannot be raced by the
+                                                    // expiry-then-reallocation pair a plain get-then-remove could.
+                                                    let _ = active_path_probes_for_drop
+                                                        .entry_by_ref(&tag)
+                                                        .and_compute_with(|current| match current {
+                                                            Some(entry)
+                                                                if entry.value().telemetry.id == probe.telemetry.id =>
+                                                            {
+                                                                moka::ops::compute::Op::Remove
+                                                            }
+                                                            // Gone (already expired), or a later probe's.
+                                                            _ => moka::ops::compute::Op::Nop,
                                                         });
-                                                    if ours {
-                                                        active_path_probes_for_drop.remove(&tag);
-                                                    }
                                                     tracing::debug!(
                                                         %tag,
                                                         id = const_hex::encode(probe.telemetry.id),
@@ -1726,6 +1744,66 @@ mod tests {
         assert!(
             store.path_timeouts() > 0,
             "an unanswered loopback probe must still be recorded as a timeout"
+        );
+        Ok(())
+    }
+
+    /// Many probes expiring at once must all be recorded within roughly one grace, not one grace
+    /// each.
+    ///
+    /// The condition that produced hoprnet/hoprnet#8661 — encode timeouts dropping loopback probes
+    /// in bulk — expires many tags together. A per-probe sleep in the verdict task would delay the
+    /// last verdict by N graces and push it out of the graph's windows; the task therefore batches
+    /// whatever is queued at once. This drives several probes to expiry inside the same window and
+    /// bounds the time until the last verdict lands, which is exactly what a serialized grace would
+    /// blow past.
+    #[tokio::test]
+    async fn a_batch_of_expired_loopback_probes_should_be_recorded_within_one_grace() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(100),
+            interval: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+        let store = PeerStore::new(*OFFCHAIN_KEYPAIR.public(), VecDeque::new());
+        let strategy = TestProbeStrategy::PeriodicLoopback {
+            routing: loopback_routing(),
+            path_id: [2, 4, 6, 8, 0],
+            period: std::time::Duration::from_millis(1),
+        };
+
+        let (jhs, _classifier, rx) = loopback_prober(cfg, strategy, store.clone()).await;
+
+        // Keep the cache active past the TTL so a burst of entries expires together, then keep it
+        // active through one grace so the batched verdict task can run.
+        let drain = |rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>, window| async move {
+            let _ = tokio::time::timeout(window, async {
+                let mut rx = rx;
+                while rx.next().await.is_some() {}
+            })
+            .await;
+        };
+        let started = std::time::Instant::now();
+        drain(rx, std::time::Duration::from_millis(200)).await;
+        let expired_at = started.elapsed();
+
+        // All of them fall due at essentially the same moment; querying after one grace (+ slack)
+        // must already see the whole batch.
+        tokio::time::sleep(LOCAL_DROP_GRACE + std::time::Duration::from_millis(400)).await;
+        jhs.abort_all();
+
+        let recorded = store.path_timeouts();
+        let elapsed_after_grace = started.elapsed();
+        assert!(
+            recorded >= 2,
+            "the batch must contain several expired probes, saw {recorded} (expiry took {expired_at:?})"
+        );
+        // A serialized grace would need `recorded` graces; allow one grace plus generous slack for
+        // the TTL drain and the verdict task.
+        let per_probe_grace_total = LOCAL_DROP_GRACE * recorded as u32;
+        assert!(
+            elapsed_after_grace < per_probe_grace_total,
+            "the batch took {elapsed_after_grace:?} for {recorded} verdicts, which is one grace each \
+             ({per_probe_grace_total:?}) rather than a single batched grace"
         );
         Ok(())
     }
