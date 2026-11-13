@@ -169,11 +169,8 @@ pub fn app_incoming_timeout_drop_count() -> usize {
     APP_INCOMING_TIMEOUT_DROPS.load(Ordering::Relaxed)
 }
 
-/// Cumulative count of refusal replies to `StartSession` that were not sent because the node's
-/// refusal reply budget was spent.
-///
-/// Each one is a requester left to time out. It drives the rate-limited warning in the Start
-/// protocol handler, and is what a flood looks like from outside.
+/// Cumulative count of `StartSession` refusal replies not sent because the refusal reply budget was
+/// spent; each is a requester left to time out.
 pub static START_REFUSAL_REPLY_DROPS: AtomicUsize = AtomicUsize::new(0);
 
 /// Returns the cumulative count of refusal replies dropped for want of budget.
@@ -182,12 +179,9 @@ pub fn start_refusal_reply_drop_count() -> usize {
     START_REFUSAL_REPLY_DROPS.load(Ordering::Relaxed)
 }
 
-/// Cumulative count of `StartSession` refusals decided by this node, whether or not the reply was
-/// sent.
+/// Cumulative count of `StartSession` refusals decided, whether or not the reply was sent.
 ///
-/// Counted per decision, so against [`START_REFUSAL_REPLY_DROPS`] it says how much of a flood the
-/// refusal reply budget absorbed. It drives the rate-limited summary warning in the Start protocol
-/// handler.
+/// Against [`START_REFUSAL_REPLY_DROPS`] it shows how much of a flood the budget absorbed.
 pub static START_REFUSALS: AtomicUsize = AtomicUsize::new(0);
 
 /// Returns the cumulative count of refused `StartSession`s.

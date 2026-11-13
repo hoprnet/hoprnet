@@ -1,7 +1,5 @@
-//! Integration coverage for the refusal reply budget.
-//!
-//! These run against the compiled library rather than `cfg(test)`, which is what lets them reach the
-//! `#[cfg(all(feature = "telemetry", not(test)))]` metric calls the unit tests cannot.
+//! Integration coverage for the refusal reply budget, against the compiled library so that the
+//! `cfg(not(test))` metric calls are reached.
 
 use anyhow::Context;
 use futures::channel::mpsc::UnboundedSender;
@@ -30,8 +28,7 @@ fn opening() -> anyhow::Result<ApplicationDataIn> {
     })
 }
 
-/// A refusal that finds the budget spent is dropped without a reply, and the replies that were sent
-/// are counted as errors sent, through the compiled library's own metric calls.
+/// Refusals beyond the budget get no reply, and the replies sent are counted as errors sent.
 #[test_log::test(tokio::test)]
 async fn refusals_beyond_the_budget_are_dropped_without_a_reply() -> anyhow::Result<()> {
     let mgr: TestManager = SessionManager::new(SessionManagerConfig {
