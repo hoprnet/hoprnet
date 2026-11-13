@@ -54,4 +54,11 @@ pub enum SessionError {
     GeneralError(#[from] GeneralError),
 }
 
+impl SessionError {
+    /// Whether the header leaves the next message boundary unknown, requiring the reader to stop.
+    pub(crate) fn is_fatal_header(&self) -> bool {
+        matches!(self, Self::WrongVersion | Self::IncorrectMessageLength)
+    }
+}
+
 pub type Result<T> = std::result::Result<T, SessionError>;
