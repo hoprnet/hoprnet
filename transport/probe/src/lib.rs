@@ -41,7 +41,13 @@ pub use crate::{
 pub enum HoprProbeProcess {
     #[strum(to_string = "probe emission")]
     Emit,
-    /// Forwards loopback probe timeouts from the tag cache's eviction listener to the graph.
+    /// Records loopback probe timeouts on the graph.
+    ///
+    /// The tag cache's eviction listener hands expired probes here rather than recording them
+    /// inline, so each can wait out the probe's local-drop grace before it counts. A probe a drop
+    /// site reported in that window is suppressed, and a batch that expires together is recorded
+    /// after one shared wait — which is why a genuine timeout reaches the graph a few seconds after
+    /// its tag expired.
     #[strum(to_string = "probe path verdicts")]
     PathVerdicts,
 }

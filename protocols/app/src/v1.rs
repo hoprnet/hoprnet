@@ -218,116 +218,132 @@ impl ApplicationDataIn {
     }
 }
 
-/// The signal a sender attaches to an outgoing packet that never left the node: the SURB it counted
-/// as consumed for the packet, and any listener that wants to learn the packet was dropped locally.
+/// The SURB a sender has already counted as consumed for an outgoing return packet, given back if
+/// the packet is dropped before it takes one.
 ///
-/// **The SURB refund.** A return packet takes its SURB only when its routing is resolved, but a
-/// sender whose reserve and admission decisions need the count at once counts it as it hands the
-/// packet on. Resolution may still find no SURB in time and drop the packet; it then calls
-/// [`give_back`](Self::give_back), so that the count is undone. The refund points at the sender's own
-/// counter rather than naming the sender: by the time the packet is dropped, the Session that counted
-/// it may be gone, or its identifier taken by another one.
+/// A return packet takes its SURB only when its routing is resolved, but a sender whose reserve and
+/// admission decisions need the count at once counts it as it hands the packet on. Resolution may
+/// still find no SURB in time and drop the packet; it then calls [`give_back`](Self::give_back), so
+/// that the count is undone. The refund points at the sender's own counter rather than naming the
+/// sender: by the time the packet is dropped, the Session that counted it may be gone, or its
+/// identifier taken by another one.
 ///
 /// It counts the SURB onto a counter of the sender's own rather than taking one off the consumed
 /// count: the readers of these counters take deltas between samples, so every counter has to keep
 /// growing, and which of them add the refunds back is the sender's choice. Empty by default: a packet
 /// nobody counted gives nothing back.
 ///
-/// **The local-drop listener.** A packet that enters the outgoing sink has not necessarily left the
-/// node: routing resolution or encoding can still drop it afterwards
-/// (`failed to resolve routing`, `outgoing packet could not be encoded`). Every such site calls
-/// [`give_back`](Self::give_back) — that call is the one unconditional local-drop notification the
-/// pipeline already has — so a sender that needs to know (the loopback prober, whose unanswered tag
-/// would otherwise expire as a relay timeout) arms this signal with
-/// [`on_local_drop`](Self::on_local_drop) instead of adding a second flag every drop site has to
-/// remember. The listener runs at most once per drop site, and never for a packet that is encoded and
-/// sent.
+/// This is only about the SURB count. Whether the packet was dropped at all is a separate question,
+/// answered by [`LocalDropSignal`]: a refund is correct only where the SURB was never taken, while a
+/// drop can also happen later, after resolution already popped one.
 #[derive(Clone, Default)]
-pub struct SurbRefund {
-    refunds: Option<std::sync::Arc<std::sync::atomic::AtomicU64>>,
-    on_local_drop: Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>,
-}
+pub struct SurbRefund(Option<std::sync::Arc<std::sync::atomic::AtomicU64>>);
 
 impl SurbRefund {
     /// A refund that counts the SURB onto `refunds`, the sender's count of SURBs given back.
     pub fn to(refunds: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
-        Self {
-            refunds: Some(refunds),
-            on_local_drop: None,
-        }
-    }
-
-    /// A signal that calls `notify` when the packet is dropped locally, before it leaves the node.
-    ///
-    /// It carries no SURB count, so [`is_counted`](Self::is_counted) stays `false` and the listener
-    /// is the only thing [`give_back`](Self::give_back) fires.
-    pub fn on_local_drop(notify: impl Fn() + Send + Sync + 'static) -> Self {
-        Self::default().with_local_drop_listener(notify)
-    }
-
-    /// Arms a local-drop listener on a signal that may already carry a SURB refund, so one packet
-    /// can both give its SURB back and notify a sender that cares.
-    pub fn with_local_drop_listener(mut self, notify: impl Fn() + Send + Sync + 'static) -> Self {
-        self.on_local_drop = Some(std::sync::Arc::new(notify));
-        self
+        Self(Some(refunds))
     }
 
     /// Whether the sender counted a SURB for this packet.
     pub fn is_counted(&self) -> bool {
-        self.refunds.is_some()
+        self.0.is_some()
     }
 
-    /// Whether a listener was armed for a local drop of this packet.
-    pub fn has_local_drop_listener(&self) -> bool {
-        self.on_local_drop.is_some()
-    }
-
-    /// The packet will not leave the node: gives the counted SURB back and notifies the
-    /// local-drop listener, if either is present.
+    /// Gives the counted SURB back. Does nothing for a packet whose sender counted none.
     pub fn give_back(&self) {
-        if let Some(refunds) = &self.refunds {
+        if let Some(refunds) = &self.0 {
             refunds.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-        if let Some(notify) = &self.on_local_drop {
-            notify();
         }
     }
 }
 
 impl std::fmt::Debug for SurbRefund {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(if self.refunds.is_some() {
+        f.write_str(if self.0.is_some() {
             "SurbRefund(counted)"
         } else {
             "SurbRefund(none)"
-        })?;
-        if self.on_local_drop.is_some() {
-            f.write_str("+local-drop")
-        } else {
-            Ok(())
+        })
+    }
+}
+
+/// Two refunds are equal when they give back to the same counter, or when neither gives anything back.
+impl PartialEq for SurbRefund {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
         }
     }
 }
 
-/// Two refunds are equal when they give back to the same counter and notify the same listener, or
-/// when neither has anything to give back or notify.
-impl PartialEq for SurbRefund {
-    fn eq(&self, other: &Self) -> bool {
-        let same_counter = match (&self.refunds, &other.refunds) {
-            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
-            (None, None) => true,
-            _ => false,
-        };
-        let same_listener = match (&self.on_local_drop, &other.on_local_drop) {
-            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
-            (None, None) => true,
-            _ => false,
-        };
-        same_counter && same_listener
+impl Eq for SurbRefund {}
+
+/// A callback a sender attaches to an outgoing packet to learn that it was dropped *locally*, before
+/// it left the node.
+///
+/// A packet that enters the outgoing sink has not necessarily left the node: routing resolution or
+/// encoding can still drop it afterwards (`failed to resolve routing`, `outgoing packet could not be
+/// encoded`). Those sites call [`notify`](Self::notify), so a sender that needs to know — the loopback
+/// prober, whose unanswered tag would otherwise expire and read as a relay timeout — is told without
+/// every drop site having to remember a boolean.
+///
+/// It is deliberately separate from [`SurbRefund`]. A refund undoes a SURB the sender counted but
+/// that was never taken; resolution is the only point at which that is true, because it is resolution
+/// that pops a SURB from the store. A packet dropped *after* resolution took its SURB has nothing to
+/// give back — refunding it there would credit a SURB that no longer exists and make the Exit
+/// over-report its stock — yet it is very much a local drop. So the two signals are independent: a
+/// drop site emits whichever of them applies, and the encode stage emits only this one.
+#[derive(Clone, Default)]
+pub struct LocalDropSignal(Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>);
+
+impl LocalDropSignal {
+    /// A signal that calls `dropped` when its packet is dropped locally.
+    pub fn new(dropped: impl Fn() + Send + Sync + 'static) -> Self {
+        Self(Some(std::sync::Arc::new(dropped)))
+    }
+
+    /// Whether a callback is attached.
+    pub fn is_armed(&self) -> bool {
+        self.0.is_some()
+    }
+
+    /// The packet was dropped locally. Does nothing when no callback is attached.
+    pub fn notify(&self) {
+        if let Some(dropped) = &self.0 {
+            dropped();
+        }
     }
 }
 
-impl Eq for SurbRefund {}
+impl std::fmt::Debug for LocalDropSignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "LocalDropSignal(armed)"
+        } else {
+            "LocalDropSignal(none)"
+        })
+    }
+}
+
+/// Two drop signals are equal when they call the same callback, or when neither is armed.
+///
+/// [`ApplicationDataOut`] derives `PartialEq`, so this keeps comparing two packets with a callback
+/// meaningful (same callback, not merely same pointer address of an equal-looking closure) instead of
+/// quietly making every comparison unequal.
+impl PartialEq for LocalDropSignal {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for LocalDropSignal {}
 
 /// Wrapper for outgoing [`ApplicationData`] with optional [`IncomingPacketInfo`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -344,6 +360,10 @@ pub struct ApplicationDataOut {
     /// The SURB its sender counted as consumed for this packet, if any; see [`SurbRefund`].
     #[cfg_attr(feature = "serde", serde(skip))]
     pub surb_refund: SurbRefund,
+    /// A callback its sender attached to learn that the packet was dropped locally; see
+    /// [`LocalDropSignal`].
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub local_drop: LocalDropSignal,
 }
 
 impl ApplicationDataOut {
@@ -353,7 +373,17 @@ impl ApplicationDataOut {
             data,
             packet_info: None,
             surb_refund: SurbRefund::default(),
+            local_drop: LocalDropSignal::default(),
         }
+    }
+
+    /// Tells the packet's sender it was dropped locally, if it is listening.
+    ///
+    /// This does *not* refund a SURB: see [`LocalDropSignal`] for why the two are separate. A drop
+    /// site calls this and, only where it knows resolution never took one, also
+    /// [`surb_refund.give_back`](SurbRefund::give_back).
+    pub fn notify_local_drop(&self) {
+        self.local_drop.notify();
     }
 
     /// Returns the upper bound of how many SURBs that will be carried with this packet.
@@ -565,79 +595,90 @@ mod tests {
         assert_eq!(SurbRefund::default(), SurbRefund::default());
     }
 
-    /// The local-drop listener is the signal a sender arms to learn its packet never left the node.
-    /// It must fire on exactly the calls that mean "dropped", and carry no SURB count of its own so
-    /// that arming it does not perturb the SURB accounting of a packet nobody counted.
+    /// The local-drop signal is what a sender arms to learn its packet never left the node. It must
+    /// fire only when notified, and carry no SURB count of its own so arming it does not perturb the
+    /// accounting of a packet nobody counted.
     #[test]
-    fn a_local_drop_listener_should_fire_on_give_back_and_not_be_counted() {
+    fn a_local_drop_signal_should_fire_only_when_notified_and_carry_no_refund() {
         let drops = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let signal = {
             let drops = drops.clone();
-            SurbRefund::on_local_drop(move || {
+            LocalDropSignal::new(move || {
                 drops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             })
         };
 
-        assert!(signal.has_local_drop_listener());
-        assert!(
-            !signal.is_counted(),
-            "a local-drop signal must not claim a SURB the sender never counted"
-        );
+        assert!(signal.is_armed());
         assert_eq!(
             0,
             drops.load(std::sync::atomic::Ordering::Relaxed),
             "nothing fires before the packet is dropped"
         );
 
-        signal.give_back();
+        signal.notify();
         assert_eq!(
             1,
             drops.load(std::sync::atomic::Ordering::Relaxed),
-            "the local drop must reach the listener"
+            "the local drop must reach the callback"
         );
 
-        // Equality is by listener identity, like the SURB counter it shares a struct with.
-        assert_eq!(signal, signal.clone(), "a cloned signal arms the same listener");
-        assert_ne!(
-            signal,
-            SurbRefund::on_local_drop(|| {}),
-            "different listeners are different signals"
-        );
-        assert_ne!(
-            signal,
-            SurbRefund::default(),
-            "a local-drop signal differs from an empty refund"
-        );
+        // An unarmed signal is a no-op, so a packet nobody watches costs nothing.
+        LocalDropSignal::default().notify();
+        assert!(LocalDropSignal::default() == LocalDropSignal::default());
     }
 
-    /// Arming a listener must not disable the SURB refund it shares the struct with: a return packet
-    /// whose sender counted a SURB and which the prober also watches must do both on a local drop.
+    /// The signal is separate from the refund because the two mean different things: resolution that
+    /// never took a SURB refunds one, while the encode stage dropped a packet whose SURB is already
+    /// gone and must only notify. Keeping them independent is what lets each drop site say exactly
+    /// what happened.
     #[test]
-    fn a_counted_refund_with_a_listener_should_give_back_and_notify_on_a_drop() {
+    fn a_drop_can_notify_without_refunding_and_refund_without_notifying() {
         let refunds = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let drops = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
-        let signal = {
+        // The encode stage: a counted SURB is already popped, so notify only.
+        let encode_dropped = {
             let drops = drops.clone();
-            // A packet can carry both: the SURB counter and the drop listener.
-            SurbRefund::to(refunds.clone()).with_local_drop_listener(move || {
-                drops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            })
+            ApplicationDataOut {
+                data: ApplicationData::new(10u64, &[1u8]).expect("a one-byte payload is valid"),
+                packet_info: None,
+                surb_refund: SurbRefund::to(refunds.clone()),
+                local_drop: LocalDropSignal::new(move || {
+                    drops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }),
+            }
         };
-
-        assert!(signal.is_counted());
-        assert!(signal.has_local_drop_listener());
-
-        signal.give_back();
-        assert_eq!(
-            1,
-            refunds.load(std::sync::atomic::Ordering::Relaxed),
-            "the SURB is still given back"
-        );
+        encode_dropped.notify_local_drop();
         assert_eq!(
             1,
             drops.load(std::sync::atomic::Ordering::Relaxed),
-            "and the listener still fires"
+            "the drop is reported"
         );
+        assert_eq!(
+            0,
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
+            "a drop after resolution must not refund a SURB that no longer exists"
+        );
+
+        // Resolution that never took a SURB: refund only, no signal attached.
+        let resolved_dropped = {
+            let mut data = ApplicationDataOut::with_no_packet_info(
+                ApplicationData::new(10u64, &[2u8]).expect("a one-byte payload is valid"),
+            );
+            data.surb_refund = SurbRefund::to(refunds.clone());
+            data
+        };
+        resolved_dropped.surb_refund.give_back();
+        assert_eq!(
+            1,
+            refunds.load(std::sync::atomic::Ordering::Relaxed),
+            "the resolution refund still works"
+        );
+
+        // Equality compares callback identity, not merely "both are armed".
+        let a = LocalDropSignal::new(|| {});
+        assert_eq!(a, a.clone());
+        assert_ne!(a, LocalDropSignal::new(|| {}));
+        assert_ne!(a, LocalDropSignal::default());
     }
 }

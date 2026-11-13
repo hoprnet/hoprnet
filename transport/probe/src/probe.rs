@@ -11,7 +11,7 @@ use hopr_api::{
     },
 };
 use hopr_protocol_app::{
-    prelude::{ApplicationDataIn, ApplicationDataOut, OutgoingPacketInfo, ReservedTag, SurbRefund},
+    prelude::{ApplicationDataIn, ApplicationDataOut, LocalDropSignal, OutgoingPacketInfo, ReservedTag},
     v1::Tag,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
@@ -63,11 +63,16 @@ type ActivePathProbeValue = Arc<ActivePathProbe>;
 /// tag's TTL can still suppress it.
 ///
 /// The two clocks disagree on purpose: a loopback tag expires after `ProbeConfig::timeout` (3 s by
-/// default), while the encode stage may only report a drop after `PACKET_ENCODING_TIMEOUT` (5 s).
-/// Waiting this long past expiry gives every in-flight drop the chance to settle its probe first. A
-/// probe that really was lost is still recorded as a timeout, just a few seconds later — noise
-/// against the graph's 60 s windows.
-const LOCAL_DROP_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+/// default, floored at 2 s), while the encode stage may only report a drop after
+/// `PACKET_ENCODING_TIMEOUT` (5 s). Waiting this long past expiry gives every in-flight drop the
+/// chance to settle its probe first.
+///
+/// Four seconds rather than three so the shortest legal tag (2 s) plus this grace *exceeds* the 5 s
+/// encode ceiling with a margin, instead of tying it: a drop that lands exactly on the encode
+/// deadline still settles its probe. That is what lets the shipped 2 s `probe.timeout` configs stay
+/// valid. The cost is that every timeout verdict now reaches the graph four seconds later than on
+/// master — negligible against its 60 s windows, but intended.
+const LOCAL_DROP_GRACE: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// Result of classifying one incoming message through the probe layer.
 pub enum ProbeDispatch {
@@ -231,8 +236,8 @@ impl Probe {
 
     /// The main function that assembles and starts the probing process.
     ///
-    /// Returns the abortable list of background tasks (probe emission) and a
-    /// [`ProbeClassifierState`] for inline classification of incoming messages.
+    /// Returns the abortable list of background tasks (probe emission, and the deferred loopback
+    /// verdict task) and a [`ProbeClassifierState`] for inline classification of incoming messages.
     /// Use [`ProbeClassifierState::filter_stream`] to wrap the incoming stream.
     pub async fn continuously_scan<T, V, Tr, G>(
         self,
@@ -304,9 +309,10 @@ impl Probe {
                 .build();
 
         // A *sync* Moka cache, because the tag also has to be readable and removable from a
-        // non-async drop callback (see the loopback emit below). The eviction listener still has to
-        // record a graph verdict, which is async, so it hands the work to a dedicated task rather
-        // than blocking the cache's maintenance on the graph update.
+        // non-async drop callback (see the loopback emit below). Its eviction listener is sync too,
+        // but it defers the verdict to a dedicated task for a different reason: the verdict has to
+        // wait out `LOCAL_DROP_GRACE` so a late local drop can still settle its probe, and an
+        // eviction listener must not block the cache's maintenance for seconds.
         //
         // Only `Expired` — a probe whose packet left the node and was never answered — can record a
         // timeout; an explicit removal (a loopback that came back, or one dropped locally before
@@ -440,6 +446,7 @@ impl Probe {
                                                 ..Default::default()
                                             }),
                                             surb_refund: Default::default(),
+                                            local_drop: LocalDropSignal::default(),
                                         };
                                         let mut push_to_network = push_to_network.clone();
 
@@ -560,7 +567,11 @@ impl Probe {
                                                             max_surbs_in_packet: 0,
                                                             ..Default::default()
                                                         }),
-                                                        surb_refund: SurbRefund::on_local_drop(on_local_drop),
+                                                        // No SURB is counted on a loopback, so this is a
+                                                        // plain drop notification: a drop site calls it
+                                                        // without refunding.
+                                                        local_drop: LocalDropSignal::new(on_local_drop),
+                                                        surb_refund: Default::default(),
                                                     },
                                                 ))
                                                 .await
@@ -1455,10 +1466,12 @@ mod tests {
     /// record no [`NetworkGraphError::ProbeLoopbackTimeout`], so a local drop cannot lower the score
     /// of a relay that never failed.
     ///
-    /// This is the in-repo half of hoprnet/hoprnet#8661: the prober registers the tag before
-    /// sending, so the drop sites (`resolve_routing_stage` and the encode stage) can find it and
-    /// fire the packet's local-drop signal. The prober's own `remove` is explicit, so even after the
-    /// tag's TTL elapses the eviction listener records no timeout.
+    /// This covers the in-grace path: the drop arrives while the tag is still registered, so the
+    /// prober's explicit `remove` is what silences the verdict. The deferred half — a drop that
+    /// lands after the tag expired, which is why the verdict task waits at all — is covered by
+    /// [`a_drop_reported_after_the_tag_ttl_should_still_record_no_timeout`]. Both are the in-repo
+    /// half of hoprnet/hoprnet#8661; what they share is that the prober registers the tag before
+    /// sending, so the drop sites can find it at all.
     #[tokio::test]
     async fn a_locally_dropped_loopback_probe_should_release_its_tag_and_record_no_timeout() -> anyhow::Result<()> {
         use anyhow::Context;
@@ -1489,7 +1502,7 @@ mod tests {
             .context("the prober must emit the loopback probe")?;
 
         anyhow::ensure!(
-            data_out.surb_refund.has_local_drop_listener(),
+            data_out.local_drop.is_armed(),
             "a loopback probe must arm the local-drop signal so a drop site can release its tag"
         );
         let tag: Tag = data_out.data.application_tag;
@@ -1497,7 +1510,7 @@ mod tests {
         // probe among the ones emitted after it.
         let dropped_telemetry = PathTelemetry::try_from(&data_out.data.plain_text[2..])
             .context("decoding the loopback probe's path telemetry")?;
-        data_out.surb_refund.give_back();
+        data_out.notify_local_drop();
 
         // Keep consuming emissions past the tag's TTL, then past the deferred-verdict grace, so the
         // cache runs maintenance and every expiry that could fire a verdict has fired.
@@ -1558,10 +1571,10 @@ mod tests {
             while rx.next().await.is_some() {}
         })
         .await;
-        data_out.surb_refund.give_back();
+        data_out.notify_local_drop();
 
         // Past the deferred-verdict grace, so any timeout queued for this probe would be recorded.
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(3_500), async {
+        let _ = tokio::time::timeout(LOCAL_DROP_GRACE + std::time::Duration::from_millis(1_100), async {
             while rx.next().await.is_some() {}
         })
         .await;
@@ -1636,7 +1649,7 @@ mod tests {
 
         // Every emission fails to send and is released; well past the TTL and the verdict grace,
         // nothing may be recorded as a timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(3_500)).await;
+        tokio::time::sleep(LOCAL_DROP_GRACE + std::time::Duration::from_millis(1_100)).await;
         jhs.abort_all();
 
         assert_eq!(
@@ -1734,7 +1747,7 @@ mod tests {
         // Leave every emission unanswered and in flight. Consuming them is what keeps the cache
         // active, which is what drives the expiry under test; the wait covers the TTL plus the
         // deferred-verdict grace.
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(3_500), async {
+        let _ = tokio::time::timeout(LOCAL_DROP_GRACE + std::time::Duration::from_millis(1_100), async {
             while rx.next().await.is_some() {}
         })
         .await;
@@ -1773,6 +1786,9 @@ mod tests {
 
         let (jhs, _classifier, rx) = loopback_prober(cfg, strategy, store.clone()).await;
 
+        // Emit well over the four entries a single grace must cover, so a serialized grace would
+        // need several: the threshold below is only meaningful against a batch that large.
+        let emit_for = std::time::Duration::from_millis(300);
         // Keep the cache active past the TTL so a burst of entries expires together, then keep it
         // active through one grace so the batched verdict task can run.
         let drain = |rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>, window| async move {
@@ -1783,7 +1799,7 @@ mod tests {
             .await;
         };
         let started = std::time::Instant::now();
-        drain(rx, std::time::Duration::from_millis(200)).await;
+        drain(rx, emit_for).await;
         let expired_at = started.elapsed();
 
         // All of them fall due at essentially the same moment; querying after one grace (+ slack)
@@ -1794,16 +1810,17 @@ mod tests {
         let recorded = store.path_timeouts();
         let elapsed_after_grace = started.elapsed();
         assert!(
-            recorded >= 2,
+            recorded >= 4,
             "the batch must contain several expired probes, saw {recorded} (expiry took {expired_at:?})"
         );
-        // A serialized grace would need `recorded` graces; allow one grace plus generous slack for
-        // the TTL drain and the verdict task.
-        let per_probe_grace_total = LOCAL_DROP_GRACE * recorded as u32;
+        // A serialized grace would need `recorded - 1` graces after the first, plus the drain; the
+        // batched task needs one. The margins leave room for the drain and the verdict task, which
+        // a serialized run cannot fit into for four or more verdicts.
+        let serialized = LOCAL_DROP_GRACE * (recorded as u32 - 1);
         assert!(
-            elapsed_after_grace < per_probe_grace_total,
-            "the batch took {elapsed_after_grace:?} for {recorded} verdicts, which is one grace each \
-             ({per_probe_grace_total:?}) rather than a single batched grace"
+            elapsed_after_grace < serialized,
+            "the batch took {elapsed_after_grace:?} for {recorded} verdicts, which is one grace each ({serialized:?} \
+             after the first) rather than a single batched grace"
         );
         Ok(())
     }

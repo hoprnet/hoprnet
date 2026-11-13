@@ -147,10 +147,11 @@ where
                                 %error,
                                 "dropping an outgoing packet: no SURB for its return path within the wait"
                             );
-                            // Its sender may have counted the SURB as consumed already, and the packet
-                            // leaves without one. This is also the packet's local-drop signal: a
-                            // probe that armed a listener here knows it never left the node.
+                            // `find_surb` never popped one, so the SURB its sender counted is still
+                            // held and is given back. The packet also never left the node: tell any
+                            // sender watching for that (a loopback probe releasing its tag).
                             data.surb_refund.give_back();
+                            data.notify_local_drop();
                             return None;
                         }
                         Err(error) if error.is_surb() => {
@@ -162,11 +163,12 @@ where
                             hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             error!(%error, "failed to resolve routing");
-                            // The packet never left the node. The refund is empty for a packet
-                            // whose sender counted no SURB, but it may still carry a local-drop
-                            // listener (a loopback probe whose tag must not expire as a timeout),
-                            // so this is the one signal every drop site fires.
+                            // The packet never left the node. Resolution failed before it could pop
+                            // a SURB, so a counted one is given back; and any sender watching for a
+                            // local drop (a loopback probe, whose tag must not expire as a timeout)
+                            // is told.
                             data.surb_refund.give_back();
+                            data.notify_local_drop();
                             return None;
                         }
                     }
@@ -472,12 +474,16 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn both_drop_paths_should_fire_the_local_drop_signal_exactly_once() -> anyhow::Result<()> {
         let drops = Arc::new(AtomicUsize::new(0));
+        let refunds = Arc::new(AtomicU64::new(0));
         let watched = |marker| {
             let mut data = packet(marker);
-            let drops = drops.clone();
-            data.surb_refund = SurbRefund::on_local_drop(move || {
+            let (drops, refunds) = (drops.clone(), refunds.clone());
+            data.local_drop = hopr_protocol_app::prelude::LocalDropSignal::new(move || {
                 drops.fetch_add(1, Ordering::Relaxed);
             });
+            // Counted, as a return packet's is at egress. Resolution never took it here, so this
+            // stage must give it back.
+            data.surb_refund = SurbRefund::to(refunds);
             data
         };
         // Markers: 0 = return packet whose SURBs never arrive (dropped), 1 = return packet whose
@@ -527,6 +533,11 @@ mod tests {
             2,
             drops.load(Ordering::Relaxed),
             "each of the two dropped packets fires the signal once, and neither emitted packet does"
+        );
+        assert_eq!(
+            2,
+            refunds.load(Ordering::Relaxed),
+            "both drops refunded their SURB: resolution failed before it could take one"
         );
 
         Ok(())

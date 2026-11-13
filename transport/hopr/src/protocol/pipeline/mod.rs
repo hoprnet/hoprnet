@@ -194,7 +194,12 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                 // signal: it never reaches the wire, and a sender that armed one (a loopback probe
                 // releasing its tag) must not read that as a relay timeout. Every drop arm below
                 // fires it; the success arm does not.
-                let surb_refund = data.surb_refund.clone();
+                //
+                // It *notifies* without refunding: by the time a return packet reaches this stage,
+                // resolution has already popped its SURB from the store, so `give_back` here would
+                // credit one that no longer exists and make the Exit over-report its stock. The
+                // refund is the resolution stage's to make, and only when it failed to take one.
+                let local_drop = data.local_drop.clone();
                 match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                     move || {
                         encoder.encode_packet(
@@ -253,20 +258,21 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                     Ok(Ok(Err(error))) => {
                         tracing::error!(%error, "outgoing packet could not be encoded");
                         // A ticket-factory or crypto failure drops the packet here, after it has
-                        // already been counted as handed on. Fired exactly once per dropped packet.
-                        surb_refund.give_back();
+                        // already been counted as handed on. Notified exactly once per dropped
+                        // packet, and never refunded — see `local_drop` above.
+                        local_drop.notify();
                         None
                     }
                     Ok(Err(error)) => {
                         tracing::error!(%error, "parallel processing of the outgoing packet failed");
-                        surb_refund.give_back();
+                        local_drop.notify();
                         None
                     }
                     Err(error) => {
                         tracing::error!(%error, "timeout while processing the outgoing packet");
                         hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        surb_refund.give_back();
+                        local_drop.notify();
                         None
                     }
                 }
@@ -1380,17 +1386,23 @@ mod tests {
     /// node.
     #[tokio::test]
     async fn the_encode_stage_should_fire_the_local_drop_signal_only_for_a_dropped_packet() -> anyhow::Result<()> {
-        // One packet per marker: 0 = fails to encode, 1 = encodes. Each gets its own drop counter.
+        // One packet per marker: 0 = fails to encode, 1 = encodes. Each gets its own drop counter
+        // and its own SURB-refund counter, so the test can pin that the encode stage notifies
+        // without refunding.
         let drops: [std::sync::Arc<std::sync::atomic::AtomicUsize>; 2] =
             std::array::from_fn(|_| std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)));
+        let refunds: [std::sync::Arc<std::sync::atomic::AtomicU64>; 2] =
+            std::array::from_fn(|_| std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)));
         let packet = |marker: u8| {
             let drops = drops[marker as usize].clone();
             let mut data = ApplicationDataOut::with_no_packet_info(
                 ApplicationData::new(Tag::from(1234u64), &[marker]).expect("a one-byte payload is valid"),
             );
-            data.surb_refund = SurbRefund::on_local_drop(move || {
+            data.local_drop = LocalDropSignal::new(move || {
                 drops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             });
+            // Counted, as a return packet's is at egress: the encode stage must not give it back.
+            data.surb_refund = SurbRefund::to(refunds[marker as usize].clone());
             data
         };
         let routing = ResolvedTransportRouting::Forward {
@@ -1442,6 +1454,14 @@ mod tests {
             drops[1].load(std::sync::atomic::Ordering::Relaxed),
             "a packet that is encoded and sent must not fire the signal"
         );
+        // Resolution already popped the SURB, so a drop here must notify without crediting one back.
+        for (marker, refunds) in refunds.iter().enumerate() {
+            assert_eq!(
+                0,
+                refunds.load(std::sync::atomic::Ordering::Relaxed),
+                "the encode stage must not refund packet {marker}'s SURB, which no longer exists"
+            );
+        }
         Ok(())
     }
 

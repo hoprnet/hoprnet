@@ -10,7 +10,7 @@ pub mod v1;
 
 pub mod prelude {
     pub use crate::v1::{
-        ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo, OutgoingPacketInfo, ReservedTag,
-        SurbRefund, Tag,
+        ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo, LocalDropSignal,
+        OutgoingPacketInfo, ReservedTag, SurbRefund, Tag,
     };
 }
