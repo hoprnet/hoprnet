@@ -758,7 +758,11 @@ where
     /// The function has a potential to run expensive operations, it should be benchmarked
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
-    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err(level = "trace"))]
+    #[tracing::instrument(
+        name = "selector.select_paths", level = "trace", skip_all,
+        fields(src = %src, dest = %dest, hops = hops, direction = if src == self.me { "forward" } else { "return" }),
+        ret, err(level = "trace")
+    )]
     fn select_path(
         &self,
         src: OffchainPublicKey,

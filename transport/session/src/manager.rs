@@ -37,7 +37,7 @@ use hopr_protocol_start::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::AbortableList;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
@@ -3000,7 +3000,13 @@ impl SurbsStored {
 // see `refuse_pix_over_direct_return_path`. What the packet did to the SURB store travels too, taken
 // before the conversion into a `HoprStartProtocol` consumes the data it is counted from: the part
 // dispatch could not book itself, which is all of it only for an opening that creates its Session.
-type StartMessage = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
+type StartMessage = (
+    HoprPseudonym,
+    HoprStartProtocol,
+    IncomingPacketInfo,
+    SurbsStored,
+    tracing::Span,
+);
 type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<StartMessage>>>>;
 
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
@@ -4441,56 +4447,61 @@ where
         );
         let ah_start_session = hopr_utils::spawn_as_abortable_named!(
             "session_start_session_processor",
-            start_session_rx.into_stream().for_each_concurrent(
-                Some(MAX_CONCURRENT_START_SESSIONS),
-                move |(pseudonym, protocol_msg, packet_info, stored)| {
-                    let myself = myself.clone();
-                    let session_diag = session_diag.clone();
-                    session_diag.wrap(|| {
+            start_session_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(MAX_CONCURRENT_START_SESSIONS),
+                    move |(pseudonym, protocol_msg, packet_info, stored, span)| {
                         let myself = myself.clone();
-                        async move {
-                            // Routing puts only `StartSession` on this lane.
-                            let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
-                                unreachable!("only StartSession is routed to the session lane")
-                            };
-                            let result = match myself
-                                .refuse_pix_over_direct_return_path(
-                                    pseudonym,
-                                    &session_req,
-                                    packet_info.min_return_path_hops,
-                                )
-                                .await
-                            {
-                                Ok(false) => {
-                                    let opened =
-                                        myself.handle_incoming_session_initiation(pseudonym, session_req).await;
-                                    // The opening's SURBs are in the pseudonym's ring already, promoted
-                                    // into the admitted class with it, but arrived before the Session
-                                    // existed, so dispatch could not book them. Without them the Exit's
-                                    // estimate starts, and stays, below what the ring holds. What the
-                                    // ring lost as they arrived is not this Session's to book: its
-                                    // estimate never counted that stock, which a newer generation
-                                    // superseded from an earlier Session under the pseudonym, and an
-                                    // opening's few SURBs do not overflow a ring on their own.
-                                    if opened.is_ok()
-                                        && let Some(slot) = myself.sessions.get(&pseudonym)
+                        let session_diag = session_diag.clone();
+                        session_diag
+                            .wrap(|| {
+                                let myself = myself.clone();
+                                async move {
+                                    // Routing puts only `StartSession` on this lane.
+                                    let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
+                                        unreachable!("only StartSession is routed to the session lane")
+                                    };
+                                    let result = match myself
+                                        .refuse_pix_over_direct_return_path(
+                                            pseudonym,
+                                            &session_req,
+                                            packet_info.min_return_path_hops,
+                                        )
+                                        .await
                                     {
-                                        let _ = book_start_message_surbs(
-                                            &slot,
-                                            &pseudonym,
-                                            SurbsStored { evicted: 0, ..stored },
-                                        );
-                                    }
-                                    opened
-                                }
-                                refused => refused.map(|_| ()),
-                            };
+                                        Ok(false) => {
+                                            let opened =
+                                                myself.handle_incoming_session_initiation(pseudonym, session_req).await;
+                                            // The opening's SURBs are in the pseudonym's ring already, promoted
+                                            // into the admitted class with it, but arrived before the Session
+                                            // existed, so dispatch could not book them. Without them the Exit's
+                                            // estimate starts, and stays, below what the ring holds. What the
+                                            // ring lost as they arrived is not this Session's to book: its
+                                            // estimate never counted that stock, which a newer generation
+                                            // superseded from an earlier Session under the pseudonym, and an
+                                            // opening's few SURBs do not overflow a ring on their own.
+                                            if opened.is_ok()
+                                                && let Some(slot) = myself.sessions.get(&pseudonym)
+                                            {
+                                                let _ = book_start_message_surbs(
+                                                    &slot,
+                                                    &pseudonym,
+                                                    SurbsStored { evicted: 0, ..stored },
+                                                );
+                                            }
+                                            opened
+                                        }
+                                        refused => refused.map(|_| ()),
+                                    };
 
-                            report_start_result(result);
-                        }
-                    })
-                }
-            )
+                                    report_start_result(result);
+                                }
+                            })
+                            .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
+                    }
+                )
+                .with_current_subscriber()
         );
 
         let myself = self.clone();
@@ -4502,39 +4513,46 @@ where
         );
         let ah_start_control = hopr_utils::spawn_as_abortable_named!(
             "session_start_control_processor",
-            start_control_rx.into_stream().for_each_concurrent(
-                Some(self.cfg.maximum_sessions + 10),
-                move |(pseudonym, protocol_msg, _packet_info, _stored)| {
-                    let myself = myself.clone();
-                    let control_diag = control_diag.clone();
-                    control_diag.wrap(|| {
+            start_control_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(self.cfg.maximum_sessions + 10),
+                    move |(pseudonym, protocol_msg, _packet_info, _stored, span)| {
                         let myself = myself.clone();
-                        async move {
-                            let result = match protocol_msg {
-                                HoprStartProtocol::SessionEstablished(est) => {
-                                    myself.handle_session_established(est).await
-                                }
-                                HoprStartProtocol::SessionError(error_type) => {
-                                    myself.handle_session_error(pseudonym, error_type).await
-                                }
-                                HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
-                                HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                    myself.handle_ssa_commit(pseudonym, client_commit_msg).await
-                                }
-                                HoprStartProtocol::SsaRequest(server_commit_msg) => {
-                                    myself.handle_ssa_request(pseudonym, server_commit_msg).await
-                                }
-                                // Routing puts `StartSession` on the session lane.
-                                HoprStartProtocol::StartSession(_) => {
-                                    unreachable!("StartSession is never routed to the control lane")
-                                }
-                            };
+                        let control_diag = control_diag.clone();
+                        control_diag
+                            .wrap(|| {
+                                let myself = myself.clone();
+                                async move {
+                                    let result = match protocol_msg {
+                                        HoprStartProtocol::SessionEstablished(est) => {
+                                            myself.handle_session_established(est).await
+                                        }
+                                        HoprStartProtocol::SessionError(error_type) => {
+                                            myself.handle_session_error(pseudonym, error_type).await
+                                        }
+                                        HoprStartProtocol::KeepAlive(msg) => {
+                                            myself.handle_keep_alive(pseudonym, msg).await
+                                        }
+                                        HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                            myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                                        }
+                                        HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                                            myself.handle_ssa_request(pseudonym, server_commit_msg).await
+                                        }
+                                        // Routing puts `StartSession` on the session lane.
+                                        HoprStartProtocol::StartSession(_) => {
+                                            unreachable!("StartSession is never routed to the control lane")
+                                        }
+                                    };
 
-                            report_start_result(result);
-                        }
-                    })
-                }
-            )
+                                    report_start_result(result);
+                                }
+                            })
+                            .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
+                    }
+                )
+                .with_current_subscriber()
         );
 
         Ok(vec![
@@ -6613,7 +6631,7 @@ where
             };
 
             if let Some(lane) = lane {
-                match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
+                match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked, tracing::Span::current())) {
                     Ok(()) => {}
                     // Backpressure, not a fault: rate-limited so a sustained flood cannot become
                     // per-packet log spam. Control drops keep their own counter, so a StartSession
@@ -6727,6 +6745,32 @@ where
         METRIC_DISPATCHED_MSGS.increment_by(&["unrelated"], 1);
 
         Ok(DispatchResult::Unrelated(in_data))
+    }
+
+    /// Installs a bounded Start queue without workers and returns a drain operation for benchmarks.
+    ///
+    /// Keeping dequeue work outside the timed section makes dispatch measurements independent of
+    /// worker scheduling. Returns `AlreadyStarted` if a processing queue is already installed.
+    #[cfg(any(feature = "benchmark", test))]
+    pub fn benchmark_start_queue(&self, capacity: usize) -> errors::Result<impl FnMut() -> usize + use<S>> {
+        let (session_tx, session_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        let (control_tx, control_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        self.start_session_tx
+            .set(session_tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        self.start_control_tx
+            .set(control_tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        Ok(move || {
+            let mut drained = 0;
+            while session_rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            while control_rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            drained
+        })
     }
 
     /// Pre-populates the sessions cache with a session slot for benchmarking.
@@ -16120,6 +16164,223 @@ mod tests {
         )))
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn start_protocol_worker_should_preserve_session_ancestry_without_reentering_the_parent() -> anyhow::Result<()>
+    {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use test_log::tracing_subscriber::{
+            self as subscriber, filter::LevelFilter, layer::SubscriberExt, registry::LookupSpan,
+        };
+        use tracing::instrument::WithSubscriber;
+
+        struct WorkerEvents {
+            events: tokio::sync::mpsc::UnboundedSender<Vec<(&'static str, tracing::span::Id)>>,
+            session_enters: Arc<AtomicUsize>,
+        }
+
+        impl<S: tracing::Subscriber + for<'a> LookupSpan<'a>> subscriber::Layer<S> for WorkerEvents {
+            fn on_enter(&self, id: &tracing::span::Id, ctx: subscriber::layer::Context<'_, S>) {
+                if ctx.span(id).is_some_and(|span| span.name() == "session") {
+                    self.session_enters.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            fn on_event(&self, event: &tracing::Event<'_>, ctx: subscriber::layer::Context<'_, S>) {
+                if *event.metadata().level() != tracing::Level::ERROR {
+                    return;
+                }
+                let Some(scope) = ctx.event_scope(event) else {
+                    return;
+                };
+                let ancestry = scope
+                    .from_root()
+                    .map(|span| (span.name(), span.id()))
+                    .collect::<Vec<_>>();
+                // Capture the worker's result event after the individual handler has returned.
+                if ancestry
+                    .last()
+                    .is_some_and(|(name, _)| *name == "session.start_protocol")
+                {
+                    let _ = self.events.send(ancestry);
+                }
+            }
+        }
+
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel();
+        let session_enters = Arc::new(AtomicUsize::new(0));
+        let subscriber = subscriber::registry()
+            .with(WorkerEvents {
+                events: events_tx,
+                session_enters: session_enters.clone(),
+            })
+            .with(LevelFilter::DEBUG);
+        async {
+            let mgr: TestManager = SessionManager::new(Default::default());
+            let (sender, _outgoing) = futures::channel::mpsc::unbounded();
+            let handles = mgr.start(sender, futures::sink::drain(), None, None)?;
+            let mut expected_roots = Vec::new();
+            let mut session_receivers = Vec::new();
+            for _ in 0..2 {
+                let id = HoprPseudonym::random();
+                session_receivers.push(mgr.pre_populate_session_with_receiver(
+                    id,
+                    DestinationRouting::Forward {
+                        destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                        pseudonym: Some(id),
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: None,
+                    },
+                ));
+                let session = tracing::debug_span!("session", session_id = %id);
+                assert!(session.id().is_some(), "fixture needs an active session span");
+                // Without a PIX toolbox, the actual SSA handler returns UnsupportedMessage.
+                // Its worker then emits an error directly within session.start_protocol.
+                let packet = ssa_request_packet(id)?;
+                assert!(matches!(
+                    session.in_scope(|| mgr.dispatch_message(id, packet))?,
+                    DispatchResult::Processed
+                ));
+                expected_roots.push(session);
+            }
+            let received = timeout(Duration::from_secs(5), async {
+                let first = events_rx.recv().await.context("missing first worker event")?;
+                let second = events_rx.recv().await.context("missing second worker event")?;
+                anyhow::Ok([first, second])
+            })
+            .await;
+            for handle in handles {
+                handle.abort();
+            }
+            for ancestry in received.context("Start protocol worker did not process both messages")?? {
+                assert_eq!(
+                    ancestry.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+                    ["session", "session.start_protocol"]
+                );
+                let root = &ancestry.first().context("missing session root")?.1;
+                let index = expected_roots
+                    .iter()
+                    .position(|span| span.id().as_ref() == Some(root))
+                    .context("worker event must retain its own dispatch session")?;
+                expected_roots.remove(index);
+            }
+            assert!(expected_roots.is_empty());
+            assert_eq!(
+                session_enters.load(Ordering::Relaxed),
+                2,
+                "session roots should be entered only for dispatch, not again by the worker"
+            );
+            anyhow::Ok(())
+        }
+        .with_subscriber(subscriber)
+        .await
+    }
+
+    #[test]
+    /// Both Start lanes retain the dispatch session span when their queues are drained.
+    fn start_protocol_queue_should_retain_the_dispatch_context() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use test_log::tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+        tracing::subscriber::with_default(
+            test_log::tracing_subscriber::registry().with(LevelFilter::DEBUG),
+            || -> anyhow::Result<()> {
+                for opening in [false, true] {
+                    let mgr: TestManager = SessionManager::new(Default::default());
+                    let (tx, rx) = crossfire::mpsc::bounded_blocking_async(1);
+                    let lane = if opening {
+                        &mgr.start_session_tx
+                    } else {
+                        &mgr.start_control_tx
+                    };
+                    lane.set(tx)
+                        .map_err(|_| anyhow::anyhow!("installing test Start queue"))?;
+                    let id = HoprPseudonym::random();
+                    let _session_rx = mgr.pre_populate_session_with_receiver(
+                        id,
+                        DestinationRouting::Forward {
+                            destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                            pseudonym: Some(id),
+                            forward_options: RoutingOptions::Hops(1.try_into()?),
+                            return_options: None,
+                        },
+                    );
+                    let packet = if opening {
+                        start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                            challenge: StartChallenge::MAX,
+                            target: SessionTarget::UdpStream(hopr_utils::network_types::prelude::SealedHost::Plain(
+                                std::net::SocketAddr::from(([127, 0, 0, 1], 1234)).into(),
+                            )),
+                            capabilities: HoprSessionCapabilities::try_from(0u8)?,
+                            additional_data: 0,
+                        }))?
+                    } else {
+                        ssa_request_packet(id)?
+                    };
+                    let span = tracing::debug_span!("session", session_id = %id);
+                    let expected = span.id();
+                    {
+                        let _entered = span.enter();
+                        assert!(matches!(mgr.dispatch_message(id, packet)?, DispatchResult::Processed));
+                    }
+                    let (queued_id, _, _, _, queued_span) = rx.try_recv().context("receiving the Start message")?;
+                    assert_eq!(queued_id, id);
+                    assert_eq!(queued_span.id(), expected);
+                }
+                Ok(())
+            },
+        )
+    }
+
+    /// The benchmark queue uses real dispatch: independent bounded lanes, reusable drains and closed-queue errors.
+    #[test]
+    fn benchmark_start_queue_drains_both_lanes_and_preserves_backpressure() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let mut drain = mgr.benchmark_start_queue(1)?;
+        assert_eq!(drain(), 0);
+        assert!(
+            mgr.benchmark_start_queue(1).is_err(),
+            "queues can only be installed once"
+        );
+        let id = HoprPseudonym::random();
+        let _session_rx = mgr.pre_populate_session_with_receiver(
+            id,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(id),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let opening = || -> anyhow::Result<_> {
+            start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                challenge: StartChallenge::MAX,
+                target: SessionTarget::UdpStream(hopr_utils::network_types::prelude::SealedHost::Plain(
+                    std::net::SocketAddr::from(([127, 0, 0, 1], 1234)).into(),
+                )),
+                capabilities: HoprSessionCapabilities::try_from(0u8)?,
+                additional_data: 0,
+            }))
+        };
+        for _ in 0..2 {
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(mgr.dispatch_message(id, packet)?, DispatchResult::Processed));
+            }
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(
+                    mgr.dispatch_message(id, packet)?,
+                    DispatchResult::Dropped(DropReason::StartQueueFull)
+                ));
+            }
+            assert_eq!(drain(), 2, "each lane contributes one message");
+            assert_eq!(drain(), 0, "draining must remove messages exactly once");
+        }
+        drop(drain);
+        assert!(mgr.dispatch_message(id, opening()?).is_err());
+        assert!(mgr.dispatch_message(id, ssa_request_packet(id)?).is_err());
+        Ok(())
+    }
+
     /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
     ///
     /// Before the admission filter, every one of these reached the shared Start-protocol worker
@@ -16378,7 +16639,7 @@ mod tests {
         let established_challenge = MIN_CHALLENGE;
         let error_challenge = MIN_CHALLENGE + 1;
         let unknown_challenge = MIN_CHALLENGE + 2;
-        let _receivers = [established_challenge, error_challenge]
+        let receivers = [established_challenge, error_challenge]
             .into_iter()
             .map(|challenge| {
                 let (tx, rx): (
@@ -16476,6 +16737,23 @@ mod tests {
             );
         }
 
+        // Admission alone does not prove the background control worker delivered either reply.
+        let established_reply = timeout(Duration::from_secs(2), receivers[0].recv())
+            .await
+            .context("establishment worker must deliver its reply")??;
+        assert!(matches!(
+            established_reply,
+            Ok(StartEstablished { orig_challenge, session_id })
+                if orig_challenge == established_challenge && session_id == replier
+        ));
+        let error_reply = timeout(Duration::from_secs(2), receivers[1].recv())
+            .await
+            .context("error worker must deliver its reply")??;
+        assert!(matches!(
+            error_reply,
+            Err(StartErrorType { identifier: ErrorIdentifier::Challenge(challenge), reason: StartErrorReason::Unknown })
+                if challenge == error_challenge
+        ));
         sender.close_channel();
         Ok(())
     }

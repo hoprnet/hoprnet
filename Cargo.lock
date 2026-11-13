@@ -4531,6 +4531,7 @@ dependencies = [
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
  "hopr-utilities",
+ "hopr-utils-tracing",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4877,6 +4878,19 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-utils-tracing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossfire",
+ "futures",
+ "hopr-utilities",
+ "test-log",
+ "tokio",
  "tracing",
 ]
 

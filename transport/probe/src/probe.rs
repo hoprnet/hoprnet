@@ -661,8 +661,10 @@ mod tests {
     }
 
     impl tracing::Subscriber for ProbeLogs {
-        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
-            true
+        fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+            // Tokio's runtime instrumentation is enabled by workspace features; only probe
+            // spans and events belong to the producer-context assertions below.
+            metadata.target().starts_with("hopr_transport_probe")
         }
 
         fn new_span(&self, attrs: &tracing::span::Attributes<'_>) -> tracing::span::Id {
@@ -722,7 +724,8 @@ mod tests {
                     ));
                     assert!(
                         logs.spans.lock().is_empty(),
-                        "ordinary packets must not create probe spans"
+                        "ordinary packets must not create probe spans: {:?}",
+                        *logs.spans.lock()
                     );
 
                     let nonce = [7; NeighborProbe::NONCE_SIZE];

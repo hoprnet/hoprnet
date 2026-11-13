@@ -20,6 +20,7 @@ use crate::{
         NopExitAcknowledgementShareProcessor, PacketPipelineBuilder, Unset, surb_telemetry,
         surb_telemetry::{PathSlotResolver, SurbRoundTripRegistry, SurbTelemetryCodec},
     },
+    trace_context::WithContext,
 };
 
 /// Builder for the HOPR packet pipeline.
@@ -411,7 +412,8 @@ where
     G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds the codec pair (and capture wiring when enabled) and the unacknowledged ticket
     /// processor, returning them together with an [`AbortableList`] already containing the
@@ -588,7 +590,8 @@ where
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds the pipeline configured for a Relay node.
     ///
@@ -662,7 +665,8 @@ where
     G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds the pipeline configured for an Entry node.
     ///
