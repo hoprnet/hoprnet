@@ -16,6 +16,7 @@ members = [
   "transport/session",
   "transport/tag-allocator",
   "utils-session",
+  "utils-tracing",
 ]
 
 [workspace.package]
@@ -28,6 +29,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 
 [workspace.metadata.publish]
 order = [
+  "hopr-utils-tracing",
   "hopr-crypto-packet",
   "hopr-protocol-app",
   "hopr-protocol-start",
@@ -136,14 +138,15 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
   "codec",
   "compat",
 ] }
-tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
+tracing = "0.1.44"
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "5.0.0" }
-hopr-types = { version = "5.0.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.19.1", default-features = false }
+hopr-api = { version = "6.1.0" }
+hopr-types = { version = "6.0.1", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.20.0", default-features = false }
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
+hopr-utils-tracing = { version = "0.1.0", path = "utils-tracing", default-features = false }
 
 hopr-crypto-packet = { version = "2.1.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
@@ -158,19 +161,19 @@ hopr-protocol-pix = { version = "0.3.1", path = "protocols/pix", default-feature
 ] }
 hopr-protocol-session = { version = "1.7.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "3.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.10.0" }
+hopr-ticket-manager = { version = "0.11.0" }
 hopr-transport = { version = "0.53.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.9.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.35.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.2.0", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.31.0" }
+hopr-chain-connector = { version = "0.33.0" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.7.0", default-features = false }
-hopr-transport-p2p = { version = "0.14.0", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.9.0", default-features = false }
-hopr-network-graph = { version = "0.10.3", default-features = false }
+hopr-session-server-forwarder = { version = "0.8.0", default-features = false }
+hopr-transport-p2p = { version = "0.15.0", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.11.0", default-features = false }
+hopr-network-graph = { version = "0.12.0", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -202,6 +205,14 @@ lto = "fat"
 panic = "abort"
 opt-level = 3
 strip = true
+
+# Published dependencies still enable tracing/release_max_level_debug. In tracing 0.1.44,
+# debug_assertions selects whether that release-only ceiling applies. Override only tracing
+# so operators can enable TRACE diagnostics while application crates keep release assertions off.
+# Downstream binary workspaces need the same top-level override while those dependencies remain.
+# Remove this workaround once dependency releases stop enabling the ceiling.
+[profile.release.package.tracing]
+debug-assertions = true
 
 # memory profiling profile — inherits release optimizations but preserves debug symbols
 # for jeprof symbol resolution

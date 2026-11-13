@@ -738,7 +738,11 @@ where
     /// The function has a potential to run expensive operations, it should be benchmarked
     /// in a production environment and possibly guarded (e.g. by offloading the long execution
     /// in an async executor to avoid blocking the caller).
-    #[tracing::instrument(level = "trace", skip(self), fields(src = %src, dest = %dest, hops), ret, err)]
+    #[tracing::instrument(
+        name = "selector.select_paths", level = "trace", skip_all,
+        fields(src = %src, dest = %dest, hops = hops, direction = if src == self.me { "forward" } else { "return" }),
+        ret, err
+    )]
     fn select_path(
         &self,
         src: OffchainPublicKey,
@@ -746,7 +750,7 @@ where
         hops: usize,
     ) -> Result<Vec<PathWithMetrics>> {
         let direction = if src == self.me { "forward" } else { "return" };
-        tracing::debug!(%src, %dest, hops, direction, "computing paths from graph");
+        tracing::trace!(%src, %dest, hops, direction, "computing paths from graph");
 
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
