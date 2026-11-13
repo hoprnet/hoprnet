@@ -27,8 +27,7 @@
 //! sum by (kind) (rate(hopr_exit_control_packets_total{outcome="dropped_budget"}[5m]))
 //! ```
 //!
-//! *What an idle Session costs.* Reports on Sessions that move no data fall as the idle backoff takes hold; a
-//! rate that stays near one per base period per Session means it is off or the Sessions are not idle:
+//! *What idle Sessions cost.* Reports fall as the idle backoff takes hold:
 //!
 //! ```promql
 //! sum by (session) (rate(hopr_exit_control_packets_total{kind="surb_report",outcome="sent"}[5m]))

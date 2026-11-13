@@ -898,10 +898,7 @@ fn default_session_surb_degraded_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(1))
 }
 
-/// Transport-layer default for the longest period the Exit's idle SURB report backs off to: 60s.
-///
-/// `SessionManager::new` clamps it to a third of the session idle timeout (60s at the default 180s), so
-/// the Entry's slot survives two lost reports.
+/// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 60s.
 fn default_session_surb_idle_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(60))
 }
@@ -1118,19 +1115,13 @@ pub struct SessionGlobalConfig {
     )]
     pub surb_degraded_notify_period: Option<Duration>,
 
-    /// The longest period the Exit's SURB-level report backs off to while a Session is idle.
+    /// The longest period the Exit's SURB-level report backs off to on an idle Session.
     ///
-    /// Every report costs the Exit a SURB, and over a multi-hop return path a ticket, so a Session that
-    /// carries no data is not reported on as often as a busy one. While no application data moves in either
-    /// direction, PIX fill is not running, and the Session is neither degraded nor down to its keep-alive
-    /// SURB reserve, the first minute of reports keeps the
-    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), and the period then doubles with every
-    /// report up to this one. Application data in either direction brings it back to the base period at once.
-    ///
-    /// On an idle Session these reports are the only thing that refreshes the Entry's slot idle timer, so the
-    /// Session manager lowers this to a third of [`idle_timeout`](Self::idle_timeout) (60 s at its default) when
-    /// it is longer, which lets the Entry survive two lost reports. A value that is not above the notification
-    /// period disables the backoff.
+    /// Each report costs the Exit a SURB, and a ticket on a multi-hop return path. While no data moves, PIX
+    /// fill is off and the Session is not degraded, the period doubles from
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
+    /// Data in either direction resets it. Clamped to a third of [`idle_timeout`](Self::idle_timeout), because
+    /// on an idle Session these reports keep the Entry's slot alive.
     ///
     /// Default is 60 seconds. Set to `null` to disable; minimum is 1 second.
     #[validate(custom(function = "validate_surb_idle_notify_period"))]
