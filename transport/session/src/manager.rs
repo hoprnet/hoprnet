@@ -53,7 +53,12 @@ use crate::{
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
+    counters::{START_REFUSAL_REPLY_DROPS, START_REFUSALS},
     errors::{self, SessionManagerError, TransportSessionError},
+    exit_control::{
+        ExitControlKind, ExitControlOutcome, ExitSessionKind, MIN_REFUSAL_REPLY_REFILL_PERIOD, RefusalReplyBucket,
+        RefusalReplyBudget, record_exit_control,
+    },
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
@@ -2611,7 +2616,7 @@ fn decode_pix_offer(
     // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
     // that would read their boundaries in the wrong place.
     if params.suite() != LOCAL_PIX_SUITE {
-        warn!(
+        debug!(
             challenge = req.challenge,
             offered = %params.suite(),
             ours = %LOCAL_PIX_SUITE,
@@ -2977,6 +2982,20 @@ pub struct SessionManagerConfig {
     /// Default is 6 seconds, the packet pipeline's own default.
     #[default(Duration::from_secs(6))]
     pub surb_resolution_wait: Duration,
+
+    /// How many refusal replies the Exit sends to `StartSession`s it refuses, across all reasons.
+    ///
+    /// A refusal is answered with a `SessionError` over a SURB the requester chose. A multi-hop SURB
+    /// costs this node a ticket per reply, while the request and its SURBs can reach it for free over
+    /// a 0-hop path, so without a bound a flood of refused requests drains the node's funds at the
+    /// flood's rate. One budget covers every reason, since a peer can provoke whichever is cheapest.
+    ///
+    /// A refusal that finds the budget spent is dropped without a reply, and the requester times out.
+    /// `None` answers every refusal, which leaves the node paying for whatever it is sent.
+    ///
+    /// Default is [`RefusalReplyBudget::default`]: a burst of 32, then one reply a second.
+    #[default(Some(RefusalReplyBudget::default()))]
+    pub refusal_reply_budget: Option<RefusalReplyBudget>,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -3480,6 +3499,10 @@ pub struct SessionManager<S> {
     /// Permits for concurrent session-server admission waits, so a slow server refuses with `Busy`
     /// instead of parking every `StartSession` handler.
     admission_permits: Arc<hopr_utils::runtime::prelude::Semaphore>,
+    /// The node-wide budget of refusal replies, shared by every clone like `live_cycle_bytes`.
+    ///
+    /// `None` when the configuration is unbounded.
+    refusal_replies: Option<Arc<RefusalReplyBucket>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -3501,6 +3524,7 @@ impl<S> Clone for SessionManager<S> {
             admission_tx: self.admission_tx.clone(),
             surb_admission: self.surb_admission.clone(),
             admission_permits: self.admission_permits.clone(),
+            refusal_replies: self.refusal_replies.clone(),
         }
     }
 }
@@ -4226,6 +4250,13 @@ where
             RoutingOptions::MAX_INTERMEDIATE_HOPS,
         ));
 
+        // The bucket floors the period itself; the config is brought in line so what it reports is
+        // what is enforced.
+        if let Some(budget) = cfg.refusal_reply_budget.as_mut() {
+            budget.refill_period = budget.refill_period.max(MIN_REFUSAL_REPLY_REFILL_PERIOD);
+        }
+        let refusal_replies = cfg.refusal_reply_budget.map(|b| Arc::new(RefusalReplyBucket::new(b)));
+
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -4305,6 +4336,7 @@ where
             admission_permits: Arc::new(hopr_utils::runtime::prelude::Semaphore::new(
                 START_SESSION_ADMISSION_CONCURRENCY,
             )),
+            refusal_replies,
         }
     }
 
@@ -7041,6 +7073,92 @@ where
         }
     }
 
+    /// Answers a refused `StartSession` with a `SessionError`, if the node's refusal reply budget allows.
+    ///
+    /// Every refusal goes through here, so they all draw on the one [`RefusalReplyBudget`]: the reply
+    /// travels over a SURB the requester chose, which can be a multi-hop path that costs this node a
+    /// ticket, and a requester can pick whichever refusal is cheapest to provoke. A refusal that finds
+    /// the budget spent is dropped without a reply and the requester times out. That is `Ok`, because
+    /// the refusal itself is carried out either way.
+    ///
+    /// The decision is counted in `hopr_pix_admission_rejections_total` before the budget is asked,
+    /// since it counts refusals and not the replies to them. The replies are counted in
+    /// `hopr_exit_control_packets_total` and `hopr_session_sent_error_count`; the latter only for those
+    /// that went out.
+    async fn refuse_session_start(
+        &self,
+        reply_routing: DestinationRouting,
+        session_req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        refusal: PixAdmissionRejection,
+        reason: StartErrorReason,
+        error_context: &'static str,
+    ) -> errors::Result<()> {
+        let capabilities = session_req.capabilities.0;
+        let kind = ExitControlKind::from(refusal);
+        let session = ExitSessionKind::of(capabilities);
+
+        // Counted before the send, not after: the refusal has already happened, and
+        // `send_via_msg_sender` can fail to encode, fail to send, or time out. Counting
+        // afterwards would drop exactly the refusals that a struggling node makes most.
+        refusal.record_if_pix(capabilities);
+
+        // Every refusal is a decision, answered or not. The per-refusal lines are `debug!` because a
+        // peer can provoke them for free, so this is what an operator sees at the default level: one
+        // line for the first refusal and then one per `FULL_QUEUE_WARN_INTERVAL`.
+        let refused_before = START_REFUSALS.fetch_add(1, Ordering::Relaxed);
+        if is_full_queue_warn_due(refused_before) {
+            warn!(
+                refused = refused_before + 1,
+                dropped = START_REFUSAL_REPLY_DROPS.load(Ordering::Relaxed),
+                last_reason = %refusal,
+                "refusing StartSessions"
+            );
+        }
+
+        // Fetched before a token is taken, so that a refusal which cannot be sent at all never spends one.
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        // A token is *not* given back if the send below fails or times out. Under sink backpressure a
+        // refund would make every following refusal hold a Start handler for the send timeout, whereas
+        // a spent token drops the later refusals at once, which is the cheaper failure on an
+        // overloaded node.
+        if self.refusal_replies.as_ref().is_some_and(|bucket| !bucket.try_take()) {
+            let drops_so_far = START_REFUSAL_REPLY_DROPS.fetch_add(1, Ordering::Relaxed);
+            record_exit_control(kind, session, ExitControlOutcome::DroppedBudget);
+            debug!(
+                challenge = session_req.challenge,
+                %refusal,
+                error_context,
+                "dropping a StartSession refusal: the refusal reply budget is spent"
+            );
+            if is_full_queue_warn_due(drops_so_far) {
+                warn!(
+                    dropped = drops_so_far + 1,
+                    "refusal replies to StartSession are being dropped because the refusal reply budget is spent; \
+                     requesters will time out instead of being told why"
+                );
+            }
+            return Ok(());
+        }
+
+        let data = HoprStartProtocol::SessionError(StartErrorType {
+            identifier: ErrorIdentifier::Challenge(session_req.challenge),
+            reason,
+        });
+        match send_via_msg_sender(&mut msg_sender, reply_routing, data, error_context).await {
+            Ok(()) => {
+                record_exit_control(kind, session, ExitControlOutcome::Sent);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                Ok(())
+            }
+            Err(error) => {
+                record_exit_control(kind, session, ExitControlOutcome::SendFailed);
+                Err(error)
+            }
+        }
+    }
+
     /// Refuses a PIX offer whose initiation packet carried a SURB with a direct (0-hop) return path.
     ///
     /// A PIX share is decrypted with the acknowledgement of the return path's first relayer, and a
@@ -7056,7 +7174,8 @@ where
     /// hop count for the lifetime of the Session. A node with no PIX support lets the offer through, so
     /// `handle_incoming_session_initiation` refuses it for that more fundamental reason.
     ///
-    /// Returns `true` if the offer was refused and a `SessionError` was sent.
+    /// Returns `true` if the offer was refused; the `SessionError` is sent only if the refusal reply
+    /// budget allows (see [`refuse_session_start`](Self::refuse_session_start)).
     async fn refuse_pix_over_direct_return_path(
         &self,
         pseudonym: HoprPseudonym,
@@ -7070,27 +7189,18 @@ where
             return Ok(false);
         }
 
-        error!(
+        debug!(
             challenge = session_req.challenge,
             "client offered PIX over a direct return path"
         );
-        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-        let reason = StartErrorReason::UnacceptablePixParams;
-        let data = HoprStartProtocol::SessionError(StartErrorType {
-            identifier: ErrorIdentifier::Challenge(session_req.challenge),
-            reason,
-        });
-        PixAdmissionRejection::DirectReturnPath.record_if_pix(session_req.capabilities.0);
-        send_via_msg_sender(
-            &mut msg_sender,
+        self.refuse_session_start(
             DestinationRouting::Return(pseudonym.into()),
-            data,
+            session_req,
+            PixAdmissionRejection::DirectReturnPath,
+            StartErrorReason::UnacceptablePixParams,
             "session error due to a PIX offer over a direct return path",
         )
         .await?;
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
         Ok(true)
     }
 
@@ -7112,26 +7222,19 @@ where
         // Reject UsePIX if this node is not configured with a PixToolbox
         // (e.g. relay nodes that do not participate in PIX processing).
         if self.pix_toolbox.get().is_none() && session_req.capabilities.0.contains(Capability::UsePIX) {
-            error!(
+            debug!(
                 challenge = session_req.challenge,
                 "client offered PIX but this node has no PIX support installed"
             );
-            let data = HoprStartProtocol::SessionError(StartErrorType {
-                identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                reason: StartErrorReason::UnacceptablePixParams,
-            });
-            // Counted before the send, not after: the refusal has already happened, and
-            // `send_via_msg_sender` can fail to encode, fail to send, or time out. Counting
-            // afterwards would drop exactly the refusals that a struggling node makes most.
-            PixAdmissionRejection::NoPixSupport.record_if_pix(session_req.capabilities.0);
-            send_via_msg_sender(
-                &mut msg_sender,
-                reply_routing,
-                data,
-                "session error due to missing PIX support",
-            )
-            .await?;
-            return Ok(());
+            return self
+                .refuse_session_start(
+                    reply_routing,
+                    &session_req,
+                    PixAdmissionRejection::NoPixSupport,
+                    StartErrorReason::UnacceptablePixParams,
+                    "session error due to missing PIX support",
+                )
+                .await;
         }
 
         // Ask whoever runs the session server on what terms this target may be served, before
@@ -7144,28 +7247,19 @@ where
         let offered = match decode_pix_offer(&session_req) {
             Ok(offered) => offered,
             Err(reason) => {
-                error!(
+                debug!(
                     challenge = session_req.challenge,
                     "client offered unacceptable PIX parameters"
                 );
-                let data = HoprStartProtocol::SessionError(StartErrorType {
-                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                    reason,
-                });
-                PixAdmissionRejection::UnacceptableParams.record_if_pix(session_req.capabilities.0);
-                send_via_msg_sender(
-                    &mut msg_sender,
-                    reply_routing,
-                    data,
-                    "session error message due to unacceptable PIX parameters",
-                )
-                .await?;
-
-                // Left after the send, unlike the line above: this one counts errors *sent*, so a
-                // send that never happened is correctly not one of them.
-                #[cfg(all(feature = "telemetry", not(test)))]
-                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-                return Ok(());
+                return self
+                    .refuse_session_start(
+                        reply_routing,
+                        &session_req,
+                        PixAdmissionRejection::UnacceptableParams,
+                        reason,
+                        "session error message due to unacceptable PIX parameters",
+                    )
+                    .await;
             }
         };
 
@@ -7173,29 +7267,22 @@ where
         let admission = match self.request_admission(session_id, &session_req, offered).await {
             Ok(decision) => decision,
             Err(reason) => {
-                let data = HoprStartProtocol::SessionError(StartErrorType {
-                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                    reason,
-                });
                 // `request_admission` distinguishes these two on purpose — a refused target will not
                 // be served however the request is phrased, while `Busy` is this node being unable
                 // to ask right now and is worth retrying — so the aggregate keeps them apart too.
-                match reason {
+                let refusal = match reason {
                     StartErrorReason::TargetNotAdmitted => PixAdmissionRejection::TargetPolicy,
                     _ => PixAdmissionRejection::Busy,
-                }
-                .record_if_pix(session_req.capabilities.0);
-                send_via_msg_sender(
-                    &mut msg_sender,
-                    reply_routing,
-                    data,
-                    "session error due to a refused admission",
-                )
-                .await?;
-
-                #[cfg(all(feature = "telemetry", not(test)))]
-                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-                return Ok(());
+                };
+                return self
+                    .refuse_session_start(
+                        reply_routing,
+                        &session_req,
+                        refusal,
+                        reason,
+                        "session error due to a refused admission",
+                    )
+                    .await;
             }
         };
         let pix_policy = self.cfg.pix_config.effective_for(&admission);
@@ -7204,29 +7291,21 @@ where
         let Some((client_params, ssas_per_request)) =
             self.check_pix_params(session_req.challenge, offered, &pix_policy)
         else {
-            error!(
+            debug!(
                 challenge = session_req.challenge,
                 "client offered unacceptable PIX parameters"
             );
 
             // Notify the sender that the session could not be established
-            let reason = StartErrorReason::UnacceptablePixParams;
-            let data = HoprStartProtocol::SessionError(StartErrorType {
-                identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                reason,
-            });
-            PixAdmissionRejection::UnacceptableParams.record_if_pix(session_req.capabilities.0);
-            send_via_msg_sender(
-                &mut msg_sender,
-                reply_routing,
-                data,
-                "session error message due to unacceptable PIX parameters",
-            )
-            .await?;
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-            return Ok(());
+            return self
+                .refuse_session_start(
+                    reply_routing,
+                    &session_req,
+                    PixAdmissionRejection::UnacceptableParams,
+                    StartErrorReason::UnacceptablePixParams,
+                    "session error message due to unacceptable PIX parameters",
+                )
+                .await;
         };
 
         info!(params = %client_params, ssas_per_request, "client offered acceptable PIX parameters");
@@ -7241,7 +7320,7 @@ where
         // whereas a Session refused now is one the peer can retry elsewhere at no charge.
         let cycle_budget = if session_req.capabilities.0.contains(Capability::UsePIX) {
             let Some(reservation) = self.reserve_cycle_budget(&client_params, ssas_per_request) else {
-                warn!(
+                debug!(
                     challenge = session_req.challenge,
                     requested = cycle_budget_for(&client_params, ssas_per_request),
                     outstanding = self.live_cycle_bytes.load(Ordering::Relaxed),
@@ -7249,26 +7328,18 @@ where
                     "refusing a PIX session: the node's live reconstructor-cycle budget is exhausted"
                 );
 
-                let reason = StartErrorReason::NoSlotsAvailable;
-                let data = HoprStartProtocol::SessionError(StartErrorType {
-                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                    reason,
-                });
                 // The refusal this whole aggregate exists to separate from the one below. Both are
                 // `NoSlotsAvailable` on the wire, but this one says the node is healthy and full of
                 // reconstructor state, and the other says it is at its Session limit.
-                PixAdmissionRejection::LiveCycleCapacity.record_if_pix(session_req.capabilities.0);
-                send_via_msg_sender(
-                    &mut msg_sender,
-                    reply_routing,
-                    data,
-                    "session error message due to an exhausted live-cycle budget",
-                )
-                .await?;
-
-                #[cfg(all(feature = "telemetry", not(test)))]
-                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-                return Ok(());
+                return self
+                    .refuse_session_start(
+                        reply_routing,
+                        &session_req,
+                        PixAdmissionRejection::LiveCycleCapacity,
+                        StartErrorReason::NoSlotsAvailable,
+                        "session error message due to an exhausted live-cycle budget",
+                    )
+                    .await;
             };
             Some(reservation)
         } else {
@@ -7312,26 +7383,16 @@ where
         // request can claim the slot for a given pseudonym.
         let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()) else {
             // No slots available for this pseudonym
-            error!("no slots available for this pseudonym");
-            let reason = StartErrorReason::NoSlotsAvailable;
-            let data = HoprStartProtocol::SessionError(StartErrorType {
-                identifier: ErrorIdentifier::Challenge(session_req.challenge),
-                reason,
-            });
-
-            PixAdmissionRejection::NoSessionSlot.record_if_pix(session_req.capabilities.0);
-            send_via_msg_sender(
-                &mut msg_sender,
-                reply_routing.clone(),
-                data,
-                "session error message due to lack of slots",
-            )
-            .await?;
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-
-            return Ok(());
+            debug!("no slots available for this pseudonym");
+            return self
+                .refuse_session_start(
+                    reply_routing.clone(),
+                    &session_req,
+                    PixAdmissionRejection::NoSessionSlot,
+                    StartErrorReason::NoSlotsAvailable,
+                    "session error message due to lack of slots",
+                )
+                .await;
         };
 
         debug!(?session_req, "assigned a new session");
@@ -15110,6 +15171,202 @@ mod tests {
         sender.close_channel();
         transport.await??;
         Ok(())
+    }
+
+    /// What [`manager_refusing_every_opening`] hands back: the manager, the receiver every message it
+    /// sends arrives on, and the incoming-session receiver and abort handles the test must hold.
+    type RefusingFixture = (
+        RecordingManager,
+        futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        Vec<AbortHandle>,
+    );
+
+    /// A manager with `budget` as its refusal reply budget and no room for any Session, so that every
+    /// opening is refused, with every message it sends delivered to the returned receiver.
+    ///
+    /// Takes the raw receiver rather than a mock, so a test can count the replies and see which
+    /// went out without waiting on a single one.
+    fn manager_refusing_every_opening(
+        budget: Option<RefusalReplyBudget>,
+        admission: Option<SessionAdmissionSink>,
+    ) -> anyhow::Result<RefusingFixture> {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            maximum_sessions: 0,
+            refusal_reply_budget: budget,
+            ..Default::default()
+        });
+        let (mock_sender, sent) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_sessions) = futures::channel::mpsc::channel(1);
+        let handles = mgr.start(mock_sender, new_session_tx, None, admission)?;
+        Ok((mgr, sent, new_sessions, handles))
+    }
+
+    /// Delivers one opening from a fresh pseudonym, as the packet pipeline would.
+    fn open_session(
+        mgr: &RecordingManager,
+        offer: StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> anyhow::Result<()> {
+        let result = mgr.dispatch_message(
+            HoprPseudonym::random(),
+            start_packet(HoprStartProtocol::StartSession(offer))?,
+        )?;
+        anyhow::ensure!(matches!(result, DispatchResult::Processed), "dispatched as {result:?}");
+        Ok(())
+    }
+
+    /// Waits until this thread's emission probe has counted `at_least` of `series`.
+    ///
+    /// The Start handlers run on this test's current-thread runtime, so their emissions land in this
+    /// thread's probe.
+    async fn probe_reaches(series: &str, at_least: i64) -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        timeout(Duration::from_secs(5), async {
+            while probe::get(series) < at_least {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .with_context(|| format!("{series} stayed at {}, short of {at_least}", probe::get(series)))
+    }
+
+    /// Takes the replies that have been sent so far, as the `SessionError`s they are.
+    fn drain_session_errors(
+        sent: &mut futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
+    ) -> anyhow::Result<Vec<StartErrorType<SessionId>>> {
+        let mut errors = Vec::new();
+        while let Ok((_, data)) = sent.try_recv() {
+            match HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)? {
+                HoprStartProtocol::SessionError(error) => errors.push(error),
+                other => anyhow::bail!("expected a SessionError, got {other:?}"),
+            }
+        }
+        Ok(errors)
+    }
+
+    /// A flood of refused openings costs the Exit one reply per token, not one per opening: each
+    /// reply is a ticket when the requester asked for a multi-hop return path.
+    #[test_log::test(tokio::test)]
+    async fn a_start_session_flood_is_answered_only_within_the_refusal_budget() -> anyhow::Result<()> {
+        use crate::{counters::start_refusal_reply_drop_count, supervision::telemetry::probe};
+
+        probe::reset();
+        let drops_before = start_refusal_reply_drop_count();
+        let refusals_before = crate::counters::start_refusal_count();
+        let (mgr, mut sent, _new_sessions, _handles) = manager_refusing_every_opening(
+            Some(RefusalReplyBudget {
+                burst: 3,
+                refill_period: Duration::from_secs(3600),
+            }),
+            None,
+        )?;
+
+        for _ in 0..10 {
+            open_session(&mgr, no_pix_offer())?;
+        }
+        probe_reaches("exit_control/refusal_no_session_slot/plain/dropped_budget", 7).await?;
+        probe_reaches("exit_control/refusal_no_session_slot/plain/sent", 3).await?;
+
+        let errors = drain_session_errors(&mut sent)?;
+        assert_eq!(3, errors.len(), "only the budget's burst is answered");
+        assert!(errors.iter().all(|e| e.reason == StartErrorReason::NoSlotsAvailable));
+        assert_eq!(3, probe::get("exit_control/refusal_no_session_slot/plain/sent"));
+        assert_eq!(
+            7,
+            probe::get("exit_control/refusal_no_session_slot/plain/dropped_budget")
+        );
+        assert!(start_refusal_reply_drop_count() >= drops_before + 7);
+        // Every decision is counted, the dropped ones included. The counter is process-wide, so
+        // concurrent tests may add to it, but none can take from it.
+        assert!(crate::counters::start_refusal_count() >= refusals_before + 10);
+        Ok(())
+    }
+
+    /// The budget is shared by every reason, because a peer picks whichever refusal is cheapest to
+    /// provoke: a budget per reason would let it spend each one in turn.
+    #[test_log::test(tokio::test)]
+    async fn every_refusal_reason_draws_from_the_one_refusal_budget() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (admission, handler) = spawn_admission_handler(|_| Err("not served here".into()));
+        let (mgr, mut sent, _new_sessions, _handles) = manager_refusing_every_opening(
+            Some(RefusalReplyBudget {
+                burst: 1,
+                refill_period: Duration::from_secs(3600),
+            }),
+            Some(admission),
+        )?;
+
+        // A refused target first, which spends the one reply...
+        open_session(&mgr, no_pix_offer())?;
+        probe_reaches("exit_control/refusal_target_policy/plain/sent", 1).await?;
+        // ...so that a PIX offer to a node without PIX support, a different reason, is not answered.
+        open_session(&mgr, pix_offer())?;
+        probe_reaches("exit_control/refusal_no_pix_support/pix/dropped_budget", 1).await?;
+
+        let errors = drain_session_errors(&mut sent)?;
+        assert_eq!(1, errors.len(), "one budget, one reply");
+        assert_eq!(StartErrorReason::TargetNotAdmitted, errors[0].reason);
+        handler.abort();
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn a_disabled_refusal_budget_answers_every_refusal() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (mgr, mut sent, _new_sessions, _handles) = manager_refusing_every_opening(None, None)?;
+
+        for _ in 0..40 {
+            open_session(&mgr, no_pix_offer())?;
+        }
+        probe_reaches("exit_control/refusal_no_session_slot/plain/sent", 40).await?;
+
+        assert_eq!(40, drain_session_errors(&mut sent)?.len());
+        assert_eq!(
+            0,
+            probe::get("exit_control/refusal_no_session_slot/plain/dropped_budget")
+        );
+        Ok(())
+    }
+
+    /// The refusal for missing PIX support is sent, and counted, like every other: it used to be the
+    /// one path that never reached `hopr_session_sent_error_count`.
+    #[test_log::test(tokio::test)]
+    async fn a_refusal_for_missing_pix_support_goes_through_the_counted_path() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (mgr, mut sent, _new_sessions, _handles) = manager_refusing_every_opening(Some(Default::default()), None)?;
+
+        open_session(&mgr, pix_offer())?;
+        probe_reaches("exit_control/refusal_no_pix_support/pix/sent", 1).await?;
+
+        let errors = drain_session_errors(&mut sent)?;
+        assert_eq!(1, errors.len());
+        assert_eq!(StartErrorReason::UnacceptablePixParams, errors[0].reason);
+        assert_eq!(1, probe::get("exit_control/refusal_no_pix_support/pix/sent"));
+        Ok(())
+    }
+
+    /// A zero period would earn a reply on every clock reading, so the manager raises it.
+    #[test]
+    fn a_zero_refusal_refill_period_is_floored() {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            refusal_reply_budget: Some(RefusalReplyBudget {
+                burst: 1,
+                refill_period: Duration::ZERO,
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            Some(MIN_REFUSAL_REPLY_REFILL_PERIOD),
+            mgr.cfg.refusal_reply_budget.map(|budget| budget.refill_period)
+        );
     }
 
     /// The check refuses PIX over a direct return path and nothing else: not a relayed return path,
