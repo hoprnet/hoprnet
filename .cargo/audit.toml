@@ -15,6 +15,9 @@ ignore = [
   "RUSTSEC-2026-0511", # hickory-proto: NXDOMAIN accepted for a proven empty non-terminal
   "RUSTSEC-2026-0512", # hickory-proto: DNSSEC validation accepted an unrelated signed RRset as the answer
   "RUSTSEC-2026-0514", # hickory-resolver 0.25.2: lookup returned records that failed DNSSEC validation; fixed in 0.26.2
+  "RUSTSEC-2026-0530", # hickory-proto: parent-side NSEC at a zone cut accepted as proof of nonexistence
+  "RUSTSEC-2026-0531", # hickory-proto: child-side NSEC or NSEC3 record accepted as proof that a delegation has no DS record
+  "RUSTSEC-2026-0532", # hickory-proto: parent-side NSEC3 at a zone cut accepted as proof of nonexistence
   "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained, pulled by alloy-sol-macro 1.6.0 and aquamarine 0.6.0; validator_derive uses proc-macro-error3, not this crate
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
