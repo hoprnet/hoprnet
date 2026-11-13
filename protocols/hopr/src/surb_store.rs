@@ -17,6 +17,35 @@ use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 /// Public so that callers applying their own override can floor it identically, rather than
 /// reaching a value the config file itself would have been rejected for.
 pub const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
+
+/// Cost of one Entry-side SURB record, as the cache is charged for it: the remembered value plus the
+/// per-entry overhead the cache adds for its hash-table slot, policy node and key.
+///
+/// Measured against moka 0.12.16 by filling a cache at the defaults and reading RSS: 838.5 B for a
+/// pending-SURB record (a 504 B `PendingSurb` value) and 502 B for a written-off leg (a 165 B
+/// return-relayer array). This constant is the larger of the two, rounded up
+/// to 850 B, and is used as the cache's weigher, so a budget of `n` bytes holds exactly one record per
+/// this weight and the capacity is the byte budget rather than an entry count.
+///
+/// It is a safe upper bound for one record: a `PendingSurb` is 504 B and does not change without this
+/// crate's dependents recompiling, and the ~336 B overhead measured here exceeds moka's documented
+/// rough figure.
+pub const PENDING_SURB_RECORD_BYTES: u64 = 850;
+
+/// Floor on the capacity of each Entry-side SURB map, in bytes: 100 000 records.
+///
+/// The config validator rejects a budget below it, and the capacity derivation floors at it, so a
+/// value smaller than this never shrinks the maps below what they held before the byte budget existed
+/// (the fixed 100 000-record cap, hoprnet#8624). 100 000 × [`PENDING_SURB_RECORD_BYTES`] ≈ 81 MiB per
+/// map, ≈ 162 MiB for the pair.
+pub const MINIMUM_PENDING_SURB_MAX_BYTES: u64 = 100_000 * PENDING_SURB_RECORD_BYTES;
+
+/// Default byte budget for **each** of the two Entry-side SURB maps.
+///
+/// 256 MiB is ~315 700 records at [`PENDING_SURB_RECORD_BYTES`], ~16 deployed-size stocks (19 264
+/// SURBs each) per map, so the overflow hoprnet#8624 describes is fixed with room to spare. See
+/// [`SurbStoreConfig::pending_surb_max_bytes`] for the pair's worst-case total.
+pub const DEFAULT_PENDING_SURB_MAX_BYTES: u64 = 256 * 1024 * 1024;
 /// Subtracts `n` from the quarantine SURB budget, clamping at zero instead of wrapping.
 ///
 /// Every refund site reads a ring length outside the ring's own lock, so a stale reader can subtract
@@ -149,6 +178,10 @@ fn default_eviction_report_interval() -> Duration {
 
 fn default_eviction_report_threshold() -> u64 {
     1000
+}
+
+fn default_pending_surb_max_bytes() -> u64 {
+    DEFAULT_PENDING_SURB_MAX_BYTES
 }
 
 fn default_quarantine_rb_capacity() -> usize {
@@ -443,6 +476,38 @@ pub struct SurbStoreConfig {
     #[default(default_admitted_headroom_percent())]
     #[cfg_attr(feature = "serde", serde(default = "default_admitted_headroom_percent"))]
     pub admitted_headroom_percent: u32,
+    /// Byte budget for **each** of the two Entry-side maps that remember minted SURBs until their reply
+    /// comes home — the pending map and the written-off-legs map. Affects only the sending side.
+    ///
+    /// A budget below [`MINIMUM_PENDING_SURB_MAX_BYTES`] (≈81 MiB, 100 000 records) is rejected by the
+    /// validator; the floor applied where the capacity is derived is the in-code backstop for a caller
+    /// that skipped validation.
+    ///
+    /// Those maps are what lets a reply settle a race and a lost SURB be written off, and a map that
+    /// cannot hold a record loses that evidence silently. The budget is enforced with moka's weigher, so
+    /// a budget of `n` bytes holds exactly one record per [`PENDING_SURB_RECORD_BYTES`] (850 B, the
+    /// measured cost of a `PendingSurb` plus moka overhead) and the cache's capacity **is** the byte
+    /// budget, not an entry count. A byte figure is what an operator can price; the older basis,
+    /// `maximum_managed_sessions × rb_capacity × 2/3`, coupled the map to two knobs that do not decide
+    /// how many SURBs are outstanding, and reached several GiB at the defaults (hoprnet#8624).
+    ///
+    /// The default 256 MiB is ~315 700 records per map, ~16 deployed-size stocks (19 264 SURBs each).
+    /// Both maps are sized from this same figure, so the pair's worst case is ≈512 MiB when both fill,
+    /// not 256 MiB for the node: a written-off leg weighs the same 850 B even though its value is
+    /// smaller (502 B with overhead), because the weigher charges every record one rate. Records a
+    /// budget cannot hold are counted by `hopr_surb_pending_lost_total`, so an undersized budget is
+    /// visible rather than silent.
+    ///
+    /// It lives on this config rather than on the transport's packet pipeline because `SurbStoreConfig`
+    /// is `Copy` and already reaches the transport's construction site; it is **not** read by
+    /// [`MemorySurbStore`](crate::MemorySurbStore) — the store names no Entry-side telemetry — only by
+    /// `hopr-transport`'s `HoprTransport::new`.
+    ///
+    /// Default is 256 MiB.
+    #[default(default_pending_surb_max_bytes())]
+    #[validate(range(min = MINIMUM_PENDING_SURB_MAX_BYTES, message = "pending_surb_max_bytes must be at least the 100 000-record floor, MINIMUM_PENDING_SURB_MAX_BYTES"))]
+    #[cfg_attr(feature = "serde", serde(default = "default_pending_surb_max_bytes"))]
+    pub pending_surb_max_bytes: u64,
 }
 
 /// Basic [`SurbStore`] implementation based on an in-memory cache.
@@ -5149,6 +5214,23 @@ mod tests {
             10_000, legacy.admitted_max_pseudonyms,
             "the admitted census is defaulted"
         );
+        assert_eq!(
+            DEFAULT_PENDING_SURB_MAX_BYTES, legacy.pending_surb_max_bytes,
+            "the pending-SURB byte budget is defaulted"
+        );
+
+        // The byte budget's floor is the map's real minimum, not one byte: a value below it would be
+        // raised silently, so the validator rejects it rather than accepting a figure it ignores.
+        assert!(
+            load(vec![("pending_surb_max_bytes", 0)]).is_err(),
+            "a zero pending-SURB budget must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES - 1)]).is_err(),
+            "a budget below the 100 000-record floor must be rejected"
+        );
+        load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the floor must load")?;
 
         Ok(())
     }

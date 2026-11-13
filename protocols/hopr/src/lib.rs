@@ -13,7 +13,10 @@ pub use errors::*;
 pub use replay_filter::{
     MIN_CAPACITY_PER_SHARD, MIN_TRACKED_PACKETS, ReplayFilterConfig, ReplayToken, TagReplayFilter,
 };
-pub use surb_store::{MINIMUM_SURB_LIFETIME, MemorySurbStore, SurbPopOrder, SurbStoreConfig};
+pub use surb_store::{
+    DEFAULT_PENDING_SURB_MAX_BYTES, MINIMUM_PENDING_SURB_MAX_BYTES, MINIMUM_SURB_LIFETIME, MemorySurbStore,
+    PENDING_SURB_RECORD_BYTES, SurbPopOrder, SurbStoreConfig,
+};
 pub use ticket_processing::{HoprUnacknowledgedTicketProcessor, HoprUnacknowledgedTicketProcessorConfig};
 pub use traits::*;
 pub use types::*;

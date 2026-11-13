@@ -96,7 +96,7 @@ const PENDING_SURB_TTL: Duration = Duration::from_secs(60);
 /// left every reply of such a session unmatched: no race, no reply evidence, no verdict and no
 /// SURB generation advance, while its Exit spent a dead relayer's SURBs into the void. The map holds
 /// what is outstanding at the counterparty, so its size is bounded by the stock and the loss rate,
-/// not by this horizon; [`MAX_PENDING_SURBS`] still bounds it.
+/// not by this horizon; the byte budget in [`pending_surbs_capacity`] bounds it.
 const PENDING_SURB_HORIZON: Duration = Duration::from_secs(15 * 60);
 const _: () = assert!(PENDING_SURB_HORIZON.as_secs() >= 10 * PENDING_SURB_TTL.as_secs());
 
@@ -208,30 +208,107 @@ pub struct SurbRoundTripRegistry {
     /// wiped stock is spent until the new generation reaches the counterparty. Recognising it here is
     /// what lets a reply home lift the verdict or the probation of the relayers on its leg.
     written_off_legs: moka::sync::Cache<HoprSurbId, ReturnRelayers>,
+    /// Records either pending map could not hold, counted together: one evicted from
+    /// [`pending`](Self::pending) before its reply could come home settles no race and is never
+    /// written off, and one evicted from `written_off_legs` leaves a reply home finding nothing, so it
+    /// cannot lift its relayer's verdict. Zero in a configuration where neither map fills; non-zero
+    /// means the byte budget is too small for the node's outstanding SURBs, and the metric
+    /// built on [`pending_lost`](Self::pending_lost) says so.
+    pending_lost: Arc<AtomicU64>,
 }
 
-/// Memory bound only. An entry leaves the map when its reply comes home, so what the map holds is
-/// the stock outstanding at the counterparties plus the replies lost within
-/// [`PENDING_SURB_HORIZON`]: several deployed-size stocks.
+/// Floor on the byte budget of each pending map: the old fixed 100 000-record cap.
+///
+/// An entry leaves the map when its reply comes home, so what a map holds is the stock outstanding at
+/// the counterparties plus the replies lost within [`PENDING_SURB_HORIZON`]: several deployed-size
+/// stocks. [`pending_surbs_capacity`] sizes the maps from a byte budget, and this floor keeps a budget
+/// below it from shrinking the maps below what they held before that budget existed (hoprnet#8624).
+/// The same figure is exported as
+/// [`MINIMUM_PENDING_SURB_MAX_BYTES`](hopr_protocol_hopr::MINIMUM_PENDING_SURB_MAX_BYTES) and enforced
+/// by the config validator, so a configuration file cannot carry a budget this floor would ignore.
 const MAX_PENDING_SURBS: u64 = 100_000;
+const _: () = assert!(
+    MAX_PENDING_SURBS
+        == hopr_protocol_hopr::MINIMUM_PENDING_SURB_MAX_BYTES / hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES
+);
+
+/// Byte capacity of one pending map, floored so a small budget never shrinks it below
+/// [`MAX_PENDING_SURBS`].
+///
+/// The result is a **byte** figure handed straight to moka's `max_capacity` beside the
+/// [`weigher`](pending_legs) charging one record
+/// [`PENDING_SURB_RECORD_BYTES`](hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES), so the cache's
+/// capacity *is* the budget and no per-record estimate can drift. A byte budget is what an operator
+/// can price, where the product of the Session limit and the ring buffer is not.
+///
+/// Both maps take this same capacity. At the 256 MiB default each holds ~315 700 records (~16
+/// deployed-size stocks) and the pair peaks at ≈512 MiB when both fill — the budget is per map, not
+/// for the node.
+pub(crate) fn pending_surbs_capacity(max_bytes: u64) -> u64 {
+    max_bytes.max(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
+}
+
+/// Cost of one remembered SURB, charged to a pending map's weigher so its byte capacity is exact.
+///
+/// Re-exported from the crate that owns the SURB configuration, where the measurement and its
+/// reasoning live; the two must not drift.
+const PENDING_SURB_RECORD_BYTES: u64 = hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES;
 
 impl Default for SurbRoundTripRegistry {
     fn default() -> Self {
-        Self {
-            inner: Default::default(),
-            relayer_health: Default::default(),
-            pending: pending_legs(MAX_PENDING_SURBS),
-            written_off: Default::default(),
-            bumped: Default::default(),
-            written_off_legs: moka::sync::Cache::builder()
-                .max_capacity(MAX_PENDING_SURBS)
-                .time_to_live(PENDING_SURB_HORIZON)
-                .build(),
-        }
+        // The floor budget, in bytes: the old 100 000-record cap.
+        Self::with_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
     }
 }
 
 impl SurbRoundTripRegistry {
+    /// A registry whose pending maps each hold up to `max_pending` **bytes**.
+    ///
+    /// A byte capacity, not a record count: each map charges one record `PENDING_SURB_RECORD_BYTES`
+    /// through its weigher, so this is the memory bound itself. Production derives it from
+    /// `surb_store.pending_surb_max_bytes` via `pending_surbs_capacity`; [`Default`] passes the floor,
+    /// `MAX_PENDING_SURBS × PENDING_SURB_RECORD_BYTES`.
+    pub fn with_capacity(max_pending: u64) -> Self {
+        let pending_lost = Arc::new(AtomicU64::new(0));
+        Self {
+            inner: Default::default(),
+            relayer_health: Default::default(),
+            pending: pending_legs(max_pending, pending_lost.clone()),
+            written_off: Default::default(),
+            bumped: Default::default(),
+            // The same figure as `pending`, never a separate one: a SURB written off leaves `pending`
+            // for this map, and the two held one number before they were derived from the config. It is
+            // charged the same per-record weight even though its value is smaller, so the pair's worst
+            // case is twice the budget, not 1.5x.
+            //
+            // `lru` for the same reason as `pending`: a written-off leg is looked up once, when the
+            // reply of a SURB the counterparty still held comes home, so TinyLFU would refuse the
+            // newest leg and lose the evidence that revives its relayer. A `Size` eviction is counted
+            // like one on `pending`: the reply then finds the leg in neither map and cannot lift the
+            // verdict or probation of the relayers on it, which is the same loss the metric reports.
+            written_off_legs: moka::sync::Cache::builder()
+                .max_capacity(max_pending)
+                .weigher(|_, _| PENDING_SURB_RECORD_BYTES as u32)
+                .time_to_live(PENDING_SURB_HORIZON)
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
+                .eviction_listener(size_evictions(pending_lost.clone()))
+                .build(),
+            pending_lost,
+        }
+    }
+
+    /// Records that minted SURBs left one of the two pending maps before their replies could come home,
+    /// because the map was full. A record evicted from `pending` settles no race and is never written
+    /// off; one evicted from the written-off-legs map lets a reply home find nothing and so fail to
+    /// lift the verdict or probation of its relayers. Both are counted here, one series for both maps:
+    /// the two are sized from one budget and fill for the same reason, and what an operator acts on is
+    /// "the pending maps are undersized", not which of the pair overflowed first. The loss is invisible
+    /// in every other counter; non-zero only when the budget is too small for what the node mints. See
+    /// `pending_surbs_capacity`.
+    pub fn pending_lost(&self) -> u64 {
+        self.pending_lost.load(Ordering::Relaxed)
+    }
+
     /// Whether the reply of the SURB at `pair_index` in its packet says anything about its return path
     /// when it races its partner's: only the SURB the replier spends first does, see
     /// [`FIRST_SPENT_INDEX`].
@@ -413,6 +490,16 @@ impl SurbRoundTripRegistry {
 
     /// Per session, how many SURBs held by the counterparty cannot bring a reply home, and their share
     /// of all it was handed that are still accounted for.
+    ///
+    /// Walks the whole pending map to count what is outstanding per session, as does
+    /// [`write_off_dead`](Self::write_off_dead), which walks it twice. Both run once per flush, this one
+    /// only when some session has written-off SURBs and the second only during a dead-relayer verdict,
+    /// so at the 256 MiB default the walk is over up to
+    /// ~315 700 records: measured at ~500 ns per entry, about 160 ms per pass (hoprnet#8624). That is
+    /// paid by the flush task on the tick an episode begins, not on the packet hot path. Replacing the
+    /// walk with an incrementally-maintained per-pseudonym count is the follow-up if it ever shows up
+    /// in a profile; the count already moves by one on every insert and remove, so that is a bounded
+    /// change rather than a redesign.
     pub fn invalid(&self) -> HashMap<HoprPseudonym, (u64, f64)> {
         if self.written_off.is_empty() {
             return HashMap::new();
@@ -498,12 +585,49 @@ pub(crate) struct PendingSurb {
 /// entire observation side of the metric.
 type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
 
-/// Builds the shared pending map, bounded by capacity and TTL.
-fn pending_legs(max_pending: u64) -> PendingLegs {
+/// Builds the shared pending map, bounded by a byte capacity, a per-record weight and a TTL.
+///
+/// `max_capacity` is in **bytes**, matched by the [`weigher`](moka::sync::CacheBuilder::weigher) that
+/// charges every record `PENDING_SURB_RECORD_BYTES`, so the byte budget is the map's real bound and not
+/// an entry count multiplied by an estimate.
+///
+/// Admission is `lru`, not moka's default TinyLFU, because a SURB is looked up exactly once, when its
+/// reply comes home: every key's frequency is about one, and TinyLFU then silently refuses the newest
+/// record once the map is full, since a candidate must be *strictly* more frequent than its victims to
+/// be admitted. A refused record settles no race and, if the SURB is lost, is never written off, so its
+/// Session is never reported for a generation bump (hoprnet#8624). Under `lru` a new record is always
+/// admitted and the victim is the least recently used one, which under FIFO is the record whose reply
+/// comes next -- the issue flags that as the cost of this policy, so every such eviction is counted
+/// through [`SurbRoundTripRegistry::pending_lost`] instead of being silent, and the byte budget is now
+/// set by the operator so that eviction is not the normal state.
+fn pending_legs(max_pending: u64, lost: Arc<AtomicU64>) -> PendingLegs {
     moka::sync::Cache::builder()
         .max_capacity(max_pending)
+        .weigher(|_, _| PENDING_SURB_RECORD_BYTES as u32)
         .time_to_live(PENDING_SURB_HORIZON)
+        .eviction_policy(moka::policy::EvictionPolicy::lru())
+        .eviction_listener(size_evictions(lost))
         .build()
+}
+
+/// An eviction listener counting only [`RemovalCause::Size`](moka::notification::RemovalCause::Size)
+/// into `lost`, shared by both pending maps.
+///
+/// Expiry is the horizon doing its job, not a loss, and `Replaced` is an update of a record already
+/// accounted for; only `Size` is a record a map could not hold. `Explicit` never reaches this map
+/// either — `pending` is consumed with `remove` and pruned with `invalidate`, both of which moka
+/// reports as `Explicit` — so a write-off or a reply leaving the map does not count as a loss.
+fn size_evictions<V>(
+    lost: Arc<AtomicU64>,
+) -> impl Fn(std::sync::Arc<HoprSurbId>, V, moka::notification::RemovalCause) + Send + Sync + 'static
+where
+    V: Send + Sync + 'static,
+{
+    move |_, _, cause| {
+        if cause == moka::notification::RemovalCause::Size {
+            lost.fetch_add(1, Ordering::Relaxed);
+        }
+    }
 }
 
 /// Per-relayer health from reply races: two SURBs of one packet share mint time, forward path and
@@ -3948,5 +4072,185 @@ mod tests {
             "spent by the counterparty since, it is no longer counted"
         );
         Ok(())
+    }
+
+    /// The regression of hoprnet#8624: under moka's default TinyLFU admission every pending key has a
+    /// frequency of about one, so a full map silently refuses the newest record. The record it refuses
+    /// settles no race and is never written off, so its Session is never reported for a generation bump.
+    #[test]
+    fn a_full_pending_map_should_keep_the_newest_record() {
+        let registry = SurbRoundTripRegistry::with_capacity(64 * PENDING_SURB_RECORD_BYTES);
+        // More mints than the map can hold, each a distinct SURB, the way one Session's FIFO stock
+        // arrives. The newest is the last to be spent, so its reply comes home last and its record is
+        // the one that has to survive.
+        for seed in 0..=64u8 {
+            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        }
+        registry.pending.run_pending_tasks();
+
+        assert!(
+            registry.pending.contains_key(&surb_id(64)),
+            "the newest record must be admitted, not refused as TinyLFU would"
+        );
+        assert_eq!(64, registry.pending.entry_count(), "the map stays at capacity");
+        assert_eq!(
+            1,
+            registry.pending_lost(),
+            "the 65th mint into a 64-record map evicts exactly one record, and it is counted"
+        );
+    }
+
+    /// A record inserted with room to spare is present, and nothing is lost: the capacity is a bound on
+    /// what is outstanding, not a quota that drops records while the map has space.
+    #[test]
+    fn a_pending_record_should_not_be_refused_with_the_map_below_capacity() {
+        let registry = SurbRoundTripRegistry::with_capacity(128 * PENDING_SURB_RECORD_BYTES);
+        for seed in 0..100u8 {
+            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        }
+        registry.pending.run_pending_tasks();
+
+        assert!(registry.pending.contains_key(&surb_id(0)), "the oldest is still there");
+        assert!(registry.pending.contains_key(&surb_id(99)), "and so is the newest");
+        assert_eq!(100, registry.pending.entry_count());
+        assert_eq!(0, registry.pending_lost(), "nothing was evicted to make room");
+    }
+
+    /// Eviction past capacity is not silent: every record the map could not hold is counted, so an
+    /// undersized map is visible rather than settling races invisibly (hoprnet#8624).
+    #[test]
+    fn records_the_pending_map_cannot_hold_should_be_counted() {
+        let registry = SurbRoundTripRegistry::with_capacity(8 * PENDING_SURB_RECORD_BYTES);
+        assert_eq!(0, registry.pending_lost());
+        for seed in 0..32u8 {
+            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        }
+        registry.pending.run_pending_tasks();
+
+        assert_eq!(
+            24,
+            registry.pending_lost(),
+            "32 mints into an 8-record map leaves 24 records it could not hold"
+        );
+    }
+
+    /// A `Size` eviction on the written-off-legs map is counted like one on the pending map: a leg the
+    /// map could not hold leaves a reply home finding nothing, so it cannot lift the verdict of the
+    /// relayers on it, and that loss must be as visible as a lost pending record (hoprnet#8624).
+    #[test]
+    fn records_the_written_off_legs_map_cannot_hold_should_be_counted() {
+        let registry = SurbRoundTripRegistry::with_capacity(8 * PENDING_SURB_RECORD_BYTES);
+        assert_eq!(0, registry.pending_lost());
+        for seed in 0..32u8 {
+            registry.written_off_legs.insert(surb_id(seed), leg(&[]));
+        }
+        registry.written_off_legs.run_pending_tasks();
+
+        assert_eq!(
+            24,
+            registry.pending_lost(),
+            "32 written-off legs into an 8-record map leaves 24 it could not hold"
+        );
+    }
+
+    /// The cap is the byte budget itself, floored at the old fixed figure so a budget below it never
+    /// shrinks the map below what it held before; the per-record weight turns bytes into records
+    /// (hoprnet#8624).
+    #[test]
+    fn the_pending_capacity_should_come_from_the_byte_budget() {
+        let mib = 1024 * 1024;
+        assert_eq!(
+            256 * mib,
+            pending_surbs_capacity(256 * mib),
+            "the default budget is handed to the cache unchanged"
+        );
+        // The floor is 100 000 records in bytes: a budget at or above it is honoured, one below it is
+        // raised.
+        assert_eq!(
+            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
+            pending_surbs_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
+        );
+        assert_eq!(
+            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
+            pending_surbs_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES - 1),
+            "a budget just below the floor is raised to it"
+        );
+        assert_eq!(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES, pending_surbs_capacity(0));
+        assert_eq!(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES, pending_surbs_capacity(1));
+        // An operator-supplied figure is only range-checked at the floor: the largest one does not
+        // overflow.
+        assert_eq!(u64::MAX, pending_surbs_capacity(u64::MAX));
+    }
+
+    /// The budget the config carries is what production converts, comfortably above the old fixed cap,
+    /// so the overflow the issue describes is fixed rather than merely re-floored.
+    #[test]
+    fn the_default_budget_should_exceed_the_old_fixed_cap_by_a_useful_margin() {
+        use hopr_protocol_hopr::{DEFAULT_PENDING_SURB_MAX_BYTES, MINIMUM_PENDING_SURB_MAX_BYTES, SurbStoreConfig};
+
+        // The config default is the single source; the transport-side constant is not duplicated.
+        assert_eq!(
+            DEFAULT_PENDING_SURB_MAX_BYTES,
+            SurbStoreConfig::default().pending_surb_max_bytes
+        );
+        assert_eq!(
+            MINIMUM_PENDING_SURB_MAX_BYTES,
+            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
+            "the config floor and the transport floor agree"
+        );
+
+        let records = pending_surbs_capacity(DEFAULT_PENDING_SURB_MAX_BYTES) / PENDING_SURB_RECORD_BYTES;
+        assert_eq!(315_806, records, "256 MiB at 850 B/record");
+        assert!(
+            records >= 3 * MAX_PENDING_SURBS,
+            "the default buys over 3x the old cap: {records}"
+        );
+    }
+
+    /// The default budget's floor is the config validator's minimum, so a configuration file carrying
+    /// the smallest accepted budget is handed the exact floor rather than a silently-raised value.
+    #[test]
+    fn the_validated_minimum_budget_should_be_the_floor() {
+        use hopr_protocol_hopr::{MINIMUM_PENDING_SURB_MAX_BYTES, SurbStoreConfig};
+        use validator::Validate;
+
+        assert_eq!(
+            MINIMUM_PENDING_SURB_MAX_BYTES,
+            pending_surbs_capacity(MINIMUM_PENDING_SURB_MAX_BYTES),
+            "the smallest accepted budget is the floor, not raised above it"
+        );
+        let cfg = SurbStoreConfig {
+            pending_surb_max_bytes: MINIMUM_PENDING_SURB_MAX_BYTES,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok(), "the floor is a valid configuration");
+    }
+
+    /// Both maps are bounded by the same byte budget, and the weigher charges every record the same
+    /// [`PENDING_SURB_RECORD_BYTES`], so a budget of `n` bytes holds `n / PENDING_SURB_RECORD_BYTES`
+    /// records in each — the pair's worst case is twice the budget, exactly (hoprnet#8624).
+    #[test]
+    fn both_pending_maps_should_share_the_configured_capacity() {
+        let budget = 64 * PENDING_SURB_RECORD_BYTES;
+        let registry = SurbRoundTripRegistry::with_capacity(budget);
+        assert_eq!(
+            Some(budget),
+            registry.pending.policy().max_capacity(),
+            "the pending map takes the configured byte budget"
+        );
+        assert_eq!(
+            Some(budget),
+            registry.written_off_legs.policy().max_capacity(),
+            "and the written-off-legs map the same one"
+        );
+    }
+
+    /// A registry at the largest capacity constructs, so an absurd but accepted operator configuration
+    /// fails nowhere before the map grows to fill it.
+    #[test]
+    fn a_registry_should_construct_at_the_saturated_capacity() {
+        let registry = SurbRoundTripRegistry::with_capacity(pending_surbs_capacity(u64::MAX));
+        assert_eq!(Some(u64::MAX), registry.pending.policy().max_capacity());
+        assert_eq!(Some(u64::MAX), registry.written_off_legs.policy().max_capacity());
     }
 }
