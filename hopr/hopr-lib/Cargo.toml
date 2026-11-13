@@ -80,8 +80,14 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-# Opt-in periodic operational state snapshots and transport counters.
-state-dump = ["dep:serde_json"]
+# Opt-in reporter interfaces and public diagnostics for enabled concrete components.
+state-dump = [
+  "dep:serde_json",
+  "hopr-api/serde",
+  "hopr-chain-connector?/state-dump",
+  "hopr-network-graph?/state-dump",
+  "hopr-transport-p2p?/state-dump",
+]
 default = ["pix-bjj", "transport-announce-quic"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
 pix-bjj = ["hopr-transport/pix-bjj"]
@@ -223,7 +229,6 @@ insta = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
-temp-env = { workspace = true }
 serde-saphyr = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

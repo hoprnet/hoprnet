@@ -10,24 +10,12 @@ use hopr_ticket_manager::{
 };
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 
-#[cfg(feature = "state-dump")]
-use crate::testing::state_dump::Factory as TestStateDump;
 use crate::{
     Hopr,
     builder::{ChainKeypair, HoprBuilder, Keypair, OffchainKeypair},
     config::HoprLibConfig,
     errors::HoprLibError,
 };
-#[cfg(not(feature = "state-dump"))]
-type TestStateDump = ();
-
-/// Disabled reporters require only the chain interface already needed by the test builder.
-#[doc(hidden)]
-#[cfg(not(feature = "state-dump"))]
-pub use hopr_chain_connector::api::HoprChainApi as StateDumpRead;
-#[doc(hidden)]
-#[cfg(feature = "state-dump")]
-pub use hopr_chain_connector::state_dump::StateRead as StateDumpRead;
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
@@ -49,10 +37,9 @@ type FullyConfiguredBuilder<Chain> = crate::builder::HoprBuilderConfigured<
     SharedChannelGraph,
     HoprNetwork,
     hopr_ct_full_network::FullNetworkDiscovery<SharedChannelGraph>,
-    TestStateDump,
 >;
 
-/// Assemble the emulated node factories and install the optional test reporter.
+/// Assemble the emulated node factories without installing application-owned reporting policy.
 fn make_builder<Chain>(
     chain_key: &ChainKeypair,
     packet_key: &OffchainKeypair,
@@ -61,7 +48,7 @@ fn make_builder<Chain>(
     chain_connector: Chain,
 ) -> anyhow::Result<FullyConfiguredBuilder<Chain>>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     let path_cfg = config.protocol.path_planner;
     let graph: SharedChannelGraph = Arc::new(
@@ -109,8 +96,6 @@ where
         .with_cover_traffic(move |ctx| {
             hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
         });
-    #[cfg(feature = "state-dump")]
-    let builder = builder.with_state_dump(TestStateDump::default());
     Ok(builder)
 }
 
@@ -131,7 +116,7 @@ pub async fn build_edge_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -171,7 +156,7 @@ pub async fn build_full_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<FullHopr<Chain>>>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -217,7 +202,7 @@ pub async fn build_entry_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
@@ -260,7 +245,7 @@ pub async fn build_exit_with_chain<
     server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
 where
-    Chain: HoprChainApi + StateDumpRead + Clone + Send + Sync + 'static,
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
     if let Some(ref pcfg) = probe_cfg {
         pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;

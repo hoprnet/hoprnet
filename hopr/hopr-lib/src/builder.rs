@@ -224,12 +224,11 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
         }
     }
 
-    /// Adds a named section to every periodic state dump record, for example the states of the
-    /// strategies the embedding node runs. `section` is called once per record and must not block.
+    /// Registers a named state callback for the embedding application's reporter.
     ///
-    /// `name` identifies the producer under `sections` in the JSON record, for example
-    /// `"strategies"` for an application's strategy state observer. It is not a log-level label.
-    /// Sections are ignored when the state dump is disabled (`HOPR_STATE_DUMP_INTERVAL=0`).
+    /// Registration does not invoke `section`. The factory receives the callback and decides when
+    /// to read it and how to serialize its value. The callback must not block. `name` identifies its
+    /// producer, for example `"strategies"`; it is not a log-level label.
     #[cfg(feature = "state-dump")]
     pub fn with_state_dump_section(
         mut self,
@@ -1468,60 +1467,71 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "testing")]
+    #[cfg(all(feature = "testing", feature = "state-dump"))]
     #[rstest::rstest]
-    #[serial_test::serial(state_dump_env)]
-    #[case::disabled("0", true)]
-    #[case::enabled("5", true)]
-    #[case::too_short("4", cfg!(not(feature = "state-dump")))]
-    #[case::too_long("86401", cfg!(not(feature = "state-dump")))]
-    #[case::malformed("invalid", cfg!(not(feature = "state-dump")))]
-    /// Validate reporter intervals only when the state-dump feature installs a reporter.
-    fn state_dump_interval_validation_matches_the_feature(
-        #[case] interval: &str,
-        #[case] valid: bool,
-    ) -> anyhow::Result<()> {
+    #[case::valid(true)]
+    #[case::invalid(false)]
+    /// The builder delegates configuration policy to the supplied reporter before building components.
+    fn state_dump_factory_validation_precedes_component_construction(#[case] valid: bool) -> anyhow::Result<()> {
+        struct ValidatedReporter(bool);
+
+        impl<Chain, Graph, Net> StateDumpFactory<Chain, Graph, Net> for ValidatedReporter {
+            fn prepare(&mut self) -> Result<(), HoprLibError> {
+                if self.0 {
+                    Ok(())
+                } else {
+                    Err(HoprLibError::GeneralError("invalid reporter configuration".into()))
+                }
+            }
+
+            fn create(
+                self,
+                _: Chain,
+                _: Graph,
+                _: Net,
+                _: Address,
+                _: crate::state_dump::StateDumpSections,
+            ) -> Option<crate::state_dump::StateDump> {
+                unreachable!("component construction must fail before reporter creation")
+            }
+        }
+
         type TestBuilder = HoprBuilderConfigured<
             Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
             hopr_network_graph::SharedChannelGraph,
             hopr_transport_p2p::HoprNetwork,
             hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
         >;
-        temp_env::with_var("HOPR_STATE_DUMP_INTERVAL", Some(interval), || {
-            let builder = HoprBuilder
-                .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
-                .with_config(HoprLibConfig::default());
-            let configured = TestBuilder {
-                ctx: builder.ctx,
-                state_dump_factory: (),
-                safe_and_module: None,
-                chain_factory: None,
-                graph_factory: None,
-                network_factory: None,
-                ct_factory: None,
-                peer_discovery_tx: builder.peer_discovery_tx,
-            };
-            #[cfg(feature = "state-dump")]
-            let configured = configured.with_state_dump(crate::testing::state_dump::Factory::default());
-            let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
-            let error =
-                futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
-                    .err()
-                    .context("startup should stop before constructing components")?;
-            if valid {
-                assert!(
-                    matches!(error, HoprLibError::BuilderError("missing chain factory")),
-                    "{error}"
-                );
-            } else {
-                assert!(matches!(error, HoprLibError::GeneralError(_)), "{error}");
-                assert!(
-                    error.to_string().contains("interval") || error.to_string().contains("HOPR_STATE_DUMP_INTERVAL"),
-                    "{error}"
-                );
-            }
-            Ok(())
-        })
+        let builder = HoprBuilder
+            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
+            .with_config(HoprLibConfig::default());
+        let configured = TestBuilder {
+            ctx: builder.ctx,
+            state_dump_factory: (),
+            safe_and_module: None,
+            chain_factory: None,
+            graph_factory: None,
+            network_factory: None,
+            ct_factory: None,
+            peer_discovery_tx: builder.peer_discovery_tx,
+        }
+        .with_state_dump(ValidatedReporter(valid));
+        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
+        let error =
+            futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
+                .err()
+                .context("startup should stop before constructing components")?;
+        if valid {
+            assert!(
+                matches!(error, HoprLibError::BuilderError("missing chain factory")),
+                "{error}"
+            );
+        } else {
+            assert!(
+                matches!(error, HoprLibError::GeneralError(message) if message == "invalid reporter configuration")
+            );
+        }
+        Ok(())
     }
 
     #[rstest::rstest]

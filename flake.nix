@@ -252,7 +252,8 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                    # The explicitly selected `state_dump` integration test requires this opt-in feature.
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                     runNextest = true;
                     testCargoProfile = "ci-test";
                     prependPackageName = false;
@@ -262,7 +263,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --test '*' -j 1
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump --test '*' -j 1
                     runHook postCheck
                   '';
                 });
@@ -305,7 +306,7 @@
                   src = testSrc;
                   # `telemetry` is what compiles the dispatch metrics into the library; without it
                   # the integration coverage of the Start drop paths cannot reach them.
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry";
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry -F hopr-lib/state-dump";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";
