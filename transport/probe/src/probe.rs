@@ -59,19 +59,14 @@ impl ActivePathProbe {
 /// What the sync path-probe cache holds per tag.
 type ActivePathProbeValue = Arc<ActivePathProbe>;
 
-/// How long a timeout verdict waits before it is recorded, so a local drop that is reported after the
-/// tag's TTL can still suppress it.
+/// How long a timeout verdict waits before it is recorded, so a local drop reported after the tag's
+/// TTL can still suppress it.
 ///
-/// The two clocks disagree on purpose: a loopback tag expires after `ProbeConfig::timeout` (3 s by
-/// default, floored at 2 s), while the encode stage may only report a drop after
-/// `PACKET_ENCODING_TIMEOUT` (5 s). Waiting this long past expiry gives every in-flight drop the
-/// chance to settle its probe first.
-///
-/// Four seconds rather than three so the shortest legal tag (2 s) plus this grace *exceeds* the 5 s
-/// encode ceiling with a margin, instead of tying it: a drop that lands exactly on the encode
-/// deadline still settles its probe. That is what lets the shipped 2 s `probe.timeout` configs stay
-/// valid. The cost is that every timeout verdict now reaches the graph four seconds later than on
-/// master — negligible against its 60 s windows, but intended.
+/// A tag expires after `ProbeConfig::timeout` (3 s default, floored at 2 s) while the encode stage
+/// may only report a drop after `PACKET_ENCODING_TIMEOUT` (5 s). Four seconds rather than three so
+/// the shortest legal tag plus the grace *exceeds* 5 s instead of tying it, which keeps the shipped
+/// 2 s `probe.timeout` configs valid. Cost: every timeout verdict reaches the graph 4 s later than
+/// on master — negligible against its 60 s windows, but intended.
 const LOCAL_DROP_GRACE: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// Result of classifying one incoming message through the probe layer.
@@ -495,24 +490,15 @@ impl Probe {
                                                 unreachable!("the message above is always telemetry")
                                             };
 
-                                            // Register the tag *before* sending, not after: the packet can be
-                                            // dropped downstream (routing resolution or encoding) as soon as
-                                            // `send` returns, and that drop has to find the probe to settle it.
+                                            // Register the tag *before* sending: the packet can be dropped
+                                            // downstream as soon as `send` returns, and that drop has to find
+                                            // the probe. Both the drop closure and a failed `send` settle and
+                                            // remove the same key, and both are idempotent, so whichever runs
+                                            // first wins the entry.
                                             //
-                                            // The drop signal carries the tag and the probe's identity through the
-                                            // closure armed below, so the ordering problem becomes a race between
-                                            // idempotent operations on one cache key:
-                                            // * a downstream drop settles and removes the probe it owns;
-                                            // * a failed `send` settles and removes the very entry it inserted.
-                                            // Whichever runs first takes the entry; the other finds only its own
-                                            // entry (if any) and does nothing. Without the pre-insert, a drop
-                                            // landing between send and insert would have found no probe at all.
-                                            //
-                                            // The drop may also arrive *after* the tag's TTL, in which case the
-                                            // entry is already gone and the removal is no longer what silences
-                                            // the timeout. That is why the release settles the shared probe state
-                                            // before removing: even once the eviction listener has seen the
-                                            // entry expire, `settled` keeps its deferred verdict silent.
+                                            // The drop may arrive after the tag's TTL, when the entry is already
+                                            // gone; settling the shared probe state before removing is what
+                                            // keeps the eviction listener's deferred verdict silent.
                                             let tag = Tag::from(tag_value);
                                             let probe = Arc::new(ActivePathProbe {
                                                 telemetry,

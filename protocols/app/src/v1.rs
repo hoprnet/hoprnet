@@ -284,18 +284,13 @@ impl Eq for SurbRefund {}
 /// A callback a sender attaches to an outgoing packet to learn that it was dropped *locally*, before
 /// it left the node.
 ///
-/// A packet that enters the outgoing sink has not necessarily left the node: routing resolution or
-/// encoding can still drop it afterwards (`failed to resolve routing`, `outgoing packet could not be
-/// encoded`). Those sites call [`notify`](Self::notify), so a sender that needs to know — the loopback
-/// prober, whose unanswered tag would otherwise expire and read as a relay timeout — is told without
-/// every drop site having to remember a boolean.
+/// A packet in the outgoing sink may still be dropped by routing resolution or encoding; those sites
+/// call [`notify`](Self::notify). The loopback prober uses it so an unanswered tag does not expire
+/// into a relay timeout.
 ///
-/// It is deliberately separate from [`SurbRefund`]. A refund undoes a SURB the sender counted but
-/// that was never taken; resolution is the only point at which that is true, because it is resolution
-/// that pops a SURB from the store. A packet dropped *after* resolution took its SURB has nothing to
-/// give back — refunding it there would credit a SURB that no longer exists and make the Exit
-/// over-report its stock — yet it is very much a local drop. So the two signals are independent: a
-/// drop site emits whichever of them applies, and the encode stage emits only this one.
+/// Separate from [`SurbRefund`] because the two apply at different points: resolution pops the SURB,
+/// so only there is a refund owed. A packet dropped after resolution has nothing to give back —
+/// refunding it would credit a SURB that no longer exists — yet it is still a local drop.
 #[derive(Clone, Default)]
 pub struct LocalDropSignal(Option<std::sync::Arc<dyn Fn() + Send + Sync + 'static>>);
 
