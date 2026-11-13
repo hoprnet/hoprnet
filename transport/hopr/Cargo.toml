@@ -30,7 +30,9 @@ crate-type = ["rlib"]
 doctest = false
 
 [features]
-default = ["pix-bjj", "p2p-announce-quic"]
+default = ["pix-bjj", "p2p-announce-quic", "tracing-context"]
+# Capture the producer span when enqueueing messages across transport tasks.
+tracing-context = ["hopr-utils-tracing/tracing-context"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
 # Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
 # production settles.
@@ -136,6 +138,7 @@ hopr-utils = { workspace = true, features = [
   "statistics-types",
   "statistics-types-weighted",
 ] }
+hopr-utils-tracing = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
@@ -205,6 +208,11 @@ required-features = ["testing"]
 
 [[bench]]
 name = "protocol_throughput_emulated_bench"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "routing_tracing_bench"
 harness = false
 required-features = ["testing"]
 
