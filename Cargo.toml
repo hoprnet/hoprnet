@@ -143,7 +143,7 @@ validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = { version = "6.1.0" }
-hopr-types = { version = "6.0.0", features = ["use-bindings"] }
+hopr-types = { version = "6.0.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.20.0", default-features = false }
 hopr-utils-session = { version = "1.3.0", path = "utils-session" }
 hopr-utils-tracing = { version = "0.1.0", path = "utils-tracing", default-features = false }

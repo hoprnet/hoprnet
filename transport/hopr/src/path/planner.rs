@@ -2922,6 +2922,26 @@ mod tests {
         paths.1.iter().map(|(vp, _)| vp.to_string()).collect()
     }
 
+    /// Records failed loopbacks on the edge, so the graph's starvation rule reads its relay as dead.
+    ///
+    /// hopr-network-graph 0.12.0 keeps an edge at its loopback rate while the loops over it still
+    /// come back, and that rate floors the SURB traffic rate (hoprnet/hoprnet#8650). A relay that
+    /// drops SURBs and answers loops is deliberately no longer starved, so a test that wants a
+    /// relay the planner must re-weight has to kill its loops as well.
+    ///
+    /// [`mark_edge_full`] records one returned intermediate loop per edge, so the rate is 100 %.
+    /// The default starvation threshold is a 10 % return rate once three loops count, so the
+    /// twelve failures below take the rate to 1/13, under it. They have to be intermediate
+    /// measurements: only those feed the loopback window, an immediate one feeds the link average.
+    fn record_failed_loops(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
+        use hopr_api::graph::traits::EdgeWeightType;
+        graph.upsert_edge(src, dst, |obs| {
+            for _ in 0..12 {
+                obs.record(EdgeWeightType::Intermediate(Err(())));
+            }
+        });
+    }
+
     /// Records `rounds` SURB round-trips on the edge, of which `observed` per round came back.
     fn record_surbs(
         graph: &ChannelGraph,
@@ -2965,6 +2985,9 @@ mod tests {
         record_surbs(&graph, &dest, &pubkey(&SECRET_A), 1_000, 1_000);
         record_surbs(&graph, &dest, &b, 1_000, 1_000);
         record_surbs(&graph, &dest, &b, 4_000, 0);
+        // B's loops stop with its SURBs: a graph that floors the traffic rate at the loopback rate
+        // keeps a relay whose loops still come back (hopr-network-graph 0.12.0).
+        record_failed_loops(&graph, &dest, &b);
 
         let replaced = planner.recompute_paths_from(&dest).await;
         assert_eq!(
@@ -3054,6 +3077,7 @@ mod tests {
         record_surbs(&graph, &dest, &pubkey(&SECRET_A), 1_000, 1_000);
         record_surbs(&graph, &dest, &pubkey(&SECRET_B), 1_000, 1_000);
         record_surbs(&graph, &dest, &pubkey(&SECRET_B), 4_000, 0);
+        record_failed_loops(&graph, &dest, &pubkey(&SECRET_B));
         assert_eq!(
             planner.recompute_paths_from(&dest).await,
             1,
@@ -3125,6 +3149,7 @@ mod tests {
         record_surbs(&graph, &dest, &a, 1_000, 1_000);
         record_surbs(&graph, &dest, &pubkey(&SECRET_B), 1_000, 1_000);
         record_surbs(&graph, &dest, &pubkey(&SECRET_B), 4_000, 0);
+        record_failed_loops(&graph, &dest, &pubkey(&SECRET_B));
         // A second entry in the other direction, which no `dest` recompute may touch.
         let _ = planner
             .cached_paths(
