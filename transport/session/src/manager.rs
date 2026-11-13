@@ -1,7 +1,10 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     pin::Pin,
-    sync::{Arc, Mutex, OnceLock, atomic::Ordering},
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -768,6 +771,49 @@ fn start_session_channel_capacity() -> usize {
 pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
 pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
+
+/// How many of the Exit's idle SURB reports fit into the Entry's slot idle timeout, at the longest.
+///
+/// On an idle Session the Exit's SURB-level reports are the only thing that refreshes the Entry's slot
+/// idle timer (the session cache's `time_to_idle`, [`SessionManagerConfig::idle_timeout`], 180 s by
+/// default): the Entry's own traffic is silent, and each report that arrives touches the slot. The longest
+/// period an idle Session's reports back off to
+/// ([`SessionManagerConfig::surb_idle_notify_period`]) is therefore clamped to a third of the idle
+/// timeout, so that the Entry still sees a report inside every timeout window after losing two of them in
+/// a row.
+const IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT: u32 = 3;
+
+/// How many idle SURB reports an Exit Session sends at the base period before it starts backing off.
+///
+/// Four reports is the first idle minute at the default 15 s. A Session that has only just gone quiet, such
+/// as one between two bursts of an interactive application, therefore keeps the cadence its Entry's
+/// balancer is tuned to for a minute before the Exit begins to spend fewer SURBs on it.
+const IDLE_REPORTS_AT_BASE: u32 = 4;
+
+/// The period an idle Session's SURB report runs at after `idle_reports` idle reports.
+///
+/// `base` for the first [`IDLE_REPORTS_AT_BASE`] of them, and then doubling with every further one until it
+/// reaches `cap`. At the defaults (15 s and 60 s) the gaps between reports run 15, 15, 15, 30, 60, 60, ...
+/// seconds. `cap` is assumed to be above `base`; one that is not simply returns `base`.
+fn backed_off_notify_period(base: Duration, cap: Duration, idle_reports: u32) -> Duration {
+    let doublings = idle_reports.saturating_sub(IDLE_REPORTS_AT_BASE - 1);
+    // Beyond 2^31 the product is past any cap a `Duration` of seconds can hold, and the shift must stay
+    // inside `u32`.
+    let factor = 1u32.checked_shl(doublings.min(31)).unwrap_or(u32::MAX);
+    base.checked_mul(factor).map_or(cap, |period| period.min(cap)).max(base)
+}
+
+/// Marks the Exit Session's keep-alive stream as having seen application data, if it runs one.
+///
+/// Looked up through the slot's [`OnceLock`] on every packet and not captured once, because the data path
+/// is built before [`SessionManager::spawn_exit_keep_alive`] publishes the control; an Exit without a
+/// keep-alive stream (no notification period, no PIX) finds the lock empty and does nothing.
+#[inline]
+fn note_exit_data_activity(activity: &OnceLock<Arc<PixFillControl>>) {
+    if let Some(control) = activity.get() {
+        control.note_data_activity();
+    }
+}
 
 /// Fastest return-path rate a Session is assumed to sustain, in packets per second.
 ///
@@ -1633,6 +1679,18 @@ pub(crate) struct PixFillControl {
     /// See [`set_degraded`](Self::set_degraded). `None` leaves the notification at
     /// [`notify_period`](Self::notify_period) whatever happens to the forward path.
     degraded_notify_period: Option<Duration>,
+    /// The longest period the notification backs off to while the Session is idle, if it may.
+    ///
+    /// `None` unless it is above [`notify_period`](Self::notify_period), since one that is not would back
+    /// off to no slower than it started. See [`with_idle_notify_period`](Self::with_idle_notify_period).
+    idle_notify_period: Option<Duration>,
+    /// Whether application data has moved in either direction since the last SURB-level report.
+    ///
+    /// Written by the data path on every packet, which is why it is an atomic and not part of the locked
+    /// state: the first packet of a burst takes the lock, and the rest only read this.
+    data_since_report: AtomicBool,
+    /// Which kind of Session this stream belongs to, for the `hopr_exit_control_packets_total` label.
+    session_kind: ExitSessionKind,
     /// SURBs that must remain estimated-available before a *fill* packet is let through.
     ///
     /// The *effective* reserve for this Session, not the configured one: the Entry decides how deep
@@ -1680,6 +1738,13 @@ struct PixFillState {
     ///
     /// Set by the same driver, and only while `degraded` is.
     dark: bool,
+    /// How many SURB reports in a row went out on an idle Session, which is what the backoff is a
+    /// function of (see [`backed_off_notify_period`]).
+    ///
+    /// Reset by anything that makes the Session not idle: application data, PIX fill, a degraded forward
+    /// path. A change to it that changes the period must be followed by [`PixFillControl::apply`] under
+    /// the same lock.
+    idle_reports: u32,
 }
 
 impl PixFillControl {
@@ -1700,6 +1765,9 @@ impl PixFillControl {
             // period with no normal one would make the notification run at the degraded cadence for
             // the Session's whole life, which is not what "report faster while degraded" means.
             degraded_notify_period: degraded_notify_period.filter(|_| notify_period.is_some()),
+            idle_notify_period: None,
+            data_since_report: AtomicBool::new(false),
+            session_kind: ExitSessionKind::Plain,
             // Clamped rather than trusted: a `SessionManager` can be built from a config that never
             // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
             // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
@@ -1715,8 +1783,26 @@ impl PixFillControl {
                 draining: false,
                 degraded: false,
                 dark: false,
+                idle_reports: 0,
             }),
         }
+    }
+
+    /// Lets the SURB-level notification back off to `cap` while the Session is idle.
+    ///
+    /// A builder and not a constructor argument, so that [`new`](Self::new) stays within the argument count
+    /// the linter allows and the call sites that have no use for the backoff are untouched. A `cap` that is
+    /// not above the normal period is dropped: it would back off to no slower than it started, which is
+    /// the same as not backing off. See [`admit`](Self::admit) for the rules.
+    fn with_idle_notify_period(mut self, cap: Option<Duration>) -> Self {
+        self.idle_notify_period = cap.filter(|cap| self.notify_period.is_some_and(|base| *cap > base));
+        self
+    }
+
+    /// Labels the packets this stream counts with the kind of Session it belongs to.
+    fn for_session(mut self, session_kind: ExitSessionKind) -> Self {
+        self.session_kind = session_kind;
+        self
     }
 
     /// The notification period the stream is running at, normal or degraded.
@@ -1734,7 +1820,14 @@ impl PixFillControl {
                 degraded => degraded.or(self.notify_period),
             }
         } else {
-            self.notify_period
+            match (self.notify_period, self.idle_notify_period) {
+                // Backed off only while PIX fill is not running: any fill rate, the 60 s heartbeat
+                // included, is the supervisor counting on the stream, and the report keeps its period.
+                (Some(base), Some(cap)) if state.fill.is_zero() => {
+                    Some(backed_off_notify_period(base, cap, state.idle_reports))
+                }
+                (base, _) => base,
+            }
         }
     }
 
@@ -1759,6 +1852,9 @@ impl PixFillControl {
             return;
         }
         state.degraded = on;
+        // A Session in trouble is not idle. Reset before `apply`, so that the rate is derived from the
+        // count that is in force.
+        state.idle_reports = 0;
         self.apply(&state);
     }
 
@@ -1788,6 +1884,25 @@ impl PixFillControl {
     #[cfg(test)]
     pub(crate) fn is_dark(&self) -> bool {
         self.state.lock().dark
+    }
+
+    /// The notification period in force, after the idle backoff.
+    #[cfg(test)]
+    pub(crate) fn notify_period_in_force(&self) -> Option<Duration> {
+        let state = self.state.lock();
+        self.period(&state)
+    }
+
+    /// How many idle SURB reports in a row have gone out.
+    #[cfg(test)]
+    pub(crate) fn idle_reports(&self) -> u32 {
+        self.state.lock().idle_reports
+    }
+
+    /// Whether application data has been seen since the last SURB report.
+    #[cfg(test)]
+    pub(crate) fn data_seen_since_report(&self) -> bool {
+        self.data_since_report.load(Ordering::Relaxed)
     }
 
     /// Whether the notification's initial delay has elapsed.
@@ -1856,8 +1971,83 @@ impl PixFillControl {
         if state.fill == rate {
             return;
         }
+        // The idle count is only meaningful while fill is zero, and starts again from nothing when it
+        // returns there: a Session that has just stopped filling is not one that has been idle.
+        if state.fill.is_zero() != rate.is_zero() {
+            state.idle_reports = 0;
+        }
         state.fill = rate;
         self.apply(&state);
+    }
+
+    /// Notes that application data moved on the Session, in either direction.
+    ///
+    /// The Exit's data path calls this for every packet. It resets the SURB-level report's idle backoff
+    /// at once, rather than at the next report: a Session that has just become busy again must not wait out
+    /// up to a backed-off period (a minute at the defaults) before the Entry's balancer hears from it. See
+    /// [`admit`](Self::admit).
+    ///
+    /// Cheap in the common case: after the first packet since the last report the flag is already set, and
+    /// the call is a single relaxed load.
+    pub(crate) fn note_data_activity(&self) {
+        if self.data_since_report.load(Ordering::Relaxed) {
+            return;
+        }
+        let mut state = self.state.lock();
+        // Under the lock, so that it is ordered against `note_report`'s read of the flag.
+        self.data_since_report.store(true, Ordering::Relaxed);
+        self.reset_idle_reports(&mut state, "application data moved");
+    }
+
+    /// Restarts the idle count, and re-applies the rate if that shortened the period.
+    ///
+    /// Shortening it is the case that matters: [`admit_at`](Self::admit_at) measures the gap since the
+    /// last report against the period in force, so an overdue report is released at once, within the
+    /// rate limiter's re-read interval, as it is for [`set_degraded`](Self::set_degraded).
+    fn reset_idle_reports(&self, state: &mut PixFillState, why: &'static str) {
+        if state.idle_reports == 0 {
+            return;
+        }
+        let before = self.period(state);
+        state.idle_reports = 0;
+        if self.period(state) != before {
+            debug!(
+                session_id = %self.session_id,
+                why,
+                period = ?self.period(state),
+                "reset the exit SURB-level notification to its base period"
+            );
+            self.apply(state);
+        }
+    }
+
+    /// Books an admitted SURB report against the idle count, and re-applies the rate if that changed the
+    /// period.
+    ///
+    /// The report counts as idle only if nothing has moved since the last one: no application data, no
+    /// fill, no degraded forward path, and a stock above the keep-alive reserve. Below the reserve the Exit
+    /// is the one in trouble and the Entry should hear it as often as it ever did.
+    fn note_report(&self, state: &mut PixFillState) {
+        let moved = self.data_since_report.swap(false, Ordering::Relaxed);
+        let idle = !moved
+            && state.fill.is_zero()
+            && !state.degraded
+            && self.estimator.saturating_diff() > current_keep_alive_surb_reserve(&self.surb_mgmt);
+
+        let before = self.period(state);
+        state.idle_reports = if idle { state.idle_reports.saturating_add(1) } else { 0 };
+        let after = self.period(state);
+        if after != before {
+            debug!(
+                session_id = %self.session_id,
+                idle_reports = state.idle_reports,
+                period = ?after,
+                "changed the exit SURB-level notification period"
+            );
+            // Under the lock the count was changed under, so that the stream's rate is never left at a
+            // period `admit_at` no longer agrees with. See the `Idle backoff` section on `admit`.
+            self.apply(state);
+        }
     }
 
     /// The rate the stream is currently running at — the faster of the two producers.
@@ -1966,6 +2156,48 @@ impl PixFillControl {
     /// degraded and keeps the normal period. That holds on PIX Sessions too. PIX fill itself is not affected by
     /// degradation: it keeps its own reserve (`min_surb_reserve`) and is classified and admitted as it is outside
     /// degraded mode.
+    ///
+    /// # Idle backoff
+    ///
+    /// Reports to an idle Session are mostly wasted SURBs, and the Exit pays a ticket for each over a
+    /// multi-hop return path. With an [`idle_notify_period`](Self::idle_notify_period) configured, the
+    /// notification therefore backs off while the Session is idle: the first [`IDLE_REPORTS_AT_BASE`] idle
+    /// reports go out at the base period, and the period then doubles with each one up to the cap (see
+    /// [`backed_off_notify_period`]). The cap is what keeps the Entry's slot alive: these reports are what
+    /// refreshes its idle timer on a Session that carries no data.
+    ///
+    /// A report counts as idle only if nothing moved since the previous one. The backoff holds only while
+    /// all of these do:
+    ///
+    /// * **PIX fill is zero.** Any fill rate, the supervisor's 60 s heartbeat included, keeps the base period, and the
+    ///   count restarts when fill returns to zero.
+    /// * **The Session is not degraded or dark.** Those cadences are shorter on purpose and are not backed off;
+    ///   entering degraded mode restarts the count.
+    /// * **The stock is above the keep-alive reserve** ([`current_keep_alive_surb_reserve`]). At or below it the Exit
+    ///   is the one in trouble, and the Entry should hear it as often as before.
+    /// * **No application data has moved in either direction.** [`note_data_activity`](Self::note_data_activity) is
+    ///   called from the Exit's data path and resets the count at once, so a Session that has become busy does not wait
+    ///   out a backed-off period. The Entry's Start-protocol keep-alives and the SURBs arriving with them do *not*
+    ///   count: the Entry's balancer decay refills an idle Session about once a minute, and counting those would defeat
+    ///   the backoff.
+    ///
+    /// A report that is withheld (no reader, no SURB) leaves the count alone.
+    ///
+    /// ## The rate must follow the period
+    ///
+    /// While fill is zero, the stream's rate must always equal `1 / period()`. This is load-bearing and not
+    /// only an optimisation: a packet the rate limiter releases that is not yet due as a notification falls
+    /// through to the fill branch below and is *sent*, as fill, whenever the stock is above the reserve. A
+    /// rate that is faster than the period in force would therefore send a report early, labelled as fill.
+    /// So every change to the idle count that changes the period is followed by [`apply`](Self::apply) under the
+    /// same lock, as [`note_report`](Self::note_report) and
+    /// [`reset_idle_reports`](Self::reset_idle_reports) do, and a change to the fill rate or to the degraded
+    /// state goes through the same lock in the same way.
+    ///
+    /// A shorter period takes effect within [`MAX_WAIT_CHUNK`], and a report that is already overdue at the new
+    /// period is released at once, because the gap is measured against the period in force (as for
+    /// [`set_degraded`](Self::set_degraded)). A longer one is safe because this runs before the limiter polls for
+    /// the next packet.
     pub(crate) fn admit(&self) -> bool {
         self.admit_at(Instant::now())
     }
@@ -1988,6 +2220,9 @@ impl PixFillControl {
         if notification_due {
             if self.surb_mgmt.counterparty_refills() && self.estimator.saturating_diff() > 0 {
                 state.last_notify_at = Some(now);
+                // Withheld reports never get here, so they leave the idle count alone.
+                self.note_report(&mut state);
+                record_exit_control(ExitControlKind::SurbReport, self.session_kind, ExitControlOutcome::Sent);
                 return true;
             }
 
@@ -2003,6 +2238,7 @@ impl PixFillControl {
             Self::set_withholding(&mut state, false);
             #[cfg(feature = "telemetry")]
             telemetry::record_pix_fill_packet();
+            record_exit_control(ExitControlKind::PixFill, self.session_kind, ExitControlOutcome::Sent);
             return true;
         }
 
@@ -2853,6 +3089,27 @@ pub struct SessionManagerConfig {
     /// Default is None (no notification sent to the client), minimum is 1 second.
     #[default(None)]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// The longest period the Exit's SURB-level report backs off to while the Session is idle.
+    ///
+    /// Each report costs the Exit a SURB, and over a multi-hop return path a ticket, so a Session that
+    /// carries no data should not be reported on as often as a busy one. While no application data moves
+    /// in either direction, the PIX fill is zero and the Session is neither degraded nor down to its SURB
+    /// reserve, the first minute of reports keeps the
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), and the period then doubles with
+    /// every report up to this cap. Application data in either direction brings it back to the base period at
+    /// once.
+    ///
+    /// On an idle Session these reports are also the only thing that refreshes the Entry's slot idle timer, so
+    /// the cap is clamped to a third of [`idle_timeout`](Self::idle_timeout), which lets the Entry survive two
+    /// lost reports; the manager logs a warning when it does. It is floored at
+    /// `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`.
+    ///
+    /// `None` disables the backoff, as does a value that, after clamping, is not above the notification
+    /// period. Default is `None` at this layer, as for the notification period; the node's own default is
+    /// set in the transport configuration.
+    #[default(None)]
+    pub surb_idle_notify_period: Option<Duration>,
 
     /// The period the Exit reports its SURB level at while the Session's forward path is degraded.
     ///
@@ -3762,6 +4019,23 @@ where
     Ok(())
 }
 
+/// Counts the outcome of an Exit-originated control packet's send in `hopr_exit_control_packets_total`.
+///
+/// Passes the result through, so it wraps the `send_via_msg_sender` call it is about.
+fn count_exit_control_send(
+    kind: ExitControlKind,
+    session: ExitSessionKind,
+    result: errors::Result<()>,
+) -> errors::Result<()> {
+    let outcome = if result.is_ok() {
+        ExitControlOutcome::Sent
+    } else {
+        ExitControlOutcome::SendFailed
+    };
+    record_exit_control(kind, session, outcome);
+    result
+}
+
 /// The batch most recently put on the wire by the PIX action driver, with the message that carried it.
 ///
 /// The one thing [`SessionPixAction::ResendSsaRequest`] can send again. See
@@ -4135,6 +4409,32 @@ where
                 normal = ?normal,
                 "the degraded SURB notification period is not faster than the normal one, so it is disabled"
             );
+        }
+        // The idle backoff. Floored like the other periods, and then held to a fraction of the idle
+        // timeout, because on an idle Session these reports are what keeps the Entry's slot alive.
+        if let (Some(cap), Some(normal)) = (cfg.surb_idle_notify_period, cfg.surb_balance_notify_period) {
+            let ceiling =
+                (cfg.idle_timeout / IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT).max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD);
+            let cap = cap.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD);
+            let clamped = cap.min(ceiling);
+            if clamped < cap {
+                warn!(
+                    configured = ?cap,
+                    clamped = ?clamped,
+                    idle_timeout = ?cfg.idle_timeout,
+                    "the idle SURB notification period is longer than a third of the session idle timeout, so it \
+                     is lowered to it: the Entry's slot must survive two lost reports"
+                );
+            }
+            if clamped <= normal {
+                warn!(
+                    idle = ?clamped,
+                    normal = ?normal,
+                    "the idle SURB notification period is not slower than the normal one, so the idle backoff is \
+                     disabled"
+                );
+            }
+            cfg.surb_idle_notify_period = Some(clamped);
         }
         cfg.minimum_surb_buffer_duration = cfg.minimum_surb_buffer_duration.max(MIN_SURB_BUFFER_DURATION);
 
@@ -5576,14 +5876,17 @@ where
                         // either — the batch was confirmed when it was first requested.
                         match myself.msg_sender.get().cloned() {
                             Some(mut msg_sender) => {
-                                if let Err(error) = send_via_msg_sender(
-                                    &mut msg_sender,
-                                    reply_routing.clone(),
-                                    message.clone(),
-                                    "re-sent session SSA commitment request message",
-                                )
-                                .await
-                                {
+                                if let Err(error) = count_exit_control_send(
+                                    ExitControlKind::SsaRequestResend,
+                                    ExitSessionKind::Pix,
+                                    send_via_msg_sender(
+                                        &mut msg_sender,
+                                        reply_routing.clone(),
+                                        message.clone(),
+                                        "re-sent session SSA commitment request message",
+                                    )
+                                    .await,
+                                ) {
                                     tracing::error!(%session_id, %error, "failed to re-send the ssa request");
                                 }
                             }
@@ -5784,15 +6087,23 @@ where
         // Created here and shared: the sink wrapper below has to hold the same control the stream is
         // rate-limited by, so that it can tell a notification packet from a fill packet.
         let controller = RateController::new(0, Duration::from_secs(1));
-        let control = Arc::new(PixFillControl::new(
-            session_id,
-            controller.clone(),
-            notify_period,
-            degraded_period,
-            min_surb_reserve,
-            slot.surb_estimator.clone(),
-            slot.surb_mgmt.clone(),
-        ));
+        let control = Arc::new(
+            PixFillControl::new(
+                session_id,
+                controller.clone(),
+                notify_period,
+                degraded_period,
+                min_surb_reserve,
+                slot.surb_estimator.clone(),
+                slot.surb_mgmt.clone(),
+            )
+            .with_idle_notify_period(self.cfg.surb_idle_notify_period)
+            .for_session(if is_pix {
+                ExitSessionKind::Pix
+            } else {
+                ExitSessionKind::Plain
+            }),
+        );
 
         let control_for_admission = control.clone();
         let surb_estimator = slot.surb_estimator.clone();
@@ -5978,7 +6289,10 @@ where
             warn!(%session_id, %reason, context, "cannot send session error - manager not started");
             return;
         };
-        match send_via_msg_sender(
+        // Counted only when the Exit sends it: the Entry's own errors go forward over a path it pays for
+        // itself. The Exit sends one only to end a PIX Session, which is why the Session is `Pix`.
+        let exit_sends = matches!(routing, DestinationRouting::Return(_));
+        let sent = send_via_msg_sender(
             &mut msg_sender,
             routing,
             HoprStartProtocol::SessionError(StartErrorType {
@@ -5987,8 +6301,13 @@ where
             }),
             context,
         )
-        .await
-        {
+        .await;
+        let sent = if exit_sends {
+            count_exit_control_send(ExitControlKind::SessionError, ExitSessionKind::Pix, sent)
+        } else {
+            sent
+        };
+        match sent {
             Ok(()) => {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
@@ -6112,13 +6431,18 @@ where
             deposit_data,
         ));
 
-        send_via_msg_sender(
-            &mut msg_sender,
-            slot.routing_opts.clone(),
-            data.clone(),
-            "session SSA commitment request message",
+        // Only PIX Sessions ask for SSA commitments.
+        count_exit_control_send(
+            ExitControlKind::SsaRequest,
+            ExitSessionKind::Pix,
+            send_via_msg_sender(
+                &mut msg_sender,
+                slot.routing_opts.clone(),
+                data.clone(),
+                "session SSA commitment request message",
+            )
+            .await,
         )
-        .await
         .map_err(TransportSessionError::packet_sending)?;
 
         Ok((guards, data))
@@ -6176,17 +6500,21 @@ where
             "re-requesting the SSA commitment parts that did not arrive"
         );
 
-        send_via_msg_sender(
-            &mut msg_sender,
-            slot.routing_opts.clone(),
-            HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
-                session_id,
-                params,
-                [(ssa_id.ssa_index(), runs)],
-            )),
-            "ssa commitment retransmission request",
+        count_exit_control_send(
+            ExitControlKind::CommitmentRetransmissionRequest,
+            ExitSessionKind::Pix,
+            send_via_msg_sender(
+                &mut msg_sender,
+                slot.routing_opts.clone(),
+                HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
+                    session_id,
+                    params,
+                    [(ssa_id.ssa_index(), runs)],
+                )),
+                "ssa commitment retransmission request",
+            )
+            .await,
         )
-        .await
         .map_err(TransportSessionError::packet_sending)?;
 
         Ok(())
@@ -7451,6 +7779,10 @@ where
 
             let surb_estimator_tx = slot.surb_estimator.clone();
             let surb_estimator_rx = slot.surb_estimator.clone();
+            // Looked up per packet and not here: `spawn_exit_keep_alive` publishes the control after
+            // this data path is built.
+            let activity_tx = slot.pix_fill.clone();
+            let activity_rx = slot.pix_fill.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
             // so the egress path never has to look inside the `OnceLock` again.
             let egress_gate = slot.pix_egress_gate.get().cloned();
@@ -7475,11 +7807,20 @@ where
                         self.cfg.surb_balance_notify_period.is_some() || pix.is_some(),
                     )
                     .rate_limit_with_controller(&egress_rate_control)
-                    .buffer((2 * target_surb_buffer_size) as usize),
+                    .buffer((2 * target_surb_buffer_size) as usize)
+                    // Outermost, so that it runs when the Session's write enters the chain: ahead of the
+                    // buffer and of the limiter, which holds a reply while the SURB stock is thin. That is
+                    // when the Entry most needs to hear the base cadence, so it must not wait for the
+                    // release.
+                    .with(move |item: EgressItem| {
+                        note_exit_data_activity(&activity_tx);
+                        futures::future::ready(Ok::<_, std::io::Error>(item))
+                    }),
                     // Received packets = SURB retrieval estimate. Session data packets only: the
                     // SURBs of a Start message, a keep-alive among them, are booked by
                     // `book_start_message_surbs`, from `dispatch_message`.
                     session_rx.inspect(move |data| {
+                        note_exit_data_activity(&activity_rx);
                         // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
                         let evicted = data.packet_info.num_evicted_surbs as u64;
@@ -7546,6 +7887,8 @@ where
             let egress_gate = slot.pix_egress_gate.get().cloned();
             let surb_estimator_tx = slot.surb_estimator.clone();
             let surb_estimator_rx = slot.surb_estimator.clone();
+            let activity_tx = slot.pix_fill.clone();
+            let activity_rx = slot.pix_fill.clone();
             let session = HoprSession::new_with_surb_state(
                 session_id,
                 reply_routing.clone(),
@@ -7553,6 +7896,7 @@ where
                 (
                     msg_sender.clone().sink_map_err(std::io::Error::other).with(
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            note_exit_data_activity(&activity_tx);
                             // Counted here too, though nothing on this branch balances anything. The
                             // estimate is what the fill reserve is measured against, and a reserve
                             // measured against a counter that only ever counts in one direction is a
@@ -7566,6 +7910,7 @@ where
                         },
                     ),
                     session_rx.inspect(move |data| {
+                        note_exit_data_activity(&activity_rx);
                         // SURBs saved into the store, and older ones the full store evicted to make room.
                         let produced = data.num_surbs_with_msg() as u64;
                         let evicted = data.packet_info.num_evicted_surbs as u64;
@@ -7628,13 +7973,17 @@ where
             session_id,
         });
 
-        send_via_msg_sender(
-            &mut msg_sender,
-            reply_routing.clone(),
-            data,
-            "session establishment message",
-        )
-        .await?;
+        count_exit_control_send(
+            ExitControlKind::SessionEstablished,
+            ExitSessionKind::of(session_req.capabilities.0),
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing.clone(),
+                data,
+                "session establishment message",
+            )
+            .await,
+        )?;
 
         #[cfg(feature = "telemetry")]
         initialize_session_telemetry(
@@ -11563,6 +11912,598 @@ mod tests {
             .produced
             .fetch_add(stock, std::sync::atomic::Ordering::Relaxed);
         control
+    }
+
+    // ---------------------------------------------------------------
+    // The idle backoff of the SURB-level report
+    // ---------------------------------------------------------------
+
+    /// SURBs the idle fixtures hold. Above their keep-alive reserve (32, for the 3 200-SURB target the fixture
+    /// announces), which is what makes a report an idle one.
+    const IDLE_STOCK: u64 = 100;
+
+    /// A [`PixFillControl`] with the idle backoff on, started, and with the Entry shown as a reader.
+    ///
+    /// The fill reserve is out of reach of the stock, so the fill branch withholds every packet and `admit_at`
+    /// is true exactly when it classifies the packet as the notification: a test can then ask "is a report due
+    /// now?" without a fill packet answering for it.
+    fn fill_control_idle(base: Duration, cap: Duration, stock: u64) -> PixFillControl {
+        let surb_mgmt = balancer_with_target(3_200);
+        let control = PixFillControl::new(
+            HoprPseudonym::random(),
+            RateController::new(0, Duration::from_secs(1)),
+            Some(base),
+            None,
+            u64::MAX,
+            Default::default(),
+            surb_mgmt,
+        )
+        .with_idle_notify_period(Some(cap))
+        .for_session(ExitSessionKind::Plain);
+        control.estimator.produced.fetch_add(stock, Ordering::Relaxed);
+        control.start_notify();
+        control
+    }
+
+    /// How early before its period a report counts as due (see the classification rule on `admit`).
+    fn due_slack(control: &PixFillControl, period: Duration) -> Duration {
+        MAX_WAIT_CHUNK.min(period / if control.is_degraded() { 10 } else { 2 })
+    }
+
+    /// Lets the next report out at `from` plus the period in force, checking that it is not due before then,
+    /// and returns when it went out together with the period it waited.
+    fn next_report(control: &PixFillControl, from: Instant) -> anyhow::Result<(Instant, Duration)> {
+        let period = control
+            .notify_period_in_force()
+            .context("the control must have a notification period")?;
+        let early = from + period.saturating_sub(due_slack(control, period) + Duration::from_millis(1));
+        anyhow::ensure!(
+            !control.admit_at(early),
+            "a report went out at {early:?}, before the period of {period:?} that was in force"
+        );
+        let due = from + period;
+        anyhow::ensure!(
+            control.admit_at(due),
+            "no report was due after the period of {period:?} that was in force"
+        );
+        Ok((due, period))
+    }
+
+    /// The gaps between `count` consecutive reports after the first one at `start`.
+    fn report_gaps(control: &PixFillControl, start: Instant, count: usize) -> anyhow::Result<Vec<Duration>> {
+        anyhow::ensure!(control.admit_at(start), "the first report is due at once");
+        let mut at = start;
+        let mut gaps = Vec::with_capacity(count);
+        for _ in 0..count {
+            let (next, gap) = next_report(control, at)?;
+            at = next;
+            gaps.push(gap);
+        }
+        Ok(gaps)
+    }
+
+    fn secs(values: &[u64]) -> Vec<Duration> {
+        values.iter().copied().map(Duration::from_secs).collect()
+    }
+
+    /// The first idle minute stays at the base period, so a Session that has just gone quiet is not slowed
+    /// down at once; then each report doubles the period until the cap.
+    #[test]
+    fn an_idle_session_reports_four_times_at_the_base_period_then_doubles_up_to_the_cap() -> anyhow::Result<()> {
+        let control = fill_control_idle(Duration::from_secs(15), Duration::from_secs(60), IDLE_STOCK);
+
+        // Reports at 0, 15, 30 and 45 s are the first minute; the fifth waits 30 s and the sixth 60 s.
+        let gaps = report_gaps(&control, Instant::now(), 7)?;
+
+        assert_eq!(secs(&[15, 15, 15, 30, 60, 60, 60]), gaps);
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+        Ok(())
+    }
+
+    /// The last step is the cap, not the next power of two of the base: a cap that is not one is reached
+    /// exactly rather than overshot or skipped.
+    #[test]
+    fn the_idle_backoff_stops_at_a_cap_that_is_not_a_power_of_two_of_the_base() -> anyhow::Result<()> {
+        let control = fill_control_idle(Duration::from_secs(10), Duration::from_secs(45), IDLE_STOCK);
+
+        let gaps = report_gaps(&control, Instant::now(), 7)?;
+
+        assert_eq!(secs(&[10, 10, 10, 20, 40, 45, 45]), gaps);
+        Ok(())
+    }
+
+    /// Application data brings a backed-off report back to the base period at once, and the count starts over.
+    #[test]
+    fn application_data_resets_a_backed_off_report_to_the_base_period_and_restarts_the_count() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 6)?;
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+
+        control.note_data_activity();
+
+        assert_eq!(Some(base), control.notify_period_in_force(), "the reset is prompt");
+        assert_eq!(0, control.idle_reports());
+        assert_eq!(
+            FillRate::once_per(base),
+            control.effective_rate(),
+            "the rate follows the period"
+        );
+
+        // The report that finds the data does not count as idle, so four more at the base period follow it
+        // before the next doubling.
+        let t1 = t0 + Duration::from_secs(300);
+        assert_eq!(secs(&[15, 15, 15, 15, 30]), report_gaps(&control, t1, 5)?);
+        Ok(())
+    }
+
+    /// A report that has gone overdue at the backed-off period is released by the reset at once, as the
+    /// degraded cadence is. Without it the Entry would wait out the rest of a minute for the first report of a
+    /// Session that has just become busy.
+    #[test]
+    fn a_reset_releases_an_overdue_report_at_once() -> anyhow::Result<()> {
+        let control = fill_control_idle(Duration::from_secs(15), Duration::from_secs(60), IDLE_STOCK);
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 6)?;
+        // Backed off at 60 s, so a report 20 s after the last is not due.
+        let last = t0 + Duration::from_secs(15 * 3 + 30 + 60 + 60);
+        let twenty_later = last + Duration::from_secs(20);
+        assert!(!control.admit_at(twenty_later));
+
+        control.note_data_activity();
+
+        assert!(
+            control.admit_at(twenty_later),
+            "twenty seconds is past the base period, so the report is overdue"
+        );
+        Ok(())
+    }
+
+    /// Data that arrives between reports means the interval was not idle, so the period never leaves the base.
+    #[test]
+    fn data_between_reports_keeps_the_base_period() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        let mut at = Instant::now();
+        assert!(control.admit_at(at));
+
+        for _ in 0..10 {
+            control.note_data_activity();
+            let (next, period) = next_report(&control, at)?;
+            at = next;
+            assert_eq!(base, period);
+            assert_eq!(0, control.idle_reports());
+        }
+        Ok(())
+    }
+
+    /// While PIX fill runs the stream is the supervisor's, and the report keeps its period: the 60 s heartbeat
+    /// counts, because it is the rate the supervisor asked for and the Entry's slot does not hear a quieter one.
+    #[test]
+    fn no_backoff_while_pix_fill_runs() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        control.set_fill(FillRate::once_per(Duration::from_secs(60)));
+
+        let gaps = report_gaps(&control, Instant::now(), 10)?;
+
+        assert_eq!(vec![base; 10], gaps);
+        assert_eq!(0, control.idle_reports());
+        assert_eq!(FillRate::once_per(base), control.effective_rate());
+        Ok(())
+    }
+
+    /// The count starts from nothing whenever fill returns to zero, and fill starting resets a backed-off
+    /// stream to the base period straight away.
+    #[test]
+    fn the_idle_count_restarts_when_fill_stops() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 6)?;
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+
+        control.set_fill(FillRate::once_per(Duration::from_secs(60)));
+        assert_eq!(Some(base), control.notify_period_in_force());
+        assert_eq!(0, control.idle_reports());
+
+        control.set_fill(FillRate::ZERO);
+        assert_eq!(
+            Some(base),
+            control.notify_period_in_force(),
+            "fill stopping is not idleness yet"
+        );
+        assert_eq!(FillRate::once_per(base), control.effective_rate());
+
+        assert_eq!(
+            secs(&[15, 15, 15, 30]),
+            report_gaps(&control, t0 + Duration::from_secs(600), 4)?
+        );
+        Ok(())
+    }
+
+    /// A degraded forward path reports at its own cadence and is never backed off; entering it restarts the
+    /// count, and leaving it does not resume where it was.
+    #[test]
+    fn no_backoff_while_degraded() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = {
+            let control = PixFillControl::new(
+                HoprPseudonym::random(),
+                RateController::new(0, Duration::from_secs(1)),
+                Some(base),
+                Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+                u64::MAX,
+                Default::default(),
+                balancer_with_target(3_200),
+            )
+            .with_idle_notify_period(Some(Duration::from_secs(60)));
+            control.estimator.produced.fetch_add(IDLE_STOCK, Ordering::Relaxed);
+            control.start_notify();
+            control
+        };
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 6)?;
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+
+        control.set_degraded(true);
+        assert_eq!(0, control.idle_reports(), "a Session in trouble is not idle");
+        let gaps = report_gaps(&control, t0 + Duration::from_secs(600), 10)?;
+        assert_eq!(vec![MIN_SURB_BUFFER_NOTIFICATION_PERIOD; 10], gaps);
+        assert_eq!(0, control.idle_reports());
+
+        control.set_degraded(false);
+        assert_eq!(Some(base), control.notify_period_in_force());
+        Ok(())
+    }
+
+    /// At or below the keep-alive reserve the Exit is the one in trouble, and the Entry hears it as often as
+    /// before; above it the same Session backs off.
+    #[test]
+    fn no_backoff_at_or_below_the_keep_alive_reserve() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), 32);
+        assert_eq!(32, current_keep_alive_surb_reserve(&control.surb_mgmt));
+        let t0 = Instant::now();
+
+        assert_eq!(vec![base; 8], report_gaps(&control, t0, 8)?);
+        assert_eq!(0, control.idle_reports());
+
+        control.estimator.produced.fetch_add(1, Ordering::Relaxed);
+        assert_eq!(
+            secs(&[15, 15, 15, 30, 60]),
+            report_gaps(&control, t0 + Duration::from_secs(600), 5)?,
+            "one SURB above the reserve is idle again, and counts from its first report"
+        );
+        Ok(())
+    }
+
+    /// A cap that is not above the base period would back off to no slower than it started, so it is no
+    /// backoff at all.
+    #[test]
+    fn a_cap_at_or_below_the_base_period_disables_the_backoff() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        for cap in [Duration::from_secs(15), Duration::from_secs(10)] {
+            let control = fill_control_idle(base, cap, IDLE_STOCK);
+            assert_eq!(None, control.idle_notify_period);
+            assert_eq!(vec![base; 8], report_gaps(&control, Instant::now(), 8)?);
+        }
+        Ok(())
+    }
+
+    /// SURBs arriving are not application data: the Entry's balancer decay refills an idle Session about once
+    /// a minute, and counting those would keep every Session at the base period.
+    #[test]
+    fn surb_arrivals_do_not_reset_the_backoff() -> anyhow::Result<()> {
+        let control = fill_control_idle(Duration::from_secs(15), Duration::from_secs(60), IDLE_STOCK);
+        let mut at = Instant::now();
+        assert!(control.admit_at(at));
+
+        for _ in 0..7 {
+            control.estimator.produced.fetch_add(8, Ordering::Relaxed);
+            at = next_report(&control, at)?.0;
+        }
+
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+        assert!(!control.data_seen_since_report());
+        Ok(())
+    }
+
+    /// A report that is withheld for want of a SURB neither advances the count nor resets it.
+    #[test]
+    fn a_withheld_report_does_not_advance_the_idle_count() -> anyhow::Result<()> {
+        let control = fill_control_idle(Duration::from_secs(15), Duration::from_secs(60), IDLE_STOCK);
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 2)?;
+        assert_eq!(3, control.idle_reports());
+
+        control.estimator.consumed.fetch_add(IDLE_STOCK, Ordering::Relaxed);
+        let later = t0 + Duration::from_secs(600);
+        assert!(!control.admit_at(later), "no SURB to send a report on");
+        assert_eq!(3, control.idle_reports());
+
+        control.estimator.produced.fetch_add(IDLE_STOCK, Ordering::Relaxed);
+        assert!(control.admit_at(later));
+        assert_eq!(4, control.idle_reports());
+        Ok(())
+    }
+
+    /// Reports and fill are counted under their own kinds, with the Session kind of the stream.
+    #[test]
+    fn admitted_reports_and_fill_are_counted_as_exit_control_packets() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let control = PixFillControl::new(
+            HoprPseudonym::random(),
+            RateController::new(0, Duration::from_secs(1)),
+            Some(Duration::from_secs(15)),
+            None,
+            10,
+            Default::default(),
+            balancer_with_target(3_200),
+        )
+        .for_session(ExitSessionKind::Pix);
+        control.estimator.produced.fetch_add(IDLE_STOCK, Ordering::Relaxed);
+        control.start_notify();
+        let now = Instant::now();
+
+        assert!(control.admit_at(now));
+        assert_eq!(1, probe::get("exit_control/surb_report/pix/sent"));
+        assert_eq!(0, probe::get("exit_control/pix_fill/pix/sent"));
+
+        // Not due again for 15 s, so the next packet is fill, which the stock above the reserve admits.
+        control.set_fill(FillRate::per_second(5));
+        assert!(control.admit_at(now + Duration::from_secs(1)));
+        assert_eq!(1, probe::get("exit_control/pix_fill/pix/sent"));
+        assert_eq!(1, probe::get("exit_control/surb_report/pix/sent"));
+        Ok(())
+    }
+
+    /// The idle period is floored like the others, and held to a third of the idle timeout, because on an idle
+    /// Session the reports are what refresh the Entry's slot.
+    #[test]
+    fn the_idle_notify_period_is_floored_and_clamped_to_a_third_of_the_idle_timeout() {
+        let manager = |idle: Option<Duration>, base: Option<Duration>| {
+            RecordingManager::new(SessionManagerConfig {
+                surb_balance_notify_period: base,
+                surb_idle_notify_period: idle,
+                idle_timeout: Duration::from_secs(180),
+                ..Default::default()
+            })
+            .cfg
+            .surb_idle_notify_period
+        };
+        let base = Some(Duration::from_secs(15));
+
+        assert_eq!(
+            Some(Duration::from_secs(60)),
+            manager(Some(Duration::from_secs(600)), base)
+        );
+        assert_eq!(
+            Some(Duration::from_secs(60)),
+            manager(Some(Duration::from_secs(60)), base)
+        );
+        assert_eq!(
+            Some(Duration::from_secs(45)),
+            manager(Some(Duration::from_secs(45)), base)
+        );
+        assert_eq!(
+            Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+            manager(Some(Duration::from_millis(100)), base)
+        );
+        assert_eq!(None, manager(None, base));
+    }
+
+    /// The idle backoff of the real stream: an idle Exit Session slows its reports to the cap, an Entry's
+    /// keep-alive carrying SURBs does not undo that, and application data does.
+    ///
+    /// The base is one second and the cap four, so the backoff is reached in about ten seconds: reports at 1,
+    /// 2, 3 and 4 s, then gaps of 2 and 4 s. The windows leave a period of margin either side of what they
+    /// assert.
+    #[test_log::test(tokio::test)]
+    async fn an_idle_exit_session_backs_its_reports_off_until_data_moves() -> anyhow::Result<()> {
+        let cap = Duration::from_secs(4);
+        let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capabilities::empty(),
+            64,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+                surb_idle_notify_period: Some(cap),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let control = mgr
+            .sessions
+            .get(&pseudonym)
+            .and_then(|slot| slot.pix_fill.get().cloned())
+            .context("an Exit Session with a notification period steers a fill control")?;
+        let mut incoming = new_session_rx.next().await.context("the Session was announced")?;
+
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        // Far above the keep-alive reserve (16 for the 64-SURB target), so every report is an idle one.
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(10_000, Ordering::Relaxed);
+
+        timeout(Duration::from_secs(30), async {
+            while control.notify_period_in_force() != Some(cap) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("an idle Session never backed its reports off to the cap")?;
+        while msg_rx.try_recv().is_ok() {}
+
+        // At most one in 3.5 s: a window that starts late on a loaded runner can reach the next report,
+        // while a base period of one second would give three.
+        let window = Duration::from_millis(3_500);
+        let idle = level_reports_during(&mut msg_rx, pseudonym, window).await;
+        assert!(
+            idle.len() <= 1,
+            "a Session whose period is {cap:?} sent {} report(s) in {window:?}: {idle:?}",
+            idle.len()
+        );
+
+        // The Entry's refill keep-alive carries SURBs and is not application data.
+        dispatch_entry_keep_alive(&mgr, pseudonym, None.into(), ENTRY_SURBS, 0)?;
+        wait_for_counterparty_refills(&mgr, &pseudonym).await?;
+        assert_eq!(Some(cap), control.notify_period_in_force());
+        assert!(!control.data_seen_since_report());
+
+        // Application data is.
+        incoming.session.write_all(b"ping").await?;
+        incoming.session.flush().await?;
+        assert_eq!(
+            Some(KEEP_ALIVE_PERIOD),
+            control.notify_period_in_force(),
+            "data must bring the base period back at once"
+        );
+        while msg_rx.try_recv().is_ok() {}
+        let busy = level_reports_during(&mut msg_rx, pseudonym, REPORT_WINDOW).await;
+        assert!(
+            busy.len() >= 2,
+            "a Session that has just moved data must report at the base period again, but {} report(s) arrived over \
+             {REPORT_WINDOW:?}: {busy:?}",
+            busy.len()
+        );
+        Ok(())
+    }
+
+    /// Application data counts as activity whichever way it goes, and on a `NoRateControl` Session as on a
+    /// rate-controlled one.
+    #[rstest::rstest]
+    #[case::rate_controlled_outbound(Capabilities::empty(), false)]
+    #[case::rate_controlled_inbound(Capabilities::empty(), true)]
+    #[case::no_rate_control_outbound(Capability::NoRateControl.into(), false)]
+    #[case::no_rate_control_inbound(Capability::NoRateControl.into(), true)]
+    #[test_log::test(tokio::test)]
+    async fn exit_session_data_is_noted_as_activity_in_either_direction(
+        #[case] capabilities: Capabilities,
+        #[case] inbound: bool,
+    ) -> anyhow::Result<()> {
+        let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            capabilities,
+            64,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+                surb_idle_notify_period: Some(Duration::from_secs(4)),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let control = mgr
+            .sessions
+            .get(&pseudonym)
+            .and_then(|slot| slot.pix_fill.get().cloned())
+            .context("an Exit Session with a notification period steers a fill control")?;
+        let mut incoming = new_session_rx.next().await.context("the Session was announced")?;
+
+        // Start-protocol traffic, SURBs included, is not application data.
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        assert!(
+            !control.data_seen_since_report(),
+            "fixture: nothing but a keep-alive has moved"
+        );
+
+        if inbound {
+            mgr.dispatch_message(pseudonym, session_data_packet(b"hello")?)?;
+            let mut buffer = [0u8; 16];
+            timeout(
+                Duration::from_secs(5),
+                futures::AsyncReadExt::read(&mut incoming.session, &mut buffer),
+            )
+            .await
+            .context("the Session never read the packet")??;
+        } else {
+            // No SURB top-up: a rate-controlled Session releases data at the rate its balancer sets, which
+            // with a stock of three against a target of 64 is a trickle, so the limiter may well still be
+            // holding the packet when this gives up. The write must be noted when it enters the chain,
+            // not when the limiter lets it go, so the flush is not waited for beyond a short while.
+            let _ = timeout(Duration::from_millis(300), async {
+                incoming.session.write_all(b"hello").await?;
+                incoming.session.flush().await
+            })
+            .await;
+            if !capabilities.contains(Capability::NoRateControl) {
+                // Judged by what left the Exit and not by its SURB count, which the Exit's own reports
+                // also move. Reports are Start-protocol keep-alives and are ignored here.
+                let mut released = 0;
+                while let Ok((_, data)) = msg_rx.try_recv() {
+                    released += usize::from(data.data.application_tag == SESSION_APPLICATION_TAG);
+                }
+                assert_eq!(
+                    0, released,
+                    "fixture: the limiter must still be holding the packet, or this does not show that the write is \
+                     noted before it"
+                );
+            }
+        }
+
+        assert!(
+            control.data_seen_since_report(),
+            "data {} the Exit must be noted as activity",
+            if inbound { "reaching" } else { "leaving" }
+        );
+        Ok(())
+    }
+
+    /// The packets an Exit PIX Session originates are counted under their kinds: the establishment, the
+    /// request for the Entry's commitments, and the reports and fill on the keep-alive stream.
+    #[test_log::test(tokio::test)]
+    async fn exit_originated_pix_control_packets_are_counted() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (mgr, mut msg_rx, pseudonym) = recovering_exit_pix_session(
+            Capabilities::empty(),
+            Some(Duration::from_secs(1)),
+            crate::supervision::PixFillConfig {
+                min_surb_reserve: 1,
+                drain_after_close: false,
+                ..Default::default()
+            },
+            None,
+        )
+        .await?;
+        {
+            let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+            slot.surb_mgmt.note_counterparty_refills();
+            slot.surb_estimator.produced.fetch_add(100_000, Ordering::Relaxed);
+        }
+
+        let _ = originated_during(&mut msg_rx, Duration::from_millis(3_500)).await;
+
+        for series in [
+            "exit_control/session_established/pix/sent",
+            "exit_control/ssa_request/pix/sent",
+            "exit_control/surb_report/pix/sent",
+            "exit_control/pix_fill/pix/sent",
+        ] {
+            assert!(probe::get(series) > 0, "{series} was never counted");
+        }
+        Ok(())
     }
 
     /// The `surb_starved` gauge moves on the edges, and a control dropped mid-stall returns it.

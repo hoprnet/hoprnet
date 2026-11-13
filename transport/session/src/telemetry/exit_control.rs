@@ -13,7 +13,7 @@
 //!
 //! | Metric | Type | Unit | Updated at | Labels |
 //! | --- | --- | --- | --- | --- |
-//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is sent, dropped for want of budget, or fails to send | `kind` = `refusal_*` (one per [`ExitControlKind`]), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
+//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is sent, dropped for want of budget, or fails to send; an admitted Session's report, fill, establishment, SSA request, SSA re-send, commitment retransmission request or session error is sent or fails to send | `kind` = one per [`ExitControlKind`] (`refusal_*`, `surb_report`, `pix_fill`, `session_established`, `ssa_request`, `ssa_request_resend`, `commitment_retransmission_request`, `session_error`), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
 //!
 //! This counts packets and not their cost. The SURB a reply travels over, and with it the path
 //! length and the ticket, is chosen later in the packet pipeline, so the spend cannot be known here.
@@ -27,12 +27,19 @@
 //! sum by (kind) (rate(hopr_exit_control_packets_total{outcome="dropped_budget"}[5m]))
 //! ```
 //!
+//! *What an idle Session costs.* Reports on Sessions that move no data fall as the idle backoff takes hold; a
+//! rate that stays near one per base period per Session means it is off or the Sessions are not idle:
+//!
+//! ```promql
+//! sum by (session) (rate(hopr_exit_control_packets_total{kind="surb_report",outcome="sent"}[5m]))
+//! ```
+//!
 //! *Share of refusals answered.* Near one is an Exit that is only occasionally refusing; a falling
 //! value is one being asked to refuse more than it will pay to answer:
 //!
 //! ```promql
-//! sum(rate(hopr_exit_control_packets_total{outcome="sent"}[5m]))
-//!   / sum(rate(hopr_exit_control_packets_total[5m]))
+//! sum(rate(hopr_exit_control_packets_total{kind=~"refusal_.*",outcome="sent"}[5m]))
+//!   / sum(rate(hopr_exit_control_packets_total{kind=~"refusal_.*"}[5m]))
 //! ```
 
 use crate::exit_control::{ExitControlKind, ExitControlOutcome, ExitSessionKind};

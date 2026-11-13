@@ -153,11 +153,8 @@ impl RefusalReplyBucket {
 /// What a packet the Exit sent on a peer's behalf was for, as `hopr_exit_control_packets_total`
 /// labels it.
 ///
-/// Closed, so that no call site can invent a label value. Kinds are added here as further packets
-/// the Exit pays for are counted.
-// Every kind is a refusal for now, which the lint reads as a redundant prefix. The prefix is the label
-// value, and the other kinds this enum is for will not share it.
-#[allow(clippy::enum_variant_names)]
+/// Closed, so that no call site can invent a label value. The `Refusal*` kinds answer a
+/// `StartSession` that was declined; the others are what an admitted Session makes the Exit send.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum ExitControlKind {
@@ -175,6 +172,22 @@ pub(crate) enum ExitControlKind {
     RefusalNoSessionSlot,
     /// A refusal because the node could not decide right now.
     RefusalBusy,
+    /// The SURB-level report that tells the Entry's balancer how many SURBs the Exit holds.
+    ///
+    /// Backs off on an idle Session, see [`PixFillControl::admit`](crate::manager::PixFillControl::admit).
+    SurbReport,
+    /// A packet of the Exit's own PIX fill, sent above the report rate.
+    PixFill,
+    /// The `SessionEstablished` that answers an admitted `StartSession`.
+    SessionEstablished,
+    /// The first request for the Entry's SSA commitments.
+    SsaRequest,
+    /// The same SSA request, sent again because no answer came.
+    SsaRequestResend,
+    /// A request for the parts of one SSA's commitment that never arrived.
+    CommitmentRetransmissionRequest,
+    /// A `SessionError` about an established Session, sent over its return path.
+    SessionError,
 }
 
 impl From<PixAdmissionRejection> for ExitControlKind {
