@@ -1,44 +1,26 @@
-//! Node-level instruments for the packets the Exit pays for on a peer's behalf.
+//! Node-level instruments for the packets the Exit pays for on a peer's behalf. Bookkeeping is in
+//! [`crate::exit_control`]; this is the emission boundary, taking closed enums for labels.
 //!
-//! The bookkeeping lives in [`crate::exit_control`] and is compiled unconditionally; this module is
-//! only the emission boundary, taking closed enums so that no call site can invent a label value.
-//!
-//! # Prefix
-//!
-//! These use `hopr_exit_*` rather than `hopr_session_*` for the reason `hopr_pix_*` does: the
-//! `hopr_session_*` prefix is routed to the OTLP-only meter provider and does not appear on the
-//! Prometheus `/metrics` endpoint (see `OTLP.md`), while an Exit operator wants to alert on this one.
+//! These use `hopr_exit_*` rather than `hopr_session_*` because the latter is routed to the OTLP-only
+//! provider (see `OTLP.md`), and an Exit operator wants to alert on this on `/metrics`.
 //!
 //! # Metric contract
 //!
 //! | Metric | Type | Unit | Updated at | Labels |
 //! | --- | --- | --- | --- | --- |
-//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is sent, dropped for want of budget, or fails to send; an admitted Session's report, fill, establishment, SSA request, SSA re-send, commitment retransmission request or session error is sent or fails to send | `kind` = one per [`ExitControlKind`] (`refusal_*`, `surb_report`, `pix_fill`, `session_established`, `ssa_request`, `ssa_request_resend`, `commitment_retransmission_request`, `session_error`), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
+//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is answered, dropped for want of budget, or fails to send; an admitted Session's control packet is sent or fails to send | `kind` = one per [`ExitControlKind`] (`refusal_*`, `surb_report`, `pix_fill`, `session_established`, `ssa_request`, `ssa_request_resend`, `commitment_retransmission_request`, `session_error`), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
 //!
-//! This counts packets and not their cost. The SURB a reply travels over, and with it the path
-//! length and the ticket, is chosen later in the packet pipeline, so the spend cannot be known here.
-//!
-//! # Operator queries
-//!
-//! *Refusals the Exit is not answering.* A sustained rate here means the refusal budget is spent,
-//! which is what a flood of requests looks like from this side:
+//! It counts packets, not their cost: the SURB, and so the path length and ticket, is chosen later in
+//! the packet pipeline.
 //!
 //! ```promql
 //! sum by (kind) (rate(hopr_exit_control_packets_total{outcome="dropped_budget"}[5m]))
 //! ```
 //!
-//! *What idle Sessions cost.* Reports fall as the idle backoff takes hold:
+//! Idle Sessions' report cost, which falls as the idle backoff takes hold:
 //!
 //! ```promql
 //! sum by (session) (rate(hopr_exit_control_packets_total{kind="surb_report",outcome="sent"}[5m]))
-//! ```
-//!
-//! *Share of refusals answered.* Near one is an Exit that is only occasionally refusing; a falling
-//! value is one being asked to refuse more than it will pay to answer:
-//!
-//! ```promql
-//! sum(rate(hopr_exit_control_packets_total{kind=~"refusal_.*",outcome="sent"}[5m]))
-//!   / sum(rate(hopr_exit_control_packets_total{kind=~"refusal_.*"}[5m]))
 //! ```
 
 use crate::exit_control::{ExitControlKind, ExitControlOutcome, ExitSessionKind};
@@ -64,10 +46,7 @@ pub(crate) fn record(kind: ExitControlKind, session: ExitSessionKind, outcome: E
 mod tests {
     use super::*;
 
-    /// No label of this instrument may identify a peer or a Session.
-    ///
-    /// A deny-list, like the one for the PIX aggregates: an identifier added as a label later
-    /// would reintroduce unbounded cardinality (#8305) without any series looking wrong at first.
+    /// No label may identify a peer or a Session: that would be unbounded cardinality (#8305).
     #[test]
     fn no_exit_control_series_is_labelled_by_an_identifier() {
         const DENIED: &[&str] = &[
@@ -101,8 +80,7 @@ mod tests {
 
         let text = hopr_api::types::telemetry::gather_all_metrics().context("must gather metrics")?;
 
-        // Each label pair is asserted on its own, since the order they are rendered in is not
-        // guaranteed, and only presence is asserted: the registry is shared with the other tests.
+        // Label order is not guaranteed, and the registry is shared, so only presence is asserted.
         let line = text
             .lines()
             .find(|line| {
