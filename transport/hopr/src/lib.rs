@@ -1317,8 +1317,14 @@ where
                     }
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
-                    // told how many of those it holds, to replace them.
-                    let current = surb_round_trips.invalid();
+                    // told how many of those it holds, to replace them. Walks the pending map, so it
+                    // runs off the runtime worker like the write-off above.
+                    let current = {
+                        let registry = surb_round_trips.clone();
+                        hopr_utils::parallelize::cpu::spawn_blocking(move || registry.invalid(), "surb_invalid")
+                            .await
+                            .unwrap_or_default()
+                    };
                     for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
                         if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
                             surb_round_trips.forget_session(&session);

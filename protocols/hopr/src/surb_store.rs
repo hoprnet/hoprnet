@@ -39,6 +39,14 @@ pub const MINIMUM_PENDING_SURB_MAX_BYTES: u64 = 100_000 * PENDING_SURB_RECORD_BY
 /// SURBs each) per map, so the overflow hoprnet#8624 describes is fixed with room to spare. See
 /// [`SurbStoreConfig::pending_surb_max_bytes`] for the pair's worst-case total.
 pub const DEFAULT_PENDING_SURB_MAX_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Ceiling on [`SurbStoreConfig::pending_surb_max_bytes`]: 4 GiB per map.
+///
+/// The budget is a memory commitment the operator makes, so a typo must not be able to ask for an
+/// unbounded map. 4 GiB is 16× the default and about 5 million records per map, far past any
+/// deployed Session count (100 Sessions × 19 264 SURBs is ~1.93 M records, 1.6 GiB) while still
+/// leaving the pair inside a node's RAM.
+pub const MAXIMUM_PENDING_SURB_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 /// Subtracts `n` from the quarantine SURB budget, clamping at zero instead of wrapping.
 ///
 /// Every refund site reads a ring length outside the ring's own lock, so a stale reader can subtract
@@ -483,7 +491,11 @@ pub struct SurbStoreConfig {
     ///
     /// Default is 256 MiB.
     #[default(default_pending_surb_max_bytes())]
-    #[validate(range(min = MINIMUM_PENDING_SURB_MAX_BYTES, message = "pending_surb_max_bytes must be at least the 100 000-record floor, MINIMUM_PENDING_SURB_MAX_BYTES"))]
+    #[validate(range(
+        min = MINIMUM_PENDING_SURB_MAX_BYTES,
+        max = MAXIMUM_PENDING_SURB_MAX_BYTES,
+        message = "pending_surb_max_bytes must be between MINIMUM_PENDING_SURB_MAX_BYTES (the 100 000-record floor) and MAXIMUM_PENDING_SURB_MAX_BYTES (4 GiB)"
+    ))]
     #[cfg_attr(feature = "serde", serde(default = "default_pending_surb_max_bytes"))]
     pub pending_surb_max_bytes: u64,
 }
@@ -5209,6 +5221,18 @@ mod tests {
         );
         load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES)])
             .context("a budget at the floor must load")?;
+
+        // And a ceiling, so a typo cannot ask for an unbounded map.
+        assert!(
+            load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES + 1)]).is_err(),
+            "a budget above the 4 GiB ceiling must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", u64::MAX)]).is_err(),
+            "u64::MAX must be rejected, not accepted as an unbounded map"
+        );
+        load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the ceiling must load")?;
 
         Ok(())
     }

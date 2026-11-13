@@ -578,6 +578,14 @@ pub(crate) struct PendingSurb {
     partner_replied: Option<(ReturnRelayers, Instant)>,
 }
 
+// The byte budget is charged per record from `PENDING_SURB_RECORD_BYTES`, a measurement of this
+// struct plus moka's overhead. Growing the struct would silently exceed the budget, so it forces a
+// re-measurement instead.
+const _: () = assert!(
+    size_of::<PendingSurb>() <= 504,
+    "PendingSurb grew: re-measure PENDING_SURB_RECORD_BYTES and the pair's worst case"
+);
+
 /// What each outstanding SURB is remembered by, shared between the two codec halves.
 ///
 /// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
@@ -592,10 +600,17 @@ type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
 ///
 /// Admission is `lru`, not moka's default TinyLFU: a SURB is looked up once, when its reply comes home,
 /// so every key's frequency is about one and TinyLFU refuses the newest record once the map is full. A
-/// refused record settles no race and, if the SURB is lost, is never written off (hoprnet#8624). Under
-/// `lru` the newest is always admitted and the victim is the oldest, whose reply comes next under FIFO
-/// — the cost the issue names, so each such eviction is counted via
-/// [`SurbRoundTripRegistry::pending_lost`].
+/// refused record settles no race and, if the SURB is lost, is never written off (hoprnet#8624).
+///
+/// Under `lru` the newest is always admitted and the victim is the oldest, whose reply comes next under
+/// FIFO — the cost the issue names. It is bounded by the budget while outstanding SURBs fit: a record
+/// survives `capacity / mint rate`, and a reply comes home after the counterparty has spent its stock
+/// (minutes, which is why [`PENDING_SURB_HORIZON`] is 15 minutes). Once the outstanding total exceeds
+/// the capacity — above ~16 fully-buffered Sessions at the default — residency falls below that wait, so
+/// an ever larger share of records is evicted before their replies arrive, and one high-rate Session
+/// shortens the residence time for every other. That regime is reachable by design and is counted via
+/// [`SurbRoundTripRegistry::pending_lost`]; raising `pending_surb_max_bytes` extends the range over
+/// which eviction is not the normal state.
 fn pending_legs(max_pending: u64, lost: Arc<AtomicU64>) -> PendingLegs {
     moka::sync::Cache::builder()
         .max_capacity(max_pending)
@@ -1395,7 +1410,13 @@ where
     if health.take_neighbour_change() || !changed.is_empty() {
         replan().await;
     }
-    registry.write_off_dead()
+    // Walks the whole pending map, twice when a verdict confirms; at the 256 MiB budget that is
+    // hundreds of milliseconds, so it must not hold a runtime worker. A failure leaves the sessions
+    // unbumped this tick and the next flush retries.
+    let registry = registry.clone();
+    hopr_utils::parallelize::cpu::spawn_blocking(move || registry.write_off_dead(), "surb_write_off_dead")
+        .await
+        .unwrap_or_default()
 }
 
 /// The invalid SURBs to hand each session this tick: every current mark, re-applied so a session
@@ -4093,6 +4114,51 @@ mod tests {
             1,
             registry.pending_lost(),
             "the 65th mint into a 64-record map evicts exactly one record, and it is counted"
+        );
+    }
+
+    /// Under sustained overload the LRU victim is the record whose reply is due next, so a hit rate
+    /// below one is the chosen cost of this policy rather than a bug — but it has to be a *chosen*
+    /// number, so this pins it for the regime the issue's capacity cannot cover.
+    ///
+    /// Shaped like the real thing: SURBs are minted in a burst, the counterparty spends them FIFO, and
+    /// each reply arrives after the whole stock has been spent. With more outstanding than the map can
+    /// hold, a record minted early is evicted before the reply that would have matched it.
+    #[test]
+    fn an_overloaded_map_should_lose_the_oldest_records_before_their_replies() {
+        const CAPACITY: u64 = 64;
+        const OUTSTANDING: u8 = 96;
+        let registry = SurbRoundTripRegistry::with_capacity(CAPACITY * PENDING_SURB_RECORD_BYTES);
+
+        // The whole stock is minted before any is spent, as a Session front-loads its SURBs.
+        for seed in 0..OUTSTANDING {
+            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        }
+        registry.pending.run_pending_tasks();
+
+        // The newest record is the one that has to survive: its reply comes last, so a policy that
+        // kept the *oldest* would lose exactly this one. Checked before the removals consume it.
+        assert!(
+            registry.pending.contains_key(&surb_id(OUTSTANDING - 1)),
+            "the newest record must survive, or the policy is keeping the wrong end"
+        );
+
+        // The counterparty spends FIFO; the reply comes home once the stock is exhausted.
+        let mut matched = 0u32;
+        for seed in 0..OUTSTANDING {
+            if registry.pending.remove(&surb_id(seed)).is_some() {
+                matched += 1;
+            }
+        }
+
+        assert_eq!(
+            CAPACITY as u32, matched,
+            "exactly the capacity can be matched: everything above it was evicted before its reply"
+        );
+        assert_eq!(
+            OUTSTANDING as u64 - matched as u64,
+            registry.pending_lost(),
+            "every unmatched record is counted, so the overload is visible rather than silent"
         );
     }
 
