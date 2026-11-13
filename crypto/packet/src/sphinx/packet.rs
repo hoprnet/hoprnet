@@ -1,9 +1,10 @@
 use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::Deref,
 };
 
+use bytes::{Buf, Bytes};
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::{
@@ -25,7 +26,7 @@ use super::{
 /// Data in this instance is guaranteed to be always `P + 1` bytes-long.
 // TODO: make P a typenum argument
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PaddedPayload<const P: usize>(Box<[u8]>);
+pub struct PaddedPayload<const P: usize>(Bytes);
 
 impl<const P: usize> PaddedPayload<P> {
     /// Byte used to pad the data.
@@ -49,7 +50,7 @@ impl<const P: usize> PaddedPayload<P> {
             ret[Self::SIZE - msg.len() - 1] = Self::PADDING_TAG;
             ret[Self::SIZE - msg.len()..].copy_from_slice(msg);
 
-            Ok(Self(ret.into_boxed_slice()))
+            Ok(Self(ret.into()))
         } else {
             Err(SphinxError::PaddingError)
         }
@@ -68,7 +69,7 @@ impl<const P: usize> PaddedPayload<P> {
         msg[0..Self::SIZE - len].fill(Self::PADDING);
         msg[Self::SIZE - len - 1] = Self::PADDING_TAG;
 
-        Ok(Self(msg.into_boxed_slice()))
+        Ok(Self(msg.into()))
     }
 
     /// Creates a new instance from an already padded message `msg` and takes its ownership.
@@ -77,38 +78,35 @@ impl<const P: usize> PaddedPayload<P> {
     /// the presence of the padding tag. If the padding tag is not present, an error
     /// is later returned when [`PaddedPayload::into_unpadded`] is called.
     ///
-    /// If the vector has any excess capacity, it will be trimmed.
-    ///
     /// If the argument's length is not equal to [`PaddedPayload::SIZE`], [`SphinxError::PaddingError`] is returned.
-    pub fn from_padded(msg: Vec<u8>) -> Result<Self, SphinxError> {
+    pub fn from_padded_bytes(msg: Bytes) -> Result<Self, SphinxError> {
         if msg.len() == Self::SIZE {
-            Ok(Self(msg.into_boxed_slice()))
+            Ok(Self(msg))
         } else {
             Err(SphinxError::PaddingError)
         }
     }
 
-    /// Consumes the instance by removing the padding and taking ownership of
-    /// the unpadded data. The original length of the data is restored.
+    /// Consumes the instance by removing the padding and returning the unpadded data
+    /// as a view into the same buffer. The original length of the data is restored.
     ///
     /// If the padding tag could not be found, [`SphinxError::PaddingError`] is returned.
-    /// This means this instance was created using [`PaddedPayload::from_padded`] with invalid data.
-    pub fn into_unpadded(self) -> Result<Box<[u8]>, SphinxError> {
-        self.0
+    /// This means this instance was created using [`PaddedPayload::from_padded_bytes`] with invalid data.
+    pub fn into_unpadded(self) -> Result<Bytes, SphinxError> {
+        let tag_pos = self
+            .0
             .iter()
             .position(|x| *x == Self::PADDING_TAG)
-            .map(|tag_pos| {
-                let mut data = self.0.into_vec();
-                data.drain(0..=tag_pos);
-                data.into_boxed_slice()
-            })
-            .ok_or(SphinxError::PaddingError)
+            .ok_or(SphinxError::PaddingError)?;
+        let mut data = self.0;
+        data.advance(tag_pos + 1);
+        Ok(data)
     }
 }
 
 impl<const P: usize> AsRef<[u8]> for PaddedPayload<P> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        &self.0
     }
 }
 
@@ -116,13 +114,7 @@ impl<const P: usize> Deref for PaddedPayload<P> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
-    }
-}
-
-impl<const P: usize> DerefMut for PaddedPayload<P> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.deref_mut()
+        &self.0
     }
 }
 
@@ -255,17 +247,19 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     }
 
     /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
-    pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
+    pub fn into_meta_packet<const P: usize>(self, payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
+        let mut packet = MetaPacket::new_from_parts(self.alpha, self.routing_info, &payload);
         for iv_key in self.prp_inits {
             let prp = iv_key.into_init::<S::PRP>();
             // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
             // However, it would be nicer to make PaddedPayload take P as a typenum parameter
             // and enforce this invariant at compile time.
-            let block = <&mut crypto_traits::Block<S::PRP>>::try_from(payload.as_mut()).expect("block size mismatch");
+            let block =
+                <&mut crypto_traits::Block<S::PRP>>::try_from(packet.payload_mut()).expect("block size mismatch");
             prp.forward(block);
         }
 
-        MetaPacket::new_from_parts(self.alpha, self.routing_info, &payload)
+        packet
     }
 }
 
@@ -308,7 +302,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PartialPacket<S, H> {}
 ///
 /// The packet format is directly dependent on the used [`SphinxSuite`].
 pub struct MetaPacket<S, H, const P: usize> {
-    packet: Box<[u8]>,
+    packet: Vec<u8>,
     _d: PhantomData<(S, H)>,
 }
 
@@ -441,15 +435,26 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         packet.extend_from_slice(&payload[0..PaddedPayload::<P>::SIZE]);
 
         Self {
-            packet: packet.into_boxed_slice(),
+            packet,
             _d: PhantomData,
         }
+    }
+
+    /// Consumes the packet and returns its buffer, including any spare capacity.
+    pub fn into_vec(self) -> Vec<u8> {
+        self.packet
     }
 
     /// Returns the Alpha value subslice from the packet data.
     fn alpha(&self) -> &[u8] {
         let len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
         &self.packet[..len]
+    }
+
+    /// Returns the Alpha value from the packet data as a mutable slice.
+    fn alpha_mut(&mut self) -> &mut [u8] {
+        let len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
+        &mut self.packet[..len]
     }
 
     /// Returns the routing information from the packet data as a mutable slice.
@@ -545,16 +550,25 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 path_pos,
                 next_node,
                 additional_info,
-            } => ForwardedMetaPacket::Relayed {
-                packet: Self::new_from_parts(alpha, next_header, decrypted),
-                packet_tag,
-                derived_secret: secret,
-                next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
-                    SphinxError::PacketDecodingError(format!("couldn't map id to public key: {}", next_node.to_hex()))
-                })?,
-                path_pos,
-                additional_info,
-            },
+            } => {
+                // The payload is already decrypted in place; write back the blinded alpha and the next header.
+                self.alpha_mut().copy_from_slice(&alpha);
+                self.routing_info_mut().copy_from_slice(next_header.as_ref());
+
+                ForwardedMetaPacket::Relayed {
+                    packet: self,
+                    packet_tag,
+                    derived_secret: secret,
+                    next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
+                        SphinxError::PacketDecodingError(format!(
+                            "couldn't map id to public key: {}",
+                            next_node.to_hex()
+                        ))
+                    })?,
+                    path_pos,
+                    additional_info,
+                }
+            }
             ForwardedHeader::Final {
                 receiver_data,
                 is_reply,
@@ -584,15 +598,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     );
                 }
 
-                // Remove all the data before the actual decrypted payload
-                // and shrink the original allocation.
-                let mut payload = self.packet.into_vec();
-                payload.drain(..<S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE);
+                // The decrypted payload is a view into the packet buffer.
+                let mut payload = Bytes::from(self.packet);
+                payload.advance(<S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE);
 
                 ForwardedMetaPacket::Final {
                     packet_tag,
                     derived_secret: secret,
-                    plain_text: PaddedPayload::from_padded(payload)?,
+                    plain_text: PaddedPayload::from_padded_bytes(payload)?,
                     receiver_data,
                     no_ack,
                 }
@@ -603,7 +616,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> AsRef<[u8]> for MetaPacket<S, H, P> {
     fn as_ref(&self) -> &[u8] {
-        self.packet.as_ref()
+        &self.packet
     }
 }
 
@@ -613,7 +626,23 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<&[u8]> for Met
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() == Self::SIZE {
             Ok(Self {
-                packet: value.into(),
+                packet: value.to_vec(),
+                _d: PhantomData,
+            })
+        } else {
+            Err(GeneralError::ParseError("MetaPacket".into()))
+        }
+    }
+}
+
+/// Takes ownership of the buffer without copying it, keeping any spare capacity.
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<Vec<u8>> for MetaPacket<S, H, P> {
+    type Error = GeneralError;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
+            Ok(Self {
+                packet: value,
                 _d: PhantomData,
             })
         } else {
@@ -781,7 +810,7 @@ pub(crate) mod tests {
 
         assert!(mp.as_ref().len() < 3600, "metapacket too long {}", mp.as_ref().len());
 
-        let mut received_plaintext = Box::default();
+        let mut received_plaintext = Bytes::new();
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()
@@ -847,7 +876,7 @@ pub(crate) mod tests {
             Some(opener.clone())
         };
 
-        let mut received_plaintext = Box::default();
+        let mut received_plaintext = Bytes::new();
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()

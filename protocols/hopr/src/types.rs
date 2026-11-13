@@ -96,7 +96,7 @@ pub struct IncomingFinalPacket {
     /// nowhere later.
     pub replied_on_surb: Option<HoprSurbId>,
     /// Plain text payload of the packet.
-    pub plain_text: Box<[u8]>,
+    pub plain_text: Bytes,
     /// Acknowledgement to be sent to the previous hop.
     pub ack_key: HalfKey,
     /// Miscellaneous information about the packet.
