@@ -52,28 +52,16 @@
 //!
 //! # The keep-alive reserve hold, which is not on this prefix
 //!
-//! One pair sits next to these and deliberately does not share the prefix. The hold the Exit's
-//! data egress takes while its SURB stock is down to the keep-alive reserve (see
-//! `hold_for_surb_reserve`) is measured as an episode by
-//! [`SurbReserveHoldEpisode`](crate::supervision::telemetry::SurbReserveHoldEpisode), not by
-//! [`PixGateBlockEpisode`](crate::supervision::telemetry::PixGateBlockEpisode): it sits *before* the
-//! PIX gate, so it fires for a rate-controlled Session without PIX as well, and conflating its
-//! episodes with `hopr_pix_gate_blocks_total` would make an SURB shortage look like a PIX budget
-//! refusal. Its instruments live in [`crate::telemetry::surb`], which documents their contract:
-//! both are labelled by `pix` = `true\|false`, so a PIX Session's hold is separable from the
-//! non-PIX backpressure a rate-controlled Session relies on, and neither is labelled by a Session.
-//! The `hopr_surb_*` prefix is load-bearing and not the `hopr_session_surb_*` of the surrounding
-//! per-Session instruments: `hopr_session_*` is diverted to the OTLP-only provider once a
-//! `hopr_session` interval override is configured (see the prefix note above), whereas
-//! `hopr_surb_*` is never diverted and keeps its Prometheus reader — so it reaches `/metrics`
-//! under every configuration, and an operator alerting on an SURB shortage dashboards it there.
-//! A packet above the reserve creates no episode; a packet held across many polling intervals
-//! creates one, not one per poll.
+//! The hold the Exit's egress takes while its SURB stock is at the keep-alive reserve is a
+//! [`SurbReserveHoldEpisode`](crate::supervision::telemetry::SurbReserveHoldEpisode), not a
+//! [`PixGateBlockEpisode`](crate::supervision::telemetry::PixGateBlockEpisode): it sits *before*
+//! the PIX gate and so also fires without PIX. Its instruments are in [`crate::telemetry::surb`],
+//! on the `hopr_surb_*` prefix, which keeps its Prometheus reader under every configuration (see
+//! the prefix note above).
 //!
-//! Do not confuse it with `hopr_pix_fill_backoff_total{reason="surb_reserve"}`, which is already in
-//! this module's table: that counts *keep-alives the Exit withheld from its own PIX fill schedule*,
-//! whereas the pair above counts *data packets it held for the Entry*, on any rate-controlled
-//! Session. Both rise under an SURB shortage, so a dashboard summing them double-counts.
+//! Not to be confused with `hopr_pix_fill_backoff_total{reason="surb_reserve"}` in this module's
+//! table: that counts keep-alives the Exit withheld from its own fill schedule, while the pair
+//! above counts data packets it held for the Entry. Both rise during an SURB shortage.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived

@@ -224,34 +224,19 @@ pub fn record_gate_closed() {
 
 /// One episode of Exit data being held back by the SURB keep-alive reserve.
 ///
-/// # Why an episode rather than a poll
+/// An episode rather than a poll: [`hold_for_surb_reserve`](crate::manager) re-checks the estimate
+/// every [`SURB_RESERVE_POLL`](crate::manager), so a long hold polls many times. The episode is
+/// counted once when the hold future is created and timed until it ends; a packet above the reserve
+/// creates none.
 ///
-/// [`hold_for_surb_reserve`](crate::manager) checks the estimate every
-/// [`SURB_RESERVE_POLL`](crate::manager) while it waits, so at a long hold it polls many times.
-/// What an operator wants is how often the Exit held data and for how long, not how many times the
-/// polling loop woke up, so the episode is counted once when the hold future is created and timed
-/// until it ends. A packet above the reserve creates no episode at all — there is nothing held.
+/// Timed by `Drop` because a hold can end three ways — the stock rises, the Session is torn down, or
+/// the future is dropped before its first poll — and `Drop` covers all of them, so every hold is
+/// timed exactly once. Unlike [`PixGateBlockEpisode`] it is not PIX-only: the hold sits before the
+/// PIX gate, so `hopr_surb_reserve_*` rather than a `hopr_pix_*` spelling.
 ///
-/// # Why `Drop`
-///
-/// The hold ends in more than one way: the stock rises and the waiting packet goes on, the Session is
-/// torn down and its sink dropped with the hold future inside, or the future is dropped before its
-/// first poll (a writer cancelled between the `Sink::with` call and the first poll). Only `Drop`
-/// covers all of them, so "every hold is timed exactly once" holds without any of those paths
-/// having to remember.
-///
-/// Unlike [`PixGateBlockEpisode`] this is not PIX-only: the hold sits on the Exit's data egress
-/// before the PIX gate, so it fires for a rate-controlled Session without PIX as well. That is why
-/// its instruments are `hopr_surb_reserve_*` and not a `hopr_pix_*` spelling.
-///
-/// # Why the episode remembers whether the Session has PIX
-///
-/// The pair is labelled by it, because the two questions are different. A PIX Session's hold is
-/// one of two gates an Exit operator watches; a non-PIX hold is the *only* SURB backpressure a
-/// rate-controlled Session has. An unlabelled counter would also conflate breadth with depth: one
-/// starved Session emits one episode per held data packet, which looks identical to a node-wide
-/// shortage. The label is a closed set chosen at construction from the egress gate the Session
-/// was built with, so it cannot grow.
+/// `pix` labels the pair because a PIX hold is one of two gates an operator watches, while a non-PIX
+/// hold is the only SURB backpressure a rate-controlled Session has; it also separates one starved
+/// Session from a node-wide shortage. A closed `bool`, so it cannot grow.
 pub struct SurbReserveHoldEpisode {
     pix: bool,
     began: Instant,
