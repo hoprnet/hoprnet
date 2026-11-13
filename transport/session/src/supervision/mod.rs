@@ -1296,6 +1296,12 @@ pub struct PixFillConfig {
     /// every fill packet is withheld, and the funded cycle strands on
     /// [`max_recovery_time`](SupervisorConfig::max_recovery_time).
     ///
+    /// The derivation follows the target the Entry has *in force*, not only the one it announced at
+    /// establishment: a `BalancerTarget` keep-alive carrying a different target re-derives the
+    /// effective reserve, lowered as well as raised, so a client that steps down to a shallower buffer
+    /// is not left with a reserve above anything it now supplies. That is the
+    /// `SessionManagerConfig::surb_target_notify` path, which turns the announcement itself on.
+    ///
     /// Default: 500, matching `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer
     /// target of the worked profile a quarter is 1 750, so the configured value is what binds there
     /// and the derivation only engages on a Session whose Entry asked for less than four times it.
