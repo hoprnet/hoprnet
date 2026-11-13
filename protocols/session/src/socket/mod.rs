@@ -21,7 +21,7 @@ use futures_concurrency::stream::Merge;
 use loss_report::{FRAME_LOSS_REPORT_INTERVAL, FrameLossReport};
 use loss_signal::FrameLossSignal;
 use state::{SocketComponents, SocketState, Stateless};
-use tracing::{Instrument, instrument};
+use tracing::{Instrument, instrument::WithSubscriber};
 #[cfg(feature = "telemetry")]
 use {
     strum::IntoDiscriminant,
@@ -158,6 +158,7 @@ enum WriteState {
 #[pin_project::pin_project(PinnedDrop)]
 pub struct SessionSocket<const C: usize, S: SocketState<C>> {
     state: S,
+    span: tracing::Span,
     // This is where upstream writes the to-be-segmented frame data to
     upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
     // This is where upstream reads the reconstructed frame data from
@@ -174,6 +175,7 @@ pub struct SessionSocket<const C: usize, S: SocketState<C>> {
 impl<const C: usize, S: SocketState<C>> PinnedDrop for SessionSocket<C, S> {
     fn drop(self: Pin<&mut Self>) {
         let this = self.project();
+        let _entered = this.span.enter();
         if let Err(error) = this.state.stop() {
             tracing::debug!(%error, "state.stop on SessionSocket drop failed");
         }
@@ -202,6 +204,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        let span = tracing::debug_span!("session.socket");
+        let _entered = span.enter();
         // Preserve frame boundaries within the number of segments SeqIndicator can enumerate.
         let frame_size = session_frame_size::<C>(cfg.frame_size, (SeqIndicator::MAX + 1) as usize);
 
@@ -246,9 +250,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let reorder_s1 = reorder.clone();
 
         // Debug tracing spans for individual pipeline stages
-        let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly", session_id = %id);
-        let stage2_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing", session_id = %id);
-        let stage3_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing", session_id = %id);
+        let stage1_span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly");
+        let stage2_span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing");
+        let stage3_span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing");
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
@@ -291,11 +295,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         })
                     }
                     Err(error) => {
-                        match error {
-                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
-                                tracing::error!(%error, "invalid session header; terminating session reader");
-                            }
-                            _ => tracing::error!(%error, "unparseable packet"),
+                        if error.is_fatal_header() {
+                            tracing::error!(%error, "invalid session header; terminating session reader");
+                        } else {
+                            tracing::error!(%error, "unparseable packet");
                         }
                         #[cfg(feature = "telemetry")]
                         s1.error();
@@ -369,6 +372,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
         Ok(Self {
             state: Stateless::new(id),
+            span: span.clone(),
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
@@ -399,6 +403,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
+        let span = tracing::debug_span!("session.socket");
+        let _entered = span.enter();
         // The upper bound is additionally limited by the missing-segment bitmap in SegmentRequests.
         let frame_size = session_frame_size::<C>(
             cfg.frame_size,
@@ -439,13 +445,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
             .with(move |segment| {
-                let _span =
-                    tracing::debug_span!("SessionSocket::packets_out::segmenter", session_id = st_1.session_id())
-                        .entered();
+                let _span = tracing::debug_span!("SessionSocket::packets_out::segmenter").entered();
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
-                    tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
+                    tracing::debug!(%error, "outgoing segment state update failed");
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
@@ -472,10 +476,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         tracing::error!(%error, "error while processing outgoing packets")
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_out",
-                    session_id = state.session_id()
-                )),
+                .instrument(tracing::debug_span!("SessionSocket::packets_out"))
+                .with_current_subscriber(),
         );
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
@@ -501,11 +503,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
-                let _span = tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_reassembly",
-                    session_id = st_1.session_id()
-                )
-                .entered();
+                let _span = tracing::debug_span!("SessionSocket::packets_in::pre_reassembly").entered();
                 futures::future::ready(match packet {
                     Ok(packet) => {
                         if let Err(error) = st_1.incoming_message(&packet) {
@@ -528,11 +526,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         })
                     }
                     Err(error) => {
-                        match error {
-                            SessionError::WrongVersion | SessionError::IncorrectMessageLength => {
-                                tracing::error!(%error, "invalid session header; terminating session reader");
-                            }
-                            _ => tracing::error!(%error, "unparseable packet"),
+                        if error.is_fatal_header() {
+                            tracing::error!(%error, "invalid session header; terminating session reader");
+                        } else {
+                            tracing::error!(%error, "unparseable packet");
                         }
                         #[cfg(feature = "telemetry")]
                         s1.error();
@@ -544,11 +541,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             .reassembler_with_inspector(cfg.frame_timeout, cfg.capacity, inspector)
             // Notify State once a frame has been reassembled, discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
-                let _span = tracing::debug_span!(
-                    "SessionSocket::packets_in::pre_sequencing",
-                    session_id = st_2.session_id()
-                )
-                .entered();
+                let _span = tracing::debug_span!("SessionSocket::packets_in::pre_sequencing").entered();
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
                         lr2.frame_reassembled();
@@ -580,11 +573,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
-                let _span = tracing::debug_span!(
-                    "SessionSocket::packets_in::post_sequencing",
-                    session_id = st_3.session_id()
-                )
-                .entered();
+                let _span = tracing::debug_span!("SessionSocket::packets_in::post_sequencing").entered();
                 // Filter out discarded Frames and dispatch events to the State if needed
                 future::ready(match maybe_frame {
                     Ok(frame) => {
@@ -622,6 +611,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         Ok(Self {
             state,
+            span: span.clone(),
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(downstream_frames_out),
             write_state: if cfg.flush_immediately {
@@ -634,16 +624,19 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 }
 
 impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncRead for SessionSocket<C, S> {
-    #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        self.project().downstream_frames_out.as_mut().poll_read(cx, buf)
+        let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("SessionSocket::poll_read", len = buf.len()).entered();
+        this.downstream_frames_out.as_mut().poll_read(cx, buf)
     }
 }
 
 impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrite for SessionSocket<C, S> {
-    #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("SessionSocket::poll_write", len = buf.len()).entered();
         loop {
             match this.write_state {
                 WriteState::WriteOnly => {
@@ -662,22 +655,26 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
         }
     }
 
-    #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        self.project().upstream_frames_in.as_mut().poll_flush(cx)
+        let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("SessionSocket::poll_flush").entered();
+        this.upstream_frames_in.as_mut().poll_flush(cx)
     }
 
-    #[instrument(name = "SessionSocket::poll_close", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
-        let _ = this.state.stop();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("SessionSocket::poll_close").entered();
+        if let Err(error) = this.state.stop() {
+            tracing::debug!(%error, "state.stop on SessionSocket close failed");
+        }
         this.upstream_frames_in.as_mut().poll_close(cx)
     }
 }
 
 #[cfg(feature = "runtime-tokio")]
 impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncRead for SessionSocket<C, S> {
-    #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id()))]
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -692,17 +689,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncRead f
 
 #[cfg(feature = "runtime-tokio")]
 impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncWrite for SessionSocket<C, S> {
-    #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
         futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
     }
 
-    #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
         futures::AsyncWrite::poll_flush(self.as_mut(), cx)
     }
 
-    #[instrument(name = "SessionSocket::poll_shutdown", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
         futures::AsyncWrite::poll_close(self.as_mut(), cx)
     }

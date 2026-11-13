@@ -153,10 +153,7 @@ pub(crate) fn stop_on_invalid_header<const C: usize>(
     let (stop, registration) = futures::future::AbortHandle::new_pair();
     futures::stream::Abortable::new(
         messages.inspect(move |message| {
-            if matches!(
-                message,
-                Err(SessionError::WrongVersion | SessionError::IncorrectMessageLength)
-            ) {
+            if matches!(message, Err(error) if error.is_fatal_header()) {
                 stop.abort();
             }
         }),
