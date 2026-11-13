@@ -32,7 +32,7 @@ use hopr_protocol_session::{
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, warn};
 
 use crate::{
     Capabilities, Capability, SESSION_MTU,
@@ -610,6 +610,7 @@ pub struct HoprSessionConfig {
 #[pin_project::pin_project]
 pub struct HoprSession {
     id: SessionId,
+    span: tracing::Span,
     #[pin]
     inner: Box<dyn AsyncReadWrite>,
     routing: DestinationRouting,
@@ -627,7 +628,6 @@ impl HoprSession {
     /// based on the given `capabilities`.
     ///
     /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
-    #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
@@ -653,7 +653,6 @@ impl HoprSession {
     /// Sessions with [`Capability::Segmentation`] (a raw Session has no frames to lose); `None`
     /// records nothing.
     #[allow(clippy::too_many_arguments)]
-    #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
@@ -669,6 +668,9 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
+        // Keep the same parent for socket workers and every later IO poll.
+        let span = tracing::debug_span!("session", session_id = %id);
+        let _entered = span.enter();
         if cfg.capabilities.contains(Capability::Segmentation) {
             let mut max_segments = (SeqIndicator::MAX + 1) as usize;
             if cfg.capabilities.contains(Capability::RetransmissionAck)
@@ -834,8 +836,10 @@ impl HoprSession {
             Box::new(transport)
         };
 
+        drop(_entered);
         Ok(Self {
             id,
+            span,
             inner,
             routing,
             cfg,
@@ -869,9 +873,10 @@ impl std::fmt::Debug for HoprSession {
 }
 
 impl futures::AsyncRead for HoprSession {
-    #[instrument(name = "Session::poll_read", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("Session::poll_read").entered();
         let read = futures::ready!(this.inner.poll_read(cx, buf))?;
         if read == 0 {
             tracing::trace!("hopr session empty read");
@@ -886,19 +891,24 @@ impl futures::AsyncRead for HoprSession {
 }
 
 impl futures::AsyncWrite for HoprSession {
-    #[instrument(name = "Session::poll_write", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        self.project().inner.poll_write(cx, buf)
+        let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("Session::poll_write").entered();
+        this.inner.poll_write(cx, buf)
     }
 
-    #[instrument(name = "Session::poll_flush", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        self.project().inner.poll_flush(cx)
+        let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("Session::poll_flush").entered();
+        this.inner.poll_flush(cx)
     }
 
-    #[instrument(name = "Session::poll_close", level = "trace", skip_all, fields(session_id = %self.id), ret)]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
+        let _entered = this.span.enter();
+        let _poll = tracing::trace_span!("Session::poll_close").entered();
         futures::ready!(this.inner.poll_close(cx))?;
         tracing::trace!("hopr session closed");
 
@@ -1286,6 +1296,190 @@ mod tests {
         set.insert(id1);
         assert!(set.contains(&id2));
         assert!(!set.contains(&id3), "different pseudonym should not be in the set");
+    }
+
+    #[test]
+    fn session_should_restore_its_span_on_each_io_poll() -> anyhow::Result<()> {
+        use test_log::tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+        let subscriber = test_log::tracing_subscriber::registry().with(LevelFilter::DEBUG);
+        tracing::subscriber::with_default(subscriber, || -> anyhow::Result<()> {
+            let observed = Arc::new(parking_lot::Mutex::new(Vec::new()));
+            let mut sessions = Vec::new();
+            for _ in 0..2 {
+                let writes = observed.clone();
+                let reads = observed.clone();
+                let id = HoprPseudonym::random();
+                let sink = futures::sink::drain().with(move |_: (DestinationRouting, ApplicationDataOut)| {
+                    writes.lock().push(tracing::Span::current().id());
+                    futures::future::ready(Ok::<_, std::convert::Infallible>(()))
+                });
+                let stream = futures::stream::poll_fn(move |_| {
+                    reads.lock().push(tracing::Span::current().id());
+                    Poll::<Option<ApplicationDataIn>>::Pending
+                });
+                sessions.push(HoprSession::new(
+                    id,
+                    DestinationRouting::Return(id.into()),
+                    HoprSessionConfig {
+                        capabilities: Default::default(),
+                        ..Default::default()
+                    },
+                    (sink, stream),
+                    None,
+                )?);
+            }
+            let unrelated = tracing::debug_span!("unrelated_poller");
+            let _entered = unrelated.enter();
+            let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+            // Interleave sessions, then re-poll the first after a Pending read.
+            for index in [0, 1, 0] {
+                let session = &mut sessions[index];
+                let expected = session.span.id();
+                assert_ne!(expected, unrelated.id());
+                let before = observed.lock().len();
+                assert!(futures::AsyncRead::poll_read(Pin::new(&mut *session), &mut cx, &mut [0]).is_pending());
+                futures::executor::block_on(async {
+                    session.write_all(b"payload").await?;
+                    session.flush().await
+                })?;
+                let observed = observed.lock();
+                assert!(
+                    observed.len() >= before + 2,
+                    "both read and write must reach the transport"
+                );
+                assert!(observed[before..].iter().all(|span| span == &expected));
+                assert_eq!(
+                    tracing::Span::current().id(),
+                    unrelated.id(),
+                    "poll guards must exit on Pending and Ready"
+                );
+            }
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn session_io_should_restore_context_on_pending_errors_and_close() -> anyhow::Result<()> {
+        use test_log::tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+        #[derive(Clone, Copy)]
+        enum Outcome {
+            Pending,
+            BrokenPipe,
+            Ready,
+        }
+
+        struct Probe {
+            outcome: Outcome,
+            observed: Arc<parking_lot::Mutex<Vec<Option<tracing::span::Id>>>>,
+        }
+
+        impl Probe {
+            fn poll<T>(&self, value: T) -> Poll<std::io::Result<T>> {
+                self.observed.lock().push(tracing::Span::current().id());
+                match self.outcome {
+                    Outcome::Pending => Poll::Pending,
+                    Outcome::BrokenPipe => Poll::Ready(Err(std::io::Error::new(
+                        std::io::ErrorKind::BrokenPipe,
+                        "test I/O failure",
+                    ))),
+                    Outcome::Ready => Poll::Ready(Ok(value)),
+                }
+            }
+        }
+
+        impl futures::AsyncRead for Probe {
+            fn poll_read(
+                self: Pin<&mut Self>,
+                _: &mut std::task::Context<'_>,
+                _: &mut [u8],
+            ) -> Poll<std::io::Result<usize>> {
+                self.poll(0)
+            }
+        }
+
+        impl futures::AsyncWrite for Probe {
+            fn poll_write(
+                self: Pin<&mut Self>,
+                _: &mut std::task::Context<'_>,
+                buf: &[u8],
+            ) -> Poll<std::io::Result<usize>> {
+                self.poll(buf.len())
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+                self.poll(())
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+                self.poll(())
+            }
+        }
+
+        tracing::subscriber::with_default(
+            test_log::tracing_subscriber::registry().with(LevelFilter::DEBUG),
+            || -> anyhow::Result<()> {
+                for outcome in [Outcome::Pending, Outcome::BrokenPipe, Outcome::Ready] {
+                    let id = HoprPseudonym::random();
+                    let closed = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                    let notifications = closed.clone();
+                    let mut session = HoprSession::new(
+                        id,
+                        DestinationRouting::Return(id.into()),
+                        HoprSessionConfig {
+                            capabilities: Default::default(),
+                            ..Default::default()
+                        },
+                        (futures::sink::drain(), futures::stream::pending()),
+                        Some(Box::new(move |id, reason| notifications.lock().push((id, reason)))),
+                    )?;
+                    let observed = Arc::new(parking_lot::Mutex::new(Vec::new()));
+                    session.inner = Box::new(Probe {
+                        outcome,
+                        observed: observed.clone(),
+                    });
+                    let unrelated = tracing::debug_span!("unrelated_poller");
+                    let _entered = unrelated.enter();
+                    let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+                    let results = [
+                        futures::AsyncWrite::poll_write(Pin::new(&mut session), &mut cx, b"payload").map_ok(|_| ()),
+                        futures::AsyncWrite::poll_flush(Pin::new(&mut session), &mut cx),
+                        futures::AsyncWrite::poll_close(Pin::new(&mut session), &mut cx),
+                        futures::AsyncRead::poll_read(Pin::new(&mut session), &mut cx, &mut [0]).map_ok(|_| ()),
+                    ];
+                    for result in results {
+                        match outcome {
+                            Outcome::Pending => assert!(result.is_pending()),
+                            Outcome::BrokenPipe => assert!(
+                                matches!(result, Poll::Ready(Err(e)) if e.kind() == std::io::ErrorKind::BrokenPipe)
+                            ),
+                            Outcome::Ready => assert!(matches!(result, Poll::Ready(Ok(())))),
+                        }
+                    }
+                    assert_eq!(*observed.lock(), vec![session.span.id(); 4]);
+                    assert_eq!(tracing::Span::current().id(), unrelated.id());
+                    if matches!(outcome, Outcome::Ready) {
+                        assert_eq!(*closed.lock(), [(id, ClosureReason::WriteClosed)]);
+                        assert!(matches!(
+                            futures::AsyncWrite::poll_close(Pin::new(&mut session), &mut cx),
+                            Poll::Ready(Ok(()))
+                        ));
+                        assert_eq!(
+                            closed.lock().len(),
+                            1,
+                            "read EOF and repeated close must not notify twice"
+                        );
+                    } else {
+                        assert!(
+                            closed.lock().is_empty(),
+                            "Pending and errors must not report successful closure"
+                        );
+                    }
+                }
+                Ok(())
+            },
+        )
     }
 
     // --- Existing tests ---

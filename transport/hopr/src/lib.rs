@@ -28,6 +28,11 @@ pub mod protocol;
 pub mod testing;
 
 mod multiaddrs;
+/// Context propagation for locally originated packets.
+pub mod trace_context;
+
+/// Outgoing application sender retaining the originating tracing context.
+pub type HoprMessageSender = trace_context::ContextSender<(DestinationRouting, ApplicationDataOut)>;
 
 #[cfg(feature = "capture")]
 mod capture;
@@ -105,7 +110,7 @@ use hopr_utils::{
     runtime::AbortableList,
 };
 pub use multiaddr::Protocol;
-use tracing::{debug, warn};
+use tracing::{Instrument, debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
@@ -267,8 +272,96 @@ pub enum HoprTransportProcess {
     Capture,
 }
 
+/// Classifies probes and dispatches session traffic while retaining each packet's context.
+/// Unrelated data reaches the application sink; a closed sink does not stop ingress.
+async fn dispatch_incoming_messages<G, In, Out>(
+    rx_from_protocol: In,
+    probe_classifier: hopr_transport_probe::ProbeClassifierState<G>,
+    unresolved_routing_msg_tx_for_task: HoprMessageSender,
+    smgr: Arc<HoprSessionManager>,
+    on_incoming_data_tx: Out,
+) where
+    G: NetworkGraphUpdate + Clone + Send + Sync + 'static,
+    In: futures::Stream<Item = trace_context::WithContext<(HoprPseudonym, ApplicationDataIn)>>,
+    Out: futures::Sink<ApplicationDataIn> + Unpin,
+{
+    rx_from_protocol
+        .filter_map(move |message| {
+            let classifier = probe_classifier.clone();
+            let push = unresolved_routing_msg_tx_for_task.clone();
+            let (value, span) = message.into_parts();
+            let output_span = span.clone();
+            async move {
+                match classifier.classify(push, value.0, value.1).await {
+                    hopr_transport_probe::ProbeDispatch::Consumed => None,
+                    hopr_transport_probe::ProbeDispatch::Passthrough(pseudonym, data) => {
+                        Some(trace_context::WithContext::new((pseudonym, data), output_span))
+                    }
+                }
+            }
+            .instrument(span)
+        })
+        .filter_map(move |message| {
+            let ((pseudonym, data), span) = message.into_parts();
+            let _entered = span.enter();
+            let _dispatch = tracing::debug_span!("session.dispatch").entered();
+            hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
+            // try_send); it never blocks. However, the crossfire stream that feeds
+            // this loop does not participate in tokio's cooperative budget, so
+            // `future::ready` — which is always Poll::Ready — would let this task
+            // monopolize its worker thread under a saturated inbound queue (Processed
+            // items are filtered to None before the fold's tx.send().await, the only
+            // other suspension point on the hot path). Calling consume_budget() here
+            // integrates this loop into tokio's coop scheduler: it is a cheap
+            // thread-local decrement on the fast path and only actually yields
+            // (~every 128 polls) when the budget is exhausted, giving co-located
+            // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
+            let result = match smgr.dispatch_message(pseudonym, data) {
+                Ok(DispatchResult::Processed) => {
+                    tracing::trace!("message dispatch completed");
+                    None
+                }
+                Ok(DispatchResult::Unrelated(data)) => {
+                    tracing::trace!("unrelated message dispatch completed");
+                    Some(data)
+                }
+                // Benign drop: the session's sink has closed, its inbox is momentarily
+                // full (backpressure), or the session is already deregistered. Counted
+                // in the session manager and logged quietly here so a departing
+                // counterparty cannot spam ERROR once per in-flight packet.
+                Ok(DispatchResult::Dropped(reason)) => {
+                    tracing::trace!(?reason, "dropped session packet");
+                    None
+                }
+                Err(error) => {
+                    tracing::error!(%error, "error while dispatching packet in the session manager");
+                    None
+                }
+            };
+            drop(_dispatch);
+            drop(_entered);
+            async move {
+                hopr_utils::runtime::prelude::consume_budget().await;
+                result
+            }
+            .instrument(span)
+        })
+        .fold(on_incoming_data_tx, |mut tx, data| async move {
+            if tx.send(data).await.is_err() {
+                tracing::error!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "incoming-data channel disconnected — dropping unrelated packet; \
+                     HoprSocket must be consumed or drained by the caller"
+                );
+            }
+            tx
+        })
+        .await;
+}
+
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<CrossfireSink<(DestinationRouting, ApplicationDataOut)>>;
+type HoprSessionManager = SessionManager<HoprMessageSender>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -577,10 +670,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -626,10 +716,7 @@ where
         on_incoming_session: Sender<IncomingSession>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -665,10 +752,7 @@ where
         ticket_factory: TFact,
         pix_events: Option<PixEvt>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -710,10 +794,7 @@ where
         on_incoming_session: Option<Sender<IncomingSession>>,
         on_session_admission: Option<SessionAdmissionSink>,
     ) -> errors::Result<(
-        HoprSocket<
-            futures::stream::BoxStream<'static, ApplicationDataIn>,
-            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
-        >,
+        HoprSocket<futures::stream::BoxStream<'static, ApplicationDataIn>, HoprMessageSender>,
         AbortableList<HoprTransportProcess>,
     )>
     where
@@ -726,8 +807,10 @@ where
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
-        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
-            bounded_sink_channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
         // -- transport medium
 
@@ -857,8 +940,10 @@ where
             capacity = msg_protocol_bidirectional_channel_capacity,
             "creating protocol bidirectional channel"
         );
-        let (tx_from_protocol, rx_from_protocol) =
-            bounded_sink_channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+        let (tx_from_protocol, rx_from_protocol) = bounded_sink_channel::<
+            trace_context::WithContext<(HoprPseudonym, ApplicationDataIn)>,
+        >(msg_protocol_bidirectional_channel_capacity);
+        let tx_from_protocol = trace_context::ContextSender::new(tx_from_protocol);
 
         // === START === cover traffic control
         // Allocate a cover traffic tag from the session telemetry partition to avoid
@@ -871,9 +956,9 @@ where
 
         // filter out the known cover traffic not to lose processing time with it
         // The allocated tag is moved into the closure to keep it alive for the transport lifetime.
-        let rx_from_protocol = rx_from_protocol.filter_map(move |(pseudonym, data)| {
+        let rx_from_protocol = rx_from_protocol.filter_map(move |message| {
             let _keep_alive = &cover_traffic_allocated_tag;
-            async move { (data.data.application_tag != cover_traffic_tag).then_some((pseudonym, data)) }
+            futures::future::ready((message.value.1.data.application_tag != cover_traffic_tag).then_some(message))
         });
 
         // prepare a cover traffic stream
@@ -883,7 +968,10 @@ where
             let data = &RANDOM_DATA[start..start + 100];
 
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
-                Some((routing, ApplicationDataOut::with_no_packet_info(data)))
+                Some(trace_context::WithContext::new(
+                    (routing, ApplicationDataOut::with_no_packet_info(data)),
+                    tracing::debug_span!(parent: None, "cover_traffic"),
+                ))
             } else {
                 tracing::error!("failed to construct cover traffic packet");
                 None
@@ -918,7 +1006,7 @@ where
                 .filter(|&n| n > 0)
                 .unwrap_or(avail)
         };
-        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage(
+        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage_with_context(
             merged_unresolved_output_data,
             move |size_hint, max_surbs, unresolved| {
                 let path_planner = path_planner.clone();
@@ -1269,60 +1357,14 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             hopr_utils::spawn_as_abortable!(async move {
-                probe_classifier
-                    .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
-                    .filter_map(move |(pseudonym, data)| {
-                        hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
-                        // try_send); it never blocks. However, the crossfire stream that feeds
-                        // this loop does not participate in tokio's cooperative budget, so
-                        // `future::ready` — which is always Poll::Ready — would let this task
-                        // monopolize its worker thread under a saturated inbound queue (Processed
-                        // items are filtered to None before the fold's tx.send().await, the only
-                        // other suspension point on the hot path). Calling consume_budget() here
-                        // integrates this loop into tokio's coop scheduler: it is a cheap
-                        // thread-local decrement on the fast path and only actually yields
-                        // (~every 128 polls) when the budget is exhausted, giving co-located
-                        // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
-                        let result = match smgr.dispatch_message(pseudonym, data) {
-                            Ok(DispatchResult::Processed) => {
-                                tracing::trace!("message dispatch completed");
-                                None
-                            }
-                            Ok(DispatchResult::Unrelated(data)) => {
-                                tracing::trace!("unrelated message dispatch completed");
-                                Some(data)
-                            }
-                            // Benign drop: the session's sink has closed, its inbox is momentarily
-                            // full (backpressure), or the session is already deregistered. Counted
-                            // in the session manager and logged quietly here so a departing
-                            // counterparty cannot spam ERROR once per in-flight packet.
-                            Ok(DispatchResult::Dropped(reason)) => {
-                                tracing::trace!(?reason, "dropped session packet");
-                                None
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, "error while dispatching packet in the session manager");
-                                None
-                            }
-                        };
-                        async move {
-                            hopr_utils::runtime::prelude::consume_budget().await;
-                            result
-                        }
-                    })
-                    .fold(on_incoming_data_tx, |mut tx, data| async move {
-                        if tx.send(data).await.is_err() {
-                            tracing::error!(
-                                task = %HoprTransportProcess::SessionsManagement(0),
-                                "incoming-data channel disconnected — dropping unrelated packet; \
-                                 HoprSocket must be consumed or drained by the caller"
-                            );
-                        }
-                        tx
-                    })
-                    .await;
+                dispatch_incoming_messages(
+                    rx_from_protocol,
+                    probe_classifier,
+                    unresolved_routing_msg_tx_for_task,
+                    smgr,
+                    on_incoming_data_tx,
+                )
+                .await;
                 tracing::warn!(
                     task = %HoprTransportProcess::SessionsManagement(0),
                     "long-running background task finished"
@@ -2003,13 +2045,161 @@ mod pix_recovery_event_tests {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    };
+    mod dispatch;
 
-    use futures::StreamExt;
-    use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+    pub(crate) mod support {
+        //! Capture structured records and formatted ancestry using the same subscriber.
+        //!
+        //! Tests asserting routing event counts use `serial_test::serial(routing_logs)` to isolate
+        //! subscriber registration and its process-wide callsite cache from other capture tests.
+
+        use std::{collections::BTreeMap, io::Write, sync::Arc};
+
+        use parking_lot::Mutex;
+        use test_log::tracing_subscriber::{self as subscriber, Layer, layer::SubscriberExt, registry::LookupSpan};
+        use tracing::{Subscriber, field::Visit};
+
+        #[derive(Default)]
+        struct Fields(BTreeMap<String, String>);
+
+        impl Visit for Fields {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                self.0.insert(field.name().into(), format!("{value:?}"));
+            }
+
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                self.0.insert(field.name().into(), value.into());
+            }
+        }
+
+        pub(crate) struct Record {
+            pub fields: BTreeMap<String, String>,
+            pub ancestry: Vec<&'static str>,
+        }
+
+        #[derive(Clone, Default)]
+        pub(crate) struct Logs {
+            events: Arc<Mutex<Vec<Record>>>,
+            output: Arc<Mutex<Vec<u8>>>,
+            causes: Arc<Mutex<Vec<(&'static str, &'static str)>>>,
+        }
+
+        impl Logs {
+            pub fn with_cpu_subscriber<F>(
+                &self,
+                subscriber: impl Subscriber + Send + Sync + 'static,
+                future: F,
+            ) -> anyhow::Result<F::Output>
+            where
+                F: std::future::Future + Send,
+                F::Output: Send,
+            {
+                use tracing::instrument::WithSubscriber;
+
+                let dispatch = tracing::Dispatch::new(subscriber);
+                let worker_dispatch = dispatch.clone();
+                // Keep the scoped dispatcher installed through utility task/span destruction, not just
+                // the decoder callback. Production workers use the process-wide subscriber.
+                let pool = hopr_utils::parallelize::cpu::rayon::ThreadPoolBuilder::new()
+                    .num_threads(2)
+                    .spawn_handler(move |thread| {
+                        let dispatch = worker_dispatch.clone();
+                        std::thread::Builder::new()
+                            .spawn(move || tracing::dispatcher::with_default(&dispatch, || thread.run()))
+                            .map(|_| ())
+                    })
+                    .build()?;
+                let runtime = tokio::runtime::Handle::current();
+                Ok(tokio::task::block_in_place(|| {
+                    pool.install(|| runtime.block_on(future.with_subscriber(dispatch)))
+                }))
+            }
+
+            pub fn subscriber(&self, level: tracing::Level) -> impl Subscriber + Send + Sync + 'static {
+                self.subscriber_disabling_spans(level, &[])
+            }
+
+            pub fn subscriber_disabling_spans(
+                &self,
+                level: tracing::Level,
+                disabled_spans: &'static [&'static str],
+            ) -> impl Subscriber + Send + Sync + 'static {
+                let output = self.output.clone();
+                subscriber::registry()
+                    .with(self.clone())
+                    .with(
+                        subscriber::fmt::layer()
+                            .with_ansi(false)
+                            .without_time()
+                            .with_writer(move || Writer(output.clone())),
+                    )
+                    // Scoped test subscribers run concurrently with different filters. Check the active
+                    // subscriber on each event rather than caching a callsite's interest at a fixed level.
+                    .with(subscriber::filter::dynamic_filter_fn(move |metadata, _| {
+                        *metadata.level() <= level && !(metadata.is_span() && disabled_spans.contains(&metadata.name()))
+                    }))
+            }
+
+            pub fn records(&self, message: &str) -> Vec<Record> {
+                self.events
+                    .lock()
+                    .iter()
+                    .filter(|event| event.fields.get("message").is_some_and(|value| value == message))
+                    .map(|event| Record {
+                        fields: event.fields.clone(),
+                        ancestry: event.ancestry.clone(),
+                    })
+                    .collect()
+            }
+
+            pub fn output(&self) -> String {
+                String::from_utf8_lossy(&self.output.lock()).into_owned()
+            }
+
+            pub fn causes(&self) -> Vec<(&'static str, &'static str)> {
+                self.causes.lock().clone()
+            }
+        }
+
+        impl<S: Subscriber + for<'a> LookupSpan<'a>> Layer<S> for Logs {
+            fn on_follows_from(
+                &self,
+                span: &tracing::span::Id,
+                follows: &tracing::span::Id,
+                ctx: subscriber::layer::Context<'_, S>,
+            ) {
+                if let (Some(span), Some(cause)) = (ctx.span(span), ctx.span(follows)) {
+                    self.causes.lock().push((span.name(), cause.name()));
+                }
+            }
+
+            fn on_event(&self, event: &tracing::Event<'_>, ctx: subscriber::layer::Context<'_, S>) {
+                let mut fields = Fields::default();
+                event.record(&mut fields);
+                let ancestry = ctx
+                    .event_scope(event)
+                    .map_or_else(Vec::new, |scope| scope.from_root().map(|span| span.name()).collect());
+                self.events.lock().push(Record {
+                    fields: fields.0,
+                    ancestry,
+                });
+            }
+        }
+
+        struct Writer(Arc<Mutex<Vec<u8>>>);
+
+        impl Write for Writer {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+    }
+
     use rstest::rstest;
 
     use super::*;
@@ -2028,84 +2218,6 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
-    /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
-    /// the tokio worker thread under a continuously saturated inbound stream.
-    ///
-    /// ### Background
-    ///
-    /// The inbound dispatch loop (`transport/hopr/src/lib.rs`) drives:
-    ///
-    /// ```text
-    /// rx_from_protocol (crossfire, no coop budget)
-    ///   → filter_stream
-    ///   → filter_map(sync dispatch_message + consume_budget().await)
-    ///   → fold(tx.send().await)          ← only fires for Unrelated items
-    /// ```
-    ///
-    /// On the `Processed` hot path (common case), items become `None` and are filtered
-    /// out before the `fold`'s `tx.send().await`, so the only suspension point is the
-    /// `consume_budget()` call inside `filter_map`.
-    ///
-    /// ### What this test proves
-    ///
-    /// On a `current_thread` runtime (single worker, fully cooperative scheduling) a tight
-    /// stream loop that never returns `Poll::Pending` starves every other spawned task until
-    /// the stream is drained.  By replacing `future::ready(result)` with an `async` block
-    /// that calls `consume_budget().await` before returning, we give the scheduler a chance
-    /// to preempt the loop every ≈128 polls.  The "canary" task — a plain `yield_now` loop —
-    /// *must* make forward progress while the dispatch stream is draining for the fix to be
-    /// considered effective.
-    ///
-    /// Reverting the `consume_budget().await` to `future::ready(result)` will make this
-    /// test fail: the canary will never be scheduled and its counter will remain 0.
-    #[tokio::test(flavor = "current_thread")]
-    async fn sessions_management_dispatch_loop_yields_to_scheduler() {
-        // N large enough to trigger ≥1 genuine yield (budget = 128 per reset).
-        const N: usize = 1_000;
-
-        // Canary: counts how many times it was scheduled during the dispatch run.
-        let counter = Arc::new(AtomicU64::new(0));
-        let counter_clone = counter.clone();
-        let canary = spawn(async move {
-            loop {
-                counter_clone.fetch_add(1, Ordering::Relaxed);
-                yield_now().await;
-            }
-        });
-
-        // Dispatch loop — same shape as the fixed SessionsManagement(0) hot path:
-        //   sync compute → consume_budget().await → None (Processed path)
-        let unrelated_count = futures::stream::iter(0..N)
-            .filter_map(|_item| {
-                // Dispatch result computed synchronously (no clone); budget consumed async.
-                let result: Option<()> = None; // every item is "Processed"
-                async move {
-                    consume_budget().await;
-                    result
-                }
-            })
-            .fold(0u64, |acc, _| async move { acc + 1 })
-            .await;
-
-        assert_eq!(
-            unrelated_count, 0,
-            "all Processed items should be filtered out by filter_map"
-        );
-
-        // The canary must have been scheduled at least once while the dispatch loop ran.
-        // If consume_budget() is removed and future::ready() is used instead, the loop
-        // never returns Poll::Pending on the current_thread executor and this assertion fails.
-        let progress = counter.load(Ordering::Relaxed);
-        assert!(
-            progress > 0,
-            "canary task made no forward progress during the {N}-item dispatch run (counter = {progress}); the \
-             dispatch loop is monopolizing the executor thread — ensure filter_map returns `async move {{ \
-             consume_budget().await; result }}` rather than `future::ready(result)`"
-        );
-
-        canary.abort();
-        canary.await.ok();
-    }
     /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
     ///
     /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
