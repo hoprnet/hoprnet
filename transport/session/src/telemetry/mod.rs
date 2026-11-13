@@ -17,6 +17,9 @@ use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPA
 // scope, which silently breaks every intra-doc link the module wrote against its own scope. The
 // module documents itself.
 pub(crate) mod pix;
+// The SURB keep-alive reserve hold: node-level like the PIX aggregates, but not PIX-only, and on the
+// `hopr_surb_*` prefix so it reaches `/metrics`. Same `//`-comment reason as `pix` above.
+pub(crate) mod surb;
 
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
@@ -222,6 +225,8 @@ lazy_static::lazy_static! {
         "hopr_session_pix_fill_packets_total",
         "PIX fill keep-alives originated by this Exit, above its SURB-level notification rate"
     ).unwrap();
+    // The keep-alive reserve hold pair lives in `surb`, not here: it is node-level, not per-Session,
+    // and on the `hopr_surb_*` prefix. See `telemetry/surb.rs`.
     static ref SESSION_RUNTIME: parking_lot::Mutex<HashMap<SessionId, SessionRuntimeState>> = parking_lot::Mutex::new(HashMap::new());
 }
 
@@ -650,6 +655,58 @@ mod tests {
 
         assert!(text.contains(&produced_metric));
         assert!(text.contains(&consumed_metric));
+    }
+
+    /// The keep-alive-reserve hold instruments are reachable, carry the closed `pix` label, and
+    /// actually observe a duration.
+    ///
+    /// The histogram half is asserted **by value**, not just by presence: a counter that never
+    /// increments and a histogram that observes 0 both export a series, so a name-only check would
+    /// pass an episode whose clock never ran. Counts and sums are process-wide, so the assertions
+    /// are lower bounds rather than exact figures; a fresh label value keeps them meaningful.
+    #[test]
+    fn surb_reserve_hold_metrics_are_exported_with_labels_and_observations() {
+        surb::record_surb_reserve_hold(true);
+        surb::record_surb_reserve_hold(true);
+        surb::record_surb_reserve_hold_duration(true, 0.25);
+
+        let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
+
+        let holds = text
+            .lines()
+            .find(|line| line.starts_with("hopr_surb_reserve_holds_total{pix=\"true\"} "))
+            .and_then(|line| line.rsplit(' ').next())
+            .and_then(|value| value.parse::<f64>().ok())
+            .expect("the counter must be exported under the closed `pix` label");
+        assert!(
+            holds >= 2.0,
+            "the counter must have counted both holds, not merely exist: was {holds}"
+        );
+
+        let sum = text
+            .lines()
+            .find(|line| line.starts_with("hopr_surb_reserve_hold_seconds_sum{pix=\"true\"} "))
+            .and_then(|line| line.rsplit(' ').next())
+            .and_then(|value| value.parse::<f64>().ok())
+            .expect("the histogram's sum must be exported under the `pix` label");
+        assert!(
+            sum >= 0.25,
+            "the observed duration must reach the histogram, not be swallowed on the way: sum was {sum}"
+        );
+
+        let count = text
+            .lines()
+            .find(|line| line.starts_with("hopr_surb_reserve_hold_seconds_count{pix=\"true\"} "))
+            .and_then(|line| line.rsplit(' ').next())
+            .and_then(|value| value.parse::<f64>().ok())
+            .expect("the histogram's count must be exported");
+        assert!(count >= 1.0, "an episode must be observed, not merely declared");
+
+        assert!(
+            !text.contains("hopr_surb_reserve_holds_total{pix=\"true\",session_id")
+                && !text.contains("hopr_surb_reserve_hold_seconds_count{pix=\"true\",session_id"),
+            "neither may be labelled by a Session: the hold is a node-level pressure signal"
+        );
     }
 
     /// Attaches balancer data to a fresh Session and returns the pieces a gauge test drives.

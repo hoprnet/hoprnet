@@ -1,10 +1,17 @@
-//! Bounded node-level accounting for the PIX Exit.
+//! Bounded node-level accounting for the PIX Exit, and for the SURB keep-alive reserve hold.
+//!
+//! Most of this module is the PIX Exit's bookkeeping. One type is not: [`SurbReserveHoldEpisode`]
+//! measures Exit data held back by the SURB keep-alive reserve, which sits on the data egress
+//! *before* the PIX gate and so fires for a rate-controlled Session without PIX as well. It is here
+//! because it is the same shape — an episode closed by `Drop` — and because the emission shims
+//! below are what make the arithmetic testable without the `telemetry` feature.
 //!
 //! Everything here is compiled unconditionally, including without the `telemetry` feature. Only the
-//! instruments the numbers are eventually written to live behind the feature, in
-//! `crate::telemetry::pix`. The split is deliberate: the delta arithmetic below is the part that
-//! can be wrong in a way an operator would never notice — a gauge that fails to come back down, a
-//! cycle counted twice — and a default `cargo nextest run --lib` must exercise it.
+//! instruments the numbers are eventually written to live behind that feature, in
+//! [`crate::telemetry`]: the PIX aggregates in [`crate::telemetry::pix`], and the SURB reserve pair
+//! in [`crate::telemetry::surb`]. The split is deliberate: the delta arithmetic below is the part
+//! that can be wrong in a way an operator would never notice — a gauge that fails to come back
+//! down, a cycle counted twice — and a default `cargo nextest run --lib` must exercise it.
 //!
 //! # Why aggregates rather than more labels
 //!
@@ -211,6 +218,61 @@ impl Drop for PixGateBlockEpisode {
 /// measure is how long the Session's teardown took to reach its last writer.
 pub fn record_gate_closed() {
     emit_gate_block(PixGateBlock::Closed);
+}
+
+/// One episode of Exit data being held back by the SURB keep-alive reserve.
+///
+/// # Why an episode rather than a poll
+///
+/// [`hold_for_surb_reserve`](crate::manager) checks the estimate every
+/// [`SURB_RESERVE_POLL`](crate::manager) while it waits, so at a long hold it polls many times.
+/// What an operator wants is how often the Exit held data and for how long, not how many times the
+/// polling loop woke up, so the episode is counted once when the hold future is created and timed
+/// until it ends. A packet above the reserve creates no episode at all — there is nothing held.
+///
+/// # Why `Drop`
+///
+/// The hold ends in more than one way: the stock rises and the waiting packet goes on, the Session is
+/// torn down and its sink dropped with the hold future inside, or the future is dropped before its
+/// first poll (a writer cancelled between the `Sink::with` call and the first poll). Only `Drop`
+/// covers all of them, so "every hold is timed exactly once" holds without any of those paths
+/// having to remember.
+///
+/// Unlike [`PixGateBlockEpisode`] this is not PIX-only: the hold sits on the Exit's data egress
+/// before the PIX gate, so it fires for a rate-controlled Session without PIX as well. That is why
+/// its instruments are `hopr_surb_reserve_*` and not a `hopr_pix_*` spelling.
+///
+/// # Why the episode remembers whether the Session has PIX
+///
+/// The pair is labelled by it, because the two questions are different. A PIX Session's hold is
+/// one of two gates an Exit operator watches; a non-PIX hold is the *only* SURB backpressure a
+/// rate-controlled Session has. An unlabelled counter would also conflate breadth with depth: one
+/// starved Session emits one episode per held data packet, which looks identical to a node-wide
+/// shortage. The label is a closed set chosen at construction from the egress gate the Session
+/// was built with, so it cannot grow.
+pub struct SurbReserveHoldEpisode {
+    pix: bool,
+    began: Instant,
+}
+
+impl SurbReserveHoldEpisode {
+    /// Counts one hold beginning, and starts its clock.
+    ///
+    /// `pix` is whether this Session runs a PIX egress gate (see
+    /// [`exit_data_egress`](crate::manager)).
+    pub fn begin(pix: bool) -> Self {
+        emit_surb_reserve_hold(pix);
+        Self {
+            pix,
+            began: Instant::now(),
+        }
+    }
+}
+
+impl Drop for SurbReserveHoldEpisode {
+    fn drop(&mut self) {
+        emit_surb_reserve_hold_duration(self.pix, self.began.elapsed().as_secs_f64());
+    }
 }
 
 /// Why an incoming PIX Session was refused before it was established.
@@ -914,6 +976,45 @@ fn emit_gate_block_duration(reason: GateBlockReason, seconds: f64) {
     probe::add(&format!("gate_block_observations/{reason}"), 1);
     #[cfg(not(any(feature = "telemetry", test)))]
     let _ = reason;
+}
+
+fn emit_surb_reserve_hold(pix: bool) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::surb::record_surb_reserve_hold(pix);
+    #[cfg(test)]
+    probe::add(&format!("surb_reserve_holds/episodes/{}", pix_label(pix)), 1);
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = pix_label(pix);
+}
+
+fn emit_surb_reserve_hold_duration(pix: bool, seconds: f64) {
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::surb::record_surb_reserve_hold_duration(pix, seconds);
+    #[cfg(not(feature = "telemetry"))]
+    let _ = seconds;
+
+    #[cfg(test)]
+    {
+        let label = pix_label(pix);
+        // The count, so a test can assert an episode closed exactly once...
+        probe::add(&format!("surb_reserve_holds/observations/{label}"), 1);
+        // ...and the value, in milliseconds, so one can assert the clock actually ran. Unlike
+        // `emit_gate_block_duration`, which discards it: the episode's `began` is this pair's only
+        // input, and a clock taken at the wrong point would be invisible to a count-only probe.
+        probe::add(
+            &format!("surb_reserve_hold_seconds/{label}"),
+            (seconds * 1000.0).round() as i64,
+        );
+    }
+    #[cfg(not(any(feature = "telemetry", test)))]
+    let _ = pix_label(pix);
+}
+
+/// The `pix` label value, spelled once and used by both the instrument and the probe mirror so the
+/// two cannot drift. Always compiled: the shims consult it even in the builds where neither the
+/// feature nor the probe is on.
+pub(crate) fn pix_label(pix: bool) -> &'static str {
+    if pix { "true" } else { "false" }
 }
 
 /// An in-process mirror of the aggregates, so tests can assert what was emitted.

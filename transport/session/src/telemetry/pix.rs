@@ -9,10 +9,11 @@
 //!
 //! These use `hopr_pix_*` rather than the `hopr_session_pix_*` of their per-Session siblings, and
 //! the difference is not cosmetic. `hopr-types`' `meter_for_metric` routes an instrument to a meter
-//! provider by *name prefix*, and `hopr_session_*` is routed to the OTLP-only provider — see
-//! `OTLP.md`, which records that those are not exposed on the Prometheus `/metrics` endpoint. These
-//! aggregates are the ones an operator dashboards and alerts on, so they belong on `/metrics`,
-//! alongside the existing `hopr_pix_share_insert_failures`.
+//! provider by *name prefix*, and hoprd gives `hopr_session_*` an OTLP-only provider *when a
+//! `hopr_session` interval override is configured* in `HOPRD_METRIC_EXPORT_INTERVAL` — see
+//! `OTLP.md`, which recommends exactly that and records that such series are not exposed on the
+//! Prometheus `/metrics` endpoint. These aggregates are the ones an operator dashboards and alerts
+//! on, so they belong on `/metrics`, alongside the existing `hopr_pix_share_insert_failures`.
 //!
 //! The per-Session gauges keep their spelling and their OTLP route. They answer a different
 //! question for a different consumer.
@@ -48,6 +49,30 @@
 //! The last two are per-Session events rather than node aggregates, but they belong on this prefix
 //! because neither is labelled by a Session. Their per-Session siblings
 //! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
+//!
+//! # The keep-alive reserve hold, which is not on this prefix
+//!
+//! One pair sits next to these and deliberately does not share the prefix. The hold the Exit's
+//! data egress takes while its SURB stock is down to the keep-alive reserve (see
+//! `hold_for_surb_reserve`) is measured as an episode by
+//! [`SurbReserveHoldEpisode`](crate::supervision::telemetry::SurbReserveHoldEpisode), not by
+//! [`PixGateBlockEpisode`](crate::supervision::telemetry::PixGateBlockEpisode): it sits *before* the
+//! PIX gate, so it fires for a rate-controlled Session without PIX as well, and conflating its
+//! episodes with `hopr_pix_gate_blocks_total` would make an SURB shortage look like a PIX budget
+//! refusal. Its instruments live in [`crate::telemetry::surb`], which documents their contract:
+//! both are labelled by `pix` = `true\|false`, so a PIX Session's hold is separable from the
+//! non-PIX backpressure a rate-controlled Session relies on, and neither is labelled by a Session.
+//! The `hopr_surb_*` prefix is load-bearing and not the `hopr_session_surb_*` of the surrounding
+//! per-Session instruments: an unprefixed family reaches `/metrics` under *every* hoprd
+//! configuration, whereas `hopr_session_*` is diverted to the OTLP-only provider once a
+//! `hopr_session` interval override is configured (see the prefix note above), and an operator
+//! alerting on an SURB shortage dashboards `/metrics`. A packet above the reserve creates no
+//! episode; a packet held across many polling intervals creates one, not one per poll.
+//!
+//! Do not confuse it with `hopr_pix_fill_backoff_total{reason="surb_reserve"}`, which is already in
+//! this module's table: that counts *keep-alives the Exit withheld from its own PIX fill schedule*,
+//! whereas the pair above counts *data packets it held for the Entry*, on any rate-controlled
+//! Session. Both rise under an SURB shortage, so a dashboard summing them double-counts.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived

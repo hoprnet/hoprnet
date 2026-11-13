@@ -57,7 +57,7 @@ use crate::{
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
-        telemetry::{PixAdmissionRejection, PixGateBlockEpisode, record_gate_closed},
+        telemetry::{PixAdmissionRejection, PixGateBlockEpisode, SurbReserveHoldEpisode, record_gate_closed},
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
@@ -438,10 +438,14 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
 /// directly (see [`SessionManager::spawn_exit_keep_alive`]), and the PIX fill packets are bounded by
 /// their own `min_surb_reserve`. That is the point of the reserve: they are what it is held for.
+///
+/// `pix` says whether the Session runs a PIX egress gate, and only labels the hold episode: the
+/// hold itself is the same either way.
 fn hold_for_surb_reserve(
     session_id: SessionId,
     estimator: &AtomicSurbFlowEstimator,
     balancer: &Arc<BalancerStateValues>,
+    pix: bool,
 ) -> Option<futures::future::BoxFuture<'static, ()>> {
     if !balancer.counterparty_refills() {
         return None;
@@ -455,7 +459,22 @@ fn hold_for_surb_reserve(
 
     debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
     let (estimator, balancer) = (estimator.clone(), balancer.clone());
+
+    // The episode begins here, before the future's first poll, and is carried into it by value so
+    // that its `Drop` closes it however the hold ends: the stock rises and the future resolves, the
+    // Session is torn down and the future is dropped mid-poll, or the caller drops it before ever
+    // polling it. Created only on this path, so a packet above the reserve records nothing.
+    //
+    // This clock is the authoritative one, and it deliberately starts earlier than the debug log's
+    // `held_for` below: the metric measures the time the Exit held data, which begins when the
+    // future is created, whereas the log measures the polling loop's own run and so misses any
+    // interval between creation and the first poll. That is the issue's requirement, not a bug —
+    // do not "fix" either clock to match the other.
+    let episode = SurbReserveHoldEpisode::begin(pix);
     Some(Box::pin(async move {
+        // Never read: its `Drop` at the end of this future — on the release path below, on
+        // cancellation, or when the future is dropped unpolled — is what records the duration.
+        let _episode = episode;
         let held_since = Instant::now();
         while estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) {
             hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
@@ -504,7 +523,7 @@ where
             count_return_packet_surb(estimator, data)
         };
         let held = keeps_alive
-            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer))
+            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer, gate.is_some()))
             .flatten();
         match held {
             None => acquire_egress_permit(gate.clone(), routing, book_consumed(&estimator, data)),
@@ -25051,8 +25070,15 @@ mod tests {
     /// The Exit must not spend its last SURBs on data: they are what its keep-alives, level reports
     /// and distress signals go out on. At the reserve the sink holds the packet, and it counts it
     /// against the stock only when it goes on; once the stock is above the reserve again it goes.
+    ///
+    /// The hold is measured here too, on a Session with no PIX gate at all (`None`): the issue's
+    /// point that the metric covers rate-controlled Sessions without PIX, which is what makes it
+    /// distinct from `hopr_pix_gate_blocks_total`.
     #[tokio::test]
     async fn data_should_be_held_back_while_the_surb_stock_sits_at_the_keep_alive_reserve() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
         let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
         let estimator = AtomicSurbFlowEstimator::default();
         let balancer = balancer_with_target(3_200);
@@ -25082,6 +25108,16 @@ mod tests {
         );
         assert_eq!(0, estimator.estimate_surbs_consumed(), "a held packet consumes nothing");
         assert!(!sending.is_finished());
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "a Session without PIX still records its hold"
+        );
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the hold is open while the packet waits"
+        );
 
         // A level report or a refill brings one more SURB than the reserve.
         estimator.produced.fetch_add(1, Ordering::Relaxed);
@@ -25091,6 +25127,11 @@ mod tests {
             .context("the sink must have forwarded it")?;
         timeout(Duration::from_secs(5), sending).await???;
         assert_eq!(1, estimator.estimate_surbs_consumed());
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the release closes the one hold this packet opened"
+        );
         Ok(())
     }
 
@@ -25104,7 +25145,7 @@ mod tests {
         let session_id = HoprPseudonym::random();
         let balancer = balancer_with_target(3_200);
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_none(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_none(),
             "no hold, no allocation"
         );
 
@@ -25194,7 +25235,7 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         let session_id = HoprPseudonym::random();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
             "with a keep-alive stream, a stock at the reserve would hold data"
         );
 
@@ -25258,7 +25299,7 @@ mod tests {
 
         balancer.note_counterparty_refills();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
             "once the Entry refills, a stock at the reserve holds data again"
         );
         Ok(())
@@ -25302,6 +25343,270 @@ mod tests {
             .context("the packet must go once the lowered reserve is below the stock")?
             .context("the sink must have forwarded it")?;
         timeout(Duration::from_secs(5), sending).await???;
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // The keep-alive reserve hold episodes
+    // -----------------------------------------------------------------------
+
+    /// A packet above the reserve is never held, so it must leave no trace in the hold metrics —
+    /// counting it would report pressure where there is none.
+    #[tokio::test]
+    async fn a_packet_above_the_reserve_creates_no_hold_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(33, Ordering::Relaxed);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer,
+            None,
+            true,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("above the reserve the packet must not wait")??;
+        assert!(forwarded.try_recv().is_ok(), "forwarded");
+        assert_eq!(0, probe::get("surb_reserve_holds/episodes/false"), "nothing was held");
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and nothing was timed"
+        );
+        Ok(())
+    }
+
+    /// A packet held across many polling intervals is one episode, not one per poll: the counter
+    /// measures held packets, and the duration is recorded once when the hold ends.
+    #[tokio::test]
+    async fn a_held_packet_creates_one_hold_episode_and_one_duration() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator
+            .produced
+            .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("a stock at the reserve must hold the packet")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "the hold is one episode"
+        );
+
+        // Several polls, well past the first interval.
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold must not resolve while the stock is at the reserve"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "still one episode, not one per poll"
+        );
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "an open hold is not timed yet"
+        );
+
+        // The Entry refills the stock, and the hold releases.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), &mut hold)
+            .await
+            .context("the hold must resolve once the stock is above the reserve")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "release is not a second episode"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the release records the duration exactly once"
+        );
+        Ok(())
+    }
+
+    /// Dropping a hold that is still waiting — a Session torn down underneath it — closes and times
+    /// the episode exactly once.
+    #[tokio::test]
+    async fn dropping_a_pending_hold_records_one_duration() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        assert_eq!(1, probe::get("surb_reserve_holds/episodes/false"));
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold waits while nothing refills the stock"
+        );
+        assert_eq!(0, probe::get("surb_reserve_holds/observations/false"));
+
+        drop(hold);
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "dropping the pending hold must close its episode"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "and must not begin another"
+        );
+        Ok(())
+    }
+
+    /// A hold created and dropped before its first poll is still one episode: the guard is carried
+    /// by the future, so `Drop` sees it even though the polling loop never ran.
+    #[test]
+    fn a_hold_dropped_before_its_first_poll_still_closes_its_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "the episode begins when the future is created"
+        );
+        drop(hold);
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "a future dropped unpolled still records exactly one duration"
+        );
+        Ok(())
+    }
+
+    /// The recorded duration is the real elapsed time, not a count dressed up as one: a clock taken
+    /// at the wrong point, or one that never advances, would pass every count-only assertion.
+    ///
+    /// Asserted from below rather than as an exact figure, because the wall clock is what is being
+    /// measured: a hold kept open for several polling intervals must report at least that long.
+    #[tokio::test]
+    async fn a_hold_episode_reports_the_time_it_was_actually_held() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+
+        // Three polling intervals, timed here as well as inside the episode.
+        let began = Instant::now();
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold must stay open while nothing refills the stock"
+        );
+        let observed_here_ms = began.elapsed().as_millis() as i64;
+
+        drop(hold);
+        let reported_ms = probe::get("surb_reserve_hold_seconds/false");
+        assert!(
+            reported_ms >= observed_here_ms,
+            "the episode must report at least the time it was held ({observed_here_ms} ms), got {reported_ms} ms"
+        );
+        assert!(
+            reported_ms >= SURB_RESERVE_POLL.as_millis() as i64,
+            "one polling interval is the floor: a clock that never ran would report ~0, got {reported_ms} ms"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and it is still one observation"
+        );
+        Ok(())
+    }
+
+    /// The holds must not be confused with PIX gate blocks: one is an SURB shortage on every
+    /// rate-controlled Exit egress, the other a PIX budget refusal behind it, and an operator
+    /// distinguishes them by the metric each lands in.
+    #[tokio::test]
+    async fn surb_reserve_holds_are_distinct_from_pix_gate_blocks() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        // One hold episode on the SURB reserve.
+        drop(
+            hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+                .context("the stock is below the reserve")?,
+        );
+
+        // One gate-block episode on a strict-prepay gate, released so it closes too.
+        let gate = ServiceGate::new(0, 10);
+        let permit = acquire_egress_permit(
+            Some(gate.clone()),
+            DestinationRouting::Return(HoprPseudonym::random().into()),
+            ApplicationDataOut::with_no_packet_info(ApplicationData::new(
+                SESSION_APPLICATION_TAG,
+                b"payload".as_slice(),
+            )?),
+        );
+        gate.release_service();
+        timeout(Duration::from_secs(5), permit)
+            .await
+            .context("funding must wake the parked packet")?
+            .context("a funded gate must admit it")?;
+
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "one SURB-reserve hold"
+        );
+        assert_eq!(1, probe::get("surb_reserve_holds/observations/false"));
+        assert_eq!(
+            1,
+            probe::get("gate_blocks/predeposit_exhausted"),
+            "one PIX gate block, counted on its own series"
+        );
+        assert_eq!(
+            1,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "closed on its own series too"
+        );
         Ok(())
     }
 }
