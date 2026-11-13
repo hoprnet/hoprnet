@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
+use bytes::{Buf, Bytes};
 use hopr_protocol_pix::{CofactorGroup, GroupEncoding, PixGroup, SsaCommitmentProof};
 use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 
@@ -103,6 +104,21 @@ where
 /// Convenience alias for HOPR specific [`PacketParts`].
 pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
+/// Individual parts of a received [`PacketMessage`].
+///
+/// Unlike [`PacketParts`], the payload is a view into the received packet's buffer.
+pub struct ReceivedPacketParts<S: SphinxSuite, H: SphinxHeaderSpec> {
+    /// Contains (a potentially empty) list of SURBs.
+    pub surbs: Vec<SURB<S, H>>,
+    /// Contains the actual packet payload.
+    pub payload: Bytes,
+    /// Additional packet signals from the sender to the recipient.
+    pub signals: PacketSignals,
+}
+
+/// Convenience alias for HOPR specific [`ReceivedPacketParts`].
+pub type HoprReceivedPacketParts = ReceivedPacketParts<HoprSphinxSuite, HoprSphinxHeaderSpec>;
+
 // Coerces PacketSignals to only lower 4 bits.
 pub(crate) const S_MASK: u8 = 0b0000_1111;
 
@@ -148,11 +164,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<S, H, P>> for PacketParts<'_, S, H> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<S, H, P>>
+    for ReceivedPacketParts<S, H>
+{
     type Error = SphinxError;
 
     fn try_from(value: PacketMessage<S, H, P>) -> Result<Self, Self::Error> {
-        let data = value.0.into_unpadded()?;
+        let mut data = value.0.into_unpadded()?;
         if data.is_empty() {
             return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
         }
@@ -161,36 +179,24 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
         let signals = PacketSignals::new((data[0] & S_MASK.not()) >> S_MASK.trailing_ones())
             .map_err(|_| GeneralError::ParseError("HoprPacketMessage.signals".into()))?;
 
-        if num_surbs > 0 {
-            let surb_end = num_surbs * SURB::<S, H>::SIZE;
-            if surb_end >= data.len() {
-                return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
-            }
-
-            let mut data = data.into_vec();
-
-            let surbs = data[1..=surb_end]
-                .chunks_exact(SURB::<S, H>::SIZE)
-                .map(SURB::<S, H>::try_from)
-                .collect::<Result<Vec<_>, _>>()?;
-
-            // Skip buffer all the way to the end of the SURBs.
-            data.drain(0..=surb_end).for_each(drop);
-
-            Ok(PacketParts {
-                surbs,
-                payload: Cow::Owned(data),
-                signals,
-            })
-        } else {
-            let mut data = data.into_vec();
-            data.remove(0);
-            Ok(PacketParts {
-                surbs: Vec::with_capacity(0),
-                payload: Cow::Owned(data),
-                signals,
-            })
+        let surb_end = num_surbs * SURB::<S, H>::SIZE;
+        if surb_end >= data.len() {
+            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
+
+        let surbs = data[1..1 + surb_end]
+            .chunks_exact(SURB::<S, H>::SIZE)
+            .map(SURB::<S, H>::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Skip the header and the SURBs, leaving only the payload.
+        data.advance(1 + surb_end);
+
+        Ok(Self {
+            surbs,
+            payload: data,
+            signals,
+        })
     }
 }
 
@@ -440,6 +446,15 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
+    fn assert_round_trip(parts: HoprPacketParts) -> anyhow::Result<()> {
+        let received: HoprReceivedPacketParts = HoprPacketMessage::try_from(parts.clone())?.try_into()?;
+        assert_eq!(parts.surbs, received.surbs);
+        assert_eq!(parts.payload.as_ref(), received.payload.as_ref());
+        assert_eq!(parts.signals, received.signals);
+
+        Ok(())
+    }
+
     #[test]
     fn hopr_packet_message_message_only() -> anyhow::Result<()> {
         let parts_1 = HoprPacketParts {
@@ -448,10 +463,7 @@ mod tests {
             signals: PacketSignal::OutOfSurbs.into(),
         };
 
-        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
-        assert_eq!(parts_1, parts_2);
-
-        Ok(())
+        assert_round_trip(parts_1)
     }
 
     #[test]
@@ -462,10 +474,7 @@ mod tests {
             signals: PacketSignal::OutOfSurbs.into(),
         };
 
-        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
-        assert_eq!(parts_1, parts_2);
-
-        Ok(())
+        assert_round_trip(parts_1)
     }
 
     #[test]
@@ -476,8 +485,32 @@ mod tests {
             signals: PacketSignal::OutOfSurbs.into(),
         };
 
-        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
-        assert_eq!(parts_1, parts_2);
+        assert_round_trip(parts_1)
+    }
+
+    fn parse_received(message: &[u8]) -> anyhow::Result<HoprReceivedPacketParts> {
+        Ok(HoprPacketMessage::from(PaddedPayload::new(message)?).try_into()?)
+    }
+
+    #[test]
+    fn received_parts_should_reject_a_message_claiming_more_surbs_than_it_holds() -> anyhow::Result<()> {
+        // The header claims one SURB, but the message holds one byte less than a whole SURB.
+        let mut message = vec![0u8; SURB::<HoprSphinxSuite, HoprSphinxHeaderSpec>::SIZE];
+        message[0] = 1;
+
+        assert!(parse_received(&message).is_err());
+        assert!(parse_received(&[1]).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn received_parts_should_parse_an_empty_message_without_surbs() -> anyhow::Result<()> {
+        let parts = parse_received(&[0])?;
+
+        assert!(parts.surbs.is_empty());
+        assert!(parts.payload.is_empty());
+        assert!(parts.signals.is_empty());
 
         Ok(())
     }
