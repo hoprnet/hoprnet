@@ -1,16 +1,5 @@
-//! What the Exit pays for on behalf of a peer that asked for it, and the bounds put on it.
-//!
-//! The Exit sends every reply to a `StartSession` over the SURBs the requester supplied, and the
-//! requester chooses the return path. A multi-hop return path costs the Exit one ticket per packet
-//! (see the packet encoder in `hopr-protocol-hopr`), while the request itself and the SURBs it
-//! carries can be delivered for free over a 0-hop forward path. A requester can therefore make the
-//! Exit spend at the rate it can send requests, unless the replies are bounded.
-//!
-//! This module holds that bound for refusals ([`RefusalReplyBudget`], [`RefusalReplyBucket`]) and
-//! the closed vocabulary the bounded `hopr_exit_control_packets_total` metric is labelled with
-//! ([`ExitControlKind`], [`ExitSessionKind`], [`ExitControlOutcome`]). The metric records how many
-//! such packets were sent, not what they cost: the SURB, and with it the path length and the ticket,
-//! is chosen later in the packet pipeline.
+//! What the Exit pays for on a peer's behalf, and the bounds put on it: the refusal reply budget and
+//! the labels of `hopr_exit_control_packets_total`.
 
 use std::time::{Duration, Instant};
 
@@ -18,50 +7,38 @@ use parking_lot::Mutex;
 
 use crate::{Capabilities, Capability, supervision::telemetry::PixAdmissionRejection};
 
-/// The default [`RefusalReplyBudget::burst`].
-///
-/// What it bounds is the most replies a flood can make the Exit pay for back to back, before the
-/// refill rate applies. It is large enough that an Exit that is merely full or briefly busy still
-/// answers the honest Entries that arrive together.
+/// The default [`RefusalReplyBudget::burst`]: the most replies a flood can make the Exit pay for back
+/// to back, while a briefly busy Exit still answers the Entries that arrive together.
 pub const DEFAULT_REFUSAL_REPLY_BURST: u32 = 32;
 
 /// The default [`RefusalReplyBudget::refill_period`].
 pub const DEFAULT_REFUSAL_REPLY_REFILL_PERIOD: Duration = Duration::from_secs(1);
 
-/// The shortest [`RefusalReplyBudget::refill_period`] the node accepts.
-///
-/// A zero period would earn a reply on every clock reading, which is no budget at all. A node that
-/// wants no bound says so with `None` rather than with a degenerate period.
+/// The shortest [`RefusalReplyBudget::refill_period`] accepted; a zero period would be no budget.
 pub const MIN_REFUSAL_REPLY_REFILL_PERIOD: Duration = Duration::from_millis(1);
 
 /// How many refusal replies an Exit sends, shared by every reason it refuses a `StartSession`.
 ///
-/// Every refusal is answered with a `SessionError` that travels over the requester's SURB, and the
-/// requester picks that SURB's path. A reply over a multi-hop path costs the Exit a ticket, so
-/// without a bound a flood of requests that are going to be refused drains the Exit's funds at the
-/// flood's rate. The bound is one budget for all reasons rather than one per reason, because a peer
-/// can pick whichever reason is cheapest to provoke.
+/// A reply travels over a SURB the requester chose, and a multi-hop one costs the Exit a ticket while
+/// the request reaches it for free, so unbounded replies let a flood drain the Exit's funds. One
+/// budget covers all reasons because a peer picks whichever is cheapest to provoke.
 ///
-/// It is a token bucket: up to [`burst`](Self::burst) replies at once, and then one more every
-/// [`refill_period`](Self::refill_period). A refusal that finds the bucket empty is dropped without
-/// a reply, and the requester finds out by timing out, as it would on a lost packet.
+/// A token bucket: up to [`burst`](Self::burst) replies at once, then one every
+/// [`refill_period`](Self::refill_period). A refusal that finds it empty gets no reply and the
+/// requester times out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RefusalReplyBudget {
-    /// The most refusal replies that can go out back to back, which is also the bucket's capacity.
-    ///
-    /// Zero means a refusal is never answered.
+    /// The bucket's capacity. Zero never answers a refusal.
     ///
     /// Default is [`DEFAULT_REFUSAL_REPLY_BURST`].
     #[default(DEFAULT_REFUSAL_REPLY_BURST)]
     pub burst: u32,
 
-    /// How long it takes to earn one more reply once the burst is spent, so the long-run rate is one
-    /// reply per period.
+    /// How long it takes to earn one more reply once the burst is spent. Floored at
+    /// [`MIN_REFUSAL_REPLY_REFILL_PERIOD`] by the manager.
     ///
-    /// Floored at [`MIN_REFUSAL_REPLY_REFILL_PERIOD`] by the manager.
-    ///
-    /// Default is [`DEFAULT_REFUSAL_REPLY_REFILL_PERIOD`] (1 second).
+    /// Default is [`DEFAULT_REFUSAL_REPLY_REFILL_PERIOD`].
     #[default(DEFAULT_REFUSAL_REPLY_REFILL_PERIOD)]
     #[serde(with = "humantime_serde")]
     pub refill_period: Duration,
@@ -74,10 +51,7 @@ struct BucketState {
     refilled_at: Instant,
 }
 
-/// A token bucket over a [`RefusalReplyBudget`].
-///
-/// Shared by every clone of the manager through an `Arc`, since the budget is the node's and not a
-/// Session's. The lock is held for a few integer operations only.
+/// A token bucket over a [`RefusalReplyBudget`], shared by every clone of the manager.
 #[derive(Debug)]
 pub(crate) struct RefusalReplyBucket {
     budget: RefusalReplyBudget,
@@ -85,10 +59,7 @@ pub(crate) struct RefusalReplyBucket {
 }
 
 impl RefusalReplyBucket {
-    /// Creates a bucket that starts full.
-    ///
-    /// A [`refill_period`](RefusalReplyBudget::refill_period) below
-    /// [`MIN_REFUSAL_REPLY_REFILL_PERIOD`] is raised to it.
+    /// Creates a bucket that starts full, raising a too-short refill period to the minimum.
     pub(crate) fn new(budget: RefusalReplyBudget) -> Self {
         Self::new_at(budget, Instant::now())
     }
@@ -109,7 +80,7 @@ impl RefusalReplyBucket {
         self.try_take_at(Instant::now())
     }
 
-    /// [`try_take`](Self::try_take) at a given instant, so the refill can be tested without sleeping.
+    /// [`try_take`](Self::try_take) at a given instant, for tests without sleeping.
     fn try_take_at(&self, now: Instant) -> bool {
         let mut state = self.state.lock();
         self.refill(&mut state, now);
@@ -117,7 +88,7 @@ impl RefusalReplyBucket {
         if state.tokens == 0 {
             return false;
         }
-        // A full bucket has no partial period to keep: the next one starts with this reply.
+        // A full bucket has no partial period to keep.
         if state.tokens == self.budget.burst {
             state.refilled_at = now;
         }
@@ -137,9 +108,7 @@ impl RefusalReplyBucket {
         if state.tokens == self.budget.burst {
             state.refilled_at = now;
         } else {
-            // Advance by whole periods only, so the part of a period already waited is not lost and
-            // the long-run rate is exact. Not full means `periods` is small, and the product is
-            // at most the elapsed time, so the checks are never the ones that decide.
+            // Advance by whole periods only, keeping partial progress so the long-run rate is exact.
             state.refilled_at = self
                 .budget
                 .refill_period
@@ -151,29 +120,24 @@ impl RefusalReplyBucket {
 }
 
 /// What a packet the Exit sent on a peer's behalf was for, as `hopr_exit_control_packets_total`
-/// labels it.
-///
-/// Closed, so that no call site can invent a label value. Kinds are added here as further packets
-/// the Exit pays for are counted.
-// Every kind is a refusal for now, which the lint reads as a redundant prefix. The prefix is the label
-// value, and the other kinds this enum is for will not share it.
+/// labels it. Closed, so no call site can invent a label value.
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum ExitControlKind {
-    /// A refusal because the offer was over a direct (0-hop) return path.
+    /// Refused: PIX offered over a direct (0-hop) return path.
     RefusalDirectReturnPath,
-    /// A refusal because this node has no PIX support installed.
+    /// Refused: no PIX support installed.
     RefusalNoPixSupport,
-    /// A refusal because the offered PIX parameters were unacceptable.
+    /// Refused: unacceptable PIX parameters.
     RefusalUnacceptableParams,
-    /// A refusal because the session server did not admit the target.
+    /// Refused: the session server did not admit the target.
     RefusalTargetPolicy,
-    /// A refusal because the node's live-cycle budget could not cover the Session.
+    /// Refused: the live-cycle budget cannot cover the Session.
     RefusalLiveCycleCapacity,
-    /// A refusal because the node has no Session slot to give.
+    /// Refused: no Session slot.
     RefusalNoSessionSlot,
-    /// A refusal because the node could not decide right now.
+    /// Refused: the node could not decide right now.
     RefusalBusy,
 }
 
@@ -191,16 +155,13 @@ impl From<PixAdmissionRejection> for ExitControlKind {
     }
 }
 
-/// Whether the Session a packet belongs to uses PIX, as `hopr_exit_control_packets_total` labels it.
-///
-/// Splits the funded population from the rest, so a node can tell a flood of PIX offers from a flood
-/// of plain Sessions.
+/// Whether the Session a packet belongs to offers PIX, as `hopr_exit_control_packets_total` labels it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum ExitSessionKind {
-    /// The Session offers PIX.
+    /// Offers PIX.
     Pix,
-    /// The Session does not.
+    /// Does not.
     Plain,
 }
 
@@ -215,23 +176,19 @@ impl ExitSessionKind {
     }
 }
 
-/// What became of a packet the Exit was about to send, as `hopr_exit_control_packets_total` labels
-/// it.
+/// What became of a packet, as `hopr_exit_control_packets_total` labels it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum ExitControlOutcome {
-    /// The packet was handed to the transport.
+    /// Handed to the transport.
     Sent,
-    /// The packet was not sent because the budget for it was spent.
+    /// Not sent: the budget was spent.
     DroppedBudget,
-    /// The transport did not take the packet, or timed out.
+    /// The transport refused it or timed out.
     SendFailed,
 }
 
 /// Counts one packet the Exit sent, or declined to send, on a peer's behalf.
-///
-/// The `telemetry` feature gates only the instrument. The probe in a test build is what lets the
-/// default test configuration assert that this was called.
 pub(crate) fn record_exit_control(kind: ExitControlKind, session: ExitSessionKind, outcome: ExitControlOutcome) {
     #[cfg(feature = "telemetry")]
     crate::telemetry::exit_control::record(kind, session, outcome);
@@ -268,11 +225,11 @@ mod tests {
         assert!(bucket.try_take_at(t0));
         assert!(bucket.try_take_at(t0));
 
-        // 1.5 periods in: one reply earned, half a period kept.
+        // 1.5 periods in: one earned, half a period kept.
         assert!(bucket.try_take_at(t0 + SECOND * 3 / 2));
         assert!(!bucket.try_take_at(t0 + SECOND * 3 / 2));
 
-        // The kept half period completes at 2 s, not at 2.5 s.
+        // The kept half completes at 2 s.
         assert!(!bucket.try_take_at(t0 + SECOND * 19 / 10));
         assert!(bucket.try_take_at(t0 + SECOND * 2));
         assert!(!bucket.try_take_at(t0 + SECOND * 2));

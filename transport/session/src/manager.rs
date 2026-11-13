@@ -2964,17 +2964,10 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_secs(6))]
     pub surb_resolution_wait: Duration,
 
-    /// How many refusal replies the Exit sends to `StartSession`s it refuses, across all reasons.
+    /// How many refusal replies the Exit sends to refused `StartSession`s, across all reasons; see
+    /// [`RefusalReplyBudget`]. `None` answers every refusal.
     ///
-    /// A refusal is answered with a `SessionError` over a SURB the requester chose. A multi-hop SURB
-    /// costs this node a ticket per reply, while the request and its SURBs can reach it for free over
-    /// a 0-hop path, so without a bound a flood of refused requests drains the node's funds at the
-    /// flood's rate. One budget covers every reason, since a peer can provoke whichever is cheapest.
-    ///
-    /// A refusal that finds the budget spent is dropped without a reply, and the requester times out.
-    /// `None` answers every refusal, which leaves the node paying for whatever it is sent.
-    ///
-    /// Default is [`RefusalReplyBudget::default`]: a burst of 32, then one reply a second.
+    /// Default is [`RefusalReplyBudget::default`].
     #[default(Some(RefusalReplyBudget::default()))]
     pub refusal_reply_budget: Option<RefusalReplyBudget>,
 }
@@ -3474,9 +3467,7 @@ pub struct SessionManager<S> {
     /// Permits for concurrent session-server admission waits, so a slow server refuses with `Busy`
     /// instead of parking every `StartSession` handler.
     admission_permits: Arc<hopr_utils::runtime::prelude::Semaphore>,
-    /// The node-wide budget of refusal replies, shared by every clone like `live_cycle_bytes`.
-    ///
-    /// `None` when the configuration is unbounded.
+    /// The node-wide refusal reply budget, shared by every clone; `None` when unbounded.
     refusal_replies: Option<Arc<RefusalReplyBucket>>,
 }
 
@@ -4225,8 +4216,7 @@ where
             RoutingOptions::MAX_INTERMEDIATE_HOPS,
         ));
 
-        // The bucket floors the period itself; the config is brought in line so what it reports is
-        // what is enforced.
+        // The bucket floors the period too; this keeps the config in line with what is enforced.
         if let Some(budget) = cfg.refusal_reply_budget.as_mut() {
             budget.refill_period = budget.refill_period.max(MIN_REFUSAL_REPLY_REFILL_PERIOD);
         }
@@ -7010,18 +7000,10 @@ where
         }
     }
 
-    /// Answers a refused `StartSession` with a `SessionError`, if the node's refusal reply budget allows.
+    /// Answers a refused `StartSession` with a `SessionError`, if the [`RefusalReplyBudget`] allows.
     ///
-    /// Every refusal goes through here, so they all draw on the one [`RefusalReplyBudget`]: the reply
-    /// travels over a SURB the requester chose, which can be a multi-hop path that costs this node a
-    /// ticket, and a requester can pick whichever refusal is cheapest to provoke. A refusal that finds
-    /// the budget spent is dropped without a reply and the requester times out. That is `Ok`, because
-    /// the refusal itself is carried out either way.
-    ///
-    /// The decision is counted in `hopr_pix_admission_rejections_total` before the budget is asked,
-    /// since it counts refusals and not the replies to them. The replies are counted in
-    /// `hopr_exit_control_packets_total` and `hopr_session_sent_error_count`; the latter only for those
-    /// that went out.
+    /// Every refusal goes through here so that they share the one budget. A dropped reply is `Ok`:
+    /// the refusal is carried out either way.
     async fn refuse_session_start(
         &self,
         reply_routing: DestinationRouting,
@@ -7034,14 +7016,11 @@ where
         let kind = ExitControlKind::from(refusal);
         let session = ExitSessionKind::of(capabilities);
 
-        // Counted before the send, not after: the refusal has already happened, and
-        // `send_via_msg_sender` can fail to encode, fail to send, or time out. Counting
-        // afterwards would drop exactly the refusals that a struggling node makes most.
+        // Counted before the send: it counts decisions, and a struggling node's sends fail most.
         refusal.record_if_pix(capabilities);
 
-        // Every refusal is a decision, answered or not. The per-refusal lines are `debug!` because a
-        // peer can provoke them for free, so this is what an operator sees at the default level: one
-        // line for the first refusal and then one per `FULL_QUEUE_WARN_INTERVAL`.
+        // The per-refusal logs are `debug!` since a peer can provoke them for free; this rate-limited
+        // summary is what shows at the default level.
         let refused_before = START_REFUSALS.fetch_add(1, Ordering::Relaxed);
         if is_full_queue_warn_due(refused_before) {
             warn!(
@@ -7052,13 +7031,11 @@ where
             );
         }
 
-        // Fetched before a token is taken, so that a refusal which cannot be sent at all never spends one.
+        // Before the token, so a refusal that cannot be sent never spends one.
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        // A token is *not* given back if the send below fails or times out. Under sink backpressure a
-        // refund would make every following refusal hold a Start handler for the send timeout, whereas
-        // a spent token drops the later refusals at once, which is the cheaper failure on an
-        // overloaded node.
+        // Not refunded if the send fails: under backpressure a refund would hold every later refusal
+        // for the send timeout, where a spent token drops them at once.
         if self.refusal_replies.as_ref().is_some_and(|bucket| !bucket.try_take()) {
             let drops_so_far = START_REFUSAL_REPLY_DROPS.fetch_add(1, Ordering::Relaxed);
             record_exit_control(kind, session, ExitControlOutcome::DroppedBudget);
@@ -15110,8 +15087,7 @@ mod tests {
         Ok(())
     }
 
-    /// What [`manager_refusing_every_opening`] hands back: the manager, the receiver every message it
-    /// sends arrives on, and the incoming-session receiver and abort handles the test must hold.
+    /// What [`manager_refusing_every_opening`] returns; the test must hold the last two.
     type RefusingFixture = (
         RecordingManager,
         futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
@@ -15119,11 +15095,8 @@ mod tests {
         Vec<AbortHandle>,
     );
 
-    /// A manager with `budget` as its refusal reply budget and no room for any Session, so that every
-    /// opening is refused, with every message it sends delivered to the returned receiver.
-    ///
-    /// Takes the raw receiver rather than a mock, so a test can count the replies and see which
-    /// went out without waiting on a single one.
+    /// A manager with `budget` and no room for any Session, so every opening is refused; its sent
+    /// messages arrive on the returned receiver.
     fn manager_refusing_every_opening(
         budget: Option<RefusalReplyBudget>,
         admission: Option<SessionAdmissionSink>,
@@ -15153,9 +15126,6 @@ mod tests {
     }
 
     /// Waits until this thread's emission probe has counted `at_least` of `series`.
-    ///
-    /// The Start handlers run on this test's current-thread runtime, so their emissions land in this
-    /// thread's probe.
     async fn probe_reaches(series: &str, at_least: i64) -> anyhow::Result<()> {
         use crate::supervision::telemetry::probe;
 
@@ -15168,7 +15138,7 @@ mod tests {
         .with_context(|| format!("{series} stayed at {}, short of {at_least}", probe::get(series)))
     }
 
-    /// Takes the replies that have been sent so far, as the `SessionError`s they are.
+    /// Takes the `SessionError`s sent so far.
     fn drain_session_errors(
         sent: &mut futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
     ) -> anyhow::Result<Vec<StartErrorType<SessionId>>> {
@@ -15182,8 +15152,7 @@ mod tests {
         Ok(errors)
     }
 
-    /// A flood of refused openings costs the Exit one reply per token, not one per opening: each
-    /// reply is a ticket when the requester asked for a multi-hop return path.
+    /// A flood of refused openings is answered once per token, not once per opening.
     #[test_log::test(tokio::test)]
     async fn a_start_session_flood_is_answered_only_within_the_refusal_budget() -> anyhow::Result<()> {
         use crate::{counters::start_refusal_reply_drop_count, supervision::telemetry::probe};
@@ -15214,14 +15183,12 @@ mod tests {
             probe::get("exit_control/refusal_no_session_slot/plain/dropped_budget")
         );
         assert!(start_refusal_reply_drop_count() >= drops_before + 7);
-        // Every decision is counted, the dropped ones included. The counter is process-wide, so
-        // concurrent tests may add to it, but none can take from it.
+        // Dropped refusals count too. `>=` because the counter is process-wide.
         assert!(crate::counters::start_refusal_count() >= refusals_before + 10);
         Ok(())
     }
 
-    /// The budget is shared by every reason, because a peer picks whichever refusal is cheapest to
-    /// provoke: a budget per reason would let it spend each one in turn.
+    /// The budget is shared by every reason, not kept per reason.
     #[test_log::test(tokio::test)]
     async fn every_refusal_reason_draws_from_the_one_refusal_budget() -> anyhow::Result<()> {
         use crate::supervision::telemetry::probe;
@@ -15236,10 +15203,10 @@ mod tests {
             Some(admission),
         )?;
 
-        // A refused target first, which spends the one reply...
+        // A refused target spends the one reply...
         open_session(&mgr, no_pix_offer())?;
         probe_reaches("exit_control/refusal_target_policy/plain/sent", 1).await?;
-        // ...so that a PIX offer to a node without PIX support, a different reason, is not answered.
+        // ...so a different reason is not answered.
         open_session(&mgr, pix_offer())?;
         probe_reaches("exit_control/refusal_no_pix_support/pix/dropped_budget", 1).await?;
 
@@ -15270,8 +15237,7 @@ mod tests {
         Ok(())
     }
 
-    /// The refusal for missing PIX support is sent, and counted, like every other: it used to be the
-    /// one path that never reached `hopr_session_sent_error_count`.
+    /// The missing-PIX-support refusal is sent and counted like every other.
     #[test_log::test(tokio::test)]
     async fn a_refusal_for_missing_pix_support_goes_through_the_counted_path() -> anyhow::Result<()> {
         use crate::supervision::telemetry::probe;
@@ -15289,7 +15255,7 @@ mod tests {
         Ok(())
     }
 
-    /// A zero period would earn a reply on every clock reading, so the manager raises it.
+    /// The manager raises a zero period to the minimum.
     #[test]
     fn a_zero_refusal_refill_period_is_floored() {
         let mgr = RecordingManager::new(SessionManagerConfig {
