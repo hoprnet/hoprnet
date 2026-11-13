@@ -8,8 +8,10 @@
 //!
 //! Everything here is compiled unconditionally, including without the `telemetry` feature. Only the
 //! instruments the numbers are eventually written to live behind that feature, in
-//! [`crate::telemetry`]: the PIX aggregates in [`crate::telemetry::pix`], and the SURB reserve pair
-//! in [`crate::telemetry::surb`]. The split is deliberate: the delta arithmetic below is the part
+//! `crate::telemetry`: the PIX aggregates in `crate::telemetry::pix`, and the SURB reserve pair
+//! in `crate::telemetry::surb`. Plain code spans rather than links because that module is itself
+//! `#[cfg(feature = "telemetry")]`, so the links would dangle in a build without the feature.
+//! The split is deliberate: the delta arithmetic below is the part
 //! that can be wrong in a way an operator would never notice — a gauge that fails to come back
 //! down, a cycle counted twice — and a default `cargo nextest run --lib` must exercise it.
 //!
