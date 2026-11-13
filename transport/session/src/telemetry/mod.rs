@@ -16,6 +16,7 @@ use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPA
 // with that module's own `//!` header and then resolves the *whole* merged block in the parent's
 // scope, which silently breaks every intra-doc link the module wrote against its own scope. The
 // module documents itself.
+pub(crate) mod exit_control;
 pub(crate) mod pix;
 // The SURB keep-alive reserve hold: node-level like the PIX aggregates, but not PIX-only, and on the
 // `hopr_surb_*` prefix so it reaches `/metrics`. Same `//`-comment reason as `pix` above.
