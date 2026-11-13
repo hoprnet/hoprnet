@@ -1761,24 +1761,19 @@ impl PixFillControl {
         self.reserve_for(self.announced_surb_target.load(Ordering::Relaxed))
     }
 
-    /// Records a target the Entry has just announced, and the reserve follows it from the next read.
+    /// Records a target the Entry has just announced; the reserve follows it from the next read.
     ///
-    /// The Entry chooses how deep the Exit's SURB buffer for this Session is, and it can change that
-    /// choice while the Session runs with a `BalancerTarget` keep-alive. The reserve has to follow it
-    /// in both directions: left at the establishment figure it is too shallow for a raised target
-    /// (fill then spends SURBs the configured margin was meant to keep) and too deep for a lowered
-    /// one (the estimate never reaches it, so every fill packet is withheld and the funded cycle
-    /// strands on `max_recovery_time`). See [`effective_surb_reserve`].
+    /// The Entry chooses how deep the Exit's SURB buffer is and can change it mid-Session, so the
+    /// reserve follows in both directions: too shallow for a raised target (fill spends the margin
+    /// meant to be kept) and too deep for a lowered one (the estimate never reaches it, so fill is
+    /// withheld and the cycle strands on `max_recovery_time`). See [`effective_surb_reserve`].
     ///
-    /// `announced` is the target already clamped to the node's `maximum_surb_buffer_size`, exactly as
-    /// the SURB ring is sized from it. A repeat of the figure already in force changes nothing and
-    /// logs nothing: the warning below fires only when the reserve actually *falls* through the
-    /// order-of-magnitude threshold, so an Entry alternating two targets cannot emit one per crossing.
+    /// `announced` is already clamped to `maximum_surb_buffer_size`, as the ring is sized from it. A
+    /// repeat changes nothing and logs nothing; the warning below fires only when the reserve actually
+    /// falls through the order-of-magnitude threshold.
     ///
-    /// A `NoRateControl` Session used not to be influenced by its Entry at all — establishment sized
-    /// its ring from the node's fallback, so announcing here could not move anything. It moves this
-    /// reserve now, which is the point, and it is self-inflicted on one Session: announcing a target
-    /// of four drives that Session's reserve to one.
+    /// A `NoRateControl` Session's Entry could not influence anything here before; it drives this
+    /// reserve now, self-inflicted on one Session — announcing four moves the reserve to one.
     pub(crate) fn set_announced_target(&self, announced: u64) {
         let previous_announced = self.announced_surb_target.swap(announced, Ordering::Relaxed);
         if previous_announced == announced {
@@ -7946,21 +7941,11 @@ where
                         }
                     }
 
-                    // The fill reserve has to follow the announced target in *both* directions, which
-                    // is what the block above does not: the ring only ever widens, and on a
-                    // `NoRateControl` Session it ignores a lower announcement entirely. A reserve left
-                    // above what the Entry now supplies is never reached by the estimate, so every
-                    // fill packet is withheld and the funded cycle strands on `max_recovery_time`.
-                    //
-                    // Decided here on its own, from whether the announcement differs from the last
-                    // one this Session's control handled, rather than from the ring's raise-only
-                    // guard. A repeat changes nothing (`set_announced_target` dedupes on it), so a
-                    // regular announcer costs a store and a compare per packet. No ordering problem:
-                    // `SessionEstablished` is sent after the keep-alive stream and its control exist.
-                    //
-                    // A flagged announcement of zero is not a change: it is how an Entry says it has
-                    // no target (`announces_target` above leaves those out), and the reserve keeps
-                    // the figure it has.
+                    // The reserve follows the announcement in *both* directions, unlike the ring
+                    // above, which only widens and ignores a lower announcement on a `NoRateControl`
+                    // Session. It is decided on its own, not by the ring's raise-only guard; a repeat
+                    // dedupes inside `set_announced_target`. A flagged zero means "no target", so the
+                    // reserve keeps the figure it has.
                     if announces_target && let Some(fill) = session_slot.pix_fill.get() {
                         fill.set_announced_target(announced);
                     }
