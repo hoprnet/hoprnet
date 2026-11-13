@@ -588,18 +588,14 @@ type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
 /// Builds the shared pending map, bounded by a byte capacity, a per-record weight and a TTL.
 ///
 /// `max_capacity` is in **bytes**, matched by the [`weigher`](moka::sync::CacheBuilder::weigher) that
-/// charges every record `PENDING_SURB_RECORD_BYTES`, so the byte budget is the map's real bound and not
-/// an entry count multiplied by an estimate.
+/// charges every record `PENDING_SURB_RECORD_BYTES`, so the budget is the map's real bound.
 ///
-/// Admission is `lru`, not moka's default TinyLFU, because a SURB is looked up exactly once, when its
-/// reply comes home: every key's frequency is about one, and TinyLFU then silently refuses the newest
-/// record once the map is full, since a candidate must be *strictly* more frequent than its victims to
-/// be admitted. A refused record settles no race and, if the SURB is lost, is never written off, so its
-/// Session is never reported for a generation bump (hoprnet#8624). Under `lru` a new record is always
-/// admitted and the victim is the least recently used one, which under FIFO is the record whose reply
-/// comes next -- the issue flags that as the cost of this policy, so every such eviction is counted
-/// through [`SurbRoundTripRegistry::pending_lost`] instead of being silent, and the byte budget is now
-/// set by the operator so that eviction is not the normal state.
+/// Admission is `lru`, not moka's default TinyLFU: a SURB is looked up once, when its reply comes home,
+/// so every key's frequency is about one and TinyLFU refuses the newest record once the map is full. A
+/// refused record settles no race and, if the SURB is lost, is never written off (hoprnet#8624). Under
+/// `lru` the newest is always admitted and the victim is the oldest, whose reply comes next under FIFO
+/// — the cost the issue names, so each such eviction is counted via
+/// [`SurbRoundTripRegistry::pending_lost`].
 fn pending_legs(max_pending: u64, lost: Arc<AtomicU64>) -> PendingLegs {
     moka::sync::Cache::builder()
         .max_capacity(max_pending)

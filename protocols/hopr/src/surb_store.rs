@@ -18,18 +18,11 @@ use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 /// reaching a value the config file itself would have been rejected for.
 pub const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
 
-/// Cost of one Entry-side SURB record, as the cache is charged for it: the remembered value plus the
-/// per-entry overhead the cache adds for its hash-table slot, policy node and key.
+/// Cost of one Entry-side SURB record: the value plus the cache's per-entry overhead, charged through
+/// moka's weigher so a byte budget holds a predictable number of records.
 ///
-/// Measured against moka 0.12.16 by filling a cache at the defaults and reading RSS: 838.5 B for a
-/// pending-SURB record (a 504 B `PendingSurb` value) and 502 B for a written-off leg (a 165 B
-/// return-relayer array). This constant is the larger of the two, rounded up
-/// to 850 B, and is used as the cache's weigher, so a budget of `n` bytes holds exactly one record per
-/// this weight and the capacity is the byte budget rather than an entry count.
-///
-/// It is a safe upper bound for one record: a `PendingSurb` is 504 B and does not change without this
-/// crate's dependents recompiling, and the ~336 B overhead measured here exceeds moka's documented
-/// rough figure.
+/// Measured against moka 0.12.16 by filling a cache and reading RSS: 838.5 B for a pending-SURB record
+/// (504 B value) and 502 B for a written-off leg (165 B value). 850 B is the larger, rounded up.
 pub const PENDING_SURB_RECORD_BYTES: u64 = 850;
 
 /// Floor on the capacity of each Entry-side SURB map, in bytes: 100 000 records.
@@ -477,31 +470,16 @@ pub struct SurbStoreConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_admitted_headroom_percent"))]
     pub admitted_headroom_percent: u32,
     /// Byte budget for **each** of the two Entry-side maps that remember minted SURBs until their reply
-    /// comes home — the pending map and the written-off-legs map. Affects only the sending side.
+    /// comes home: the pending map and the written-off-legs map. Sending side only.
     ///
-    /// A budget below [`MINIMUM_PENDING_SURB_MAX_BYTES`] (≈81 MiB, 100 000 records) is rejected by the
-    /// validator; the floor applied where the capacity is derived is the in-code backstop for a caller
-    /// that skipped validation.
+    /// Enforced with moka's weigher, so the capacity **is** the byte budget rather than an entry count.
+    /// The default 256 MiB holds ~315 700 records per map (~16 deployed-size stocks); both maps fill
+    /// from it, so the pair peaks at ~512 MiB. Records a budget cannot hold are counted by
+    /// `hopr_surb_pending_lost_total`, so an undersized budget is visible.
     ///
-    /// Those maps are what lets a reply settle a race and a lost SURB be written off, and a map that
-    /// cannot hold a record loses that evidence silently. The budget is enforced with moka's weigher, so
-    /// a budget of `n` bytes holds exactly one record per [`PENDING_SURB_RECORD_BYTES`] (850 B, the
-    /// measured cost of a `PendingSurb` plus moka overhead) and the cache's capacity **is** the byte
-    /// budget, not an entry count. A byte figure is what an operator can price; the older basis,
-    /// `maximum_managed_sessions × rb_capacity × 2/3`, coupled the map to two knobs that do not decide
-    /// how many SURBs are outstanding, and reached several GiB at the defaults (hoprnet#8624).
-    ///
-    /// The default 256 MiB is ~315 700 records per map, ~16 deployed-size stocks (19 264 SURBs each).
-    /// Both maps are sized from this same figure, so the pair's worst case is ≈512 MiB when both fill,
-    /// not 256 MiB for the node: a written-off leg weighs the same 850 B even though its value is
-    /// smaller (502 B with overhead), because the weigher charges every record one rate. Records a
-    /// budget cannot hold are counted by `hopr_surb_pending_lost_total`, so an undersized budget is
-    /// visible rather than silent.
-    ///
-    /// It lives on this config rather than on the transport's packet pipeline because `SurbStoreConfig`
-    /// is `Copy` and already reaches the transport's construction site; it is **not** read by
-    /// [`MemorySurbStore`](crate::MemorySurbStore) — the store names no Entry-side telemetry — only by
-    /// `hopr-transport`'s `HoprTransport::new`.
+    /// Below [`MINIMUM_PENDING_SURB_MAX_BYTES`] (81 MiB, 100 000 records) the validator rejects the
+    /// value. `MemorySurbStore` does not read this field; only `hopr-transport`'s `HoprTransport::new`
+    /// does.
     ///
     /// Default is 256 MiB.
     #[default(default_pending_surb_max_bytes())]
