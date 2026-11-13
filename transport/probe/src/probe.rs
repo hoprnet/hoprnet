@@ -28,6 +28,47 @@ use crate::{
 type CacheNeighborKey = (HoprPseudonym, NeighborProbe);
 type CacheNeighborValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
 
+/// A loopback probe awaiting its return, with the tag its packet travels under.
+///
+/// The telemetry id is the probe's identity: a tag value is recycled by the allocator as soon as
+/// its entry leaves the cache, so a delayed local-drop callback for one probe must be able to tell
+/// its own entry from that of a later probe on the same tag. [`PathTelemetry::id`] already
+/// distinguishes them, and is what the graph keys a loopback verdict by.
+#[derive(Debug)]
+struct ActivePathProbe {
+    telemetry: PathTelemetry,
+    /// Held only so the tag returns to its allocator when the cache releases the entry.
+    #[expect(dead_code, reason = "released by its Drop when the entry leaves the cache")]
+    allocated_tag: Arc<AllocatedTag>,
+    /// The probe has reached, or can no longer reach, a verdict of its own: it came back, or a drop
+    /// site reported it never left the node. A settled probe must not be recorded as a timeout by
+    /// the eviction listener, however late that listener fires.
+    settled: std::sync::atomic::AtomicBool,
+}
+
+impl ActivePathProbe {
+    fn settle(&self) {
+        self.settled.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    fn is_settled(&self) -> bool {
+        self.settled.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+/// What the sync path-probe cache holds per tag.
+type ActivePathProbeValue = Arc<ActivePathProbe>;
+
+/// How long a timeout verdict waits before it is recorded, so a local drop that is reported after the
+/// tag's TTL can still suppress it.
+///
+/// The two clocks disagree on purpose: a loopback tag expires after `ProbeConfig::timeout` (3 s by
+/// default), while the encode stage may only report a drop after `PACKET_ENCODING_TIMEOUT` (5 s).
+/// Waiting this long past expiry gives every in-flight drop the chance to settle its probe first. A
+/// probe that really was lost is still recorded as a timeout, just a few seconds later — noise
+/// against the graph's 60 s windows.
+const LOCAL_DROP_GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+
 /// Result of classifying one incoming message through the probe layer.
 pub enum ProbeDispatch {
     /// The message was a probe message and has been consumed internally.
@@ -47,7 +88,7 @@ pub struct ProbeClassifierState<G> {
     /// Loopback probes awaiting their return. A *sync* cache, so a local-drop callback running on
     /// the pipeline's own thread can release the tag without an executor; see the eviction listener
     /// in [`Probe::continuously_scan`] for why the timeout verdict is handed to a task.
-    active_path_probes: moka::sync::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
+    active_path_probes: moka::sync::Cache<Tag, ActivePathProbeValue>,
     network_graph: G,
 }
 
@@ -71,11 +112,14 @@ where
     {
         let tag: Tag = in_data.data.application_tag;
 
-        if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag) {
+        if let Some(probe) = self.active_path_probes.remove(&tag) {
             tracing::debug!(%tag, "loopback probe successfully received");
+            // Settle as well as remove: if the TTL expired first, this removal is a no-op on the
+            // cache but the probe has still answered, and a deferred verdict must see that.
+            probe.settle();
             self.network_graph
                 .record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(
-                    EdgeTransportTelemetry::Loopback(path_telemetry),
+                    EdgeTransportTelemetry::Loopback(probe.telemetry),
                 )));
         } else if tag == ReservedTag::Ping.into() {
             let message: anyhow::Result<Message> = in_data
@@ -259,32 +303,38 @@ impl Probe {
                 )
                 .build();
 
-        // A *sync* Moka cache, because the tag also has to be removable from a non-async drop
-        // callback (see the loopback emit below). The eviction listener still has to record a graph
-        // verdict, which is async, so it hands the work to a dedicated task rather than blocking
-        // the cache's maintenance on the graph update. Only `Expired` — a probe whose packet left the
-        // node and was never answered — records a timeout; an explicit removal (a loopback that came
-        // back, or one dropped locally before departure) records nothing.
-        let (path_verdict_tx, path_verdict_rx) = futures::channel::mpsc::unbounded::<(Tag, PathTelemetry)>();
-        let active_path_probes: moka::sync::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)> =
-            moka::sync::Cache::builder()
-                .time_to_live(timeout)
-                .max_capacity(100_000)
-                .eviction_listener(
-                    move |tag: Arc<Tag>,
-                          (path, _allocated_tag): (PathTelemetry, Arc<AllocatedTag>),
-                          cause: moka::notification::RemovalCause| {
-                        if matches!(cause, moka::notification::RemovalCause::Expired) {
-                            tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
-                            // Unbounded and only written from the eviction listener: an eviction
-                            // listener must not block, and this one hand-off is its only work.
-                            if path_verdict_tx.unbounded_send((*tag, path)).is_err() {
-                                tracing::warn!(%tag, "path telemetry verdict sink is gone");
-                            }
-                        }
-                    },
-                )
-                .build();
+        // A *sync* Moka cache, because the tag also has to be readable and removable from a
+        // non-async drop callback (see the loopback emit below). The eviction listener still has to
+        // record a graph verdict, which is async, so it hands the work to a dedicated task rather
+        // than blocking the cache's maintenance on the graph update.
+        //
+        // Only `Expired` — a probe whose packet left the node and was never answered — can record a
+        // timeout; an explicit removal (a loopback that came back, or one dropped locally before
+        // departure) records nothing. Because a drop can be reported later than the tag's TTL — the
+        // encode stage waits up to `PACKET_ENCODING_TIMEOUT`, longer than the default probe timeout
+        // — expiry only *schedules* the verdict: the task waits `LOCAL_DROP_GRACE` first, and by
+        // then any drop site that saw the packet has settled the probe (see `ActivePathProbe::settled`).
+        let (path_verdict_tx, path_verdict_rx) =
+            futures::channel::mpsc::unbounded::<(Tag, PathTelemetry, ActivePathProbeValue)>();
+        let active_path_probes: moka::sync::Cache<Tag, ActivePathProbeValue> = moka::sync::Cache::builder()
+            .time_to_live(timeout)
+            .max_capacity(100_000)
+            .eviction_listener(
+                move |tag: Arc<Tag>, probe: ActivePathProbeValue, cause: moka::notification::RemovalCause| {
+                    if !matches!(cause, moka::notification::RemovalCause::Expired) {
+                        return;
+                    }
+                    // Unbounded and only written from the eviction listener: an eviction
+                    // listener must not block, and this one hand-off is its only work.
+                    if path_verdict_tx
+                        .unbounded_send((*tag, probe.telemetry, probe.clone()))
+                        .is_err()
+                    {
+                        tracing::warn!(%tag, "path telemetry verdict sink is gone");
+                    }
+                },
+            )
+            .build();
 
         let push_to_network = api_out.clone();
 
@@ -304,19 +354,25 @@ impl Probe {
                     Some((ProbeRouting::Neighbor(routing), Some(notifier)))
                 }));
 
-        // Turns the eviction listener's timeout hand-offs into graph verdicts off the cache's
-        // maintenance path. See the cache builder above for why the listener only queues them.
+        // Turns the eviction listener's expiry hand-offs into graph verdicts off the cache's
+        // maintenance path. Each waits `LOCAL_DROP_GRACE` before recording, so a drop that is
+        // reported after the tag's TTL can settle its probe first.
         let network_graph_internal_path_verdicts = network_graph_internal_path;
         let mut path_verdict_rx = path_verdict_rx;
         processes.insert(
             HoprProbeProcess::PathVerdicts,
             hopr_utils::spawn_as_abortable_named!("probe_path_verdicts", async move {
                 use futures::StreamExt;
-                while let Some((tag, path)) = path_verdict_rx.next().await {
+                while let Some((tag, path, probe)) = path_verdict_rx.next().await {
+                    hopr_utils::runtime::prelude::sleep(LOCAL_DROP_GRACE).await;
+                    if probe.is_settled() {
+                        tracing::debug!(%tag, reason = "settled before expiry was recorded", "loopback probe");
+                        continue;
+                    }
+                    tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
                     network_graph_internal_path_verdicts.record_edge::<NeighborTelemetry, PathTelemetry>(
                         hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(path))),
                     );
-                    tracing::trace!(%tag, "recorded a loopback probe timeout");
                 }
                 tracing::warn!(
                     task = "transport (probe - path verdicts)",
@@ -423,35 +479,57 @@ impl Probe {
 
                                             // Register the tag *before* sending, not after: the packet can be
                                             // dropped downstream (routing resolution or encoding) as soon as
-                                            // `send` returns, and that drop has to find the tag to release it.
+                                            // `send` returns, and that drop has to find the probe to settle it.
                                             //
-                                            // The drop signal carries the tag through the closure armed below, so
-                                            // the ordering problem becomes a race between two explicit `remove`
-                                            // calls on one cache key, and both are idempotent:
-                                            // * a downstream drop removes the entry and releases the tag (a
-                                            //   `RemovalCause::Explicit` removal, so no timeout is recorded);
-                                            // * a failed `send` removes the very entry it inserted.
-                                            // Whichever runs first takes the entry; the other finds none and records
-                                            // nothing. Without the pre-insert, a drop landing between the send and
-                                            // the insert would still have found no tag and expired as a timeout.
+                                            // The drop signal carries the tag and the probe's identity through the
+                                            // closure armed below, so the ordering problem becomes a race between
+                                            // idempotent operations on one cache key:
+                                            // * a downstream drop settles and removes the probe it owns;
+                                            // * a failed `send` settles and removes the very entry it inserted.
+                                            // Whichever runs first takes the entry; the other finds only its own
+                                            // entry (if any) and does nothing. Without the pre-insert, a drop
+                                            // landing between send and insert would have found no probe at all.
+                                            //
+                                            // The drop may also arrive *after* the tag's TTL, in which case the
+                                            // entry is already gone and the removal is no longer what silences
+                                            // the timeout. That is why the release settles the shared probe state
+                                            // before removing: even once the eviction listener has seen the
+                                            // entry expire, `settled` keeps its deferred verdict silent.
                                             let tag = Tag::from(tag_value);
-                                            let active_path_probes = active_path_probes.clone();
+                                            let probe = Arc::new(ActivePathProbe {
+                                                telemetry,
+                                                allocated_tag: Arc::new(allocated_tag),
+                                                settled: std::sync::atomic::AtomicBool::new(false),
+                                            });
+                                            let active_path_probes_for_drop = active_path_probes.clone();
+                                            // The probe's telemetry id, captured for the log line: the
+                                            // entry itself may already be gone when the drop lands.
                                             let on_local_drop = {
-                                                let active_path_probes = active_path_probes.clone();
+                                                let probe = probe.clone();
                                                 move || {
-                                                    if active_path_probes.remove(&tag).is_some() {
-                                                        // Explicit removal: the eviction listener records no
-                                                        // timeout, and dropping the `AllocatedTag` inside the
-                                                        // removed value returns it.
-                                                        tracing::debug!(
-                                                            %tag,
-                                                            reason = "dropped locally before leaving the node",
-                                                            "loopback probe not sent"
-                                                        );
+                                                    // Settle first: a deferred verdict reads this flag.
+                                                    probe.settle();
+                                                    // Remove only *our own* entry. A tag is recycled as soon
+                                                    // as an entry leaves the cache, so this tag may now
+                                                    // belong to a later probe; that one must survive.
+                                                    let ours =
+                                                        active_path_probes_for_drop.get(&tag).is_some_and(|current| {
+                                                            current.telemetry.id == probe.telemetry.id
+                                                        });
+                                                    if ours {
+                                                        active_path_probes_for_drop.remove(&tag);
                                                     }
+                                                    tracing::debug!(
+                                                        %tag,
+                                                        id = const_hex::encode(probe.telemetry.id),
+                                                        reason = "dropped locally before leaving the node",
+                                                        "loopback probe released"
+                                                    );
+                                                    // Dropping the entry's `AllocatedTag` returns the tag to the
+                                                    // allocator once the cache no longer holds it.
                                                 }
                                             };
-                                            active_path_probes.insert(tag, (telemetry, Arc::new(allocated_tag)));
+                                            active_path_probes.insert(tag, probe);
 
                                             // Loopback telemetry probes are self-routed and never replied to via
                                             // SURB, so no SURBs should be bundled. See hoprnet/hoprnet#7972.
@@ -472,7 +550,15 @@ impl Probe {
                                                 // The packet never entered the sink, so nothing downstream can
                                                 // report it: release the tag here, exactly as a downstream drop
                                                 // would.
-                                                active_path_probes.remove(&tag);
+                                                if let Some(probe) = active_path_probes.remove(&tag) {
+                                                    probe.settle();
+                                                    tracing::debug!(
+                                                        %tag,
+                                                        id = const_hex::encode(probe.telemetry.id),
+                                                        reason = "the outgoing sink rejected the packet",
+                                                        "loopback probe released"
+                                                    );
+                                                }
                                                 tracing::error!("failed to send out a ping");
                                             }
                                         } else {
@@ -1090,7 +1176,7 @@ mod tests {
     // #[tracing_test::traced_test]
     async fn probe_should_pass_through_non_associated_tags() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_millis(20),
+            timeout: std::time::Duration::from_millis(100),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1308,6 +1394,25 @@ mod tests {
         ProbeClassifierState<PeerStore>,
         futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
     ) {
+        let (tx, rx) = futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
+        let (jhs, classifier) = prober_with_sink(cfg, strategy, store, tx).await;
+        (jhs, classifier, rx)
+    }
+
+    /// [`loopback_prober`] with the outgoing sink injected, so a test can make the send itself fail.
+    async fn prober_with_sink<T>(
+        cfg: ProbeConfig,
+        strategy: TestProbeStrategy,
+        store: PeerStore,
+        out: T,
+    ) -> (
+        hopr_utils::runtime::AbortableList<HoprProbeProcess>,
+        ProbeClassifierState<PeerStore>,
+    )
+    where
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        T::Error: Send,
+    {
         let tag_allocators = hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
@@ -1323,11 +1428,9 @@ mod tests {
             .expect("probing allocator should exist");
         let probe = Probe::new(cfg, probing_allocator);
 
-        let (tx, rx) = futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
         let (_manual_tx, manual_rx) = futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(100);
 
-        let (jhs, classifier) = probe.continuously_scan(tx, manual_rx, strategy, store.clone()).await;
-        (jhs, classifier, rx)
+        probe.continuously_scan(out, manual_rx, strategy, store).await
     }
 
     /// A probe whose packet is dropped locally before it leaves the node must release its tag and
@@ -1342,11 +1445,12 @@ mod tests {
     async fn a_locally_dropped_loopback_probe_should_release_its_tag_and_record_no_timeout() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        // Short enough that a tag left behind would expire within the test's wait. The emission
-        // period is independent: Moka expires entries only while the cache is active, so the
-        // prober, not a timer, is what drives maintenance.
+        // The tag TTL must dwarf any scheduling jitter between insert and the test's release: a
+        // TTL the test occasionally overshoots would turn a correct release into an `Expired`
+        // removal and fail on a loaded runner. The emission period is independent — Moka expires
+        // entries only while the cache is active, so the prober, not a timer, drives maintenance.
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_millis(20),
+            timeout: std::time::Duration::from_millis(100),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1377,9 +1481,9 @@ mod tests {
             .context("decoding the loopback probe's path telemetry")?;
         data_out.surb_refund.give_back();
 
-        // Keep consuming emissions past the tag's TTL so the cache runs maintenance and would evict
-        // the tag were it still registered.
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(150), async {
+        // Keep consuming emissions past the tag's TTL, then past the deferred-verdict grace, so the
+        // cache runs maintenance and every expiry that could fire a verdict has fired.
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(600), async {
             while rx.next().await.is_some() {}
         })
         .await;
@@ -1398,6 +1502,133 @@ mod tests {
         Ok(())
     }
 
+    /// A drop reported *after* its tag's TTL must also be silent. The pipeline's clocks disagree:
+    /// an encode drop can fire at `PACKET_ENCODING_TIMEOUT` (5 s), long after a loopback tag's TTL
+    /// (`ProbeConfig::timeout`, 3 s by default), so by then the entry is gone and the removal is
+    /// `Expired`. The release must still stop the verdict — this is the hole a removal-only release
+    /// left open.
+    #[tokio::test]
+    async fn a_drop_reported_after_the_tag_ttl_should_still_record_no_timeout() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(100),
+            interval: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+        let store = PeerStore::new(*OFFCHAIN_KEYPAIR.public(), VecDeque::new());
+        let strategy = TestProbeStrategy::PeriodicLoopback {
+            routing: loopback_routing(),
+            path_id: [7, 7, 7, 7, 7],
+            period: std::time::Duration::from_millis(1),
+        };
+
+        let (jhs, _classifier, mut rx) = loopback_prober(cfg, strategy, store.clone()).await;
+
+        let (_routing, data_out) = tokio::time::timeout(std::time::Duration::from_secs(1), rx.next())
+            .await
+            .context("timeout waiting for the loopback probe")?
+            .context("the prober must emit the loopback probe")?;
+        let tag: Tag = data_out.data.application_tag;
+        let dropped = PathTelemetry::try_from(&data_out.data.plain_text[2..])
+            .context("decoding the loopback probe's path telemetry")?;
+
+        // Let the tag TTL elapse, and keep the cache active so its expiry is actually processed,
+        // before the drop site reports the packet as lost. That reproduces the real ordering: the
+        // entry is gone by the time the drop arrives.
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(150), async {
+            while rx.next().await.is_some() {}
+        })
+        .await;
+        data_out.surb_refund.give_back();
+
+        // Past the deferred-verdict grace, so any timeout queued for this probe would be recorded.
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(3_500), async {
+            while rx.next().await.is_some() {}
+        })
+        .await;
+        jhs.abort_all();
+
+        assert!(
+            !store
+                .path_verdicts
+                .read()
+                .expect("should be lockable")
+                .iter()
+                .any(|(timed_out, id)| *timed_out && *id == dropped.id),
+            "a drop reported after its TTL (tag {tag}) must still record no timeout for that probe"
+        );
+        Ok(())
+    }
+
+    /// A `send` that fails never lets the packet reach any drop site, so the prober releases the
+    /// tag itself. Without that, the probe would sit until its TTL and blame the path for a sink
+    /// failure that never involved a relay.
+    #[tokio::test]
+    async fn a_loopback_probe_whose_send_fails_should_record_no_timeout() -> anyhow::Result<()> {
+        /// A sink that accepts nothing — `send` returns `Err` without yielding the item.
+        #[derive(Clone)]
+        struct FailingSink;
+
+        impl futures::Sink<(DestinationRouting, ApplicationDataOut)> for FailingSink {
+            type Error = std::io::Error;
+
+            fn poll_ready(
+                self: std::pin::Pin<&mut Self>,
+                _cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Result<(), Self::Error>> {
+                std::task::Poll::Ready(Ok(()))
+            }
+
+            fn start_send(
+                self: std::pin::Pin<&mut Self>,
+                _item: (DestinationRouting, ApplicationDataOut),
+            ) -> Result<(), Self::Error> {
+                Err(std::io::Error::other("the outgoing sink is closed"))
+            }
+
+            fn poll_flush(
+                self: std::pin::Pin<&mut Self>,
+                _cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Result<(), Self::Error>> {
+                std::task::Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(
+                self: std::pin::Pin<&mut Self>,
+                _cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Result<(), Self::Error>> {
+                std::task::Poll::Ready(Ok(()))
+            }
+        }
+
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(100),
+            interval: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+        let store = PeerStore::new(*OFFCHAIN_KEYPAIR.public(), VecDeque::new());
+        let strategy = TestProbeStrategy::PeriodicLoopback {
+            routing: loopback_routing(),
+            path_id: [3, 3, 3, 3, 3],
+            period: std::time::Duration::from_millis(1),
+        };
+
+        let (jhs, _classifier) = prober_with_sink(cfg, strategy, store.clone(), FailingSink).await;
+
+        // Every emission fails to send and is released; well past the TTL and the verdict grace,
+        // nothing may be recorded as a timeout.
+        tokio::time::sleep(std::time::Duration::from_millis(3_500)).await;
+        jhs.abort_all();
+
+        assert_eq!(
+            store.path_timeouts(),
+            0,
+            "a loopback whose send failed must be released, not left to expire as a timeout"
+        );
+        Ok(())
+    }
+
     /// A loopback that returns must record a success, not a timeout: the tag is removed on the way
     /// back, before its TTL can expire. This is the peer-delivery half of the same mechanism — it
     /// pins that a probe which came home is never counted against the path.
@@ -1406,7 +1637,7 @@ mod tests {
         use anyhow::Context;
 
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_millis(20),
+            timeout: std::time::Duration::from_millis(100),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1441,7 +1672,7 @@ mod tests {
             ProbeDispatch::Consumed
         ));
 
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(300), async {
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(600), async {
             while rx.next().await.is_some() {}
         })
         .await;
@@ -1469,7 +1700,7 @@ mod tests {
     #[tokio::test]
     async fn an_unanswered_loopback_probe_should_record_a_timeout_when_its_tag_expires() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_millis(20),
+            timeout: std::time::Duration::from_millis(100),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1483,8 +1714,9 @@ mod tests {
         let (jhs, _classifier, mut rx) = loopback_prober(cfg, strategy, store.clone()).await;
 
         // Leave every emission unanswered and in flight. Consuming them is what keeps the cache
-        // active, which is what drives the expiry under test.
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(150), async {
+        // active, which is what drives the expiry under test; the wait covers the TTL plus the
+        // deferred-verdict grace.
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(3_500), async {
             while rx.next().await.is_some() {}
         })
         .await;
