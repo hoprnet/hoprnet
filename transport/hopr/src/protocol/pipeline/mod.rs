@@ -190,6 +190,11 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                 // The SURB-batch generation was captured with the return-path plan and carried on
                 // `packet_info`; stamp that, not a value re-read at encode time.
                 let generation = data.packet_info.and_then(|info| info.surb_generation);
+                // Kept out of the closure so a packet that fails to encode can fire its local-drop
+                // signal: it never reaches the wire, and a sender that armed one (a loopback probe
+                // releasing its tag) must not read that as a relay timeout. Every drop arm below
+                // fires it; the success arm does not.
+                let surb_refund = data.surb_refund.clone();
                 match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                     move || {
                         encoder.encode_packet(
@@ -247,16 +252,21 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                     }
                     Ok(Ok(Err(error))) => {
                         tracing::error!(%error, "outgoing packet could not be encoded");
+                        // A ticket-factory or crypto failure drops the packet here, after it has
+                        // already been counted as handed on. Fired exactly once per dropped packet.
+                        surb_refund.give_back();
                         None
                     }
                     Ok(Err(error)) => {
                         tracing::error!(%error, "parallel processing of the outgoing packet failed");
+                        surb_refund.give_back();
                         None
                     }
                     Err(error) => {
                         tracing::error!(%error, "timeout while processing the outgoing packet");
                         hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        surb_refund.give_back();
                         None
                     }
                 }
@@ -1306,6 +1316,133 @@ mod tests {
                 "{other} must keep the generic label"
             );
         }
+    }
+
+    /// An encoder that fails for one chosen payload marker and encodes the rest, so the two arms of
+    /// the encode stage can be driven from one run without a second pipeline.
+    #[derive(Clone)]
+    struct ScriptedEncoderForMarkers {
+        fail_marker: u8,
+    }
+
+    impl PacketEncoder for ScriptedEncoderForMarkers {
+        type Error = HoprProtocolError;
+
+        fn encode_packet<
+            T: AsRef<[u8]> + Send + 'static,
+            S: Into<hopr_crypto_packet::prelude::PacketSignals> + Send + 'static,
+        >(
+            &self,
+            data: T,
+            routing: ResolvedTransportRouting<HoprSurb>,
+            _signals: S,
+            _generation: Option<u8>,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            // The stage hands over `ApplicationData::to_bytes()`: the 8-byte tag, then the payload.
+            let bytes = data.as_ref();
+            let marker = *bytes.get(Tag::SIZE).expect("the test payload carries a marker");
+            if marker == self.fail_marker {
+                // The same shape as the ticket factory's `balance ... is too low`.
+                return Err(HoprProtocolError::InvalidState(
+                    "the ticket factory rejected the packet",
+                ));
+            }
+            let next_hop = match routing {
+                ResolvedTransportRouting::Forward { forward_path, .. } => {
+                    *forward_path.hops().last().expect("a resolved path has a next hop")
+                }
+                ResolvedTransportRouting::Return(..) => *OffchainKeypair::random().public(),
+            };
+            Ok(OutgoingPacket {
+                next_hop,
+                ack_challenge: Default::default(),
+                encrypted_pix_share: None,
+                data: Bytes::from_static(b"encoded"),
+                minted_surbs: vec![],
+            })
+        }
+
+        fn encode_acknowledgements(
+            &self,
+            _acks: &[VerifiedAcknowledgement],
+            _destination: &OffchainPublicKey,
+        ) -> Result<OutgoingPacket, Self::Error> {
+            unreachable!("the outgoing packet pipeline only encodes packets")
+        }
+    }
+
+    /// The encode stage must fire a packet's local-drop signal exactly when it drops it, and never
+    /// for a packet it encodes and sends.
+    ///
+    /// This is the `outgoing packet could not be encoded` site of hoprnet/hoprnet#8661 — the one a
+    /// ticket factory's `balance ... is too low` lands on. Before the signal existed, the probe's
+    /// tag stood registered and expired as a relay timeout even though the packet never left the
+    /// node.
+    #[tokio::test]
+    async fn the_encode_stage_should_fire_the_local_drop_signal_only_for_a_dropped_packet() -> anyhow::Result<()> {
+        // One packet per marker: 0 = fails to encode, 1 = encodes. Each gets its own drop counter.
+        let drops: [std::sync::Arc<std::sync::atomic::AtomicUsize>; 2] =
+            std::array::from_fn(|_| std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)));
+        let packet = |marker: u8| {
+            let drops = drops[marker as usize].clone();
+            let mut data = ApplicationDataOut::with_no_packet_info(
+                ApplicationData::new(Tag::from(1234u64), &[marker]).expect("a one-byte payload is valid"),
+            );
+            data.surb_refund = SurbRefund::on_local_drop(move || {
+                drops.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            });
+            data
+        };
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path: ValidatedPath::direct(
+                *OffchainKeypair::random().public(),
+                ChainKeypair::random().public().to_address(),
+            ),
+            return_paths: vec![],
+        };
+
+        let input = futures::stream::iter(vec![(routing.clone(), packet(0)), (routing, packet(1))]);
+
+        // Only the first packet fails: the scripted encoder keys off the payload byte, which the
+        // stage hands it as `data.to_bytes()` — tag first, then the marker.
+        let encoder = std::sync::Arc::new(ScriptedEncoderForMarkers { fail_marker: 0 });
+        let (wire_tx, mut wire_rx) =
+            hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(PeerId, Bytes)>(16);
+
+        start_outgoing_packet_pipeline(
+            input,
+            encoder,
+            None::<NopExitAcknowledgementShareProcessor>,
+            wire_tx.with_timeout(QUEUE_SEND_TIMEOUT),
+            PeerProtocolCounterRegistry::default(),
+            4,
+        )
+        .await;
+
+        // The pipeline forwards every emitted packet into the wire sink; the one that encoded is
+        // there, and the one that failed is not.
+        let sent = wire_rx
+            .next()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("no packet reached the wire"))?;
+        assert_eq!(sent.1.as_ref(), b"encoded", "the encoded packet must reach the wire");
+        assert!(
+            wire_rx.next().await.is_none(),
+            "the packet that failed to encode must not reach the wire"
+        );
+
+        assert_eq!(
+            1,
+            drops[0].load(std::sync::atomic::Ordering::Relaxed),
+            "the dropped packet must fire its local-drop signal exactly once"
+        );
+        assert_eq!(
+            0,
+            drops[1].load(std::sync::atomic::Ordering::Relaxed),
+            "a packet that is encoded and sent must not fire the signal"
+        );
+        Ok(())
     }
 
     /// A replayed packet must be alertable on its own: it is dropped before the packet is authenticated, which is a

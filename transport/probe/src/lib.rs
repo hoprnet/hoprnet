@@ -41,4 +41,7 @@ pub use crate::{
 pub enum HoprProbeProcess {
     #[strum(to_string = "probe emission")]
     Emit,
+    /// Forwards loopback probe timeouts from the tag cache's eviction listener to the graph.
+    #[strum(to_string = "probe path verdicts")]
+    PathVerdicts,
 }

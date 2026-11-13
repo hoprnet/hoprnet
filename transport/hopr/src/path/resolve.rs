@@ -141,7 +141,8 @@ where
                                 "dropping an outgoing packet: no SURB for its return path within the wait"
                             );
                             // Its sender may have counted the SURB as consumed already, and the packet
-                            // leaves without one.
+                            // leaves without one. This is also the packet's local-drop signal: a
+                            // probe that armed a listener here knows it never left the node.
                             data.surb_refund.give_back();
                             return None;
                         }
@@ -154,6 +155,11 @@ where
                             hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             error!(%error, "failed to resolve routing");
+                            // The packet never left the node. The refund is empty for a packet
+                            // whose sender counted no SURB, but it may still carry a local-drop
+                            // listener (a loopback probe whose tag must not expire as a timeout),
+                            // so this is the one signal every drop site fires.
+                            data.surb_refund.give_back();
                             return None;
                         }
                     }
@@ -444,6 +450,76 @@ mod tests {
             1,
             refunds.load(Ordering::Relaxed),
             "only the counted packet that starved gives its SURB back"
+        );
+
+        Ok(())
+    }
+
+    /// Both ways this stage drops a packet — a return path that ran out of SURBs, and any other
+    /// resolution failure — must fire the packet's local-drop signal exactly once. A packet that
+    /// resolves and is emitted must fire it not at all, or a sender that armed one (a loopback
+    /// prober releasing its tag) would hear about a packet that is still on the wire.
+    ///
+    /// A resolution failure is the `failed to resolve routing` path in hoprnet/hoprnet#8661: before
+    /// this signal it was silent, and the probe's unanswered tag expired as a relay timeout.
+    #[test_log::test(tokio::test)]
+    async fn both_drop_paths_should_fire_the_local_drop_signal_exactly_once() -> anyhow::Result<()> {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let watched = |marker| {
+            let mut data = packet(marker);
+            let drops = drops.clone();
+            data.surb_refund = SurbRefund::on_local_drop(move || {
+                drops.fetch_add(1, Ordering::Relaxed);
+            });
+            data
+        };
+        // Markers: 0 = return packet whose SURBs never arrive (dropped), 1 = return packet whose
+        // resolution fails outright (dropped), 2 = return packet that resolves, 3 = forward packet
+        // that resolves. Only the two drops may fire the signal.
+        let (starved, failed, served) = (
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+        );
+        let input = futures::stream::iter(vec![
+            (return_routing(starved), watched(0)),
+            (return_routing(failed), watched(1)),
+            (return_routing(served), watched(2)),
+            (forward_routing(), watched(3)),
+        ]);
+
+        let emitted = resolve_routing_stage(
+            input,
+            move |_size_hint, _max_surbs, routing: DestinationRouting| async move {
+                match &routing {
+                    DestinationRouting::Return(matcher) if matcher.pseudonym() == served => {
+                        Ok((resolved(), Some(5), None))
+                    }
+                    DestinationRouting::Return(matcher) if matcher.pseudonym() == failed => {
+                        Err(PathPlannerError::Api("no path through the graph".into()))
+                    }
+                    DestinationRouting::Return(_) => Err(no_surb(&routing)),
+                    DestinationRouting::Forward { .. } => Ok((resolved(), None, None)),
+                }
+            },
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            surb_resolution_wait(Some(std::time::Duration::ZERO)),
+        )
+        .collect::<Vec<_>>()
+        .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+        .await
+        .map_err(|_| anyhow::anyhow!("the stage stalled instead of dropping the unresolvable packets"))?;
+
+        assert_eq!(
+            emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
+            vec![2, 3],
+            "the two resolvable packets go on, in order"
+        );
+        assert_eq!(
+            2,
+            drops.load(Ordering::Relaxed),
+            "each of the two dropped packets fires the signal once, and neither emitted packet does"
         );
 
         Ok(())
