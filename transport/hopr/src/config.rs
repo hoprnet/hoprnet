@@ -1138,16 +1138,12 @@ pub struct SessionGlobalConfig {
 
     /// How many refusal replies the Exit sends to refused `StartSession`s, across all reasons.
     ///
-    /// A refusal is answered over a SURB the requester chose, and a multi-hop one costs this node a ticket
-    /// per reply, while the request reaches it for free. Without a bound, a flood of refused requests
-    /// drains the node's funds at the flood's rate. One budget covers every reason a Session can be
-    /// refused, as a peer can provoke whichever is cheapest.
+    /// Each reply can cost the Exit a ticket while the request is free, so a flood of refused requests
+    /// would otherwise drain its funds. A refusal that finds the budget spent gets no reply and the
+    /// requester times out.
     ///
-    /// A refusal that finds the budget spent is dropped without a reply, and the requester times out.
-    ///
-    /// Default is a burst of 32 replies, then one every second:
-    /// `refusal_reply_budget: { burst: 32, refill_period: 1s }`. A `burst` of 0 never answers a refusal.
-    /// Set to `null` to answer every refusal; the refill period must be at least 1 millisecond.
+    /// Default is `{ burst: 32, refill_period: 1s }`; a `burst` of 0 never answers. Set to `null` to
+    /// answer every refusal. The refill period must be at least 1 millisecond.
     #[validate(custom(function = "validate_refusal_reply_budget"))]
     #[default(default_session_refusal_reply_budget())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
