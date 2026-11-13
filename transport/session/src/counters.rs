@@ -122,18 +122,41 @@ pub fn session_stale_start_message_count() -> usize {
     SESSION_STALE_START_MESSAGES.load(Ordering::Relaxed)
 }
 
-/// Cumulative count of Start-protocol messages dropped because the bounded processing queue was
-/// full (`try_send` failed).
+/// Cumulative count of Start-tagged packets that failed to decode.
+///
+/// Anyone can send these for free, so each drop logs only a `trace!` and the volume is read here.
+pub static SESSION_MALFORMED_START_MESSAGES: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative malformed Start-protocol message count.
+#[inline]
+pub fn session_malformed_start_message_count() -> usize {
+    SESSION_MALFORMED_START_MESSAGES.load(Ordering::Relaxed)
+}
+
+/// Cumulative count of Start-protocol messages that never reached a processing lane: the lane was
+/// full, or the manager was shutting down (`try_send` failed).
 ///
 /// Distinct from [`SESSION_STALE_START_MESSAGES`]: these named real local state and were lost to
-/// backpressure rather than to the admission filter. Before the filter existed this was the counter
-/// the DoS drove.
+/// backpressure or to shutdown rather than to the admission filter. Before the filter existed this
+/// was the counter the DoS drove.
 pub static START_PROTOCOL_SEND_DROPS: AtomicUsize = AtomicUsize::new(0);
 
 /// Returns the cumulative Start-protocol queue-drop count.
 #[inline]
 pub fn start_protocol_send_drop_count() -> usize {
     START_PROTOCOL_SEND_DROPS.load(Ordering::Relaxed)
+}
+
+/// Cumulative count of control-lane Start-protocol messages lost to a full queue.
+///
+/// Split from [`START_PROTOCOL_SEND_DROPS`] because a lost `SsaCommit` is unrecoverable: a
+/// `StartSession` flood advancing the shared counter could otherwise hide it entirely.
+pub static START_CONTROL_SEND_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative control-lane queue-drop count.
+#[inline]
+pub fn start_control_send_drop_count() -> usize {
+    START_CONTROL_SEND_DROPS.load(Ordering::Relaxed)
 }
 
 /// Cumulative count of packets dropped by `forward_to_timeout(app_incoming)` at the ingress

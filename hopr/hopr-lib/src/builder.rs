@@ -361,7 +361,10 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
             "hopr_lib_session_admission",
             admission_rx
                 .for_each_concurrent(
-                    None,
+                    // The transport releases its admission permit when its own deadline fires, not
+                    // when `admit` returns, so this pool needs its own bound or a stalled server
+                    // accumulates work without limit.
+                    Some(hopr_transport::session::START_SESSION_ADMISSION_CONCURRENCY),
                     move |(request, reply): (_, hopr_transport::SessionAdmissionReply)| {
                         let server = admission_server.clone();
                         let admission_diag = admission_diag.clone();
