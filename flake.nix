@@ -231,7 +231,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                     runNextest = true;
                     testCargoProfile = "ci-test";
                     prependPackageName = false;
@@ -241,7 +241,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --lib
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump --lib
                     runHook postCheck
                   '';
                 });
@@ -273,7 +273,7 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
+                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                   cargoNextestExtraArgs = "--lib";
                   runNextest = true;
                   testCargoProfile = "ci-test";
@@ -288,7 +288,8 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  # Include the opt-in reporter's unit tests, matching the integration coverage features.
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";

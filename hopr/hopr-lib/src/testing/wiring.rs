@@ -267,3 +267,129 @@ where
 
     Ok(Arc::new(node))
 }
+
+#[cfg(all(test, feature = "state-dump"))]
+mod tests {
+    use anyhow::Context;
+    use hopr_api::types::primitive::prelude::Address;
+    use hopr_chain_connector::{
+        BlockchainConnectorConfig, create_trustful_hopr_blokli_connector, testing::FullStateEmulator,
+    };
+    use tokio::sync::oneshot;
+
+    use super::*;
+    use crate::{
+        state_dump::{StateDump, StateDumpFactory, StateDumpSections},
+        testing::fixtures::{NODE_CHAIN_KEYS, NODE_OFFCHAIN_KEYS, NODE_SAFES_MODULES, build_blokli_client},
+    };
+
+    /// Observe the host's task ownership without implementing a diagnostic collector.
+    struct ReporterProbe {
+        enabled: bool,
+        observer: Option<hopr_transport::TransportObserver>,
+        started: oneshot::Sender<Vec<(&'static str, serde_json::Value)>>,
+        lifetime: oneshot::Sender<()>,
+    }
+
+    impl<Chain, Graph, Net> StateDumpFactory<Chain, Graph, Net> for ReporterProbe {
+        fn create(self, _: Chain, _: Graph, _: Net, _: Address, sections: StateDumpSections) -> Option<StateDump> {
+            self.enabled.then(|| {
+                StateDump::new(self.observer, async move {
+                    // Dropping this sender signals cancellation, including when the task is aborted.
+                    let _lifetime = self.lifetime;
+                    let _ = self
+                        .started
+                        .send(sections.into_iter().map(|(name, read)| (name, read())).collect());
+                    futures::future::pending::<()>().await;
+                })
+            })
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::with_observer(true, true)]
+    #[case::without_observer(true, false)]
+    #[case::disabled(false, true)]
+    #[tokio::test]
+    async fn node_owns_the_optional_reporter_lifetime(
+        #[case] enabled: bool,
+        #[case] with_observer: bool,
+    ) -> anyhow::Result<()> {
+        let chain_key = &NODE_CHAIN_KEYS[0];
+        let packet_key = &NODE_OFFCHAIN_KEYS[0];
+        let (safe, module) = NODE_SAFES_MODULES[0];
+        let client = build_blokli_client().with_mutator(FullStateEmulator::new(module));
+        let mut connector =
+            create_trustful_hopr_blokli_connector(chain_key, BlockchainConnectorConfig::default(), client, module)
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        let config = HoprLibConfig {
+            safe_module: crate::config::SafeModule {
+                safe_address: safe,
+                module_address: module,
+            },
+            ..Default::default()
+        };
+        let ticket_factory = ticket_factory_from_chain(&connector, RedbStore::new_temp()?)
+            .await
+            .map_err(|error| anyhow::anyhow!("create ticket factory: {error}"))?;
+        let (started_tx, started_rx) = oneshot::channel();
+        let (lifetime_tx, mut lifetime_rx) = oneshot::channel();
+        let observer: hopr_transport::TransportObserver = Arc::new(|_| {});
+        let observer_ref = Arc::downgrade(&observer);
+        let reporter = ReporterProbe {
+            enabled,
+            observer: with_observer.then_some(observer),
+            started: started_tx,
+            lifetime: lifetime_tx,
+        };
+        let node = make_builder(chain_key, packet_key, config, Default::default(), connector)?
+            // Reporting needs a real network handle, but no listening sockets or peers.
+            .with_network(|ctx| {
+                Box::pin(async move {
+                    HoprLibp2pNetworkBuilder::new(futures::stream::empty())
+                        .build(
+                            &ctx.packet_key,
+                            vec![],
+                            hopr_transport::protocol::CURRENT_HOPR_MSG_PROTOCOL,
+                            true,
+                        )
+                        .await
+                        .map_err(|error| HoprLibError::GeneralError(error.to_string()))
+                })
+            })
+            .with_state_dump(reporter)
+            .with_state_dump_section("application", || serde_json::json!({ "ready": true }))
+            .with_session_server(crate::testing::dummies::EchoServer::default())
+            .build_entry(ticket_factory)
+            .await?;
+
+        let started = tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
+            .await
+            .context("reporter should start or be disabled during node construction")?;
+        assert_eq!(
+            observer_ref.upgrade().is_some(),
+            enabled && with_observer,
+            "transport must retain the enabled observer after the factory is consumed"
+        );
+        if enabled {
+            assert_eq!(started?, vec![("application", serde_json::json!({ "ready": true }))]);
+            assert_eq!(
+                lifetime_rx.try_recv(),
+                Err(oneshot::error::TryRecvError::Empty),
+                "the reporter must remain alive while the node owns it"
+            );
+        } else {
+            assert!(started.is_err(), "disabled reporting must never poll the task");
+        }
+        drop(node);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_secs(5), lifetime_rx)
+                .await
+                .context("dropping the node must cancel its reporter")?
+                .is_err()
+        );
+        Ok(())
+    }
+}
