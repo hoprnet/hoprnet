@@ -898,6 +898,11 @@ fn default_session_surb_degraded_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(1))
 }
 
+/// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 45s.
+fn default_session_surb_idle_notify_period() -> Option<Duration> {
+    Some(Duration::from_secs(45))
+}
+
 /// Transport-layer default for the Exit's refusal reply budget: a burst of 32, then one reply a second.
 fn default_session_refusal_reply_budget() -> Option<RefusalReplyBudget> {
     Some(RefusalReplyBudget::default())
@@ -952,6 +957,16 @@ fn validate_surb_degraded_notify_period(value: &Duration) -> Result<(), Validati
     } else {
         Err(ValidationError::new(
             "SURB degraded notify period must be at least 1 second",
+        ))
+    }
+}
+
+fn validate_surb_idle_notify_period(value: &Duration) -> Result<(), ValidationError> {
+    if *value >= Duration::from_secs(1) {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "SURB idle notify period must be at least 1 second",
         ))
     }
 }
@@ -1099,6 +1114,30 @@ pub struct SessionGlobalConfig {
         )
     )]
     pub surb_degraded_notify_period: Option<Duration>,
+
+    /// The longest period the Exit's SURB-level report backs off to on an idle Session.
+    ///
+    /// Each report costs the Exit a SURB, and a ticket on a multi-hop return path. While no data moves, PIX
+    /// fill is off and the Session is not degraded, the period doubles from
+    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
+    /// Data in either direction resets it. Clamped to a quarter of [`idle_timeout`](Self::idle_timeout), because
+    /// on an idle Session these reports keep the Entry's slot alive.
+    ///
+    /// The Exit cannot see the Entry's idle timeout, so the clamp assumes the Entry's is at least the Exit's (both
+    /// default to 3 minutes). An Entry with a shorter one survives fewer lost reports, and below the cap loses
+    /// idle Sessions outright.
+    ///
+    /// Default is 45 seconds. Set to `null` to disable; minimum is 1 second.
+    #[validate(custom(function = "validate_surb_idle_notify_period"))]
+    #[default(default_session_surb_idle_notify_period())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "default_session_surb_idle_notify_period",
+            with = "humantime_serde::option"
+        )
+    )]
+    pub surb_idle_notify_period: Option<Duration>,
 
     /// Whether the Entry's SURB balancer tells the Exit its buffer target on its keep-alives.
     ///
@@ -2370,6 +2409,57 @@ mod tests {
         let cfg: SessionGlobalConfig =
             serde_saphyr::from_str("surb_degraded_notify_period: 2s").context("a humantime period must parse")?;
         assert_eq!(Some(Duration::from_secs(2)), cfg.surb_degraded_notify_period);
+        Ok(())
+    }
+
+    // --- surb_idle_notify_period tests ---
+
+    #[test]
+    fn surb_idle_notify_period_defaults_to_45_seconds() {
+        let cfg = SessionGlobalConfig::default();
+        assert_eq!(Some(Duration::from_secs(45)), cfg.surb_idle_notify_period);
+        assert!(
+            cfg.surb_idle_notify_period <= Some(cfg.idle_timeout / 4),
+            "the default must not trigger the clamp warning"
+        );
+        assert!(
+            cfg.surb_idle_notify_period > cfg.surb_balance_notify_period,
+            "the idle period must report slower than the normal one, or it backs nothing off"
+        );
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_idle_notify_period_null_disables_it() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_idle_notify_period: null").context("null must parse")?;
+        assert_eq!(None, cfg.surb_idle_notify_period);
+        assert!(cfg.validate().is_ok(), "disabling the idle backoff is valid");
+        Ok(())
+    }
+
+    #[test]
+    fn surb_idle_notify_period_below_the_floor_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            surb_idle_notify_period: Some(Duration::from_millis(999)),
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+
+        let at_floor = SessionGlobalConfig {
+            surb_idle_notify_period: Some(Duration::from_secs(1)),
+            ..Default::default()
+        };
+        assert!(at_floor.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn surb_idle_notify_period_parses_humantime() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("surb_idle_notify_period: 45s").context("a humantime period must parse")?;
+        assert_eq!(Some(Duration::from_secs(45)), cfg.surb_idle_notify_period);
         Ok(())
     }
 

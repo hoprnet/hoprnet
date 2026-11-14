@@ -615,6 +615,7 @@ where
                 std::env::var(SURB_DEGRADED_NOTIFY_PERIOD_ENV).ok().as_deref(),
                 cfg.session.surb_degraded_notify_period,
             ),
+            surb_idle_notify_period: cfg.session.surb_idle_notify_period,
             surb_target_notify: cfg.session.surb_target_notify,
             refusal_reply_budget: cfg.session.refusal_reply_budget,
             maximum_sessions: cfg.session.maximum_managed_sessions,
