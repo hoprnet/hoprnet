@@ -1121,11 +1121,8 @@ pub struct SessionGlobalConfig {
     /// fill is off and the Session is not degraded, the period doubles from
     /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
     /// Data in either direction resets it. Clamped to a quarter of [`idle_timeout`](Self::idle_timeout), because
-    /// on an idle Session these reports keep the Entry's slot alive.
-    ///
-    /// The Exit cannot see the Entry's idle timeout, so the clamp assumes the Entry's is at least the Exit's (both
-    /// default to 3 minutes). An Entry with a shorter one survives fewer lost reports, and below the cap loses
-    /// idle Sessions outright.
+    /// on an idle Session these reports keep the Entry's slot alive, and per Session to a quarter of the idle
+    /// timeout the Entry announces. An Entry that announces none is assumed to use this node's.
     ///
     /// Default is 45 seconds. Set to `null` to disable; minimum is 1 second.
     #[validate(custom(function = "validate_surb_idle_notify_period"))]

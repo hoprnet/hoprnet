@@ -797,9 +797,9 @@ pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1)
 /// session cache's `time_to_idle`, [`SessionManagerConfig::idle_timeout`]). A quarter of it means that with
 /// two lost reports the next still lands a quarter of the timeout before the Entry's slot expires.
 ///
-/// The Exit cannot see the Entry's idle timeout, so this assumes the Entry's is at least the Exit's (both
-/// default to 3 minutes). An Entry with a shorter one survives fewer lost reports, and below the cap loses idle
-/// Sessions outright.
+/// The Entry announces its idle timeout when it opens the Session (see [`into_initiation_additional_data`]),
+/// and the cap is a quarter of that. An Entry that announces none, as older releases do, is assumed to use the
+/// Exit's idle timeout, which bounds the node's cap (both default to 3 minutes).
 const IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT: u32 = 4;
 
 /// Idle reports sent at the base period before backing off: the first idle minute at 15 s.
@@ -1658,6 +1658,16 @@ fn count_return_packet_surb(estimator: &AtomicSurbFlowEstimator, mut data: Appli
     data
 }
 
+/// What `spawn_exit_keep_alive` takes from the Entry's Session request.
+#[derive(Clone, Copy, Debug)]
+struct EntryAnnouncement {
+    /// The SURB buffer target the Entry asked for; what the fill reserve is derived against (see
+    /// [`effective_surb_reserve`]).
+    surb_target: u64,
+    /// The longest idle report period this Session backs off to (see [`session_idle_notify_cap`]).
+    idle_notify_cap: Option<Duration>,
+}
+
 /// The Exit's control over the single Exit → Entry keep-alive stream a Session runs.
 ///
 /// One stream, two producers with different jobs, and this is what reconciles them:
@@ -2008,16 +2018,30 @@ impl PixFillControl {
         }
     }
 
+    /// Whether the SURB stock leaves room for an idle report: above the keep-alive reserve after the report,
+    /// which spends one SURB itself.
+    fn report_leaves_stock_above_reserve(&self) -> bool {
+        self.estimator.saturating_diff() > current_keep_alive_surb_reserve(&self.surb_mgmt).saturating_add(1)
+    }
+
+    /// Ends the idle backoff if the stock no longer allows it.
+    ///
+    /// The stock is otherwise only checked when a report is admitted. Called when SURBs are evicted (a new SURB
+    /// generation wipes the stock) and when an announced target changes the reserve, so the Entry does not wait out
+    /// a backed-off period while the Exit runs low.
+    pub(crate) fn recheck_reserve(&self) {
+        let mut state = self.state.lock();
+        if state.idle_reports > 0 && !self.report_leaves_stock_above_reserve() {
+            self.reset_idle_reports(&mut state, "SURB stock at the keep-alive reserve");
+        }
+    }
+
     /// Books an admitted report against the idle count, and re-applies the rate if the period changed.
     ///
     /// Idle means nothing moved since the last report; see the rules on [`admit`](Self::admit).
     fn note_report(&self, state: &mut PixFillState) {
         let moved = self.data_since_report.swap(false, Ordering::Relaxed);
-        let idle = !moved
-            && state.fill.is_zero()
-            && !state.degraded
-            // The report being admitted spends one of the SURBs above the reserve.
-            && self.estimator.saturating_diff() > current_keep_alive_surb_reserve(&self.surb_mgmt).saturating_add(1);
+        let idle = !moved && state.fill.is_zero() && !state.degraded && self.report_leaves_stock_above_reserve();
 
         let before = self.period(state);
         state.idle_reports = if idle { state.idle_reports.saturating_add(1) } else { 0 };
@@ -2152,7 +2176,8 @@ impl PixFillControl {
     ///   when fill returns to zero.
     /// * **Not degraded or dark.** Those cadences are shorter on purpose; entering degraded mode restarts the count.
     /// * **Stock above the keep-alive reserve** ([`current_keep_alive_surb_reserve`]) after the report. Otherwise the
-    ///   Exit is in trouble and the Entry should hear it as often as before.
+    ///   Exit is in trouble and the Entry should hear it as often as before. Also checked between reports, when SURBs
+    ///   are evicted or the announced target changes ([`recheck_reserve`](Self::recheck_reserve)).
     /// * **No application data in either direction.** [`note_data_activity`](Self::note_data_activity) resets the count
     ///   at once. The Entry's keep-alives and the SURBs they carry do *not* count: its balancer decay refills an idle
     ///   Session about once a minute, which would defeat the backoff.
@@ -2758,21 +2783,54 @@ impl EffectivePixAdmission {
 
 /// Bit position of the 64-bit options word within `StartInitiation::additional_data`.
 ///
-/// The options word (PIX parameters and SURB balancer target) occupies the most significant 64 bits;
-/// the least significant 64 bits are currently unused and always sent as `0`.
+/// The options word (PIX parameters and SURB balancer target) occupies the most significant 64 bits. The
+/// least significant 32 bits carry the Entry's idle timeout (see [`into_initiation_additional_data`]); the 32
+/// above them are unused and always sent as `0`.
 const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
 
-/// Places the 64-bit options word into the most significant half of `StartInitiation::additional_data`,
-/// leaving the (currently unused) least significant half zero.
+/// Packs the 64-bit options word into the most significant half of `StartInitiation::additional_data`, and
+/// the Entry's idle timeout into its lowest 32 bits.
+///
+/// The timeout is in whole seconds, at least 1 for a nonzero one, saturating at `u32::MAX`; `0` means it is
+/// not announced. The Exit bounds its idle report backoff by it (see [`session_idle_notify_cap`]).
 #[inline]
-const fn into_initiation_additional_data(options: u64) -> u128 {
-    (options as u128) << INITIATION_OPTIONS_SHIFT
+fn into_initiation_additional_data(options: u64, entry_idle_timeout: Duration) -> u128 {
+    let idle_secs = if entry_idle_timeout.is_zero() {
+        0
+    } else {
+        entry_idle_timeout.as_secs().clamp(1, u32::MAX as u64) as u32
+    };
+    ((options as u128) << INITIATION_OPTIONS_SHIFT) | idle_secs as u128
 }
 
-/// Inverse of [`into_initiation_additional_data`], ignoring the least significant half.
+/// Inverse of [`into_initiation_additional_data`] for the options word, ignoring the least significant half.
 #[inline]
 const fn initiation_options(additional_data: u128) -> u64 {
     (additional_data >> INITIATION_OPTIONS_SHIFT) as u64
+}
+
+/// The idle timeout the Entry announced in `additional_data`, or `None` if it announced none.
+#[inline]
+fn announced_idle_timeout(additional_data: u128) -> Option<Duration> {
+    match additional_data as u32 {
+        0 => None,
+        secs => Some(Duration::from_secs(secs as u64)),
+    }
+}
+
+/// The longest idle report period for one Exit Session.
+///
+/// `configured` is the node's cap, already clamped to the Exit's own idle timeout. On an idle Session the
+/// reports refresh the *Entry's* slot, so an Entry that announced its idle timeout bounds it further, to a
+/// quarter of that (see [`IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT`]). An Entry that announced none is assumed to
+/// use the Exit's.
+fn session_idle_notify_cap(configured: Option<Duration>, entry_idle_timeout: Option<Duration>) -> Option<Duration> {
+    let entry_cap = entry_idle_timeout
+        .map(|idle| (idle / IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT).max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
+    match (configured, entry_cap) {
+        (Some(configured), Some(entry_cap)) => Some(configured.min(entry_cap)),
+        (configured, _) => configured,
+    }
 }
 
 /// Decodes the incentivization the Entry offered, before anyone is asked what to do about it.
@@ -3070,9 +3128,10 @@ pub struct SessionManagerConfig {
     /// `PixFillControl::admit` for the rules.
     ///
     /// Floored at `MIN_SURB_BUFFER_NOTIFICATION_PERIOD` and clamped to `idle_timeout / 4`, because on an idle
-    /// Session these reports refresh the Entry's slot timer; this assumes the Entry's idle timeout is at least
-    /// the Exit's. `None`, or a value not above
-    /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), disables the backoff.
+    /// Session these reports refresh the Entry's slot timer. Per Session it is further bounded to a quarter of
+    /// the idle timeout the Entry announces; an Entry that announces none is assumed to use this node's. `None`,
+    /// or a value not above [`surb_balance_notify_period`](Self::surb_balance_notify_period), disables the
+    /// backoff.
     ///
     /// Default is `None` here; the node's default is in the transport configuration.
     #[default(None)]
@@ -3847,6 +3906,12 @@ fn book_start_message_surbs(slot: &SessionSlot, session_id: &SessionId, stored: 
         return false;
     }
     account_incoming_surbs(&slot.surb_estimator, stored.saved, stored.evicted);
+    if stored.evicted > 0 {
+        // The stock may have fallen to the reserve, which ends the idle report backoff.
+        if let Some(control) = slot.pix_fill.get() {
+            control.recheck_reserve();
+        }
+    }
     #[cfg(feature = "telemetry")]
     telemetry::record_session_surb_produced(session_id, stored.saved);
     #[cfg(not(feature = "telemetry"))]
@@ -5071,7 +5136,7 @@ where
             challenge,
             target,
             capabilities: HoprSessionCapabilities(cfg.capabilities),
-            additional_data: into_initiation_additional_data(additional_data),
+            additional_data: into_initiation_additional_data(additional_data, self.cfg.idle_timeout),
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -6028,7 +6093,7 @@ where
     /// [`PixFillControl::admit`]'s SURB reserve, which is about this node's own ability to send at
     /// all rather than about what the peer has paid for.
     ///
-    /// `announced_surb_target` is the SURB buffer target the Entry asked for, and it is what that
+    /// `announced.surb_target` is the SURB buffer target the Entry asked for, and it is what that
     /// reserve is derived against — see [`effective_surb_reserve`]. It has to be, because the
     /// configured reserve is an absolute count while the buffer it is measured against is the Entry's
     /// choice; a Session whose Entry asks for a shallower buffer than the configured reserve could
@@ -6039,7 +6104,7 @@ where
         slot: &SessionSlot,
         msg_sender: S,
         is_pix: bool,
-        announced_surb_target: u64,
+        announced: EntryAnnouncement,
         loss_signal: Option<Arc<FrameLossSignal>>,
     ) {
         let notify_period = self.cfg.surb_balance_notify_period;
@@ -6055,7 +6120,7 @@ where
             .filter(|degraded| notify_period.is_some_and(|normal| *degraded < normal));
 
         let configured_reserve = self.cfg.pix_config.supervision.fill.min_surb_reserve;
-        let min_surb_reserve = effective_surb_reserve(configured_reserve, announced_surb_target);
+        let min_surb_reserve = effective_surb_reserve(configured_reserve, announced.surb_target);
 
         // Created here and shared: the sink wrapper below has to hold the same control the stream is
         // rate-limited by, so that it can tell a notification packet from a fill packet.
@@ -6070,7 +6135,7 @@ where
                 slot.surb_estimator.clone(),
                 slot.surb_mgmt.clone(),
             )
-            .with_idle_notify_period(self.cfg.surb_idle_notify_period)
+            .with_idle_notify_period(announced.idle_notify_cap)
             .for_session(if is_pix {
                 ExitSessionKind::Pix
             } else {
@@ -6192,7 +6257,7 @@ where
                 %session_id,
                 configured = configured_reserve,
                 effective = min_surb_reserve,
-                announced_surb_target,
+                announced_surb_target = announced.surb_target,
                 "the PIX fill SURB reserve was lowered by more than an order of magnitude to fit the SURB buffer \
                  target the entry announced for this session"
             );
@@ -6201,7 +6266,7 @@ where
         debug!(
             %session_id, ?notify_period, is_pix,
             surb_reserve = min_surb_reserve,
-            announced_surb_target,
+            announced_surb_target = announced.surb_target,
             "started the exit keep-alive stream"
         );
     }
@@ -7703,6 +7768,24 @@ where
             }
         };
 
+        // The Entry's idle timeout bounds how far the idle reports may back off, as they are what keeps its slot
+        // alive (see `IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT`).
+        let entry_idle_timeout = announced_idle_timeout(session_req.additional_data);
+        let idle_notify_cap = session_idle_notify_cap(self.cfg.surb_idle_notify_period, entry_idle_timeout);
+        if idle_notify_cap != self.cfg.surb_idle_notify_period {
+            debug!(
+                %session_id,
+                ?entry_idle_timeout,
+                node_cap = ?self.cfg.surb_idle_notify_period,
+                cap = ?idle_notify_cap,
+                "the Entry's idle timeout lowers the idle SURB notification period"
+            );
+        }
+        let announcement = EntryAnnouncement {
+            surb_target: announced_surb_target,
+            idle_notify_cap,
+        };
+
         // The target this Session's SURB ring is sized from: the one the Entry announced, or, when it
         // announced none, the largest this node allows (`maximum_surb_buffer_size`).
         //
@@ -7766,6 +7849,7 @@ where
             let surb_estimator_rx = slot.surb_estimator.clone();
             // Resolved per packet: `spawn_exit_keep_alive` publishes the control after this is built.
             let activity_tx = slot.pix_fill.clone();
+            let activity_egress = slot.pix_fill.clone();
             let activity_rx = slot.pix_fill.clone();
             // Resolved once, here, rather than per packet: the gate was installed before this point,
             // so the egress path never has to look inside the `OnceLock` again.
@@ -7790,6 +7874,11 @@ where
                         egress_gate,
                         self.cfg.surb_balance_notify_period.is_some() || pix.is_some(),
                     )
+                    // Where the limiter releases a reply, so a burst draining slowly stays activity until it is out.
+                    .with(move |item: EgressItem| {
+                        note_exit_data_activity(&activity_egress);
+                        futures::future::ready(Ok::<_, std::io::Error>(item))
+                    })
                     .rate_limit_with_controller(&egress_rate_control)
                     .buffer((2 * target_surb_buffer_size) as usize)
                     // Outermost, so the write is noted on entry, ahead of the limiter that holds replies while
@@ -7857,7 +7946,7 @@ where
                 &slot,
                 msg_sender.clone(),
                 pix.is_some(),
-                announced_surb_target,
+                announcement,
                 loss_signal,
             );
 
@@ -7912,7 +8001,7 @@ where
                 &slot,
                 msg_sender.clone(),
                 pix.is_some(),
-                announced_surb_target,
+                announcement,
                 loss_signal,
             );
 
@@ -8190,6 +8279,11 @@ where
                                 session_slot.peek_admission_token(),
                                 announced as usize,
                             );
+                        }
+
+                        // The target sets the keep-alive reserve, which may now reach the stock.
+                        if let Some(control) = session_slot.pix_fill.get() {
+                            control.recheck_reserve();
                         }
 
                         if balanced {
@@ -9292,6 +9386,7 @@ mod tests {
             PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
                 .expect("test dimensions must be valid")
                 .into_additional_data(0),
+            Duration::ZERO,
         )
     }
 
@@ -9303,7 +9398,7 @@ mod tests {
 
     /// [`small_pix_params`] as an Entry offering them would pack them into `additional_data`.
     fn small_pix_additional_data() -> u128 {
-        into_initiation_additional_data(small_pix_params().into_additional_data(0))
+        into_initiation_additional_data(small_pix_params().into_additional_data(0), Duration::ZERO)
     }
 
     /// Surplus used by the small test `SsaGeneratorConfig`s below. Non-zero and different from
@@ -10592,6 +10687,22 @@ mod tests {
         futures::channel::mpsc::Receiver<IncomingSession>,
         HoprPseudonym,
     )> {
+        exit_session_reporting_levels_for_entry(capabilities, announced_target, Duration::ZERO, cfg).await
+    }
+
+    /// [`exit_session_reporting_levels_with`] for an Entry that announces `entry_idle_timeout`
+    /// (zero: it announces none).
+    async fn exit_session_reporting_levels_for_entry(
+        capabilities: Capabilities,
+        announced_target: u64,
+        entry_idle_timeout: Duration,
+        cfg: SessionManagerConfig,
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        HoprPseudonym,
+    )> {
         let mgr = RecordingManager::new(cfg);
         let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
@@ -10604,7 +10715,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(capabilities),
-                additional_data: into_initiation_additional_data(announced_target),
+                additional_data: into_initiation_additional_data(announced_target, entry_idle_timeout),
             },
         )
         .await?;
@@ -12199,6 +12310,320 @@ mod tests {
         Ok(())
     }
 
+    /// The Entry's idle timeout travels in the low half of `additional_data`, beside the options word.
+    #[test]
+    fn the_entry_idle_timeout_is_announced_in_whole_seconds_beside_the_options_word() {
+        let options = 0xdead_beef_0123_4567u64;
+        let u32_max = Duration::from_secs(u32::MAX as u64);
+        for (idle, expected) in [
+            (Duration::ZERO, None),
+            (Duration::from_millis(1), Some(Duration::from_secs(1))),
+            (Duration::from_millis(1_500), Some(Duration::from_secs(1))),
+            (Duration::from_secs(180), Some(Duration::from_secs(180))),
+            (u32_max, Some(u32_max)),
+            (Duration::from_secs(u64::MAX), Some(u32_max)),
+        ] {
+            let data = into_initiation_additional_data(options, idle);
+            assert_eq!(options, initiation_options(data), "options for {idle:?}");
+            assert_eq!(expected, announced_idle_timeout(data), "announcement for {idle:?}");
+        }
+        assert_eq!(
+            None,
+            announced_idle_timeout(into_initiation_additional_data(options, Duration::ZERO))
+        );
+    }
+
+    /// The per-session cap is a quarter of the Entry's announced timeout, never above the node's cap.
+    #[test]
+    fn the_session_idle_notify_cap_follows_the_entry_idle_timeout() {
+        let node_cap = Some(Duration::from_secs(45));
+        let announced = |secs: u64| session_idle_notify_cap(node_cap, Some(Duration::from_secs(secs)));
+
+        assert_eq!(
+            node_cap,
+            session_idle_notify_cap(node_cap, None),
+            "a silent Entry keeps the node cap"
+        );
+        assert_eq!(Some(Duration::from_secs(10)), announced(40));
+        assert_eq!(Some(Duration::from_secs(30)), announced(120));
+        assert_eq!(node_cap, announced(3_600));
+        assert_eq!(
+            Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
+            announced(2),
+            "floored at the minimum period"
+        );
+        assert_eq!(None, session_idle_notify_cap(None, Some(Duration::from_secs(120))));
+
+        // At or below the base period, `with_idle_notify_period` drops it: no backoff for a 40 s Entry.
+        let base = Duration::from_secs(15);
+        let control = |cap| fill_control_idle(base, cap, IDLE_STOCK).idle_notify_period;
+        assert_eq!(None, control(announced(40).unwrap_or_default()));
+        assert_eq!(
+            Some(Duration::from_secs(30)),
+            control(announced(120).unwrap_or_default())
+        );
+    }
+
+    /// The Entry sends its idle timeout in the `StartSession` it opens a Session with.
+    #[test_log::test(tokio::test)]
+    async fn the_entry_announces_its_idle_timeout_in_the_start_session() -> anyhow::Result<()> {
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+        let alice_mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            idle_timeout: Duration::from_secs(120),
+            ..Default::default()
+        });
+
+        let sent: Arc<parking_lot::Mutex<Vec<StartInitiation<SessionTarget, HoprSessionCapabilities>>>> =
+            Default::default();
+        let captured = sent.clone();
+        let mut alice_transport = MockMsgSender::new();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .withf(move |_, data| msg_type(data, StartProtocolDiscriminants::StartSession))
+            .returning(move |_, data| {
+                if let Ok(StartProtocol::StartSession(init)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    captured.lock().push(init);
+                }
+                Box::pin(async { Ok(()) })
+            });
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx, None, None)?;
+
+        let _ = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    pseudonym: HoprPseudonym::random().into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let sent = sent.lock();
+        anyhow::ensure!(sent.len() == 1, "exactly one StartSession must have been sent");
+        assert_eq!(
+            Some(Duration::from_secs(120)),
+            announced_idle_timeout(sent[0].additional_data)
+        );
+        Ok(())
+    }
+
+    /// The Exit bounds the idle backoff by what the Entry announced.
+    #[rstest::rstest]
+    #[case::silent(Duration::ZERO, Some(Duration::from_secs(45)))]
+    #[case::short_entry(Duration::from_secs(40), None)]
+    #[case::mid_entry(Duration::from_secs(120), Some(Duration::from_secs(30)))]
+    #[case::long_entry(Duration::from_secs(3_600), Some(Duration::from_secs(45)))]
+    #[test_log::test(tokio::test)]
+    async fn the_exit_bounds_the_idle_backoff_by_the_announced_entry_idle_timeout(
+        #[case] entry_idle: Duration,
+        #[case] expected_cap: Option<Duration>,
+    ) -> anyhow::Result<()> {
+        // The node's own cap is clamped to 45 s (a quarter of 180 s).
+        let (mgr, _msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_for_entry(
+            Capabilities::empty(),
+            64,
+            entry_idle,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(Duration::from_secs(15)),
+                surb_idle_notify_period: Some(Duration::from_secs(600)),
+                idle_timeout: Duration::from_secs(180),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let control = mgr
+            .sessions
+            .get(&pseudonym)
+            .and_then(|slot| slot.pix_fill.get().cloned())
+            .context("an Exit Session with a notification period steers a fill control")?;
+
+        assert_eq!(expected_cap, control.idle_notify_period);
+        Ok(())
+    }
+
+    /// A stock wiped below the reserve ends the backoff at once, without waiting for the next report.
+    #[test]
+    fn a_stock_that_falls_to_the_reserve_ends_the_backoff_at_once() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        let t0 = Instant::now();
+        report_gaps(&control, t0, 6)?;
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+        let last = t0 + Duration::from_secs(15 * 3 + 30 + 60 + 60);
+        let twenty_later = last + Duration::from_secs(20);
+        assert!(!control.admit_at(twenty_later));
+
+        // Still well above the reserve: nothing changes.
+        control.recheck_reserve();
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+
+        // A new SURB generation wipes most of the stock.
+        control.estimator.evicted.fetch_add(IDLE_STOCK - 2, Ordering::Relaxed);
+        control.recheck_reserve();
+
+        assert_eq!(Some(base), control.notify_period_in_force());
+        assert_eq!(0, control.idle_reports());
+        assert!(control.admit_at(twenty_later), "the overdue report goes out at once");
+        Ok(())
+    }
+
+    /// A target raised so that the reserve reaches the stock ends the backoff at once.
+    #[test]
+    fn a_raised_target_that_lifts_the_reserve_to_the_stock_ends_the_backoff_at_once() -> anyhow::Result<()> {
+        let base = Duration::from_secs(15);
+        let control = fill_control_idle(base, Duration::from_secs(60), IDLE_STOCK);
+        report_gaps(&control, Instant::now(), 6)?;
+        assert_eq!(Some(Duration::from_secs(60)), control.notify_period_in_force());
+
+        control
+            .surb_mgmt
+            .target_surb_buffer_size
+            .store(10_000, Ordering::Relaxed);
+        assert_eq!(100, current_keep_alive_surb_reserve(&control.surb_mgmt));
+        control.recheck_reserve();
+
+        assert_eq!(Some(base), control.notify_period_in_force());
+        assert_eq!(0, control.idle_reports());
+        Ok(())
+    }
+
+    /// SURBs evicted by a Start message (a generation wipe) end the backoff of a backed-off Exit Session.
+    #[test_log::test(tokio::test)]
+    async fn evicted_surbs_end_the_backoff_of_an_idle_exit_session() -> anyhow::Result<()> {
+        let cap = Duration::from_secs(4);
+        let (mgr, _msg_rx, _new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capabilities::empty(),
+            64,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+                surb_idle_notify_period: Some(cap),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let control = mgr
+            .sessions
+            .get(&pseudonym)
+            .and_then(|slot| slot.pix_fill.get().cloned())
+            .context("an Exit Session with a notification period steers a fill control")?;
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(10_000, Ordering::Relaxed);
+        timeout(Duration::from_secs(30), async {
+            while control.notify_period_in_force() != Some(cap) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .context("an idle Session never backed its reports off to the cap")?;
+
+        let slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        assert!(book_start_message_surbs(
+            &slot,
+            &pseudonym,
+            SurbsStored {
+                saved: 0,
+                evicted: 10_000
+            }
+        ));
+
+        assert_eq!(Some(KEEP_ALIVE_PERIOD), control.notify_period_in_force());
+        Ok(())
+    }
+
+    /// A reply burst that drains slowly through the egress limiter is activity until it has drained: the
+    /// hook in front of the buffer alone sees it once, on entry.
+    #[test_log::test(tokio::test)]
+    async fn a_burst_draining_slowly_through_the_egress_limiter_is_noted_as_activity() -> anyhow::Result<()> {
+        // A target of 10 at the default 5 s minimum buffer duration limits the egress to 2 packets per second.
+        let (mgr, mut msg_rx, mut new_session_rx, pseudonym) = exit_session_reporting_levels_with(
+            Capabilities::empty(),
+            10,
+            SessionManagerConfig {
+                surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+                surb_idle_notify_period: Some(Duration::from_secs(4)),
+                initial_return_session_egress_rate: 2,
+                ..Default::default()
+            },
+        )
+        .await?;
+        let control = mgr
+            .sessions
+            .get(&pseudonym)
+            .and_then(|slot| slot.pix_fill.get().cloned())
+            .context("an Exit Session with a notification period steers a fill control")?;
+        let mut incoming = new_session_rx.next().await.context("the Session was announced")?;
+        show_exit_its_entry(
+            &mgr,
+            pseudonym,
+            SimulatedEntry::Balancing {
+                target_notify: false,
+                surbs: ENTRY_SURBS,
+            },
+        )
+        .await?;
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(10_000, Ordering::Relaxed);
+
+        // Queued at once; at 2 per second this drains for about ten seconds.
+        let writer = tokio::spawn(async move {
+            for _ in 0..20 {
+                incoming.session.write_all(b"burst").await?;
+            }
+            incoming.session.flush().await?;
+            anyhow::Ok(incoming)
+        });
+
+        let mut released = 0;
+        let mut released_at_half = 0;
+        for tick in 0..80 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            while let Ok((_, data)) = msg_rx.try_recv() {
+                released += usize::from(data.data.application_tag == SESSION_APPLICATION_TAG);
+            }
+            if tick == 60 {
+                released_at_half = released;
+            }
+            assert_eq!(
+                Some(KEEP_ALIVE_PERIOD),
+                control.notify_period_in_force(),
+                "the period backed off while the burst was still draining (tick {tick}, {released} released)"
+            );
+        }
+        assert!(
+            released > released_at_half,
+            "fixture: the burst must still be draining at the end of the window ({released} released)"
+        );
+        writer.abort();
+        Ok(())
+    }
+
     /// Reports and fill are counted under their own kinds.
     #[test]
     fn admitted_reports_and_fill_are_counted_as_exit_control_packets() -> anyhow::Result<()> {
@@ -13442,7 +13867,10 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(capabilities | Capability::UsePIX),
-                additional_data: into_initiation_additional_data(params.into_additional_data(announced_target)),
+                additional_data: into_initiation_additional_data(
+                    params.into_additional_data(announced_target),
+                    Duration::ZERO,
+                ),
             },
         )
         .await?;
@@ -15301,7 +15729,7 @@ mod tests {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
                     capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                    additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+                    additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
                 },
             )
         };
@@ -15651,7 +16079,10 @@ mod tests {
 
         // Zero polynomials is outside the protocol range, so unpacking refuses it outright.
         let unreadable = StartInitiation {
-            additional_data: into_initiation_additional_data(((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40)),
+            additional_data: into_initiation_additional_data(
+                ((LOCAL_PIX_SUITE as u64) << 62) | (128u64 << 40),
+                Duration::ZERO,
+            ),
             ..pix_offer()
         };
         mgr.handle_incoming_session_initiation(HoprPseudonym::random(), unreadable)
@@ -18810,7 +19241,7 @@ mod tests {
             pseudonym,
             StartInitiation {
                 capabilities: HoprSessionCapabilities(capabilities),
-                additional_data: into_initiation_additional_data(announced),
+                additional_data: into_initiation_additional_data(announced, Duration::ZERO),
                 ..no_pix_offer()
             },
         )
@@ -19219,7 +19650,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(capabilities),
-                additional_data: into_initiation_additional_data(announced),
+                additional_data: into_initiation_additional_data(announced, Duration::ZERO),
             },
         )
         .await?;
@@ -19362,7 +19793,7 @@ mod tests {
         mgr.handle_incoming_session_initiation(
             pseudonym,
             StartInitiation {
-                additional_data: into_initiation_additional_data(admitted_with),
+                additional_data: into_initiation_additional_data(admitted_with, Duration::ZERO),
                 ..no_pix_offer()
             },
         )
@@ -20258,7 +20689,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
             },
         )
         .await?;
@@ -20393,7 +20824,10 @@ mod tests {
             challenge: MIN_CHALLENGE,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-            additional_data: into_initiation_additional_data(DEFAULT_PIX_PARAMS.into_additional_data(0)),
+            additional_data: into_initiation_additional_data(
+                DEFAULT_PIX_PARAMS.into_additional_data(0),
+                Duration::ZERO,
+            ),
         };
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
@@ -21228,7 +21662,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
             },
         )
         .await?;
@@ -25070,7 +25504,7 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: into_initiation_additional_data(additional_data),
+            additional_data: into_initiation_additional_data(additional_data, Duration::ZERO),
         };
         // Packed by hand rather than through `pix_additional_data`, because that helper refuses to
         // build the very values under test. The layout it mirrors is pinned in `PixParams`' own
@@ -25147,6 +25581,7 @@ mod tests {
                 PixParams::try_new(8192, 128, 37, suite)
                     .expect("test dimensions must be valid")
                     .into_additional_data(0),
+                Duration::ZERO,
             ),
         };
 
@@ -25171,6 +25606,7 @@ mod tests {
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
             additional_data: into_initiation_additional_data(
                 (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+                Duration::ZERO,
             ),
         };
         assert!(
@@ -25201,7 +25637,7 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+            additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
         };
 
         // The default range, in shares, is a quarter of the deployed cycle up to the whole of it:
@@ -25287,7 +25723,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: into_initiation_additional_data(params.into_additional_data(0)),
+                additional_data: into_initiation_additional_data(params.into_additional_data(0), Duration::ZERO),
             },
         )
         .await?;
