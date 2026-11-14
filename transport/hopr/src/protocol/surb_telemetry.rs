@@ -29,21 +29,24 @@
 //!   few races to have a margin of its own borrows the bar of the best-measured relayer, raised to whatever its own
 //!   settled races measure, and none is judged while no relayer has one; its own races that expired open are booked as
 //!   lost and are not replies that came home, so they do not reset the clock. Effect: health `0`, the walk prunes it. A
-//!   verdict is lifted by a reply coming home through the relayer, not by time. Once no reply through it is out any
-//!   more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*: published at
-//!   `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration still does, and
-//!   that draw is the probe. A probe reply home through it revives it, to the health its lost races leave it, so
-//!   gradually; a probe that goes missing leaves it where it is, and one that is a black hole again goes back to dead
-//!   without a new SURB generation. Must not fight: common-mode outages, where no partner gets home and nothing is
-//!   judged.
+//!   verdict is lifted by a reply coming home through the relayer, not by time. From the moment the verdict is acted on
+//!   (`VERDICT_CONFIRMATION`), only a reply on a SURB minted after it counts: the late replies a slow relayer still
+//!   delivers are what the verdict was about, not news that it ended (`RelayerHealth::is_fresh_for`). Once no reply
+//!   through it is out any more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*:
+//!   published at `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration
+//!   still does, and that draw is the probe. A probe is minted after the verdict, so a probe reply home through it
+//!   revives it, to the health its lost races leave it, so gradually; a probe that goes missing leaves it where it is,
+//!   and one that is a black hole again goes back to dead without a new SURB generation. Must not fight: common-mode
+//!   outages, where no partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict, or probation. Effect: each session is told how many SURBs in its
 //!   counterparty's store run through that relayer; the balancer subtracts them from its level and sends replacements.
 //!   A lapsed verdict is only a timeout and the counterparty still holds the SURBs, probe SURBs included, so the
 //!   write-off outlives it; each written-off SURB counts as held only until `WRITE_OFF_HORIZON`, the time the
-//!   counterparty needs to spend it, and a reply through the relayer (which ends the probation) or the end of the
-//!   session ends the write-off sooner. A session's count is dropped when its SURB generation is advanced, though: the
-//!   wipe takes the SURBs it counted, and from then on it counts only the probes minted since. Must not fight: flow
-//!   control, which keeps the raw level so the replacements are not throttled.
+//!   counterparty needs to spend it, and a reply through the relayer that revives it (one on a SURB minted after the
+//!   verdict, see `RelayerHealth::is_fresh_for`) or the end of the session ends the write-off sooner. A session's count
+//!   is dropped when its SURB generation is advanced, though: the wipe takes the SURBs it counted, and from then on it
+//!   counts only the probes minted since. Must not fight: flow control, which keeps the raw level so the replacements
+//!   are not throttled.
 //! - **Fresh SURB generation.** Trigger: a dead verdict that held for a second flush (`VERDICT_CONFIRMATION`) reaching
 //!   a session for the first time, at most once per (session, relayer) while the relayer is known dead, and per
 //!   `REBUMP_COOLDOWN` after it is revived. Effect: the session's SURB generation advances, so the counterparty drops
@@ -930,8 +933,8 @@ impl RelayerHealth {
     ///
     /// A relayer is alive until it is a black hole, which makes it dead. Its verdict does not end with the
     /// condition: once no overdue reply is out any more it goes on probation instead, and stays there
-    /// until a reply comes home through it (`revive_by_reply`). One on probation
-    /// that is a black hole again is dead again.
+    /// until a reply on a SURB minted after the verdict comes home through it (`revive_by_reply`,
+    /// `is_fresh_for`), a probe's above all. One on probation that is a black hole again is dead again.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
         let last_reply = self.last_reply();
         // The bar of the best-measured relayer, for those with too short a history of their own.
