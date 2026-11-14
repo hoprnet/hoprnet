@@ -18,6 +18,7 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
+pub mod observer;
 /// Graph-based path planning for the HOPR transport layer.
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
@@ -114,7 +115,11 @@ use tracing::{Instrument, debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
-pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
+pub use crate::{
+    config::HoprProtocolConfig,
+    observer::{TransportEvent, TransportObserver},
+    protocol::PeerProtocolCounterRegistry,
+};
 use crate::{
     config::PixGlobalConfig,
     constants::SESSION_INITIATION_TIMEOUT_BASE,
@@ -659,6 +664,17 @@ where
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
         })
+    }
+
+    /// Attach a path, search and SURB observer before starting transport.
+    /// Cloned planner state is detached so existing users keep their observer.
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.path_planner.configure_selector(|selector| {
+            *selector = selector.clone().with_observer(observer.clone());
+        });
+        self.path_planner = self.path_planner.with_observer(observer.clone());
+        self.surb_round_trips = self.surb_round_trips.with_observer(observer);
+        self
     }
 
     /// Execute all processes of the [`HoprTransport`] object as a **Relay** node.
