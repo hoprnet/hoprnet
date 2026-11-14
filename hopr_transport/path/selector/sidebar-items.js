@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MIDDLE_HOP_SHARE","SHARE_SEARCHES"],"fn":["compute_paths","compute_paths_spread","distinct_first_relayers","opt_min","prune_for_consistency","search_share","take_relayer_diverse"],"struct":["ContinuedValueFn","HoprGraphPathSelector","MetricsValueFn","PathCostWithMetrics"]};
