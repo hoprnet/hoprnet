@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 
+use bytes::Bytes;
 use hopr_protocol_pix::{EntryShareGenerator, TaggedEncryptedPartialSsaShare};
 use hopr_types::{
     crypto::prelude::*,
@@ -22,7 +23,7 @@ use crate::{
     expand::KeyExpander,
     por::{ProofOfRelayString, ProofOfRelayValues, derive_ack_key_share, generate_proof_of_relay, pre_verify},
     sphinx::prelude::*,
-    types::{HoprPacketMessage, HoprPacketParts, PacketSignals, SurbReceiverInfo},
+    types::{HoprPacketMessage, HoprPacketParts, HoprReceivedPacketParts, PacketSignals, SurbReceiverInfo},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -306,7 +307,7 @@ pub struct HoprIncomingPacket {
     /// Address of the previous hop.
     pub previous_hop: OffchainPublicKey,
     /// Decrypted packet payload.
-    pub plain_text: Box<[u8]>,
+    pub plain_text: Bytes,
     /// Pseudonym of the packet creator.
     pub sender: HoprPseudonym,
     /// List of [`SURBs`](SURB) to be used for replies sent to the packet creator.
@@ -345,6 +346,19 @@ pub struct HoprOutgoingPacket {
     /// This is populated only if this is a return path packet and the associated SURB contained an encrypted partial
     /// SSA share.
     pub encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
+}
+
+impl HoprOutgoingPacket {
+    /// Builds the wire frame (the packet followed by its ticket) in the packet's own buffer.
+    ///
+    /// This does not copy the packet if its buffer has room for the ticket, as is the case for relayed packets.
+    pub fn frame(packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>, ticket: Ticket) -> Bytes {
+        let encoded_ticket = ticket.into_encoded();
+        let mut frame = packet.into_vec();
+        frame.reserve_exact(encoded_ticket.len());
+        frame.extend_from_slice(&encoded_ticket);
+        frame.into()
+    }
 }
 
 impl std::fmt::Debug for HoprOutgoingPacket {
@@ -628,8 +642,10 @@ impl HoprPacket {
             let (pre_packet, pre_ticket) =
                 data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN);
 
-            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
-                MetaPacket::try_from(pre_packet)?;
+            // Spare room for the ticket lets a relayed packet become the outbound frame without another copy.
+            let mut owned = Vec::with_capacity(Self::SIZE);
+            owned.extend_from_slice(pre_packet);
+            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> = MetaPacket::try_from(owned)?;
 
             let state = mp.forward_secret(node_keypair)?;
             let tag = *state.tag();
@@ -755,7 +771,7 @@ impl HoprPacket {
                 no_ack,
             } => {
                 // The pre_ticket is not parsed nor verified on the final hop
-                let HoprPacketParts {
+                let HoprReceivedPacketParts {
                     surbs,
                     payload,
                     signals,
@@ -766,7 +782,7 @@ impl HoprPacket {
                         packet_tag,
                         ack_key: should_acknowledge.then(|| derive_ack_key_share(&derived_secret)),
                         previous_hop,
-                        plain_text: payload.into(),
+                        plain_text: payload,
                         surbs: receiver_data.into_sequence().map(|d| d.surb_id()).zip(surbs).collect(),
                         sender: receiver_data.pseudonym(),
                         signals,
@@ -832,7 +848,7 @@ mod tests {
                 "67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349"
             );
             let (packet, ticket) = match self {
-                Self::Final(packet) => (packet.plain_text.clone(), dummy_ticket.as_ref().into()),
+                Self::Final(packet) => (packet.plain_text.as_ref().into(), dummy_ticket.as_ref().into()),
                 Self::Forwarded(fwd) => (
                     Vec::from(fwd.outgoing.packet.as_ref()).into_boxed_slice(),
                     fwd.outgoing.ticket.into_boxed(),
@@ -987,6 +1003,70 @@ mod tests {
         }
     }
 
+    #[test]
+    fn relayed_packet_frame_should_reuse_the_received_buffer() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(2, SimplePseudonym::random(), vec![], b"relay me")?;
+        let wire = packet.to_bytes();
+        let relayed = HoprPacket::from_incoming(&wire, &PEERS[1].1, *PEERS[0].1.public(), &*MAPPER, |_| None)?
+            .try_as_forwarded()
+            .context("packet is not forwarded")?;
+
+        let packet_ptr = relayed.outgoing.packet.as_ref().as_ptr();
+        let packet_bytes = relayed.outgoing.packet.as_ref().to_vec();
+        let ticket = relayed.outgoing.ticket;
+        let frame = HoprOutgoingPacket::frame(relayed.outgoing.packet, ticket);
+
+        assert_eq!(HoprPacket::SIZE, frame.len());
+        assert_eq!(packet_ptr, frame.as_ptr(), "the packet must not be copied");
+        assert_eq!(packet_bytes, frame[..packet_bytes.len()]);
+        assert_eq!(ticket.into_encoded().as_ref(), &frame[packet_bytes.len()..]);
+        Ok(())
+    }
+
+    #[test]
+    fn meta_packet_from_vec_should_keep_the_buffer_and_check_its_size() -> anyhow::Result<()> {
+        type Packet = MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
+
+        let mut buffer = Vec::with_capacity(HoprPacket::SIZE);
+        buffer.resize(Packet::SIZE, 7);
+        let buffer_ptr = buffer.as_ptr();
+
+        let buffer = Packet::try_from(buffer)?.into_vec();
+        assert_eq!(buffer_ptr, buffer.as_ptr());
+        assert!(buffer.capacity() >= HoprPacket::SIZE);
+
+        assert_eq!(Packet::try_from(buffer.as_slice())?.as_ref(), buffer.as_slice());
+        assert!(Packet::try_from(&buffer[..Packet::SIZE - 1]).is_err());
+
+        assert!(Packet::try_from(vec![0u8; Packet::SIZE - 1]).is_err());
+        assert!(Packet::try_from(vec![0u8; Packet::SIZE + 1]).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn relaying_should_fail_when_the_next_hop_key_cannot_be_resolved() -> anyhow::Result<()> {
+        let (packet, _) = create_packet(2, SimplePseudonym::random(), vec![], b"relay me")?;
+
+        // The mapper of the first relayer does not know the next hop (node 2)
+        let mapper: SimpleBiMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> = PEERS
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i != 2)
+            .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
+            .collect::<BiHashMap<_, _>>()
+            .into();
+
+        let error = HoprPacket::from_incoming(&packet.to_bytes(), &PEERS[1].1, *PEERS[0].1.public(), &mapper, |_| None)
+            .err()
+            .context("the packet must not decode")?;
+        assert!(
+            error.to_string().contains("map id to public key"),
+            "unexpected: {error}"
+        );
+
+        Ok(())
+    }
+
     #[parameterized(hops = { 0,1,2,3 })]
     fn test_packet_forward_message_no_surb(hops: usize) -> anyhow::Result<()> {
         let msg = b"some testing forward message";
@@ -999,7 +1079,7 @@ mod tests {
             _ => bail!("invalid packet initial state"),
         }
 
-        let mut actual_plain_text = Box::default();
+        let mut actual_plain_text = Bytes::new();
         for hop in 1..=hops + 1 {
             packet = process_packet_at_node(hops + 1, hop, false, packet, |_| None)
                 .context(format!("packet decoding failed at hop {hop}"))?;
@@ -1036,7 +1116,7 @@ mod tests {
             _ => bail!("invalid packet initial state"),
         }
 
-        let mut received_plain_text = Box::default();
+        let mut received_plain_text = Bytes::new();
         let mut received_surbs = vec![];
         for hop in 1..=forward_hops + 1 {
             packet = process_packet_at_node(forward_hops + 1, hop, false, packet, |_| None)
@@ -1092,7 +1172,7 @@ mod tests {
             _ => bail!("invalid packet initial state"),
         }
 
-        let mut received_fwd_plain_text = Box::default();
+        let mut received_fwd_plain_text = Bytes::new();
         let mut received_surbs = vec![];
         for hop in 1..=forward_hops + 1 {
             fwd_packet = process_packet_at_node(forward_hops + 1, hop, false, fwd_packet, |_| None)
@@ -1150,7 +1230,7 @@ mod tests {
             _ => bail!("invalid packet initial state"),
         }
 
-        let mut received_re_plain_text = Box::default();
+        let mut received_re_plain_text = Bytes::new();
         for hop in (0..=return_hops).rev() {
             re_packet = process_packet_at_node(return_hops + 1, hop, true, re_packet, &mut openers_fn)
                 .context(format!("packet decoding failed at hop {hop}"))?;
@@ -1256,7 +1336,7 @@ mod tests {
                 _ => bail!("invalid packet initial state in reply {i}"),
             }
 
-            let mut received_re_plain_text = Box::default();
+            let mut received_re_plain_text = Bytes::new();
             for hop in (0..=return_hops).rev() {
                 re_packet = process_packet_at_node(return_hops + 1, hop, true, re_packet, &mut openers_fn)
                     .context(format!("packet decoding failed at hop {hop} in reply {i}"))?;

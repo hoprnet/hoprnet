@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use bytes::{BufMut, BytesMut};
 use hopr_api::{
     chain::*,
     types::{
@@ -179,15 +178,11 @@ where
             "cannot send out packet that is not outgoing",
         ))?;
 
-        let mut transport_payload = BytesMut::with_capacity(HoprPacket::SIZE);
-        transport_payload.put_slice(out.packet.as_ref());
-        transport_payload.put_slice(&out.ticket.into_encoded());
-
         Ok(OutgoingPacket {
             next_hop: out.next_hop,
             ack_challenge: out.ack_challenge,
             encrypted_pix_share: out.encrypted_pix_share,
-            data: transport_payload.freeze(),
+            data: HoprOutgoingPacket::frame(out.packet, out.ticket),
             minted_surbs,
         })
     }
