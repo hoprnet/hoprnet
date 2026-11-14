@@ -161,7 +161,7 @@ lazy_static::lazy_static! {
     static ref METRIC_SURB_PENDING_LOST: hopr_api::types::telemetry::SimpleCounter =
         hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_surb_pending_lost_total",
-            "SURB records the capacity-bounded pending maps could not hold and evicted before their replies came home: an evicted pending record settles no race and is never written off, and an evicted written-off leg cannot revive its relayer. A non-zero rate means the maps are undersized for the node's outstanding SURBs; raise surb_store.pending_surb_max_bytes",
+            "SURB records the capacity-bounded pending map could not hold and evicted before their replies came home: an evicted record settles no race and is never written off. A non-zero rate means the map is undersized for the node's outstanding SURBs; raise surb_store.pending_surb_max_bytes",
         )
         .unwrap();
 }
@@ -567,10 +567,9 @@ where
         // only pop order, makes the older of the two.
         //
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
-        // worst case is twice it; see `pending_surbs_capacity`.
-        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::with_capacity(
-            protocol::surb_telemetry::pending_surbs_capacity(cfg.packet.surb_store.pending_surb_max_bytes),
-        );
+        // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
+        let surb_round_trips =
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -1267,10 +1266,6 @@ where
         lazy_static::initialize(&METRIC_SURB_GENERATION_BUMPS);
         #[cfg(all(feature = "telemetry", not(test)))]
         lazy_static::initialize(&METRIC_SURB_PENDING_LOST);
-        // `pending_lost` only ever grows, so the counter is driven by the delta since the last tick
-        // rather than by the absolute value, which `SimpleCounter::increment_by` would re-add.
-        #[cfg(all(feature = "telemetry", not(test)))]
-        let mut pending_lost_reported = 0u64;
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1280,15 +1275,13 @@ where
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
-                    // Records either pending map could not hold are lost silently as far as every
-                    // other counter is concerned; reading the cumulative figure here is what makes the
-                    // loss visible.
+                    // Records the pending map could not hold are lost silently as far as every other
+                    // counter is concerned; reporting what was lost since the last tick is what makes
+                    // the loss visible.
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    {
-                        let lost = surb_round_trips.pending_lost();
-                        METRIC_SURB_PENDING_LOST.increment_by(lost.saturating_sub(pending_lost_reported));
-                        pending_lost_reported = lost;
-                    }
+                    METRIC_SURB_PENDING_LOST.increment_by(surb_round_trips.take_pending_lost());
+                    // Drops the records outlived by their horizon, a part of the map per tick.
+                    surb_round_trips.expire_step();
                     // Refresh the SURB-store gauge alongside the flush tick. The store updates its
                     // accounting synchronously, but nothing on the hot path samples it, so without a
                     // poller the series would be declared and never emitted. Once per flush interval
@@ -1334,21 +1327,24 @@ where
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
                     // told how many of those it holds, to replace them. Walks the pending map, so it
-                    // runs off the runtime worker like the write-off above. A full pool refuses it
+                    // runs off the runtime worker like the write-off above, and only while some
+                    // session has SURBs written off: with none there is nothing to count, and the
+                    // empty figure clears the marks left from before. A full pool refuses the walk
                     // before it runs; the marks are then kept as they are until the next tick, since an
                     // empty figure would clear every session's mark only to set it again.
-                    let registry = surb_round_trips.clone();
-                    let current = match hopr_utils::parallelize::cpu::spawn_blocking(
-                        move || registry.invalid(),
-                        "surb_invalid",
-                    )
-                    .await
-                    {
-                        Ok(current) => current,
-                        Err(error) => {
-                            tracing::warn!(%error, "invalid SURB update deferred to the next flush");
-                            continue;
+                    let current = if surb_round_trips.has_write_offs() {
+                        let registry = surb_round_trips.clone();
+                        match hopr_utils::parallelize::cpu::spawn_blocking(move || registry.invalid(), "surb_invalid")
+                            .await
+                        {
+                            Ok(current) => current,
+                            Err(error) => {
+                                tracing::warn!(%error, "invalid SURB update deferred to the next flush");
+                                continue;
+                            }
                         }
+                    } else {
+                        std::collections::HashMap::new()
                     };
                     for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
                         if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {

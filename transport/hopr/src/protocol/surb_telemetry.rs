@@ -79,9 +79,15 @@ use hopr_api::{
     },
 };
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
-use hopr_protocol_hopr::{IncomingPacket, IncomingPacketError, OutgoingPacket, PacketDecoder, PacketEncoder};
+use hopr_protocol_hopr::{
+    IncomingPacket, IncomingPacketError, MAXIMUM_PENDING_SURB_MAX_BYTES, MINIMUM_PENDING_SURB_MAX_BYTES,
+    OutgoingPacket, PacketDecoder, PacketEncoder,
+};
 
-use crate::observer::{TransportEvent, TransportObserver};
+use crate::{
+    observer::{TransportEvent, TransportObserver},
+    protocol::surb_map::RandomEvictionMap,
+};
 
 /// Slots in a [`PathId`], and therefore the longest leg that can be reported.
 pub(crate) const PATH_ID_SLOTS: usize = 5;
@@ -101,9 +107,15 @@ const PENDING_SURB_TTL: Duration = Duration::from_secs(60);
 /// left every reply of such a session unmatched: no race, no reply evidence, no verdict and no
 /// SURB generation advance, while its Exit spent a dead relayer's SURBs into the void. The map holds
 /// what is outstanding at the counterparty, so its size is bounded by the stock and the loss rate,
-/// not by this horizon; the byte budget in [`pending_surbs_capacity`] bounds it.
+/// not by this horizon; the byte budget of [`SurbRoundTripRegistry::with_budget`] bounds it. The
+/// horizon is enforced by [`SurbRoundTripRegistry::expire_step`], which the flush runs every tick.
 const PENDING_SURB_HORIZON: Duration = Duration::from_secs(15 * 60);
 const _: () = assert!(PENDING_SURB_HORIZON.as_secs() >= 10 * PENDING_SURB_TTL.as_secs());
+// Expiry can never orphan a live race. Every race is opened by updating the record it waits on, and an update
+// restarts that record's horizon (`RandomEvictionMap::update`), so the record outlives the race by about
+// `PENDING_SURB_HORIZON - PENDING_SURB_TTL`, whatever its age at the time: the assertion above is what makes
+// that margin large. A leg in `written_off_legs` is inserted at write-off time, after the race opened, so it
+// has a fresh horizon too.
 
 /// How long a SURB written off through a relayer known dead keeps counting as held by the
 /// counterparty, and therefore as invalid.
@@ -195,7 +207,11 @@ pub struct SurbRoundTripRegistry {
     /// Per-relayer health from reply races, published into the graph.
     relayer_health: Arc<RelayerHealth>,
     /// Every outstanding SURB, shared by both codec halves.
-    pending: PendingLegs,
+    ///
+    /// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
+    /// shared by both. Giving each half its own leaves every lookup missing and silently discards the
+    /// entire observation side of the metric.
+    pending: Arc<RandomEvictionMap<PendingSurb>>,
     /// Per session, SURBs written off because their return path runs through a relayer known dead, by
     /// that relayer, even though the counterparty may still hold them. Kept while the relayer stays
     /// known dead (a lapsed verdict only times out, the write-off outlives it), but dropped when the
@@ -217,56 +233,26 @@ pub struct SurbRoundTripRegistry {
     /// what lets a reply home lift the verdict or the probation of the relayers on its leg. With each leg
     /// goes the SURB's mint time: a reply on a SURB older than a verdict already acted on is not news
     /// about that relayer (see `RelayerHealth::is_fresh_for`).
-    written_off_legs: moka::sync::Cache<HoprSurbId, (ReturnRelayers, Instant)>,
-    /// Records either pending map could not hold, counted together: one evicted from
-    /// [`pending`](Self::pending) before its reply could come home settles no race and is never
-    /// written off, and one evicted from `written_off_legs` leaves a reply home finding nothing, so it
-    /// cannot lift its relayer's verdict. Zero in a configuration where neither map fills; non-zero
-    /// means the byte budget is too small for the node's outstanding SURBs, and the metric
-    /// built on [`pending_lost`](Self::pending_lost) says so.
+    ///
+    /// Bounded like `pending`, by the same byte budget, so the pair uses up to twice the budget when
+    /// both fill; it evicts at random for the same reason: a leg is looked up once, when the reply of a
+    /// SURB the counterparty still held comes home, and by age or recency that would be the leg looked
+    /// up next. A leg it could not hold leaves a reply home finding nothing, which then cannot lift the
+    /// verdict of its relayers, but it is no loss of the pending map: the wipe or write-off that put it
+    /// here has already settled what the counterparty held, so such an eviction is not counted in
+    /// [`take_pending_lost`](Self::take_pending_lost).
+    written_off_legs: Arc<RandomEvictionMap<(ReturnRelayers, Instant)>>,
+    /// Records `pending` could not hold and evicted before their reply came home, since the last
+    /// [`take_pending_lost`](Self::take_pending_lost). An evicted record settles no race and is never
+    /// written off, so its Session's SURBs through a dead relayer may go unnoticed. Zero in a
+    /// configuration where `pending` does not fill; non-zero means the byte budget is too small for the
+    /// node's outstanding SURBs, and the metric built on it says so.
     pending_lost: Arc<AtomicU64>,
 }
 
-/// Floor on the byte budget of each pending map: the old fixed 100 000-record cap.
-///
-/// An entry leaves the map when its reply comes home, so what a map holds is the stock outstanding at
-/// the counterparties plus the replies lost within [`PENDING_SURB_HORIZON`]: several deployed-size
-/// stocks. [`pending_surbs_capacity`] sizes the maps from a byte budget, and this floor keeps a budget
-/// below it from shrinking the maps below what they held before that budget existed (hoprnet#8624).
-/// The same figure is exported as
-/// [`MINIMUM_PENDING_SURB_MAX_BYTES`](hopr_protocol_hopr::MINIMUM_PENDING_SURB_MAX_BYTES) and enforced
-/// by the config validator, so a configuration file cannot carry a budget this floor would ignore.
-const MAX_PENDING_SURBS: u64 = 100_000;
-const _: () = assert!(
-    MAX_PENDING_SURBS
-        == hopr_protocol_hopr::MINIMUM_PENDING_SURB_MAX_BYTES / hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES
-);
-
-/// Byte capacity of one pending map, floored so a small budget never shrinks it below
-/// [`MAX_PENDING_SURBS`].
-///
-/// The result is a **byte** figure handed straight to moka's `max_capacity` beside the
-/// [`weigher`](pending_legs) charging one record
-/// [`PENDING_SURB_RECORD_BYTES`](hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES), so the cache's
-/// capacity *is* the budget and no per-record estimate can drift.
-///
-/// Both maps take this same capacity. At the 256 MiB default each holds ~315 700 records (~16
-/// deployed-size stocks) and the pair peaks at ≈512 MiB when both fill — the budget is per map, not
-/// for the node.
-pub(crate) fn pending_surbs_capacity(max_bytes: u64) -> u64 {
-    max_bytes.max(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
-}
-
-/// Cost of one remembered SURB, charged to a pending map's weigher so its byte capacity is exact.
-///
-/// Re-exported from the crate that owns the SURB configuration, where the measurement and its
-/// reasoning live; the two must not drift.
-const PENDING_SURB_RECORD_BYTES: u64 = hopr_protocol_hopr::PENDING_SURB_RECORD_BYTES;
-
 impl Default for SurbRoundTripRegistry {
     fn default() -> Self {
-        // The floor budget, in bytes: the old 100 000-record cap.
-        Self::with_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
+        Self::with_budget(MINIMUM_PENDING_SURB_MAX_BYTES)
     }
 }
 
@@ -299,54 +285,96 @@ impl SurbRoundTripRegistry {
         }
     }
 
-    /// A registry whose pending maps each hold up to `max_pending` **bytes**.
+    /// A registry whose pending maps each hold what fits in `max_bytes` of memory, clamped to the range
+    /// the config validator accepts, `MINIMUM_PENDING_SURB_MAX_BYTES` to `MAXIMUM_PENDING_SURB_MAX_BYTES`.
     ///
-    /// A byte capacity, not a record count: each map charges one record `PENDING_SURB_RECORD_BYTES`
-    /// through its weigher, so this is the memory bound itself. Production derives it from
-    /// `surb_store.pending_surb_max_bytes` via `pending_surbs_capacity`; [`Default`] passes the floor,
-    /// `MAX_PENDING_SURBS × PENDING_SURB_RECORD_BYTES`.
-    pub fn with_capacity(max_pending: u64) -> Self {
-        let pending_lost = Arc::new(AtomicU64::new(0));
-        let relayer_health = Arc::new(RelayerHealth::default());
+    /// Each map turns the budget into records by the memory one of *its* records costs (see
+    /// `record_bytes`), so each honours the budget itself and
+    /// the pair, once both fill, uses up to twice it. Clamped rather than trusted so that `0`, or a
+    /// record count passed by mistake, can never leave the maps holding next to nothing.
+    pub fn with_budget(max_bytes: u64) -> Self {
+        let budget = max_bytes.clamp(MINIMUM_PENDING_SURB_MAX_BYTES, MAXIMUM_PENDING_SURB_MAX_BYTES);
+        Self::from_maps(RandomEvictionMap::new(budget), RandomEvictionMap::new(budget))
+    }
+
+    /// A registry whose pending maps each hold `records` records and evict from the RNG seeded with
+    /// `seed`, for tests that need a map small enough to fill and the same eviction every run.
+    #[cfg(test)]
+    pub(crate) fn with_records(records: usize, seed: u64) -> Self {
+        Self::from_maps(
+            RandomEvictionMap::with_seed(records, seed),
+            RandomEvictionMap::with_seed(records, seed ^ !0),
+        )
+    }
+
+    fn from_maps(
+        pending: RandomEvictionMap<PendingSurb>,
+        written_off_legs: RandomEvictionMap<(ReturnRelayers, Instant)>,
+    ) -> Self {
         Self {
             inner: Default::default(),
             destinations: Default::default(),
             observer: None,
-            pending: pending_legs(max_pending, pending_lost.clone(), relayer_health.clone()),
-            relayer_health,
+            pending: Arc::new(pending),
+            relayer_health: Default::default(),
             written_off: Default::default(),
             bumped: Default::default(),
-            // The same figure as `pending`, never a separate one: a SURB written off leaves `pending`
-            // for this map, and the two held one number before they were derived from the config. It is
-            // charged the same per-record weight even though its value is smaller, so the pair's worst
-            // case is twice the budget, not 1.5x.
-            //
-            // `lru` for the same reason as `pending`: a written-off leg is looked up once, when the
-            // reply of a SURB the counterparty still held comes home, so TinyLFU would refuse the
-            // newest leg and lose the evidence that revives its relayer. A `Size` eviction is counted
-            // like one on `pending`: the reply then finds the leg in neither map and cannot lift the
-            // verdict or probation of the relayers on it, which is the same loss the metric reports.
-            written_off_legs: moka::sync::Cache::builder()
-                .max_capacity(max_pending)
-                .weigher(|_, _| PENDING_SURB_RECORD_BYTES as u32)
-                .time_to_live(PENDING_SURB_HORIZON)
-                .eviction_policy(moka::policy::EvictionPolicy::lru())
-                .eviction_listener(size_evictions(pending_lost.clone()))
-                .build(),
-            pending_lost,
+            written_off_legs: Arc::new(written_off_legs),
+            pending_lost: Default::default(),
         }
     }
 
-    /// Records that minted SURBs left one of the two pending maps before their replies could come home,
-    /// because the map was full. A record evicted from `pending` settles no race and is never written
-    /// off; one evicted from the written-off-legs map lets a reply home find nothing and so fail to
-    /// lift the verdict or probation of its relayers. Both are counted here, one series for both maps:
-    /// the two are sized from one budget and fill for the same reason, and what an operator acts on is
-    /// "the pending maps are undersized", not which of the pair overflowed first. The loss is invisible
-    /// in every other counter; non-zero only when the budget is too small for what the node mints. See
-    /// `pending_surbs_capacity`.
-    pub fn pending_lost(&self) -> u64 {
-        self.pending_lost.load(Ordering::Relaxed)
+    /// Takes the number of minted SURBs the pending map evicted before their replies could come home
+    /// since the last call, because it was full.
+    ///
+    /// Such a record settles no race and is never written off, and the loss is invisible in every other
+    /// counter. Only the pending map is counted: a leg evicted from the written-off map belongs to SURBs
+    /// whose accounting a wipe or a write-off already settled, which is no reason to raise the budget.
+    /// See [`with_budget`](Self::with_budget).
+    pub fn take_pending_lost(&self) -> u64 {
+        self.pending_lost.swap(0, Ordering::Relaxed)
+    }
+
+    /// Remembers a minted SURB until its reply comes home, and handles the record it evicted when the
+    /// map was full: its reply will now find nothing, so it is counted as lost, and the race it was
+    /// out on, if its partner's reply was home, can no longer be closed and is discarded.
+    ///
+    /// An eviction is no evidence about a relayer either way. Left open, the race would expire as a
+    /// loss of the relayers on the record's leg, healthy or not, and under sustained eviction that is
+    /// enough unanswered races to judge a healthy relayer dead and wipe its Sessions' stock (see
+    /// [`open_race`](Self::open_race) for the eviction that lands before the race opens).
+    fn remember(&self, surb_id: HoprSurbId, pending: PendingSurb) {
+        if let Some((evicted_id, evicted)) = self.pending.insert(surb_id, pending) {
+            self.pending_lost.fetch_add(1, Ordering::Relaxed);
+            if evicted.partner_replied.is_some() {
+                self.relayer_health.discard_race(&evicted.return_relayers, &evicted_id);
+            }
+        }
+    }
+
+    /// Remembers the leg of a SURB written off or wiped, and discards the race of the leg it evicted:
+    /// the reply of that SURB can no longer close it.
+    ///
+    /// Not counted as lost, see [`take_pending_lost`](Self::take_pending_lost).
+    fn remember_written_off(&self, surb_id: HoprSurbId, leg: ReturnRelayers, minted_at: Instant) {
+        if let Some((evicted_id, (evicted, _))) = self.written_off_legs.insert(surb_id, (leg, minted_at)) {
+            self.relayer_health.discard_race(&evicted, &evicted_id);
+        }
+    }
+
+    /// Drops the records of either map older than `PENDING_SURB_HORIZON`, a part of each map per call.
+    ///
+    /// Cheap enough to run inline on every flush tick: it sweeps a sixteenth of the shards, holding one
+    /// shard's lock at a time.
+    pub fn expire_step(&self) {
+        self.pending.expire_step(PENDING_SURB_HORIZON);
+        self.written_off_legs.expire_step(PENDING_SURB_HORIZON);
+    }
+
+    /// Whether some session has SURBs written off, which is when [`invalid`](Self::invalid) has anything
+    /// to report.
+    pub fn has_write_offs(&self) -> bool {
+        !self.written_off.is_empty()
     }
 
     /// Whether the reply of the SURB at `pair_index` in its packet says anything about its return path
@@ -367,11 +395,12 @@ impl SurbRoundTripRegistry {
     /// `home`, and keeps it open only while `partner` can still close it.
     ///
     /// The race is opened after `partner`'s record was updated, so the record can leave the pending map
-    /// in between: home, its reply settling a race not yet open, or evicted, its eviction listener
-    /// finding no race to discard. Either way nothing would ever close the race, and it would expire as a
-    /// loss of the relayers on `waiting`. Checked after the race is opened, so an eviction after the
-    /// check finds the race and discards it itself. A record written off in between is still in
-    /// `written_off_legs` and keeps its race, as one written off after the race opened does.
+    /// in between: home, its reply settling a race not yet open, or evicted, its eviction finding no race
+    /// to discard. Either way nothing would ever close the race, and it would expire as a loss of the
+    /// relayers on `waiting`. Checked after the race is opened, so an eviction after the check finds the
+    /// race and discards it itself. A record written off in between is still in `written_off_legs`, and
+    /// its race is kept until that SURB's reply comes home and closes it (see
+    /// [`SurbTelemetryCodec::on_replied`]), as one written off after the race opened is.
     fn open_race(&self, waiting: &ReturnRelayers, partner: HoprSurbId, home: &ReturnRelayers, round_trip: Duration) {
         self.relayer_health.open_race(waiting, partner, home, round_trip);
         if !self.pending.contains_key(&partner) && !self.written_off_legs.contains_key(&partner) {
@@ -393,37 +422,10 @@ impl SurbRoundTripRegistry {
         self.relayer_health.clone()
     }
 
-    /// Moves outstanding SURBs whose return path runs through a relayer judged dead, or on probation
-    /// after such a verdict, into the per-session write-off, and drops the write-off of relayers that
-    /// recovered.
-    ///
-    /// Only the SURBs through the relayer are written off, and only they are counted: the
-    /// counterparty's other SURBs are as good as ever until the caller supersedes the whole stock.
-    /// A relayer on probation is known dead all the same: the probes the planner's exploration sends
-    /// through it are written off like any other SURB through it.
-    ///
-    /// Returns the sessions a dead verdict reached for the first time, i.e. the ones for which a
-    /// relayer has SURBs outstanding that were not written off before. The counterparty cannot tell
-    /// which of the SURBs it holds run through the dead relayer, since it sees only their first hop,
-    /// so the caller advances each such session's SURB generation and the counterparty drops its
-    /// whole stock on the next push. The write-off of such a session is dropped at the end of the pass:
-    /// the wipe takes exactly the SURBs it counted, and the balancer's reset and paced refill replace
-    /// them, so counting them on would only make the balancer produce that many SURBs above the target
-    /// for good. The SURBs through the relayer minted after the wipe are written off anew on later
-    /// passes, and the count stays small and current.
-    ///
-    /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
-    /// this flush is written off and bumped at the next one, if it is still dead then.
-    ///
-    /// Only stock reports a session: a SURB minted through the relayer before it was judged dead, which
-    /// the counterparty may hold. One minted after is a probe the planner's exploration sent through a
-    /// relayer published at zero or on probation, and is written off without a report. That holds in
-    /// a session the wipe never reached too, one opened since or with nothing through the relayer at
-    /// the time, which has no mark for the pair: its first probe must not cost it its stock.
-    /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
-    /// revives it once per `REBUMP_COOLDOWN` from the revival: a verdict reached again inside either
-    /// is written off as usual but reports nothing.
-    pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
+    /// Ages the write-offs: drops what the counterparty has spent by now (see `WRITE_OFF_HORIZON`), the
+    /// write-off of relayers that recovered, and the re-bump marks that ran out. Touches only the small
+    /// per-session maps, so it is cheap and runs on every flush.
+    pub fn age_write_offs(&self) {
         let health = &self.relayer_health;
         for mut session in self.written_off.iter_mut() {
             session.retain(|relayer, written_off_at| {
@@ -449,26 +451,120 @@ impl SurbRoundTripRegistry {
                 at.elapsed() < REBUMP_COOLDOWN
             }
         });
-        if health.dead.is_empty() && health.probation.is_empty() {
-            return Vec::new();
-        }
-        // Only verdicts that held for a second flush act on the stock; see `VERDICT_CONFIRMATION`.
-        #[allow(clippy::type_complexity)]
-        let through_dead: Vec<(HoprSurbId, HoprPseudonym, OffchainPublicKey, ReturnRelayers, Instant)> = self
-            .pending
+    }
+
+    /// The outstanding SURBs whose return path runs through a relayer confirmed dead, in one walk of
+    /// the pending map.
+    ///
+    /// A snapshot, taken shard by shard: SURBs minted, spent or evicted during the walk may or may not
+    /// be in it, which `write_off` tolerates by re-checking each before acting.
+    /// Empty without a walk when no relayer is confirmed dead.
+    ///
+    /// The walk is over every record of the map: measured at about 20 ns per record, so some 9 ms at the
+    /// 256 MiB default and 20 ms for a million records. It repeats on every flush tick for as long as any relayer is
+    /// known dead, which for a relayer that stays dead is for good: probation ends only when a reply comes home
+    /// through the relayer. The flush therefore runs it on the blocking pool and only while a relayer is known dead
+    /// ([`RelayerHealth::any_known_dead`]), not on a runtime worker.
+    pub(crate) fn dead_stock(&self) -> Vec<StockThroughDead> {
+        let health = &self.relayer_health;
+        // The relayers confirmed dead, once, so that the walk compares against a short list instead of
+        // looking each record's relayers up in the health sets.
+        let dead: Vec<OffchainPublicKey> = health
+            .probation
             .iter()
-            .filter_map(|(id, pending)| {
-                relayers_of(&pending.return_relayers)
-                    .find(|relayer| health.is_confirmed_dead(relayer))
-                    .map(|dead| (*id, pending.pseudonym, dead, pending.return_relayers, pending.minted_at))
-            })
+            .map(|relayer| *relayer)
+            .chain(
+                health
+                    .confirmed
+                    .iter()
+                    .map(|relayer| *relayer)
+                    .filter(|relayer| health.dead.contains(relayer)),
+            )
             .collect();
+        let mut stock = Vec::new();
+        if dead.is_empty() {
+            return stock;
+        }
+        self.pending.for_each(|id, pending| {
+            if let Some(relayer) = relayers_of(&pending.return_relayers).find(|relayer| dead.contains(relayer)) {
+                stock.push(StockThroughDead {
+                    id: *id,
+                    pseudonym: pending.pseudonym,
+                    dead: relayer,
+                    return_relayers: pending.return_relayers,
+                    minted_at: pending.minted_at,
+                });
+            }
+        });
+        stock
+    }
+
+    /// Moves outstanding SURBs whose return path runs through a relayer judged dead, or on probation after
+    /// such a verdict, into the per-session write-off, and drops the write-off of relayers that
+    /// recovered. This is [`age_write_offs`](Self::age_write_offs), `dead_stock` and
+    /// `write_off` in a row; the flush runs them separately, so that the walk is
+    /// skipped when no relayer is dead.
+    ///
+    /// Only the SURBs through the relayer are written off, and only they are counted: the
+    /// counterparty's other SURBs are as good as ever until the caller supersedes the whole stock.
+    /// A relayer on probation is known dead all the same: the probes the planner's exploration sends
+    /// through it are written off like any other SURB through it.
+    ///
+    /// Returns the sessions a dead verdict reached for the first time, see `write_off`.
+    pub fn write_off_dead(&self) -> Vec<HoprPseudonym> {
+        self.age_write_offs();
+        self.write_off(self.dead_stock())
+    }
+
+    /// Writes off `stock`, as found by `dead_stock`, and returns the sessions a
+    /// dead verdict reached for the first time, i.e. the ones for which a relayer has SURBs outstanding
+    /// that were not written off before. The counterparty cannot tell which of the SURBs it holds run
+    /// through the dead relayer, since it sees only their first hop, so the caller advances each such
+    /// session's SURB generation and the counterparty drops its whole stock on the next push. The
+    /// write-off of such a session is dropped at the end of the pass: the wipe takes exactly the SURBs
+    /// it counted, and the balancer's reset and paced refill replace them, so counting them on would only
+    /// make the balancer produce that many SURBs above the target for good. The SURBs through the relayer
+    /// minted after the wipe are written off anew on later passes, and the count stays small and current.
+    ///
+    /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
+    /// this flush is written off and bumped at the next one, if it is still dead then. The stock is a
+    /// snapshot and a reply may revive its relayer while it is being worked through, so each SURB is
+    /// checked against the verdict again just before it is acted on: left out, a revived relayer's
+    /// probe would be taken for stock, because the check below that tells them apart reads the death
+    /// the revival ended, and an unreached session's whole generation would be wiped for it.
+    ///
+    /// Only stock reports a session: a SURB minted through the relayer before it was judged dead, which
+    /// the counterparty may hold. One minted after is a probe the planner's exploration sent through a
+    /// relayer published at zero or on probation, and is written off without a report. That holds in
+    /// a session the wipe never reached too, one opened since or with nothing through the relayer at
+    /// the time, which has no mark for the pair: its first probe must not cost it its stock.
+    /// A (session, relayer) pair is reported once while the relayer is known dead, and after a reply
+    /// revives it once per `REBUMP_COOLDOWN` from the revival: a verdict reached again inside either
+    /// is written off as usual but reports nothing.
+    pub(crate) fn write_off(&self, stock: Vec<StockThroughDead>) -> Vec<HoprPseudonym> {
+        let health = &self.relayer_health;
         let mut reached: Vec<HoprPseudonym> = Vec::new();
-        for (id, pseudonym, dead, return_relayers, minted_at) in through_dead {
+        for StockThroughDead {
+            id,
+            pseudonym,
+            dead,
+            return_relayers,
+            minted_at,
+        } in stock
+        {
+            if !health.is_confirmed_dead(&dead) {
+                // Revived, or its verdict lapsed, since the snapshot was taken: nothing to write off.
+                continue;
+            }
             // Remembered before it leaves `pending`, so that a reply decoded in between finds it in
             // one of the two.
-            self.written_off_legs.insert(id, (return_relayers, minted_at));
-            self.pending.invalidate(&id);
+            self.remember_written_off(id, return_relayers, minted_at);
+            if self.pending.remove(&id).is_none() {
+                // Its reply came home in between and settled it normally: the counterparty no longer
+                // holds this SURB, so it is no part of the write-off.
+                self.written_off_legs.remove(&id);
+                continue;
+            }
             let mut session = self.written_off.entry(pseudonym).or_default();
             let first_for_pair = !session.contains_key(&dead);
             session.entry(dead).or_default().push_back(Instant::now());
@@ -529,16 +625,20 @@ impl SurbRoundTripRegistry {
             // cannot make a second relayer confirmed at a later flush look as if it still had a stock
             // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
             // that a reply spent in the meantime still proves its relayers alive: it can revive one
-            // judged dead in this same flush, whose verdict is not confirmed yet.
-            let wiped: Vec<(HoprSurbId, ReturnRelayers, Instant)> = self
-                .pending
-                .iter()
-                .filter(|(_, pending)| reached.contains(&pending.pseudonym))
-                .map(|(id, pending)| (*id, pending.return_relayers, pending.minted_at))
-                .collect();
+            // judged dead in this same flush, whose verdict is not confirmed yet. A second walk, but
+            // only when a session was reached, which is once per verdict.
+            let mut wiped: Vec<(HoprSurbId, ReturnRelayers, Instant)> = Vec::new();
+            self.pending.for_each(|id, pending| {
+                if reached.contains(&pending.pseudonym) {
+                    wiped.push((*id, pending.return_relayers, pending.minted_at));
+                }
+            });
             for (id, return_relayers, minted_at) in wiped {
-                self.written_off_legs.insert(id, (return_relayers, minted_at));
-                self.pending.invalidate(&id);
+                self.remember_written_off(id, return_relayers, minted_at);
+                if self.pending.remove(&id).is_none() {
+                    // Spent in between, as in the loop above: the counterparty no longer holds it.
+                    self.written_off_legs.remove(&id);
+                }
             }
         }
         reached
@@ -548,19 +648,19 @@ impl SurbRoundTripRegistry {
     /// of all it was handed that are still accounted for.
     ///
     /// Walks the whole pending map to count what is outstanding per session, as does
-    /// [`write_off_dead`](Self::write_off_dead), which walks it twice. Both run once per flush, this one
-    /// only when some session has written-off SURBs and the second only during a dead-relayer verdict,
-    /// so at the 256 MiB default the walk is over up to ~315 700 records: measured at ~500 ns per entry,
-    /// about 160 ms per pass (hoprnet#8624). The flush therefore runs both on the blocking pool, not on
-    /// a runtime worker and not on the packet hot path.
+    /// `dead_stock`. Called only while some session has written-off SURBs
+    /// ([`has_write_offs`](Self::has_write_offs)), which lasts as long as a relayer stays dead and
+    /// SURBs keep being minted through it, so on every flush tick for a permanently dead one. At the
+    /// 256 MiB default the walk takes some 10 ms (see `dead_stock`), so the flush runs it on the
+    /// blocking pool, not on a runtime worker and not on the packet hot path.
     pub fn invalid(&self) -> HashMap<HoprPseudonym, (u64, f64)> {
         if self.written_off.is_empty() {
             return HashMap::new();
         }
         let mut outstanding: HashMap<HoprPseudonym, u64> = HashMap::new();
-        for (_, pending) in self.pending.iter() {
+        self.pending.for_each(|_, pending| {
             *outstanding.entry(pending.pseudonym).or_default() += 1;
-        }
+        });
         self.written_off
             .iter()
             .map(|session| {
@@ -642,83 +742,16 @@ pub(crate) struct PendingSurb {
     partner_replied: Option<(ReturnRelayers, Instant)>,
 }
 
-// The byte budget is charged per record from `PENDING_SURB_RECORD_BYTES`, a measurement of this
-// struct plus moka's overhead. Growing the struct would silently exceed the budget, so it forces a
-// re-measurement instead.
-const _: () = assert!(
-    size_of::<PendingSurb>() <= 504,
-    "PendingSurb grew: re-measure PENDING_SURB_RECORD_BYTES and the pair's worst case"
-);
-
-/// What each outstanding SURB is remembered by, shared between the two codec halves.
-///
-/// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
-/// shared by both. Giving each half its own leaves every lookup missing and silently discards the
-/// entire observation side of the metric.
-type PendingLegs = moka::sync::Cache<HoprSurbId, PendingSurb>;
-
-/// Builds the shared pending map, bounded by a byte capacity, a per-record weight and a TTL.
-///
-/// `max_capacity` is in **bytes**, matched by the [`weigher`](moka::sync::CacheBuilder::weigher) that
-/// charges every record `PENDING_SURB_RECORD_BYTES`, so the budget is the map's real bound.
-///
-/// Admission is `lru`, not moka's default TinyLFU: a SURB is looked up once, when its reply comes home,
-/// so every key's frequency is about one and TinyLFU refuses the newest record once the map is full. A
-/// refused record settles no race and, if the SURB is lost, is never written off (hoprnet#8624).
-///
-/// Under `lru` the newest is always admitted and the victim is the oldest, whose reply comes next under
-/// FIFO — the cost the issue names. It is bounded by the budget while outstanding SURBs fit: a record
-/// survives `capacity / mint rate`, and a reply comes home after the counterparty has spent its stock
-/// (minutes, which is why [`PENDING_SURB_HORIZON`] is 15 minutes). Once the outstanding total exceeds
-/// the capacity — above ~16 fully-buffered Sessions at the default — residency falls below that wait, so
-/// an ever larger share of records is evicted before their replies arrive, and one high-rate Session
-/// shortens the residence time for every other. That regime is reachable by design and is counted via
-/// [`SurbRoundTripRegistry::pending_lost`]; raising `pending_surb_max_bytes` extends the range over
-/// which eviction is not the normal state.
-///
-/// A record evicted while its partner is home leaves the race that partner opened with nothing to
-/// close it: the reply finds no record, settles nothing, and the race would expire as a loss of the
-/// relayers on its leg, healthy or not. Under sustained eviction that is enough unanswered races to
-/// judge a healthy relayer dead and wipe its Sessions' stock. An eviction is no evidence about a
-/// relayer either way, so the race is discarded with the record (see
-/// [`SurbRoundTripRegistry::open_race`] for the eviction that lands before the race opens).
-fn pending_legs(max_pending: u64, lost: Arc<AtomicU64>, health: Arc<RelayerHealth>) -> PendingLegs {
-    let count_lost = size_evictions(lost);
-    moka::sync::Cache::builder()
-        .max_capacity(max_pending)
-        .weigher(|_, _| PENDING_SURB_RECORD_BYTES as u32)
-        .time_to_live(PENDING_SURB_HORIZON)
-        .eviction_policy(moka::policy::EvictionPolicy::lru())
-        // Runs on whichever thread's read or write triggers moka's housekeeping, and takes
-        // `RelayerHealth`'s per-relayer locks, so `pending` must never be used while one is held. It
-        // holds by construction: `RelayerHealth` has no handle on `pending`.
-        .eviction_listener(move |surb, pending: PendingSurb, cause| {
-            if cause == moka::notification::RemovalCause::Size && pending.partner_replied.is_some() {
-                health.discard_race(&pending.return_relayers, &surb);
-            }
-            count_lost(surb, pending, cause);
-        })
-        .build()
-}
-
-/// An eviction listener counting only [`RemovalCause::Size`](moka::notification::RemovalCause::Size)
-/// into `lost`, shared by both pending maps.
-///
-/// Expiry is the horizon doing its job, not a loss, and `Replaced` is an update of a record already
-/// accounted for; only `Size` is a record a map could not hold. `Explicit` is not counted either:
-/// `pending` is consumed with `remove` and pruned with `invalidate`, both of which moka reports as
-/// `Explicit`, so a write-off or a reply leaving the map is not a loss.
-fn size_evictions<V>(
-    lost: Arc<AtomicU64>,
-) -> impl Fn(std::sync::Arc<HoprSurbId>, V, moka::notification::RemovalCause) + Send + Sync + 'static
-where
-    V: Send + Sync + 'static,
-{
-    move |_, _, cause| {
-        if cause == moka::notification::RemovalCause::Size {
-            lost.fetch_add(1, Ordering::Relaxed);
-        }
-    }
+/// An outstanding SURB whose return path runs through a relayer confirmed dead, as found by
+/// [`SurbRoundTripRegistry::dead_stock`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StockThroughDead {
+    id: HoprSurbId,
+    pseudonym: HoprPseudonym,
+    /// The first relayer on its return path that was confirmed dead.
+    dead: OffchainPublicKey,
+    return_relayers: ReturnRelayers,
+    minted_at: Instant,
 }
 
 /// Per-relayer health from reply races: two SURBs of one packet share mint time, forward path and
@@ -1019,6 +1052,16 @@ impl RelayerHealth {
         }
     }
 
+    /// [`discard_race`](Self::discard_race) for the relayers on `waiting` that a reply on a SURB minted at
+    /// `minted_at` is news about (see [`Self::is_fresh_for`]), the filter `note_home` applies.
+    fn discard_race_if_fresh(&self, waiting: &ReturnRelayers, surb: &HoprSurbId, minted_at: Instant) {
+        for relayer in relayers_of(waiting).filter(|relayer| self.is_fresh_for(relayer, minted_at)) {
+            if let Some(mut history) = self.relayers.get_mut(&relayer) {
+                history.open.remove(surb);
+            }
+        }
+    }
+
     fn record(&self, relayer: OffchainPublicKey, race: Race) {
         let mut history = self.relayers.entry(relayer).or_default();
         history.races.push_back(race);
@@ -1063,6 +1106,11 @@ impl RelayerHealth {
         stored
             .checked_sub(1)
             .and_then(|ms| self.last_reply.epoch.checked_add(Duration::from_millis(ms)))
+    }
+
+    /// Whether any relayer is judged dead or on probation: when none is, there is nothing to write off.
+    pub fn any_known_dead(&self) -> bool {
+        !self.dead.is_empty() || !self.probation.is_empty()
     }
 
     /// Whether the relayer is judged dead or on probation after such a verdict: its SURBs are written
@@ -1514,17 +1562,25 @@ where
     if health.take_neighbour_change() || !changed.is_empty() {
         replan().await;
     }
-    // Walks the whole pending map, twice when a verdict confirms; at the 256 MiB budget that is
-    // hundreds of milliseconds, so it must not hold a runtime worker. The only failure is a full pool
-    // refusing the task before it runs, which leaves the sessions unbumped this tick and the next
-    // flush retries.
+    // The housekeeping is cheap and runs here. The walk of the pending map is not, so it is skipped while
+    // no relayer is known dead, and runs on the blocking pool otherwise: it takes some 10 ms at the
+    // 256 MiB budget and the pool is shared with the packet crypto, so it must not hold a runtime
+    // worker either. The only failure is a full pool refusing the task before it runs, which leaves the
+    // sessions unbumped this tick and the next flush retries.
+    registry.age_write_offs();
+    if !health.any_known_dead() {
+        return Vec::new();
+    }
     let registry = registry.clone();
-    hopr_utils::parallelize::cpu::spawn_blocking(move || registry.write_off_dead(), "surb_write_off_dead")
-        .await
-        .unwrap_or_else(|error| {
-            tracing::warn!(%error, "SURB write-off deferred to the next flush");
-            Vec::new()
-        })
+    hopr_utils::parallelize::cpu::spawn_blocking(
+        move || registry.write_off(registry.dead_stock()),
+        "surb_write_off_dead",
+    )
+    .await
+    .unwrap_or_else(|error| {
+        tracing::warn!(%error, "SURB write-off deferred to the next flush");
+        Vec::new()
+    })
 }
 
 /// The invalid SURBs to hand each session this tick: every current mark, re-applied so a session
@@ -1630,7 +1686,7 @@ impl<C> SurbTelemetryCodec<C> {
             };
 
             self.registry.record_minted(paths, 1, destination);
-            self.registry.pending.insert(
+            self.registry.remember(
                 *surb_id,
                 PendingSurb {
                     paths,
@@ -1660,6 +1716,14 @@ impl<C> SurbTelemetryCodec<C> {
             // relayers are delivering: those it is news about (see `RelayerHealth::is_fresh_for`).
             if let Some((leg, minted_at)) = self.registry.written_off_legs.remove(surb_id) {
                 health.note_home(&leg, minted_at);
+                // A race may still be open on this SURB: its partner came home first and it was then
+                // written off, which keeps the race (see `open_race`). Its reply is the one thing
+                // that can close it, and it is home, so the race is over; left open it would be booked
+                // as lost by a minute against relayers that just delivered, and a wipe moves a whole
+                // stock's legs here, healthy ones included. Only for the relayers the reply is news
+                // about, as for `note_home`: a stale reply is no evidence for a relayer whose verdict is
+                // confirmed, so its race stays open and is booked as lost, as that verdict intends.
+                health.discard_race_if_fresh(&leg, surb_id, minted_at);
                 health.revive_by_reply(&leg, minted_at);
             } else {
                 tracing::trace!("reply on a surb with no pending legs");
@@ -1686,26 +1750,21 @@ impl<C> SurbTelemetryCodec<C> {
                 partner_home.elapsed(),
             );
         } else if let Some(partner) = pending.partner {
-            // Atomic, so a partner consumed by a concurrent decode is not brought back.
+            // Changed in place under the map's lock and never inserted: a partner that a concurrent decode
+            // consumed is not there to find, and stays gone. Reading it, changing it and putting it back
+            // would resurrect it, and a race opened on a record nothing can close is booked as a loss
+            // against a healthy relayer.
             let home = Instant::now();
-            let updated = self
-                .registry
-                .pending
-                .entry(partner)
-                .and_compute_with(|current| match current {
-                    Some(current) => {
-                        let mut waiting = current.into_value();
-                        waiting.partner_replied = Some((pending.return_relayers, home));
-                        moka::ops::compute::Op::Put(waiting)
-                    }
-                    None => moka::ops::compute::Op::Nop,
-                });
-            if let moka::ops::compute::CompResult::ReplacedWith(waiting) = updated {
-                if !self.registry.judges(waiting.value().pair_index) {
+            let waiting = self.registry.pending.update(&partner, |waiting| {
+                waiting.partner_replied = Some((pending.return_relayers, home));
+                *waiting
+            });
+            if let Some(waiting) = waiting {
+                if !self.registry.judges(waiting.pair_index) {
                     return;
                 }
                 self.registry.open_race(
-                    &waiting.value().return_relayers,
+                    &waiting.return_relayers,
                     partner,
                     &pending.return_relayers,
                     home.duration_since(pending.minted_at),
@@ -3039,8 +3098,9 @@ mod tests {
         judge_dead(&registry.relayer_health, dead);
         registry.write_off_dead();
 
-        registry.pending.invalidate_all();
-        registry.pending.run_pending_tasks();
+        for seed in [1, 2] {
+            registry.pending.remove(&surb_id(seed));
+        }
         assert_eq!(
             HashMap::from([(*SESSION, (1, 1.0))]),
             registry.invalid(),
@@ -3102,7 +3162,6 @@ mod tests {
             registry.write_off_dead(),
             "the verdict reaches the session once"
         );
-        registry.pending.run_pending_tasks();
         assert!(
             registry.pending.get(&surb_id(1)).is_none(),
             "the SURB through the dead relayer is written off"
@@ -4455,74 +4514,173 @@ mod tests {
         Ok(())
     }
 
+    /// A SURB id with room for more records than `surb_id`'s 256.
+    fn wide_id(n: u32) -> HoprSurbId {
+        let mut id = [0u8; SURB_ID_SIZE];
+        id[..size_of::<u32>()].copy_from_slice(&n.to_le_bytes());
+        id
+    }
+
+    const SEED: u64 = 0x5EED;
+
     /// The regression of hoprnet#8624: under moka's default TinyLFU admission every pending key has a
     /// frequency of about one, so a full map silently refuses the newest record. The record it refuses
     /// settles no race and is never written off, so its Session is never reported for a generation bump.
     #[test]
     fn a_full_pending_map_should_keep_the_newest_record() {
-        let registry = SurbRoundTripRegistry::with_capacity(64 * PENDING_SURB_RECORD_BYTES);
+        let registry = SurbRoundTripRegistry::with_records(64, SEED);
         // More mints than the map can hold, each a distinct SURB, the way one Session's FIFO stock
         // arrives. The newest is the last to be spent, so its reply comes home last and its record is
         // the one that has to survive.
         for seed in 0..=64u8 {
-            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+            registry.remember(surb_id(seed), pending_to(&[], None, 0));
         }
-        registry.pending.run_pending_tasks();
 
         assert!(
             registry.pending.contains_key(&surb_id(64)),
             "the newest record must be admitted, not refused as TinyLFU would"
         );
-        assert_eq!(64, registry.pending.entry_count(), "the map stays at capacity");
+        assert_eq!(64, registry.pending.len(), "the map stays at capacity");
         assert_eq!(
             1,
-            registry.pending_lost(),
+            registry.take_pending_lost(),
             "the 65th mint into a 64-record map evicts exactly one record, and it is counted"
         );
     }
 
-    /// Under sustained overload the LRU victim is the record whose reply is due next, so a hit rate
-    /// below one is the chosen cost of this policy rather than a bug — but it has to be a *chosen*
-    /// number, so this pins it for the regime the issue's capacity cannot cover.
+    /// What the plain least-recently-used policy of the first fix did to a Session whose replies wait
+    /// long: once the outstanding SURBs exceeded the map, every record whose reply took longer than
+    /// `capacity / mint rate` was evicted just before its reply, so that Session matched none, kept no
+    /// race evidence and, having no record left at a verdict, was never advanced. Random eviction is
+    /// memoryless: a record survives its wait with probability falling exponentially with the evicting
+    /// mints in it, so a longer wait loses more but no Session drops to zero. Sessions that wait alike
+    /// lose alike, about 9 % at 1.05x and 80 % at 2x; unequal waits lose unequally, as the simulation
+    /// below shows (0.94 busy against 0.83 quiet at 1.05x, 0.32 against 0.03 at 2x).
     ///
-    /// Shaped like the real thing: SURBs are minted in a burst, the counterparty spends them FIFO, and
-    /// each reply arrives after the whole stock has been spent. With more outstanding than the map can
-    /// hold, a record minted early is evicted before the reply that would have matched it.
+    /// Shaped like the real thing in steady state: one SURB is minted per tick, a busy Session getting
+    /// seven in eight with a short wait and a quiet one the rest with a long wait, and each reply comes
+    /// home that long after its mint, so SURBs are spent oldest first. The map is overloaded by the
+    /// stated factor, outstanding SURBs over capacity.
     #[test]
-    fn an_overloaded_map_should_lose_the_oldest_records_before_their_replies() {
-        const CAPACITY: u64 = 64;
-        const OUTSTANDING: u8 = 96;
-        let registry = SurbRoundTripRegistry::with_capacity(CAPACITY * PENDING_SURB_RECORD_BYTES);
+    fn under_overload_no_session_should_lose_all_its_replies() {
+        const CAPACITY: u32 = 2_000;
+        /// How many times longer the quiet Session's replies wait than the busy one's.
+        const QUIET_WAIT_FACTOR: u32 = 3;
+        /// One mint in this many is the quiet Session's.
+        const QUIET_EVERY: u32 = 8;
 
-        // The whole stock is minted before any is spent, as a Session front-loads its SURBs.
-        for seed in 0..OUTSTANDING {
-            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        for (overload, min_busy, min_quiet) in [(1.05, 0.7, 0.5), (2.0, 0.1, 0.01)] {
+            let registry = SurbRoundTripRegistry::with_records(CAPACITY as usize, SEED);
+            let [busy, quiet] = [(); 2].map(|_| HoprPseudonym::random());
+            // Outstanding = busy share × busy wait + quiet share × quiet wait = overload × capacity.
+            let busy_share = f64::from(QUIET_EVERY - 1) / f64::from(QUIET_EVERY);
+            let quiet_share = 1.0 / f64::from(QUIET_EVERY);
+            let busy_wait =
+                (overload * f64::from(CAPACITY) / (busy_share + quiet_share * f64::from(QUIET_WAIT_FACTOR))) as u32;
+            let quiet_wait = QUIET_WAIT_FACTOR * busy_wait;
+            let is_quiet = |tick: u32| tick.is_multiple_of(QUIET_EVERY);
+
+            let [mut busy_matched, mut busy_total, mut quiet_matched, mut quiet_total] = [0u32; 4];
+            // Long enough for the quiet Session's oldest replies to be measured many times over.
+            for tick in 0..20 * quiet_wait {
+                let session = if is_quiet(tick) { quiet } else { busy };
+                registry.remember(
+                    wide_id(tick),
+                    PendingSurb {
+                        pseudonym: session,
+                        ..pending_to(&[], None, 0)
+                    },
+                );
+                // The replies due now: the SURB each Session minted its wait ago.
+                for (wait, quiet_session) in [(busy_wait, false), (quiet_wait, true)] {
+                    let Some(minted) = tick
+                        .checked_sub(wait)
+                        .filter(|minted| is_quiet(*minted) == quiet_session)
+                    else {
+                        continue;
+                    };
+                    let matched = registry.pending.remove(&wide_id(minted)).is_some();
+                    // Measured once the map has settled.
+                    if tick >= 4 * quiet_wait {
+                        let (matches, total) = if quiet_session {
+                            (&mut quiet_matched, &mut quiet_total)
+                        } else {
+                            (&mut busy_matched, &mut busy_total)
+                        };
+                        *matches += u32::from(matched);
+                        *total += 1;
+                    }
+                }
+            }
+
+            let (busy_rate, quiet_rate) = (
+                f64::from(busy_matched) / f64::from(busy_total),
+                f64::from(quiet_matched) / f64::from(quiet_total),
+            );
+            assert!(
+                busy_rate >= min_busy,
+                "at {overload}x the busy Session matched {busy_rate:.3} of its replies"
+            );
+            assert!(
+                quiet_rate >= min_quiet,
+                "at {overload}x the Session with the long wait matched {quiet_rate:.3} of its replies, which an \
+                 eviction by age would take to zero"
+            );
         }
-        registry.pending.run_pending_tasks();
+    }
 
-        // The newest record is the one that has to survive: its reply comes last, so a policy that
-        // kept the *oldest* would lose exactly this one. Checked before the removals consume it.
-        assert!(
-            registry.pending.contains_key(&surb_id(OUTSTANDING - 1)),
-            "the newest record must survive, or the policy is keeping the wrong end"
-        );
+    /// Hoprnet#8624's second guarantee under overload: a quiet Session that holds SURBs through a relayer
+    /// still has some of them recorded when the relayer is judged dead, so it is reached and advanced.
+    /// Evicting by age, the busy Sessions' mints would have pushed every record of the quiet one out long
+    /// before.
+    #[test]
+    fn a_quiet_session_holding_surbs_through_a_dead_relayer_should_be_reached_under_overload() {
+        const CAPACITY: u32 = 2_000;
+        const QUIET_STOCK: u32 = 500;
+        // Outstanding SURBs, over capacity, from the busy Session's wait alone.
+        const OVERLOAD: u32 = 2;
 
-        // The counterparty spends FIFO; the reply comes home once the stock is exhausted.
-        let mut matched = 0u32;
-        for seed in 0..OUTSTANDING {
-            if registry.pending.remove(&surb_id(seed)).is_some() {
-                matched += 1;
+        let registry = SurbRoundTripRegistry::with_records(CAPACITY as usize, SEED);
+        let [quiet, busy] = [(); 2].map(|_| HoprPseudonym::random());
+        let [dead, alive] = [(); 2].map(|_| key());
+
+        // The quiet Session minted its stock early, through the relayer that is about to die, and has
+        // minted nothing since.
+        for n in 0..QUIET_STOCK {
+            registry.remember(
+                wide_id(n),
+                PendingSurb {
+                    pseudonym: quiet,
+                    ..pending_to(&[dead], None, 0)
+                },
+            );
+        }
+        // The busy Sessions mint one SURB a tick, over a healthy relayer, and each is spent after the
+        // wait that overloads the map; the quiet stock is several times as old as the map's turnover.
+        let wait = OVERLOAD * CAPACITY;
+        for tick in 0..4 * CAPACITY {
+            registry.remember(
+                wide_id(QUIET_STOCK + tick),
+                PendingSurb {
+                    pseudonym: busy,
+                    ..pending_to(&[alive], None, 0)
+                },
+            );
+            if let Some(minted) = tick.checked_sub(wait) {
+                registry.pending.remove(&wide_id(QUIET_STOCK + minted));
             }
         }
+        let mut held = 0;
+        registry
+            .pending
+            .for_each(|_, pending| held += u32::from(pending.pseudonym == quiet));
+        assert!(held > 0, "some of the quiet Session's stock must still be recorded");
 
+        judge_dead(&registry.relayer_health, dead);
         assert_eq!(
-            CAPACITY as u32, matched,
-            "exactly the capacity can be matched: everything above it was evicted before its reply"
-        );
-        assert_eq!(
-            OUTSTANDING as u64 - matched as u64,
-            registry.pending_lost(),
-            "every unmatched record is counted, so the overload is visible rather than silent"
+            vec![quiet],
+            registry.write_off_dead(),
+            "the dead relayer reaches the quiet Session, and only it"
         );
     }
 
@@ -4530,123 +4688,151 @@ mod tests {
     /// what is outstanding, not a quota that drops records while the map has space.
     #[test]
     fn a_pending_record_should_not_be_refused_with_the_map_below_capacity() {
-        let registry = SurbRoundTripRegistry::with_capacity(128 * PENDING_SURB_RECORD_BYTES);
+        let registry = SurbRoundTripRegistry::with_records(128, SEED);
         for seed in 0..100u8 {
-            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+            registry.remember(surb_id(seed), pending_to(&[], None, 0));
         }
-        registry.pending.run_pending_tasks();
 
         assert!(registry.pending.contains_key(&surb_id(0)), "the oldest is still there");
         assert!(registry.pending.contains_key(&surb_id(99)), "and so is the newest");
-        assert_eq!(100, registry.pending.entry_count());
-        assert_eq!(0, registry.pending_lost(), "nothing was evicted to make room");
+        assert_eq!(100, registry.pending.len());
+        assert_eq!(0, registry.take_pending_lost(), "nothing was evicted to make room");
     }
 
     /// Eviction past capacity is not silent: every record the map could not hold is counted, so an
-    /// undersized map is visible rather than settling races invisibly (hoprnet#8624).
+    /// undersized map is visible rather than settling races invisibly (hoprnet#8624), and what is counted
+    /// is taken, so each call reports what was lost since the last.
     #[test]
-    fn records_the_pending_map_cannot_hold_should_be_counted() {
-        let registry = SurbRoundTripRegistry::with_capacity(8 * PENDING_SURB_RECORD_BYTES);
-        assert_eq!(0, registry.pending_lost());
+    fn records_the_pending_map_cannot_hold_should_be_counted_and_taken() {
+        let registry = SurbRoundTripRegistry::with_records(8, SEED);
+        assert_eq!(0, registry.take_pending_lost());
         for seed in 0..32u8 {
-            registry.pending.insert(surb_id(seed), pending_to(&[], None, 0));
+            registry.remember(surb_id(seed), pending_to(&[], None, 0));
         }
-        registry.pending.run_pending_tasks();
 
         assert_eq!(
             24,
-            registry.pending_lost(),
+            registry.take_pending_lost(),
             "32 mints into an 8-record map leaves 24 records it could not hold"
         );
+        assert_eq!(0, registry.take_pending_lost(), "and they are reported once");
     }
 
-    /// A `Size` eviction on the written-off-legs map is counted like one on the pending map: a leg the
-    /// map could not hold leaves a reply home finding nothing, so it cannot lift the verdict of the
-    /// relayers on it, and that loss must be as visible as a lost pending record (hoprnet#8624).
+    /// A leg the written-off map could not hold is no loss of the pending map: the wipe or the write-off
+    /// that put it there already settled what the counterparty held, and the metric tells an operator to
+    /// raise the pending budget.
     #[test]
-    fn records_the_written_off_legs_map_cannot_hold_should_be_counted() {
-        let registry = SurbRoundTripRegistry::with_capacity(8 * PENDING_SURB_RECORD_BYTES);
-        assert_eq!(0, registry.pending_lost());
+    fn a_written_off_leg_the_map_cannot_hold_should_not_count_as_lost() {
+        let registry = SurbRoundTripRegistry::with_records(8, SEED);
         for seed in 0..32u8 {
-            registry
-                .written_off_legs
-                .insert(surb_id(seed), (leg(&[]), Instant::now()));
+            registry.remember_written_off(surb_id(seed), leg(&[]), Instant::now());
         }
-        registry.written_off_legs.run_pending_tasks();
 
-        assert_eq!(
-            24,
-            registry.pending_lost(),
-            "32 written-off legs into an 8-record map leaves 24 it could not hold"
-        );
+        assert_eq!(8, registry.written_off_legs.len(), "the map holds what it can");
+        assert_eq!(0, registry.take_pending_lost());
     }
 
-    /// The cap is the byte budget itself, floored at the old fixed figure so a budget below it never
-    /// shrinks the map below what it held before; the per-record weight turns bytes into records
-    /// (hoprnet#8624).
+    /// An evicted written-off leg's reply can no longer close the race it was out on, so the race goes
+    /// with it, as a pending record's does.
     #[test]
-    fn the_pending_capacity_should_come_from_the_byte_budget() {
-        let mib = 1024 * 1024;
-        assert_eq!(
-            256 * mib,
-            pending_surbs_capacity(256 * mib),
-            "the default budget is handed to the cache unchanged"
-        );
-        // The floor is 100 000 records in bytes: a budget at or above it is honoured, one below it is
-        // raised.
-        assert_eq!(
-            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
-            pending_surbs_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES)
-        );
-        assert_eq!(
-            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
-            pending_surbs_capacity(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES - 1),
-            "a budget just below the floor is raised to it"
-        );
-        assert_eq!(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES, pending_surbs_capacity(0));
-        assert_eq!(MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES, pending_surbs_capacity(1));
-        // Only the floor is applied here; the ceiling is the config validator's. Even the largest
-        // figure does not overflow.
-        assert_eq!(u64::MAX, pending_surbs_capacity(u64::MAX));
+    fn an_evicted_written_off_leg_should_not_leave_its_race_open() {
+        let registry = SurbRoundTripRegistry::with_records(1, SEED);
+        let health = registry.relayer_health();
+        let [late, home] = [(); 2].map(|_| key());
+
+        registry.remember_written_off(surb_id(1), leg(&[late]), Instant::now());
+        registry.open_race(&leg(&[late]), surb_id(1), &leg(&[home]), ROUND_TRIP);
+        assert_eq!(1, open_races_of(&health, &late));
+
+        registry.remember_written_off(surb_id(2), leg(&[]), Instant::now());
+        assert!(!registry.written_off_legs.contains_key(&surb_id(1)));
+        assert_eq!(0, open_races_of(&health, &late));
     }
 
-    /// The budget the config carries is what production converts, comfortably above the old fixed cap,
-    /// so the overflow the issue describes is fixed rather than merely re-floored.
+    /// The byte budget is clamped to what the config validator accepts, so a budget of zero, or a record
+    /// count passed by mistake, can never leave the maps holding next to nothing (hoprnet#8624).
     #[test]
-    fn the_default_budget_should_exceed_the_old_fixed_cap_by_a_useful_margin() {
-        use hopr_protocol_hopr::{DEFAULT_PENDING_SURB_MAX_BYTES, MINIMUM_PENDING_SURB_MAX_BYTES, SurbStoreConfig};
+    fn a_budget_outside_the_accepted_range_should_be_clamped() {
+        let capacity_of = |budget| {
+            let registry = SurbRoundTripRegistry::with_budget(budget);
+            (registry.pending.capacity(), registry.written_off_legs.capacity())
+        };
+        let floor = capacity_of(MINIMUM_PENDING_SURB_MAX_BYTES);
+        assert_eq!(floor, capacity_of(0), "no budget is the floor");
+        assert_eq!(
+            floor,
+            capacity_of(100_000),
+            "a record count passed as bytes is the floor"
+        );
+        assert_eq!(floor, capacity_of(MINIMUM_PENDING_SURB_MAX_BYTES - 1));
+        assert_eq!(
+            floor,
+            capacity_of(MINIMUM_PENDING_SURB_MAX_BYTES),
+            "and the floor itself is honoured"
+        );
+        let ceiling = capacity_of(MAXIMUM_PENDING_SURB_MAX_BYTES);
+        assert_eq!(ceiling, capacity_of(u64::MAX), "no budget is above the ceiling");
+        assert!(ceiling.0 > floor.0 && ceiling.1 > floor.1);
+    }
 
-        // The config default is the single source; the transport-side constant is not duplicated.
+    /// Each map turns the budget into records by the cost of its own record, and holds at most as much
+    /// memory as the budget by that cost; the floor never shrinks the maps below the fixed 100 000-record
+    /// cap they replaced (hoprnet#8624).
+    #[test]
+    fn each_map_should_honour_the_byte_budget_by_its_own_record_cost() {
+        use crate::protocol::surb_map::record_bytes;
+
+        let budget = 64 * MINIMUM_PENDING_SURB_MAX_BYTES;
+        let registry = SurbRoundTripRegistry::with_budget(budget);
+        assert!(registry.pending.capacity() as u64 * record_bytes::<PendingSurb>() as u64 <= budget);
+        assert!(
+            registry.written_off_legs.capacity() as u64 * record_bytes::<(ReturnRelayers, Instant)>() as u64 <= budget
+        );
+        assert!(
+            registry.written_off_legs.capacity() > 2 * registry.pending.capacity(),
+            "a written-off leg is a fraction of a pending record, and is charged as one"
+        );
+
+        let floor = SurbRoundTripRegistry::with_budget(MINIMUM_PENDING_SURB_MAX_BYTES);
+        assert!(
+            floor.pending.capacity() >= 100_000,
+            "the floor holds at least the old fixed cap: {}",
+            floor.pending.capacity()
+        );
+        // `MINIMUM_PENDING_SURB_MAX_BYTES` documents about 143 000 records.
+        assert!((140_000..=148_000).contains(&floor.pending.capacity()));
+    }
+
+    /// The budget the config carries is what production converts, and holds many deployed-size stocks
+    /// per map, so the overflow the issue describes is fixed rather than merely re-floored.
+    #[test]
+    fn the_default_budget_should_hold_many_deployed_size_stocks() {
+        use hopr_protocol_hopr::{DEFAULT_PENDING_SURB_MAX_BYTES, SurbStoreConfig};
+
+        // The config default is the single source.
         assert_eq!(
             DEFAULT_PENDING_SURB_MAX_BYTES,
             SurbStoreConfig::default().pending_surb_max_bytes
         );
-        assert_eq!(
-            MINIMUM_PENDING_SURB_MAX_BYTES,
-            MAX_PENDING_SURBS * PENDING_SURB_RECORD_BYTES,
-            "the config floor and the transport floor agree"
-        );
-
-        let records = pending_surbs_capacity(DEFAULT_PENDING_SURB_MAX_BYTES) / PENDING_SURB_RECORD_BYTES;
-        assert_eq!(315_806, records, "256 MiB at 850 B/record");
+        /// SURBs a deployed Session's store holds.
+        const DEPLOYED_STOCK: usize = 19_264;
+        let registry = SurbRoundTripRegistry::with_budget(DEFAULT_PENDING_SURB_MAX_BYTES);
+        // `DEFAULT_PENDING_SURB_MAX_BYTES` documents about 454 000 records, 23 stocks, per map.
+        let records = registry.pending.capacity();
         assert!(
-            records >= 3 * MAX_PENDING_SURBS,
-            "the default buys over 3x the old cap: {records}"
+            (450_000..=458_000).contains(&records),
+            "the default holds {records} records, not the ~454 000 documented"
         );
+        assert_eq!(23, records / DEPLOYED_STOCK);
     }
 
     /// The default budget's floor is the config validator's minimum, so a configuration file carrying
-    /// the smallest accepted budget is handed the exact floor rather than a silently-raised value.
+    /// the smallest accepted budget is valid and is honoured as it is.
     #[test]
-    fn the_validated_minimum_budget_should_be_the_floor() {
-        use hopr_protocol_hopr::{MINIMUM_PENDING_SURB_MAX_BYTES, SurbStoreConfig};
+    fn the_validated_minimum_budget_should_be_accepted() {
+        use hopr_protocol_hopr::SurbStoreConfig;
         use validator::Validate;
 
-        assert_eq!(
-            MINIMUM_PENDING_SURB_MAX_BYTES,
-            pending_surbs_capacity(MINIMUM_PENDING_SURB_MAX_BYTES),
-            "the smallest accepted budget is the floor, not raised above it"
-        );
         let cfg = SurbStoreConfig {
             pending_surb_max_bytes: MINIMUM_PENDING_SURB_MAX_BYTES,
             ..Default::default()
@@ -4654,80 +4840,65 @@ mod tests {
         assert!(cfg.validate().is_ok(), "the floor is a valid configuration");
     }
 
-    /// Both maps are bounded by the same byte budget, and the weigher charges every record the same
-    /// [`PENDING_SURB_RECORD_BYTES`], so a budget of `n` bytes holds `n / PENDING_SURB_RECORD_BYTES`
-    /// records in each — the pair's worst case is twice the budget, exactly (hoprnet#8624).
-    #[test]
-    fn both_pending_maps_should_share_the_configured_capacity() {
-        let budget = 64 * PENDING_SURB_RECORD_BYTES;
-        let registry = SurbRoundTripRegistry::with_capacity(budget);
-        assert_eq!(
-            Some(budget),
-            registry.pending.policy().max_capacity(),
-            "the pending map takes the configured byte budget"
-        );
-        assert_eq!(
-            Some(budget),
-            registry.written_off_legs.policy().max_capacity(),
-            "and the written-off-legs map the same one"
-        );
-    }
-
-    /// A registry at the largest capacity constructs, so an absurd but accepted operator configuration
-    /// fails nowhere before the map grows to fill it.
-    #[test]
-    fn a_registry_should_construct_at_the_saturated_capacity() {
-        let registry = SurbRoundTripRegistry::with_capacity(pending_surbs_capacity(u64::MAX));
-        assert_eq!(Some(u64::MAX), registry.pending.policy().max_capacity());
-        assert_eq!(Some(u64::MAX), registry.written_off_legs.policy().max_capacity());
-    }
-
     /// A record evicted after its partner came home takes the race it is out on with it. Its reply would
     /// find no record and settle nothing, so the race would expire as a loss of a relayer that may well
     /// have delivered it, and enough of them under sustained eviction would judge that relayer dead and
     /// wipe its Sessions' stock (hoprnet#8624).
     #[test]
-    fn an_evicted_surb_should_not_leave_its_race_open() {
-        const CAPACITY: u8 = 8;
-        let registry = SurbRoundTripRegistry::with_capacity(u64::from(CAPACITY) * PENDING_SURB_RECORD_BYTES);
+    fn an_evicted_surb_should_not_leave_its_race_open() -> anyhow::Result<()> {
+        const CAPACITY: usize = 8;
+        let registry = SurbRoundTripRegistry::with_records(CAPACITY, SEED);
         let health = registry.relayer_health();
         let recorder = SurbTelemetryCodec::new((), key(), no_path_slots(), registry);
-        let pending = &recorder.registry.pending;
         let [late, home] = [(); 2].map(|_| key());
 
         // Two pairs whose second SURB comes home first: a race is open on each first SURB, both over
         // the same relayer.
         for (first, second) in [(1, 2), (3, 4)] {
-            pending.insert(surb_id(first), pending_to(&[late], Some(surb_id(second)), 0));
-            pending.insert(surb_id(second), pending_to(&[home], Some(surb_id(first)), 1));
+            recorder
+                .registry
+                .remember(surb_id(first), pending_to(&[late], Some(surb_id(second)), 0));
+            recorder
+                .registry
+                .remember(surb_id(second), pending_to(&[home], Some(surb_id(first)), 1));
             recorder.on_replied(&surb_id(second));
         }
         assert_eq!(2, open_races_of(&health, &late));
 
-        // Newer mints fill the map, pushing out the older of the two only.
-        for seed in 100..100 + CAPACITY - 1 {
-            pending.insert(surb_id(seed), pending_to(&[], None, 0));
+        // Newer mints fill the map and push records out at random, until one of the two is gone.
+        let mut seed = 100u8;
+        while recorder.registry.pending.contains_key(&surb_id(1)) && recorder.registry.pending.contains_key(&surb_id(3))
+        {
+            assert!(seed < 250, "no record of the pair was evicted");
+            recorder.registry.remember(surb_id(seed), pending_to(&[], None, 0));
+            seed += 1;
         }
-        pending.run_pending_tasks();
-        assert!(!pending.contains_key(&surb_id(1)), "the oldest record is evicted");
-        assert!(pending.contains_key(&surb_id(3)), "the newer one is kept");
-        assert_eq!(1, recorder.registry.pending_lost());
+        let evicted = [1, 3]
+            .into_iter()
+            .find(|first| !recorder.registry.pending.contains_key(&surb_id(*first)))
+            .context("a record of the pair is gone")?;
+        let kept: Vec<u8> = [1, 3]
+            .into_iter()
+            .filter(|first| recorder.registry.pending.contains_key(&surb_id(*first)))
+            .collect();
+        assert!(recorder.registry.take_pending_lost() > 0);
         assert_eq!(
-            1,
+            kept.len(),
             open_races_of(&health, &late),
-            "the evicted record's race is discarded, the other stays open"
+            "the evicted record's race is discarded, the other stays open while its record does"
         );
 
         // The evicted SURB's reply comes home on nothing and books nothing against its relayer.
-        recorder.on_replied(&surb_id(1));
+        recorder.on_replied(&surb_id(evicted));
         assert!(margins_of(&health, &late).is_empty());
-        assert_eq!(1, open_races_of(&health, &late));
+        assert_eq!(kept.len(), open_races_of(&health, &late));
+        Ok(())
     }
 
     /// A race opens after its SURB's record is updated, and the record can leave in between: evicted,
-    /// its listener finding no race yet to discard, or home, its reply finding none to settle. A race
-    /// opened on a SURB gone from both maps is discarded as it opens; one on a SURB still pending, or
-    /// written off in between, stays open as it would have had the record left after.
+    /// finding no race yet to discard, or home, its reply finding none to settle. A race opened on a
+    /// SURB gone from both maps is discarded as it opens; one on a SURB still pending, or written off in
+    /// between, stays open as it would have had the record left after.
     #[test]
     fn a_race_opened_on_a_surb_already_gone_should_not_stay_open() {
         let registry = SurbRoundTripRegistry::default();
@@ -4756,5 +4927,260 @@ mod tests {
             open_races_of(&health, &late),
             "written off: kept, as when the write-off comes after"
         );
+    }
+
+    /// A reply on a SURB written off while a race was open on it closes that race: the reply is the only
+    /// thing that can, and it is home. Left open, the race would be booked a minute later as a loss of
+    /// relayers that just delivered, and a wipe moves a whole stock's legs to the written-off map,
+    /// healthy relayers' included.
+    ///
+    /// Only for the relayers the reply is news about: a reply on a SURB minted before a confirmed verdict
+    /// is no evidence for that relayer (see `RelayerHealth::is_fresh_for`), so its race stays open and is
+    /// booked as lost, as that verdict intends, while a healthy relayer on the same leg has its race closed.
+    #[rstest::rstest]
+    #[case::minted_after_the_verdict(true)]
+    #[case::minted_before_the_verdict(false)]
+    fn the_reply_of_a_written_off_surb_should_close_the_open_races_it_is_news_about(
+        #[case] minted_after_verdict: bool,
+    ) -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let recorder = SurbTelemetryCodec::new((), key(), no_path_slots(), registry);
+        let [healthy, dead, home] = [(); 3].map(|_| key());
+
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_to(&[healthy, dead], Some(surb_id(2)), 0));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_to(&[home], Some(surb_id(1)), 1));
+        recorder.on_replied(&surb_id(2));
+        assert_eq!(1, open_races_of(&health, &healthy));
+        assert_eq!(1, open_races_of(&health, &dead));
+
+        // The verdict is confirmed, and the SURB written off with its Session's stock.
+        judge_dead(&health, dead);
+        let minted_at = if minted_after_verdict {
+            Instant::now()
+        } else {
+            ago(Duration::from_secs(5))?
+        };
+        recorder
+            .registry
+            .remember_written_off(surb_id(1), leg(&[healthy, dead]), minted_at);
+        recorder.registry.pending.remove(&surb_id(1));
+        assert_eq!(1, open_races_of(&health, &healthy), "a written-off SURB keeps its race");
+
+        recorder.on_replied(&surb_id(1));
+        assert_eq!(
+            0,
+            open_races_of(&health, &healthy),
+            "the healthy relayer delivered: its race is closed"
+        );
+        assert_eq!(
+            usize::from(!minted_after_verdict),
+            open_races_of(&health, &dead),
+            "a stale reply is no news about the confirmed-dead relayer, so its race stays open"
+        );
+        assert!(margins_of(&health, &healthy).is_empty() && margins_of(&health, &dead).is_empty());
+        Ok(())
+    }
+
+    /// The registry-level sequence: the first SURB of a pair is consumed, then the reply on the second
+    /// finds no partner to update, so none is inserted and no race opens on it. It is sequential, so it
+    /// would pass on the read-compute-insert update too; the regression for that concurrent re-insert is
+    /// `a_record_removed_while_it_is_updated_should_never_come_back` in `surb_map.rs`.
+    #[test]
+    fn a_reply_after_its_partner_was_consumed_should_find_nothing_to_update() {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let recorder = SurbTelemetryCodec::new((), key(), no_path_slots(), registry);
+        let [late, home] = [(); 2].map(|_| key());
+
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(1), pending_to(&[late], Some(surb_id(2)), 0));
+        recorder
+            .registry
+            .pending
+            .insert(surb_id(2), pending_to(&[home], Some(surb_id(1)), 1));
+        recorder.on_replied(&surb_id(1));
+        recorder.on_replied(&surb_id(2));
+
+        assert!(
+            !recorder.registry.pending.contains_key(&surb_id(1)),
+            "consumed stays consumed"
+        );
+        assert!(recorder.registry.pending.is_empty());
+        assert_eq!(0, open_races_of(&health, &late));
+    }
+
+    /// A reply may revive the relayer while the write-off works through the stock it found. The
+    /// verdict the stock was found under is then over, so none of it is written off: a probe, which
+    /// is told from stock by the death the revival ended, would otherwise be taken for stock and
+    /// wipe the whole generation of a Session the dead relayer never reached.
+    ///
+    /// Only a reply that is news about the relayer revives it (see `RelayerHealth::is_fresh_for`): one on
+    /// a SURB minted after the verdict. A stale one, a late reply of the stall the verdict was about,
+    /// does not, and the stock is written off as usual.
+    #[rstest::rstest]
+    #[case::fresh_reply_revives(true)]
+    #[case::stale_reply_does_not(false)]
+    fn a_relayer_revived_during_the_walk_should_reach_no_session(#[case] fresh: bool) -> anyhow::Result<()> {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let (stocked, unreached) = (*SESSION, HoprPseudonym::random());
+        let dead = key();
+        judge_dead(&health, dead);
+        health.known_dead_since.insert(dead, ago(Duration::from_secs(2))?);
+        registry.pending.insert(
+            surb_id(1),
+            PendingSurb {
+                minted_at: ago(Duration::from_secs(5))?,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        registry.pending.insert(
+            surb_id(2),
+            PendingSurb {
+                pseudonym: unreached,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+
+        let stock = registry.dead_stock();
+        assert_eq!(2, stock.len(), "both are found while the relayer is dead");
+        let reply_minted_at = if fresh {
+            Instant::now()
+        } else {
+            ago(Duration::from_secs(5))?
+        };
+        health.revive_by_reply(&leg(&[dead]), reply_minted_at);
+        assert_eq!(fresh, !health.is_known_dead(&dead));
+        let reached = registry.write_off(stock);
+        if fresh {
+            assert_eq!(Vec::<HoprPseudonym>::new(), reached, "revived: no session is reached");
+            assert!(registry.pending.contains_key(&surb_id(1)) && registry.pending.contains_key(&surb_id(2)));
+            assert!(registry.invalid().is_empty(), "and nothing is written off");
+            assert!(!registry.bumped.contains_key(&(stocked, dead)));
+        } else {
+            assert_eq!(
+                vec![stocked],
+                reached,
+                "still dead: the stock reaches its session, the probe none"
+            );
+            assert!(!registry.pending.contains_key(&surb_id(1)));
+        }
+        Ok(())
+    }
+
+    /// A SURB whose reply came home between the walk and the write-off is settled, not written off: the
+    /// counterparty no longer holds it.
+    #[test]
+    fn a_surb_spent_during_the_walk_should_not_be_written_off() {
+        let registry = SurbRoundTripRegistry::default();
+        let dead = key();
+        judge_dead(&registry.relayer_health, dead);
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+
+        let stock = registry.dead_stock();
+        registry.pending.remove(&surb_id(1));
+        assert!(registry.write_off(stock).is_empty());
+        assert!(registry.invalid().is_empty(), "it is not counted as held");
+        assert!(!registry.written_off_legs.contains_key(&surb_id(1)), "nor remembered");
+    }
+
+    /// The flush gates its walks on these, so a quiet node walks nothing.
+    #[test]
+    fn the_walks_should_be_gated_on_a_relayer_being_known_dead_and_a_write_off_standing() {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let dead = key();
+        assert!(!health.any_known_dead() && !registry.has_write_offs());
+        assert!(registry.dead_stock().is_empty());
+
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        // Bumped for already, so that the write-off stays counted instead of going with a wipe.
+        registry.bumped.insert((*SESSION, dead), Instant::now());
+        judge_dead(&health, dead);
+        assert!(health.any_known_dead());
+        registry.write_off_dead();
+        assert!(registry.has_write_offs());
+
+        health.dead.remove(&dead);
+        assert!(!health.any_known_dead());
+        health.probation.insert(dead);
+        assert!(health.any_known_dead(), "probation is known dead");
+    }
+
+    /// The page size of the Linux targets this runs on, which `/proc/self/statm` counts in.
+    #[cfg(target_os = "linux")]
+    const PAGE_BYTES: usize = 4096;
+
+    /// Resident memory of this process, in bytes.
+    #[cfg(target_os = "linux")]
+    fn resident_bytes() -> anyhow::Result<usize> {
+        let statm = std::fs::read_to_string("/proc/self/statm").context("reading /proc/self/statm")?;
+        let pages: usize = statm
+            .split_whitespace()
+            .nth(1)
+            .context("no resident figure")?
+            .parse()
+            .context("resident pages")?;
+        Ok(pages * PAGE_BYTES)
+    }
+
+    /// Fills a map of a million records, then churns it through eviction and removal as a node under load
+    /// would, and checks that `record_bytes` does not understate what the process really holds.
+    ///
+    /// Reads the resident set, so it needs a process to itself: `cargo nextest run --run-ignored only`.
+    #[cfg(target_os = "linux")]
+    fn assert_budget_covers_resident_memory<V: Copy>(value: V) -> anyhow::Result<()> {
+        use crate::protocol::surb_map::record_bytes;
+
+        const RECORDS: u64 = 1_000_000;
+        /// The accounted figure may fall short of the measurement by this factor at most.
+        const SLACK: f64 = 1.10;
+        let id = |n: u64| n.wrapping_mul(0x9E37_79B9_7F4A_7C15).to_le_bytes();
+
+        let before = resident_bytes()?;
+        let map = RandomEvictionMap::<V>::with_seed(RECORDS as usize, SEED);
+        for n in 0..RECORDS {
+            map.insert(id(n), value);
+        }
+        for n in RECORDS..4 * RECORDS {
+            map.insert(id(n), value);
+        }
+        for n in (RECORDS..3 * RECORDS).step_by(3) {
+            map.remove(&id(n));
+        }
+        for n in 10 * RECORDS..11 * RECORDS {
+            map.insert(id(n), value);
+        }
+        let per_record = (resident_bytes()? - before) as f64 / map.len() as f64;
+        let accounted = record_bytes::<V>() as f64;
+        eprintln!("{} B per record resident, {accounted} accounted", per_record.round());
+        assert!(
+            accounted * SLACK >= per_record,
+            "a record costs {per_record:.0} B, more than the {accounted} B accounted"
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "reads the resident set of the process: run it alone"]
+    #[cfg(target_os = "linux")]
+    fn a_pending_record_should_not_cost_more_than_its_accounted_bytes() -> anyhow::Result<()> {
+        assert_budget_covers_resident_memory(pending_to(&[], None, 0))
+    }
+
+    #[test]
+    #[ignore = "reads the resident set of the process: run it alone"]
+    #[cfg(target_os = "linux")]
+    fn a_written_off_leg_should_not_cost_more_than_its_accounted_bytes() -> anyhow::Result<()> {
+        assert_budget_covers_resident_memory((leg(&[]), Instant::now()))
     }
 }
