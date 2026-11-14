@@ -1318,12 +1318,21 @@ where
 
                     // The counterparty still counts SURBs through a dead relayer, so each session is
                     // told how many of those it holds, to replace them. Walks the pending map, so it
-                    // runs off the runtime worker like the write-off above.
-                    let current = {
-                        let registry = surb_round_trips.clone();
-                        hopr_utils::parallelize::cpu::spawn_blocking(move || registry.invalid(), "surb_invalid")
-                            .await
-                            .unwrap_or_default()
+                    // runs off the runtime worker like the write-off above. A full pool refuses it
+                    // before it runs; the marks are then kept as they are until the next tick, since an
+                    // empty figure would clear every session's mark only to set it again.
+                    let registry = surb_round_trips.clone();
+                    let current = match hopr_utils::parallelize::cpu::spawn_blocking(
+                        move || registry.invalid(),
+                        "surb_invalid",
+                    )
+                    .await
+                    {
+                        Ok(current) => current,
+                        Err(error) => {
+                            tracing::warn!(%error, "invalid SURB update deferred to the next flush");
+                            continue;
+                        }
                     };
                     for (session, (count, share)) in protocol::surb_telemetry::invalid_updates(&invalid, &current) {
                         if !surb_flush_smgr.set_invalid_surbs(&session, count, share) {
