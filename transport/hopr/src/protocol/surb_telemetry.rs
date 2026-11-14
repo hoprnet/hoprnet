@@ -1634,6 +1634,33 @@ mod tests {
     }
 
     #[test]
+    fn registry_debug_output_stays_bounded_without_consuming_telemetry() {
+        let registry = SurbRoundTripRegistry::default().with_observer(Arc::new(|_| {}));
+        assert_eq!(format!("{registry:?}"), "SurbRoundTripRegistry { pairs: 0, .. }");
+
+        let destination = key();
+        for peer in 1..=64 {
+            registry.record_minted(
+                ForwardAndReturnPath {
+                    forward: [0, peer, 0, 0, 0],
+                    reply: [peer, 0, 0, 0, 0],
+                },
+                1,
+                destination,
+            );
+        }
+        // Debug logs expose only the count, never the per-path map or observer contents.
+        assert_eq!(format!("{registry:?}"), "SurbRoundTripRegistry { pairs: 64, .. }");
+        let counts = registry.drain();
+        assert_eq!(counts.len(), 64);
+        assert!(
+            counts
+                .iter()
+                .all(|(_, minted, returned)| (*minted, *returned) == (1, 0))
+        );
+    }
+
+    #[test]
     fn drain_should_take_the_counts_and_leave_the_entry_empty() {
         let registry = SurbRoundTripRegistry::default();
         let paths = ForwardAndReturnPath {

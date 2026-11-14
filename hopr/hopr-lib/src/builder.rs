@@ -1473,31 +1473,10 @@ mod tests {
     #[case::invalid(false)]
     /// The builder delegates configuration policy to the supplied reporter before building components.
     fn state_dump_factory_validation_precedes_component_construction(#[case] valid: bool) -> anyhow::Result<()> {
-        struct ValidatedReporter(bool);
-
-        impl<Chain, Graph, Net> StateDumpFactory<Chain, Graph, Net> for ValidatedReporter {
-            fn prepare(&mut self) -> Result<(), HoprLibError> {
-                if self.0 {
-                    Ok(())
-                } else {
-                    Err(HoprLibError::GeneralError("invalid reporter configuration".into()))
-                }
-            }
-
-            fn create(
-                self,
-                _: Chain,
-                _: Graph,
-                _: Net,
-                _: Address,
-                _: crate::state_dump::StateDumpSections,
-            ) -> Option<crate::state_dump::StateDump> {
-                unreachable!("component construction must fail before reporter creation")
-            }
-        }
+        use crate::testing::wiring::tests::ReporterProbe;
 
         type TestBuilder = HoprBuilderConfigured<
-            Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+            crate::testing::TestingConnector,
             hopr_network_graph::SharedChannelGraph,
             hopr_transport_p2p::HoprNetwork,
             hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
@@ -1515,7 +1494,7 @@ mod tests {
             ct_factory: None,
             peer_discovery_tx: builder.peer_discovery_tx,
         }
-        .with_state_dump(ValidatedReporter(valid));
+        .with_state_dump(ReporterProbe::new(valid, false, None).0);
         let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
         let error =
             futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
@@ -1572,37 +1551,6 @@ mod tests {
         }
         Ok(())
     }
-    /// A factory specialized for the final components can be registered before those components.
-    #[cfg(feature = "state-dump")]
-    #[test]
-    fn state_dump_factory_can_be_set_before_component_factories() {
-        struct FinalComponentsOnly;
-
-        impl StateDumpFactory<u8, u16, u32> for FinalComponentsOnly {
-            fn create(
-                self,
-                _: u8,
-                _: u16,
-                _: u32,
-                _: Address,
-                _: crate::state_dump::StateDumpSections,
-            ) -> Option<crate::state_dump::StateDump> {
-                None
-            }
-        }
-
-        let configured: HoprBuilderConfigured<u8, u16, u32, (), FinalComponentsOnly> = HoprBuilder
-            .with_identity(&ChainKeypair::random(), &OffchainKeypair::random())
-            .with_config(HoprLibConfig::default())
-            .with_state_dump(FinalComponentsOnly)
-            .with_chain_api(|_| 1_u8)
-            .with_graph(|_| 2_u16)
-            .with_network(|_| Box::pin(async { unreachable!("this test does not start the network") }));
-        assert!(configured.chain_factory.is_some());
-        assert!(configured.graph_factory.is_some());
-        assert!(configured.network_factory.is_some());
-    }
-
     #[cfg(feature = "state-dump")]
     #[test]
     /// Preserve registered sections as component setters change the builder types.

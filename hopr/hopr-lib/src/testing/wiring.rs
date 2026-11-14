@@ -269,7 +269,7 @@ where
 }
 
 #[cfg(all(test, feature = "state-dump"))]
-mod tests {
+pub(crate) mod tests {
     use anyhow::Context;
     use hopr_api::types::primitive::prelude::Address;
     use hopr_chain_connector::{
@@ -284,15 +284,57 @@ mod tests {
     };
 
     /// Observe the host's task ownership without implementing a diagnostic collector.
-    struct ReporterProbe {
+    pub(crate) struct ReporterProbe {
+        valid: bool,
         enabled: bool,
         observer: Option<hopr_transport::TransportObserver>,
         started: oneshot::Sender<Vec<(&'static str, serde_json::Value)>>,
         lifetime: oneshot::Sender<()>,
     }
 
-    impl<Chain, Graph, Net> StateDumpFactory<Chain, Graph, Net> for ReporterProbe {
-        fn create(self, _: Chain, _: Graph, _: Net, _: Address, sections: StateDumpSections) -> Option<StateDump> {
+    type ReportedSections = Vec<(&'static str, serde_json::Value)>;
+
+    impl ReporterProbe {
+        pub(crate) fn new(
+            valid: bool,
+            enabled: bool,
+            observer: Option<hopr_transport::TransportObserver>,
+        ) -> (Self, oneshot::Receiver<ReportedSections>, oneshot::Receiver<()>) {
+            let (started, started_rx) = oneshot::channel();
+            let (lifetime, lifetime_rx) = oneshot::channel();
+            (
+                Self {
+                    valid,
+                    enabled,
+                    observer,
+                    started,
+                    lifetime,
+                },
+                started_rx,
+                lifetime_rx,
+            )
+        }
+    }
+
+    // Specialize for the final component types to check that registering a reporter before
+    // those component factories does not constrain the builder's intermediate types.
+    impl StateDumpFactory<crate::testing::TestingConnector, SharedChannelGraph, HoprNetwork> for ReporterProbe {
+        fn prepare(&mut self) -> Result<(), HoprLibError> {
+            if self.valid {
+                Ok(())
+            } else {
+                Err(HoprLibError::GeneralError("invalid reporter configuration".into()))
+            }
+        }
+
+        fn create(
+            self,
+            _: crate::testing::TestingConnector,
+            _: SharedChannelGraph,
+            _: HoprNetwork,
+            _: Address,
+            sections: StateDumpSections,
+        ) -> Option<StateDump> {
             self.enabled.then(|| {
                 StateDump::new(self.observer, async move {
                     // Dropping this sender signals cancellation, including when the task is aborted.
@@ -334,17 +376,19 @@ mod tests {
         let ticket_factory = ticket_factory_from_chain(&connector, RedbStore::new_temp()?)
             .await
             .map_err(|error| anyhow::anyhow!("create ticket factory: {error}"))?;
-        let (started_tx, started_rx) = oneshot::channel();
-        let (lifetime_tx, mut lifetime_rx) = oneshot::channel();
         let observer: hopr_transport::TransportObserver = Arc::new(|_| {});
         let observer_ref = Arc::downgrade(&observer);
-        let reporter = ReporterProbe {
-            enabled,
-            observer: with_observer.then_some(observer),
-            started: started_tx,
-            lifetime: lifetime_tx,
-        };
-        let node = make_builder(chain_key, packet_key, config, Default::default(), connector)?
+        let (reporter, started_rx, mut lifetime_rx) =
+            ReporterProbe::new(true, enabled, with_observer.then_some(observer));
+        let graph = Arc::new(ChannelGraph::new(*packet_key.public()));
+        let graph_for_ct = graph.clone();
+        let node = HoprBuilder
+            .with_identity(chain_key, packet_key)
+            .with_config(config)
+            .with_state_dump(reporter)
+            .with_state_dump_section("application", || serde_json::json!({ "ready": true }))
+            .with_chain_api(move |_| connector)
+            .with_graph(move |_| graph)
             // Reporting needs a real network handle, but no listening sockets or peers.
             .with_network(|ctx| {
                 Box::pin(async move {
@@ -359,8 +403,13 @@ mod tests {
                         .map_err(|error| HoprLibError::GeneralError(error.to_string()))
                 })
             })
-            .with_state_dump(reporter)
-            .with_state_dump_section("application", || serde_json::json!({ "ready": true }))
+            .with_cover_traffic(move |ctx| {
+                hopr_ct_full_network::FullNetworkDiscovery::new(
+                    *ctx.packet_key.public(),
+                    Default::default(),
+                    graph_for_ct,
+                )
+            })
             .with_session_server(crate::testing::dummies::EchoServer::default())
             .build_entry(ticket_factory)
             .await?;
