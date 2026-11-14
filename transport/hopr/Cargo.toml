@@ -203,6 +203,11 @@ temp-env = { workspace = true }
 tokio = { workspace = true }
 
 [[bench]]
+name = "pending_surb_map_bench"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
 name = "pipeline_e2e_bench"
 harness = false
 required-features = ["testing"]
