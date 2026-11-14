@@ -475,7 +475,7 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
-                plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes(),
+                plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes().into(),
                 ack_key: HalfKey::random(),
                 info: Default::default(),
             }
@@ -507,7 +507,9 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
-                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?
+                    .to_bytes()
+                    .into(),
                 ack_key: HalfKey::random(),
                 info: Default::default(),
             }
@@ -530,7 +532,9 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
-                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?
+                    .to_bytes()
+                    .into(),
                 ack_key: HalfKey::random(),
                 info: Default::default(),
             }
@@ -546,7 +550,9 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
-                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?
+                    .to_bytes()
+                    .into(),
                 ack_key: HalfKey::random(),
                 info: Default::default(),
             }
@@ -565,7 +571,9 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 sender: SimplePseudonym::random(),
-                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
+                plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?
+                    .to_bytes()
+                    .into(),
                 ack_key: HalfKey::random(),
                 info: Default::default(),
             }
