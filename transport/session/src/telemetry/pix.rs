@@ -9,10 +9,11 @@
 //!
 //! These use `hopr_pix_*` rather than the `hopr_session_pix_*` of their per-Session siblings, and
 //! the difference is not cosmetic. `hopr-types`' `meter_for_metric` routes an instrument to a meter
-//! provider by *name prefix*, and `hopr_session_*` is routed to the OTLP-only provider — see
-//! `OTLP.md`, which records that those are not exposed on the Prometheus `/metrics` endpoint. These
-//! aggregates are the ones an operator dashboards and alerts on, so they belong on `/metrics`,
-//! alongside the existing `hopr_pix_share_insert_failures`.
+//! provider by *name prefix*, and hoprd gives `hopr_session_*` an OTLP-only provider *when a
+//! `hopr_session` interval override is configured* in `HOPRD_METRIC_EXPORT_INTERVAL` — see
+//! `OTLP.md`, which recommends exactly that and records that such series are not exposed on the
+//! Prometheus `/metrics` endpoint. These aggregates are the ones an operator dashboards and alerts
+//! on, so they belong on `/metrics`, alongside the existing `hopr_pix_share_insert_failures`.
 //!
 //! The per-Session gauges keep their spelling and their OTLP route. They answer a different
 //! question for a different consumer.
@@ -48,6 +49,19 @@
 //! The last two are per-Session events rather than node aggregates, but they belong on this prefix
 //! because neither is labelled by a Session. Their per-Session siblings
 //! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
+//!
+//! # The keep-alive reserve hold, which is not on this prefix
+//!
+//! The hold the Exit's egress takes while its SURB stock is at the keep-alive reserve is a
+//! [`SurbReserveHoldEpisode`](crate::supervision::telemetry::SurbReserveHoldEpisode), not a
+//! [`PixGateBlockEpisode`](crate::supervision::telemetry::PixGateBlockEpisode): it sits *before*
+//! the PIX gate and so also fires without PIX. Its instruments are in [`crate::telemetry::surb`],
+//! on the `hopr_surb_*` prefix, which keeps its Prometheus reader under every configuration (see
+//! the prefix note above).
+//!
+//! Not to be confused with `hopr_pix_fill_backoff_total{reason="surb_reserve"}` in this module's
+//! table: that counts keep-alives the Exit withheld from its own fill schedule, while the pair
+//! above counts data packets it held for the Entry. Both rise during an SURB shortage.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived

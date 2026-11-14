@@ -4221,6 +4221,7 @@ version = "2.2.0"
 dependencies = [
  "anyhow",
  "bimap",
+ "bytes",
  "const-hex",
  "criterion",
  "flagset",
@@ -4340,10 +4341,10 @@ name = "hopr-protocol-app"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "hopr-crypto-packet",
  "hopr-types 6.0.1",
  "serde",
- "serde_bytes",
  "strum",
  "thiserror 2.0.21",
 ]
