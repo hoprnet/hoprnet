@@ -7,7 +7,7 @@
     # The heavy pins (nixpkgs, nixpkgs-unstable, rust-overlay and crane) come from nix-lib's
     # lock. To bump them, point nix-lib.url at the new release tag, then run
     # `nix flake update nix-lib`.
-    nix-lib.url = "github:hoprnet/nix-lib/v2.1.7";
+    nix-lib.url = "github:hoprnet/nix-lib/v2.2.1";
     nixpkgs.follows = "nix-lib/nixpkgs";
     nixpkgs-unstable.follows = "nix-lib/nixpkgs-unstable";
     rust-overlay.follows = "nix-lib/rust-overlay";
