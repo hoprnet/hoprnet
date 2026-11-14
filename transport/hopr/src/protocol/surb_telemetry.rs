@@ -29,21 +29,24 @@
 //!   few races to have a margin of its own borrows the bar of the best-measured relayer, raised to whatever its own
 //!   settled races measure, and none is judged while no relayer has one; its own races that expired open are booked as
 //!   lost and are not replies that came home, so they do not reset the clock. Effect: health `0`, the walk prunes it. A
-//!   verdict is lifted by a reply coming home through the relayer, not by time. Once no reply through it is out any
-//!   more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*: published at
-//!   `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration still does, and
-//!   that draw is the probe. A probe reply home through it revives it, to the health its lost races leave it, so
-//!   gradually; a probe that goes missing leaves it where it is, and one that is a black hole again goes back to dead
-//!   without a new SURB generation. Must not fight: common-mode outages, where no partner gets home and nothing is
-//!   judged.
+//!   verdict is lifted by a reply coming home through the relayer, not by time. From the moment the verdict is acted on
+//!   (`VERDICT_CONFIRMATION`), only a reply on a SURB minted after it counts: the late replies a slow relayer still
+//!   delivers are what the verdict was about, not news that it ended (`RelayerHealth::is_fresh_for`). Once no reply
+//!   through it is out any more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*:
+//!   published at `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration
+//!   still does, and that draw is the probe. A probe is minted after the verdict, so a probe reply home through it
+//!   revives it, to the health its lost races leave it, so gradually; a probe that goes missing leaves it where it is,
+//!   and one that is a black hole again goes back to dead without a new SURB generation. Must not fight: common-mode
+//!   outages, where no partner gets home and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict, or probation. Effect: each session is told how many SURBs in its
 //!   counterparty's store run through that relayer; the balancer subtracts them from its level and sends replacements.
 //!   A lapsed verdict is only a timeout and the counterparty still holds the SURBs, probe SURBs included, so the
 //!   write-off outlives it; each written-off SURB counts as held only until `WRITE_OFF_HORIZON`, the time the
-//!   counterparty needs to spend it, and a reply through the relayer (which ends the probation) or the end of the
-//!   session ends the write-off sooner. A session's count is dropped when its SURB generation is advanced, though: the
-//!   wipe takes the SURBs it counted, and from then on it counts only the probes minted since. Must not fight: flow
-//!   control, which keeps the raw level so the replacements are not throttled.
+//!   counterparty needs to spend it, and a reply through the relayer that revives it (one on a SURB minted after the
+//!   verdict, see `RelayerHealth::is_fresh_for`) or the end of the session ends the write-off sooner. A session's count
+//!   is dropped when its SURB generation is advanced, though: the wipe takes the SURBs it counted, and from then on it
+//!   counts only the probes minted since. Must not fight: flow control, which keeps the raw level so the replacements
+//!   are not throttled.
 //! - **Fresh SURB generation.** Trigger: a dead verdict that held for a second flush (`VERDICT_CONFIRMATION`) reaching
 //!   a session for the first time, at most once per (session, relayer) while the relayer is known dead, and per
 //!   `REBUMP_COOLDOWN` after it is revived. Effect: the session's SURB generation advances, so the counterparty drops
@@ -129,7 +132,8 @@ const _: () = assert!(REBUMP_COOLDOWN.as_secs() == 2 * PENDING_SURB_TTL.as_secs(
 
 /// The health published for a relayer on probation: a thousandth.
 ///
-/// A relayer whose dead verdict has lapsed is not trusted again until a reply comes home through it.
+/// A relayer whose dead verdict has lapsed is not trusted again until a reply that is news about it comes home
+/// through it, one on a SURB minted after the verdict (see `RelayerHealth::is_fresh_for`).
 /// The graph scales every edge into it by this, so weighted selection draws it far less than a healthy
 /// relayer, while the planner's uniform exploration (`return_path_exploration`, 10 % by default) still
 /// draws it as a candidate: that draw is the probe, and a reply on it ends the probation. Not `0`, which
@@ -210,8 +214,10 @@ pub struct SurbRoundTripRegistry {
     /// Writing a SURB off takes it out of `pending`, but the counterparty still holds it and may spend
     /// it: the reply of a probe through a relayer on probation arrives after the write-off, and a
     /// wiped stock is spent until the new generation reaches the counterparty. Recognising it here is
-    /// what lets a reply home lift the verdict or the probation of the relayers on its leg.
-    written_off_legs: moka::sync::Cache<HoprSurbId, ReturnRelayers>,
+    /// what lets a reply home lift the verdict or the probation of the relayers on its leg. With each leg
+    /// goes the SURB's mint time: a reply on a SURB older than a verdict already acted on is not news
+    /// about that relayer (see `RelayerHealth::is_fresh_for`).
+    written_off_legs: moka::sync::Cache<HoprSurbId, (ReturnRelayers, Instant)>,
     /// Records either pending map could not hold, counted together: one evicted from
     /// [`pending`](Self::pending) before its reply could come home settles no race and is never
     /// written off, and one evicted from `written_off_legs` leaves a reply home finding nothing, so it
@@ -461,7 +467,7 @@ impl SurbRoundTripRegistry {
         for (id, pseudonym, dead, return_relayers, minted_at) in through_dead {
             // Remembered before it leaves `pending`, so that a reply decoded in between finds it in
             // one of the two.
-            self.written_off_legs.insert(id, return_relayers);
+            self.written_off_legs.insert(id, (return_relayers, minted_at));
             self.pending.invalidate(&id);
             let mut session = self.written_off.entry(pseudonym).or_default();
             let first_for_pair = !session.contains_key(&dead);
@@ -524,14 +530,14 @@ impl SurbRoundTripRegistry {
             // to wipe. Their legs are kept as written-off legs are, before they leave `pending`, so
             // that a reply spent in the meantime still proves its relayers alive: it can revive one
             // judged dead in this same flush, whose verdict is not confirmed yet.
-            let wiped: Vec<(HoprSurbId, ReturnRelayers)> = self
+            let wiped: Vec<(HoprSurbId, ReturnRelayers, Instant)> = self
                 .pending
                 .iter()
                 .filter(|(_, pending)| reached.contains(&pending.pseudonym))
-                .map(|(id, pending)| (*id, pending.return_relayers))
+                .map(|(id, pending)| (*id, pending.return_relayers, pending.minted_at))
                 .collect();
-            for (id, return_relayers) in wiped {
-                self.written_off_legs.insert(id, return_relayers);
+            for (id, return_relayers, minted_at) in wiped {
+                self.written_off_legs.insert(id, (return_relayers, minted_at));
                 self.pending.invalidate(&id);
             }
         }
@@ -730,8 +736,9 @@ pub struct RelayerHealth {
     /// Relayers in `dead` whose verdict held for `VERDICT_CONFIRMATION`, and so is acted on. A verdict
     /// that lapses before it is confirmed is withdrawn rather than put on probation: it never held.
     confirmed: DashSet<OffchainPublicKey>,
-    /// Relayers whose dead verdict has lapsed without a reply coming home through them, published at
-    /// `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
+    /// Relayers whose dead verdict has lapsed without a reply that is news about them coming home through them,
+    /// published at `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by such a reply (see
+    /// `RelayerHealth::is_fresh_for`).
     probation: DashSet<OffchainPublicKey>,
     /// When each relayer known dead was first judged dead in its current death, kept through probation
     /// and any later verdict until a reply revives it. A SURB minted through it after that is a probe the
@@ -1071,11 +1078,12 @@ impl RelayerHealth {
         self.probation.contains(relayer) || (self.dead.contains(relayer) && self.confirmed.contains(relayer))
     }
 
-    /// A reply came home over `leg`: every relayer on it delivered. This is what "home since" means for
-    /// a black hole (see [`RaceHistory::unanswered`]), whether or not the reply settled a race.
-    fn note_home(&self, leg: &ReturnRelayers) {
+    /// A reply on a SURB minted at `minted_at` came home over `leg`: every relayer on it that the reply
+    /// is news about (see [`Self::is_fresh_for`]) delivered. This is what "home since" means for a black
+    /// hole (see [`RaceHistory::unanswered`]), whether or not the reply settled a race.
+    fn note_home(&self, leg: &ReturnRelayers, minted_at: Instant) {
         let now = Instant::now();
-        for relayer in relayers_of(leg) {
+        for relayer in relayers_of(leg).filter(|relayer| self.is_fresh_for(relayer, minted_at)) {
             // Only relayers with races can be black holes, and only they have a history.
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.last_home = Some(now);
@@ -1096,14 +1104,26 @@ impl RelayerHealth {
         self.known_dead_since.get(relayer).map(|since| *since)
     }
 
-    /// A reply came home over `leg`, so every relayer on it is delivering: any that was judged dead or
-    /// on probation is alive again. Its health is then what its races say, which still holds the ones
-    /// it lost, so it recovers gradually as they are forgotten.
-    fn revive_by_reply(&self, leg: &ReturnRelayers) {
+    /// Whether a reply on a SURB minted at `minted_at` is news about `relayer`. It is, unless the
+    /// relayer's verdict was acted on (confirmed, or the relayer is on probation) and the SURB is older
+    /// than the verdict. A relayer that is slow rather than dead delivers such replies late, after the
+    /// verdict that judged them overdue: they are what the verdict was about, not proof that it ended,
+    /// and taking them as proof put a stalling relayer back into routing after every verdict. Before
+    /// the verdict is confirmed they still count, so that a relayer that is merely slow is revived by
+    /// its own late replies without costing a wipe, and a probe minted after the verdict always counts.
+    fn is_fresh_for(&self, relayer: &OffchainPublicKey, minted_at: Instant) -> bool {
+        !self.is_confirmed_dead(relayer) || self.known_dead_since(relayer).is_none_or(|since| minted_at >= since)
+    }
+
+    /// A reply on a SURB minted at `minted_at` came home over `leg`, so every relayer on it is
+    /// delivering: any that was judged dead or on probation is alive again, unless the reply is not news
+    /// about it (see [`Self::is_fresh_for`]). Its health is then what its races say, which still holds
+    /// the ones it lost, so it recovers gradually as they are forgotten.
+    fn revive_by_reply(&self, leg: &ReturnRelayers, minted_at: Instant) {
         for relayer in relayers_of(leg) {
             // Looked up before it is taken out: this is on the path of every reply, and the sets are
             // empty nearly always.
-            if !self.is_known_dead(&relayer) {
+            if !self.is_known_dead(&relayer) || !self.is_fresh_for(&relayer, minted_at) {
                 continue;
             }
             let was_dead = self.dead.remove(&relayer).is_some();
@@ -1134,8 +1154,8 @@ impl RelayerHealth {
     ///
     /// A relayer is alive until it is a black hole, which makes it dead. Its verdict does not end with the
     /// condition: once no overdue reply is out any more it goes on probation instead, and stays there
-    /// until a reply comes home through it (`revive_by_reply`). One on probation
-    /// that is a black hole again is dead again.
+    /// until a reply on a SURB minted after the verdict comes home through it (`revive_by_reply`,
+    /// `is_fresh_for`), a probe's above all. One on probation that is a black hole again is dead again.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
         let last_reply = self.last_reply();
         // The bar of the best-measured relayer, for those with too short a history of their own.
@@ -1637,10 +1657,10 @@ impl<C> SurbTelemetryCodec<C> {
             // spent by the counterparty all the same: a probe through a relayer on probation arrives
             // like this, and so does a SURB spent before the new generation reached the counterparty.
             // Its legs are not credited, the expectation was written off with it, but it proves its
-            // relayers are delivering.
-            if let Some(leg) = self.registry.written_off_legs.remove(surb_id) {
-                health.note_home(&leg);
-                health.revive_by_reply(&leg);
+            // relayers are delivering: those it is news about (see `RelayerHealth::is_fresh_for`).
+            if let Some((leg, minted_at)) = self.registry.written_off_legs.remove(surb_id) {
+                health.note_home(&leg, minted_at);
+                health.revive_by_reply(&leg, minted_at);
             } else {
                 tracing::trace!("reply on a surb with no pending legs");
             }
@@ -1648,9 +1668,10 @@ impl<C> SurbTelemetryCodec<C> {
         };
         self.registry.record_observed(pending.paths, 1);
 
-        // Every relayer on its leg is delivering: a dead verdict or probation on one of them ends.
-        health.note_home(&pending.return_relayers);
-        health.revive_by_reply(&pending.return_relayers);
+        // Every relayer on its leg is delivering: a dead verdict or probation on one of them ends, unless
+        // the SURB is older than a verdict already acted on (see `RelayerHealth::is_fresh_for`).
+        health.note_home(&pending.return_relayers, pending.minted_at);
+        health.revive_by_reply(&pending.return_relayers, pending.minted_at);
         // Only a SURB the replier's pop order makes attributable settles: the other may have waited in
         // the replier's store.
         if let Some((partner_relayers, partner_home)) = pending.partner_replied {
@@ -1952,7 +1973,9 @@ mod tests {
     /// A relayer judged dead long enough ago for the verdict to be confirmed (see `VERDICT_CONFIRMATION`),
     /// the way most tests here want it: the verdict itself is not what they test.
     fn judge_dead(health: &RelayerHealth, relayer: OffchainPublicKey) {
-        health.dead.insert(relayer);
+        // `mark_dead` and then `confirm_verdicts`: reached now, so that the SURBs a test minted before are stock
+        // and no news about it, and old enough to be confirmed.
+        health.mark_dead(relayer);
         health.dead_since.insert(
             relayer,
             Instant::now()
@@ -2289,7 +2312,7 @@ mod tests {
     /// dead, with a reply home through `shared` after they fell due or without one, and the three.
     fn judged_behind_a_shared_relayer(
         reply_through_shared: bool,
-    ) -> anyhow::Result<(Vec<OffchainPublicKey>, [OffchainPublicKey; 3])> {
+    ) -> anyhow::Result<(Vec<OffchainPublicKey>, [OffchainPublicKey; 4], RelayerHealth)> {
         let [shared, first, second, healthy] = [(); 4].map(|_| key());
         let [a1, a2, a3, b1, b2, b3] = [(); 6].map(|_| key());
         let legs: [&[OffchainPublicKey]; 6] = [
@@ -2305,17 +2328,21 @@ mod tests {
         overdue_legs(&health, &legs, 1, healthy);
         backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
         if reply_through_shared {
-            health.note_home(&leg(&[shared, healthy]));
+            health.note_home(&leg(&[shared, healthy]), Instant::now());
         }
         health.record_reply();
-        Ok((sorted(judged_dead(&health.refresh(4))), [shared, first, second]))
+        Ok((
+            sorted(judged_dead(&health.refresh(4))),
+            [shared, first, second, healthy],
+            health,
+        ))
     }
 
     /// A reply home through the shared relayer after the replies fell due answers its races, so it is
     /// no suspect, and both dead ones are judged.
     #[test]
     fn a_relayer_shared_by_two_dead_ones_should_be_cleared_by_a_reply_through_it() -> anyhow::Result<()> {
-        let (judged, [_, first, second]) = judged_behind_a_shared_relayer(true)?;
+        let (judged, [_, first, second, _], _) = judged_behind_a_shared_relayer(true)?;
         assert_eq!(sorted(vec![first, second]), judged);
         Ok(())
     }
@@ -2327,8 +2354,39 @@ mod tests {
     /// nothing.
     #[test]
     fn a_relayer_shared_by_two_dead_ones_is_judged_in_their_place_as_a_known_limitation() -> anyhow::Result<()> {
-        let (judged, [shared, ..]) = judged_behind_a_shared_relayer(false)?;
+        let (judged, [shared, ..], _) = judged_behind_a_shared_relayer(false)?;
         assert_eq!(vec![shared], judged);
+        Ok(())
+    }
+
+    /// What that limitation costs once the verdict on the live relayer is confirmed: a reply over one of its
+    /// healthy legs on a SURB minted before the verdict no longer clears it, as it does inside
+    /// `VERDICT_CONFIRMATION`; a reply on a SURB minted since does. Until one comes, it waits for its overdue races
+    /// to expire like any relayer judged dead (see `RelayerHealth::is_fresh_for`).
+    #[rstest::rstest]
+    #[case::before_confirmation(false)]
+    #[case::once_confirmed(true)]
+    fn a_relayer_judged_in_place_of_dead_ones_should_be_cleared_by_replies_as_its_verdict_allows(
+        #[case] confirmed: bool,
+    ) -> anyhow::Result<()> {
+        let (judged, [shared, _, _, healthy], health) = judged_behind_a_shared_relayer(false)?;
+        assert_eq!(vec![shared], judged);
+        if confirmed {
+            confirm_verdicts(&health);
+        }
+        let older = ago(Duration::from_secs(1))?;
+        health.note_home(&leg(&[shared, healthy]), older);
+        health.revive_by_reply(&leg(&[shared, healthy]), older);
+        assert_eq!(
+            !confirmed,
+            !health.is_known_dead(&shared),
+            "a reply on a SURB older than the verdict clears it only before the verdict is confirmed"
+        );
+        health.revive_by_reply(&leg(&[shared, healthy]), Instant::now());
+        assert!(
+            !health.is_known_dead(&shared),
+            "a reply on a SURB minted since clears it"
+        );
         Ok(())
     }
 
@@ -2684,8 +2742,9 @@ mod tests {
             "revived and past the cooldown, the mark is dropped"
         );
 
-        judge_dead(&health, dead);
+        // Stock minted before the verdict, as a bump needs.
         registry.pending.insert(surb_id(4), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
         assert_eq!(
             vec![*SESSION],
             registry.write_off_dead(),
@@ -3171,8 +3230,9 @@ mod tests {
         // A session of the same pseudonym that starts afresh is not held back by the old one's cooldown.
         registry.relayer_health.dead.remove(&dead);
         registry.write_off_dead();
-        judge_dead(&registry.relayer_health, dead);
+        // Stock minted before the verdict, as a bump needs.
         registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        judge_dead(&registry.relayer_health, dead);
         assert_eq!(vec![*SESSION], registry.write_off_dead());
     }
 
@@ -3999,8 +4059,9 @@ mod tests {
         assert_eq!(vec![slow], judged_dead(&health.refresh(4)));
         assert!(registry.write_off_dead().is_empty(), "not acted on yet");
 
-        // Its late replies come home before the next flush.
-        health.revive_by_reply(&[Some(slow), None, None, None, None]);
+        // Its late replies come home before the next flush. Their SURBs are older than the verdict, but it
+        // is not confirmed yet, so they still revive it.
+        health.revive_by_reply(&[Some(slow), None, None, None, None], ago(Duration::from_millis(500))?);
         assert!(!health.is_known_dead(&slow));
         confirm_verdicts(&health);
         assert!(
@@ -4173,6 +4234,65 @@ mod tests {
             "a reply on a wiped SURB revives the relayer it came home through"
         );
         assert!(health.is_known_dead(&dead), "and only that one");
+    }
+
+    /// A stalling relayer goes on delivering the replies its verdict judged overdue, late. Once the
+    /// verdict is acted on they are what it was about, not proof that it ended: a reply on a SURB minted
+    /// before the verdict neither revives the relayer nor counts as it coming home, whether the SURB was
+    /// still pending or written off already. One that settles a race, which only a still-pending SURB can,
+    /// still answers the relayer's overdue races through that race (hoprnet#8679). A reply on a SURB minted
+    /// after the verdict revives it.
+    #[rstest::rstest]
+    #[case::still_pending(false)]
+    #[case::written_off(true)]
+    fn a_late_reply_should_not_revive_a_relayer_once_its_verdict_is_confirmed(
+        #[case] written_off_first: bool,
+    ) -> anyhow::Result<()> {
+        let (graph, _me, _peers) = graph_with(0);
+        let recorder = recorder(graph);
+        let registry = &recorder.registry;
+        let health = registry.relayer_health();
+        let [stalled, reference] = [(); 2].map(|_| key());
+        // The bar the stalled relayer borrows, so that its overdue replies keep it a black hole.
+        settled_since(&health, reference, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, stalled, MIN_RACES as u8, ago(Duration::from_secs(2))?);
+        let mut late = pending_to(&[stalled], None, 0);
+        late.minted_at = ago(Duration::from_secs(2))?;
+        registry.pending.insert(surb_id(1), late);
+        health.mark_dead(stalled);
+        confirm_verdicts(&health);
+        if written_off_first {
+            registry.write_off_dead();
+            assert!(
+                registry.pending.get(&surb_id(1)).is_none(),
+                "written off with the verdict"
+            );
+        }
+
+        recorder.on_replied(&surb_id(1));
+        assert!(
+            health.is_dead(&stalled),
+            "a reply on a SURB minted before the confirmed verdict does not revive it"
+        );
+        assert_eq!(
+            None,
+            health.relayers.get(&stalled).and_then(|history| history.last_home),
+            "nor does it answer the races the verdict was about"
+        );
+        health.record_reply();
+        health.refresh(4);
+        assert!(
+            health.is_dead(&stalled),
+            "so the verdict still stands at the next flush"
+        );
+
+        registry.pending.insert(surb_id(2), pending_to(&[stalled], None, 0));
+        recorder.on_replied(&surb_id(2));
+        assert!(
+            !health.is_known_dead(&stalled),
+            "a reply on a SURB minted after the verdict revives it"
+        );
+        Ok(())
     }
 
     /// What a cluster run showed: three relayers judged dead around one flush, the session bumped once
@@ -4448,7 +4568,9 @@ mod tests {
         let registry = SurbRoundTripRegistry::with_capacity(8 * PENDING_SURB_RECORD_BYTES);
         assert_eq!(0, registry.pending_lost());
         for seed in 0..32u8 {
-            registry.written_off_legs.insert(surb_id(seed), leg(&[]));
+            registry
+                .written_off_legs
+                .insert(surb_id(seed), (leg(&[]), Instant::now()));
         }
         registry.written_off_legs.run_pending_tasks();
 
@@ -4625,7 +4747,9 @@ mod tests {
         registry.open_race(&leg(&[late]), surb_id(2), &leg(&[home]), ROUND_TRIP);
         assert_eq!(1, open_races_of(&health, &late), "still pending: its reply settles it");
 
-        registry.written_off_legs.insert(surb_id(4), leg(&[late]));
+        registry
+            .written_off_legs
+            .insert(surb_id(4), (leg(&[late]), Instant::now()));
         registry.open_race(&leg(&[late]), surb_id(4), &leg(&[home]), ROUND_TRIP);
         assert_eq!(
             2,
