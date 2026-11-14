@@ -794,9 +794,13 @@ pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1)
 /// How many idle reports fit into the Entry's slot idle timeout at the longest backoff.
 ///
 /// On an idle Session the Exit's reports are the only thing refreshing the Entry's slot idle timer (the
-/// session cache's `time_to_idle`, [`SessionManagerConfig::idle_timeout`]). A third of it lets the Entry
-/// survive two lost reports.
-const IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT: u32 = 3;
+/// session cache's `time_to_idle`, [`SessionManagerConfig::idle_timeout`]). A quarter of it means that with
+/// two lost reports the next still lands a quarter of the timeout before the Entry's slot expires.
+///
+/// The Exit cannot see the Entry's idle timeout, so this assumes the Entry's is at least the Exit's (both
+/// default to 3 minutes). An Entry with a shorter one survives fewer lost reports, and below the cap loses idle
+/// Sessions outright.
+const IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT: u32 = 4;
 
 /// Idle reports sent at the base period before backing off: the first idle minute at 15 s.
 const IDLE_REPORTS_AT_BASE: u32 = 4;
@@ -2012,7 +2016,8 @@ impl PixFillControl {
         let idle = !moved
             && state.fill.is_zero()
             && !state.degraded
-            && self.estimator.saturating_diff() > current_keep_alive_surb_reserve(&self.surb_mgmt);
+            // The report being admitted spends one of the SURBs above the reserve.
+            && self.estimator.saturating_diff() > current_keep_alive_surb_reserve(&self.surb_mgmt).saturating_add(1);
 
         let before = self.period(state);
         state.idle_reports = if idle { state.idle_reports.saturating_add(1) } else { 0 };
@@ -2146,13 +2151,20 @@ impl PixFillControl {
     /// * **PIX fill is zero.** Any fill rate, the 60 s heartbeat included, keeps the base period; the count restarts
     ///   when fill returns to zero.
     /// * **Not degraded or dark.** Those cadences are shorter on purpose; entering degraded mode restarts the count.
-    /// * **Stock above the keep-alive reserve** ([`current_keep_alive_surb_reserve`]). Below it the Exit is in trouble
-    ///   and the Entry should hear it as often as before.
+    /// * **Stock above the keep-alive reserve** ([`current_keep_alive_surb_reserve`]) after the report. Otherwise the
+    ///   Exit is in trouble and the Entry should hear it as often as before.
     /// * **No application data in either direction.** [`note_data_activity`](Self::note_data_activity) resets the count
     ///   at once. The Entry's keep-alives and the SURBs they carry do *not* count: its balancer decay refills an idle
     ///   Session about once a minute, which would defeat the backoff.
     ///
     /// Withheld reports (no reader, no SURB) leave the count alone.
+    ///
+    /// ## Known limit
+    ///
+    /// The Exit learns of a degraded forward path only from what arrives. If a relayer dies during an idle stretch
+    /// and none of the Entry's packets arrive afterwards, reports stay at the backed-off period, which slows the
+    /// Entry's dead-relayer verdict. Any packet that does arrive resets the backoff and releases an overdue report
+    /// at once, and stall or loss detection then switches to the degraded cadence.
     ///
     /// ## The rate must follow the period
     ///
@@ -3057,8 +3069,9 @@ pub struct SessionManagerConfig {
     /// The longest period the Exit's SURB-level report backs off to on an idle Session; see
     /// `PixFillControl::admit` for the rules.
     ///
-    /// Floored at `MIN_SURB_BUFFER_NOTIFICATION_PERIOD` and clamped to `idle_timeout / 3`, because on an idle
-    /// Session these reports refresh the Entry's slot timer. `None`, or a value not above
+    /// Floored at `MIN_SURB_BUFFER_NOTIFICATION_PERIOD` and clamped to `idle_timeout / 4`, because on an idle
+    /// Session these reports refresh the Entry's slot timer; this assumes the Entry's idle timeout is at least
+    /// the Exit's. `None`, or a value not above
     /// [`surb_balance_notify_period`](Self::surb_balance_notify_period), disables the backoff.
     ///
     /// Default is `None` here; the node's default is in the transport configuration.
@@ -4359,7 +4372,7 @@ where
                 "the degraded SURB notification period is not faster than the normal one, so it is disabled"
             );
         }
-        // Floored, then clamped so the Entry's slot survives two lost reports (see
+        // Floored, then clamped to a quarter of the idle timeout so the Entry's slot survives two lost reports (see
         // `IDLE_NOTIFY_PERIODS_PER_IDLE_TIMEOUT`).
         if let (Some(cap), Some(normal)) = (cfg.surb_idle_notify_period, cfg.surb_balance_notify_period) {
             let ceiling =
@@ -4371,8 +4384,8 @@ where
                     configured = ?cap,
                     clamped = ?clamped,
                     idle_timeout = ?cfg.idle_timeout,
-                    "the idle SURB notification period is longer than a third of the session idle timeout, so it \
-                     is lowered to it: the Entry's slot must survive two lost reports"
+                    "the idle SURB notification period is longer than a quarter of the session idle timeout, so \
+                     it is lowered to it: the Entry's slot must survive two lost reports"
                 );
             }
             if clamped <= normal {
@@ -12110,9 +12123,9 @@ mod tests {
         Ok(())
     }
 
-    /// No backoff at or below the keep-alive reserve; one SURB above it the Session backs off.
+    /// No backoff unless the report leaves the stock above the keep-alive reserve: the report spends a SURB itself.
     #[test]
-    fn no_backoff_at_or_below_the_keep_alive_reserve() -> anyhow::Result<()> {
+    fn no_backoff_unless_the_report_leaves_the_stock_above_the_keep_alive_reserve() -> anyhow::Result<()> {
         let base = Duration::from_secs(15);
         let control = fill_control_idle(base, Duration::from_secs(60), 32);
         assert_eq!(32, current_keep_alive_surb_reserve(&control.surb_mgmt));
@@ -12123,9 +12136,17 @@ mod tests {
 
         control.estimator.produced.fetch_add(1, Ordering::Relaxed);
         assert_eq!(
+            vec![base; 8],
+            report_gaps(&control, t0 + Duration::from_secs(600), 8)?,
+            "the report would leave the stock at the reserve"
+        );
+        assert_eq!(0, control.idle_reports());
+
+        control.estimator.produced.fetch_add(1, Ordering::Relaxed);
+        assert_eq!(
             secs(&[15, 15, 15, 30, 60]),
-            report_gaps(&control, t0 + Duration::from_secs(600), 5)?,
-            "one SURB above the reserve is idle again, and counts from its first report"
+            report_gaps(&control, t0 + Duration::from_secs(1200), 5)?,
+            "two SURBs above the reserve is idle, and counts from its first report"
         );
         Ok(())
     }
@@ -12210,9 +12231,9 @@ mod tests {
         Ok(())
     }
 
-    /// The idle period is floored and clamped to a third of the idle timeout.
+    /// The idle period is floored and clamped to a quarter of the idle timeout.
     #[test]
-    fn the_idle_notify_period_is_floored_and_clamped_to_a_third_of_the_idle_timeout() {
+    fn the_idle_notify_period_is_floored_and_clamped_to_a_quarter_of_the_idle_timeout() {
         let manager = |idle: Option<Duration>, base: Option<Duration>| {
             RecordingManager::new(SessionManagerConfig {
                 surb_balance_notify_period: base,
@@ -12226,16 +12247,20 @@ mod tests {
         let base = Some(Duration::from_secs(15));
 
         assert_eq!(
-            Some(Duration::from_secs(60)),
+            Some(Duration::from_secs(45)),
             manager(Some(Duration::from_secs(600)), base)
         );
         assert_eq!(
-            Some(Duration::from_secs(60)),
+            Some(Duration::from_secs(45)),
             manager(Some(Duration::from_secs(60)), base)
         );
         assert_eq!(
             Some(Duration::from_secs(45)),
             manager(Some(Duration::from_secs(45)), base)
+        );
+        assert_eq!(
+            Some(Duration::from_secs(30)),
+            manager(Some(Duration::from_secs(30)), base)
         );
         assert_eq!(
             Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),

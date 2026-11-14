@@ -898,9 +898,9 @@ fn default_session_surb_degraded_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(1))
 }
 
-/// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 60s.
+/// Transport-layer default for [`SessionGlobalConfig::surb_idle_notify_period`]: 45s.
 fn default_session_surb_idle_notify_period() -> Option<Duration> {
-    Some(Duration::from_secs(60))
+    Some(Duration::from_secs(45))
 }
 
 /// Transport-layer default for the Exit's refusal reply budget: a burst of 32, then one reply a second.
@@ -1120,10 +1120,14 @@ pub struct SessionGlobalConfig {
     /// Each report costs the Exit a SURB, and a ticket on a multi-hop return path. While no data moves, PIX
     /// fill is off and the Session is not degraded, the period doubles from
     /// [`surb_balance_notify_period`](Self::surb_balance_notify_period) up to this value, after the first minute.
-    /// Data in either direction resets it. Clamped to a third of [`idle_timeout`](Self::idle_timeout), because
+    /// Data in either direction resets it. Clamped to a quarter of [`idle_timeout`](Self::idle_timeout), because
     /// on an idle Session these reports keep the Entry's slot alive.
     ///
-    /// Default is 60 seconds. Set to `null` to disable; minimum is 1 second.
+    /// The Exit cannot see the Entry's idle timeout, so the clamp assumes the Entry's is at least the Exit's (both
+    /// default to 3 minutes). An Entry with a shorter one survives fewer lost reports, and below the cap loses
+    /// idle Sessions outright.
+    ///
+    /// Default is 45 seconds. Set to `null` to disable; minimum is 1 second.
     #[validate(custom(function = "validate_surb_idle_notify_period"))]
     #[default(default_session_surb_idle_notify_period())]
     #[cfg_attr(
@@ -2411,9 +2415,13 @@ mod tests {
     // --- surb_idle_notify_period tests ---
 
     #[test]
-    fn surb_idle_notify_period_defaults_to_one_minute() {
+    fn surb_idle_notify_period_defaults_to_45_seconds() {
         let cfg = SessionGlobalConfig::default();
-        assert_eq!(Some(Duration::from_secs(60)), cfg.surb_idle_notify_period);
+        assert_eq!(Some(Duration::from_secs(45)), cfg.surb_idle_notify_period);
+        assert!(
+            cfg.surb_idle_notify_period <= Some(cfg.idle_timeout / 4),
+            "the default must not trigger the clamp warning"
+        );
         assert!(
             cfg.surb_idle_notify_period > cfg.surb_balance_notify_period,
             "the idle period must report slower than the normal one, or it backs nothing off"
