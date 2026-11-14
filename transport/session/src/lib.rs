@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod counters;
 pub mod errors;
+pub(crate) mod exit_control;
 pub mod flow_control;
 mod manager;
 /// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
@@ -21,6 +22,10 @@ mod types;
 mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
+pub use exit_control::{
+    DEFAULT_REFUSAL_REPLY_BURST, DEFAULT_REFUSAL_REPLY_REFILL_PERIOD, MIN_REFUSAL_REPLY_REFILL_PERIOD,
+    RefusalReplyBudget,
+};
 use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;

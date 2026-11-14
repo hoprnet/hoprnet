@@ -168,3 +168,24 @@ pub static APP_INCOMING_TIMEOUT_DROPS: AtomicUsize = AtomicUsize::new(0);
 pub fn app_incoming_timeout_drop_count() -> usize {
     APP_INCOMING_TIMEOUT_DROPS.load(Ordering::Relaxed)
 }
+
+/// Cumulative count of `StartSession` refusal replies not sent because the refusal reply budget was
+/// spent; each is a requester left to time out.
+pub static START_REFUSAL_REPLY_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative count of refusal replies dropped for want of budget.
+#[inline]
+pub fn start_refusal_reply_drop_count() -> usize {
+    START_REFUSAL_REPLY_DROPS.load(Ordering::Relaxed)
+}
+
+/// Cumulative count of `StartSession` refusals decided, whether or not the reply was sent.
+///
+/// Against [`START_REFUSAL_REPLY_DROPS`] it shows how much of a flood the budget absorbed.
+pub static START_REFUSALS: AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the cumulative count of refused `StartSession`s.
+#[inline]
+pub fn start_refusal_count() -> usize {
+    START_REFUSALS.load(Ordering::Relaxed)
+}

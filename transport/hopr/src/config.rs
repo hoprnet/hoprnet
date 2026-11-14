@@ -15,7 +15,8 @@ pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
-    MAX_ASSUMED_SESSION_PACKET_RATE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    MAX_ASSUMED_SESSION_PACKET_RATE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_REFUSAL_REPLY_REFILL_PERIOD,
+    MIN_SURB_BUFFER_DURATION, RefusalReplyBudget,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -897,6 +898,11 @@ fn default_session_surb_degraded_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(1))
 }
 
+/// Transport-layer default for the Exit's refusal reply budget: a burst of 32, then one reply a second.
+fn default_session_refusal_reply_budget() -> Option<RefusalReplyBudget> {
+    Some(RefusalReplyBudget::default())
+}
+
 fn default_session_max_frames_behind_gap() -> Option<usize> {
     Some(256)
 }
@@ -946,6 +952,16 @@ fn validate_surb_degraded_notify_period(value: &Duration) -> Result<(), Validati
     } else {
         Err(ValidationError::new(
             "SURB degraded notify period must be at least 1 second",
+        ))
+    }
+}
+
+fn validate_refusal_reply_budget(value: &RefusalReplyBudget) -> Result<(), ValidationError> {
+    if value.refill_period >= MIN_REFUSAL_REPLY_REFILL_PERIOD {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "refusal reply budget refill period must be at least 1 millisecond",
         ))
     }
 }
@@ -1119,6 +1135,19 @@ pub struct SessionGlobalConfig {
     #[default(default_session_max_frames_behind_gap())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_max_frames_behind_gap"))]
     pub max_frames_behind_gap: Option<usize>,
+
+    /// How many refusal replies the Exit sends to refused `StartSession`s, across all reasons.
+    ///
+    /// Each reply can cost the Exit a ticket while the request is free, so a flood of refused requests
+    /// would otherwise drain its funds. A refusal that finds the budget spent gets no reply and the
+    /// requester times out.
+    ///
+    /// Default is `{ burst: 32, refill_period: 1s }`; a `burst` of 0 never answers. Set to `null` to
+    /// answer every refusal. The refill period must be at least 1 millisecond.
+    #[validate(custom(function = "validate_refusal_reply_budget"))]
+    #[default(default_session_refusal_reply_budget())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_refusal_reply_budget"))]
+    pub refusal_reply_budget: Option<RefusalReplyBudget>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
@@ -2342,6 +2371,88 @@ mod tests {
             serde_saphyr::from_str("surb_degraded_notify_period: 2s").context("a humantime period must parse")?;
         assert_eq!(Some(Duration::from_secs(2)), cfg.surb_degraded_notify_period);
         Ok(())
+    }
+
+    // --- refusal_reply_budget tests ---
+
+    #[test]
+    fn refusal_reply_budget_defaults_to_a_burst_of_32_and_one_reply_a_second() {
+        let cfg = SessionGlobalConfig::default();
+        assert_eq!(
+            Some(RefusalReplyBudget {
+                burst: 32,
+                refill_period: Duration::from_secs(1),
+            }),
+            cfg.refusal_reply_budget
+        );
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn refusal_reply_budget_defaults_when_omitted_from_the_config_file() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig = serde_saphyr::from_str("idle_timeout: 3m").context("must parse")?;
+        assert_eq!(
+            SessionGlobalConfig::default().refusal_reply_budget,
+            cfg.refusal_reply_budget
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn refusal_reply_budget_null_means_unlimited() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("refusal_reply_budget: null").context("null must parse")?;
+        assert_eq!(None, cfg.refusal_reply_budget);
+        assert!(cfg.validate().is_ok(), "an unbounded budget is valid");
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn refusal_reply_budget_parses_humantime() -> anyhow::Result<()> {
+        let cfg: SessionGlobalConfig =
+            serde_saphyr::from_str("refusal_reply_budget: { burst: 5, refill_period: 250ms }")
+                .context("a humantime refill period must parse")?;
+        assert_eq!(
+            Some(RefusalReplyBudget {
+                burst: 5,
+                refill_period: Duration::from_millis(250),
+            }),
+            cfg.refusal_reply_budget
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn refusal_reply_budget_with_a_zero_refill_period_is_rejected() {
+        let cfg = SessionGlobalConfig {
+            refusal_reply_budget: Some(RefusalReplyBudget {
+                burst: 1,
+                refill_period: Duration::ZERO,
+            }),
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+
+        let at_floor = SessionGlobalConfig {
+            refusal_reply_budget: Some(RefusalReplyBudget {
+                burst: 0,
+                refill_period: MIN_REFUSAL_REPLY_REFILL_PERIOD,
+            }),
+            ..Default::default()
+        };
+        assert!(
+            at_floor.validate().is_ok(),
+            "a zero burst is a valid way to never answer"
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn refusal_reply_budget_rejects_unknown_fields() {
+        assert!(serde_saphyr::from_str::<SessionGlobalConfig>("refusal_reply_budget: { burts: 5 }").is_err());
     }
 
     #[test]

@@ -98,3 +98,10 @@ PromQL for the questions above — is the module documentation of
 
 Note that per-Session series are subject to the OpenTelemetry SDK's 2000-per-instrument cardinality limit (see
 issue #8305); the `hopr_pix_*` aggregates are not, by construction.
+
+## Exit Control Metrics
+
+- **`hopr_exit_*`** — bounded counters of packets an Exit sends on a peer's behalf; today
+  `hopr_exit_control_packets_total{kind, session, outcome}`, which counts `StartSession` refusals and whether
+  each was answered or dropped by the refusal reply budget. Unlike `hopr_session_*`, they appear on `/metrics`.
+  The contract is in `transport/session/src/telemetry/exit_control.rs`.
