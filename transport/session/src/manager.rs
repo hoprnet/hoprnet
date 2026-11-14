@@ -1873,8 +1873,28 @@ impl PixFillControl {
     ///
     /// A `NoRateControl` Session's Entry could not influence anything here before; it drives this
     /// reserve now, self-inflicted on one Session — announcing four moves the reserve to one.
+    ///
+    /// Ignored once the Session is draining. The supervisor admits a drain once, against the
+    /// [`drainable_surbs`](Self::drainable_surbs) reported at the close, and never re-reads it, while
+    /// the slot (and so this keep-alive path) stays in place for the whole drain. A raise in that
+    /// window would have fill withhold the very packets the drain was admitted to spend, stranding the
+    /// cycle on its deadline; a lowering would spend past what the drain was planned against. The
+    /// check and the swap happen under the state lock that [`enter_drain`](Self::enter_drain) takes,
+    /// so an announcement either lands before the drain begins or not at all.
     pub(crate) fn set_announced_target(&self, announced: u64) {
-        let previous_announced = self.announced_surb_target.swap(announced, Ordering::Relaxed);
+        let previous_announced = {
+            let state = self.state.lock();
+            if state.draining {
+                trace!(
+                    session_id = %self.session_id,
+                    announced,
+                    reserve = self.surb_reserve(),
+                    "ignoring a target announced during a drain: the drain keeps the reserve it was admitted against"
+                );
+                return;
+            }
+            self.announced_surb_target.swap(announced, Ordering::Relaxed)
+        };
         if previous_announced == announced {
             return;
         }
@@ -2077,7 +2097,7 @@ impl PixFillControl {
     /// invalidated relayers are all unobserved — which is why the supervisor weighs it against a
     /// cycle's whole remaining emission rather than a discounted one. The reserve subtracted is the
     /// *effective* one in force for this Session, not the configured ceiling, and it follows the
-    /// target the Entry last announced.
+    /// target the Entry last announced until the Session starts draining, after which it is frozen.
     pub(crate) fn drainable_surbs(&self) -> u64 {
         self.estimator.saturating_diff().saturating_sub(self.surb_reserve())
     }
@@ -6788,6 +6808,15 @@ where
         // keeps the supervisor from being told a Session closed twice.
         if !fill.enter_drain() {
             return answer_while_draining(reason);
+        }
+
+        // Re-read now that the reserve is frozen (see `PixFillControl::set_announced_target`): an
+        // announcement that landed between the fast path above and the transition moved the reserve
+        // the drain will be held to, and the supervisor must plan against that one. Falling through to
+        // the teardown from here is what a refused event below does too.
+        let drainable_surbs = fill.drainable_surbs();
+        if drainable_surbs == 0 {
+            return None;
         }
 
         if !supervisor.try_send_event(SessionPixEvent::SessionClosed { drainable_surbs }) {
@@ -14270,6 +14299,9 @@ mod tests {
     /// The target is peer-controlled and arrives on a keep-alive the Entry sends as often as it likes.
     /// Warning on every downward crossing would let it log at will for the Session's four hours; the
     /// latch makes it one line per Session, and only when a warning actually goes out.
+    ///
+    /// Counted at the subscriber rather than read off the latch: a regression that warned on every
+    /// crossing and set the flag as well would leave the flag looking exactly as it does here.
     #[test]
     fn the_order_of_magnitude_warning_is_latched() -> anyhow::Result<()> {
         const CONFIGURED: u64 = 500;
@@ -14283,28 +14315,124 @@ mod tests {
             control.surb_reserve()
         );
 
-        // Alternating across the threshold: only the first downward crossing warns.
-        for _ in 0..20 {
-            control.set_announced_target(7_000);
-            control.set_announced_target(180);
-        }
-        assert!(
-            control.warned_lowered_reserve.load(Ordering::Relaxed),
-            "a lowering through the order-of-magnitude threshold must have latched the warning"
+        // Alternating across the threshold, deep then shallow, twenty times over: one warning in all.
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || {
+            for _ in 0..20 {
+                control.set_announced_target(7_000);
+                control.set_announced_target(180);
+            }
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "an Entry alternating across the threshold must produce exactly one warning per Session"
         );
 
-        // A fresh control that only repeated its target is not latched, so a later crossing still warns.
+        // A fresh control that only repeated its target has not warned, so a later crossing still does.
         let mut fresh = fill_control(None, CONFIGURED);
         fresh.establishment_surb_target = 7_000;
-        fresh.set_announced_target(7_000);
-        assert!(
-            !fresh.warned_lowered_reserve.load(Ordering::Relaxed),
-            "a repeat of the target in force is not a crossing, so it must not latch"
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || fresh.set_announced_target(7_000));
+        assert_eq!(
+            0,
+            warnings.count(),
+            "a repeat of the target in force is not a crossing, so it must not warn"
         );
-        fresh.set_announced_target(180);
+        tracing::subscriber::with_default(warnings.clone(), || {
+            fresh.set_announced_target(180);
+            fresh.set_announced_target(7_000);
+            fresh.set_announced_target(180);
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "the first real crossing must warn, and the next one must not"
+        );
+        Ok(())
+    }
+
+    /// Counts `WARN` events; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct WarnCounter(std::sync::atomic::AtomicU64);
+
+    impl WarnCounter {
+        fn count(&self) -> u64 {
+            self.0.load(Ordering::Relaxed)
+        }
+    }
+
+    impl tracing::Subscriber for WarnCounter {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    /// An admitted drain keeps the reserve it was admitted against, whatever the Entry announces.
+    ///
+    /// The supervisor admits a drain once, against the `drainable_surbs` reported at the close, and
+    /// the slot stays in place for the drain, so the Entry's keep-alives still reach
+    /// `handle_keep_alive`. A raise followed there would have fill withhold the packets the drain was
+    /// admitted to spend — 200 announced at establishment is a reserve of 50, and 7 000 afterwards
+    /// would make it 500, above the 120 held — and the cycle would strand on its deadline. A lowering
+    /// would spend past the figure the drain was planned against. Neither may move it.
+    #[rstest]
+    #[case::raised(7_000)]
+    #[case::lowered(40)]
+    #[test_log::test(tokio::test)]
+    async fn an_announcement_during_a_drain_leaves_the_fill_reserve_alone(
+        #[case] announced: u64,
+    ) -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        control
+            .estimator
+            .produced
+            .fetch_add(120, std::sync::atomic::Ordering::Relaxed);
+        anyhow::ensure!(
+            control.drainable_surbs() == 70,
+            "fixture: 120 held against a reserve of 50 leaves 70 drainable, got {}",
+            control.drainable_surbs()
+        );
+
+        anyhow::ensure!(control.enter_drain(), "fixture: the drain must begin");
+        control.set_fill(FillRate::per_second(10));
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, announced))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            50,
+            control.surb_reserve(),
+            "a target of {announced} announced during the drain must not move the reserve it was admitted against"
+        );
+        assert_eq!(
+            70,
+            control.drainable_surbs(),
+            "the drain was planned against 70 drainable SURBs, and an announcement must not change that"
+        );
         assert!(
-            fresh.warned_lowered_reserve.load(Ordering::Relaxed),
-            "the first real crossing must latch"
+            control.admit(),
+            "with 120 held above the admitted reserve of 50, the drain's fill must still go out"
         );
         Ok(())
     }

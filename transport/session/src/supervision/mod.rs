@@ -1300,7 +1300,9 @@ pub struct PixFillConfig {
     /// establishment: a `BalancerTarget` keep-alive carrying a different target re-derives the
     /// effective reserve, lowered as well as raised, so a client that steps down to a shallower buffer
     /// is not left with a reserve above anything it now supplies. That is the
-    /// `SessionManagerConfig::surb_target_notify` path, which turns the announcement itself on.
+    /// `SessionManagerConfig::surb_target_notify` path, which turns the announcement itself on. Once a
+    /// closed Session starts draining (`drain_after_close`), the reserve stops following: the drain
+    /// keeps the one it was admitted against.
     ///
     /// Default: 500, matching `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer
     /// target of the worked profile a quarter is 1 750, so the configured value is what binds there
