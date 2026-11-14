@@ -130,7 +130,8 @@ const _: () = assert!(REBUMP_COOLDOWN.as_secs() == 2 * PENDING_SURB_TTL.as_secs(
 
 /// The health published for a relayer on probation: a thousandth.
 ///
-/// A relayer whose dead verdict has lapsed is not trusted again until a reply comes home through it.
+/// A relayer whose dead verdict has lapsed is not trusted again until a reply that is news about it comes home
+/// through it, one on a SURB minted after the verdict (see `RelayerHealth::is_fresh_for`).
 /// The graph scales every edge into it by this, so weighted selection draws it far less than a healthy
 /// relayer, while the planner's uniform exploration (`return_path_exploration`, 10 % by default) still
 /// draws it as a candidate: that draw is the probe, and a reply on it ends the probation. Not `0`, which
@@ -526,8 +527,9 @@ pub struct RelayerHealth {
     /// Relayers in `dead` whose verdict held for `VERDICT_CONFIRMATION`, and so is acted on. A verdict
     /// that lapses before it is confirmed is withdrawn rather than put on probation: it never held.
     confirmed: DashSet<OffchainPublicKey>,
-    /// Relayers whose dead verdict has lapsed without a reply coming home through them, published at
-    /// `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by a reply home through it.
+    /// Relayers whose dead verdict has lapsed without a reply that is news about them coming home through them,
+    /// published at `PROBATION_HEALTH`. Disjoint from `dead`; a relayer leaves both only by such a reply (see
+    /// `RelayerHealth::is_fresh_for`).
     probation: DashSet<OffchainPublicKey>,
     /// When each relayer known dead was first judged dead in its current death, kept through probation
     /// and any later verdict until a reply revives it. A SURB minted through it after that is a probe the
@@ -1714,7 +1716,9 @@ mod tests {
     /// A relayer judged dead long enough ago for the verdict to be confirmed (see `VERDICT_CONFIRMATION`),
     /// the way most tests here want it: the verdict itself is not what they test.
     fn judge_dead(health: &RelayerHealth, relayer: OffchainPublicKey) {
-        health.dead.insert(relayer);
+        // `mark_dead` and then `confirm_verdicts`: reached now, so that the SURBs a test minted before are stock
+        // and no news about it, and old enough to be confirmed.
+        health.mark_dead(relayer);
         health.dead_since.insert(
             relayer,
             Instant::now()
@@ -2051,7 +2055,7 @@ mod tests {
     /// dead, with a reply home through `shared` after they fell due or without one, and the three.
     fn judged_behind_a_shared_relayer(
         reply_through_shared: bool,
-    ) -> anyhow::Result<(Vec<OffchainPublicKey>, [OffchainPublicKey; 3])> {
+    ) -> anyhow::Result<(Vec<OffchainPublicKey>, [OffchainPublicKey; 4], RelayerHealth)> {
         let [shared, first, second, healthy] = [(); 4].map(|_| key());
         let [a1, a2, a3, b1, b2, b3] = [(); 6].map(|_| key());
         let legs: [&[OffchainPublicKey]; 6] = [
@@ -2070,14 +2074,18 @@ mod tests {
             health.note_home(&leg(&[shared, healthy]), Instant::now());
         }
         health.record_reply();
-        Ok((sorted(judged_dead(&health.refresh(4))), [shared, first, second]))
+        Ok((
+            sorted(judged_dead(&health.refresh(4))),
+            [shared, first, second, healthy],
+            health,
+        ))
     }
 
     /// A reply home through the shared relayer after the replies fell due answers its races, so it is
     /// no suspect, and both dead ones are judged.
     #[test]
     fn a_relayer_shared_by_two_dead_ones_should_be_cleared_by_a_reply_through_it() -> anyhow::Result<()> {
-        let (judged, [_, first, second]) = judged_behind_a_shared_relayer(true)?;
+        let (judged, [_, first, second, _], _) = judged_behind_a_shared_relayer(true)?;
         assert_eq!(sorted(vec![first, second]), judged);
         Ok(())
     }
@@ -2089,8 +2097,39 @@ mod tests {
     /// nothing.
     #[test]
     fn a_relayer_shared_by_two_dead_ones_is_judged_in_their_place_as_a_known_limitation() -> anyhow::Result<()> {
-        let (judged, [shared, ..]) = judged_behind_a_shared_relayer(false)?;
+        let (judged, [shared, ..], _) = judged_behind_a_shared_relayer(false)?;
         assert_eq!(vec![shared], judged);
+        Ok(())
+    }
+
+    /// What that limitation costs once the verdict on the live relayer is confirmed: a reply over one of its
+    /// healthy legs on a SURB minted before the verdict no longer clears it, as it does inside
+    /// `VERDICT_CONFIRMATION`; a reply on a SURB minted since does. Until one comes, it waits for its overdue races
+    /// to expire like any relayer judged dead (see `RelayerHealth::is_fresh_for`).
+    #[rstest::rstest]
+    #[case::before_confirmation(false)]
+    #[case::once_confirmed(true)]
+    fn a_relayer_judged_in_place_of_dead_ones_should_be_cleared_by_replies_as_its_verdict_allows(
+        #[case] confirmed: bool,
+    ) -> anyhow::Result<()> {
+        let (judged, [shared, _, _, healthy], health) = judged_behind_a_shared_relayer(false)?;
+        assert_eq!(vec![shared], judged);
+        if confirmed {
+            confirm_verdicts(&health);
+        }
+        let older = ago(Duration::from_secs(1))?;
+        health.note_home(&leg(&[shared, healthy]), older);
+        health.revive_by_reply(&leg(&[shared, healthy]), older);
+        assert_eq!(
+            !confirmed,
+            !health.is_known_dead(&shared),
+            "a reply on a SURB older than the verdict clears it only before the verdict is confirmed"
+        );
+        health.revive_by_reply(&leg(&[shared, healthy]), Instant::now());
+        assert!(
+            !health.is_known_dead(&shared),
+            "a reply on a SURB minted since clears it"
+        );
         Ok(())
     }
 
@@ -2446,8 +2485,9 @@ mod tests {
             "revived and past the cooldown, the mark is dropped"
         );
 
-        judge_dead(&health, dead);
+        // Stock minted before the verdict, as a bump needs.
         registry.pending.insert(surb_id(4), pending_to(&[dead], None, 0));
+        judge_dead(&health, dead);
         assert_eq!(
             vec![*SESSION],
             registry.write_off_dead(),
@@ -2933,8 +2973,9 @@ mod tests {
         // A session of the same pseudonym that starts afresh is not held back by the old one's cooldown.
         registry.relayer_health.dead.remove(&dead);
         registry.write_off_dead();
-        judge_dead(&registry.relayer_health, dead);
+        // Stock minted before the verdict, as a bump needs.
         registry.pending.insert(surb_id(3), pending_to(&[dead], None, 0));
+        judge_dead(&registry.relayer_health, dead);
         assert_eq!(vec![*SESSION], registry.write_off_dead());
     }
 
@@ -3908,8 +3949,10 @@ mod tests {
 
     /// A stalling relayer goes on delivering the replies its verdict judged overdue, late. Once the
     /// verdict is acted on they are what it was about, not proof that it ended: a reply on a SURB minted
-    /// before the verdict neither revives the relayer nor answers its overdue races, whether the SURB was
-    /// still pending or written off already. A reply on a SURB minted after the verdict revives it.
+    /// before the verdict neither revives the relayer nor counts as it coming home, whether the SURB was
+    /// still pending or written off already. One that settles a race, which only a still-pending SURB can,
+    /// still answers the relayer's overdue races through that race (hoprnet#8679). A reply on a SURB minted
+    /// after the verdict revives it.
     #[rstest::rstest]
     #[case::still_pending(false)]
     #[case::written_off(true)]
@@ -3920,7 +3963,9 @@ mod tests {
         let recorder = recorder(graph);
         let registry = &recorder.registry;
         let health = registry.relayer_health();
-        let stalled = key();
+        let [stalled, reference] = [(); 2].map(|_| key());
+        // The bar the stalled relayer borrows, so that its overdue replies keep it a black hole.
+        settled_since(&health, reference, ago(Duration::from_secs(10))?, jitter(0));
         open_since(&health, stalled, MIN_RACES as u8, ago(Duration::from_secs(2))?);
         let mut late = pending_to(&[stalled], None, 0);
         late.minted_at = ago(Duration::from_secs(2))?;
@@ -3944,6 +3989,12 @@ mod tests {
             None,
             health.relayers.get(&stalled).and_then(|history| history.last_home),
             "nor does it answer the races the verdict was about"
+        );
+        health.record_reply();
+        health.refresh(4);
+        assert!(
+            health.is_dead(&stalled),
+            "so the verdict still stands at the next flush"
         );
 
         registry.pending.insert(surb_id(2), pending_to(&[stalled], None, 0));
