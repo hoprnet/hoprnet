@@ -4535,6 +4535,7 @@ dependencies = [
  "hopr-utilities",
  "hopr-utils-tracing",
  "humantime-serde",
+ "indexmap 2.14.2",
  "insta",
  "lazy_static",
  "libp2p",

@@ -15,7 +15,7 @@ pub use replay_filter::{
 };
 pub use surb_store::{
     DEFAULT_PENDING_SURB_MAX_BYTES, MAXIMUM_PENDING_SURB_MAX_BYTES, MINIMUM_PENDING_SURB_MAX_BYTES,
-    MINIMUM_SURB_LIFETIME, MemorySurbStore, PENDING_SURB_RECORD_BYTES, SurbPopOrder, SurbStoreConfig,
+    MINIMUM_SURB_LIFETIME, MemorySurbStore, SurbPopOrder, SurbStoreConfig,
 };
 pub use ticket_processing::{HoprUnacknowledgedTicketProcessor, HoprUnacknowledgedTicketProcessorConfig};
 pub use traits::*;
