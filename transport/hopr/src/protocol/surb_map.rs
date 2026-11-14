@@ -518,7 +518,9 @@ mod tests {
     /// test of that guarantee, with a short horizon.
     #[test]
     fn an_update_should_restart_the_expiry_of_the_record() {
-        const HORIZON: Duration = Duration::from_millis(200);
+        // Long enough that each check has 400 ms of slack on either side, so a loaded machine that
+        // stalls the test between a sleep and a check does not fail it.
+        const HORIZON: Duration = Duration::from_secs(1);
         let map = RandomEvictionMap::<u32>::with_seed(16, SEED);
         map.insert(id(1), 1);
         std::thread::sleep(HORIZON * 6 / 10);
