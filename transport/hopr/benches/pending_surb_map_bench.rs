@@ -142,19 +142,25 @@ fn insert_at_capacity(c: &mut Criterion) {
 
 /// Runs `work(thread index)` on `THREADS` threads released together, and times from the release to the
 /// last one finishing: spawning and joining are outside the clock.
+///
+/// The clock starts once every worker is parked at the start barrier (`ready`) and about to be released, so
+/// that workers that run as soon as they are released cannot do work before it is read.
 fn timed_threads(work: impl Fn(u64) + Sync) -> Duration {
-    let (start, end) = (Barrier::new(THREADS as usize + 1), Barrier::new(THREADS as usize + 1));
+    let parties = THREADS as usize + 1;
+    let (ready, start, end) = (Barrier::new(parties), Barrier::new(parties), Barrier::new(parties));
     thread::scope(|scope| {
         for t in 0..THREADS {
-            let (start, end, work) = (&start, &end, &work);
+            let (ready, start, end, work) = (&ready, &start, &end, &work);
             scope.spawn(move || {
+                ready.wait();
                 start.wait();
                 work(t);
                 end.wait();
             });
         }
-        start.wait();
+        ready.wait();
         let began = Instant::now();
+        start.wait();
         end.wait();
         began.elapsed()
     })

@@ -111,6 +111,11 @@ const PENDING_SURB_TTL: Duration = Duration::from_secs(60);
 /// horizon is enforced by [`SurbRoundTripRegistry::expire_step`], which the flush runs every tick.
 const PENDING_SURB_HORIZON: Duration = Duration::from_secs(15 * 60);
 const _: () = assert!(PENDING_SURB_HORIZON.as_secs() >= 10 * PENDING_SURB_TTL.as_secs());
+// Expiry can never orphan a live race. Every race is opened by updating the record it waits on, and an update
+// restarts that record's horizon (`RandomEvictionMap::update`), so the record outlives the race by about
+// `PENDING_SURB_HORIZON - PENDING_SURB_TTL`, whatever its age at the time: the assertion above is what makes
+// that margin large. A leg in `written_off_legs` is inserted at write-off time, after the race opened, so it
+// has a fresh horizon too.
 
 /// How long a SURB written off through a relayer known dead keeps counting as held by the
 /// counterparty, and therefore as invalid.

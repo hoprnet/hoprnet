@@ -78,11 +78,11 @@ const SHARD_MULTIPLIER: u64 = 0x9E37_79B9_7F4A_7C15;
 const HASH_MULTIPLIER: u64 = 0x517C_C1B7_2722_0A95;
 const RNG_MULTIPLIER: u64 = 0x2545_F491_4F6C_DD1D;
 
-/// A stored record: the value and when it was inserted, for expiry.
+/// A stored record: the value and when it was last written (inserted or updated), for expiry.
 #[derive(Debug, Clone, Copy)]
 struct Slot<V> {
     value: V,
-    inserted: Instant,
+    written: Instant,
 }
 
 /// The layout of one entry of the [`IndexMap`] (hash, key, value), whose own type is private, so that
@@ -255,7 +255,7 @@ impl<V> RandomEvictionMap<V> {
     pub fn insert(&self, id: HoprSurbId, value: V) -> Option<(HoprSurbId, V)> {
         let slot = Slot {
             value,
-            inserted: Instant::now(),
+            written: Instant::now(),
         };
         let mut shard = self.shard_of(&id).lock();
         let full = shard.entries.len() >= self.shard_capacity;
@@ -295,12 +295,16 @@ impl<V> RandomEvictionMap<V> {
     ///
     /// The change happens under the shard's lock and never inserts, so a record that a concurrent
     /// [`remove`](Self::remove) took is never brought back by it.
+    ///
+    /// An update counts as a write: the record's expiry runs from it, as it did when the update was a
+    /// re-insert. The registry opens every reply race through such an update, so after it the record
+    /// lives a further full horizon, far past the race's own lifetime, and expiry can never drop a
+    /// record while a race that only its reply can close is still open.
     pub fn update<R>(&self, id: &HoprSurbId, change: impl FnOnce(&mut V) -> R) -> Option<R> {
-        self.shard_of(id)
-            .lock()
-            .entries
-            .get_mut(id)
-            .map(|slot| change(&mut slot.value))
+        self.shard_of(id).lock().entries.get_mut(id).map(|slot| {
+            slot.written = Instant::now();
+            change(&mut slot.value)
+        })
     }
 
     /// Whether there is a record under `id`.
@@ -334,7 +338,7 @@ impl<V> RandomEvictionMap<V> {
         }
     }
 
-    /// Drops the records inserted longer than `horizon` ago from the next `1 / EXPIRY_SWEEP_STEPS` of
+    /// Drops the records last written longer than `horizon` ago from the next `1 / EXPIRY_SWEEP_STEPS` of
     /// the shards (at least one), so that every shard is swept once per that many calls, and returns
     /// how many it dropped.
     ///
@@ -347,7 +351,7 @@ impl<V> RandomEvictionMap<V> {
         for offset in 0..per_step {
             let mut shard = self.shards[(start + offset) % self.shards.len()].lock();
             let before = shard.entries.len();
-            shard.entries.retain(|_, slot| slot.inserted.elapsed() <= horizon);
+            shard.entries.retain(|_, slot| slot.written.elapsed() <= horizon);
             expired += before - shard.entries.len();
         }
         expired
@@ -505,6 +509,26 @@ mod tests {
         assert!(!map.contains_key(&id(1)) && !map.contains_key(&id(2)));
         assert!(map.contains_key(&id(3)), "a younger record stays");
         assert_eq!(0, map.expire_step(HORIZON));
+    }
+
+    /// An update restarts the record's expiry. The registry opens a reply race by updating the partner's
+    /// record, which may be nearly a horizon old: expiring it by its mint time would drop it while the
+    /// race it just opened is live, and its reply could then settle nothing. The registry's horizon is
+    /// the const `PENDING_SURB_HORIZON` of 15 minutes, too long for a test of its own, so this is the
+    /// test of that guarantee, with a short horizon.
+    #[test]
+    fn an_update_should_restart_the_expiry_of_the_record() {
+        const HORIZON: Duration = Duration::from_millis(200);
+        let map = RandomEvictionMap::<u32>::with_seed(16, SEED);
+        map.insert(id(1), 1);
+        std::thread::sleep(HORIZON * 6 / 10);
+        assert_eq!(Some(()), map.update(&id(1), |value| *value += 1));
+        // The insert is now past the horizon, the update is not.
+        std::thread::sleep(HORIZON * 6 / 10);
+        assert_eq!(0, map.expire_step(HORIZON), "expiry counts from the update");
+        assert_eq!(Some(2), map.get(&id(1)));
+        std::thread::sleep(HORIZON * 6 / 10);
+        assert_eq!(1, map.expire_step(HORIZON), "and it expires a horizon after the update");
     }
 
     #[test]
