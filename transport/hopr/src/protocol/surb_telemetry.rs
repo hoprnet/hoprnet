@@ -4549,7 +4549,7 @@ mod tests {
     /// race evidence and, having no record left at a verdict, was never advanced. Random eviction is
     /// memoryless: a record survives its wait with probability falling exponentially with the evicting
     /// mints in it, so a longer wait loses more but no Session drops to zero. Sessions that wait alike
-    /// lose alike, about 18 % at 1.05x and 80 % at 2x; unequal waits lose unequally, as the simulation
+    /// lose alike, about 9 % at 1.05x and 80 % at 2x; unequal waits lose unequally, as the simulation
     /// below shows (0.94 busy against 0.83 quiet at 1.05x, 0.32 against 0.03 at 2x).
     ///
     /// Shaped like the real thing in steady state: one SURB is minted per tick, a busy Session getting

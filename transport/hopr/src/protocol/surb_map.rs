@@ -16,7 +16,7 @@
 //! the more it loses, smoothly (exponentially), and no Session drops to exactly zero, as one does
 //! under eviction by age. When every Session waits alike, with `ρ` the outstanding SURBs divided by
 //! the capacity, the share `h` of replies that still find their record solves `h = e^(-(1 - h) ρ)`:
-//! about 82 % at `ρ = 1.05` and about 20 % at `ρ = 2`. Sessions whose waits differ lose unequally: in
+//! about 91 % at `ρ = 1.05` and about 20 % at `ρ = 2`. Sessions whose waits differ lose unequally: in
 //! the simulation of `under_overload_no_session_should_lose_all_its_replies`, a Session waiting three
 //! times as long as its busy neighbour matches 83 % of its replies against the neighbour's 94 % at
 //! `ρ = 1.05`, and 3 % against 32 % at `ρ = 2`. The newest record is always admitted: a full map
@@ -455,7 +455,7 @@ mod tests {
     /// The race this map exists to close: a record consumed by one thread while another updates it
     /// must stay consumed, which a read-compute-insert update cannot promise.
     #[test]
-    fn a_record_removed_while_it_is_updated_should_never_come_back() {
+    fn a_record_removed_while_it_is_updated_should_never_come_back() -> anyhow::Result<()> {
         const ROUNDS: usize = 20_000;
         let map = Arc::new(RandomEvictionMap::<u32>::with_seed(16, SEED));
         let barrier = Arc::new(Barrier::new(3));
@@ -487,8 +487,9 @@ mod tests {
             barrier.wait();
             assert!(!map.contains_key(&key), "round {round}: the removed record came back");
         }
-        remover.join().expect("remover panicked");
-        updater.join().expect("updater panicked");
+        remover.join().map_err(|_| anyhow::anyhow!("remover thread panicked"))?;
+        updater.join().map_err(|_| anyhow::anyhow!("updater thread panicked"))?;
+        Ok(())
     }
 
     #[test]
