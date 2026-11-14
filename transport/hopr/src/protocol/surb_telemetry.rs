@@ -529,9 +529,11 @@ impl SurbRoundTripRegistry {
     /// A verdict is acted on only once it has held for `VERDICT_CONFIRMATION`: a relayer judged dead in
     /// this flush is written off and bumped at the next one, if it is still dead then. The stock is a
     /// snapshot and a reply may revive its relayer while it is being worked through, so each SURB is
-    /// checked against the verdict again just before it is acted on: left out, a revived relayer's
-    /// probe would be taken for stock, because the check below that tells them apart reads the death
-    /// the revival ended, and an unreached session's whole generation would be wiped for it.
+    /// checked against the verdict and the relayer's death again just before it is acted on, and the
+    /// death that check reads is the one that tells a probe from stock below. A death found missing
+    /// cancels the write-off like a lapsed verdict, even with the verdict still standing: that is a
+    /// revival caught half way. Taken for no death at all instead, it would make a revived relayer's
+    /// probe stock, and an unreached session's whole generation would be wiped for it.
     ///
     /// Only stock reports a session: a SURB minted through the relayer before it was judged dead, which
     /// the counterparty may hold. One minted after is a probe the planner's exploration sent through a
@@ -552,10 +554,15 @@ impl SurbRoundTripRegistry {
             minted_at,
         } in stock
         {
-            if !health.is_confirmed_dead(&dead) {
-                // Revived, or its verdict lapsed, since the snapshot was taken: nothing to write off.
-                continue;
-            }
+            // The death is read once, here, and a missing one cancels the write-off as a lapsed verdict
+            // does: a reply that revives the relayer takes out both, one after the other, and a death read
+            // later could come back empty for a relayer the verdict was found standing for, which would make
+            // a probe look like stock.
+            let since = match health.known_dead_since(&dead) {
+                Some(since) if health.is_confirmed_dead(&dead) => since,
+                // Revived since the snapshot was taken, or being revived now: nothing to write off.
+                _ => continue,
+            };
             // Remembered before it leaves `pending`, so that a reply decoded in between finds it in
             // one of the two.
             self.remember_written_off(id, return_relayers, minted_at);
@@ -571,7 +578,7 @@ impl SurbRoundTripRegistry {
             drop(session);
             // A probe, not stock: see the docs above. Judged per SURB, and before the mark, so that a
             // probe written off first leaves the stock SURBs of the same pass free to report the pair.
-            if health.known_dead_since(&dead).is_some_and(|since| minted_at >= since) {
+            if minted_at >= since {
                 tracing::trace!(
                     %pseudonym,
                     relayer = %dead,
@@ -4396,6 +4403,8 @@ mod tests {
         let registry = SurbRoundTripRegistry::default();
         let health = registry.relayer_health();
         let dead = key();
+        // On probation, with the death it lapsed from: a relayer is known dead only with one.
+        health.known_dead_since.insert(dead, Instant::now());
         health.probation.insert(dead);
         // Bumped already in this death, so the write-off is all that happens.
         registry.bumped.insert((*SESSION, dead), Instant::now());
@@ -5075,6 +5084,51 @@ mod tests {
             assert!(!registry.pending.contains_key(&surb_id(1)));
         }
         Ok(())
+    }
+
+    /// A reply that revives a relayer takes its verdict and its death out one after the other, so the
+    /// write-off can find the verdict still standing and the death already gone: the revival, caught half
+    /// way. It cancels the write-off as a finished revival does. Taken for no death at all instead, it would
+    /// make a probe through the relayer stock and wipe the whole generation of a Session the dead relayer
+    /// never reached.
+    #[rstest::rstest]
+    #[case::confirmed_dead(false)]
+    #[case::on_probation(true)]
+    fn a_relayer_caught_half_way_through_its_revival_should_reach_no_session(#[case] on_probation: bool) {
+        let registry = SurbRoundTripRegistry::default();
+        let health = registry.relayer_health();
+        let unreached = HoprPseudonym::random();
+        let dead = key();
+        judge_dead(&health, dead);
+        if on_probation {
+            // The verdict lapsed, as `refresh` lapses a confirmed one.
+            health.dead.remove(&dead);
+            health.dead_since.remove(&dead);
+            health.confirmed.remove(&dead);
+            health.probation.insert(dead);
+        }
+        // A probe: minted through the relayer after it was judged dead.
+        registry.pending.insert(
+            surb_id(1),
+            PendingSurb {
+                pseudonym: unreached,
+                ..pending_to(&[dead], None, 0)
+            },
+        );
+        let stock = registry.dead_stock();
+        assert_eq!(1, stock.len(), "found while the relayer is dead");
+
+        // Where the write-off may see a reply's revival: the death is gone, the verdict not yet.
+        health.known_dead_since.remove(&dead);
+        assert!(health.is_confirmed_dead(&dead));
+        assert_eq!(
+            Vec::<HoprPseudonym>::new(),
+            registry.write_off(stock),
+            "no session is reached"
+        );
+        assert!(registry.pending.contains_key(&surb_id(1)), "the probe stays pending");
+        assert!(registry.invalid().is_empty(), "and nothing is written off");
+        assert!(!registry.bumped.contains_key(&(unreached, dead)));
     }
 
     /// A SURB whose reply came home between the walk and the write-off is settled, not written off: the
