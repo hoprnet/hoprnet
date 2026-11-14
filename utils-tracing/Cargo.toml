@@ -1,0 +1,29 @@
+[package]
+name = "hopr-utils-tracing"
+description = "Tracing context propagation across bounded asynchronous queues"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["tracing", "utilities", "asynchronous"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["asynchronous", "development-tools::debugging"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
+
+[features]
+default = ["tracing-context"]
+tracing-context = []
+
+[dependencies]
+crossfire = { workspace = true }
+futures = { workspace = true }
+hopr-utils = { workspace = true, features = ["network-types"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }

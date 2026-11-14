@@ -37,7 +37,7 @@ use hopr_protocol_start::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::AbortableList;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
@@ -57,7 +57,7 @@ use crate::{
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
-        telemetry::{PixAdmissionRejection, PixGateBlockEpisode, record_gate_closed},
+        telemetry::{PixAdmissionRejection, PixGateBlockEpisode, SurbReserveHoldEpisode, record_gate_closed},
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
@@ -438,10 +438,14 @@ fn current_keep_alive_surb_reserve(balancer: &BalancerStateValues) -> u64 {
 /// The Exit's keep-alives do not come through here: its keep-alive stream sends on the message sender
 /// directly (see [`SessionManager::spawn_exit_keep_alive`]), and the PIX fill packets are bounded by
 /// their own `min_surb_reserve`. That is the point of the reserve: they are what it is held for.
+///
+/// `pix` says whether the Session runs a PIX egress gate, and only labels the hold episode: the
+/// hold itself is the same either way.
 fn hold_for_surb_reserve(
     session_id: SessionId,
     estimator: &AtomicSurbFlowEstimator,
     balancer: &Arc<BalancerStateValues>,
+    pix: bool,
 ) -> Option<futures::future::BoxFuture<'static, ()>> {
     if !balancer.counterparty_refills() {
         return None;
@@ -455,7 +459,22 @@ fn hold_for_surb_reserve(
 
     debug!(%session_id, stock, reserve, "holding data back: the SURB stock is down to its keep-alive reserve");
     let (estimator, balancer) = (estimator.clone(), balancer.clone());
+
+    // The episode begins here, before the future's first poll, and is carried into it by value so
+    // that its `Drop` closes it however the hold ends: the stock rises and the future resolves, the
+    // Session is torn down and the future is dropped mid-poll, or the caller drops it before ever
+    // polling it. Created only on this path, so a packet above the reserve records nothing.
+    //
+    // This clock is the authoritative one, and it deliberately starts earlier than the debug log's
+    // `held_for` below: the metric measures the time the Exit held data, which begins when the
+    // future is created, whereas the log measures the polling loop's own run and so misses any
+    // interval between creation and the first poll. That is the issue's requirement, not a bug —
+    // do not "fix" either clock to match the other.
+    let episode = SurbReserveHoldEpisode::begin(pix);
     Some(Box::pin(async move {
+        // Never read: its `Drop` at the end of this future — on the release path below, on
+        // cancellation, or when the future is dropped unpolled — is what records the duration.
+        let _episode = episode;
         let held_since = Instant::now();
         while estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer) {
             hopr_utils::runtime::prelude::sleep(SURB_RESERVE_POLL).await;
@@ -504,7 +523,7 @@ where
             count_return_packet_surb(estimator, data)
         };
         let held = keeps_alive
-            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer))
+            .then(|| hold_for_surb_reserve(session_id, &estimator, &balancer, gate.is_some()))
             .flatten();
         match held {
             None => acquire_egress_permit(gate.clone(), routing, book_consumed(&estimator, data)),
@@ -3119,7 +3138,13 @@ impl SurbsStored {
 // see `refuse_pix_over_direct_return_path`. What the packet did to the SURB store travels too, taken
 // before the conversion into a `HoprStartProtocol` consumes the data it is counted from: the part
 // dispatch could not book itself, which is all of it only for an opening that creates its Session.
-type StartMessage = (HoprPseudonym, HoprStartProtocol, IncomingPacketInfo, SurbsStored);
+type StartMessage = (
+    HoprPseudonym,
+    HoprStartProtocol,
+    IncomingPacketInfo,
+    SurbsStored,
+    tracing::Span,
+);
 type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<StartMessage>>>>;
 
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
@@ -4560,56 +4585,61 @@ where
         );
         let ah_start_session = hopr_utils::spawn_as_abortable_named!(
             "session_start_session_processor",
-            start_session_rx.into_stream().for_each_concurrent(
-                Some(MAX_CONCURRENT_START_SESSIONS),
-                move |(pseudonym, protocol_msg, packet_info, stored)| {
-                    let myself = myself.clone();
-                    let session_diag = session_diag.clone();
-                    session_diag.wrap(|| {
+            start_session_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(MAX_CONCURRENT_START_SESSIONS),
+                    move |(pseudonym, protocol_msg, packet_info, stored, span)| {
                         let myself = myself.clone();
-                        async move {
-                            // Routing puts only `StartSession` on this lane.
-                            let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
-                                unreachable!("only StartSession is routed to the session lane")
-                            };
-                            let result = match myself
-                                .refuse_pix_over_direct_return_path(
-                                    pseudonym,
-                                    &session_req,
-                                    packet_info.min_return_path_hops,
-                                )
-                                .await
-                            {
-                                Ok(false) => {
-                                    let opened =
-                                        myself.handle_incoming_session_initiation(pseudonym, session_req).await;
-                                    // The opening's SURBs are in the pseudonym's ring already, promoted
-                                    // into the admitted class with it, but arrived before the Session
-                                    // existed, so dispatch could not book them. Without them the Exit's
-                                    // estimate starts, and stays, below what the ring holds. What the
-                                    // ring lost as they arrived is not this Session's to book: its
-                                    // estimate never counted that stock, which a newer generation
-                                    // superseded from an earlier Session under the pseudonym, and an
-                                    // opening's few SURBs do not overflow a ring on their own.
-                                    if opened.is_ok()
-                                        && let Some(slot) = myself.sessions.get(&pseudonym)
+                        let session_diag = session_diag.clone();
+                        session_diag
+                            .wrap(|| {
+                                let myself = myself.clone();
+                                async move {
+                                    // Routing puts only `StartSession` on this lane.
+                                    let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
+                                        unreachable!("only StartSession is routed to the session lane")
+                                    };
+                                    let result = match myself
+                                        .refuse_pix_over_direct_return_path(
+                                            pseudonym,
+                                            &session_req,
+                                            packet_info.min_return_path_hops,
+                                        )
+                                        .await
                                     {
-                                        let _ = book_start_message_surbs(
-                                            &slot,
-                                            &pseudonym,
-                                            SurbsStored { evicted: 0, ..stored },
-                                        );
-                                    }
-                                    opened
-                                }
-                                refused => refused.map(|_| ()),
-                            };
+                                        Ok(false) => {
+                                            let opened =
+                                                myself.handle_incoming_session_initiation(pseudonym, session_req).await;
+                                            // The opening's SURBs are in the pseudonym's ring already, promoted
+                                            // into the admitted class with it, but arrived before the Session
+                                            // existed, so dispatch could not book them. Without them the Exit's
+                                            // estimate starts, and stays, below what the ring holds. What the
+                                            // ring lost as they arrived is not this Session's to book: its
+                                            // estimate never counted that stock, which a newer generation
+                                            // superseded from an earlier Session under the pseudonym, and an
+                                            // opening's few SURBs do not overflow a ring on their own.
+                                            if opened.is_ok()
+                                                && let Some(slot) = myself.sessions.get(&pseudonym)
+                                            {
+                                                let _ = book_start_message_surbs(
+                                                    &slot,
+                                                    &pseudonym,
+                                                    SurbsStored { evicted: 0, ..stored },
+                                                );
+                                            }
+                                            opened
+                                        }
+                                        refused => refused.map(|_| ()),
+                                    };
 
-                            report_start_result(result);
-                        }
-                    })
-                }
-            )
+                                    report_start_result(result);
+                                }
+                            })
+                            .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
+                    }
+                )
+                .with_current_subscriber()
         );
 
         let myself = self.clone();
@@ -4621,39 +4651,46 @@ where
         );
         let ah_start_control = hopr_utils::spawn_as_abortable_named!(
             "session_start_control_processor",
-            start_control_rx.into_stream().for_each_concurrent(
-                Some(self.cfg.maximum_sessions + 10),
-                move |(pseudonym, protocol_msg, _packet_info, _stored)| {
-                    let myself = myself.clone();
-                    let control_diag = control_diag.clone();
-                    control_diag.wrap(|| {
+            start_control_rx
+                .into_stream()
+                .for_each_concurrent(
+                    Some(self.cfg.maximum_sessions + 10),
+                    move |(pseudonym, protocol_msg, _packet_info, _stored, span)| {
                         let myself = myself.clone();
-                        async move {
-                            let result = match protocol_msg {
-                                HoprStartProtocol::SessionEstablished(est) => {
-                                    myself.handle_session_established(est).await
-                                }
-                                HoprStartProtocol::SessionError(error_type) => {
-                                    myself.handle_session_error(pseudonym, error_type).await
-                                }
-                                HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
-                                HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                    myself.handle_ssa_commit(pseudonym, client_commit_msg).await
-                                }
-                                HoprStartProtocol::SsaRequest(server_commit_msg) => {
-                                    myself.handle_ssa_request(pseudonym, server_commit_msg).await
-                                }
-                                // Routing puts `StartSession` on the session lane.
-                                HoprStartProtocol::StartSession(_) => {
-                                    unreachable!("StartSession is never routed to the control lane")
-                                }
-                            };
+                        let control_diag = control_diag.clone();
+                        control_diag
+                            .wrap(|| {
+                                let myself = myself.clone();
+                                async move {
+                                    let result = match protocol_msg {
+                                        HoprStartProtocol::SessionEstablished(est) => {
+                                            myself.handle_session_established(est).await
+                                        }
+                                        HoprStartProtocol::SessionError(error_type) => {
+                                            myself.handle_session_error(pseudonym, error_type).await
+                                        }
+                                        HoprStartProtocol::KeepAlive(msg) => {
+                                            myself.handle_keep_alive(pseudonym, msg).await
+                                        }
+                                        HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                            myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                                        }
+                                        HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                                            myself.handle_ssa_request(pseudonym, server_commit_msg).await
+                                        }
+                                        // Routing puts `StartSession` on the session lane.
+                                        HoprStartProtocol::StartSession(_) => {
+                                            unreachable!("StartSession is never routed to the control lane")
+                                        }
+                                    };
 
-                            report_start_result(result);
-                        }
-                    })
-                }
-            )
+                                    report_start_result(result);
+                                }
+                            })
+                            .instrument(tracing::debug_span!(parent: &span, "session.start_protocol"))
+                    }
+                )
+                .with_current_subscriber()
         );
 
         Ok(vec![
@@ -6738,7 +6775,7 @@ where
             };
 
             if let Some(lane) = lane {
-                match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked)) {
+                match lane.try_send((pseudonym, msg, in_data.packet_info, unbooked, tracing::Span::current())) {
                     Ok(()) => {}
                     // Backpressure, not a fault: rate-limited so a sustained flood cannot become
                     // per-packet log spam. Control drops keep their own counter, so a StartSession
@@ -6852,6 +6889,32 @@ where
         METRIC_DISPATCHED_MSGS.increment_by(&["unrelated"], 1);
 
         Ok(DispatchResult::Unrelated(in_data))
+    }
+
+    /// Installs a bounded Start queue without workers and returns a drain operation for benchmarks.
+    ///
+    /// Keeping dequeue work outside the timed section makes dispatch measurements independent of
+    /// worker scheduling. Returns `AlreadyStarted` if a processing queue is already installed.
+    #[cfg(any(feature = "benchmark", test))]
+    pub fn benchmark_start_queue(&self, capacity: usize) -> errors::Result<impl FnMut() -> usize + use<S>> {
+        let (session_tx, session_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        let (control_tx, control_rx) = crossfire::mpsc::bounded_blocking_async(capacity);
+        self.start_session_tx
+            .set(session_tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        self.start_control_tx
+            .set(control_tx)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        Ok(move || {
+            let mut drained = 0;
+            while session_rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            while control_rx.try_recv().is_ok() {
+                drained += 1;
+            }
+            drained
+        })
     }
 
     /// Pre-populates the sessions cache with a session slot for benchmarking.
@@ -16773,6 +16836,223 @@ mod tests {
         )))
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn start_protocol_worker_should_preserve_session_ancestry_without_reentering_the_parent() -> anyhow::Result<()>
+    {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use test_log::tracing_subscriber::{
+            self as subscriber, filter::LevelFilter, layer::SubscriberExt, registry::LookupSpan,
+        };
+        use tracing::instrument::WithSubscriber;
+
+        struct WorkerEvents {
+            events: tokio::sync::mpsc::UnboundedSender<Vec<(&'static str, tracing::span::Id)>>,
+            session_enters: Arc<AtomicUsize>,
+        }
+
+        impl<S: tracing::Subscriber + for<'a> LookupSpan<'a>> subscriber::Layer<S> for WorkerEvents {
+            fn on_enter(&self, id: &tracing::span::Id, ctx: subscriber::layer::Context<'_, S>) {
+                if ctx.span(id).is_some_and(|span| span.name() == "session") {
+                    self.session_enters.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            fn on_event(&self, event: &tracing::Event<'_>, ctx: subscriber::layer::Context<'_, S>) {
+                if *event.metadata().level() != tracing::Level::ERROR {
+                    return;
+                }
+                let Some(scope) = ctx.event_scope(event) else {
+                    return;
+                };
+                let ancestry = scope
+                    .from_root()
+                    .map(|span| (span.name(), span.id()))
+                    .collect::<Vec<_>>();
+                // Capture the worker's result event after the individual handler has returned.
+                if ancestry
+                    .last()
+                    .is_some_and(|(name, _)| *name == "session.start_protocol")
+                {
+                    let _ = self.events.send(ancestry);
+                }
+            }
+        }
+
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel();
+        let session_enters = Arc::new(AtomicUsize::new(0));
+        let subscriber = subscriber::registry()
+            .with(WorkerEvents {
+                events: events_tx,
+                session_enters: session_enters.clone(),
+            })
+            .with(LevelFilter::DEBUG);
+        async {
+            let mgr: TestManager = SessionManager::new(Default::default());
+            let (sender, _outgoing) = futures::channel::mpsc::unbounded();
+            let handles = mgr.start(sender, futures::sink::drain(), None, None)?;
+            let mut expected_roots = Vec::new();
+            let mut session_receivers = Vec::new();
+            for _ in 0..2 {
+                let id = HoprPseudonym::random();
+                session_receivers.push(mgr.pre_populate_session_with_receiver(
+                    id,
+                    DestinationRouting::Forward {
+                        destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                        pseudonym: Some(id),
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: None,
+                    },
+                ));
+                let session = tracing::debug_span!("session", session_id = %id);
+                assert!(session.id().is_some(), "fixture needs an active session span");
+                // Without a PIX toolbox, the actual SSA handler returns UnsupportedMessage.
+                // Its worker then emits an error directly within session.start_protocol.
+                let packet = ssa_request_packet(id)?;
+                assert!(matches!(
+                    session.in_scope(|| mgr.dispatch_message(id, packet))?,
+                    DispatchResult::Processed
+                ));
+                expected_roots.push(session);
+            }
+            let received = timeout(Duration::from_secs(5), async {
+                let first = events_rx.recv().await.context("missing first worker event")?;
+                let second = events_rx.recv().await.context("missing second worker event")?;
+                anyhow::Ok([first, second])
+            })
+            .await;
+            for handle in handles {
+                handle.abort();
+            }
+            for ancestry in received.context("Start protocol worker did not process both messages")?? {
+                assert_eq!(
+                    ancestry.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+                    ["session", "session.start_protocol"]
+                );
+                let root = &ancestry.first().context("missing session root")?.1;
+                let index = expected_roots
+                    .iter()
+                    .position(|span| span.id().as_ref() == Some(root))
+                    .context("worker event must retain its own dispatch session")?;
+                expected_roots.remove(index);
+            }
+            assert!(expected_roots.is_empty());
+            assert_eq!(
+                session_enters.load(Ordering::Relaxed),
+                2,
+                "session roots should be entered only for dispatch, not again by the worker"
+            );
+            anyhow::Ok(())
+        }
+        .with_subscriber(subscriber)
+        .await
+    }
+
+    #[test]
+    /// Both Start lanes retain the dispatch session span when their queues are drained.
+    fn start_protocol_queue_should_retain_the_dispatch_context() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use test_log::tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+        tracing::subscriber::with_default(
+            test_log::tracing_subscriber::registry().with(LevelFilter::DEBUG),
+            || -> anyhow::Result<()> {
+                for opening in [false, true] {
+                    let mgr: TestManager = SessionManager::new(Default::default());
+                    let (tx, rx) = crossfire::mpsc::bounded_blocking_async(1);
+                    let lane = if opening {
+                        &mgr.start_session_tx
+                    } else {
+                        &mgr.start_control_tx
+                    };
+                    lane.set(tx)
+                        .map_err(|_| anyhow::anyhow!("installing test Start queue"))?;
+                    let id = HoprPseudonym::random();
+                    let _session_rx = mgr.pre_populate_session_with_receiver(
+                        id,
+                        DestinationRouting::Forward {
+                            destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                            pseudonym: Some(id),
+                            forward_options: RoutingOptions::Hops(1.try_into()?),
+                            return_options: None,
+                        },
+                    );
+                    let packet = if opening {
+                        start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                            challenge: StartChallenge::MAX,
+                            target: SessionTarget::UdpStream(hopr_utils::network_types::prelude::SealedHost::Plain(
+                                std::net::SocketAddr::from(([127, 0, 0, 1], 1234)).into(),
+                            )),
+                            capabilities: HoprSessionCapabilities::try_from(0u8)?,
+                            additional_data: 0,
+                        }))?
+                    } else {
+                        ssa_request_packet(id)?
+                    };
+                    let span = tracing::debug_span!("session", session_id = %id);
+                    let expected = span.id();
+                    {
+                        let _entered = span.enter();
+                        assert!(matches!(mgr.dispatch_message(id, packet)?, DispatchResult::Processed));
+                    }
+                    let (queued_id, _, _, _, queued_span) = rx.try_recv().context("receiving the Start message")?;
+                    assert_eq!(queued_id, id);
+                    assert_eq!(queued_span.id(), expected);
+                }
+                Ok(())
+            },
+        )
+    }
+
+    /// The benchmark queue uses real dispatch: independent bounded lanes, reusable drains and closed-queue errors.
+    #[test]
+    fn benchmark_start_queue_drains_both_lanes_and_preserves_backpressure() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+        let mut drain = mgr.benchmark_start_queue(1)?;
+        assert_eq!(drain(), 0);
+        assert!(
+            mgr.benchmark_start_queue(1).is_err(),
+            "queues can only be installed once"
+        );
+        let id = HoprPseudonym::random();
+        let _session_rx = mgr.pre_populate_session_with_receiver(
+            id,
+            DestinationRouting::Forward {
+                destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+                pseudonym: Some(id),
+                forward_options: RoutingOptions::Hops(1.try_into()?),
+                return_options: None,
+            },
+        );
+        let opening = || -> anyhow::Result<_> {
+            start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                challenge: StartChallenge::MAX,
+                target: SessionTarget::UdpStream(hopr_utils::network_types::prelude::SealedHost::Plain(
+                    std::net::SocketAddr::from(([127, 0, 0, 1], 1234)).into(),
+                )),
+                capabilities: HoprSessionCapabilities::try_from(0u8)?,
+                additional_data: 0,
+            }))
+        };
+        for _ in 0..2 {
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(mgr.dispatch_message(id, packet)?, DispatchResult::Processed));
+            }
+            for packet in [opening()?, ssa_request_packet(id)?] {
+                assert!(matches!(
+                    mgr.dispatch_message(id, packet)?,
+                    DispatchResult::Dropped(DropReason::StartQueueFull)
+                ));
+            }
+            assert_eq!(drain(), 2, "each lane contributes one message");
+            assert_eq!(drain(), 0, "draining must remove messages exactly once");
+        }
+        drop(drain);
+        assert!(mgr.dispatch_message(id, opening()?).is_err());
+        assert!(mgr.dispatch_message(id, ssa_request_packet(id)?).is_err());
+        Ok(())
+    }
+
     /// A flood of `SsaRequest`s for pseudonyms this node never issued must be rejected at dispatch.
     ///
     /// Before the admission filter, every one of these reached the shared Start-protocol worker
@@ -17031,7 +17311,7 @@ mod tests {
         let established_challenge = MIN_CHALLENGE;
         let error_challenge = MIN_CHALLENGE + 1;
         let unknown_challenge = MIN_CHALLENGE + 2;
-        let _receivers = [established_challenge, error_challenge]
+        let receivers = [established_challenge, error_challenge]
             .into_iter()
             .map(|challenge| {
                 let (tx, rx): (
@@ -17129,6 +17409,23 @@ mod tests {
             );
         }
 
+        // Admission alone does not prove the background control worker delivered either reply.
+        let established_reply = timeout(Duration::from_secs(2), receivers[0].recv())
+            .await
+            .context("establishment worker must deliver its reply")??;
+        assert!(matches!(
+            established_reply,
+            Ok(StartEstablished { orig_challenge, session_id })
+                if orig_challenge == established_challenge && session_id == replier
+        ));
+        let error_reply = timeout(Duration::from_secs(2), receivers[1].recv())
+            .await
+            .context("error worker must deliver its reply")??;
+        assert!(matches!(
+            error_reply,
+            Err(StartErrorType { identifier: ErrorIdentifier::Challenge(challenge), reason: StartErrorReason::Unknown })
+                if challenge == error_challenge
+        ));
         sender.close_channel();
         Ok(())
     }
@@ -25704,8 +26001,15 @@ mod tests {
     /// The Exit must not spend its last SURBs on data: they are what its keep-alives, level reports
     /// and distress signals go out on. At the reserve the sink holds the packet, and it counts it
     /// against the stock only when it goes on; once the stock is above the reserve again it goes.
+    ///
+    /// The hold is measured here too, on a Session with no PIX gate at all (`None`): the issue's
+    /// point that the metric covers rate-controlled Sessions without PIX, which is what makes it
+    /// distinct from `hopr_pix_gate_blocks_total`.
     #[tokio::test]
     async fn data_should_be_held_back_while_the_surb_stock_sits_at_the_keep_alive_reserve() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
         let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
         let estimator = AtomicSurbFlowEstimator::default();
         let balancer = balancer_with_target(3_200);
@@ -25735,6 +26039,16 @@ mod tests {
         );
         assert_eq!(0, estimator.estimate_surbs_consumed(), "a held packet consumes nothing");
         assert!(!sending.is_finished());
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "a Session without PIX still records its hold"
+        );
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the hold is open while the packet waits"
+        );
 
         // A level report or a refill brings one more SURB than the reserve.
         estimator.produced.fetch_add(1, Ordering::Relaxed);
@@ -25744,6 +26058,11 @@ mod tests {
             .context("the sink must have forwarded it")?;
         timeout(Duration::from_secs(5), sending).await???;
         assert_eq!(1, estimator.estimate_surbs_consumed());
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the release closes the one hold this packet opened"
+        );
         Ok(())
     }
 
@@ -25757,7 +26076,7 @@ mod tests {
         let session_id = HoprPseudonym::random();
         let balancer = balancer_with_target(3_200);
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_none(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_none(),
             "no hold, no allocation"
         );
 
@@ -25847,7 +26166,7 @@ mod tests {
         let balancer = balancer_with_target(3_200);
         let session_id = HoprPseudonym::random();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
             "with a keep-alive stream, a stock at the reserve would hold data"
         );
 
@@ -25911,7 +26230,7 @@ mod tests {
 
         balancer.note_counterparty_refills();
         assert!(
-            hold_for_surb_reserve(session_id, &estimator, &balancer).is_some(),
+            hold_for_surb_reserve(session_id, &estimator, &balancer, false).is_some(),
             "once the Entry refills, a stock at the reserve holds data again"
         );
         Ok(())
@@ -25955,6 +26274,355 @@ mod tests {
             .context("the packet must go once the lowered reserve is below the stock")?
             .context("the sink must have forwarded it")?;
         timeout(Duration::from_secs(5), sending).await???;
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // The keep-alive reserve hold episodes
+    // -----------------------------------------------------------------------
+
+    /// A packet above the reserve is never held, so it must leave no trace in the hold metrics —
+    /// counting it would report pressure where there is none.
+    #[tokio::test]
+    async fn a_packet_above_the_reserve_creates_no_hold_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let (tx, mut forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(33, Ordering::Relaxed);
+
+        let mut sink = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer,
+            None,
+            true,
+        ));
+        timeout(Duration::from_secs(5), sink.send(data_packet()?))
+            .await
+            .context("above the reserve the packet must not wait")??;
+        assert!(forwarded.try_recv().is_ok(), "forwarded");
+        assert_eq!(0, probe::get("surb_reserve_holds/episodes/false"), "nothing was held");
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and nothing was timed"
+        );
+        Ok(())
+    }
+
+    /// A PIX Session's hold is labelled `pix=true`, and a session with no gate `pix=false`: the label
+    /// comes from the egress gate the Session was built with, so an operator can tell a PIX Session's
+    /// hold from the non-PIX backpressure a rate-controlled Session relies on.
+    #[tokio::test]
+    async fn a_hold_is_labelled_by_whether_the_session_runs_pix() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        // The flag is all that distinguishes them here: the hold itself does not depend on the gate.
+        let pix = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, true)
+            .context("the stock is below the reserve")?;
+        let plain = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        drop((pix, plain));
+
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/true"),
+            "a Session with an egress gate is labelled `pix=true`"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/true"),
+            "and its duration lands on the same label"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "a Session without one is labelled `pix=false`"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and likewise for its duration"
+        );
+        Ok(())
+    }
+
+    /// The egress path takes the label from the gate it was given: a Session that carries one is
+    /// `pix=true`, the same Session without one is `pix=false`. This is the single site that derives
+    /// it, so a wrong derivation would mislabel every hold.
+    #[tokio::test]
+    async fn exit_data_egress_labels_the_hold_from_its_gate() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        // At the reserve, so the packet is held; one more SURB releases it.
+        estimator
+            .produced
+            .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
+
+        // An unfunded-but-admitting gate: the first packet is served from the predeposit budget.
+        let gate = ServiceGate::new(10, 10);
+        let (tx, _forwarded) = futures::channel::mpsc::unbounded::<EgressItem>();
+        let mut with_pix = Box::pin(exit_data_egress(
+            tx.sink_map_err(std::io::Error::other),
+            HoprPseudonym::random(),
+            estimator.clone(),
+            balancer.clone(),
+            Some(gate),
+            true,
+        ));
+        let item = data_packet()?;
+        let sending = tokio::spawn(async move { with_pix.send(item).await });
+        // Give the spawned send a turn so the hold episode is created before the stock rises.
+        tokio::time::sleep(SURB_RESERVE_POLL / 4).await;
+        // The hold is open: one episode on the `true` label, none on `false`.
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/true"),
+            "a Session with a gate must label its hold `pix=true`"
+        );
+        assert_eq!(0, probe::get("surb_reserve_holds/episodes/false"));
+
+        // Refill so the packet goes on and the spawn finishes.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), sending).await???;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/true"),
+            "and close it on the same label"
+        );
+        Ok(())
+    }
+
+    /// A packet held across many polling intervals is one episode, not one per poll: the counter
+    /// measures held packets, and the duration is recorded once when the hold ends.
+    #[tokio::test]
+    async fn a_held_packet_creates_one_hold_episode_and_one_duration() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator
+            .produced
+            .store(current_keep_alive_surb_reserve(&balancer), Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("a stock at the reserve must hold the packet")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "the hold is one episode"
+        );
+
+        // Several polls, well past the first interval.
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold must not resolve while the stock is at the reserve"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "still one episode, not one per poll"
+        );
+        assert_eq!(
+            0,
+            probe::get("surb_reserve_holds/observations/false"),
+            "an open hold is not timed yet"
+        );
+
+        // The Entry refills the stock, and the hold releases.
+        estimator.produced.fetch_add(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(5), &mut hold)
+            .await
+            .context("the hold must resolve once the stock is above the reserve")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "release is not a second episode"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "the release records the duration exactly once"
+        );
+        Ok(())
+    }
+
+    /// Dropping a hold that is still waiting — a Session torn down underneath it — closes and times
+    /// the episode exactly once.
+    #[tokio::test]
+    async fn dropping_a_pending_hold_records_one_duration() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        assert_eq!(1, probe::get("surb_reserve_holds/episodes/false"));
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold waits while nothing refills the stock"
+        );
+        assert_eq!(0, probe::get("surb_reserve_holds/observations/false"));
+
+        drop(hold);
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "dropping the pending hold must close its episode"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "and must not begin another"
+        );
+        Ok(())
+    }
+
+    /// A hold created and dropped before its first poll is still one episode: the guard is carried
+    /// by the future, so `Drop` sees it even though the polling loop never ran.
+    #[test]
+    fn a_hold_dropped_before_its_first_poll_still_closes_its_episode() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "the episode begins when the future is created"
+        );
+        drop(hold);
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "a future dropped unpolled still records exactly one duration"
+        );
+        Ok(())
+    }
+
+    /// The recorded duration is the real elapsed time, not a count dressed up as one: a clock taken
+    /// at the wrong point, or one that never advances, would pass every count-only assertion.
+    ///
+    /// Asserted from below rather than as an exact figure, because the wall clock is what is being
+    /// measured: a hold kept open for several polling intervals must report at least that long.
+    #[tokio::test]
+    async fn a_hold_episode_reports_the_time_it_was_actually_held() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        let mut hold = hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+            .context("the stock is below the reserve")?;
+
+        // Three polling intervals, timed here as well as inside the episode.
+        let began = Instant::now();
+        assert!(
+            timeout(
+                Duration::from_millis(3 * SURB_RESERVE_POLL.as_millis() as u64),
+                &mut hold
+            )
+            .await
+            .is_err(),
+            "the hold must stay open while nothing refills the stock"
+        );
+        let observed_here_ms = began.elapsed().as_millis() as i64;
+
+        drop(hold);
+        let reported_ms = probe::get("surb_reserve_hold_seconds/false");
+        assert!(
+            reported_ms >= observed_here_ms,
+            "the episode must report at least the time it was held ({observed_here_ms} ms), got {reported_ms} ms"
+        );
+        assert!(
+            reported_ms >= SURB_RESERVE_POLL.as_millis() as i64,
+            "one polling interval is the floor: a clock that never ran would report ~0, got {reported_ms} ms"
+        );
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/observations/false"),
+            "and it is still one observation"
+        );
+        Ok(())
+    }
+
+    /// The holds must not be confused with PIX gate blocks: one is an SURB shortage on every
+    /// rate-controlled Exit egress, the other a PIX budget refusal behind it, and an operator
+    /// distinguishes them by the metric each lands in.
+    #[tokio::test]
+    async fn surb_reserve_holds_are_distinct_from_pix_gate_blocks() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let estimator = AtomicSurbFlowEstimator::default();
+        let balancer = balancer_with_target(3_200);
+        estimator.produced.store(1, Ordering::Relaxed);
+
+        // One hold episode on the SURB reserve.
+        drop(
+            hold_for_surb_reserve(HoprPseudonym::random(), &estimator, &balancer, false)
+                .context("the stock is below the reserve")?,
+        );
+
+        // One gate-block episode on a strict-prepay gate, released so it closes too.
+        let gate = ServiceGate::new(0, 10);
+        let (routing, data) = data_packet()?;
+        let permit = acquire_egress_permit(Some(gate.clone()), routing, data);
+        gate.release_service();
+        timeout(Duration::from_secs(5), permit)
+            .await
+            .context("funding must wake the parked packet")?
+            .context("a funded gate must admit it")?;
+
+        assert_eq!(
+            1,
+            probe::get("surb_reserve_holds/episodes/false"),
+            "one SURB-reserve hold"
+        );
+        assert_eq!(1, probe::get("surb_reserve_holds/observations/false"));
+        assert_eq!(
+            1,
+            probe::get("gate_blocks/predeposit_exhausted"),
+            "one PIX gate block, counted on its own series"
+        );
+        assert_eq!(
+            1,
+            probe::get("gate_block_observations/predeposit_exhausted"),
+            "closed on its own series too"
+        );
         Ok(())
     }
 }

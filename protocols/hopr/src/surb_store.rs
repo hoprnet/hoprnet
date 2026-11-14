@@ -17,6 +17,36 @@ use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 /// Public so that callers applying their own override can floor it identically, rather than
 /// reaching a value the config file itself would have been rejected for.
 pub const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
+
+/// Cost of one Entry-side SURB record: the value plus the cache's per-entry overhead, charged through
+/// moka's weigher so a byte budget holds a predictable number of records.
+///
+/// Measured against moka 0.12.16 by filling a cache and reading RSS: 838.5 B for a pending-SURB record
+/// (504 B value) and 502 B for a written-off leg (165 B value). 850 B is the larger, rounded up.
+pub const PENDING_SURB_RECORD_BYTES: u64 = 850;
+
+/// Floor on the capacity of each Entry-side SURB map, in bytes: 100 000 records.
+///
+/// The config validator rejects a budget below it, and the capacity derivation floors at it, so a
+/// value smaller than this never shrinks the maps below what they held before the byte budget existed
+/// (the fixed 100 000-record cap, hoprnet#8624). 100 000 × [`PENDING_SURB_RECORD_BYTES`] ≈ 81 MiB per
+/// map, ≈ 162 MiB for the pair.
+pub const MINIMUM_PENDING_SURB_MAX_BYTES: u64 = 100_000 * PENDING_SURB_RECORD_BYTES;
+
+/// Default byte budget for **each** of the two Entry-side SURB maps.
+///
+/// 256 MiB is ~315 700 records at [`PENDING_SURB_RECORD_BYTES`], ~16 deployed-size stocks (19 264
+/// SURBs each) per map, so the overflow hoprnet#8624 describes is fixed with room to spare. See
+/// [`SurbStoreConfig::pending_surb_max_bytes`] for the pair's worst-case total.
+pub const DEFAULT_PENDING_SURB_MAX_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Ceiling on [`SurbStoreConfig::pending_surb_max_bytes`]: 4 GiB per map.
+///
+/// The budget is a memory commitment the operator makes, so a typo must not be able to ask for an
+/// unbounded map. 4 GiB is 16× the default and about 5 million records per map, far past any
+/// deployed Session count (100 Sessions × 19 264 SURBs is ~1.93 M records, 1.6 GiB) while still
+/// leaving the pair inside a node's RAM.
+pub const MAXIMUM_PENDING_SURB_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 /// Subtracts `n` from the quarantine SURB budget, clamping at zero instead of wrapping.
 ///
 /// Every refund site reads a ring length outside the ring's own lock, so a stale reader can subtract
@@ -149,6 +179,10 @@ fn default_eviction_report_interval() -> Duration {
 
 fn default_eviction_report_threshold() -> u64 {
     1000
+}
+
+fn default_pending_surb_max_bytes() -> u64 {
+    DEFAULT_PENDING_SURB_MAX_BYTES
 }
 
 fn default_quarantine_rb_capacity() -> usize {
@@ -443,6 +477,27 @@ pub struct SurbStoreConfig {
     #[default(default_admitted_headroom_percent())]
     #[cfg_attr(feature = "serde", serde(default = "default_admitted_headroom_percent"))]
     pub admitted_headroom_percent: u32,
+    /// Byte budget for **each** of the two Entry-side maps that remember minted SURBs until their reply
+    /// comes home: the pending map and the written-off-legs map. Sending side only.
+    ///
+    /// Enforced with moka's weigher, so the capacity **is** the byte budget rather than an entry count.
+    /// The default 256 MiB holds ~315 700 records per map (~16 deployed-size stocks); both maps fill
+    /// from it, so the pair peaks at ~512 MiB. Records a budget cannot hold are counted by
+    /// `hopr_surb_pending_lost_total`, so an undersized budget is visible.
+    ///
+    /// Below [`MINIMUM_PENDING_SURB_MAX_BYTES`] (81 MiB, 100 000 records) the validator rejects the
+    /// value. `MemorySurbStore` does not read this field; only `hopr-transport`'s `HoprTransport::new`
+    /// does.
+    ///
+    /// Default is 256 MiB.
+    #[default(default_pending_surb_max_bytes())]
+    #[validate(range(
+        min = MINIMUM_PENDING_SURB_MAX_BYTES,
+        max = MAXIMUM_PENDING_SURB_MAX_BYTES,
+        message = "pending_surb_max_bytes must be between MINIMUM_PENDING_SURB_MAX_BYTES (the 100 000-record floor) and MAXIMUM_PENDING_SURB_MAX_BYTES (4 GiB)"
+    ))]
+    #[cfg_attr(feature = "serde", serde(default = "default_pending_surb_max_bytes"))]
+    pub pending_surb_max_bytes: u64,
 }
 
 /// Basic [`SurbStore`] implementation based on an in-memory cache.
@@ -5149,6 +5204,35 @@ mod tests {
             10_000, legacy.admitted_max_pseudonyms,
             "the admitted census is defaulted"
         );
+        assert_eq!(
+            DEFAULT_PENDING_SURB_MAX_BYTES, legacy.pending_surb_max_bytes,
+            "the pending-SURB byte budget is defaulted"
+        );
+
+        // The byte budget's floor is the map's real minimum, not one byte: a value below it would be
+        // raised silently, so the validator rejects it rather than accepting a figure it ignores.
+        assert!(
+            load(vec![("pending_surb_max_bytes", 0)]).is_err(),
+            "a zero pending-SURB budget must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES - 1)]).is_err(),
+            "a budget below the 100 000-record floor must be rejected"
+        );
+        load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the floor must load")?;
+
+        // And a ceiling, so a typo cannot ask for an unbounded map.
+        assert!(
+            load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES + 1)]).is_err(),
+            "a budget above the 4 GiB ceiling must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", u64::MAX)]).is_err(),
+            "u64::MAX must be rejected, not accepted as an unbounded map"
+        );
+        load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the ceiling must load")?;
 
         Ok(())
     }

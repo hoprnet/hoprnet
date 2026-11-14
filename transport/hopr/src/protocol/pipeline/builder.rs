@@ -16,7 +16,7 @@ use super::{
     NodeType, NoopTicketProcessor, NopExitAcknowledgementShareProcessor, PacketPipelineProcesses,
     config::PacketPipelineConfig, run_packet_pipeline_inner,
 };
-use crate::PeerProtocolCounterRegistry;
+use crate::{PeerProtocolCounterRegistry, trace_context::WithContext};
 
 /// Placeholder type used by [`PacketPipelineBuilder`] for generic parameters that have
 /// not yet been provided via the corresponding builder method.
@@ -257,7 +257,8 @@ where
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds and starts the full packet pipeline for a HOPR **Relay** node.
     ///
@@ -301,7 +302,8 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds and starts the packet pipeline for a HOPR **Entry** node.
     ///
@@ -342,7 +344,8 @@ where
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
-    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    AppIn: futures::Stream + Send + 'static,
+    AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
     /// Builds and starts the packet pipeline for a HOPR **Exit** node.
     ///

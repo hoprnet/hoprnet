@@ -4206,6 +4206,7 @@ dependencies = [
  "petgraph",
  "postcard",
  "redb",
+ "serde",
  "serde_json",
  "smart-default",
  "tempfile",
@@ -4220,6 +4221,7 @@ version = "2.2.0"
 dependencies = [
  "anyhow",
  "bimap",
+ "bytes",
  "const-hex",
  "criterion",
  "flagset",
@@ -4295,6 +4297,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "serde_with",
  "serial_test",
  "smart-default",
@@ -4311,13 +4314,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5ef2106012c61eff5f9be5efb3b248cd7f734fee80dfe27c56ea9bfde39073a"
+checksum = "c0947dbc8e4e435e0b77c720dc6761ba832d39a2b2ac12003e413f6395a611ca"
 dependencies = [
  "anyhow",
  "bimap",
  "futures",
+ "futures-time",
  "hopr-api",
  "hopr-utilities",
  "indexmap 2.14.2",
@@ -4337,10 +4341,10 @@ name = "hopr-protocol-app"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "hopr-crypto-packet",
  "hopr-types 6.0.1",
  "serde",
- "serde_bytes",
  "strum",
  "thiserror 2.0.21",
 ]
@@ -4529,6 +4533,7 @@ dependencies = [
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
  "hopr-utilities",
+ "hopr-utils-tracing",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4593,6 +4598,7 @@ dependencies = [
  "backon",
  "dashmap",
  "futures",
+ "futures-time",
  "futures-timer",
  "hopr-api",
  "hopr-utilities",
@@ -4600,6 +4606,8 @@ dependencies = [
  "libp2p-stream",
  "pin-project",
  "quinn-udp 0.6.3",
+ "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "tracing",
 ]
@@ -4625,6 +4633,7 @@ dependencies = [
  "lazy_static",
  "moka",
  "more-asserts",
+ "parking_lot 0.12.5",
  "rand 0.10.3",
  "rstest",
  "serde",
@@ -4874,6 +4883,19 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-utils-tracing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossfire",
+ "futures",
+ "hopr-utilities",
+ "test-log",
+ "tokio",
  "tracing",
 ]
 

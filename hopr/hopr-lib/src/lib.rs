@@ -23,6 +23,9 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
+/// Periodic operational state dump: extra sections and the bridge from transport events.
+#[cfg(feature = "state-dump")]
+pub mod state_dump;
 /// Testing utilities: cluster fixtures, node wiring helpers, echo server.
 #[cfg(feature = "testing")]
 pub mod testing;
@@ -64,7 +67,7 @@ use hopr_api::{
         HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState, NodeOnchainIdentity, PixEvent,
     },
     tickets::TicketManagement,
-    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
+    types::crypto::prelude::OffchainKeypair,
 };
 /// Maximum user-data payload per HOPR session frame (bytes).
 ///
@@ -76,7 +79,7 @@ pub use hopr_transport::SESSION_MTU;
 ///
 /// Both `hopr_lib::mixer` and `hopr_lib::exports::transport::mixer` name the same items.
 pub use hopr_transport::mixer;
-use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
+use hopr_transport::{ApplicationDataIn, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
     FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, LOCAL_PIX_SUITE, PixParams,
@@ -288,6 +291,9 @@ pub(crate) enum HoprLibProcess {
     TicketEvents,
     #[strum(to_string = "neglecting tickets on closed channels")]
     ChannelClosureNeglect,
+    #[cfg(feature = "state-dump")]
+    #[strum(to_string = "periodic operational state dump")]
+    StateDump,
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.
@@ -333,7 +339,7 @@ pub fn prepare_tokio_runtime(
 /// Type alias used to send and receive transport data via a running HOPR node.
 pub type HoprTransportIO = hopr_transport::socket::HoprSocket<
     futures::stream::BoxStream<'static, ApplicationDataIn>,
-    hopr_utils::network_types::crossfire_sink::CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
+    hopr_transport::HoprMessageSender,
 >;
 
 type TicketEvents = (

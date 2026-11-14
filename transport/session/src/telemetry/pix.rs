@@ -9,10 +9,11 @@
 //!
 //! These use `hopr_pix_*` rather than the `hopr_session_pix_*` of their per-Session siblings, and
 //! the difference is not cosmetic. `hopr-types`' `meter_for_metric` routes an instrument to a meter
-//! provider by *name prefix*, and `hopr_session_*` is routed to the OTLP-only provider — see
-//! `OTLP.md`, which records that those are not exposed on the Prometheus `/metrics` endpoint. These
-//! aggregates are the ones an operator dashboards and alerts on, so they belong on `/metrics`,
-//! alongside the existing `hopr_pix_share_insert_failures`.
+//! provider by *name prefix*, and hoprd gives `hopr_session_*` an OTLP-only provider *when a
+//! `hopr_session` interval override is configured* in `HOPRD_METRIC_EXPORT_INTERVAL` — see
+//! `OTLP.md`, which recommends exactly that and records that such series are not exposed on the
+//! Prometheus `/metrics` endpoint. These aggregates are the ones an operator dashboards and alerts
+//! on, so they belong on `/metrics`, alongside the existing `hopr_pix_share_insert_failures`.
 //!
 //! The per-Session gauges keep their spelling and their OTLP route. They answer a different
 //! question for a different consumer.
@@ -48,6 +49,19 @@
 //! The last two are per-Session events rather than node aggregates, but they belong on this prefix
 //! because neither is labelled by a Session. Their per-Session siblings
 //! (`hopr_session_pix_gate_mode`, `_recovery_progress`, `_fill_rate`) stay on the OTLP route.
+//!
+//! # The keep-alive reserve hold, which is not on this prefix
+//!
+//! The hold the Exit's egress takes while its SURB stock is at the keep-alive reserve is a
+//! [`SurbReserveHoldEpisode`](crate::supervision::telemetry::SurbReserveHoldEpisode), not a
+//! [`PixGateBlockEpisode`](crate::supervision::telemetry::PixGateBlockEpisode): it sits *before*
+//! the PIX gate and so also fires without PIX. Its instruments are in [`crate::telemetry::surb`],
+//! on the `hopr_surb_*` prefix, which keeps its Prometheus reader under every configuration (see
+//! the prefix note above).
+//!
+//! Not to be confused with `hopr_pix_fill_backoff_total{reason="surb_reserve"}` in this module's
+//! table: that counts keep-alives the Exit withheld from its own fill schedule, while the pair
+//! above counts data packets it held for the Entry. Both rise during an SURB shortage.
 //!
 //! The live-set gauges are **delta-counted** from a recomputed census and the counters are
 //! **event-counted** at the transition that changes the source-of-truth state. Neither is derived
@@ -598,11 +612,14 @@ mod tests {
     }
 
     #[test]
-    fn aggregates_are_exported_through_hopr_metrics() {
+    fn aggregates_are_exported_through_hopr_metrics() -> anyhow::Result<()> {
+        use anyhow::Context;
+
         add_sessions_active(PixGateMode::Funded, 3);
         add_cycles_active(PixCyclePhase::Recovering, 2);
         add_cycles_total(PixCycleEvent::Requested, 5);
         add_ssa_requests_resent(2);
+        set_held_shares(3);
         record_admission_rejection(PixAdmissionRejection::LiveCycleCapacity);
         record_cycle_bytes_reserved(1024);
         add_egress_packets(PixGateMode::Predeposit, 7);
@@ -617,7 +634,7 @@ mod tests {
         record_cycle_phase_duration(PixCyclePhase::AwaitingDeposit, 12.5);
         add_sessions_stalled(PixStallCause::ShareStarved, 1);
 
-        let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_api::types::telemetry::gather_all_metrics().context("gathering registered metrics")?;
 
         // Only the *presence* of a series with the right label is asserted, not its value: the
         // registry is process-wide and shared with every other test in this binary, so an exact
@@ -627,6 +644,7 @@ mod tests {
             "hopr_pix_cycles_active{phase=\"recovering\"}",
             "hopr_pix_cycles_total{event=\"requested\"}",
             "hopr_pix_ssa_requests_resent_total",
+            "hopr_pix_held_shares",
             "hopr_pix_admission_rejections_total{reason=\"live_cycle_capacity\"}",
             "hopr_pix_live_cycle_bytes",
             "hopr_pix_cycle_bytes_reserved_total",
@@ -646,5 +664,6 @@ mod tests {
         ] {
             assert!(text.contains(expected), "{expected} was not exported:\n{text}");
         }
+        Ok(())
     }
 }

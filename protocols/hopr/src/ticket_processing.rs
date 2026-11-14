@@ -308,16 +308,9 @@ where
 
                     let next_hop = *next_hop;
                     builder = builder.eviction_listener(move |_, _, cause| {
-                        let peer_id_for_eviction = next_hop.to_peerid_str();
+                        let peer_id = PER_PEER_ENABLED.then(|| next_hop.to_peerid_str());
                         UNACK_TICKETS.decrement(1.0);
-                        UNACK_TICKETS_PER_PEER.decrement(
-                            &[if *PER_PEER_ENABLED {
-                                peer_id_for_eviction.as_str()
-                            } else {
-                                "redacted"
-                            }],
-                            1.0,
-                        );
+                        UNACK_TICKETS_PER_PEER.decrement(&[peer_id.as_deref().unwrap_or("redacted")], 1.0);
 
                         // Only count Expired/Size removals as evictions (not Explicit or Replaced)
                         if matches!(
@@ -335,17 +328,10 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let peer_id = next_hop.to_peerid_str();
+            let peer_id = PER_PEER_ENABLED.then(|| next_hop.to_peerid_str());
             UNACK_INSERTIONS.increment();
             UNACK_TICKETS.increment(1.0);
-            UNACK_TICKETS_PER_PEER.increment(
-                &[if *PER_PEER_ENABLED {
-                    peer_id.as_str()
-                } else {
-                    "redacted"
-                }],
-                1.0,
-            );
+            UNACK_TICKETS_PER_PEER.increment(&[peer_id.as_deref().unwrap_or("redacted")], 1.0);
         }
 
         Ok(())
