@@ -22,6 +22,7 @@ use super::{
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
+use crate::observer::{PathDirection, TransportEvent, TransportObserver};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -484,6 +485,7 @@ fn apply_diversity_transition(
 type RebuiltPaths = (CandidateSet, Option<DiversityObservation>);
 
 /// What a cache entry is rebuilt from, shared by the planner and its background sweep.
+#[derive(Clone)]
 struct PathBuilder<R, S> {
     resolver: R,
     selector: S,
@@ -570,6 +572,26 @@ where
 
         let (set_id, weighted) = identify_candidates(hopr_utils::statistics::WeightedCollection::new(valid_paths));
         let total_wt = weighted.total_weight();
+        // Cache rebuilds are the useful DEBUG boundary; per-draw details remain at TRACE.
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            const MAX_LOGGED_CANDIDATES: usize = 8;
+            let candidates = weighted
+                .iter()
+                .take(MAX_LOGGED_CANDIDATES)
+                .map(|(path, weight)| (path.to_string(), *weight))
+                .collect::<Vec<_>>();
+            tracing::debug!(
+                kind,
+                source = %src_key,
+                destination = %dest_key,
+                hops,
+                total_weight = total_wt,
+                candidate_count = weighted.len(),
+                omitted = weighted.len().saturating_sub(MAX_LOGGED_CANDIDATES),
+                ?candidates,
+                "rebuilt weighted path collection",
+            );
+        }
         // Return draws spend `exploration` of their picks uniformly, so log what a draw actually does.
         let exploration = if dest_key == me {
             weighting.return_path_exploration
@@ -789,6 +811,7 @@ pub struct PathPlanner<Surb, R, S> {
     refresh_period: Duration,
     /// See [`IMPLAUSIBLE_PROBE_INTERVAL`]; shared by every clone of the planner.
     probe_budget: Arc<ProbeBudget>,
+    observer: Option<TransportObserver>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -836,6 +859,49 @@ where
             cache,
             refresh_period: config.refresh_period,
             probe_budget: Arc::default(),
+            observer: None,
+        }
+    }
+
+    /// Report path resolves to `observer`. Attach it before the planner is shared.
+    pub fn with_observer(mut self, observer: TransportObserver) -> Self {
+        self.observer = Some(observer);
+        self
+    }
+
+    /// Configure the owned selector without changing existing planner clones.
+    pub(crate) fn configure_selector(&mut self, configure: impl FnOnce(&mut S))
+    where
+        R: Clone,
+        S: Clone,
+    {
+        configure(&mut Arc::make_mut(&mut self.paths).selector);
+    }
+
+    /// Report an outcome using canonical peer identity, retaining unresolved chain addresses.
+    fn record_resolution(&self, source: NodeId, destination: NodeId, succeeded: bool) {
+        if let Some(observer) = &self.observer {
+            let (direction, peer) = if source == NodeId::Offchain(self.me) {
+                (PathDirection::Forward, destination)
+            } else {
+                (PathDirection::Return, source)
+            };
+            let peer = match peer {
+                NodeId::Chain(address) => self
+                    .paths
+                    .resolver
+                    .chain_key_to_packet_key(&address)
+                    .ok()
+                    .flatten()
+                    .map(NodeId::Offchain)
+                    .unwrap_or(peer),
+                _ => peer,
+            };
+            observer(TransportEvent::PathResolved {
+                direction,
+                destination: peer,
+                succeeded,
+            });
         }
     }
 
@@ -863,6 +929,7 @@ where
         }
     }
 
+    /// Report the result of each forward resolution, including cache hits and failures.
     #[tracing::instrument(name = "planner.resolve_path", level = "trace", skip_all)]
     async fn resolve_path(
         &self,
@@ -870,9 +937,21 @@ where
         destination: NodeId,
         options: RoutingOptions,
     ) -> Result<ValidatedPath> {
+        let result = self.resolve_path_inner(source, destination, options).await;
+        self.record_resolution(source, destination, result.is_ok());
+        result
+    }
+
+    /// Resolve cached or newly selected paths while retaining validation and cache semantics.
+    async fn resolve_path_inner(
+        &self,
+        source: NodeId,
+        destination: NodeId,
+        options: RoutingOptions,
+    ) -> Result<ValidatedPath> {
         let path = match options {
             RoutingOptions::IntermediatePath(explicit_path) => {
-                tracing::debug!(
+                tracing::trace!(
                     direction = "loopback",
                     ?source,
                     ?destination,
@@ -1092,6 +1171,22 @@ where
         options: RoutingOptions,
         count: usize,
     ) -> Result<Vec<ValidatedPath>> {
+        let result = self
+            .resolve_diverse_return_paths_inner(destination, options, count)
+            .await;
+        if count > 0 {
+            self.record_resolution(destination, NodeId::Offchain(self.me), result.is_ok());
+        }
+        result
+    }
+
+    /// Draw return paths from cached or rebuilt candidates while preserving path diversity.
+    async fn resolve_diverse_return_paths_inner(
+        &self,
+        destination: NodeId,
+        options: RoutingOptions,
+        count: usize,
+    ) -> Result<Vec<ValidatedPath>> {
         // No return paths requested (e.g. the message fills the payload, leaving no room for
         // SURBs). Resolve nothing — querying the planner here would turn "none wanted" into a
         // `PathNotFound` error.
@@ -1106,7 +1201,7 @@ where
             // A fixed path or a direct return has no alternatives to weight over.
             other => {
                 return (0..count)
-                    .map(|_| self.resolve_path(destination, me, other.clone()))
+                    .map(|_| self.resolve_path_inner(destination, me, other.clone()))
                     .collect::<FuturesUnordered<_>>()
                     .try_collect::<Vec<_>>()
                     .await;
@@ -1206,12 +1301,12 @@ where
                 forward_options,
                 return_options,
             } => {
-                tracing::debug!(direction = "forward", %destination, "resolving forward path");
+                tracing::trace!(direction = "forward", %destination, "resolving forward path");
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
                     .await?;
-                tracing::debug!(direction = "forward", %destination, path = %forward_path, "resolved path");
+                tracing::trace!(direction = "forward", %destination, path = %forward_path, "resolved path");
 
                 let resolved_pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
 
@@ -1248,7 +1343,7 @@ where
                         .into_iter()
                         .enumerate()
                         .inspect(|(i, rp)| {
-                            tracing::debug!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
+                            tracing::trace!(direction = "return", %destination, index = i, path = %rp, "resolved return path");
                         })
                         .map(|(_, rp)| rp)
                         .collect();
@@ -3557,5 +3652,91 @@ mod tests {
         assert!((w_without - expected_without).abs() < 1e-9);
         // With capacity the factor adds further reduction (capacity_factor < 1.0 here).
         assert!(w_with <= w_without, "known capacity should not increase the weight");
+    }
+    #[tokio::test]
+    /// Verify canonical peer identities and the unresolved chain-address fallback in observer events.
+    async fn observer_canonicalizes_chain_addresses_and_retains_unresolvable_destinations() -> anyhow::Result<()> {
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let (planner, _) = two_relayer_return_planner();
+        let planner = planner.with_observer(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        }));
+        let me = NodeId::Offchain(planner.me);
+        planner
+            .resolve_path(me, NodeId::Chain(dest_addr()), RoutingOptions::Hops(0.try_into()?))
+            .await?;
+        planner
+            .resolve_path(NodeId::Chain(dest_addr()), me, RoutingOptions::Hops(1.try_into()?))
+            .await?;
+        let unknown = NodeId::Chain(Address::from([99; 20]));
+        assert!(
+            planner
+                .resolve_path(me, unknown, RoutingOptions::Hops(1.try_into()?))
+                .await
+                .is_err()
+        );
+        let events = events.lock();
+        assert_eq!(events.len(), 3);
+        assert!(matches!(&events[0], TransportEvent::PathResolved {
+            direction: PathDirection::Forward, destination, succeeded: true,
+        } if *destination == NodeId::Offchain(pubkey(&SECRET_DEST))));
+        assert!(matches!(&events[1], TransportEvent::PathResolved {
+            direction: PathDirection::Return, destination, succeeded: true,
+        } if *destination == NodeId::Offchain(pubkey(&SECRET_DEST))));
+        assert!(matches!(&events[2], TransportEvent::PathResolved {
+            direction: PathDirection::Forward, destination, succeeded: false,
+        } if *destination == unknown));
+        Ok(())
+    }
+
+    #[tokio::test]
+    /// Report cached return batches and failed resolves without counting them as graph searches.
+    async fn observer_sees_cached_return_batches_and_resolution_failures() -> anyhow::Result<()> {
+        let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let (planner, _) = two_relayer_return_planner();
+        let planner = planner.with_observer(Arc::new({
+            let events = events.clone();
+            move |event| events.lock().push(event)
+        }));
+        let source = NodeId::Offchain(pubkey(&SECRET_DEST));
+        for _ in 0..2 {
+            planner
+                .resolve_diverse_return_paths(source, RoutingOptions::Hops(1.try_into()?), 2)
+                .await?;
+        }
+        assert!(
+            planner
+                .resolve_path(
+                    NodeId::Offchain(planner.me),
+                    NodeId::Offchain(pubkey(&[99; 32])),
+                    RoutingOptions::Hops(1.try_into()?)
+                )
+                .await
+                .is_err()
+        );
+        let resolved: Vec<_> = events
+            .lock()
+            .iter()
+            .filter_map(|event| match event {
+                TransportEvent::PathResolved {
+                    direction,
+                    destination,
+                    succeeded,
+                } => Some((*direction, *destination, *succeeded)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            2,
+            resolved
+                .iter()
+                .filter(|r| **r == (PathDirection::Return, source, true))
+                .count(),
+            "each cached return batch is one resolve"
+        );
+        assert_eq!(1, resolved.iter().filter(|(_, _, succeeded)| !succeeded).count());
+        assert_eq!(3, resolved.len(), "the planner reports resolves only, no searches");
+        Ok(())
     }
 }

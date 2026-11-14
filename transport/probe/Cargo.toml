@@ -44,6 +44,7 @@ hopr-protocol-app = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
+parking_lot = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 lazy_static = { workspace = true }
