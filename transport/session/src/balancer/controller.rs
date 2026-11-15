@@ -2754,6 +2754,45 @@ mod tests {
         );
     }
 
+    /// Keep-alives counted while the balancer ticks must never look like a reply: the keep-alive count is
+    /// written before `consumed` and read after it.
+    #[test]
+    fn keep_alives_racing_the_balancer_should_never_count_as_a_reply() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+        const PER_WRITER: u64 = 100_000;
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        let writers: Vec<_> = (0..2)
+            .map(|_| {
+                let (state, estimator) = (state.clone(), estimator.clone());
+                std::thread::spawn(move || (0..PER_WRITER).for_each(|_| state.note_keep_alive_consumed(&estimator)))
+            })
+            .collect();
+        while !writers.iter().all(|w| w.is_finished()) {
+            tick_for(&mut balancer, Duration::from_millis(50));
+        }
+        for w in writers {
+            w.join().map_err(|_| anyhow::anyhow!("keep-alive writer panicked"))?;
+        }
+        tick_for(&mut balancer, Duration::from_millis(50));
+
+        assert_eq!(0, state.last_reply_heard.load(Relaxed), "keep-alives are not replies");
+        assert_eq!(2 * PER_WRITER, estimator.consumed.load(Relaxed));
+        assert_eq!(2 * PER_WRITER, state.keep_alives_consumed());
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "a reply after them still counts"
+        );
+        Ok(())
+    }
+
     /// A reply home is the Exit answering, counted by the estimator as a SURB consumed, even where none of
     /// its packets reached the hooks that record it. Production minted and nothing consumed is not.
     #[test_log::test]
