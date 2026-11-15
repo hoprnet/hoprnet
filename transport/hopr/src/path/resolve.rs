@@ -13,12 +13,37 @@ use futures::{Stream, StreamExt};
 use hopr_api::types::internal::routing::{DestinationRouting, ResolvedTransportRouting};
 use hopr_crypto_packet::prelude::{HoprSurb, PacketSignal};
 use hopr_protocol_app::prelude::ApplicationDataOut;
-use tracing::{Instrument, error, trace, warn};
+use tracing::{Instrument, debug, trace, warn};
 
 use super::errors::Result as PathResult;
 
 /// How often a return route whose SURBs have not arrived is retried.
 const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
+
+/// Unroutable packets fail at packet rate, so they log at DEBUG with at most one WARN per interval.
+const ROUTING_FAILURE_WARN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// When the last routing-failure WARN went out, and how many failures stayed at DEBUG since.
+#[derive(Debug, Default)]
+struct RoutingFailureWarnings {
+    last_warned: Option<std::time::Instant>,
+    suppressed: u64,
+}
+
+impl RoutingFailureWarnings {
+    /// Returns the failures suppressed since the last WARN when this one is due to warn.
+    fn record(&mut self, now: std::time::Instant) -> Option<u64> {
+        let is_due = self
+            .last_warned
+            .is_none_or(|last| now.duration_since(last) >= ROUTING_FAILURE_WARN_INTERVAL);
+        if !is_due {
+            self.suppressed += 1;
+            return None;
+        }
+        self.last_warned = Some(now);
+        Some(std::mem::take(&mut self.suppressed))
+    }
+}
 
 /// Default for [`PacketPipelineConfig::surb_resolution_wait`][cfg], used when it is unset.
 ///
@@ -75,6 +100,7 @@ where
     F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
     Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>, Option<u8>)>>,
 {
+    let failure_warnings = std::sync::Arc::new(parking_lot::Mutex::new(RoutingFailureWarnings::default()));
     input
         .map(move |message| {
             let ((unresolved, mut data), span) = message.into_parts();
@@ -86,6 +112,7 @@ where
             let span = if request_span.is_disabled() { span } else { request_span };
             let output_span = span.clone();
             let resolve = resolve.clone();
+            let failure_warnings = failure_warnings.clone();
             async move {
                 // Retry on SURB starvation: the SURB pool on the exit side refills asynchronously
                 // (target 600, ~300/sec via keep-alive). Silently dropping return-path packets when
@@ -161,7 +188,15 @@ where
                         Err(error) => {
                             hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            error!(%error, "failed to resolve routing");
+                            let warning = failure_warnings.lock().record(std::time::Instant::now());
+                            match warning {
+                                Some(suppressed) => warn!(
+                                    %error,
+                                    suppressed_since_last_warning = suppressed,
+                                    "dropping outgoing packets: failed to resolve routing"
+                                ),
+                                None => debug!(%error, "failed to resolve routing"),
+                            }
                             return None;
                         }
                     }
@@ -719,5 +754,18 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn routing_failures_warn_at_most_once_per_interval_and_count_the_rest() {
+        let start = std::time::Instant::now();
+        let mut warnings = RoutingFailureWarnings::default();
+
+        assert_eq!(warnings.record(start), Some(0));
+        for second in 1..60 {
+            assert_eq!(warnings.record(start + std::time::Duration::from_secs(second)), None);
+        }
+        assert_eq!(warnings.record(start + ROUTING_FAILURE_WARN_INTERVAL), Some(59));
+        assert_eq!(warnings.record(start + ROUTING_FAILURE_WARN_INTERVAL), None);
     }
 }
