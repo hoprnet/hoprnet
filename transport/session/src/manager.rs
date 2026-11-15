@@ -13933,6 +13933,68 @@ mod tests {
         assert!(!switch.degraded, "darkness is switched apart from degradation");
     }
 
+    /// The Exit's keep-alive schedule, as a table: for each way of producing keep-alives, which of a
+    /// few instants (milliseconds after the first) admit a packet.
+    ///
+    /// Columns: the notification period, the degraded period, the SURB stock, the fill reserve, whether
+    /// fill runs, and whether the Session is degraded and dark.
+    #[rstest]
+    #[case::level_reports_only(
+        Some(10_000), None, 1, 100, false, (false, false),
+        &[(0, true), (1_000, false), (10_000, true), (11_000, false)],
+    )]
+    #[case::fill_only(
+        None, None, 5, 5, true, (false, false),
+        &[(0, true), (1, true), (1_000, true)],
+    )]
+    #[case::reports_only_below_the_fill_reserve(
+        Some(10_000), None, 1, 5, true, (false, false),
+        &[(0, true), (1_000, false), (10_000, true), (10_500, false)],
+    )]
+    #[case::degraded_period(
+        Some(3_600_000), Some(10_000), 1, 100, false, (true, false),
+        &[(0, true), (1_000, false), (10_000, true), (11_000, false)],
+    )]
+    #[case::dark_period(
+        Some(15_000), Some(1_000), 1, 100, false, (true, true),
+        &[(0, true), (50, false), (100, true), (150, false)],
+    )]
+    #[case::nothing_without_surbs(
+        Some(10_000), None, 0, 5, true, (false, false),
+        &[(0, false), (1_000, false), (10_000, false)],
+    )]
+    fn the_exit_keep_alive_schedule_admits_the_expected_packets(
+        #[case] notify_ms: Option<u64>,
+        #[case] degraded_ms: Option<u64>,
+        #[case] stock: u64,
+        #[case] reserve: u64,
+        #[case] fill: bool,
+        #[case] (degraded, dark): (bool, bool),
+        #[case] timeline: &[(u64, bool)],
+    ) {
+        let control = fill_control_degraded(
+            notify_ms.map(Duration::from_millis),
+            degraded_ms.map(Duration::from_millis),
+            reserve,
+            stock,
+        );
+        control.start_notify();
+        if fill {
+            control.set_fill(FillRate::per_second(10));
+        }
+        control.set_degraded(degraded);
+        control.set_dark(dark);
+
+        let t0 = Instant::now();
+        for (offset_ms, admitted) in timeline {
+            assert_eq!(
+                *admitted,
+                control.admit_at(t0 + Duration::from_millis(*offset_ms)),
+                "at +{offset_ms} ms"
+            );
+        }
+    }
+
     /// The driver tells the stream about a change in its answer, and only about a change.
     #[test]
     fn the_driver_acts_only_on_transitions() {
@@ -15630,6 +15692,154 @@ mod tests {
         );
 
         let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+        Ok(())
+    }
+
+    /// The ways a Session can be torn down, for the matrix below.
+    #[derive(Clone, Copy, Debug)]
+    enum TearDown {
+        Close,
+        SocketClosed,
+        IdleEviction,
+        PeerSessionError,
+        SurbDrain,
+        RolledBack,
+    }
+
+    /// However a Session ends, it leaves the same state behind: gone from the manager, its admission
+    /// retired once with the token it was given (a rolled-back Session was never admitted, so none is
+    /// minted and it retires with `AdmissionToken::NONE`), and the peer is sent no `SessionError`. Only
+    /// the PIX failure teardowns (not covered here) notify the peer.
+    #[rstest]
+    #[case::explicit_close(TearDown::Close)]
+    #[case::socket_closed(TearDown::SocketClosed)]
+    #[case::idle_eviction(TearDown::IdleEviction)]
+    #[case::peer_session_error(TearDown::PeerSessionError)]
+    #[case::surb_drain(TearDown::SurbDrain)]
+    #[case::rolled_back(TearDown::RolledBack)]
+    #[test_log::test(tokio::test)]
+    async fn every_way_a_session_ends_leaves_the_same_state_behind(#[case] way: TearDown) -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let cfg = SessionManagerConfig {
+            surb_resolution_wait: Duration::from_millis(100),
+            idle_timeout: if matches!(way, TearDown::IdleEviction) {
+                KEEP_ALIVE_PERIOD * 3
+            } else {
+                SessionManagerConfig::default().idle_timeout
+            },
+            ..Default::default()
+        };
+        let (mgr, mut msg_rx, incoming, pseudonym) = match way {
+            TearDown::SurbDrain => {
+                let (mgr, msg_rx, pseudonym) =
+                    drainable_exit_pix_session(KEEP_ALIVE_PERIOD, Some(Arc::new(admission.clone()))).await?;
+                (mgr, msg_rx, None, pseudonym)
+            }
+            TearDown::RolledBack => {
+                let mgr = RecordingManager::new(cfg.clone());
+                mgr.set_surb_admission(Arc::new(admission.clone()));
+                let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
+                // A dropped receiver fails the notification after the slot was inserted.
+                let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+                mgr.start(msg_tx, new_session_tx, None, None)?;
+                let pseudonym = HoprPseudonym::random();
+                let started = mgr
+                    .handle_incoming_session_initiation(
+                        pseudonym,
+                        StartInitiation {
+                            challenge: MIN_CHALLENGE,
+                            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                            capabilities: HoprSessionCapabilities::empty(),
+                            additional_data: 0,
+                        },
+                    )
+                    .await;
+                anyhow::ensure!(started.is_err(), "the setup must fail for the rollback to run");
+                (mgr, msg_rx, None, pseudonym)
+            }
+            _ => {
+                let (mgr, msg_rx, incoming, pseudonym) =
+                    exit_session_originating_keep_alives(cfg, Some(Arc::new(admission.clone()))).await?;
+                (mgr, msg_rx, Some(incoming), pseudonym)
+            }
+        };
+
+        match way {
+            TearDown::Close | TearDown::SurbDrain => assert!(mgr.close_session(&pseudonym)),
+            TearDown::SocketClosed => {
+                let mut incoming = incoming.context("the fixture keeps the incoming session channel")?;
+                let mut exit_session = incoming
+                    .next()
+                    .await
+                    .context("the Exit must have been handed a Session")?;
+                exit_session.session.close().await?;
+            }
+            TearDown::IdleEviction => {
+                for _ in 0..50 {
+                    mgr.sessions.run_pending_tasks();
+                    tokio::time::sleep(KEEP_ALIVE_PERIOD / 10).await;
+                }
+            }
+            TearDown::PeerSessionError => {
+                let error = StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(pseudonym),
+                    reason: StartErrorReason::Unknown,
+                };
+                mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::SessionError(error))?)?;
+            }
+            TearDown::RolledBack => {}
+        }
+        if matches!(way, TearDown::SurbDrain) {
+            // The drain keeps the slot; the supervisor's own close, here a recovered cycle, ends it.
+            let ssa_id = SsaId::new(pseudonym, SsaIndex::new(1).context("index one is non-zero")?);
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+                .await?;
+        }
+
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "{way:?} must remove the Session"
+        );
+        assert!(mgr.sessions.get(&pseudonym).is_none(), "{way:?} left a slot behind");
+        assert_eq!(
+            mgr.num_active_sessions(),
+            0,
+            "{way:?} must give the Session's count back"
+        );
+
+        assert_eq!(wait_for_retire(&admission, &pseudonym, 1).await, 1);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(admission.retired(&pseudonym), 1, "{way:?} must retire exactly once");
+        if matches!(way, TearDown::RolledBack) {
+            assert!(
+                admission.minted_tokens().is_empty(),
+                "a rolled-back Session is never admitted"
+            );
+            assert_eq!(
+                admission.retire_tokens(),
+                vec![AdmissionToken::NONE],
+                "a rolled-back Session must retire with `NONE`, which matches no admission"
+            );
+        } else {
+            assert_eq!(
+                admission.retire_tokens(),
+                admission.minted_tokens(),
+                "{way:?} must retire with the token its admission returned"
+            );
+        }
+
+        let told = originated_during(&mut msg_rx, Duration::from_millis(200))
+            .await
+            .iter()
+            .any(|(_, data)| {
+                start_msg_match(data, |m| {
+                    matches!(
+                        m,
+                        HoprStartProtocol::SessionError(e) if e.identifier == ErrorIdentifier::SessionId(pseudonym)
+                    )
+                })
+            });
+        assert!(!told, "{way:?} must not send a SessionError naming the Session");
         Ok(())
     }
 
