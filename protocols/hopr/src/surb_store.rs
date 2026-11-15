@@ -4087,11 +4087,12 @@ mod tests {
         assert_eq!(5, insert(3, 0)?, "a stale older generation is refused whole");
         assert_eq!(Some(5), held());
 
-        store
+        let popped = store
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
             .context("a SURB must be there to pop")?;
         let level = level - 1;
         assert_eq!(Some(level as usize), held(), "a successful pop is one SURB");
+        assert_eq!(level as usize, popped.remaining, "and it reports what is left");
 
         store.invalidate_relayer(&relayer);
         assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none());
