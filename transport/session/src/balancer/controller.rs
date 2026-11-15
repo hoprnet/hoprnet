@@ -204,6 +204,9 @@ pub struct BalancerStateValues {
     /// the first packet sent after the counterparty was last heard. See
     /// [`silence_sustain`](Self::silence_sustain).
     sending_since: AtomicU64,
+    /// When the run of data before the current one ended, in the same unit as [`last_heard`](Self::last_heard):
+    /// its last packet. The reply stream is judged against it; see [`silence_sustain`](Self::silence_sustain).
+    previous_run_ended: AtomicU64,
     /// When a reply the estimator counted as consumed last came home, in the same unit as
     /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
     last_reply_heard: AtomicU64,
@@ -242,9 +245,9 @@ impl Default for ActivityEpoch {
 /// [`silence_sustain`](BalancerStateValues::silence_sustain).
 pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 
-/// How recent the last reply must be, relative to the last time the counterparty was heard at all, for
-/// a silence to be a reply stream that stopped rather than a Session that gets no replies: one default
-/// notify period.
+/// How recent the last reply must be, relative to the last data packet before the current run of unanswered
+/// data, for a silence to be a reply stream that stopped rather than a Session that gets no replies: one
+/// default notify period.
 pub const REPLY_STREAM_WINDOW: Duration = Duration::from_secs(15);
 
 /// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
@@ -554,12 +557,13 @@ impl BalancerStateValues {
     }
 
     /// Records that a Session data packet is going out now. The first one since the counterparty was
-    /// last heard starts a new run of unanswered data.
+    /// last heard starts a new run of unanswered data, and the last packet before it ended the previous one.
     pub(crate) fn note_sent(&self) {
         use std::sync::atomic::Ordering::Relaxed;
 
         let now = std::time::Instant::now();
         if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.previous_run_ended.fetch_max(self.last_sent.load(Relaxed), Relaxed);
             self.stamp(&self.sending_since, now);
         }
         self.stamp(&self.last_sent, now);
@@ -621,10 +625,27 @@ impl BalancerStateValues {
     /// sent then. Takes the epoch [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
     #[cfg(test)]
     pub(crate) fn sending_since_ago(self, ago: Duration) -> Self {
+        use std::sync::atomic::Ordering::Relaxed;
+
         let at = std::time::Instant::now()
             .checked_sub(ago)
             .expect("monotonic clock younger than `ago`");
+        // As `note_sent` does: a run that starts after the counterparty was heard ends the previous one.
+        if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.previous_run_ended.fetch_max(self.last_sent.load(Relaxed), Relaxed);
+        }
         self.stamp(&self.sending_since, at);
+        self.stamp(&self.last_sent, at);
+        self
+    }
+
+    /// Test hook: as if the last data packet had gone out `ago` ago, without starting a run. Takes the epoch
+    /// [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
+    #[cfg(test)]
+    pub(crate) fn last_sent_ago(self, ago: Duration) -> Self {
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
         self.stamp(&self.last_sent, at);
         self
     }
@@ -666,9 +687,12 @@ impl BalancerStateValues {
     /// Exit.
     ///
     /// Only a reply stream that stopped counts: the last reply must be within [`REPLY_STREAM_WINDOW`] of
-    /// the last time the counterparty was heard at all. A Session the Exit does not answer hears only its
-    /// reports, one per notify period, and sustaining it would put one SURB in every data packet into a
-    /// stock nothing spends, up to the store's capacity.
+    /// the last data packet before the current run, that is, the Exit answered the data that went out
+    /// before. A Session the Exit does not answer hears only its reports, one per notify period, and
+    /// sustaining it would put one SURB in every data packet into a stock nothing spends, up to the
+    /// store's capacity. The reports that arrive while nothing goes out do not age the reply stream: a
+    /// Session that was answered, went quiet, and whose return path failed meanwhile still gets the
+    /// sustain once it sends again.
     ///
     /// Judged between the stamps, not against the clock, so that the answer is about the packet being
     /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.
@@ -686,7 +710,7 @@ impl BalancerStateValues {
                 let since = self.sending_since.load(Relaxed);
                 // A reply stream that stopped, not a Session the counterparty does not answer, and data
                 // going out unanswered for longer than the grace, not the first packet after a pause.
-                replied.saturating_add(window) >= heard
+                replied.saturating_add(window) >= self.previous_run_ended.load(Relaxed)
                     && since > heard
                     && self.last_sent.load(Relaxed) > since.saturating_add(after)
             }
@@ -2636,6 +2660,61 @@ mod tests {
         assert!(
             !sending.silence_sustain(),
             "heard again, and the packet after it starts a new run"
+        );
+    }
+
+    /// The reply stream is judged against the data before the current run, not against the last word heard:
+    /// reports that arrive while nothing goes out do not age it. A Session that was answered, went quiet and
+    /// whose return path failed meanwhile is a silence once it sends again; one that kept sending through the
+    /// reports without an answer is an upload and is not.
+    #[test]
+    fn reports_during_a_quiet_stretch_should_not_age_the_reply_stream() {
+        // Data answered until 40 s ago, then nothing either way but the Exit's reports, the last one 5 s
+        // ago; data going out again since 4 s ago, unanswered.
+        let paused = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(40))
+            .last_sent_ago(Duration::from_secs(40))
+            .heard_again_ago(Duration::from_secs(5))
+            .sending_since_ago(Duration::from_secs(4));
+        paused.note_sent();
+        assert!(
+            paused.silence_sustain(),
+            "the data before the pause was answered and the data after it is not: a return path that failed"
+        );
+
+        // The same reply and reports, but data kept going out through them, the last packet just before
+        // the last report: unanswered for 35 s, an upload.
+        let upload = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(40))
+            .last_sent_ago(Duration::from_millis(5_010))
+            .heard_again_ago(Duration::from_secs(5))
+            .sending_since_ago(Duration::from_secs(4));
+        upload.note_sent();
+        assert!(
+            !upload.silence_sustain(),
+            "data went out unanswered for 35 s before the last report: there is no reply stream to lose"
+        );
+    }
+
+    /// Driven through the state's own stamps rather than the time-travel hooks: an answered packet, a quiet
+    /// stretch with a report in it, then data again. The report alone starts nothing, and the first packet
+    /// after it starts the run that is judged against the answered packet before the pause.
+    #[test]
+    fn the_run_after_a_quiet_stretch_should_be_judged_against_the_data_before_it() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(30));
+        state.note_sent();
+        let answered = state.last_sent.load(Relaxed);
+        state.note_heard();
+        state.note_reply_heard();
+        state.note_heard(); // a report during the quiet stretch
+        assert_eq!(0, state.previous_run_ended.load(Relaxed), "a report starts no run");
+        state.note_sent();
+        assert_eq!(
+            answered,
+            state.previous_run_ended.load(Relaxed),
+            "the run after the report ends the one that held the answered packet"
         );
     }
 
