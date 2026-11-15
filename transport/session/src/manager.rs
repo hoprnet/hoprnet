@@ -561,8 +561,6 @@ where
 /// per Session at INFO, so its whole lifetime can be read from a production log without the
 /// per-frame detail of the socket.
 ///
-/// Also takes the Session off `METRIC_ACTIVE_SESSIONS`, which only a committed slot was counted in.
-///
 /// `admission` is the SURB-store seam, forwarded to [`release_session_slot`]; `None` only ever
 /// reaches here from a teardown that had no seam to call.
 fn close_session(
@@ -574,8 +572,6 @@ fn close_session(
     token: AdmissionToken,
 ) {
     tracing::info!(%session_id, %reason, "session closed");
-    #[cfg(all(feature = "telemetry", not(test)))]
-    METRIC_ACTIVE_SESSIONS.decrement(1.0);
     release_session_slot(session_id, session_data, reason, admission, grace, token);
 }
 
@@ -583,7 +579,9 @@ fn close_session(
 ///
 /// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
 /// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
-/// It does not touch `METRIC_ACTIVE_SESSIONS`; [`close_session`] does.
+///
+/// Takes the slot off `METRIC_ACTIVE_SESSIONS`, which counts slots from their allocation (see
+/// [`SessionManager::allocate_session_slot`]), so a slot torn down before its commit is paired too.
 ///
 /// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
 /// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
@@ -671,6 +669,9 @@ fn release_session_slot(
     if let Some(reservation) = session_data.cycle_budget.as_ref() {
         reservation.release();
     }
+
+    #[cfg(all(feature = "telemetry", not(test)))]
+    METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
 /// How a close is answered for a Session whose SURB buffer is already draining.
@@ -2404,9 +2405,8 @@ impl Drop for CycleBudgetReservation {
 /// another reader: they all share the one cell.
 ///
 /// An absent slot is not an error: the Session *was* established on this path, and `commit` runs with
-/// `None` so the guard is still marked committed and the Session still counted. The teardown that
-/// removed the slot already decremented `METRIC_ACTIVE_SESSIONS` and logged "session closed", so
-/// skipping the commit here would drift the gauge down by one and leave that close unpaired (see
+/// `None` so the guard is still marked committed. The teardown that removed the slot already logged
+/// "session closed", so skipping the commit here would leave that close unpaired (see
 /// [`SessionSlotGuard::commit`]).
 ///
 /// A slot found by key that is *not* the one this establishment allocated is treated exactly like an
@@ -2530,10 +2530,9 @@ impl<'a> SessionSlotGuard<'a> {
     /// Session on the same pseudonym — [`commit_slot_guard`] discards the latter before calling here.
     /// Committing without a slot is still a commit: the Session *was* established (the Exit sends
     /// `SessionEstablished` before it commits, so an Entry can close or answer with a
-    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed and
-    /// the Session counted, or the teardown's decrement would leave `METRIC_ACTIVE_SESSIONS` drifting
-    /// down and `close_session` would log a "session closed" with no matching "new session
-    /// established". Only the `admit` is skipped — there is no cell left to carry its token.
+    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed, or
+    /// `close_session` would log a "session closed" with no matching "new session established". Only
+    /// the `admit` is skipped — there is no cell left to carry its token.
     ///
     /// When a slot *is* present, it is this Session's own (the caller checked), so its cell arbitrates
     /// against a teardown racing this commit and nothing else can be writing to it. The teardown claims
@@ -2551,7 +2550,7 @@ impl<'a> SessionSlotGuard<'a> {
         // `None` means nothing to admit for: either the Session was torn down — its teardown already
         // ran its (no-op) retire, and any batch a peer sends meanwhile lands in the quarantine like any
         // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
-        // this admission's to stamp. The commit itself — logging and the metric below — still happens.
+        // this admission's to stamp. The commit itself — the logging above — still happens.
         if let (Some(admission), Some(slot)) = (admission, slot) {
             // The Exit commits after it has answered `SessionEstablished`, so a `BalancerTarget`
             // keep-alive can have announced a raised target before the ring exists. Admit at the
@@ -2580,9 +2579,6 @@ impl<'a> SessionSlotGuard<'a> {
                 admission.raise_target(&self.session_id, token, raised);
             }
         }
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_ACTIVE_SESSIONS.increment(1.0);
     }
 }
 
@@ -4967,14 +4963,14 @@ where
     ///
     /// Establishing a session involves several fallible steps *after* the slot has been
     /// inserted. The returned guard rolls the slot back - tearing the partially
-    /// established session down via [`close_session`] - unless it is
+    /// established session down via [`release_session_slot`] - unless it is
     /// [committed](SessionSlotGuard::commit).
     ///
-    /// The active-sessions gauge is incremented here, atomically with the insertion and
-    /// the guard creation, precisely so that it is always paired with the guard's
-    /// rollback decrement (performed through [`close_session`]). This keeps the gauge
-    /// accurate: it is never decremented for a slot that was not counted in the first
-    /// place, and every counted slot is decremented exactly once when it leaves the cache.
+    /// The active-sessions gauge is incremented here, with the insertion, and decremented by
+    /// [`release_session_slot`] on every path that removes the slot — a close or the guard's
+    /// rollback — so, like `active_sessions`, it counts every slot exactly once. It is not counted
+    /// at the commit: a close can reach a slot whose setup is still in progress, and if that setup
+    /// then fails, the slot would be decremented without ever having been counted.
     ///
     /// Returns `None` if a slot for `session_id` already exists; in that case nothing is
     /// inserted, the gauge is left untouched, and no guard is produced. The atomic `entry`
@@ -5021,6 +5017,9 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_ACTIVE_SESSIONS.increment(1.0);
+
                 // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
                 // is now available. Drain and signal the senders registered for this SessionId.
                 if let Some(waiters) = self
@@ -25888,10 +25887,9 @@ mod tests {
     ///
     /// The Session *was* established on this path — the Exit sends `SessionEstablished` before it
     /// commits, so an Entry can close or answer with a `SessionId`-scoped `SessionError` in that
-    /// window — so the guard must be marked committed rather than rolled back, and the Session still
-    /// counted. Only the admission is skipped: there is no slot left to carry its token. Skipping the
-    /// commit instead would drift `METRIC_ACTIVE_SESSIONS` down (the teardown already decremented it)
-    /// and leave the teardown's "session closed" unpaired.
+    /// window — so the guard must be marked committed rather than rolled back. Only the admission is
+    /// skipped: there is no slot left to carry its token. Skipping the commit instead would leave the
+    /// teardown's "session closed" unpaired.
     #[test_log::test(tokio::test)]
     async fn a_commit_without_a_slot_still_commits_the_session() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
