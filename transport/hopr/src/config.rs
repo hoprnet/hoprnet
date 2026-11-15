@@ -280,7 +280,8 @@ pub struct HoprProtocolConfig {
     #[cfg_attr(feature = "serde", serde(default = "default_latency_race_memory"))]
     pub latency_race_memory: u32,
     /// How hard relayer health bites in path selection: the graph gets `health^weight`. `1` as judged,
-    /// above `1` harsher, `0` switches the mitigation off, dead relayers included. Must be finite.
+    /// above `1` harsher, `0` switches the mitigation off, dead relayers included: nothing is written off
+    /// and no SURB generation is advanced either. Must be finite.
     #[default(default_relayer_health_weight())]
     #[validate(custom(function = "validate_relayer_health_weight"))]
     #[cfg_attr(feature = "serde", serde(default = "default_relayer_health_weight"))]

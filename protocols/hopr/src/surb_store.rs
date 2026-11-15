@@ -550,7 +550,7 @@ pub struct MemorySurbStore {
     /// ([`pseudonym_openers`](Self::pseudonym_openers)) — **not** like the receiving-side
     /// [`admitted_surbs_per_pseudonym`](Self::admitted_surbs_per_pseudonym). If this entry were evicted while the peer
     /// still held SURBs of generation `N`, [`current_generation`](Self::current_generation) would
-    /// fall back to `0`; the peer's [`SurbRingBuffer::push`] then reads `generation_is_newer(0, N)`
+    /// fall back to `0`; the peer's [`SurbRingBuffer::push_counting`] then reads `generation_is_newer(0, N)`
     /// as false (for `1 <= N <= 128`) and silently discards every fresh batch, stranding the reply
     /// path. Both dimensions are therefore taken from the sending-side reply-opener config, not the
     /// receiving-side SURB config: `reply_opener_lifetime` bounds how long we expect replies (hence
@@ -636,8 +636,9 @@ enum SurbHeldClass {
 /// Which of the store's caches shed an entry. Doubles as the `cache` label on metrics and log lines.
 ///
 /// The two `Ring*` variants are not caches in the moka sense: they count the SURBs that one
-/// pseudonym's full ring buffer drops or refuses (always with [`RemovalCause::Size`]), split by what
-/// that costs, so that the same per-interval summary can tell a routine loss from a permanent one.
+/// pseudonym's full ring buffer drops or refuses ([`RemovalCause::Size`]), or a generation change takes out
+/// of play ([`RemovalCause::Replaced`]), split by what that costs, so that the same per-interval summary can tell a
+/// routine loss from a permanent one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 enum EvictedCache {
@@ -651,8 +652,8 @@ enum EvictedCache {
     /// return path and nothing more, and routine while a sender that bypasses the balancer gate
     /// outproduces what this side spends.
     RingPlain,
-    /// Replying side: a SURB carrying a PIX share that a full ring buffer dropped. A share reaches the
-    /// reconstructor only when its SURB is *used*, so the share is lost for good.
+    /// Replying side: a SURB carrying a PIX share that a full ring buffer dropped or a generation change took out of
+    /// play. A share reaches the reconstructor only when its SURB is *used*, so the share is lost for good.
     RingShare,
     /// Sending side: a pseudonym's SURB generation serial (`generations`).
     Generation,
@@ -1064,8 +1065,9 @@ impl MemorySurbStore {
         admitted + quarantined
     }
 
-    /// Books what a ring-buffer push dropped into the eviction summary, split by what it cost.
-    fn record_ring_overflow(&self, outcome: &SurbInsertOutcome) {
+    /// Books what a ring-buffer push dropped into the eviction summary, split by what it cost, and the
+    /// `replaced_shares` a generation change took out of play.
+    fn record_ring_overflow(&self, outcome: &SurbInsertOutcome, replaced_shares: usize) {
         // The total that `num_evicted_surbs` carries upwards, and the Exit books into its flow
         // estimate, cannot tell a lost share from a lost return path, and only the former always
         // warrants a warning. Recording a count of zero is free, so the usual push, which overflows
@@ -1080,6 +1082,8 @@ impl MemorySurbStore {
             RemovalCause::Size,
             outcome.evicted_shares as u64,
         );
+        self.stats
+            .record_many(EvictedCache::RingShare, RemovalCause::Replaced, replaced_shares as u64);
     }
 
     /// Removes `pseudonym`'s quarantine ring, if it has one, and refunds what it held to the budget.
@@ -1122,8 +1126,8 @@ impl MemorySurbStore {
         admitted: &SurbRingBuffer<HoprSurb>,
     ) -> Option<SurbInsertOutcome> {
         let (generation, held) = self.take_quarantine_ring(pseudonym)?.take_all();
-        let outcome = admitted.push(held, generation?);
-        self.record_ring_overflow(&outcome);
+        let (outcome, replaced_shares) = admitted.push_counting(held, generation?);
+        self.record_ring_overflow(&outcome, replaced_shares);
         Some(outcome)
     }
 
@@ -1152,8 +1156,8 @@ impl MemorySurbStore {
     ) -> SurbInsertOutcome {
         let folded = self.fold_quarantine_into(pseudonym, admitted).unwrap_or_default();
 
-        let outcome = admitted.push(surbs, generation);
-        self.record_ring_overflow(&outcome);
+        let (outcome, replaced_shares) = admitted.push_counting(surbs, generation);
+        self.record_ring_overflow(&outcome, replaced_shares);
         SurbInsertOutcome {
             retained: outcome.retained,
             evicted: outcome.evicted + folded.evicted,
@@ -1178,6 +1182,7 @@ impl MemorySurbStore {
         generation: u8,
     ) -> SurbInsertOutcome {
         let mut pushed = SurbInsertOutcome::default();
+        let mut replaced_shares = 0;
         self.quarantine_surbs.entry_by_ref(pseudonym).and_compute_with(
             |entry: Option<moka::Entry<HoprPseudonym, SurbRingBuffer<HoprSurb>>>| {
                 // The entry's value shares its buffer with the cache's, so a push through it lands in
@@ -1192,7 +1197,7 @@ impl MemorySurbStore {
                 };
 
                 let before = ring.len();
-                pushed = ring.push(surbs, generation);
+                (pushed, replaced_shares) = ring.push_counting(surbs, generation);
                 match pushed.retained.checked_sub(before) {
                     Some(grown) => {
                         self.quarantine_budget
@@ -1204,7 +1209,7 @@ impl MemorySurbStore {
             },
         );
 
-        self.record_ring_overflow(&pushed);
+        self.record_ring_overflow(&pushed, replaced_shares);
         pushed
     }
 
@@ -2143,12 +2148,20 @@ impl<S> SurbRingBuffer<S> {
     /// [`superseded`](SurbInsertOutcome::superseded): the whole of what a newer generation cleared, or
     /// the whole of an older-generation batch that was refused. The caller that tracks what the buffer
     /// holds adds the two, so that `retained` and its own count of what was received agree.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> SurbInsertOutcome
+    ///
+    /// Also returns how many share-carrying SURBs the generation rule took out of play: the shares a newer
+    /// generation cleared, or those of an older-generation batch it refused.
+    fn push_counting<I: IntoIterator<Item = (HoprSurbId, S)>>(
+        &self,
+        surbs: I,
+        generation: u8,
+    ) -> (SurbInsertOutcome, usize)
     where
         S: SurbShareInfo,
     {
         let mut inner = self.inner.lock();
         let mut superseded = 0;
+        let mut replaced_shares = 0;
 
         match inner.generation {
             Some(current) if generation == current => {} // ordinary refill: append below
@@ -2156,18 +2169,23 @@ impl<S> SurbRingBuffer<S> {
                 // Return path changed: everything held is for the superseded path. Drop it wholesale
                 // so the newer batch is all that remains and the next reply uses the live path.
                 superseded = inner.len();
+                replaced_shares = inner.shares.len();
                 inner.clear();
                 inner.generation = Some(generation);
             }
             Some(_) => {
                 // Older than what we already hold: a late or reordered batch for a path the creator
                 // has already moved on from. Discard it rather than reintroduce stale SURBs.
-                return SurbInsertOutcome {
+                let (refused, shares) = surbs.into_iter().fold((0, 0), |(all, shares), (_, surb)| {
+                    (all + 1, shares + surb.ssa_index().is_some() as usize)
+                });
+                let outcome = SurbInsertOutcome {
                     retained: inner.len(),
                     evicted: 0,
                     evicted_shares: 0,
-                    superseded: surbs.into_iter().count(),
+                    superseded: refused,
                 };
+                return (outcome, shares);
             }
             None => inner.generation = Some(generation),
         }
@@ -2200,12 +2218,22 @@ impl<S> SurbRingBuffer<S> {
             };
             tier.push_back((id, surb));
         }
-        SurbInsertOutcome {
+        let outcome = SurbInsertOutcome {
             retained: inner.len(),
             evicted,
             evicted_shares,
             superseded,
-        }
+        };
+        (outcome, replaced_shares)
+    }
+
+    /// [`push_counting`](Self::push_counting) without the share count, for tests.
+    #[cfg(test)]
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I, generation: u8) -> SurbInsertOutcome
+    where
+        S: SurbShareInfo,
+    {
+        self.push_counting(surbs, generation).0
     }
 
     /// Pops the next SURB that `is_valid` accepts: a share-bearing one while any is held, the oldest of
@@ -3116,6 +3144,31 @@ mod tests {
         assert_eq!(1, rb.len(), "a late older-generation batch must not be reintroduced");
         assert_eq!(Some(9), rb.generation());
         assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
+    }
+
+    /// The shares a generation change takes out of play are reported, whether it clears the ring or
+    /// refuses a late older batch.
+    #[test]
+    fn surb_ring_buffer_should_count_the_shares_a_generation_change_takes_out_of_play() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(8);
+        rb.push([share_surb(1)?, plain_surb(2)?, share_surb(3)?], 3);
+
+        let (outcome, replaced_shares) = rb.push_counting([plain_surb(4)?, share_surb(5)?, share_surb(6)?], 2);
+        assert_eq!(
+            (3, 2),
+            (outcome.superseded, replaced_shares),
+            "the late batch is refused"
+        );
+
+        let (outcome, replaced_shares) = rb.push_counting([share_surb(7)?], 4);
+        assert_eq!(
+            (3, 2),
+            (outcome.superseded, replaced_shares),
+            "the newer generation clears the ring"
+        );
+        assert_eq!(1, rb.len());
 
         Ok(())
     }
@@ -4044,6 +4097,36 @@ mod tests {
             "any lost share warrants a warning, four dropped return paths do not"
         );
 
+        Ok(())
+    }
+
+    /// The shares a newer generation clears are lost for good, and are booked as replaced.
+    #[test]
+    fn memory_surb_store_should_count_the_shares_a_newer_generation_replaces() -> anyhow::Result<()> {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+        store.insert_surbs(pseudonym, vec![share_surb(1)?, plain_surb(2)?, share_surb(3)?]);
+        store.insert_surbs(
+            pseudonym,
+            vec![([4u8; 8], surb_gen(HoprKeyIdent::from(1u32), TWO_HOP, 1)?)],
+        );
+
+        let report = store
+            .stats
+            .record_at(
+                EvictedCache::SurbRing,
+                RemovalCause::Explicit,
+                Instant::now() + 2 * REPORT_INTERVAL,
+            )
+            .context("the interval has elapsed, so a report is due")?;
+        assert_eq!(
+            EvictionCounts {
+                expired: 0,
+                size: 0,
+                replaced: 2
+            },
+            report.counts(EvictedCache::RingShare)
+        );
         Ok(())
     }
 
