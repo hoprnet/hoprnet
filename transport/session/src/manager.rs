@@ -39,7 +39,7 @@ use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::AbortableList;
+use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -213,6 +213,22 @@ impl Drop for ParkedSurbRefund {
     fn drop(&mut self) {
         // A no-op after `admit`, which leaves an empty refund behind.
         self.0.give_back();
+    }
+}
+
+/// Aborts the wrapped task when dropped, which neither a join handle nor an [`AbortHandle`] does on
+/// its own drop. Built through `From` from any [`Abortable`].
+struct AbortOnDrop(Box<dyn Abortable + Send + Sync>);
+
+impl<A: Abortable + Send + Sync + 'static> From<A> for AbortOnDrop {
+    fn from(task: A) -> Self {
+        Self(Box::new(task))
+    }
+}
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort_task();
     }
 }
 
@@ -571,6 +587,9 @@ fn close_session(
 /// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
 /// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
 ///
+/// Takes the slot off `METRIC_ACTIVE_SESSIONS`, which counts slots from their allocation (see
+/// [`SessionManager::allocate_session_slot`]), so a slot torn down before its commit is paired too.
+///
 /// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
 /// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
 /// notification a closing Exit has just enqueued — the PIX-failure notice is the one such packet —
@@ -676,6 +695,21 @@ fn answer_while_draining(reason: ClosureReason) -> Option<bool> {
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
+}
+
+/// How long `new_session` waits for the answer to a `StartSession` over the given hop counts.
+fn initiation_wait(base: Duration, forward_hops: usize, return_hops: usize) -> Duration {
+    initiation_timeout_max_one_way(base, forward_hops + return_hops + 2)
+}
+
+/// TTL of the pending-initiation caches: the longest [`initiation_wait`] plus the time the
+/// `StartSession` send may take before that wait starts.
+fn initiation_cache_ttl(base: Duration) -> Duration {
+    initiation_wait(
+        base,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+    ) + EXTERNAL_SEND_TIMEOUT
 }
 
 /// Conservative lower bound on how many coefficient commitments fit into one `SsaCommit` message.
@@ -2519,9 +2553,8 @@ impl Drop for CycleBudgetReservation {
 /// another reader: they all share the one cell.
 ///
 /// An absent slot is not an error: the Session *was* established on this path, and `commit` runs with
-/// `None` so the guard is still marked committed and the Session still counted. The teardown that
-/// removed the slot already decremented `METRIC_ACTIVE_SESSIONS` and logged "session closed", so
-/// skipping the commit here would drift the gauge down by one and leave that close unpaired (see
+/// `None` so the guard is still marked committed. The teardown that removed the slot already logged
+/// "session closed", so skipping the commit here would leave that close unpaired (see
 /// [`SessionSlotGuard::commit`]).
 ///
 /// A slot found by key that is *not* the one this establishment allocated is treated exactly like an
@@ -2645,10 +2678,9 @@ impl<'a> SessionSlotGuard<'a> {
     /// Session on the same pseudonym — [`commit_slot_guard`] discards the latter before calling here.
     /// Committing without a slot is still a commit: the Session *was* established (the Exit sends
     /// `SessionEstablished` before it commits, so an Entry can close or answer with a
-    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed and
-    /// the Session counted, or the teardown's decrement would leave `METRIC_ACTIVE_SESSIONS` drifting
-    /// down and `close_session` would log a "session closed" with no matching "new session
-    /// established". Only the `admit` is skipped — there is no cell left to carry its token.
+    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed, or
+    /// `close_session` would log a "session closed" with no matching "new session established". Only
+    /// the `admit` is skipped — there is no cell left to carry its token.
     ///
     /// When a slot *is* present, it is this Session's own (the caller checked), so its cell arbitrates
     /// against a teardown racing this commit and nothing else can be writing to it. The teardown claims
@@ -2666,7 +2698,7 @@ impl<'a> SessionSlotGuard<'a> {
         // `None` means nothing to admit for: either the Session was torn down — its teardown already
         // ran its (no-op) retire, and any batch a peer sends meanwhile lands in the quarantine like any
         // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
-        // this admission's to stamp. The commit itself — logging and the metric below — still happens.
+        // this admission's to stamp. The commit itself — the logging above — still happens.
         if let (Some(admission), Some(slot)) = (admission, slot) {
             // The Exit commits after it has answered `SessionEstablished`, so a `BalancerTarget`
             // keep-alive can have announced a raised target before the ring exists. Admit at the
@@ -2695,9 +2727,6 @@ impl<'a> SessionSlotGuard<'a> {
                 admission.raise_target(&self.session_id, token, raised);
             }
         }
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_ACTIVE_SESSIONS.increment(1.0);
     }
 }
 
@@ -4706,8 +4735,7 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
-        let initiation_timeout =
-            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
+        let initiation_timeout = initiation_cache_ttl(cfg.initiation_timeout_base);
         let pix_toolbox: Arc<OnceLock<PixToolbox>> = Arc::new(OnceLock::new());
         // Captured by the eviction listener below, which is built here and has no `&self` to read
         // later — same shape as `active_sessions_for_listener`. Cloned before the closure moves the
@@ -5083,14 +5111,14 @@ where
     ///
     /// Establishing a session involves several fallible steps *after* the slot has been
     /// inserted. The returned guard rolls the slot back - tearing the partially
-    /// established session down via [`close_session`] - unless it is
+    /// established session down via [`release_session_slot`] - unless it is
     /// [committed](SessionSlotGuard::commit).
     ///
-    /// The active-sessions gauge is incremented here, atomically with the insertion and
-    /// the guard creation, precisely so that it is always paired with the guard's
-    /// rollback decrement (performed through [`close_session`]). This keeps the gauge
-    /// accurate: it is never decremented for a slot that was not counted in the first
-    /// place, and every counted slot is decremented exactly once when it leaves the cache.
+    /// The active-sessions gauge is incremented here, with the insertion, and decremented by
+    /// [`release_session_slot`] on every path that removes the slot — a close or the guard's
+    /// rollback — so, like `active_sessions`, it counts every slot exactly once. It is not counted
+    /// at the commit: a close can reach a slot whose setup is still in progress, and if that setup
+    /// then fails, the slot would be decremented without ever having been counted.
     ///
     /// Returns `None` if a slot for `session_id` already exists; in that case nothing is
     /// inserted, the gauge is left untouched, and no guard is produced. The atomic `entry`
@@ -5137,6 +5165,9 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_ACTIVE_SESSIONS.increment(1.0);
+
                 // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
                 // is now available. Drain and signal the senders registered for this SessionId.
                 if let Some(waiters) = self
@@ -5343,9 +5374,10 @@ where
         })?;
 
         // The timeout is given by the number of hops requested
-        let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
+        let initiation_timeout: futures_time::time::Duration = initiation_wait(
             self.cfg.initiation_timeout_base,
-            cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
+            cfg.forward_path_options.count_hops(),
+            cfg.return_path_options.count_hops(),
         )
         .into();
 
@@ -5524,12 +5556,12 @@ where
                     // aborted as soon as the readiness wait resolves.
                     let sessions_keepalive = self.sessions.clone();
                     let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
-                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                    let slot_keepalive = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
                         loop {
                             hopr_utils::runtime::prelude::sleep(touch_period).await;
                             let _ = sessions_keepalive.get(&session_id);
                         }
-                    });
+                    }));
 
                     // The session is ready once a quarter of the target is believed to be at the
                     // counterparty: that is the point the first replies can come home, and a quarter of
@@ -5545,7 +5577,7 @@ where
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await;
-                    slot_keepalive.abort();
+                    drop(slot_keepalive);
                     match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
@@ -9581,6 +9613,25 @@ mod tests {
     /// [`SsaGeneratorConfig::default`], so a value that failed to cross the wire is visible.
     const TEST_SURPLUS_SHARES: u8 = 1;
 
+    #[tokio::test]
+    async fn abort_on_drop_stops_the_task() -> anyhow::Result<()> {
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let guard = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
+            let _tx = tx;
+            let _ = started_tx.send(());
+            std::future::pending::<()>().await;
+        }));
+        started_rx.await.context("the task never ran")?;
+        drop(guard);
+
+        let result = timeout(Duration::from_secs(1), rx)
+            .await
+            .context("the task was not aborted")?;
+        assert!(result.is_err(), "the sender must have been dropped without sending");
+        Ok(())
+    }
+
     #[test]
     fn session_config_forwards_max_buffered_segments() {
         assert_eq!(
@@ -10515,6 +10566,19 @@ mod tests {
         Ok(())
     }
 
+    /// The pending-initiation entries must outlive the longest wait `new_session` can make.
+    #[test]
+    fn initiation_cache_ttl_outlasts_the_longest_wait() {
+        let max = RoutingOptions::MAX_INTERMEDIATE_HOPS;
+        for base in [Duration::from_millis(100), Duration::from_secs(5)] {
+            assert!(initiation_cache_ttl(base) > initiation_wait(base, max, max));
+        }
+        assert_eq!(
+            initiation_cache_ttl(Duration::from_secs(5)),
+            Duration::from_millis(40_200)
+        );
+    }
+
     /// Verifies that a session initiation returns `TransportSessionError::Timeout` when the peer
     /// never processes or responds to the `StartSession` message.
     ///
@@ -11247,15 +11311,6 @@ mod tests {
         Ok(())
     }
 
-    /// Aborts a background task of a test when it goes out of scope.
-    struct AbortOnDrop(tokio::task::JoinHandle<()>);
-
-    impl Drop for AbortOnDrop {
-        fn drop(&mut self) {
-            self.0.abort();
-        }
-    }
-
     /// Keeps a Session's SURB estimate at `level` while it runs, so that the reports it sends do not walk the
     /// stock off the point a test is about. Dropping the guard stops it.
     fn hold_stock_at(estimator: &AtomicSurbFlowEstimator, level: u64) -> AbortOnDrop {
@@ -11275,7 +11330,7 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// Records a loss into `signal` every `every` until the guard is dropped, as a continuously faulty path does.
@@ -11286,7 +11341,7 @@ mod tests {
                 tokio::time::sleep(every).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// The Session stops reporting at the degraded period exactly at the keep-alive reserve, and not one SURB
@@ -11377,7 +11432,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -11582,7 +11637,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let _sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -26902,10 +26957,9 @@ mod tests {
     ///
     /// The Session *was* established on this path — the Exit sends `SessionEstablished` before it
     /// commits, so an Entry can close or answer with a `SessionId`-scoped `SessionError` in that
-    /// window — so the guard must be marked committed rather than rolled back, and the Session still
-    /// counted. Only the admission is skipped: there is no slot left to carry its token. Skipping the
-    /// commit instead would drift `METRIC_ACTIVE_SESSIONS` down (the teardown already decremented it)
-    /// and leave the teardown's "session closed" unpaired.
+    /// window — so the guard must be marked committed rather than rolled back. Only the admission is
+    /// skipped: there is no slot left to carry its token. Skipping the commit instead would leave the
+    /// teardown's "session closed" unpaired.
     #[test_log::test(tokio::test)]
     async fn a_commit_without_a_slot_still_commits_the_session() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();
