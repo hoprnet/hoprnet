@@ -28,9 +28,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Build candidate binary
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # nix-action-v2.0.0
         with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: nix build -L .#binary-ticket-inspector
 
@@ -62,9 +62,9 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@13489274cf2d23929227fcd62bb8ac2341615b3e # workflow-benchmark-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-benchmarks-v3.0.0
     with:
-      source_branch: ${{ github.event.pull_request.head.ref }}
+      repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
       # Benchmarks disabled for now — flip these two booleans back to re-enable.

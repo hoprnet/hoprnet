@@ -19,9 +19,9 @@ jobs:
     permissions:
       contents: read
       id-token: write # Codecov OIDC upload
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@3ee95c480962bb3c1fc0061887da9ba735f537c7 # workflow-tests-v6
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-tests-v7.0.0
     with:
-      source_branch: ${{ github.ref_name }}
+      repo_sha: ${{ github.sha }}
       enable_unit_tests: false
       enable_integration_tests: false
       enable_nightly_tests: false
@@ -41,9 +41,9 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@13489274cf2d23929227fcd62bb8ac2341615b3e # workflow-benchmark-v2
+    uses: hoprnet/hopr-workflows/.github/workflows/benchmarks.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # workflow-benchmarks-v3.0.0
     with:
-      source_branch: ${{ github.ref_name }}
+      repo_sha: ${{ github.sha }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
       # Benchmarks disabled for now — flip these two booleans back to re-enable.

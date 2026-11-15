@@ -20,12 +20,12 @@ permissions: {}
 jobs:
   build-library:
     name: Build & Publish Library
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@3d291616a704bea189af1f16cefc25e26d2857c0 # build-library-v3
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # build-library-v4.0.0
     permissions:
       contents: read
       id-token: write
     with:
-      source_branch: ${{ github.ref_name }}
+      repo_sha: ${{ github.sha }}
       version_type: release
       architecture: x86_64-linux
       runner: depot-ubuntu-24.04-4

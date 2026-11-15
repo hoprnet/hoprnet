@@ -17,6 +17,31 @@ use crate::{FoundSurb, SurbInsertOutcome, traits::SurbStore};
 /// Public so that callers applying their own override can floor it identically, rather than
 /// reaching a value the config file itself would have been rejected for.
 pub const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
+
+/// Floor on the byte budget of each Entry-side SURB map: 85 MB, about what the fixed 100 000-record
+/// cap of the pending map used, measured at roughly 840 B per record in the cache it was built on
+/// (hoprnet#8624).
+///
+/// The config validator rejects a budget below it, and the transport clamps to it, so a small value
+/// never shrinks the maps below what they held before the byte budget existed. The maps account a
+/// record by its own size, so this budget holds about 143 000 pending records, never fewer than the
+/// 100 000 it replaces.
+pub const MINIMUM_PENDING_SURB_MAX_BYTES: u64 = 85_000_000;
+
+/// Default byte budget for **each** of the two Entry-side SURB maps.
+///
+/// 256 MiB holds about 454 000 pending records per map, some 23 deployed-size stocks (19 264 SURBs
+/// each), so the overflow hoprnet#8624 describes is fixed with room to spare. See
+/// [`SurbStoreConfig::pending_surb_max_bytes`] for the pair's worst-case total.
+pub const DEFAULT_PENDING_SURB_MAX_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Ceiling on [`SurbStoreConfig::pending_surb_max_bytes`]: 4 GiB per map.
+///
+/// The budget is a memory commitment the operator makes, so a typo must not be able to ask for an
+/// unbounded map. 4 GiB is 16× the default and about 7 million pending records per map, far past any
+/// deployed Session count (100 Sessions × 19 264 SURBs is ~1.93 M records, about 1.1 GB) while still
+/// leaving the pair inside a node's RAM.
+pub const MAXIMUM_PENDING_SURB_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 /// Subtracts `n` from the quarantine SURB budget, clamping at zero instead of wrapping.
 ///
 /// Every refund site reads a ring length outside the ring's own lock, so a stale reader can subtract
@@ -149,6 +174,10 @@ fn default_eviction_report_interval() -> Duration {
 
 fn default_eviction_report_threshold() -> u64 {
     1000
+}
+
+fn default_pending_surb_max_bytes() -> u64 {
+    DEFAULT_PENDING_SURB_MAX_BYTES
 }
 
 fn default_quarantine_rb_capacity() -> usize {
@@ -443,6 +472,28 @@ pub struct SurbStoreConfig {
     #[default(default_admitted_headroom_percent())]
     #[cfg_attr(feature = "serde", serde(default = "default_admitted_headroom_percent"))]
     pub admitted_headroom_percent: u32,
+    /// Byte budget for **each** of the two Entry-side maps that remember minted SURBs until their reply
+    /// comes home: the pending map and the written-off-legs map. Sending side only.
+    ///
+    /// Each map holds as many records as fit in the budget at its own record size, evicting a random
+    /// record to admit a new one when full. The default 256 MiB holds about 454 000 pending records per
+    /// map (some 23 deployed-size stocks); both maps fill from it, so the pair peaks at about twice the
+    /// budget. Records the pending map could not hold are counted by `hopr_surb_pending_lost_total`, so
+    /// an undersized budget is visible.
+    ///
+    /// The validator rejects a value outside [`MINIMUM_PENDING_SURB_MAX_BYTES`] (85 MB) to
+    /// [`MAXIMUM_PENDING_SURB_MAX_BYTES`] (4 GiB). `MemorySurbStore` does not read this field; only
+    /// `hopr-transport`'s `HoprTransport::new` does.
+    ///
+    /// Default is 256 MiB.
+    #[default(default_pending_surb_max_bytes())]
+    #[validate(range(
+        min = MINIMUM_PENDING_SURB_MAX_BYTES,
+        max = MAXIMUM_PENDING_SURB_MAX_BYTES,
+        message = "pending_surb_max_bytes must be between 85000000 and 4294967296 bytes"
+    ))]
+    #[cfg_attr(feature = "serde", serde(default = "default_pending_surb_max_bytes"))]
+    pub pending_surb_max_bytes: u64,
 }
 
 /// Basic [`SurbStore`] implementation based on an in-memory cache.
@@ -5149,7 +5200,60 @@ mod tests {
             10_000, legacy.admitted_max_pseudonyms,
             "the admitted census is defaulted"
         );
+        assert_eq!(
+            DEFAULT_PENDING_SURB_MAX_BYTES, legacy.pending_surb_max_bytes,
+            "the pending-SURB byte budget is defaulted"
+        );
 
+        // The byte budget's floor is the map's real minimum, not one byte: a value below it would be
+        // raised silently, so the validator rejects it rather than accepting a figure it ignores.
+        assert!(
+            load(vec![("pending_surb_max_bytes", 0)]).is_err(),
+            "a zero pending-SURB budget must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES - 1)]).is_err(),
+            "a budget below the floor must be rejected"
+        );
+        load(vec![("pending_surb_max_bytes", MINIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the floor must load")?;
+
+        // And a ceiling, so a typo cannot ask for an unbounded map.
+        assert!(
+            load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES + 1)]).is_err(),
+            "a budget above the 4 GiB ceiling must be rejected"
+        );
+        assert!(
+            load(vec![("pending_surb_max_bytes", u64::MAX)]).is_err(),
+            "u64::MAX must be rejected, not accepted as an unbounded map"
+        );
+        load(vec![("pending_surb_max_bytes", MAXIMUM_PENDING_SURB_MAX_BYTES)])
+            .context("a budget at the ceiling must load")?;
+
+        Ok(())
+    }
+
+    /// The validator prints only its message, not the constants it checks, so an operator can fix a
+    /// rejected value only if the message names the bounds in bytes.
+    #[test]
+    fn the_budget_rejection_should_name_both_bounds_in_bytes() -> anyhow::Result<()> {
+        use validator::Validate;
+
+        let rejected = SurbStoreConfig {
+            pending_surb_max_bytes: 0,
+            ..Default::default()
+        };
+        let message = rejected
+            .validate()
+            .err()
+            .context("a zero budget must be rejected")?
+            .to_string();
+        for bound in [MINIMUM_PENDING_SURB_MAX_BYTES, MAXIMUM_PENDING_SURB_MAX_BYTES] {
+            assert!(
+                message.contains(&bound.to_string()),
+                "the message must name {bound}: {message}"
+            );
+        }
         Ok(())
     }
 }

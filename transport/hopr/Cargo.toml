@@ -105,6 +105,7 @@ halfbrown = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
+indexmap = { workspace = true }
 moka = { workspace = true }
 multiaddr = { workspace = true }
 parking_lot = { workspace = true }
@@ -200,6 +201,11 @@ hopr-transport-mixer = { workspace = true, features = ["serde"] }
 hopr-ticket-manager = { workspace = true }
 temp-env = { workspace = true }
 tokio = { workspace = true }
+
+[[bench]]
+name = "pending_surb_map_bench"
+harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "pipeline_e2e_bench"

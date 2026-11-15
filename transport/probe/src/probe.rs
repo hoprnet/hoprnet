@@ -69,7 +69,9 @@ where
         let tag: Tag = in_data.data.application_tag;
 
         if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag).await {
-            tracing::debug!(%tag, "loopback probe successfully received");
+            let span = tracing::trace_span!("loopback_probe_reply", %pseudonym, %tag);
+            let _entered = span.enter();
+            tracing::trace!(%tag, "loopback probe successfully received");
             self.network_graph
                 .record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(
                     EdgeTransportTelemetry::Loopback(path_telemetry),
@@ -86,7 +88,7 @@ where
                         tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
                     }
                     Message::Probe(NeighborProbe::Ping(ping)) => {
-                        tracing::debug!(%pseudonym, nonce = const_hex::encode(ping), "received ping");
+                        tracing::trace!(%pseudonym, nonce = const_hex::encode(ping), "received ping");
                         tracing::trace!(%pseudonym, nonce = const_hex::encode(ping), "wrapping a pong in the found SURB");
 
                         let message = Message::Probe(NeighborProbe::Pong(ping));
@@ -101,16 +103,18 @@ where
                         }
                     }
                     Message::Probe(NeighborProbe::Pong(pong)) => {
-                        tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), "received pong");
+                        tracing::trace!(%pseudonym, nonce = const_hex::encode(pong), "received pong");
                         if let Some((peer, start, replier)) = self
                             .active_neighbor_probes
                             .remove(&(pseudonym, NeighborProbe::Ping(pong)))
                             .await
                         {
+                            let span = tracing::trace_span!("neighbor_probe_reply", %peer, %pseudonym, nonce = const_hex::encode(pong));
+                            let _entered = span.enter();
                             let latency = current_time().as_unix_timestamp().saturating_sub(start);
 
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                tracing::trace!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
                                 self.network_graph.record_edge::<NeighborTelemetry, PathTelemetry>(
                                     hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(
                                         NeighborTelemetry {
@@ -127,7 +131,7 @@ where
                                 replier.notify(Ok(latency));
                             }
                         } else {
-                            tracing::warn!(%pseudonym, nonce = const_hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
+                            tracing::trace!(%pseudonym, nonce = const_hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
                         }
                     }
                 },
@@ -222,8 +226,10 @@ impl Probe {
                             // If the eviction cause is expiration => record as a failed probe
                             let store = network_graph_internal_neighbor.clone();
                             let (peer, _start, notifier) = v;
+                            let span = tracing::trace_span!("neighbor_probe_expiry", %peer, pseudonym = %k.0);
+                            let _entered = span.enter();
 
-                            tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
+                            tracing::trace!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
                             if let Some(replier) = notifier {
                                 if matches!(peer.as_ref(), NodeId::Offchain(_)) {
                                     replier.notify(Err(()));
@@ -267,9 +273,11 @@ impl Probe {
                           -> moka::notification::ListenerFuture {
                         if matches!(cause, moka::notification::RemovalCause::Expired) {
                             // If the eviction cause is expiration => record as a failed probe
+                            let span = tracing::trace_span!("loopback_probe_expiry", %tag);
+                            let _entered = span.enter();
                             let store = network_graph_internal_path.clone();
 
-                            tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
+                            tracing::trace!(%tag, reason = "timeout", "loopback probe failed");
 
                             store.record_edge::<NeighborTelemetry, PathTelemetry>(
                                 hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(
@@ -558,6 +566,7 @@ mod tests {
     }
 
     impl NetworkGraphUpdate for PeerStore {
+        /// Store neighbor successes and timeouts in the test harness, ignoring loopback measurements.
         fn record_edge<N, P>(&self, telemetry: MeasurableEdge<N, P>)
         where
             N: hopr_api::graph::MeasurablePeer + Send + Clone,
@@ -577,6 +586,8 @@ mod tests {
                         Err(ProbeError::TrafficError(NetworkGraphError::ProbeNeighborTimeout(peer))),
                     ));
                 }
+                MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Loopback(_)))
+                | MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(_))) => {}
                 _ => panic!("unexpected telemetry type, unimplemented"),
             }
         }
@@ -630,6 +641,135 @@ mod tests {
 
     type TestClassifier = ProbeClassifierState<PeerStore>;
 
+    /// Capture producer spans and the span depth at which each log message is emitted.
+    #[derive(Clone, Default)]
+    struct ProbeLogs {
+        spans: Arc<parking_lot::Mutex<Vec<&'static str>>>,
+        messages: Arc<parking_lot::Mutex<Vec<(String, usize)>>>,
+        depth: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    struct MessageVisitor(String);
+
+    impl tracing::field::Visit for MessageVisitor {
+        /// Extract the message field without coupling the assertion to logger formatting.
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            if field.name() == "message" {
+                self.0 = format!("{value:?}");
+            }
+        }
+    }
+
+    impl tracing::Subscriber for ProbeLogs {
+        fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+            // Tokio's runtime instrumentation is enabled by workspace features; only probe
+            // spans and events belong to the producer-context assertions below.
+            metadata.target().starts_with("hopr_transport_probe")
+        }
+
+        fn new_span(&self, attrs: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            let mut spans = self.spans.lock();
+            spans.push(attrs.metadata().name());
+            tracing::span::Id::from_u64(spans.len() as u64)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            let mut message = MessageVisitor(String::new());
+            event.record(&mut message);
+            self.messages
+                .lock()
+                .push((message.0, self.depth.load(std::sync::atomic::Ordering::Relaxed)));
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {
+            self.depth.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        fn exit(&self, _: &tracing::span::Id) {
+            self.depth.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    /// Ordinary packets create no probe span; matched replies log inside their producer span.
+    fn probe_reply_logs_stay_in_the_producer_span() -> anyhow::Result<()> {
+        let logs = ProbeLogs::default();
+        tracing::subscriber::with_default(logs.clone(), || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?
+                .block_on(async {
+                    let store = PeerStore {
+                        me: *OFFCHAIN_KEYPAIR.public(),
+                        get_peers: Arc::new(RwLock::new(VecDeque::new())),
+                        on_finished: Arc::new(RwLock::new(Vec::new())),
+                    };
+                    let classifier = ProbeClassifierState {
+                        active_neighbor_probes: moka::future::Cache::new(1),
+                        active_path_probes: moka::future::Cache::new(1),
+                        network_graph: store.clone(),
+                    };
+                    let pseudonym = HoprPseudonym::random();
+                    let ordinary = ApplicationDataIn {
+                        data: ApplicationData::new(Tag::MAX, b"ordinary")?,
+                        packet_info: Default::default(),
+                    };
+                    assert!(matches!(
+                        classifier.classify(futures::sink::drain(), pseudonym, ordinary).await,
+                        ProbeDispatch::Passthrough(..)
+                    ));
+                    assert!(
+                        logs.spans.lock().is_empty(),
+                        "ordinary packets must not create probe spans: {:?}",
+                        *logs.spans.lock()
+                    );
+
+                    let nonce = [7; NeighborProbe::NONCE_SIZE];
+                    classifier
+                        .active_neighbor_probes
+                        .insert(
+                            (pseudonym, NeighborProbe::Ping(nonce)),
+                            (
+                                Box::new(NodeId::Offchain(NEIGHBOURS[0])),
+                                current_time().as_unix_timestamp(),
+                                None,
+                            ),
+                        )
+                        .await;
+                    classifier
+                        .classify(
+                            futures::sink::drain(),
+                            pseudonym,
+                            ApplicationDataIn {
+                                data: Message::Probe(NeighborProbe::Pong(nonce)).try_into()?,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await;
+                    assert_eq!(&*logs.spans.lock(), &["neighbor_probe_reply"]);
+                    assert!(
+                        logs.messages
+                            .lock()
+                            .iter()
+                            .any(|(message, depth)| { message == "probe successful" && *depth == 1 })
+                    );
+                    assert_eq!(
+                        store
+                            .on_finished
+                            .read()
+                            .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?
+                            .len(),
+                        1
+                    );
+                    anyhow::Ok(())
+                })
+        })
+    }
+
     struct TestInterface {
         probe_classifier: TestClassifier,
         from_probing_to_network_rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
@@ -637,6 +777,7 @@ mod tests {
         manual_probe_tx: futures::channel::mpsc::Sender<(OffchainPublicKey, PingQueryReplier)>,
     }
 
+    /// Run probe producers and classifiers with bounded test channels.
     async fn test_with_probing<F, Fut>(cfg: ProbeConfig, store: PeerStore, test: F) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
@@ -1119,12 +1260,16 @@ mod tests {
         0,
     )]
     #[tokio::test]
+    /// Check emitted probe SURB counts for configured path lengths and enabled probe modes.
     async fn probe_should_emit_with_expected_surb_count(
         #[case] strategy: TestProbeStrategy,
         #[case] expected_max_surbs: usize,
+        #[values(true, false)] reply: bool,
     ) -> anyhow::Result<()> {
+        use anyhow::Context;
+
         let cfg = ProbeConfig {
-            timeout: std::time::Duration::from_secs(1),
+            timeout: std::time::Duration::from_millis(200),
             interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
@@ -1161,8 +1306,8 @@ mod tests {
         // Kick off the probing process before triggering — the strategy's stream drives
         // the loopback case, and we push to `manual_probe_tx` below for the neighbor case.
         let is_manual = matches!(strategy, TestProbeStrategy::ManualNeighbor);
-        let (jhs, _probe_classifier) = probe
-            .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store)
+        let (jhs, classifier) = probe
+            .continuously_scan(from_probing_to_network_tx, manual_probe_rx, strategy, store.clone())
             .await;
 
         if is_manual {
@@ -1170,12 +1315,10 @@ mod tests {
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
         }
 
-        let (_routing, data_out) =
+        let (routing, data_out) =
             tokio::time::timeout(std::time::Duration::from_secs(1), from_probing_to_network_rx.next())
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("no probe emitted"))?;
-
-        jhs.abort_all();
 
         let packet_info = data_out
             .packet_info
@@ -1185,6 +1328,108 @@ mod tests {
             "probe must request exactly {expected_max_surbs} SURB(s)"
         );
 
+        let pseudonym = match routing {
+            DestinationRouting::Forward { pseudonym, .. } => pseudonym.context("probe pseudonym")?,
+            _ => anyhow::bail!("probe must have forward routing"),
+        };
+        let tag = data_out.data.application_tag;
+        let nonce = if is_manual {
+            match Message::try_from(data_out.data.clone())? {
+                Message::Probe(NeighborProbe::Ping(nonce)) => Some(nonce),
+                _ => anyhow::bail!("neighbor probe must be a ping"),
+            }
+        } else {
+            None
+        };
+        // The receiver can wake before the producer finishes registering the outbound probe.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let registered = if let Some(nonce) = nonce {
+                    classifier
+                        .active_neighbor_probes
+                        .get(&(pseudonym, NeighborProbe::Ping(nonce)))
+                        .await
+                        .is_some()
+                } else {
+                    classifier.active_path_probes.get(&tag).await.is_some()
+                };
+                if registered {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await?;
+        if reply {
+            let data = if let Some(nonce) = nonce {
+                Message::Probe(NeighborProbe::Pong(nonce)).try_into()?
+            } else {
+                data_out.data.clone()
+            };
+            for _ in 0..2 {
+                classifier
+                    .classify(
+                        futures::sink::drain(),
+                        pseudonym,
+                        ApplicationDataIn {
+                            data: data.clone(),
+                            packet_info: Default::default(),
+                        },
+                    )
+                    .await;
+            }
+        }
+        tokio::time::sleep(cfg.timeout * 2).await;
+        classifier.active_neighbor_probes.run_pending_tasks().await;
+        classifier.active_path_probes.run_pending_tasks().await;
+        jhs.abort_all();
+        if is_manual {
+            let outcomes = store
+                .on_finished
+                .read()
+                .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?;
+            assert_eq!(outcomes.len(), 1, "duplicate replies must not update the graph twice");
+            assert_eq!(outcomes[0].0, NEIGHBOURS[0]);
+            assert_eq!(outcomes[0].1.is_ok(), reply);
+        }
+        assert_eq!(classifier.active_neighbor_probes.entry_count(), 0);
+        assert_eq!(classifier.active_path_probes.entry_count(), 0);
+        Ok(())
+    }
+    #[tokio::test]
+    /// A timed-out neighbor probe notifies its caller and updates the graph exactly once.
+    async fn neighbor_expiry_updates_the_graph_once() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(10),
+            interval: std::time::Duration::ZERO,
+            ..Default::default()
+        };
+        let store = PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
+            get_peers: Arc::new(RwLock::new(VecDeque::new())),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+        test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
+            let mut manual = iface.manual_probe_tx;
+            let (tx, mut rx) = futures::channel::mpsc::channel(8);
+            manual.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+            // Consume the outbound packet without returning a pong.
+            let mut outbound = iface.from_probing_to_network_rx;
+            tokio::time::timeout(std::time::Duration::from_secs(2), outbound.next()).await?;
+            tokio::time::sleep(cfg.timeout * 2).await;
+            iface.probe_classifier.active_neighbor_probes.run_pending_tasks().await;
+            let result = tokio::time::timeout(std::time::Duration::from_secs(2), rx.next()).await?;
+            assert!(matches!(result, Some(Err(()))));
+            Ok(())
+        })
+        .await?;
+        let outcomes = store
+            .on_finished
+            .read()
+            .map_err(|_| anyhow::anyhow!("probe graph lock poisoned"))?;
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].0, NEIGHBOURS[0]);
+        assert!(outcomes[0].1.is_err());
         Ok(())
     }
 }
