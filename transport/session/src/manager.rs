@@ -1912,12 +1912,15 @@ impl PixFillControl {
         // The same warning `spawn_exit_keep_alive` emits at establishment, applied to a target changed
         // afterwards: an Entry that starts deep and drops its target while the Session runs moves the
         // reserve by more than an order of magnitude with nothing else in the log to say so. Only on
-        // the crossing *down*, when it actually falls, and only once per Session: the target is
-        // peer-controlled, so an Entry alternating 7 000 and 180 would otherwise pick the log rate for
-        // as long as the Session lasts. The latch is set only when a warning actually goes out, so a
-        // Session that starts at the establishment warning can still report its first later lowering.
-        if reserve < previous_reserve
-            && reserve.saturating_mul(10) < self.reserve_basis.configured
+        // the crossing *down*, from at or over the threshold to under it, and only once per Session: the
+        // target is peer-controlled, so an Entry alternating 7 000 and 180 would otherwise pick the log
+        // rate for as long as the Session lasts. A lowering that starts under the threshold crosses
+        // nothing, so it neither warns nor spends the latch, which is set only when a warning actually
+        // goes out: a Session that started under it, and warned at establishment, can still report a
+        // later crossing.
+        let under_threshold = |figure: u64| figure.saturating_mul(10) < self.reserve_basis.configured;
+        if !under_threshold(previous_reserve)
+            && under_threshold(reserve)
             && !self.warned_lowered_reserve.swap(true, Ordering::Relaxed)
         {
             warn!(
@@ -14363,6 +14366,54 @@ mod tests {
             1,
             warnings.count(),
             "the first real crossing must warn, and the next one must not"
+        );
+        Ok(())
+    }
+
+    /// A lowering that starts under the order-of-magnitude threshold crosses nothing, so it stays quiet.
+    ///
+    /// Established at 180 against a configured 500, the reserve starts at 45, under the threshold of 50,
+    /// and the establishment warning has already said so. Warning again at 160 (reserve 40) would say
+    /// nothing new and spend the latch, so a later real crossing would go unreported.
+    #[test]
+    fn a_lowering_already_under_the_threshold_does_not_warn() -> anyhow::Result<()> {
+        const CONFIGURED: u64 = 500;
+        let mut control = fill_control(None, CONFIGURED);
+        control.reserve_basis.establishment_target = 180;
+        anyhow::ensure!(
+            control.surb_reserve() == 45,
+            "fixture: the establishment reserve must be 45, got {}",
+            control.surb_reserve()
+        );
+
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || control.set_announced_target(160));
+        assert_eq!(
+            0,
+            warnings.count(),
+            "a lowering from under the threshold is not a crossing, so it must not warn"
+        );
+
+        // Back over the threshold and down through it: a real crossing, and the latch is still unspent.
+        tracing::subscriber::with_default(warnings.clone(), || {
+            control.set_announced_target(7_000);
+            control.set_announced_target(180);
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "the first crossing after a lowering under the threshold must warn"
+        );
+
+        // From exactly at the threshold (200 derives 50) to under it (196 derives 49) is a crossing.
+        let mut at_threshold = fill_control(None, CONFIGURED);
+        at_threshold.reserve_basis.establishment_target = 200;
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || at_threshold.set_announced_target(196));
+        assert_eq!(
+            1,
+            warnings.count(),
+            "a fall from the threshold itself to under it is a crossing and must warn"
         );
         Ok(())
     }
