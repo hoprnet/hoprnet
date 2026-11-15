@@ -39,7 +39,7 @@ use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::AbortableList;
+use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -213,6 +213,22 @@ impl Drop for ParkedSurbRefund {
     fn drop(&mut self) {
         // A no-op after `admit`, which leaves an empty refund behind.
         self.0.give_back();
+    }
+}
+
+/// Aborts the wrapped task when dropped, which neither a join handle nor an [`AbortHandle`] does on
+/// its own drop. Built through `From` from any [`Abortable`].
+struct AbortOnDrop(Box<dyn Abortable + Send + Sync>);
+
+impl<A: Abortable + Send + Sync + 'static> From<A> for AbortOnDrop {
+    fn from(task: A) -> Self {
+        Self(Box::new(task))
+    }
+}
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort_task();
     }
 }
 
@@ -571,6 +587,9 @@ fn close_session(
 /// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
 /// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
 ///
+/// Takes the slot off `METRIC_ACTIVE_SESSIONS`, which counts slots from their allocation (see
+/// [`SessionManager::allocate_session_slot`]), so a slot torn down before its commit is paired too.
+///
 /// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
 /// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
 /// notification a closing Exit has just enqueued — the PIX-failure notice is the one such packet —
@@ -676,6 +695,21 @@ fn answer_while_draining(reason: ClosureReason) -> Option<bool> {
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
+}
+
+/// How long `new_session` waits for the answer to a `StartSession` over the given hop counts.
+fn initiation_wait(base: Duration, forward_hops: usize, return_hops: usize) -> Duration {
+    initiation_timeout_max_one_way(base, forward_hops + return_hops + 2)
+}
+
+/// TTL of the pending-initiation caches: the longest [`initiation_wait`] plus the time the
+/// `StartSession` send may take before that wait starts.
+fn initiation_cache_ttl(base: Duration) -> Duration {
+    initiation_wait(
+        base,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+    ) + EXTERNAL_SEND_TIMEOUT
 }
 
 /// Conservative lower bound on how many coefficient commitments fit into one `SsaCommit` message.
@@ -1709,8 +1743,24 @@ pub(crate) struct PixFillControl {
     ///
     /// The *effective* reserve for this Session, not the configured one: the Entry decides how deep
     /// the Exit's SURB buffer for the Session is, so a reserve above what the Entry ever intends to
-    /// supply would refuse every fill packet forever. See [`effective_surb_reserve`].
-    min_surb_reserve: u64,
+    /// supply would refuse every fill packet forever. Not stored, but derived at every read from the
+    /// target in force — see [`surb_reserve`](Self::surb_reserve) — so there is no second figure to
+    /// keep in step with it. See [`effective_surb_reserve`].
+    reserve_basis: SurbReserveBasis,
+    /// The target the Entry last announced with a `BalancerTarget` keep-alive, or [`NO_ANNOUNCEMENT`]
+    /// while it has announced none.
+    ///
+    /// Held here rather than on the slot because the ring's record of the announced target is
+    /// monotone (`fetch_max`) on purpose: it only ever widens, so it cannot say that the Entry has
+    /// announced a *lower* target since. The reserve has to follow a lower announcement, so it keeps
+    /// the last figure as announced, and it is the only figure that changes.
+    announced_surb_target: std::sync::atomic::AtomicU64,
+    /// Whether the order-of-magnitude lowering has already been logged for this Session.
+    ///
+    /// The target is peer-controlled, so without it an Entry alternating a deep and a shallow target
+    /// sets the `warn!` cadence for the Session's whole life. Once is enough to say the Session's
+    /// shape and the operator's intent have parted.
+    warned_lowered_reserve: std::sync::atomic::AtomicBool,
     /// The Session's SURB flow estimate, which is what the reserve is measured against.
     estimator: AtomicSurbFlowEstimator,
     /// The Session's balancer state, read for whether the Entry has shown that it refills this side's
@@ -1757,13 +1807,28 @@ struct PixFillState {
     idle_reports: u32,
 }
 
+/// What one Session's fill reserve is derived from (see [`effective_surb_reserve`]).
+///
+/// Two figures of the one reserve, named so a call site cannot pass them swapped.
+#[derive(Clone, Copy, Debug)]
+struct SurbReserveBasis {
+    /// The configured reserve, which is the ceiling the effective reserve is derived against.
+    ///
+    /// Kept next to the target so a later announcement is derived against the same ceiling
+    /// establishment used, rather than against whatever is in force at the time.
+    configured: u64,
+    /// The target in force at establishment: the Entry's announcement, or this node's fallback when
+    /// it announced none (a `NoRateControl` Session, or one without `surb_management`).
+    establishment_target: u64,
+}
+
 impl PixFillControl {
     fn new(
         session_id: SessionId,
         controller: RateController,
         notify_period: Option<Duration>,
         degraded_notify_period: Option<Duration>,
-        min_surb_reserve: u64,
+        reserve_basis: SurbReserveBasis,
         estimator: AtomicSurbFlowEstimator,
         surb_mgmt: Arc<BalancerStateValues>,
     ) -> Self {
@@ -1778,11 +1843,11 @@ impl PixFillControl {
             idle_notify_period: None,
             data_since_report: AtomicBool::new(false),
             session_kind: ExitSessionKind::Plain,
-            // Clamped rather than trusted: a `SessionManager` can be built from a config that never
-            // went through `validate_pix_supervision`, and a zero reserve would let fill spend the
-            // Session's last SURB. `effective_surb_reserve` applies the same floor, so this is only
-            // load-bearing for the tests that construct a control directly.
-            min_surb_reserve: min_surb_reserve.max(1),
+            reserve_basis,
+            // Empty until the Entry announces a target, so the first announcement is a change
+            // whatever it says and is treated exactly as a later one is.
+            announced_surb_target: std::sync::atomic::AtomicU64::new(NO_ANNOUNCEMENT),
+            warned_lowered_reserve: std::sync::atomic::AtomicBool::new(false),
             estimator,
             surb_mgmt,
             state: parking_lot::Mutex::new(PixFillState {
@@ -1811,6 +1876,107 @@ impl PixFillControl {
     fn for_session(mut self, session_kind: ExitSessionKind) -> Self {
         self.session_kind = session_kind;
         self
+    }
+
+    /// The SURBs a fill packet must leave estimated-available in this Session.
+    ///
+    /// Derived at every read from the target in force, rather than kept as a figure of its own: one
+    /// cell changes, and the reserve is whatever that cell implies, so there is no second figure to
+    /// fall out of step with it. The cost is a `min` and a division per packet, beside an estimator
+    /// read that is several atomic loads.
+    ///
+    /// Relaxed is enough throughout: the reserve is read for a heuristic, and every use either
+    /// compares it against an estimate read the same way or is a log line. A packet that races an
+    /// announcement gets the reserve of one of the two targets, both of which are valid for the
+    /// Session; the next read gets the new one.
+    fn surb_reserve(&self) -> u64 {
+        self.reserve_for(self.announced_surb_target.load(Ordering::Relaxed))
+    }
+
+    /// Records a target the Entry has just announced; the reserve follows it from the next read.
+    ///
+    /// The Entry chooses how deep the Exit's SURB buffer is and can change it mid-Session, so the
+    /// reserve follows in both directions: too shallow for a raised target (fill spends the margin
+    /// meant to be kept) and too deep for a lowered one (the estimate never reaches it, so fill is
+    /// withheld and the cycle strands on `max_recovery_time`). See [`effective_surb_reserve`].
+    ///
+    /// `announced` is already clamped to `maximum_surb_buffer_size`, as the ring is sized from it. A
+    /// repeat changes nothing and logs nothing; the warning below fires only when the reserve actually
+    /// falls through the order-of-magnitude threshold.
+    ///
+    /// A `NoRateControl` Session's Entry could not influence anything here before; it drives this
+    /// reserve now, self-inflicted on one Session — announcing four moves the reserve to one.
+    ///
+    /// Ignored once the Session is draining. The supervisor admits a drain once, against the
+    /// [`drainable_surbs`](Self::drainable_surbs) reported at the close, and never re-reads it, while
+    /// the slot (and so this keep-alive path) stays in place for the whole drain. A raise in that
+    /// window would have fill withhold the very packets the drain was admitted to spend, stranding the
+    /// cycle on its deadline; a lowering would spend past what the drain was planned against. The
+    /// check and the swap happen under the state lock that [`enter_drain`](Self::enter_drain) takes,
+    /// so an announcement either lands before the drain begins or not at all.
+    pub(crate) fn set_announced_target(&self, announced: u64) {
+        let previous_announced = {
+            let state = self.state.lock();
+            if state.draining {
+                trace!(
+                    session_id = %self.session_id,
+                    announced,
+                    reserve = self.surb_reserve(),
+                    "ignoring a target announced during a drain: the drain keeps the reserve it was admitted against"
+                );
+                return;
+            }
+            self.announced_surb_target.swap(announced, Ordering::Relaxed)
+        };
+        if previous_announced == announced {
+            return;
+        }
+
+        let previous_reserve = self.reserve_for(previous_announced);
+        let reserve = self.reserve_for(announced);
+        trace!(
+            session_id = %self.session_id,
+            announced,
+            configured = self.reserve_basis.configured,
+            previous = previous_reserve,
+            reserve,
+            "the PIX fill SURB reserve follows the target the entry announced"
+        );
+
+        // The same warning `spawn_exit_keep_alive` emits at establishment, applied to a target changed
+        // afterwards: an Entry that starts deep and drops its target while the Session runs moves the
+        // reserve by more than an order of magnitude with nothing else in the log to say so. Only on
+        // the crossing *down*, from at or over the threshold to under it, and only once per Session: the
+        // target is peer-controlled, so an Entry alternating 7 000 and 180 would otherwise pick the log
+        // rate for as long as the Session lasts. A lowering that starts under the threshold crosses
+        // nothing, so it neither warns nor spends the latch, which is set only when a warning actually
+        // goes out: a Session that started under it, and warned at establishment, can still report a
+        // later crossing.
+        let under_threshold = |figure: u64| figure.saturating_mul(10) < self.reserve_basis.configured;
+        if !under_threshold(previous_reserve)
+            && under_threshold(reserve)
+            && !self.warned_lowered_reserve.swap(true, Ordering::Relaxed)
+        {
+            warn!(
+                session_id = %self.session_id,
+                configured = self.reserve_basis.configured,
+                previous = previous_reserve,
+                effective = reserve,
+                announced,
+                "the PIX fill SURB reserve was lowered by more than an order of magnitude to fit the SURB buffer \
+                 target the entry announced for this session"
+            );
+        }
+    }
+
+    /// The reserve `announced` implies here, or the establishment figure for [`NO_ANNOUNCEMENT`].
+    fn reserve_for(&self, announced: u64) -> u64 {
+        let target = if announced == NO_ANNOUNCEMENT {
+            self.reserve_basis.establishment_target
+        } else {
+            announced
+        };
+        effective_surb_reserve(self.reserve_basis.configured, target)
     }
 
     /// The notification period the stream is running at, normal or degraded.
@@ -1966,9 +2132,10 @@ impl PixFillControl {
     /// An estimate and an upper bound at that — ring-buffer overwrites, store eviction and
     /// invalidated relayers are all unobserved — which is why the supervisor weighs it against a
     /// cycle's whole remaining emission rather than a discounted one. The reserve subtracted is the
-    /// *effective* one already derived for this Session, not the configured ceiling.
+    /// *effective* one in force for this Session, not the configured ceiling, and it follows the
+    /// target the Entry last announced until the Session starts draining, after which it is frozen.
     pub(crate) fn drainable_surbs(&self) -> u64 {
-        self.estimator.saturating_diff().saturating_sub(self.min_surb_reserve)
+        self.estimator.saturating_diff().saturating_sub(self.surb_reserve())
     }
 
     /// Applies a rate planned by the PIX supervisor.
@@ -2235,7 +2402,8 @@ impl PixFillControl {
             }
         }
 
-        if self.estimator.saturating_diff() >= self.min_surb_reserve {
+        let reserve = self.surb_reserve();
+        if self.estimator.saturating_diff() >= reserve {
             Self::set_withholding(&mut state, false);
             #[cfg(feature = "telemetry")]
             telemetry::record_pix_fill_packet();
@@ -2245,7 +2413,7 @@ impl PixFillControl {
 
         debug!(
             session_id = %self.session_id,
-            reserve = self.min_surb_reserve,
+            reserve,
             estimate = self.estimator.saturating_diff(),
             "withholding a PIX fill keep-alive to stay above the SURB reserve"
         );
@@ -2280,6 +2448,13 @@ impl Drop for PixFillControl {
         Self::set_withholding(self.state.get_mut(), false);
     }
 }
+
+/// Stands for "the Entry has announced no target" in [`PixFillControl`]'s record of the last one.
+///
+/// Unreachable as a real figure: an announcement is clamped to the node's `maximum_surb_buffer_size`,
+/// which derives from the SURB ring's `rb_capacity` and so is far below `u64::MAX` on every target
+/// this code is built for.
+const NO_ANNOUNCEMENT: u64 = u64::MAX;
 
 /// The SURB reserve one Session's fill actually respects.
 ///
@@ -2378,9 +2553,8 @@ impl Drop for CycleBudgetReservation {
 /// another reader: they all share the one cell.
 ///
 /// An absent slot is not an error: the Session *was* established on this path, and `commit` runs with
-/// `None` so the guard is still marked committed and the Session still counted. The teardown that
-/// removed the slot already decremented `METRIC_ACTIVE_SESSIONS` and logged "session closed", so
-/// skipping the commit here would drift the gauge down by one and leave that close unpaired (see
+/// `None` so the guard is still marked committed. The teardown that removed the slot already logged
+/// "session closed", so skipping the commit here would leave that close unpaired (see
 /// [`SessionSlotGuard::commit`]).
 ///
 /// A slot found by key that is *not* the one this establishment allocated is treated exactly like an
@@ -2504,10 +2678,9 @@ impl<'a> SessionSlotGuard<'a> {
     /// Session on the same pseudonym — [`commit_slot_guard`] discards the latter before calling here.
     /// Committing without a slot is still a commit: the Session *was* established (the Exit sends
     /// `SessionEstablished` before it commits, so an Entry can close or answer with a
-    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed and
-    /// the Session counted, or the teardown's decrement would leave `METRIC_ACTIVE_SESSIONS` drifting
-    /// down and `close_session` would log a "session closed" with no matching "new session
-    /// established". Only the `admit` is skipped — there is no cell left to carry its token.
+    /// `SessionId`-scoped `SessionError` in that window), so the guard must be marked committed, or
+    /// `close_session` would log a "session closed" with no matching "new session established". Only
+    /// the `admit` is skipped — there is no cell left to carry its token.
     ///
     /// When a slot *is* present, it is this Session's own (the caller checked), so its cell arbitrates
     /// against a teardown racing this commit and nothing else can be writing to it. The teardown claims
@@ -2525,7 +2698,7 @@ impl<'a> SessionSlotGuard<'a> {
         // `None` means nothing to admit for: either the Session was torn down — its teardown already
         // ran its (no-op) retire, and any batch a peer sends meanwhile lands in the quarantine like any
         // other unadmitted one — or the pseudonym was reallocated to a successor, whose ring is not
-        // this admission's to stamp. The commit itself — logging and the metric below — still happens.
+        // this admission's to stamp. The commit itself — the logging above — still happens.
         if let (Some(admission), Some(slot)) = (admission, slot) {
             // The Exit commits after it has answered `SessionEstablished`, so a `BalancerTarget`
             // keep-alive can have announced a raised target before the ring exists. Admit at the
@@ -2554,9 +2727,6 @@ impl<'a> SessionSlotGuard<'a> {
                 admission.raise_target(&self.session_id, token, raised);
             }
         }
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_ACTIVE_SESSIONS.increment(1.0);
     }
 }
 
@@ -4565,8 +4735,7 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
-        let initiation_timeout =
-            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
+        let initiation_timeout = initiation_cache_ttl(cfg.initiation_timeout_base);
         let pix_toolbox: Arc<OnceLock<PixToolbox>> = Arc::new(OnceLock::new());
         // Captured by the eviction listener below, which is built here and has no `&self` to read
         // later — same shape as `active_sessions_for_listener`. Cloned before the closure moves the
@@ -4942,14 +5111,14 @@ where
     ///
     /// Establishing a session involves several fallible steps *after* the slot has been
     /// inserted. The returned guard rolls the slot back - tearing the partially
-    /// established session down via [`close_session`] - unless it is
+    /// established session down via [`release_session_slot`] - unless it is
     /// [committed](SessionSlotGuard::commit).
     ///
-    /// The active-sessions gauge is incremented here, atomically with the insertion and
-    /// the guard creation, precisely so that it is always paired with the guard's
-    /// rollback decrement (performed through [`close_session`]). This keeps the gauge
-    /// accurate: it is never decremented for a slot that was not counted in the first
-    /// place, and every counted slot is decremented exactly once when it leaves the cache.
+    /// The active-sessions gauge is incremented here, with the insertion, and decremented by
+    /// [`release_session_slot`] on every path that removes the slot — a close or the guard's
+    /// rollback — so, like `active_sessions`, it counts every slot exactly once. It is not counted
+    /// at the commit: a close can reach a slot whose setup is still in progress, and if that setup
+    /// then fails, the slot would be decremented without ever having been counted.
     ///
     /// Returns `None` if a slot for `session_id` already exists; in that case nothing is
     /// inserted, the gauge is left untouched, and no guard is produced. The atomic `entry`
@@ -4996,6 +5165,9 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_ACTIVE_SESSIONS.increment(1.0);
+
                 // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
                 // is now available. Drain and signal the senders registered for this SessionId.
                 if let Some(waiters) = self
@@ -5202,9 +5374,10 @@ where
         })?;
 
         // The timeout is given by the number of hops requested
-        let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
+        let initiation_timeout: futures_time::time::Duration = initiation_wait(
             self.cfg.initiation_timeout_base,
-            cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
+            cfg.forward_path_options.count_hops(),
+            cfg.return_path_options.count_hops(),
         )
         .into();
 
@@ -5383,12 +5556,12 @@ where
                     // aborted as soon as the readiness wait resolves.
                     let sessions_keepalive = self.sessions.clone();
                     let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
-                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                    let slot_keepalive = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
                         loop {
                             hopr_utils::runtime::prelude::sleep(touch_period).await;
                             let _ = sessions_keepalive.get(&session_id);
                         }
-                    });
+                    }));
 
                     // The session is ready once a quarter of the target is believed to be at the
                     // counterparty: that is the point the first replies can come home, and a quarter of
@@ -5404,7 +5577,7 @@ where
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await;
-                    slot_keepalive.abort();
+                    drop(slot_keepalive);
                     match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
@@ -6098,6 +6271,11 @@ where
     /// configured reserve is an absolute count while the buffer it is measured against is the Entry's
     /// choice; a Session whose Entry asks for a shallower buffer than the configured reserve could
     /// otherwise never be filled at all.
+    ///
+    /// That derivation is only the establishment figure: the Entry may change its target later with a
+    /// `BalancerTarget` keep-alive, and [`handle_keep_alive`](Self::handle_keep_alive) re-derives the
+    /// reserve from it then. The configured ceiling is passed through so that re-derivation uses the
+    /// same one this derivation does.
     fn spawn_exit_keep_alive(
         &self,
         session_id: SessionId,
@@ -6131,7 +6309,10 @@ where
                 controller.clone(),
                 notify_period,
                 degraded_period,
-                min_surb_reserve,
+                SurbReserveBasis {
+                    configured: configured_reserve,
+                    establishment_target: announced.surb_target,
+                },
                 slot.surb_estimator.clone(),
                 slot.surb_mgmt.clone(),
             )
@@ -6663,6 +6844,15 @@ where
         // keeps the supervisor from being told a Session closed twice.
         if !fill.enter_drain() {
             return answer_while_draining(reason);
+        }
+
+        // Re-read now that the reserve is frozen (see `PixFillControl::set_announced_target`): an
+        // announcement that landed between the fast path above and the transition moved the reserve
+        // the drain will be held to, and the supervisor must plan against that one. Falling through to
+        // the teardown from here is what a refused event below does too.
+        let drainable_surbs = fill.drainable_surbs();
+        if drainable_surbs == 0 {
+            return None;
         }
 
         if !supervisor.try_send_event(SessionPixEvent::SessionClosed { drainable_surbs }) {
@@ -8237,10 +8427,19 @@ where
                     // (gnosis/gnosis_vpn#739). With no set-point to compare against, a raise is
                     // whatever exceeds the largest figure already recorded on the slot; the ring
                     // only ever widens, so a repeated announcement changes nothing.
+                    //
+                    // That widen-only rule is the ring's, and below it the block is only entered for
+                    // a raise. The fill reserve is re-derived separately, after it, from the same
+                    // clamped figure: it follows a lowered target too.
                     let announced = msg.additional_data.min(self.cfg.maximum_surb_buffer_size as u64);
                     let balanced = !session_slot.surb_mgmt.is_disabled();
-                    if msg.flags.contains(KeepAliveFlag::BalancerTarget)
-                        && announced > 0
+                    // A flagged announcement of zero is "no target", not "a target of zero": the Exit
+                    // reads zero that way everywhere (`BalancerStateValues::is_disabled`, the ring's
+                    // own guard below), so the reserve keeps the figure it has rather than following
+                    // zero to `effective_surb_reserve`'s floor of one. An Entry that drops its buffer
+                    // without disabling its balancer announces a small non-zero target instead.
+                    let announces_target = msg.flags.contains(KeepAliveFlag::BalancerTarget) && announced > 0;
+                    if announces_target
                         && if balanced {
                             session_slot.surb_mgmt.controller_bounds().target() != announced
                         } else {
@@ -8290,6 +8489,15 @@ where
                         } else {
                             debug!(%session_id, target_surb_buffer_size = announced, "keep-alive target recorded for the SURB ring of a session without a balancer");
                         }
+                    }
+
+                    // The reserve follows the announcement in *both* directions, unlike the ring
+                    // above, which only widens and ignores a lower announcement on a `NoRateControl`
+                    // Session. It is decided on its own, not by the ring's raise-only guard; a repeat
+                    // dedupes inside `set_announced_target`. A flagged zero means "no target", so the
+                    // reserve keeps the figure it has.
+                    if announces_target && let Some(fill) = session_slot.pix_fill.get() {
+                        fill.set_announced_target(announced);
                     }
                 }
             }
@@ -9404,6 +9612,25 @@ mod tests {
     /// [`SsaGeneratorConfig::default`], so a value that failed to cross the wire is visible.
     const TEST_SURPLUS_SHARES: u8 = 1;
 
+    #[tokio::test]
+    async fn abort_on_drop_stops_the_task() -> anyhow::Result<()> {
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let guard = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
+            let _tx = tx;
+            let _ = started_tx.send(());
+            std::future::pending::<()>().await;
+        }));
+        started_rx.await.context("the task never ran")?;
+        drop(guard);
+
+        let result = timeout(Duration::from_secs(1), rx)
+            .await
+            .context("the task was not aborted")?;
+        assert!(result.is_err(), "the sender must have been dropped without sending");
+        Ok(())
+    }
+
     #[test]
     fn session_config_forwards_max_buffered_segments() {
         assert_eq!(
@@ -10338,6 +10565,19 @@ mod tests {
         Ok(())
     }
 
+    /// The pending-initiation entries must outlive the longest wait `new_session` can make.
+    #[test]
+    fn initiation_cache_ttl_outlasts_the_longest_wait() {
+        let max = RoutingOptions::MAX_INTERMEDIATE_HOPS;
+        for base in [Duration::from_millis(100), Duration::from_secs(5)] {
+            assert!(initiation_cache_ttl(base) > initiation_wait(base, max, max));
+        }
+        assert_eq!(
+            initiation_cache_ttl(Duration::from_secs(5)),
+            Duration::from_millis(40_200)
+        );
+    }
+
     /// Verifies that a session initiation returns `TransportSessionError::Timeout` when the peer
     /// never processes or responds to the `StartSession` message.
     ///
@@ -11070,15 +11310,6 @@ mod tests {
         Ok(())
     }
 
-    /// Aborts a background task of a test when it goes out of scope.
-    struct AbortOnDrop(tokio::task::JoinHandle<()>);
-
-    impl Drop for AbortOnDrop {
-        fn drop(&mut self) {
-            self.0.abort();
-        }
-    }
-
     /// Keeps a Session's SURB estimate at `level` while it runs, so that the reports it sends do not walk the
     /// stock off the point a test is about. Dropping the guard stops it.
     fn hold_stock_at(estimator: &AtomicSurbFlowEstimator, level: u64) -> AbortOnDrop {
@@ -11098,7 +11329,7 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// Records a loss into `signal` every `every` until the guard is dropped, as a continuously faulty path does.
@@ -11109,7 +11340,7 @@ mod tests {
                 tokio::time::sleep(every).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// The Session stops reporting at the degraded period exactly at the keep-alive reserve, and not one SURB
@@ -11200,7 +11431,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -11405,7 +11636,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let _sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -11969,7 +12200,15 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             notify_period,
             None,
-            reserve,
+            // The establishment target is the one whose derivation gives `reserve`: these tests are
+            // about what `admit` does with a reserve, not about where it came from. Against a ceiling
+            // of `reserve` itself, a quarter is below it, so the target is four times the reserve —
+            // except at the floor, where `effective_surb_reserve` derives 1 from any small target.
+            // The announcement tests below build their own control to move it.
+            SurbReserveBasis {
+                configured: reserve,
+                establishment_target: reserve.saturating_mul(4),
+            },
             Default::default(),
             surb_mgmt,
         )
@@ -11991,7 +12230,12 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             notify_period,
             degraded_period,
-            reserve,
+            // Four times the reserve, so its derivation gives exactly `reserve` against a ceiling of
+            // `reserve` — see `fill_control_for`.
+            SurbReserveBasis {
+                configured: reserve,
+                establishment_target: reserve.saturating_mul(4),
+            },
             Default::default(),
             {
                 let surb_mgmt = Arc::new(BalancerStateValues::default());
@@ -12018,7 +12262,11 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             Some(base),
             None,
-            u64::MAX,
+            // The reserve these derive is out of reach.
+            SurbReserveBasis {
+                configured: u64::MAX,
+                establishment_target: u64::MAX,
+            },
             Default::default(),
             surb_mgmt,
         )
@@ -12209,7 +12457,11 @@ mod tests {
                 RateController::new(0, Duration::from_secs(1)),
                 Some(base),
                 Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
-                u64::MAX,
+                // The reserve these derive is out of reach.
+                SurbReserveBasis {
+                    configured: u64::MAX,
+                    establishment_target: u64::MAX,
+                },
                 Default::default(),
                 balancer_with_target(3_200),
             )
@@ -12634,7 +12886,11 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             Some(Duration::from_secs(15)),
             None,
-            10,
+            // A target of 40 derives a reserve of 10 against a ceiling of 10.
+            SurbReserveBasis {
+                configured: 10,
+                establishment_target: 40,
+            },
             Default::default(),
             balancer_with_target(3_200),
         )
@@ -13616,7 +13872,10 @@ mod tests {
                 RateController::new(0, Duration::from_secs(1)),
                 Some(Duration::from_secs(3600)),
                 Some(degraded),
-                RESERVE,
+                SurbReserveBasis {
+                    configured: RESERVE,
+                    establishment_target: RESERVE.saturating_mul(4),
+                },
                 Default::default(),
                 surb_mgmt,
             );
@@ -13728,6 +13987,68 @@ mod tests {
         assert!(!switch.degraded, "darkness is switched apart from degradation");
     }
 
+    /// The Exit's keep-alive schedule, as a table: for each way of producing keep-alives, which of a
+    /// few instants (milliseconds after the first) admit a packet.
+    ///
+    /// Columns: the notification period, the degraded period, the SURB stock, the fill reserve, whether
+    /// fill runs, and whether the Session is degraded and dark.
+    #[rstest]
+    #[case::level_reports_only(
+        Some(10_000), None, 1, 100, false, (false, false),
+        &[(0, true), (1_000, false), (10_000, true), (11_000, false)],
+    )]
+    #[case::fill_only(
+        None, None, 5, 5, true, (false, false),
+        &[(0, true), (1, true), (1_000, true)],
+    )]
+    #[case::reports_only_below_the_fill_reserve(
+        Some(10_000), None, 1, 5, true, (false, false),
+        &[(0, true), (1_000, false), (10_000, true), (10_500, false)],
+    )]
+    #[case::degraded_period(
+        Some(3_600_000), Some(10_000), 1, 100, false, (true, false),
+        &[(0, true), (1_000, false), (10_000, true), (11_000, false)],
+    )]
+    #[case::dark_period(
+        Some(15_000), Some(1_000), 1, 100, false, (true, true),
+        &[(0, true), (50, false), (100, true), (150, false)],
+    )]
+    #[case::nothing_without_surbs(
+        Some(10_000), None, 0, 5, true, (false, false),
+        &[(0, false), (1_000, false), (10_000, false)],
+    )]
+    fn the_exit_keep_alive_schedule_admits_the_expected_packets(
+        #[case] notify_ms: Option<u64>,
+        #[case] degraded_ms: Option<u64>,
+        #[case] stock: u64,
+        #[case] reserve: u64,
+        #[case] fill: bool,
+        #[case] (degraded, dark): (bool, bool),
+        #[case] timeline: &[(u64, bool)],
+    ) {
+        let control = fill_control_degraded(
+            notify_ms.map(Duration::from_millis),
+            degraded_ms.map(Duration::from_millis),
+            reserve,
+            stock,
+        );
+        control.start_notify();
+        if fill {
+            control.set_fill(FillRate::per_second(10));
+        }
+        control.set_degraded(degraded);
+        control.set_dark(dark);
+
+        let t0 = Instant::now();
+        for (offset_ms, admitted) in timeline {
+            assert_eq!(
+                *admitted,
+                control.admit_at(t0 + Duration::from_millis(*offset_ms)),
+                "at +{offset_ms} ms"
+            );
+        }
+    }
+
     /// The driver tells the stream about a change in its answer, and only about a change.
     #[test]
     fn the_driver_acts_only_on_transitions() {
@@ -13775,6 +14096,655 @@ mod tests {
         assert_eq!(1, effective_surb_reserve(500, 3));
         assert_eq!(1, effective_surb_reserve(500, 0));
         assert_eq!(1, effective_surb_reserve(0, 7_000));
+    }
+
+    /// An Exit-side slot with a fill control, set up the way `spawn_exit_keep_alive` sets it up.
+    ///
+    /// The reserve is derived at establishment from `announced`, against `configured_reserve` as the
+    /// ceiling — exactly the figures `handle_keep_alive` then re-derives from. A rate-controlled
+    /// Session's balancer starts at the announced target too, which is the value a `BalancerTarget`
+    /// keep-alive is compared against to decide whether the target actually changed.
+    fn exit_slot_with_fill_control(
+        pseudonym: HoprPseudonym,
+        announced: u64,
+        configured_reserve: u64,
+    ) -> anyhow::Result<(RecordingManager, Arc<PixFillControl>)> {
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                // Wide enough that the announcements below are not clamped by it.
+                maximum_surb_buffer_size: MAXIMUM_SURB_BUFFER_SIZE_FOR_TESTS,
+                ..Default::default()
+            });
+        let estimator = AtomicSurbFlowEstimator::default();
+        let surb_mgmt = Arc::new(BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: announced,
+            ..Default::default()
+        }));
+        let control = Arc::new(PixFillControl::new(
+            pseudonym,
+            RateController::new(0, Duration::from_secs(1)),
+            Some(Duration::from_secs(3600)),
+            None,
+            SurbReserveBasis {
+                configured: configured_reserve,
+                establishment_target: announced,
+            },
+            estimator.clone(),
+            surb_mgmt.clone(),
+        ));
+        let fill = Arc::new(OnceLock::new());
+        anyhow::ensure!(
+            fill.set(control.clone()).is_ok(),
+            "fixture: the fill control is installed once"
+        );
+
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        mgr.sessions.insert(
+            pseudonym,
+            SessionSlot {
+                session_tx: dummy_tx,
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
+                abort_handles: Default::default(),
+                surb_mgmt,
+                surb_estimator: estimator,
+                current_ssa_state: Default::default(),
+                pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
+                pix_fill: fill,
+                exit_loss_signal: Default::default(),
+                returned_packets: Default::default(),
+                cycle_budget: None,
+                admission_token: Default::default(),
+                raised_surb_target: Default::default(),
+            },
+        );
+        Ok((mgr, control))
+    }
+
+    /// A keep-alive from the Entry that announces `target` as its SURB buffer target.
+    fn keep_alive_announcing(pseudonym: HoprPseudonym, target: u64) -> KeepAliveMessage<SessionId> {
+        KeepAliveMessage::<SessionId> {
+            session_id: pseudonym,
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: target,
+        }
+    }
+
+    /// A raised target must raise the fill reserve with it.
+    ///
+    /// The reserve is derived at establishment from the target the Entry announced then, and the
+    /// Entry can change that target later. Left at the establishment figure it is far too shallow for
+    /// a Session whose Entry stepped up to a deeper buffer: at 200 the reserve is 50, and an Entry
+    /// that moves to 7 000 keeps 500.
+    #[test_log::test(tokio::test)]
+    async fn a_raised_target_raises_the_fill_reserve() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+
+        anyhow::ensure!(
+            control.surb_reserve() == 50,
+            "fixture: a 200-SURB target has a fill reserve of 50, not {}",
+            control.surb_reserve()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            500,
+            control.surb_reserve(),
+            "a target raised to 7 000 must move the reserve to a quarter of it, capped at the configured 500"
+        );
+        Ok(())
+    }
+
+    /// A lowered target must lower the fill reserve too, unlike the SURB ring, which only widens.
+    ///
+    /// A reserve above what the Entry now supplies is never reached by the estimate, so every fill
+    /// packet is withheld and the funded cycle strands on `max_recovery_time` — the exact failure the
+    /// derivation exists to prevent.
+    #[test_log::test(tokio::test)]
+    async fn a_lowered_target_lowers_the_fill_reserve() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 7_000, 500)?;
+
+        anyhow::ensure!(
+            control.surb_reserve() == 500,
+            "fixture: a 7 000-SURB target has a fill reserve of 500, not {}",
+            control.surb_reserve()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 400))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            100,
+            control.surb_reserve(),
+            "a target lowered to 400 must move the reserve to a quarter of it, not leave it at the establishment 500"
+        );
+        Ok(())
+    }
+
+    /// A lowered target lowers the fill reserve on a `NoRateControl` Session too.
+    ///
+    /// Such a Session runs no balancer on the Exit, so there is no set-point to move and the ring is
+    /// widened by a monotone `fetch_max` — a lower announcement is not a raise and the ring ignores it
+    /// entirely. The reserve must not inherit that asymmetry: it has to follow the target down, or it
+    /// sits above what the Entry now supplies, the estimate never reaches it, and every fill packet is
+    /// withheld until the funded cycle strands on `max_recovery_time`. This is the issue's lowered-target
+    /// case, on the side that has no balancer to notice it.
+    ///
+    /// The raise comes first and is not decoration: the ring's recorded figure is what the raise-only
+    /// guard compares a later announcement against, so without it a first announcement of any size
+    /// passes the guard and the lowered case would be masked.
+    #[test_log::test(tokio::test)]
+    async fn a_lowered_target_lowers_the_fill_reserve_without_rate_control() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        // `NoRateControl` is a capability of the Session, not of the slot: the disable comes from the
+        // balancer state, which `spawn_exit_keep_alive` leaves at zero for such a Session.
+        let mut slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.surb_mgmt = Arc::new(BalancerStateValues::default());
+        anyhow::ensure!(
+            slot.surb_mgmt.is_disabled(),
+            "fixture: a NoRateControl Exit runs no balancer, so its state holds no target"
+        );
+        mgr.sessions.insert(pseudonym, slot);
+
+        anyhow::ensure!(
+            control.surb_reserve() == 50,
+            "fixture: a 200-SURB target has a fill reserve of 50, not {}",
+            control.surb_reserve()
+        );
+
+        // The Entry steps up to its main tier: the ring records 7 000 and the reserve follows.
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the raised keep-alive must be handled")?;
+        anyhow::ensure!(
+            control.surb_reserve() == 500,
+            "fixture: the raise must have moved the reserve to 500, got {}",
+            control.surb_reserve()
+        );
+
+        // And back down, below where the ring's monotone figure can compare: the ring keeps 7 000,
+        // the reserve must still follow the Entry to 400.
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 400))
+            .await
+            .context("the lowered keep-alive must be handled")?;
+
+        assert_eq!(
+            100,
+            control.surb_reserve(),
+            "a target lowered to 400 must move the reserve to a quarter of it, with no balancer to compare against"
+        );
+        Ok(())
+    }
+
+    /// The Entry repeats its announcement on every keep-alive; a repeat changes nothing.
+    #[test_log::test(tokio::test)]
+    async fn a_repeated_announcement_changes_nothing() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the first keep-alive must be handled")?;
+        anyhow::ensure!(
+            control.surb_reserve() == 500,
+            "fixture: the raise must have moved the reserve to 500, got {}",
+            control.surb_reserve()
+        );
+
+        for _ in 0..3 {
+            mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+                .await
+                .context("the repeated keep-alive must be handled")?;
+            assert_eq!(
+                500,
+                control.surb_reserve(),
+                "an announcement of the target already in force must not move the reserve"
+            );
+        }
+        Ok(())
+    }
+
+    /// Before any announcement the reserve is the establishment one, and a repeat of it leaves it so.
+    ///
+    /// The establishment figure is the target in force at establishment — the Entry's announcement,
+    /// or the node's fallback when it made none. Nothing records it as "announced", so the control
+    /// derives it until a keep-alive says otherwise; a keep-alive repeating it must be a no-op, which
+    /// is what keeps a regular announcer from re-deriving — and re-warning — on every packet.
+    #[test_log::test(tokio::test)]
+    async fn a_first_announcement_of_the_establishment_target_changes_nothing() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        // Establishment at 7 000 against a configured 500: the ceiling binds, so the reserve is 500.
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 7_000, 500)?;
+        anyhow::ensure!(
+            control.surb_reserve() == 500,
+            "fixture: establishment at 7 000 must give a reserve of 500, got {}",
+            control.surb_reserve()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            500,
+            control.surb_reserve(),
+            "a keep-alive repeating the establishment target must leave the reserve where establishment put it"
+        );
+        Ok(())
+    }
+
+    /// A target inside `effective_surb_reserve`'s floor still moves the reserve, to the floor.
+    ///
+    /// An Entry that lowers its target to a handful of SURBs is the case the floor exists for, and
+    /// the reserve has to reach it through the keep-alive path rather than only in the arithmetic.
+    #[rstest]
+    #[case::announced_one(1, 1)]
+    #[case::announced_two(2, 1)]
+    #[case::announced_three(3, 1)]
+    #[case::announced_four(4, 1)]
+    #[test_log::test(tokio::test)]
+    async fn a_target_at_the_floor_moves_the_reserve_to_it(
+        #[case] announced: u64,
+        #[case] expected: u64,
+    ) -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 7_000, 500)?;
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, announced))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            expected,
+            control.surb_reserve(),
+            "a target of {announced} must leave a reserve of {expected}, not the establishment 500"
+        );
+        Ok(())
+    }
+
+    /// A flagged announcement of zero is "no target", so the reserve keeps the figure it has.
+    ///
+    /// The Exit reads a zero target as a disabled balancer everywhere else (`is_disabled`, the ring's
+    /// own raise guard), so the reserve must not follow it to `effective_surb_reserve`'s floor of one.
+    /// A client that steps down to a small buffer announces a small non-zero target instead.
+    #[test_log::test(tokio::test)]
+    async fn a_zero_announcement_is_no_target_and_leaves_the_fill_reserve_alone() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        anyhow::ensure!(
+            control.surb_reserve() == 50,
+            "fixture: the establishment reserve must be 50, got {}",
+            control.surb_reserve()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 0))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            50,
+            control.surb_reserve(),
+            "a flagged announcement of zero means no target, so the reserve must stay at 50 rather than fall to the \
+             floor"
+        );
+        Ok(())
+    }
+
+    /// An unannounced keep-alive (`surb_target_notify` off) leaves the reserve at its establishment figure.
+    ///
+    /// The `BalancerTarget` flag is what carries a target; without it the keep-alive is a refill and a
+    /// level report, and its `additional_data` is not a target at all.
+    #[test_log::test(tokio::test)]
+    async fn an_unflagged_keep_alive_leaves_the_fill_reserve_alone() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        anyhow::ensure!(
+            control.surb_reserve() == 50,
+            "fixture: the establishment reserve must be 50, got {}",
+            control.surb_reserve()
+        );
+
+        let keep_alive = KeepAliveMessage::<SessionId> {
+            session_id: pseudonym,
+            flags: None.into(),
+            additional_data: 7_000,
+        };
+        mgr.handle_keep_alive(pseudonym, keep_alive)
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            50,
+            control.surb_reserve(),
+            "a keep-alive that does not announce a target must not move the reserve, whatever figure it carries"
+        );
+        Ok(())
+    }
+
+    /// The order-of-magnitude warning is latched, so an Entry alternating targets cannot set its rate.
+    ///
+    /// The target is peer-controlled and arrives on a keep-alive the Entry sends as often as it likes.
+    /// Warning on every downward crossing would let it log at will for the Session's four hours; the
+    /// latch makes it one line per Session, and only when a warning actually goes out.
+    ///
+    /// Counted at the subscriber rather than read off the latch: a regression that warned on every
+    /// crossing and set the flag as well would leave the flag looking exactly as it does here.
+    #[test]
+    fn the_order_of_magnitude_warning_is_latched() -> anyhow::Result<()> {
+        const CONFIGURED: u64 = 500;
+        // The establishment reserve is 500, above the threshold, so 180 (reserve 45) is a crossing.
+        // `fill_control` derives its establishment target from the reserve, so the field is set here.
+        let mut control = fill_control(None, CONFIGURED);
+        control.reserve_basis.establishment_target = 7_000;
+        anyhow::ensure!(
+            control.surb_reserve() == 500,
+            "fixture: the establishment reserve must be 500, got {}",
+            control.surb_reserve()
+        );
+
+        // Alternating across the threshold, deep then shallow, twenty times over: one warning in all.
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || {
+            for _ in 0..20 {
+                control.set_announced_target(7_000);
+                control.set_announced_target(180);
+            }
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "an Entry alternating across the threshold must produce exactly one warning per Session"
+        );
+
+        // A fresh control that only repeated its target has not warned, so a later crossing still does.
+        let mut fresh = fill_control(None, CONFIGURED);
+        fresh.reserve_basis.establishment_target = 7_000;
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || fresh.set_announced_target(7_000));
+        assert_eq!(
+            0,
+            warnings.count(),
+            "a repeat of the target in force is not a crossing, so it must not warn"
+        );
+        tracing::subscriber::with_default(warnings.clone(), || {
+            fresh.set_announced_target(180);
+            fresh.set_announced_target(7_000);
+            fresh.set_announced_target(180);
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "the first real crossing must warn, and the next one must not"
+        );
+        Ok(())
+    }
+
+    /// A lowering that starts under the order-of-magnitude threshold crosses nothing, so it stays quiet.
+    ///
+    /// Established at 180 against a configured 500, the reserve starts at 45, under the threshold of 50,
+    /// and the establishment warning has already said so. Warning again at 160 (reserve 40) would say
+    /// nothing new and spend the latch, so a later real crossing would go unreported.
+    #[test]
+    fn a_lowering_already_under_the_threshold_does_not_warn() -> anyhow::Result<()> {
+        const CONFIGURED: u64 = 500;
+        let mut control = fill_control(None, CONFIGURED);
+        control.reserve_basis.establishment_target = 180;
+        anyhow::ensure!(
+            control.surb_reserve() == 45,
+            "fixture: the establishment reserve must be 45, got {}",
+            control.surb_reserve()
+        );
+
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || control.set_announced_target(160));
+        assert_eq!(
+            0,
+            warnings.count(),
+            "a lowering from under the threshold is not a crossing, so it must not warn"
+        );
+
+        // Back over the threshold and down through it: a real crossing, and the latch is still unspent.
+        tracing::subscriber::with_default(warnings.clone(), || {
+            control.set_announced_target(7_000);
+            control.set_announced_target(180);
+        });
+        assert_eq!(
+            1,
+            warnings.count(),
+            "the first crossing after a lowering under the threshold must warn"
+        );
+
+        // From exactly at the threshold (200 derives 50) to under it (196 derives 49) is a crossing.
+        let mut at_threshold = fill_control(None, CONFIGURED);
+        at_threshold.reserve_basis.establishment_target = 200;
+        let warnings = Arc::new(WarnCounter::default());
+        tracing::subscriber::with_default(warnings.clone(), || at_threshold.set_announced_target(196));
+        assert_eq!(
+            1,
+            warnings.count(),
+            "a fall from the threshold itself to under it is a crossing and must warn"
+        );
+        Ok(())
+    }
+
+    /// Counts `WARN` events; `enabled` is always true so the logging macros' bodies actually run.
+    #[derive(Default)]
+    struct WarnCounter(std::sync::atomic::AtomicU64);
+
+    impl WarnCounter {
+        fn count(&self) -> u64 {
+            self.0.load(Ordering::Relaxed)
+        }
+    }
+
+    impl tracing::Subscriber for WarnCounter {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    /// An admitted drain keeps the reserve it was admitted against, whatever the Entry announces.
+    ///
+    /// The supervisor admits a drain once, against the `drainable_surbs` reported at the close, and
+    /// the slot stays in place for the drain, so the Entry's keep-alives still reach
+    /// `handle_keep_alive`. A raise followed there would have fill withhold the packets the drain was
+    /// admitted to spend — 200 announced at establishment is a reserve of 50, and 7 000 afterwards
+    /// would make it 500, above the 120 held — and the cycle would strand on its deadline. A lowering
+    /// would spend past the figure the drain was planned against. Neither may move it.
+    #[rstest]
+    #[case::raised(7_000)]
+    #[case::lowered(40)]
+    #[test_log::test(tokio::test)]
+    async fn an_announcement_during_a_drain_leaves_the_fill_reserve_alone(
+        #[case] announced: u64,
+    ) -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        control
+            .estimator
+            .produced
+            .fetch_add(120, std::sync::atomic::Ordering::Relaxed);
+        anyhow::ensure!(
+            control.drainable_surbs() == 70,
+            "fixture: 120 held against a reserve of 50 leaves 70 drainable, got {}",
+            control.drainable_surbs()
+        );
+
+        anyhow::ensure!(control.enter_drain(), "fixture: the drain must begin");
+        control.set_fill(FillRate::per_second(10));
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, announced))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            50,
+            control.surb_reserve(),
+            "a target of {announced} announced during the drain must not move the reserve it was admitted against"
+        );
+        assert_eq!(
+            70,
+            control.drainable_surbs(),
+            "the drain was planned against 70 drainable SURBs, and an announcement must not change that"
+        );
+        assert!(
+            control.admit(),
+            "with 120 held above the admitted reserve of 50, the drain's fill must still go out"
+        );
+        Ok(())
+    }
+
+    /// The reserve follows the announced target down and up, and settles on the last one announced.
+    ///
+    /// The announcement tests above each check one move through the manager. This drives the control
+    /// directly from several threads, which is the shape the real calls take — two keep-alives for one
+    /// Session are handled as two tasks. It pins two things: that a finished round of announcements
+    /// leaves the reserve derived from the last figure recorded, and that no announcement can leave a
+    /// figure whose derived reserve is not what a read returns. The derive-at-read shape is what makes
+    /// the second hold by construction, rather than by keeping two cells in step.
+    ///
+    /// A reader that samples the target and the reserve separately may see the two from either side of
+    /// one announcement, which is why the per-sample check is against the figure read back, not against
+    /// the last one written.
+    #[test]
+    fn the_announced_target_and_the_reserve_move_together() {
+        const CONFIGURED: u64 = 500;
+        let control = Arc::new(fill_control(None, CONFIGURED));
+
+        // Figures whose effective reserves differ, so a reserve derived from the wrong one is visible
+        // rather than coincidentally equal.
+        let announced: [u64; 6] = [200, 7_000, 400, 3, 2_000, 900];
+        std::thread::scope(|scope| {
+            for target in announced {
+                let control = control.clone();
+                scope.spawn(move || {
+                    for _ in 0..2_000 {
+                        control.set_announced_target(target);
+                    }
+                });
+            }
+        });
+
+        for target in announced {
+            control.set_announced_target(target);
+            assert_eq!(
+                effective_surb_reserve(CONFIGURED, target),
+                control.surb_reserve(),
+                "a settled announcement of {target} must be the reserve a read returns"
+            );
+        }
+
+        // And what is left is the derivation of the last figure recorded, whichever thread wrote it.
+        let last = control.announced_surb_target.load(Ordering::Relaxed);
+        assert_eq!(
+            effective_surb_reserve(CONFIGURED, last),
+            control.surb_reserve(),
+            "the reserve must be derived from the announcement the control holds ({last})"
+        );
+    }
+
+    /// A drain is planned against `drainable_surbs`, so that has to follow the reserve too.
+    ///
+    /// Otherwise a Session whose Entry raised its target reports less drainable than it could spend,
+    /// and one whose Entry lowered it reports more than it should.
+    #[test_log::test(tokio::test)]
+    async fn the_drainable_surbs_follow_the_announced_target() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+        control
+            .estimator
+            .produced
+            .fetch_add(120, std::sync::atomic::Ordering::Relaxed);
+
+        anyhow::ensure!(
+            control.drainable_surbs() == 70,
+            "fixture: 120 held against a reserve of 50 leaves 70 drainable, got {}",
+            control.drainable_surbs()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the keep-alive must be handled")?;
+        assert_eq!(
+            0,
+            control.drainable_surbs(),
+            "with the reserve now 500, 120 held leaves nothing to drain"
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 400))
+            .await
+            .context("the lowered keep-alive must be handled")?;
+        assert_eq!(
+            20,
+            control.drainable_surbs(),
+            "with the reserve now 100, 120 held leaves 20 to drain"
+        );
+        Ok(())
+    }
+
+    /// A keep-alive on an outgoing Session is from the Exit, so it carries no Entry target to follow.
+    ///
+    /// A regression guard for the `Forward` arm rather than evidence of the bug: it also holds on the
+    /// pre-fix code, which never re-derived the reserve at all. What it protects is the reach of the
+    /// `Return`-only re-derivation — moving the reserve here would apply the Exit's own report to the
+    /// Entry's buffer.
+    #[test_log::test(tokio::test)]
+    async fn a_keep_alive_on_an_outgoing_session_leaves_the_fill_reserve_alone() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let (mgr, control) = exit_slot_with_fill_control(pseudonym, 200, 500)?;
+
+        // The same slot, but as an Entry's own outgoing Session. The cache hands out clones, so the
+        // changed slot has to go back in for the manager to see it.
+        let mut slot = mgr.sessions.get(&pseudonym).context("the session slot must exist")?;
+        slot.routing_opts = DestinationRouting::Forward {
+            destination: Box::new(Address::from(&ChainKeypair::random()).into()),
+            pseudonym: Some(pseudonym),
+            forward_options: RoutingOptions::Hops(1.try_into()?),
+            return_options: None,
+        };
+        mgr.sessions.insert(pseudonym, slot);
+
+        anyhow::ensure!(
+            control.surb_reserve() == 50,
+            "fixture: the reserve starts at 50, not {}",
+            control.surb_reserve()
+        );
+
+        mgr.handle_keep_alive(pseudonym, keep_alive_announcing(pseudonym, 7_000))
+            .await
+            .context("the keep-alive must be handled")?;
+
+        assert_eq!(
+            50,
+            control.surb_reserve(),
+            "an outgoing Session's keep-alive is the Exit's, and must not touch the Entry's fill reserve"
+        );
+        Ok(())
     }
 
     /// Test dimensions whose cycle is large enough to need a visible fill rate.
@@ -14016,7 +14986,7 @@ mod tests {
                 control.clone(),
                 slot.surb_estimator.clone(),
                 keep_alive_surb_reserve(target),
-                control.min_surb_reserve,
+                control.surb_reserve(),
             )
         };
         anyhow::ensure!(
@@ -14354,7 +15324,7 @@ mod tests {
             .pix_fill
             .get()
             .context("a PIX session has a fill control")?
-            .min_surb_reserve;
+            .surb_reserve();
         let held = slot.surb_estimator.saturating_diff();
         anyhow::ensure!(
             0 < held && held < reserve,
@@ -14419,7 +15389,7 @@ mod tests {
             .pix_fill
             .get()
             .context("a PIX session has a fill control")?
-            .min_surb_reserve;
+            .surb_reserve();
         anyhow::ensure!(
             6 < reserve && !slot.surb_mgmt.counterparty_refills(),
             "fixture: below the reserve of {reserve}, with an Entry that has not been heard"
@@ -14776,6 +15746,154 @@ mod tests {
         );
 
         let _ = originated_during(&mut msg_rx, Duration::from_millis(200)).await;
+        Ok(())
+    }
+
+    /// The ways a Session can be torn down, for the matrix below.
+    #[derive(Clone, Copy, Debug)]
+    enum TearDown {
+        Close,
+        SocketClosed,
+        IdleEviction,
+        PeerSessionError,
+        SurbDrain,
+        RolledBack,
+    }
+
+    /// However a Session ends, it leaves the same state behind: gone from the manager, its admission
+    /// retired once with the token it was given (a rolled-back Session was never admitted, so none is
+    /// minted and it retires with `AdmissionToken::NONE`), and the peer is sent no `SessionError`. Only
+    /// the PIX failure teardowns (not covered here) notify the peer.
+    #[rstest]
+    #[case::explicit_close(TearDown::Close)]
+    #[case::socket_closed(TearDown::SocketClosed)]
+    #[case::idle_eviction(TearDown::IdleEviction)]
+    #[case::peer_session_error(TearDown::PeerSessionError)]
+    #[case::surb_drain(TearDown::SurbDrain)]
+    #[case::rolled_back(TearDown::RolledBack)]
+    #[test_log::test(tokio::test)]
+    async fn every_way_a_session_ends_leaves_the_same_state_behind(#[case] way: TearDown) -> anyhow::Result<()> {
+        let admission = RecordingAdmission::default();
+        let cfg = SessionManagerConfig {
+            surb_resolution_wait: Duration::from_millis(100),
+            idle_timeout: if matches!(way, TearDown::IdleEviction) {
+                KEEP_ALIVE_PERIOD * 3
+            } else {
+                SessionManagerConfig::default().idle_timeout
+            },
+            ..Default::default()
+        };
+        let (mgr, mut msg_rx, incoming, pseudonym) = match way {
+            TearDown::SurbDrain => {
+                let (mgr, msg_rx, pseudonym) =
+                    drainable_exit_pix_session(KEEP_ALIVE_PERIOD, Some(Arc::new(admission.clone()))).await?;
+                (mgr, msg_rx, None, pseudonym)
+            }
+            TearDown::RolledBack => {
+                let mgr = RecordingManager::new(cfg.clone());
+                mgr.set_surb_admission(Arc::new(admission.clone()));
+                let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
+                // A dropped receiver fails the notification after the slot was inserted.
+                let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+                mgr.start(msg_tx, new_session_tx, None, None)?;
+                let pseudonym = HoprPseudonym::random();
+                let started = mgr
+                    .handle_incoming_session_initiation(
+                        pseudonym,
+                        StartInitiation {
+                            challenge: MIN_CHALLENGE,
+                            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                            capabilities: HoprSessionCapabilities::empty(),
+                            additional_data: 0,
+                        },
+                    )
+                    .await;
+                anyhow::ensure!(started.is_err(), "the setup must fail for the rollback to run");
+                (mgr, msg_rx, None, pseudonym)
+            }
+            _ => {
+                let (mgr, msg_rx, incoming, pseudonym) =
+                    exit_session_originating_keep_alives(cfg, Some(Arc::new(admission.clone()))).await?;
+                (mgr, msg_rx, Some(incoming), pseudonym)
+            }
+        };
+
+        match way {
+            TearDown::Close | TearDown::SurbDrain => assert!(mgr.close_session(&pseudonym)),
+            TearDown::SocketClosed => {
+                let mut incoming = incoming.context("the fixture keeps the incoming session channel")?;
+                let mut exit_session = incoming
+                    .next()
+                    .await
+                    .context("the Exit must have been handed a Session")?;
+                exit_session.session.close().await?;
+            }
+            TearDown::IdleEviction => {
+                for _ in 0..50 {
+                    mgr.sessions.run_pending_tasks();
+                    tokio::time::sleep(KEEP_ALIVE_PERIOD / 10).await;
+                }
+            }
+            TearDown::PeerSessionError => {
+                let error = StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(pseudonym),
+                    reason: StartErrorReason::Unknown,
+                };
+                mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::SessionError(error))?)?;
+            }
+            TearDown::RolledBack => {}
+        }
+        if matches!(way, TearDown::SurbDrain) {
+            // The drain keeps the slot; the supervisor's own close, here a recovered cycle, ends it.
+            let ssa_id = SsaId::new(pseudonym, SsaIndex::new(1).context("index one is non-zero")?);
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+                .await?;
+        }
+
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "{way:?} must remove the Session"
+        );
+        assert!(mgr.sessions.get(&pseudonym).is_none(), "{way:?} left a slot behind");
+        assert_eq!(
+            mgr.num_active_sessions(),
+            0,
+            "{way:?} must give the Session's count back"
+        );
+
+        assert_eq!(wait_for_retire(&admission, &pseudonym, 1).await, 1);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(admission.retired(&pseudonym), 1, "{way:?} must retire exactly once");
+        if matches!(way, TearDown::RolledBack) {
+            assert!(
+                admission.minted_tokens().is_empty(),
+                "a rolled-back Session is never admitted"
+            );
+            assert_eq!(
+                admission.retire_tokens(),
+                vec![AdmissionToken::NONE],
+                "a rolled-back Session must retire with `NONE`, which matches no admission"
+            );
+        } else {
+            assert_eq!(
+                admission.retire_tokens(),
+                admission.minted_tokens(),
+                "{way:?} must retire with the token its admission returned"
+            );
+        }
+
+        let told = originated_during(&mut msg_rx, Duration::from_millis(200))
+            .await
+            .iter()
+            .any(|(_, data)| {
+                start_msg_match(data, |m| {
+                    matches!(
+                        m,
+                        HoprStartProtocol::SessionError(e) if e.identifier == ErrorIdentifier::SessionId(pseudonym)
+                    )
+                })
+            });
+        assert!(!told, "{way:?} must not send a SessionError naming the Session");
         Ok(())
     }
 
@@ -25843,10 +26961,9 @@ mod tests {
     ///
     /// The Session *was* established on this path — the Exit sends `SessionEstablished` before it
     /// commits, so an Entry can close or answer with a `SessionId`-scoped `SessionError` in that
-    /// window — so the guard must be marked committed rather than rolled back, and the Session still
-    /// counted. Only the admission is skipped: there is no slot left to carry its token. Skipping the
-    /// commit instead would drift `METRIC_ACTIVE_SESSIONS` down (the teardown already decremented it)
-    /// and leave the teardown's "session closed" unpaired.
+    /// window — so the guard must be marked committed rather than rolled back. Only the admission is
+    /// skipped: there is no slot left to carry its token. Skipping the commit instead would leave the
+    /// teardown's "session closed" unpaired.
     #[test_log::test(tokio::test)]
     async fn a_commit_without_a_slot_still_commits_the_session() -> anyhow::Result<()> {
         let admission = RecordingAdmission::default();

@@ -4047,6 +4047,61 @@ mod tests {
         Ok(())
     }
 
+    /// The level the Exit's session layer keeps from what each packet reports (`evicted + superseded`
+    /// per insert, one per pop) follows the store through every exit but one: SURBs discarded at pop
+    /// time, because their first relayer was invalidated, are not reported back.
+    #[test]
+    fn the_reported_surb_level_follows_the_store_except_for_discards_at_pop_time() -> anyhow::Result<()> {
+        const CAPACITY: usize = MIN_SURB_RB_CAPACITY;
+        let (relayer, pseudonym) = (HoprKeyIdent::from(1u32), HoprPseudonym::random());
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            rb_capacity: CAPACITY,
+            ..Default::default()
+        });
+        store.admit(&pseudonym, CAPACITY);
+
+        let (mut level, mut next_id) = (0isize, 0u64);
+        let mut insert = |count: usize, generation: u8| -> anyhow::Result<isize> {
+            let batch = (0..count)
+                .map(|_| {
+                    next_id += 1;
+                    Ok((next_id.to_be_bytes(), surb_gen(relayer, TWO_HOP, generation)?))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            let outcome = store.insert_surbs(pseudonym, batch);
+            level += count as isize - (outcome.evicted + outcome.superseded) as isize;
+            Ok(level)
+        };
+        let held = || store.tier_lens(&pseudonym).map(|(shares, plain)| shares + plain);
+
+        assert_eq!(10, insert(10, 0)?, "a plain fill");
+        assert_eq!(Some(10), held());
+        assert_eq!(
+            CAPACITY as isize,
+            insert(CAPACITY, 0)?,
+            "an overflow evicts the oldest ten"
+        );
+        assert_eq!(Some(CAPACITY), held());
+        assert_eq!(5, insert(5, 1)?, "a newer generation wipes the stock");
+        assert_eq!(Some(5), held());
+        assert_eq!(5, insert(3, 0)?, "a stale older generation is refused whole");
+        assert_eq!(Some(5), held());
+
+        let popped = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .context("a SURB must be there to pop")?;
+        let level = level - 1;
+        assert_eq!(Some(level as usize), held(), "a successful pop is one SURB");
+        assert_eq!(level as usize, popped.remaining, "and it reports what is left");
+
+        store.invalidate_relayer(&relayer);
+        assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none());
+        // This exit is not reported to the caller: its running level stays above what the store holds.
+        assert_eq!((4, Some(0)), (level, held()), "the pop discarded every remaining SURB");
+
+        Ok(())
+    }
+
     #[test]
     fn memory_surb_store_should_count_size_evictions_of_flooded_reply_openers() {
         let (client, _) = flooded_client(MINIMUM_OPENERS_PER_PSEUDONYM, 3 * MINIMUM_OPENERS_PER_PSEUDONYM as u64);
