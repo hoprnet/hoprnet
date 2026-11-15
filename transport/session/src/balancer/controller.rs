@@ -13,8 +13,8 @@ use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
 use super::{
-    BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
-    SurbFlowController, SurbFlowEstimator,
+    AtomicSurbFlowEstimator, BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator,
+    SurbBalancerController, SurbFlowController, SurbFlowEstimator,
 };
 use crate::SessionId;
 
@@ -207,6 +207,9 @@ pub struct BalancerStateValues {
     /// When a reply the estimator counted as consumed last came home, in the same unit as
     /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
     last_reply_heard: AtomicU64,
+    /// Entry-side: the SURBs the estimator counted as consumed for the counterparty's keep-alives rather
+    /// than for replies to data. Only ever grows.
+    keep_alives_consumed: AtomicU64,
     /// The fewest SURBs per second the paced fill and refill may be held to: one keep-alive's worth,
     /// set by the Session that owns the balancer. `0` until set. See [`pacing_cap`](Self::pacing_cap).
     pacing_floor: AtomicU64,
@@ -567,6 +570,22 @@ impl BalancerStateValues {
         self.stamp(&self.last_reply_heard, std::time::Instant::now());
     }
 
+    /// Counts a SURB consumed by a counterparty keep-alive, not by a reply, in the `estimator` too.
+    ///
+    /// The keep-alive count is written before `consumed` is released, and the estimator acquires `consumed`
+    /// when read, so a reader that sees the SURB also sees its keep-alive.
+    pub(crate) fn note_keep_alive_consumed(&self, estimator: &AtomicSurbFlowEstimator) {
+        self.keep_alives_consumed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Release);
+    }
+
+    /// The number of consumed SURBs that were spent on counterparty keep-alives. See
+    /// [`note_keep_alive_consumed`](Self::note_keep_alive_consumed).
+    pub(crate) fn keep_alives_consumed(&self) -> u64 {
+        self.keep_alives_consumed.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Test hook: as if the counterparty had last been heard from `ago` ago.
     ///
     /// The stamps count from the instant the state was made, so for one to lie in the past the epoch
@@ -857,6 +876,7 @@ pub struct SurbBalancer<C, E, F> {
     flow_control: F,
     state: Arc<BalancerStateValues>,
     last_estimator_state: SimpleSurbFlowEstimator,
+    replies_seen: u64,
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
@@ -898,6 +918,7 @@ where
             session_id,
             state,
             last_estimator_state: Default::default(),
+            replies_seen: 0,
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
@@ -934,10 +955,18 @@ where
         let produced_before_lag = self.produced_history.record(self.last_update, snapshot.produced);
         self.state.publish_production(produced_before_lag, snapshot.produced);
 
-        // A reply came home since the last tick: the counterparty answered, whether or not any of its
-        // packets reached the hooks that record it.
+        // The estimator counted a consumed SURB since the last tick, so the counterparty was heard, by a
+        // reply or a keep-alive, whether or not any of its packets reached the hooks that record it.
         if snapshot.consumed > self.last_estimator_state.consumed {
             self.state.note_heard();
+        }
+
+        // Only replies count towards the reply stream. The keep-alive count is written before `consumed` is
+        // released and the snapshot acquired `consumed` before this read, so the difference never
+        // over-counts replies; its maximum is what is tracked.
+        let replies = snapshot.consumed.saturating_sub(self.state.keep_alives_consumed());
+        if replies > self.replies_seen {
+            self.replies_seen = replies;
             self.state.note_reply_heard();
         }
 
@@ -2692,6 +2721,36 @@ mod tests {
         assert!(
             stale_report.silence_sustain(),
             "data unanswered for longer than the grace since the last report is a silence"
+        );
+    }
+
+    /// A keep-alive is counted by the estimator as a consumed SURB: it is the counterparty being heard, but
+    /// it is not a reply, and a reply after it still is one.
+    #[test]
+    fn a_keep_alive_counted_as_consumed_should_be_heard_but_not_as_a_reply() {
+        use std::sync::atomic::Ordering::Relaxed;
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        // The keep-alive is processed as the session manager does: level first, then the consumed SURB.
+        state.observe_counterparty_signals(PacketSignals::default());
+        state.observe_reported_level(1_000);
+        state.note_keep_alive_consumed(&estimator);
+        tick(&mut balancer, &estimator, &output, 0);
+        assert!(
+            state.last_heard.load(Relaxed) > 0,
+            "a keep-alive is the counterparty being heard"
+        );
+        assert_eq!(0, state.last_reply_heard.load(Relaxed), "a keep-alive is not a reply");
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick(&mut balancer, &estimator, &output, 0);
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "a reply after a keep-alive still counts"
         );
     }
 

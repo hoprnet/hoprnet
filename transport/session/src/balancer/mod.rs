@@ -201,7 +201,8 @@ pub struct AtomicSurbFlowEstimator {
 
 impl SurbFlowEstimator for AtomicSurbFlowEstimator {
     fn estimate_surbs_consumed(&self) -> u64 {
-        self.consumed.load(std::sync::atomic::Ordering::Relaxed)
+        // Pairs with the release in `BalancerStateValues::note_keep_alive_consumed`.
+        self.consumed.load(std::sync::atomic::Ordering::Acquire)
     }
 
     fn estimate_surbs_produced(&self) -> u64 {
