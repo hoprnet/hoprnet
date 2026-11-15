@@ -59,6 +59,8 @@
 //!   such losses.
 //! - **Lost neighbour.** Trigger: our own connection drops. Effect: re-plan only; the graph's connection status already
 //!   rejects that edge, so its SURBs are not invalidated.
+//!
+//! With `HoprProtocolConfig::relayer_health_weight` at `0` none of these acts, except the lost-neighbour re-plan.
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -1531,7 +1533,7 @@ where
 /// the re-plan already avoids them; the write-off follows it, so the refill goes over new paths.
 ///
 /// Returns the sessions whose SURB generation the caller should advance, as reported by
-/// [`SurbRoundTripRegistry::write_off_dead`].
+/// [`SurbRoundTripRegistry::write_off_dead`]. At `weight` `0` nothing is written off and none is returned.
 pub async fn refresh_relayer_health<G, F>(
     registry: &SurbRoundTripRegistry,
     graph: &G,
@@ -1568,6 +1570,11 @@ where
     }
     if health.take_neighbour_change() || !changed.is_empty() {
         replan().await;
+    }
+    // Weight `0` switches the mitigation off: the verdicts are neither written off nor reported, so no
+    // SURB generation is advanced.
+    if weight == 0.0 {
+        return Vec::new();
     }
     // The housekeeping is cheap and runs here. The walk of the pending map is not, so it is skipped while
     // no relayer is known dead, and runs on the blocking pool otherwise: it takes some 10 ms at the
@@ -3364,6 +3371,30 @@ mod tests {
             bumped,
             "the session the verdict reached is handed back for its SURB generation to be advanced"
         );
+        Ok(())
+    }
+
+    /// At weight `0` the verdict is not acted on at all: nothing is written off, no session is handed back.
+    #[tokio::test]
+    async fn a_confirmed_dead_verdict_should_write_off_nothing_at_weight_zero() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let [dead] = peers[..] else {
+            anyhow::bail!("one peer asked for");
+        };
+        graph.add_edge(&me, &dead)?;
+        let registry = SurbRoundTripRegistry::default();
+        registry.pending.insert(surb_id(1), pending_to(&[dead], None, 0));
+        let health = registry.relayer_health();
+        settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+        open_since(&health, dead, MIN_RACES as u8, ago(Duration::from_secs(5))?);
+        health.record_reply();
+
+        refresh_relayer_health(&registry, &graph, 4, 0.0, || async {}).await;
+        confirm_verdicts(&health);
+        let bumped = refresh_relayer_health(&registry, &graph, 4, 0.0, || async {}).await;
+
+        assert!(bumped.is_empty(), "no session is handed back for a generation advance");
+        assert!(!registry.has_write_offs(), "nothing is written off");
         Ok(())
     }
 
