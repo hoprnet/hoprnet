@@ -1712,10 +1712,7 @@ pub(crate) struct PixFillControl {
     /// supply would refuse every fill packet forever. Not stored, but derived at every read from the
     /// target in force — see [`surb_reserve`](Self::surb_reserve) — so there is no second figure to
     /// keep in step with it. See [`effective_surb_reserve`].
-    ///
-    /// The target in force at establishment is the Entry's announcement, or this node's fallback when
-    /// it announced none (a `NoRateControl` Session, or one without `surb_management`).
-    establishment_surb_target: u64,
+    reserve_basis: SurbReserveBasis,
     /// The target the Entry last announced with a `BalancerTarget` keep-alive, or [`NO_ANNOUNCEMENT`]
     /// while it has announced none.
     ///
@@ -1724,11 +1721,6 @@ pub(crate) struct PixFillControl {
     /// announced a *lower* target since. The reserve has to follow a lower announcement, so it keeps
     /// the last figure as announced, and it is the only figure that changes.
     announced_surb_target: std::sync::atomic::AtomicU64,
-    /// The configured reserve, which is the ceiling the effective reserve is derived against.
-    ///
-    /// Kept next to the target so a later announcement is derived against the same ceiling
-    /// establishment used, rather than against whatever is in force at the time.
-    configured_surb_reserve: u64,
     /// Whether the order-of-magnitude lowering has already been logged for this Session.
     ///
     /// The target is peer-controlled, so without it an Entry alternating a deep and a shallow target
@@ -1781,20 +1773,28 @@ struct PixFillState {
     idle_reports: u32,
 }
 
+/// What one Session's fill reserve is derived from (see [`effective_surb_reserve`]).
+///
+/// Two figures of the one reserve, named so a call site cannot pass them swapped.
+#[derive(Clone, Copy, Debug)]
+struct SurbReserveBasis {
+    /// The configured reserve, which is the ceiling the effective reserve is derived against.
+    ///
+    /// Kept next to the target so a later announcement is derived against the same ceiling
+    /// establishment used, rather than against whatever is in force at the time.
+    configured: u64,
+    /// The target in force at establishment: the Entry's announcement, or this node's fallback when
+    /// it announced none (a `NoRateControl` Session, or one without `surb_management`).
+    establishment_target: u64,
+}
+
 impl PixFillControl {
-    /// `establishment_surb_target` is the target in force when the Session was established, and
-    /// `configured_surb_reserve` is the configured ceiling both it and any later announcement are
-    /// derived against.
-    // Eight, but two of them are the one reserve figure seen at two levels, and bundling exactly
-    // those two into a struct would make every call site spell out a type to pass two numbers.
-    #[allow(clippy::too_many_arguments)]
     fn new(
         session_id: SessionId,
         controller: RateController,
         notify_period: Option<Duration>,
         degraded_notify_period: Option<Duration>,
-        establishment_surb_target: u64,
-        configured_surb_reserve: u64,
+        reserve_basis: SurbReserveBasis,
         estimator: AtomicSurbFlowEstimator,
         surb_mgmt: Arc<BalancerStateValues>,
     ) -> Self {
@@ -1809,11 +1809,10 @@ impl PixFillControl {
             idle_notify_period: None,
             data_since_report: AtomicBool::new(false),
             session_kind: ExitSessionKind::Plain,
-            establishment_surb_target,
+            reserve_basis,
             // Empty until the Entry announces a target, so the first announcement is a change
             // whatever it says and is treated exactly as a later one is.
             announced_surb_target: std::sync::atomic::AtomicU64::new(NO_ANNOUNCEMENT),
-            configured_surb_reserve,
             warned_lowered_reserve: std::sync::atomic::AtomicBool::new(false),
             estimator,
             surb_mgmt,
@@ -1904,7 +1903,7 @@ impl PixFillControl {
         trace!(
             session_id = %self.session_id,
             announced,
-            configured = self.configured_surb_reserve,
+            configured = self.reserve_basis.configured,
             previous = previous_reserve,
             reserve,
             "the PIX fill SURB reserve follows the target the entry announced"
@@ -1918,12 +1917,12 @@ impl PixFillControl {
         // as long as the Session lasts. The latch is set only when a warning actually goes out, so a
         // Session that starts at the establishment warning can still report its first later lowering.
         if reserve < previous_reserve
-            && reserve.saturating_mul(10) < self.configured_surb_reserve
+            && reserve.saturating_mul(10) < self.reserve_basis.configured
             && !self.warned_lowered_reserve.swap(true, Ordering::Relaxed)
         {
             warn!(
                 session_id = %self.session_id,
-                configured = self.configured_surb_reserve,
+                configured = self.reserve_basis.configured,
                 previous = previous_reserve,
                 effective = reserve,
                 announced,
@@ -1936,11 +1935,11 @@ impl PixFillControl {
     /// The reserve `announced` implies here, or the establishment figure for [`NO_ANNOUNCEMENT`].
     fn reserve_for(&self, announced: u64) -> u64 {
         let target = if announced == NO_ANNOUNCEMENT {
-            self.establishment_surb_target
+            self.reserve_basis.establishment_target
         } else {
             announced
         };
-        effective_surb_reserve(self.configured_surb_reserve, target)
+        effective_surb_reserve(self.reserve_basis.configured, target)
     }
 
     /// The notification period the stream is running at, normal or degraded.
@@ -6275,8 +6274,10 @@ where
                 controller.clone(),
                 notify_period,
                 degraded_period,
-                announced.surb_target,
-                configured_reserve,
+                SurbReserveBasis {
+                    configured: configured_reserve,
+                    establishment_target: announced.surb_target,
+                },
                 slot.surb_estimator.clone(),
                 slot.surb_mgmt.clone(),
             )
@@ -12147,8 +12148,10 @@ mod tests {
             // of `reserve` itself, a quarter is below it, so the target is four times the reserve —
             // except at the floor, where `effective_surb_reserve` derives 1 from any small target.
             // The announcement tests below build their own control to move it.
-            reserve.saturating_mul(4),
-            reserve,
+            SurbReserveBasis {
+                configured: reserve,
+                establishment_target: reserve.saturating_mul(4),
+            },
             Default::default(),
             surb_mgmt,
         )
@@ -12172,8 +12175,10 @@ mod tests {
             degraded_period,
             // Four times the reserve, so its derivation gives exactly `reserve` against a ceiling of
             // `reserve` — see `fill_control_for`.
-            reserve.saturating_mul(4),
-            reserve,
+            SurbReserveBasis {
+                configured: reserve,
+                establishment_target: reserve.saturating_mul(4),
+            },
             Default::default(),
             {
                 let surb_mgmt = Arc::new(BalancerStateValues::default());
@@ -12200,9 +12205,11 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             Some(base),
             None,
-            // Target and ceiling: the reserve they derive is out of reach.
-            u64::MAX,
-            u64::MAX,
+            // The reserve these derive is out of reach.
+            SurbReserveBasis {
+                configured: u64::MAX,
+                establishment_target: u64::MAX,
+            },
             Default::default(),
             surb_mgmt,
         )
@@ -12393,9 +12400,11 @@ mod tests {
                 RateController::new(0, Duration::from_secs(1)),
                 Some(base),
                 Some(MIN_SURB_BUFFER_NOTIFICATION_PERIOD),
-                // Target and ceiling: the reserve they derive is out of reach.
-                u64::MAX,
-                u64::MAX,
+                // The reserve these derive is out of reach.
+                SurbReserveBasis {
+                    configured: u64::MAX,
+                    establishment_target: u64::MAX,
+                },
                 Default::default(),
                 balancer_with_target(3_200),
             )
@@ -12821,8 +12830,10 @@ mod tests {
             Some(Duration::from_secs(15)),
             None,
             // A target of 40 derives a reserve of 10 against a ceiling of 10.
-            40,
-            10,
+            SurbReserveBasis {
+                configured: 10,
+                establishment_target: 40,
+            },
             Default::default(),
             balancer_with_target(3_200),
         )
@@ -13804,8 +13815,10 @@ mod tests {
                 RateController::new(0, Duration::from_secs(1)),
                 Some(Duration::from_secs(3600)),
                 Some(degraded),
-                RESERVE.saturating_mul(4),
-                RESERVE,
+                SurbReserveBasis {
+                    configured: RESERVE,
+                    establishment_target: RESERVE.saturating_mul(4),
+                },
                 Default::default(),
                 surb_mgmt,
             );
@@ -13993,8 +14006,10 @@ mod tests {
             RateController::new(0, Duration::from_secs(1)),
             Some(Duration::from_secs(3600)),
             None,
-            announced,
-            configured_reserve,
+            SurbReserveBasis {
+                configured: configured_reserve,
+                establishment_target: announced,
+            },
             estimator.clone(),
             surb_mgmt.clone(),
         ));
@@ -14308,7 +14323,7 @@ mod tests {
         // The establishment reserve is 500, above the threshold, so 180 (reserve 45) is a crossing.
         // `fill_control` derives its establishment target from the reserve, so the field is set here.
         let mut control = fill_control(None, CONFIGURED);
-        control.establishment_surb_target = 7_000;
+        control.reserve_basis.establishment_target = 7_000;
         anyhow::ensure!(
             control.surb_reserve() == 500,
             "fixture: the establishment reserve must be 500, got {}",
@@ -14331,7 +14346,7 @@ mod tests {
 
         // A fresh control that only repeated its target has not warned, so a later crossing still does.
         let mut fresh = fill_control(None, CONFIGURED);
-        fresh.establishment_surb_target = 7_000;
+        fresh.reserve_basis.establishment_target = 7_000;
         let warnings = Arc::new(WarnCounter::default());
         tracing::subscriber::with_default(warnings.clone(), || fresh.set_announced_target(7_000));
         assert_eq!(
