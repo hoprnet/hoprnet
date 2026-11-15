@@ -100,8 +100,9 @@ pub struct StartInitiation<T, C> {
     /// [`PixParams::into_additional_data`](hopr_protocol_pix::PixParams::into_additional_data) —
     /// and the lower 32 bits of them are the SURB balancer target.
     ///
-    /// The least significant 64 bits are currently unused: senders must set them to `0` and
-    /// receivers ignore them, so that they can be allocated later without breaking older decoders.
+    /// The least significant 64 bits are reserved: the lowest 32 carry the sender's session idle timeout in
+    /// whole seconds (`0` if not announced), and the 32 above them are unused. Senders set unused bits to `0`
+    /// and receivers ignore them, so that they can be allocated later without breaking older decoders.
     pub additional_data: u128,
 }
 

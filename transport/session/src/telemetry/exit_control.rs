@@ -8,13 +8,19 @@
 //!
 //! | Metric | Type | Unit | Updated at | Labels |
 //! | --- | --- | --- | --- | --- |
-//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is sent, dropped for want of budget, or fails to send | `kind` = `refusal_*` (see [`ExitControlKind`]), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
+//! | `hopr_exit_control_packets_total` | MultiCounter | packets | a refusal is answered, dropped for want of budget, or fails to send; a SURB report or fill packet is `sent` once the keep-alive stream admits it, never `send_failed`; any other admitted Session control packet is sent or fails to send | `kind` = one per [`ExitControlKind`] (`refusal_*`, `surb_report`, `pix_fill`, `session_established`, `ssa_request`, `ssa_request_resend`, `commitment_retransmission_request`, `session_error`), `session` = `pix\|plain`, `outcome` = `sent\|dropped_budget\|send_failed` |
 //!
 //! It counts packets, not their cost: the SURB, and so the path length and ticket, is chosen later in
 //! the packet pipeline.
 //!
 //! ```promql
 //! sum by (kind) (rate(hopr_exit_control_packets_total{outcome="dropped_budget"}[5m]))
+//! ```
+//!
+//! Idle Sessions' report cost, which falls as the idle backoff takes hold:
+//!
+//! ```promql
+//! sum by (session) (rate(hopr_exit_control_packets_total{kind="surb_report",outcome="sent"}[5m]))
 //! ```
 
 use crate::exit_control::{ExitControlKind, ExitControlOutcome, ExitSessionKind};
