@@ -39,7 +39,7 @@ use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::AbortableList;
+use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -216,12 +216,19 @@ impl Drop for ParkedSurbRefund {
     }
 }
 
-/// Aborts the wrapped task when dropped.
-struct AbortOnDrop(hopr_utils::runtime::prelude::JoinHandle<()>);
+/// Aborts the wrapped task when dropped, which neither a join handle nor an [`AbortHandle`] does on
+/// its own drop. Built through `From` from any [`Abortable`].
+struct AbortOnDrop(Box<dyn Abortable + Send + Sync>);
+
+impl<A: Abortable + Send + Sync + 'static> From<A> for AbortOnDrop {
+    fn from(task: A) -> Self {
+        Self(Box::new(task))
+    }
+}
 
 impl Drop for AbortOnDrop {
     fn drop(&mut self) {
-        self.0.abort();
+        self.0.abort_task();
     }
 }
 
@@ -5408,7 +5415,7 @@ where
                     // aborted as soon as the readiness wait resolves.
                     let sessions_keepalive = self.sessions.clone();
                     let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
-                    let slot_keepalive = AbortOnDrop(hopr_utils::runtime::prelude::spawn(async move {
+                    let slot_keepalive = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
                         loop {
                             hopr_utils::runtime::prelude::sleep(touch_period).await;
                             let _ = sessions_keepalive.get(&session_id);
@@ -9434,7 +9441,7 @@ mod tests {
     async fn abort_on_drop_stops_the_task() -> anyhow::Result<()> {
         let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-        let guard = AbortOnDrop(hopr_utils::runtime::prelude::spawn(async move {
+        let guard = AbortOnDrop::from(hopr_utils::runtime::prelude::spawn(async move {
             let _tx = tx;
             let _ = started_tx.send(());
             std::future::pending::<()>().await;
@@ -11147,7 +11154,7 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// Records a loss into `signal` every `every` until the guard is dropped, as a continuously faulty path does.
@@ -11158,7 +11165,7 @@ mod tests {
                 tokio::time::sleep(every).await;
             }
         });
-        AbortOnDrop(task)
+        AbortOnDrop::from(task)
     }
 
     /// The Session stops reporting at the degraded period exactly at the keep-alive reserve, and not one SURB
@@ -11249,7 +11256,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -11454,7 +11461,7 @@ mod tests {
         let ever_degraded = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let _sampler = {
             let (control, ever_degraded) = (control.clone(), ever_degraded.clone());
-            AbortOnDrop(tokio::spawn(async move {
+            AbortOnDrop::from(tokio::spawn(async move {
                 loop {
                     if control.is_degraded() {
                         ever_degraded.store(true, std::sync::atomic::Ordering::Relaxed);
