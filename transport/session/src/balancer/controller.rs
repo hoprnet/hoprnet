@@ -2793,6 +2793,49 @@ mod tests {
         Ok(())
     }
 
+    /// A sample taken between a keep-alive's two counts sees one reply fewer than came home. The SURB of
+    /// that keep-alive, when it lands, must not count as a reply, and a reply it hid must count once it
+    /// lands.
+    #[test]
+    fn a_keep_alive_sampled_halfway_should_neither_pass_for_a_reply_nor_lose_one() {
+        use std::sync::atomic::Ordering::{Relaxed, Release};
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(state.last_reply_heard.load(Relaxed) > 0, "a reply counts");
+        state.last_reply_heard.store(0, Relaxed);
+
+        state.keep_alives_consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        estimator.consumed.fetch_add(1, Release);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert_eq!(
+            0,
+            state.last_reply_heard.load(Relaxed),
+            "the SURB of a keep-alive sampled halfway is not a reply"
+        );
+
+        state.keep_alives_consumed.fetch_add(1, Relaxed);
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert_eq!(
+            0,
+            state.last_reply_heard.load(Relaxed),
+            "a reply sampled with a keep-alive halfway is hidden"
+        );
+        estimator.consumed.fetch_add(1, Release);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "and counts once the keep-alive's SURB lands"
+        );
+    }
+
     /// A reply home is the Exit answering, counted by the estimator as a SURB consumed, even where none of
     /// its packets reached the hooks that record it. Production minted and nothing consumed is not.
     #[test_log::test]
