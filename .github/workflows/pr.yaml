@@ -168,8 +168,11 @@ jobs:
       # Coverage runs the same nextest selection as test-unit and test-integration
       # (--lib / --test '*' with identical features and profile), so the plain
       # test jobs would run every test twice. Nightly stays: other toolchain.
-      enable_unit_tests: false
-      enable_integration_tests: false
+      # Fork PRs are the exception: the pinned tests.yaml skips both coverage
+      # jobs for them (no OIDC token for Codecov), so the plain jobs run
+      # instead and the PR still gets a unit and integration signal.
+      enable_unit_tests: ${{ needs.changes.outputs.code == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+      enable_integration_tests: ${{ needs.changes.outputs.code == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       enable_nightly_tests: ${{ needs.changes.outputs.code == 'true' }}
       nightly_test_command: "nix build -L .#test-nightly"
       enable_benchmarks: false
@@ -271,8 +274,10 @@ jobs:
         uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
-          # validate-pr-title and label run on pull_request only; benchmarks
-          # also skips for fork PRs (the workflow skips them itself). `tests`, `build-library` and `docs` are
+          # validate-pr-title and label run on pull_request only, and label
+          # also skips for fork PRs (read-only token, no label write access);
+          # benchmarks skips for fork PRs the same way (the workflow skips
+          # itself). `tests`, `build-library` and `docs` are
           # gated on `changes.outputs.code`; when every inner job of a
           # reusable workflow skips, the caller job reports skipped as well.
           # So their skip is allowed only for a docs-only change; a code
