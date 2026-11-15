@@ -15708,8 +15708,8 @@ mod tests {
 
     /// However a Session ends, it leaves the same state behind: gone from the manager, its admission
     /// retired once with the token it was given (a rolled-back Session was never admitted, so none is
-    /// minted), and the peer is sent no `SessionError`. Only the PIX failure teardowns (not covered here)
-    /// notify the peer.
+    /// minted and it retires with `AdmissionToken::NONE`), and the peer is sent no `SessionError`. Only
+    /// the PIX failure teardowns (not covered here) notify the peer.
     #[rstest]
     #[case::explicit_close(TearDown::Close)]
     #[case::socket_closed(TearDown::SocketClosed)]
@@ -15814,6 +15814,11 @@ mod tests {
             assert!(
                 admission.minted_tokens().is_empty(),
                 "a rolled-back Session is never admitted"
+            );
+            assert_eq!(
+                admission.retire_tokens(),
+                vec![AdmissionToken::NONE],
+                "a rolled-back Session must retire with `NONE`, which matches no admission"
             );
         } else {
             assert_eq!(
