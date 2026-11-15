@@ -208,6 +208,15 @@ impl Drop for ParkedSurbRefund {
     }
 }
 
+/// Aborts the wrapped task when dropped.
+struct AbortOnDrop(hopr_utils::runtime::prelude::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// How long a teardown waits before retiring its Session's pseudonym from the SURB store's admitted
 /// class.
 ///
@@ -544,6 +553,8 @@ where
 /// per Session at INFO, so its whole lifetime can be read from a production log without the
 /// per-frame detail of the socket.
 ///
+/// Also takes the Session off `METRIC_ACTIVE_SESSIONS`, which only a committed slot was counted in.
+///
 /// `admission` is the SURB-store seam, forwarded to [`release_session_slot`]; `None` only ever
 /// reaches here from a teardown that had no seam to call.
 fn close_session(
@@ -555,6 +566,8 @@ fn close_session(
     token: AdmissionToken,
 ) {
     tracing::info!(%session_id, %reason, "session closed");
+    #[cfg(all(feature = "telemetry", not(test)))]
+    METRIC_ACTIVE_SESSIONS.decrement(1.0);
     release_session_slot(session_id, session_data, reason, admission, grace, token);
 }
 
@@ -562,6 +575,7 @@ fn close_session(
 ///
 /// Logs nothing at INFO, because it also cleans up a Session whose setup failed before it was
 /// established (see [`SessionSlotGuard`]). An established Session is closed with [`close_session`].
+/// It does not touch `METRIC_ACTIVE_SESSIONS`; [`close_session`] does.
 ///
 /// Retires the Session's pseudonym from the SURB store's admitted class, but not immediately: the
 /// retire is pushed past the packet pipeline's SURB-resolution window, so the return-routed
@@ -649,9 +663,6 @@ fn release_session_slot(
     if let Some(reservation) = session_data.cycle_budget.as_ref() {
         reservation.release();
     }
-
-    #[cfg(all(feature = "telemetry", not(test)))]
-    METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
 /// How a close is answered for a Session whose SURB buffer is already draining.
@@ -668,6 +679,21 @@ fn answer_while_draining(reason: ClosureReason) -> Option<bool> {
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
+}
+
+/// How long `new_session` waits for the answer to a `StartSession` over the given hop counts.
+fn initiation_wait(base: Duration, forward_hops: usize, return_hops: usize) -> Duration {
+    initiation_timeout_max_one_way(base, forward_hops + return_hops + 2)
+}
+
+/// TTL of the pending-initiation caches: the longest [`initiation_wait`] plus the time the
+/// `StartSession` send may take before that wait starts.
+fn initiation_cache_ttl(base: Duration) -> Duration {
+    initiation_wait(
+        base,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+    ) + EXTERNAL_SEND_TIMEOUT
 }
 
 /// Conservative lower bound on how many coefficient commitments fit into one `SsaCommit` message.
@@ -4233,8 +4259,7 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
-        let initiation_timeout =
-            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
+        let initiation_timeout = initiation_cache_ttl(cfg.initiation_timeout_base);
         let pix_toolbox: Arc<OnceLock<PixToolbox>> = Arc::new(OnceLock::new());
         // Captured by the eviction listener below, which is built here and has no `&self` to read
         // later — same shape as `active_sessions_for_listener`. Cloned before the closure moves the
@@ -4869,9 +4894,10 @@ where
         })?;
 
         // The timeout is given by the number of hops requested
-        let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
+        let initiation_timeout: futures_time::time::Duration = initiation_wait(
             self.cfg.initiation_timeout_base,
-            cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
+            cfg.forward_path_options.count_hops(),
+            cfg.return_path_options.count_hops(),
         )
         .into();
 
@@ -5050,12 +5076,12 @@ where
                     // aborted as soon as the readiness wait resolves.
                     let sessions_keepalive = self.sessions.clone();
                     let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
-                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                    let slot_keepalive = AbortOnDrop(hopr_utils::runtime::prelude::spawn(async move {
                         loop {
                             hopr_utils::runtime::prelude::sleep(touch_period).await;
                             let _ = sessions_keepalive.get(&session_id);
                         }
-                    });
+                    }));
 
                     // The session is ready once a quarter of the target is believed to be at the
                     // counterparty: that is the point the first replies can come home, and a quarter of
@@ -5071,7 +5097,7 @@ where
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await;
-                    slot_keepalive.abort();
+                    drop(slot_keepalive);
                     match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
@@ -8981,6 +9007,22 @@ mod tests {
     /// [`SsaGeneratorConfig::default`], so a value that failed to cross the wire is visible.
     const TEST_SURPLUS_SHARES: u8 = 1;
 
+    #[tokio::test]
+    async fn abort_on_drop_stops_the_task() -> anyhow::Result<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let guard = AbortOnDrop(hopr_utils::runtime::prelude::spawn(async move {
+            let _tx = tx;
+            std::future::pending::<()>().await;
+        }));
+        drop(guard);
+
+        let result = timeout(Duration::from_secs(1), rx)
+            .await
+            .context("the task was not aborted")?;
+        assert!(result.is_err(), "the sender must have been dropped without sending");
+        Ok(())
+    }
+
     #[test]
     fn session_config_forwards_max_buffered_segments() {
         assert_eq!(
@@ -9915,6 +9957,19 @@ mod tests {
         Ok(())
     }
 
+    /// The pending-initiation entries must outlive the longest wait `new_session` can make.
+    #[test]
+    fn initiation_cache_ttl_outlasts_the_longest_wait() {
+        let max = RoutingOptions::MAX_INTERMEDIATE_HOPS;
+        for base in [Duration::from_millis(100), Duration::from_secs(5)] {
+            assert!(initiation_cache_ttl(base) > initiation_wait(base, max, max));
+        }
+        assert_eq!(
+            initiation_cache_ttl(Duration::from_secs(5)),
+            Duration::from_millis(40_200)
+        );
+    }
+
     /// Verifies that a session initiation returns `TransportSessionError::Timeout` when the peer
     /// never processes or responds to the `StartSession` message.
     ///
@@ -10629,15 +10684,6 @@ mod tests {
 
         assert!(mgr.close_session(&pseudonym));
         Ok(())
-    }
-
-    /// Aborts a background task of a test when it goes out of scope.
-    struct AbortOnDrop(tokio::task::JoinHandle<()>);
-
-    impl Drop for AbortOnDrop {
-        fn drop(&mut self) {
-            self.0.abort();
-        }
     }
 
     /// Keeps a Session's SURB estimate at `level` while it runs, so that the reports it sends do not walk the

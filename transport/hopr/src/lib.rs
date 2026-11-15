@@ -142,11 +142,7 @@ use hopr_api::{
 use hopr_crypto_packet::HoprShareResolution;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
-// Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
-    static ref SESSION_INITIATION_TIMEOUT_MAX: Duration = 2 * SESSION_INITIATION_TIMEOUT_BASE * RoutingOptions::MAX_INTERMEDIATE_HOPS as u32;
-
-
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
 
