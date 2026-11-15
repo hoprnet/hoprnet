@@ -10,7 +10,7 @@ use std::{
 use futures::{FutureExt, StreamExt};
 use futures_time::stream::StreamExt as TimeStreamExt;
 use hopr_utils::network_types::crossfire_sink::{CrossfireSink, bounded_sink_channel};
-use tracing::Instrument;
+use tracing::{Instrument, instrument::WithSubscriber};
 
 use crate::{
     errors::SessionError,
@@ -499,7 +499,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         &self.id
     }
 
-    #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components))]
     fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
         if self.started.load(std::sync::atomic::Ordering::Relaxed) && self.context.is_some() {
             return Err(SessionError::InvalidState("state is already running".into()));
@@ -583,6 +583,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Err(error) => tracing::debug!(%error, "incoming frame resends ended after the state stopped")
                 })
                 .instrument(tracing::debug_span!("incoming_frame_retries_sender"))
+                .with_current_subscriber()
             );
         }
 
@@ -601,7 +602,8 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("acknowledgement forwarding done"),
                     Err(error) => tracing::debug!(%error, "acknowledgement forwarding failed"),
                 })
-                .instrument(tracing::debug_span!("acknowledgement_sender")),
+                .instrument(tracing::debug_span!("acknowledgement_sender"))
+                .with_current_subscriber(),
         );
 
         // Resend outgoing frame Segments if they were not (partially or fully) acknowledged
@@ -671,7 +673,8 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     }
                     Err(error) => tracing::debug!(%error, "outgoing frame retries ended after the state stopped"),
                 })
-                .instrument(tracing::debug_span!("outgoing_frame_retries_sender")),
+                .instrument(tracing::debug_span!("outgoing_frame_retries_sender"))
+                .with_current_subscriber(),
         );
 
         tracing::debug!("acknowledgement state has been started");
@@ -680,7 +683,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::stop", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::stop", skip(self))]
     fn stop(&mut self) -> Result<(), SessionError> {
         if let Some(mut ctx) = self.context.take() {
             // Mark the state as stopped before closing the channels, so the background tasks
@@ -701,7 +704,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::incoming_segment", skip(self), fields(session_id = self.id, frame_id = seg_id.0))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_segment", skip(self), fields(frame_id = seg_id.0))]
     fn incoming_segment(&mut self, seg_id: &SegmentId, _ind: SeqIndicator) -> Result<(), SessionError> {
         tracing::trace!("segment received");
 
@@ -726,7 +729,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::incoming_retransmission_request", skip(self, request), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_retransmission_request", skip(self, request))]
     fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError> {
         // The state will respond to segment retransmission requests even
         // if it has this feature disabled in the config.
@@ -837,7 +840,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::incoming_acknowledged_frames", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_acknowledged_frames", skip(self))]
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         tracing::trace!(count = ack.len(), "frame acknowledgements received");
 
@@ -875,7 +878,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::frame_complete", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_complete", skip(self))]
     fn frame_complete(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame complete");
 
@@ -904,7 +907,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::frame_emitted", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_emitted", skip(self))]
     fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame emitted");
         let _ = self
@@ -916,7 +919,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::frame_discarded", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_discarded", skip(self))]
     fn frame_discarded(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame discarded");
 
@@ -940,7 +943,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState::segment_sent", skip(self, segment), fields(session_id = self.id, frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
+    #[tracing::instrument(name = "AcknowledgementState::segment_sent", skip(self, segment), fields(frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
         tracing::trace!("segment sent");
 

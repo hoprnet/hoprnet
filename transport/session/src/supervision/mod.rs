@@ -1296,6 +1296,14 @@ pub struct PixFillConfig {
     /// every fill packet is withheld, and the funded cycle strands on
     /// [`max_recovery_time`](SupervisorConfig::max_recovery_time).
     ///
+    /// The derivation follows the target the Entry has *in force*, not only the one it announced at
+    /// establishment: a `BalancerTarget` keep-alive carrying a different target re-derives the
+    /// effective reserve, lowered as well as raised, so a client that steps down to a shallower buffer
+    /// is not left with a reserve above anything it now supplies. That is the
+    /// `SessionManagerConfig::surb_target_notify` path, which turns the announcement itself on. Once a
+    /// closed Session starts draining (`drain_after_close`), the reserve stops following: the drain
+    /// keeps the one it was admitted against.
+    ///
     /// Default: 500, matching `SurbStoreConfig::distress_threshold`. Against the 7 000-SURB balancer
     /// target of the worked profile a quarter is 1 750, so the configured value is what binds there
     /// and the derivation only engages on a Session whose Entry asked for less than four times it.
@@ -2143,7 +2151,9 @@ mod tests {
     /// which guard fired, and the zero and the at-the-deadline values are the ones two guards could
     /// share between them.
     #[test]
-    fn validation_rejects_a_resend_interval_that_cannot_work() {
+    fn validation_rejects_a_resend_interval_that_cannot_work() -> anyhow::Result<()> {
+        use anyhow::Context;
+
         let message_of = |cfg: &SupervisorConfig, rcn: &SsaReconstructorConfig| match validate_pix_supervision(cfg, rcn)
         {
             Err(TransportSessionError::InvalidConfig(message)) => message,
@@ -2188,11 +2198,12 @@ mod tests {
         }
         outlives_registration.ssa_request_resend_interval = Duration::from_millis(59_999);
         validate_pix_supervision(&outlives_registration, &short_lived)
-            .expect("an interval strictly inside all three limits is valid");
+            .context("an interval strictly inside all three limits must be valid")?;
 
         // The shipping default satisfies all three, which is what makes it safe to enforce them.
         validate_pix_supervision(&SupervisorConfig::default(), &SsaReconstructorConfig::default())
-            .expect("the shipped defaults must validate");
+            .context("the shipped defaults must validate")?;
+        Ok(())
     }
 
     /// Unlike its siblings, this one has to assert on the message.
@@ -2553,7 +2564,7 @@ mod tests {
 
     /// The `Display` value of every close reason is a metric label, so it is API.
     ///
-    /// [`crate::telemetry::pix::record_pix_closure`] derives the `reason` label of
+    /// `crate::telemetry::pix::record_pix_closure` derives the `reason` label of
     /// `hopr_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
     /// attribute added to one, silently renames a metric series and breaks whatever dashboards and
     /// alerts were built on the old name.

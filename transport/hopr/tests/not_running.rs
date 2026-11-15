@@ -64,6 +64,51 @@ fn create_stubbed_transport_with_cfg(
     )?)
 }
 
+#[tokio::test]
+async fn an_observer_does_not_invent_events_before_transport_runs() -> anyhow::Result<()> {
+    use std::sync::Arc;
+
+    let (offchain, chain_key) = &PEER_KEYS[0];
+    let events = Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let observed = events.clone();
+    let transport = TestTransport::new(
+        (chain_key, offchain),
+        stubs::StubChain::new(offchain, chain_key),
+        ChannelGraph::new(*offchain.public()),
+        Vec::new(),
+        HoprProtocolConfig::default(),
+    )?
+    .with_observer(Arc::new(move |event| observed.lock().push(event)));
+    assert!(transport.listening_multiaddresses().await.is_empty());
+    assert!(transport.ping(PEER_KEYS[1].0.public()).await.is_err());
+    assert!(
+        events.lock().is_empty(),
+        "an unavailable transport must not report probe or routing outcomes"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn network_view_is_empty_and_its_event_stream_closes_before_startup() -> anyhow::Result<()> {
+    use futures::StreamExt;
+    use hopr_api::network::{Health, traits::NetworkView};
+
+    let transport = create_stubbed_transport(0)?;
+    let peer = PeerId::from(*PEER_KEYS[1].0.public());
+    assert!(NetworkView::listening_as(&transport).is_empty());
+    assert!(NetworkView::multiaddress_of(&transport, &peer).is_none());
+    assert!(NetworkView::discovered_peers(&transport).is_empty());
+    assert!(NetworkView::connected_peers(&transport).is_empty());
+    assert!(!NetworkView::is_connected(&transport, &peer));
+    assert_eq!(NetworkView::health(&transport), Health::Red);
+    let mut events = Box::pin(NetworkView::subscribe_network_events(&transport));
+    assert!(
+        events.next().await.is_none(),
+        "an unstarted transport must not leave subscribers waiting"
+    );
+    Ok(())
+}
+
 // --- Construction tests ---
 
 #[tokio::test]

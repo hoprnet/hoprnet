@@ -1029,11 +1029,15 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn coalescible_dropped_on_full_non_coalescible_and_disconnected_are_fatal() {
+    async fn coalescible_dropped_on_full_non_coalescible_and_disconnected_are_fatal() -> anyhow::Result<()> {
+        use anyhow::Context;
+
         let (action_tx, _action_rx) = crossfire::mpsc::bounded_async::<SessionPixAction>(1);
 
         // Fill the channel so the next send hits TrySendError::Full.
-        action_tx.try_send(SessionPixAction::ReleaseService).unwrap();
+        action_tx
+            .try_send(SessionPixAction::ReleaseService)
+            .context("filling the action channel before testing saturation")?;
 
         // Flood with coalescible actions — silently dropped, send_actions
         // returns true (session survives).
@@ -1082,6 +1086,7 @@ mod tests {
         let (action_tx2, action_rx2) = crossfire::mpsc::bounded_async::<SessionPixAction>(1);
         drop(action_rx2);
         assert!(!send_actions(&progress, &action_tx2));
+        Ok(())
     }
 
     // ---------------------------------------------------------------

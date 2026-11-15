@@ -27,6 +27,12 @@ mod pipeline;
 /// Stream processing utilities
 pub mod stream;
 
+/// A bounded map of minted SURBs that evicts a random record when full.
+#[cfg(feature = "testing")]
+pub mod surb_map;
+#[cfg(not(feature = "testing"))]
+pub(crate) mod surb_map;
+
 /// Records SURB round-trips as network graph edge telemetry.
 pub mod surb_telemetry;
 

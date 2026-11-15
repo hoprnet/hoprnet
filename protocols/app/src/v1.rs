@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt::Formatter, ops::Range, str::FromStr};
 
+use bytes::{Buf, Bytes};
 use hopr_crypto_packet::prelude::{HoprPacket, PacketSignals};
 use hopr_types::primitive::to_hex_shortened;
 use strum::IntoEnumIterator;
@@ -316,15 +317,15 @@ impl ApplicationDataOut {
 /// Represents the to-be-sent or received decrypted packet carrying the application-layer data.
 ///
 /// This type is already HOPR specific, as it enforces the maximum payload size to be at most
-/// [`HoprPacket::PAYLOAD_SIZE`] bytes-long. This structure always owns the data.
+/// [`HoprPacket::PAYLOAD_SIZE`] bytes-long. Received data is a view into the buffer the packet was decoded from,
+/// so copy it with [`Bytes::copy_from_slice`] before storing it long-term.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
     /// Tag identifying the application-layer protocol.
     pub application_tag: Tag,
     /// The actual application-layer data.
-    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    pub plain_text: Box<[u8]>,
+    pub plain_text: Bytes,
 }
 
 impl ApplicationData {
@@ -342,7 +343,10 @@ impl ApplicationData {
         if data.len() <= Self::PAYLOAD_SIZE {
             Ok(Self {
                 application_tag: application_tag.into(),
-                plain_text: data.into(),
+                plain_text: match data {
+                    Cow::Owned(vec) => vec.into(),
+                    Cow::Borrowed(slice) => Bytes::copy_from_slice(slice),
+                },
             })
         } else {
             Err(ApplicationLayerError::PayloadTooLarge)
@@ -392,22 +396,40 @@ impl std::fmt::Display for ApplicationData {
     }
 }
 
+/// Checks that `len` can hold the [`Tag`] and fits into a HOPR packet.
+fn check_len(len: usize) -> Result<(), ApplicationLayerError> {
+    if (Tag::SIZE..=HoprPacket::PAYLOAD_SIZE).contains(&len) {
+        Ok(())
+    } else {
+        Err(ApplicationLayerError::DecodingError("ApplicationData.size".into()))
+    }
+}
+
 impl TryFrom<&[u8]> for ApplicationData {
     type Error = ApplicationLayerError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() >= Tag::SIZE && value.len() <= HoprPacket::PAYLOAD_SIZE {
-            Ok(Self {
-                application_tag: Tag::from_be_bytes(
-                    value[0..Tag::SIZE]
-                        .try_into()
-                        .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
-                ),
-                plain_text: Box::from(&value[Tag::SIZE..]),
-            })
-        } else {
-            Err(ApplicationLayerError::DecodingError("ApplicationData.size".into()))
-        }
+        check_len(value.len())?;
+        Self::try_from(Bytes::copy_from_slice(value))
+    }
+}
+
+impl TryFrom<Bytes> for ApplicationData {
+    type Error = ApplicationLayerError;
+
+    /// Same as `TryFrom<&[u8]>`, but the payload is a view into `value` instead of a copy.
+    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
+        check_len(value.len())?;
+        let application_tag = Tag::from_be_bytes(
+            value[0..Tag::SIZE]
+                .try_into()
+                .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
+        );
+        value.advance(Tag::SIZE);
+        Ok(Self {
+            application_tag,
+            plain_text: value,
+        })
     }
 }
 
@@ -476,6 +498,21 @@ mod tests {
 
         assert!(ApplicationData::try_from([0_u8; Tag::SIZE - 1].as_ref()).is_err());
         assert!(ApplicationData::try_from([0_u8; ApplicationData::PAYLOAD_SIZE + Tag::SIZE + 1].as_ref()).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn application_data_from_bytes_should_share_the_buffer() -> anyhow::Result<()> {
+        let original = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
+        let encoded = Bytes::from(original.to_bytes().into_vec());
+
+        let decoded = ApplicationData::try_from(encoded.clone())?;
+        assert_eq!(original, decoded);
+        assert_eq!(encoded[Tag::SIZE..].as_ptr(), decoded.plain_text.as_ptr());
+
+        assert!(ApplicationData::try_from(Bytes::from(vec![0_u8; Tag::SIZE - 1])).is_err());
+        assert!(ApplicationData::try_from(Bytes::from(vec![0_u8; HoprPacket::PAYLOAD_SIZE + 1])).is_err());
 
         Ok(())
     }

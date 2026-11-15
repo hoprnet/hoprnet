@@ -375,7 +375,6 @@ impl<S: PixSpec> SsaCycle<S> {
         self.parts.get(poly_index as usize)
     }
 
-    /// The accumulator that sums recovered parts into the SSA scalar.
     /// Shares held by this cycle's part builders, i.e. by the polynomials still short of their
     /// threshold. Takes each part's lock in turn, briefly; meant for an occasional reading, not the
     /// share path.
@@ -383,6 +382,7 @@ impl<S: PixSpec> SsaCycle<S> {
         self.parts.iter().map(|part| part.lock().verification_state_len()).sum()
     }
 
+    /// The accumulator that sums recovered parts into the SSA scalar.
     pub fn builder(&self) -> &parking_lot::Mutex<SsaBuilder<S>> {
         &self.builder
     }

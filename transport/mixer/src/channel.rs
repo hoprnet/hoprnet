@@ -350,6 +350,7 @@ pub fn channel<T>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use futures::{SinkExt, StreamExt};
     use tokio::time::timeout;
 
@@ -420,24 +421,24 @@ mod tests {
     async fn mixer_channel_should_work_concurrently_and_properly_closed_channels() -> anyhow::Result<()> {
         const ITERATIONS: usize = 1000;
 
-        let (tx, mut rx) = channel(uniform_default());
+        let (tx, rx) = channel(uniform_default());
 
-        let recv_task = tokio::task::spawn(async move {
-            while let Some(_item) = timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION, rx.next())
-                .await
-                .expect("receiver should not fail")
-            {}
-        });
+        let recv_task = tokio::task::spawn(async move { rx.collect::<Vec<_>>().await });
 
         let send_task =
             tokio::task::spawn(async move { futures::stream::iter(0..ITERATIONS).map(Ok).forward(tx).await });
 
-        let (_recv, send) = futures::try_join!(
-            timeout(MAXIMUM_SINGLE_DELAY_DURATION, recv_task),
-            timeout(MAXIMUM_SINGLE_DELAY_DURATION, send_task)
-        )?;
+        // This checks delivery and closure, so allow scheduling and sending time in addition
+        // to the per-packet mixing delay, especially when the whole suite runs in parallel.
+        let (mut received, send) = timeout(Duration::from_secs(5), async {
+            futures::try_join!(recv_task, send_task)
+        })
+        .await
+        .context("mixer did not deliver all messages and close")??;
 
-        send??;
+        send?;
+        received.sort_unstable();
+        assert_eq!(received, (0..ITERATIONS).collect::<Vec<_>>());
 
         Ok(())
     }

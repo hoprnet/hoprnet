@@ -200,6 +200,15 @@
             cargoExtraArgs = "--bin ticket-inspector -F redb,serde,cli";
           };
 
+          # Nix otherwise uses the crate name when selecting the executable for `nix run`.
+          mkTicketInspector =
+            builder:
+            (builder.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs).overrideAttrs (old: {
+              meta = (old.meta or { }) // {
+                mainProgram = "ticket-inspector";
+              };
+            });
+
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
           fixUtoipaEmbedPaths =
             drv:
@@ -213,16 +222,16 @@
 
           hoprPackages = {
             # ticket-inspector: diagnostic CLI for inspecting the tickets database
-            binary-ticket-inspector = rust-builder-local.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-x86_64-linux = rust-builder-x86_64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
-            binary-ticket-inspector-aarch64-linux = rust-builder-aarch64-linux.callPackage nixLib.mkRustPackage ticketInspectorBuildArgs;
+            binary-ticket-inspector = mkTicketInspector rust-builder-local;
+            binary-ticket-inspector-x86_64-linux = mkTicketInspector rust-builder-x86_64-linux;
+            binary-ticket-inspector-aarch64-linux = mkTicketInspector rust-builder-aarch64-linux;
             test-unit =
               (fixUtoipaEmbedPaths (
                 rust-builder-local.callPackage nixLib.mkRustPackage (
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                     runNextest = true;
                     testCargoProfile = "ci-test";
                     prependPackageName = false;
@@ -232,7 +241,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --lib
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump --lib
                     runHook postCheck
                   '';
                 });
@@ -243,7 +252,8 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                    # The explicitly selected `state_dump` integration test requires this opt-in feature.
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                     runNextest = true;
                     testCargoProfile = "ci-test";
                     prependPackageName = false;
@@ -253,7 +263,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --test '*' -j 1
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing -F hopr-lib/state-dump --test '*' -j 1
                     runHook postCheck
                   '';
                 });
@@ -263,7 +273,7 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
+                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                   cargoNextestExtraArgs = "--lib";
                   runNextest = true;
                   testCargoProfile = "ci-test";
@@ -278,7 +288,8 @@
                 libraryBuildArgs
                 // {
                   src = testSrc;
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  # Include the opt-in reporter's unit tests, matching the integration coverage features.
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F hopr-lib/state-dump";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";
@@ -296,7 +307,7 @@
                   src = testSrc;
                   # `telemetry` is what compiles the dispatch metrics into the library; without it
                   # the integration coverage of the Start drop paths cannot reach them.
-                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry";
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing -F telemetry -F hopr-lib/state-dump";
                   cargoLlvmCovCommand = "nextest";
                   runCoverage = true;
                   testCargoProfile = "ci-test";
@@ -373,7 +384,12 @@
               generate-metrics-docs = {
                 enable = true;
                 name = "METRICS.md must stay in sync with code";
-                entry = "bash .github/scripts/generate-metrics-docs.sh --fix";
+                entry = toString (
+                  pkgs.writeShellScript "generate-metrics-docs" ''
+                    export PATH="${pkgs.gawk}/bin:$PATH"
+                    exec ${pkgs.bash}/bin/bash .github/scripts/generate-metrics-docs.sh --fix
+                  ''
+                );
                 files = "(METRICS\\.md|\\.rs)$";
                 pass_filenames = false;
                 language = "system";
