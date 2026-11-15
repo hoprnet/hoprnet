@@ -606,7 +606,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                 .and_then(|message| {
                     let ((sender, data, aux_info), span) = message.into_parts();
                     let _entered = span.enter();
-                    ApplicationData::try_from(data.as_ref())
+                    ApplicationData::try_from(data)
                     .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                     .ok()
                     .map(|data| WithContext::new((sender, ApplicationDataIn {
@@ -1336,7 +1336,7 @@ mod tests {
                     previous_hop: self.peer,
                     sender: self.sessions[usize::from(marker)],
                     replied_on_surb: None,
-                    plain_text: data.to_bytes(),
+                    plain_text: data.to_bytes().into(),
                     ack_key: HalfKey::default(),
                     info: Default::default(),
                 })))

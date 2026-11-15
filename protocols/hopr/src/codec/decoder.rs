@@ -1,6 +1,6 @@
 use std::ops::Mul;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use hopr_api::{
     chain::*,
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
@@ -398,9 +398,7 @@ where
                     })?
                 });
 
-                let mut payload = BytesMut::with_capacity(HoprPacket::SIZE);
-                payload.put_slice(fwd.outgoing.packet.as_ref());
-                payload.put_slice(&fwd.outgoing.ticket.into_encoded());
+                let frame = HoprOutgoingPacket::frame(fwd.outgoing.packet, fwd.outgoing.ticket);
 
                 #[cfg(feature = "trace-timing")]
                 tracing::trace!(
@@ -413,7 +411,7 @@ where
                         packet_tag: fwd.packet_tag,
                         previous_hop: fwd.previous_hop,
                         next_hop: fwd.outgoing.next_hop,
-                        data: payload.freeze(),
+                        data: frame,
                         ack_challenge: fwd.outgoing.ack_challenge,
                         received_ticket: verified_unack_ticket,
                         ack_key_prev_hop: fwd.ack_key,

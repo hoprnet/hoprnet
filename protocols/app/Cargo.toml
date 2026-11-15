@@ -15,12 +15,12 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
+serde = ["dep:serde", "bytes/serde", "hopr-crypto-packet/serde"]
 
 [dependencies]
+bytes = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
-serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 hopr-crypto-packet = { workspace = true }
@@ -28,9 +28,3 @@ hopr-types = { workspace = true, features = ["primitive"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
-
-[package.metadata.cargo-shear]
-ignored = ["serde_bytes"]
