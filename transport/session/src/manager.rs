@@ -9009,11 +9009,14 @@ mod tests {
 
     #[tokio::test]
     async fn abort_on_drop_stops_the_task() -> anyhow::Result<()> {
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         let guard = AbortOnDrop(hopr_utils::runtime::prelude::spawn(async move {
             let _tx = tx;
+            let _ = started_tx.send(());
             std::future::pending::<()>().await;
         }));
+        started_rx.await.context("the task never ran")?;
         drop(guard);
 
         let result = timeout(Duration::from_secs(1), rx)
