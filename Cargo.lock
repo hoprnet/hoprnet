@@ -1831,7 +1831,7 @@ dependencies = [
  "indexmap 2.14.2",
  "launchdarkly-sdk-transport",
  "parking_lot 0.12.5",
- "rand 0.10.3",
+ "rand 0.10.4",
  "reqwest",
  "serde",
  "serde_json",
@@ -3317,7 +3317,7 @@ dependencies = [
  "launchdarkly-sdk-transport",
  "log",
  "pin-project",
- "rand 0.10.3",
+ "rand 0.10.4",
  "tokio",
 ]
 
@@ -3812,7 +3812,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fd1a1c7a5206c5b7a3f5a0d7ccd3ff85d0c8f5133d62a02680255b0004af5f4"
 dependencies = [
  "ff 0.14.0",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand_core 0.10.1",
  "subtle",
 ]
@@ -4005,7 +4005,7 @@ dependencies = [
  "idna",
  "ipnet",
  "jni",
- "rand 0.10.3",
+ "rand 0.10.4",
  "thiserror 2.0.21",
  "tinyvec",
  "tokio",
@@ -4051,7 +4051,7 @@ dependencies = [
  "jni",
  "once_cell",
  "prefix-trie",
- "rand 0.10.3",
+ "rand 0.10.4",
  "ring",
  "thiserror 2.0.21",
  "tinyvec",
@@ -4097,7 +4097,7 @@ dependencies = [
  "ndk-context",
  "once_cell",
  "parking_lot 0.12.5",
- "rand 0.10.3",
+ "rand 0.10.4",
  "resolv-conf",
  "smallvec",
  "system-configuration",
@@ -4289,11 +4289,11 @@ dependencies = [
  "humantime-serde",
  "insta",
  "lazy_static",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
- "parking_lot 0.12.5",
+ "opentelemetry-prometheus-text-exporter 0.4.0",
+ "opentelemetry_sdk 0.33.1",
+ "parking_lot 0.13.0",
  "pprof",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rstest",
  "serde",
  "serde-saphyr",
@@ -4328,7 +4328,7 @@ dependencies = [
  "lazy_static",
  "parking_lot 0.12.5",
  "petgraph",
- "rand 0.10.3",
+ "rand 0.10.4",
  "serde",
  "serde_json",
  "smallvec",
@@ -4371,7 +4371,7 @@ dependencies = [
  "lazy_static",
  "moka",
  "parameterized",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "rstest",
  "serde",
  "serde-saphyr",
@@ -4399,8 +4399,8 @@ dependencies = [
  "hopr-types 6.0.1",
  "hopr-utilities",
  "moka",
- "parking_lot 0.12.5",
- "rand 0.10.3",
+ "parking_lot 0.13.0",
+ "rand 0.10.4",
  "serde",
  "serde_bytes",
  "serde_cbor_2",
@@ -4440,9 +4440,9 @@ dependencies = [
  "mimalloc",
  "mockall",
  "parameterized",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "pin-project",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand_distr",
  "ringbuffer",
  "serde",
@@ -4541,10 +4541,10 @@ dependencies = [
  "libp2p",
  "moka",
  "multiaddr",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "pcap-file",
  "proc-macro-regex",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand_distr",
  "rstest",
  "rust-stream-ext-concurrent",
@@ -4576,7 +4576,7 @@ dependencies = [
  "humantime-serde",
  "insta",
  "lazy_static",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",
@@ -4634,8 +4634,8 @@ dependencies = [
  "lazy_static",
  "moka",
  "more-asserts",
- "parking_lot 0.12.5",
- "rand 0.10.3",
+ "parking_lot 0.13.0",
+ "rand 0.10.4",
  "rstest",
  "serde",
  "smart-default",
@@ -4671,10 +4671,10 @@ dependencies = [
  "mimalloc",
  "mockall",
  "moka",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "pid",
  "pin-project",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rstest",
  "serde",
  "serde_bytes",
@@ -4739,7 +4739,7 @@ dependencies = [
  "num_enum",
  "poly1305 0.9.1",
  "primitive-types 0.14.0",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rayon",
  "regex",
  "secp256k1 0.31.1",
@@ -4791,12 +4791,12 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "num_enum",
- "opentelemetry",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
+ "opentelemetry 0.32.0",
+ "opentelemetry-prometheus-text-exporter 0.3.0",
+ "opentelemetry_sdk 0.32.1",
  "poly1305 0.9.1",
  "primitive-types 0.14.0",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rayon",
  "regex",
  "rlp 0.6.1",
@@ -4847,7 +4847,7 @@ dependencies = [
  "multiaddr",
  "pcap-file",
  "pin-project",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rayon",
  "serde",
  "serde_bytes",
@@ -4877,7 +4877,7 @@ dependencies = [
  "hopr-utilities",
  "human-bandwidth",
  "lazy_static",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "serde",
  "serde_with",
  "test-log",
@@ -6605,13 +6605,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c1f1a6ac9c875a4941e4c7c085b61e8f4daa326de03b4701768c3491a6ad9ee"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "opentelemetry-prometheus-text-exporter"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4fe57ea90b12f643a366aa7c4fa5cfb54bd1cf252f55368337e40534b278a68"
 dependencies = [
- "opentelemetry",
- "opentelemetry_sdk",
+ "opentelemetry 0.32.0",
+ "opentelemetry_sdk 0.32.1",
+ "smartstring",
+]
+
+[[package]]
+name = "opentelemetry-prometheus-text-exporter"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "884d95dfaf00ec1e068b5786ced2ab28f2d264cb3ff2cfd98a7408eed0207e85"
+dependencies = [
+ "opentelemetry 0.33.1",
+ "opentelemetry_sdk 0.33.1",
  "smartstring",
 ]
 
@@ -6624,7 +6649,23 @@ dependencies = [
  "futures-channel",
  "futures-executor",
  "futures-util",
- "opentelemetry",
+ "opentelemetry 0.32.0",
+ "percent-encoding",
+ "portable-atomic",
+ "rand 0.9.5",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "372a912db2974d1990207006fd0e3aa0ef3fd4ad3be43c65cfaadf2206866061"
+dependencies = [
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "opentelemetry 0.33.1",
  "percent-encoding",
  "portable-atomic",
  "rand 0.9.5",
@@ -7308,7 +7349,7 @@ dependencies = [
  "chacha20 0.10.2",
  "core_detect",
  "num-traits",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand_xorshift",
  "regex-syntax 0.8.11",
  "unarray",
@@ -7410,7 +7451,7 @@ dependencies = [
  "fastbloom",
  "getrandom 0.4.3",
  "lru-slab",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand_pcg",
  "ring",
  "rustc-hash",
@@ -7501,9 +7542,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
+checksum = "8f6fa277c67e6ea590466f04c3fe82cb509f0864fe470643e5570de9514a9b11"
 dependencies = [
  "chacha20 0.10.2",
  "getrandom 0.4.3",
@@ -7562,7 +7603,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d431c2703ccf129de4d45253c03f49ebb22b97d6ad79ee3ecfc7e3f4862c1d8"
 dependencies = [
  "num-traits",
- "rand 0.10.3",
+ "rand 0.10.4",
 ]
 
 [[package]]
@@ -7833,9 +7874,9 @@ dependencies = [
 
 [[package]]
 name = "rstest"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "948203e6d13b83e51a90d7cf236dd58a0065f23f4b902f00f306e7eb2bd09b9c"
+checksum = "b376e512f30a7686a8dbc6aeaace99b3ade1c26c1c63473473a817ade226dafc"
 dependencies = [
  "futures-timer",
  "futures-util",
@@ -7844,9 +7885,9 @@ dependencies = [
 
 [[package]]
 name = "rstest_macros"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8d92eaf7b6e51e12471d71ddc72608e7151573de44099aacfbb1128177c0da4"
+checksum = "88512dbfb5b73a0dfa38aef7bc73b5657035fce477b923faf12d332dd83051ea"
 dependencies = [
  "cfg-if",
  "glob",
@@ -7898,7 +7939,7 @@ dependencies = [
  "parity-scale-codec",
  "primitive-types 0.12.2",
  "proptest",
- "rand 0.10.3",
+ "rand 0.10.4",
  "rand 0.8.8",
  "rand 0.9.5",
  "rlp 0.5.2",
