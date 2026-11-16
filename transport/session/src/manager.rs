@@ -8385,11 +8385,10 @@ where
                         }
                     }
 
-                    // Increase the number of consumed SURBs in the estimator
+                    // Increase the number of consumed SURBs in the estimator, as a keep-alive and not a reply
                     session_slot
-                        .surb_estimator
-                        .consumed
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        .surb_mgmt
+                        .note_keep_alive_consumed(&session_slot.surb_estimator);
                     #[cfg(feature = "telemetry")]
                     telemetry::record_session_surb_consumed(&session_id, 1);
                 }
@@ -19833,6 +19832,11 @@ mod tests {
             1,
             session_slot.returned_packets.load(Ordering::Relaxed),
             "an Exit keep-alive consumes a return SURB and must count toward the successor gate"
+        );
+        assert_eq!(
+            1,
+            session_slot.surb_mgmt.keep_alives_consumed(),
+            "an Exit keep-alive must be counted as a keep-alive, not as a reply"
         );
 
         Ok(())

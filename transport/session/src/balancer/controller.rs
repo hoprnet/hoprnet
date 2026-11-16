@@ -13,8 +13,8 @@ use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
 use super::{
-    BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
-    SurbFlowController, SurbFlowEstimator,
+    AtomicSurbFlowEstimator, BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator,
+    SurbBalancerController, SurbFlowController, SurbFlowEstimator,
 };
 use crate::SessionId;
 
@@ -204,9 +204,15 @@ pub struct BalancerStateValues {
     /// the first packet sent after the counterparty was last heard. See
     /// [`silence_sustain`](Self::silence_sustain).
     sending_since: AtomicU64,
+    /// When the run of data before the current one ended, in the same unit as [`last_heard`](Self::last_heard):
+    /// its last packet. The reply stream is judged against it; see [`silence_sustain`](Self::silence_sustain).
+    previous_run_ended: AtomicU64,
     /// When a reply the estimator counted as consumed last came home, in the same unit as
     /// [`last_heard`](Self::last_heard): what tells a reply stream that stopped from one that never was.
     last_reply_heard: AtomicU64,
+    /// Entry-side: the SURBs the estimator counted as consumed for the counterparty's keep-alives rather
+    /// than for replies to data. Only ever grows.
+    keep_alives_consumed: AtomicU64,
     /// The fewest SURBs per second the paced fill and refill may be held to: one keep-alive's worth,
     /// set by the Session that owns the balancer. `0` until set. See [`pacing_cap`](Self::pacing_cap).
     pacing_floor: AtomicU64,
@@ -239,9 +245,9 @@ impl Default for ActivityEpoch {
 /// [`silence_sustain`](BalancerStateValues::silence_sustain).
 pub const SILENCE_SUSTAIN_AFTER: Duration = Duration::from_secs(3);
 
-/// How recent the last reply must be, relative to the last time the counterparty was heard at all, for
-/// a silence to be a reply stream that stopped rather than a Session that gets no replies: one default
-/// notify period.
+/// How recent the last reply must be, relative to the last data packet before the current run of unanswered
+/// data, for a silence to be a reply stream that stopped rather than a Session that gets no replies: one
+/// default notify period.
 pub const REPLY_STREAM_WINDOW: Duration = Duration::from_secs(15);
 
 /// How long the refill that follows a wipe of the counterparty's stock is paced for, at a rate of
@@ -551,12 +557,13 @@ impl BalancerStateValues {
     }
 
     /// Records that a Session data packet is going out now. The first one since the counterparty was
-    /// last heard starts a new run of unanswered data.
+    /// last heard starts a new run of unanswered data, and the last packet before it ended the previous one.
     pub(crate) fn note_sent(&self) {
         use std::sync::atomic::Ordering::Relaxed;
 
         let now = std::time::Instant::now();
         if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.previous_run_ended.fetch_max(self.last_sent.load(Relaxed), Relaxed);
             self.stamp(&self.sending_since, now);
         }
         self.stamp(&self.last_sent, now);
@@ -565,6 +572,22 @@ impl BalancerStateValues {
     /// Records that a reply the estimator counted as consumed came home now.
     pub(crate) fn note_reply_heard(&self) {
         self.stamp(&self.last_reply_heard, std::time::Instant::now());
+    }
+
+    /// Counts a SURB consumed by a counterparty keep-alive, not by a reply, in the `estimator` too.
+    ///
+    /// The keep-alive count is written before `consumed` is released, and the estimator acquires `consumed`
+    /// when read, so a reader that sees the SURB also sees its keep-alive.
+    pub(crate) fn note_keep_alive_consumed(&self, estimator: &AtomicSurbFlowEstimator) {
+        self.keep_alives_consumed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        estimator.consumed.fetch_add(1, std::sync::atomic::Ordering::Release);
+    }
+
+    /// The number of consumed SURBs that were spent on counterparty keep-alives. See
+    /// [`note_keep_alive_consumed`](Self::note_keep_alive_consumed).
+    pub(crate) fn keep_alives_consumed(&self) -> u64 {
+        self.keep_alives_consumed.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Test hook: as if the counterparty had last been heard from `ago` ago.
@@ -602,10 +625,27 @@ impl BalancerStateValues {
     /// sent then. Takes the epoch [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
     #[cfg(test)]
     pub(crate) fn sending_since_ago(self, ago: Duration) -> Self {
+        use std::sync::atomic::Ordering::Relaxed;
+
         let at = std::time::Instant::now()
             .checked_sub(ago)
             .expect("monotonic clock younger than `ago`");
+        // As `note_sent` does: a run that starts after the counterparty was heard ends the previous one.
+        if self.sending_since.load(Relaxed) <= self.last_heard.load(Relaxed) {
+            self.previous_run_ended.fetch_max(self.last_sent.load(Relaxed), Relaxed);
+        }
         self.stamp(&self.sending_since, at);
+        self.stamp(&self.last_sent, at);
+        self
+    }
+
+    /// Test hook: as if the last data packet had gone out `ago` ago, without starting a run. Takes the epoch
+    /// [`last_heard_ago`](Self::last_heard_ago) set, so it comes after it.
+    #[cfg(test)]
+    pub(crate) fn last_sent_ago(self, ago: Duration) -> Self {
+        let at = std::time::Instant::now()
+            .checked_sub(ago)
+            .expect("monotonic clock younger than `ago`");
         self.stamp(&self.last_sent, at);
         self
     }
@@ -647,9 +687,12 @@ impl BalancerStateValues {
     /// Exit.
     ///
     /// Only a reply stream that stopped counts: the last reply must be within [`REPLY_STREAM_WINDOW`] of
-    /// the last time the counterparty was heard at all. A Session the Exit does not answer hears only its
-    /// reports, one per notify period, and sustaining it would put one SURB in every data packet into a
-    /// stock nothing spends, up to the store's capacity.
+    /// the last data packet before the current run, that is, the Exit answered the data that went out
+    /// before. A Session the Exit does not answer hears only its reports, one per notify period, and
+    /// sustaining it would put one SURB in every data packet into a stock nothing spends, up to the
+    /// store's capacity. The reports that arrive while nothing goes out do not age the reply stream: a
+    /// Session that was answered, went quiet, and whose return path failed meanwhile still gets the
+    /// sustain once it sends again.
     ///
     /// Judged between the stamps, not against the clock, so that the answer is about the packet being
     /// sent: it takes [`note_sent`](Self::note_sent) for that packet first.
@@ -667,7 +710,7 @@ impl BalancerStateValues {
                 let since = self.sending_since.load(Relaxed);
                 // A reply stream that stopped, not a Session the counterparty does not answer, and data
                 // going out unanswered for longer than the grace, not the first packet after a pause.
-                replied.saturating_add(window) >= heard
+                replied.saturating_add(window) >= self.previous_run_ended.load(Relaxed)
                     && since > heard
                     && self.last_sent.load(Relaxed) > since.saturating_add(after)
             }
@@ -857,6 +900,7 @@ pub struct SurbBalancer<C, E, F> {
     flow_control: F,
     state: Arc<BalancerStateValues>,
     last_estimator_state: SimpleSurbFlowEstimator,
+    replies_seen: u64,
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
@@ -898,6 +942,7 @@ where
             session_id,
             state,
             last_estimator_state: Default::default(),
+            replies_seen: 0,
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
@@ -934,10 +979,18 @@ where
         let produced_before_lag = self.produced_history.record(self.last_update, snapshot.produced);
         self.state.publish_production(produced_before_lag, snapshot.produced);
 
-        // A reply came home since the last tick: the counterparty answered, whether or not any of its
-        // packets reached the hooks that record it.
+        // The estimator counted a consumed SURB since the last tick, so the counterparty was heard, by a
+        // reply or a keep-alive, whether or not any of its packets reached the hooks that record it.
         if snapshot.consumed > self.last_estimator_state.consumed {
             self.state.note_heard();
+        }
+
+        // Only replies count towards the reply stream. The keep-alive count is written before `consumed` is
+        // released and the snapshot acquired `consumed` before this read, so the difference never
+        // over-counts replies; its maximum is what is tracked.
+        let replies = snapshot.consumed.saturating_sub(self.state.keep_alives_consumed());
+        if replies > self.replies_seen {
+            self.replies_seen = replies;
             self.state.note_reply_heard();
         }
 
@@ -2610,6 +2663,61 @@ mod tests {
         );
     }
 
+    /// The reply stream is judged against the data before the current run, not against the last word heard:
+    /// reports that arrive while nothing goes out do not age it. A Session that was answered, went quiet and
+    /// whose return path failed meanwhile is a silence once it sends again; one that kept sending through the
+    /// reports without an answer is an upload and is not.
+    #[test]
+    fn reports_during_a_quiet_stretch_should_not_age_the_reply_stream() {
+        // Data answered until 40 s ago, then nothing either way but the Exit's reports, the last one 5 s
+        // ago; data going out again since 4 s ago, unanswered.
+        let paused = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(40))
+            .last_sent_ago(Duration::from_secs(40))
+            .heard_again_ago(Duration::from_secs(5))
+            .sending_since_ago(Duration::from_secs(4));
+        paused.note_sent();
+        assert!(
+            paused.silence_sustain(),
+            "the data before the pause was answered and the data after it is not: a return path that failed"
+        );
+
+        // The same reply and reports, but data kept going out through them, the last packet just before
+        // the last report: unanswered for 35 s, an upload.
+        let upload = gate_state(100, 200)
+            .last_heard_ago(Duration::from_secs(40))
+            .last_sent_ago(Duration::from_millis(5_010))
+            .heard_again_ago(Duration::from_secs(5))
+            .sending_since_ago(Duration::from_secs(4));
+        upload.note_sent();
+        assert!(
+            !upload.silence_sustain(),
+            "data went out unanswered for 35 s before the last report: there is no reply stream to lose"
+        );
+    }
+
+    /// Driven through the state's own stamps rather than the time-travel hooks: an answered packet, a quiet
+    /// stretch with a report in it, then data again. The report alone starts nothing, and the first packet
+    /// after it starts the run that is judged against the answered packet before the pause.
+    #[test]
+    fn the_run_after_a_quiet_stretch_should_be_judged_against_the_data_before_it() {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let state = gate_state(100, 200).last_heard_ago(Duration::from_secs(30));
+        state.note_sent();
+        let answered = state.last_sent.load(Relaxed);
+        state.note_heard();
+        state.note_reply_heard();
+        state.note_heard(); // a report during the quiet stretch
+        assert_eq!(0, state.previous_run_ended.load(Relaxed), "a report starts no run");
+        state.note_sent();
+        assert_eq!(
+            answered,
+            state.previous_run_ended.load(Relaxed),
+            "the run after the report ends the one that held the answered packet"
+        );
+    }
+
     /// Whatever the Exit says is heard: a report of its level, and any packet at all, whose signals are
     /// all the Entry reads of it.
     #[test]
@@ -2692,6 +2800,118 @@ mod tests {
         assert!(
             stale_report.silence_sustain(),
             "data unanswered for longer than the grace since the last report is a silence"
+        );
+    }
+
+    /// A keep-alive is counted by the estimator as a consumed SURB: it is the counterparty being heard, but
+    /// it is not a reply, and a reply after it still is one.
+    #[test]
+    fn a_keep_alive_counted_as_consumed_should_be_heard_but_not_as_a_reply() {
+        use std::sync::atomic::Ordering::Relaxed;
+        let (mut balancer, estimator, state, output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        // The keep-alive is processed as the session manager does: level first, then the consumed SURB.
+        state.observe_counterparty_signals(PacketSignals::default());
+        state.observe_reported_level(1_000);
+        state.note_keep_alive_consumed(&estimator);
+        tick(&mut balancer, &estimator, &output, 0);
+        assert!(
+            state.last_heard.load(Relaxed) > 0,
+            "a keep-alive is the counterparty being heard"
+        );
+        assert_eq!(0, state.last_reply_heard.load(Relaxed), "a keep-alive is not a reply");
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick(&mut balancer, &estimator, &output, 0);
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "a reply after a keep-alive still counts"
+        );
+    }
+
+    /// Keep-alives counted while the balancer ticks must never look like a reply: the keep-alive count is
+    /// written before `consumed` and read after it.
+    #[test]
+    fn keep_alives_racing_the_balancer_should_never_count_as_a_reply() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+        const PER_WRITER: u64 = 100_000;
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        let writers: Vec<_> = (0..2)
+            .map(|_| {
+                let (state, estimator) = (state.clone(), estimator.clone());
+                std::thread::spawn(move || (0..PER_WRITER).for_each(|_| state.note_keep_alive_consumed(&estimator)))
+            })
+            .collect();
+        while !writers.iter().all(|w| w.is_finished()) {
+            tick_for(&mut balancer, Duration::from_millis(50));
+        }
+        for w in writers {
+            w.join().map_err(|_| anyhow::anyhow!("keep-alive writer panicked"))?;
+        }
+        tick_for(&mut balancer, Duration::from_millis(50));
+
+        assert_eq!(0, state.last_reply_heard.load(Relaxed), "keep-alives are not replies");
+        assert_eq!(2 * PER_WRITER, estimator.consumed.load(Relaxed));
+        assert_eq!(2 * PER_WRITER, state.keep_alives_consumed());
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "a reply after them still counts"
+        );
+        Ok(())
+    }
+
+    /// A sample taken between a keep-alive's two counts sees one reply fewer than came home. The SURB of
+    /// that keep-alive, when it lands, must not count as a reply, and a reply it hid must count once it
+    /// lands.
+    #[test]
+    fn a_keep_alive_sampled_halfway_should_neither_pass_for_a_reply_nor_lose_one() {
+        use std::sync::atomic::Ordering::{Relaxed, Release};
+        let (mut balancer, estimator, state, _output) = balancer_with_feedback(SurbBalancerConfig {
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+        });
+
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(state.last_reply_heard.load(Relaxed) > 0, "a reply counts");
+        state.last_reply_heard.store(0, Relaxed);
+
+        state.keep_alives_consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        estimator.consumed.fetch_add(1, Release);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert_eq!(
+            0,
+            state.last_reply_heard.load(Relaxed),
+            "the SURB of a keep-alive sampled halfway is not a reply"
+        );
+
+        state.keep_alives_consumed.fetch_add(1, Relaxed);
+        estimator.consumed.fetch_add(1, Relaxed);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert_eq!(
+            0,
+            state.last_reply_heard.load(Relaxed),
+            "a reply sampled with a keep-alive halfway is hidden"
+        );
+        estimator.consumed.fetch_add(1, Release);
+        tick_for(&mut balancer, Duration::from_millis(50));
+        assert!(
+            state.last_reply_heard.load(Relaxed) > 0,
+            "and counts once the keep-alive's SURB lands"
         );
     }
 
