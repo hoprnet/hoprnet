@@ -565,7 +565,9 @@ where
         // The pending maps are bounded by the byte budget the operator sets, per map, so the pair's
         // worst case is twice it; see `SurbRoundTripRegistry::with_budget`.
         let surb_round_trips =
-            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes);
+            protocol::surb_telemetry::SurbRoundTripRegistry::with_budget(cfg.packet.surb_store.pending_surb_max_bytes)
+                .with_forward_receipts(cfg.session.forward_receipts);
+        let forward_receipts = surb_round_trips.forward().cloned();
         let path_planner = PathPlanner::new(
             me_offchain,
             MemorySurbStore::new(surb_store_cfg),
@@ -573,6 +575,12 @@ where
             selector,
             planner_config,
         );
+        let path_planner = match forward_receipts {
+            Some(forward) => {
+                path_planner.with_forward_exclusions(Arc::new(move |exit| forward.excluded_relayers(exit)))
+            }
+            None => path_planner,
+        };
 
         // Bound before the struct literal rather than inside it so `set_surb_admission` below can
         // reach the manager: the seam depends on `path_planner`, which does not exist inside the
@@ -620,6 +628,7 @@ where
             // Session's SURB admission has to wait out this window, and it is the operator's own
             // pipeline setting here that decides how long that is.
             surb_resolution_wait: crate::path::resolve::surb_resolution_wait(cfg.packet.pipeline.surb_resolution_wait),
+            forward_receipts: cfg.session.forward_receipts,
             ..Default::default()
         }));
 
@@ -630,6 +639,10 @@ where
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
         }));
+
+        if let Some(forward) = surb_round_trips.forward() {
+            let _ = smgr.set_forward_receipt_sink(forward.clone());
+        }
 
         // The store's admitted class cannot see the session config, so the invariant that it must
         // hold every Session that can be managed at once is checked here, where both figures are in
@@ -1298,6 +1311,9 @@ where
                         || surb_flush_planner.refresh_cached_paths(),
                     )
                     .await;
+                    if let Some(forward) = surb_round_trips.forward() {
+                        forward.refresh();
+                    }
 
                     // The counterparty sees only the first hop of the SURBs it holds, so it cannot tell
                     // which of them run through the dead relayer, and a FIFO store would spend them into

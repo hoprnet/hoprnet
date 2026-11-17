@@ -184,6 +184,9 @@ where
             encrypted_pix_share: out.encrypted_pix_share,
             data: HoprOutgoingPacket::frame(out.packet, out.ticket),
             minted_surbs,
+            forward_receipt_tag: out
+                .final_packet_tag
+                .map(|tag| u32::from_be_bytes([tag[0], tag[1], tag[2], tag[3]])),
         })
     }
 }
