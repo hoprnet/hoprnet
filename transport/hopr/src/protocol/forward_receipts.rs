@@ -187,7 +187,7 @@ impl ForwardReceipts {
                     .iter()
                     .filter(|(_, since)| now.saturating_duration_since(*since) > FORWARD_GRACE)
                     .map(|(_, since)| *since)
-                    .min();
+                    .max();
                 if let Some(since) = lost {
                     stream.floor = stream.floor.max(since);
                     stream
@@ -682,6 +682,20 @@ mod tests {
         }
     }
 
+    /// Runs `scenario` under a capturing subscriber until its log has a line with `expect`. A scoped subscriber can
+    /// miss events while other tests install theirs, so a miss runs the scenario again.
+    fn logged<T>(expect: &str, scenario: impl Fn() -> anyhow::Result<T>) -> anyhow::Result<(T, Vec<String>)> {
+        for _ in 0..20 {
+            let logs = Logs::default();
+            let out = tracing::subscriber::with_default(logs.clone(), &scenario)?;
+            let lines = logs.0.lock().clone();
+            if lines.iter().any(|line| line.contains(expect)) {
+                return Ok((out, lines));
+            }
+        }
+        anyhow::bail!("`{expect}` was never logged")
+    }
+
     fn lose_nothing(_: u32) -> bool {
         false
     }
@@ -689,33 +703,24 @@ mod tests {
     const FAST: Option<u64> = Some(20);
 
     #[test]
-    #[serial_test::serial(routing_logs)]
     fn a_dead_relayer_should_be_judged_after_the_confirmation_and_logged() -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
-        // A scoped subscriber can miss events when other tests install theirs at the same time: run again then
-        let (sim, logs) = (0..20)
-            .find_map(|_| {
-                let mut sim = Sim::new();
-                let logs = Logs::default();
-                tracing::subscriber::with_default(logs.clone(), || {
-                    sim.run(
-                        0,
-                        4_000,
-                        rotate(vec![vec![a], vec![b], vec![c]]),
-                        |path| if path.contains(&a) { None } else { FAST },
-                        lose_nothing,
-                    );
-                });
-                let seen = logs.0.lock().iter().any(|line| line.contains("relayer judged dead"));
-                seen.then_some((sim, logs))
-            })
-            .context("the verdict was never logged")?;
+        let (sim, lines) = logged("relayer judged dead", || {
+            let mut sim = Sim::new();
+            sim.run(
+                0,
+                4_000,
+                rotate(vec![vec![a], vec![b], vec![c]]),
+                |path| if path.contains(&a) { None } else { FAST },
+                lose_nothing,
+            );
+            Ok(sim)
+        })?;
 
         assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
         // The first receipt that finds it a black hole is at 1000 ms: it stands 900 ms after that.
         let verdict = sim.verdict_ms.context("judged")?;
         assert!((1_900..=2_250).contains(&verdict), "judged at {verdict} ms");
-        let lines = logs.0.lock();
         let judged: Vec<_> = lines
             .iter()
             .filter(|line| line.contains("relayer judged dead"))
@@ -909,87 +914,81 @@ mod tests {
     }
 
     #[test]
-    #[serial_test::serial(routing_logs)]
     fn a_verdict_should_lapse_after_its_ttl_without_a_stale_rejudgement() -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
-        let mut sim = Sim::new();
-        let fate = |path: &[Key]| if path.contains(&a) { None } else { FAST };
-        let healthy = rotate(vec![vec![b], vec![c]]);
-        sim.run(0, 4_000, rotate(vec![vec![a], vec![b], vec![c]]), fate, lose_nothing);
-        assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
-        let lapse = sim.verdict_ms.context("judged")? + FORWARD_VERDICT_TTL.as_millis() as u64;
+        logged("forward verdict lifted", || {
+            let mut sim = Sim::new();
+            let fate = |path: &[Key]| if path.contains(&a) { None } else { FAST };
+            let healthy = rotate(vec![vec![b], vec![c]]);
+            sim.run(0, 4_000, rotate(vec![vec![a], vec![b], vec![c]]), fate, lose_nothing);
+            assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
+            let lapse = sim.verdict_ms.context("judged")? + FORWARD_VERDICT_TTL.as_millis() as u64;
 
-        // Packets through it, lost, within 10 s of the lift, which has to drop them
-        sim.run(4_000, lapse - 1_100, &healthy, fate, lose_nothing);
-        for i in 0..5 {
-            sim.send(lapse - 1_100 + i, &[a], None);
-        }
-        sim.run(lapse - 1_000, lapse, &healthy, fate, lose_nothing);
-        assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
+            // Packets through it, lost, within 10 s of the lift, which has to drop them
+            sim.run(4_000, lapse - 1_100, &healthy, fate, lose_nothing);
+            for i in 0..5 {
+                sim.send(lapse - 1_100 + i, &[a], None);
+            }
+            sim.run(lapse - 1_000, lapse, &healthy, fate, lose_nothing);
+            assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
 
-        let logs = Logs::default();
-        tracing::subscriber::with_default(logs.clone(), || {
-            tracing::callsite::rebuild_interest_cache();
-            sim.fr.refresh_at(sim.at(lapse))
-        });
-        assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
-        assert!(logs.0.lock().iter().any(|line| line.contains("forward verdict lifted")));
-        assert!(
-            !sim.fr
-                .state
-                .lock()
-                .records
-                .values()
-                .flatten()
-                .any(|(_, r)| r.relayers().any(|r| *r == a))
-        );
+            sim.fr.refresh_at(sim.at(lapse));
+            assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
+            assert!(
+                !sim.fr
+                    .state
+                    .lock()
+                    .records
+                    .values()
+                    .flatten()
+                    .any(|(_, r)| r.relayers().any(|r| *r == a))
+            );
 
-        // Without the drop, those packets would be judged again at once
-        sim.run(lapse + 10, lapse + 2_000, &healthy, fate, lose_nothing);
-        assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
+            // Without the drop, those packets would be judged again at once
+            sim.run(lapse + 10, lapse + 2_000, &healthy, fate, lose_nothing);
+            assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
+            Ok(())
+        })?;
         Ok(())
     }
 
     #[test]
-    #[serial_test::serial(routing_logs)]
     fn a_receipt_for_a_packet_sent_after_the_verdict_should_lift_it_early_and_a_relapse_skips_the_wait()
     -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
-        let mut sim = Sim::new();
-        let route = rotate(vec![vec![a], vec![b], vec![c]]);
-        sim.run(
-            0,
-            4_000,
-            &route,
-            |path| if path.contains(&a) { None } else { FAST },
-            lose_nothing,
-        );
-        assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
+        logged("forward verdict lifted", || {
+            let mut sim = Sim::new();
+            let route = rotate(vec![vec![a], vec![b], vec![c]]);
+            sim.run(
+                0,
+                4_000,
+                &route,
+                |path| if path.contains(&a) { None } else { FAST },
+                lose_nothing,
+            );
+            assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
 
-        // The fallback draw sent a packet through it after the verdict, and it got home.
-        let logs = Logs::default();
-        tracing::subscriber::with_default(logs.clone(), || {
-            tracing::callsite::rebuild_interest_cache();
+            // The fallback draw sent a packet through it after the verdict, and it got home.
             sim.send(4_000, &[a], FAST);
             sim.receipt(4_250, 0);
-        });
-        assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
-        assert!(logs.0.lock().iter().any(|line| line.contains("forward verdict lifted")));
+            assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
 
-        // The packets from before the lift are not judged again, and it is judged without the wait when it
-        // fails again: an overdue packet needs 500 ms and a receipt, nothing more.
-        sim.run(4_250, 4_750, &route, |_| FAST, lose_nothing);
-        assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
-        sim.verdict_ms = None;
-        sim.run(
-            4_750,
-            7_000,
-            &route,
-            |path| if path.contains(&a) { None } else { FAST },
-            lose_nothing,
-        );
-        let relapse = sim.verdict_ms.context("judged again")?;
-        assert!(relapse <= 4_750 + 1_000, "judged at {relapse} ms");
+            // The packets from before the lift are not judged again, and it is judged without the wait when it
+            // fails again: an overdue packet needs 500 ms and a receipt, nothing more.
+            sim.run(4_250, 4_750, &route, |_| FAST, lose_nothing);
+            assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
+            sim.verdict_ms = None;
+            sim.run(
+                4_750,
+                7_000,
+                &route,
+                |path| if path.contains(&a) { None } else { FAST },
+                lose_nothing,
+            );
+            let relapse = sim.verdict_ms.context("judged again")?;
+            assert!(relapse <= 4_750 + 1_000, "judged at {relapse} ms");
+            Ok(())
+        })?;
         Ok(())
     }
 
@@ -1042,6 +1041,35 @@ mod tests {
         fr.receipts_at(session, 7, &[], at(700));
         assert_eq!(at(100), fr.state.lock().streams[&session].floor, "4 never came");
         assert!(fr.state.lock().streams[&session].missing.is_empty());
+    }
+
+    /// Two jumps whose missing receipts expire at the same arrival: the packets sent between them were
+    /// receipted by the receipt after the first jump, so they are evidence.
+    #[test]
+    fn the_floor_should_be_the_latest_lost_gap() {
+        let [x, y, exit] = [(); 3].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        for seq in 1..=3 {
+            fr.receipts_at(session, seq, &[], at(0));
+        }
+        // 4 goes missing at 100 ms, and 7 at 300 ms; 5 and 8 are covered by their successors
+        fr.receipts_at(session, 6, &[], at(100));
+        for tag in 1..=3 {
+            fr.record_at(session, tag, &[x, exit], at(200));
+        }
+        fr.record_at(session, 99, &[y, exit], at(850));
+        fr.receipts_at(session, 9, &[], at(300));
+        fr.receipts_at(session, 10, &[99], at(900));
+
+        let state = fr.state.lock();
+        assert_eq!(at(300), state.streams[&session].floor);
+        assert!(
+            state.suspected.is_empty(),
+            "packets sent before the floor are no evidence"
+        );
     }
 
     /// 6 overtakes, 5 arrives late and carries what 4 did: nothing is lost.
