@@ -22,22 +22,30 @@
 //!   through it are drawn less. Settings: `HoprProtocolConfig::latency_race_memory`,
 //!   `HoprProtocolConfig::relayer_health_weight` (`0` off). Must not fight: the return-path temper, which flattens it
 //!   along with path quality.
-//! - **Dead verdict.** Trigger: at least `MIN_RACES` replies trailing their partners by more than any race the relayer
-//!   settled, none home since, and a reply home through some relayer after the first of them fell due. A reply is
-//!   overdue only while others are delivering: a pause in the replier's stream, or an outage of every return relayer,
-//!   leaves nothing arriving and so nothing overdue, however long the replies stay out. A relayer that has settled too
-//!   few races to have a margin of its own borrows the bar of the best-measured relayer, raised to whatever its own
-//!   settled races measure, and none is judged while no relayer has one; its own races that expired open are booked as
-//!   lost and are not replies that came home, so they do not reset the clock. Effect: health `0`, the walk prunes it. A
-//!   verdict is lifted by a reply coming home through the relayer, not by time. From the moment the verdict is acted on
-//!   (`VERDICT_CONFIRMATION`), only a reply on a SURB minted after it counts: the late replies a slow relayer still
-//!   delivers are what the verdict was about, not news that it ended (`RelayerHealth::is_fresh_for`). Once no reply
-//!   through it is out any more (about `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*:
-//!   published at `PROBATION_HEALTH`, which weighted selection all but never draws while the planner's exploration
-//!   still does, and that draw is the probe. A probe is minted after the verdict, so a probe reply home through it
-//!   revives it, to the health its lost races leave it, so gradually; a probe that goes missing leaves it where it is,
-//!   and one that is a black hole again goes back to dead without a new SURB generation. Must not fight: common-mode
-//!   outages, where no partner gets home and nothing is judged.
+//! - **Dead verdict.** Trigger: at least `MIN_RACES` replies trailing their partners by more than any race settled by a
+//!   relayer on their leg, none home through the relayer since, and a reply home through some relayer after the first
+//!   of them fell due. A reply is overdue only while others are delivering: a pause in the replier's stream, or an
+//!   outage of every return relayer, leaves nothing arriving and so nothing overdue, however long the replies stay out.
+//!   A relayer that has settled too few races to have a margin of its own borrows the bar of the best-measured relayer,
+//!   raised to whatever its own settled races measure, and none is judged while no relayer has one; its own races that
+//!   expired open are booked as lost and are not replies that came home, so they do not reset the clock. Of the
+//!   relayers the same overdue replies point at, the one that explains the most of them is taken, the one further up
+//!   their legs if two explain the same, and two that the replies do not tell apart wait for a reply that does
+//!   (`explain_away`). A relayer has two hops: from the counterparty, where it is a leg's first relayer, and from
+//!   another relayer, whichever that is. One the counterparty can no longer reach still delivers behind other relayers,
+//!   which says nothing about the replies sent to it directly: a relayer that delivers over one hop is judged over the
+//!   other on `MIN_RACES_OVER_ONE_HOP` replies with none home over that hop since, is only suspected at first, and
+//!   judged when the next flush finds the hop still silent (`RelayerHealth::has_stood`). Effect: health `0`, the walk
+//!   prunes it. A verdict is lifted by a reply coming home through the relayer, over the hop it is about if it was
+//!   reached while the other delivered, not by time. From the moment the verdict is acted on (`VERDICT_CONFIRMATION`),
+//!   only a reply on a SURB minted after it counts: the late replies a slow relayer still delivers are what the verdict
+//!   was about, not news that it ended (`RelayerHealth::is_fresh_for`). Once no reply through it is out any more (about
+//!   `PENDING_SURB_TTL`) the condition lapses, and the relayer goes on *probation*: published at `PROBATION_HEALTH`,
+//!   which weighted selection all but never draws while the planner's exploration still does, and that draw is the
+//!   probe. A probe is minted after the verdict, so a probe reply home through it revives it, to the health its lost
+//!   races leave it, so gradually; a probe that goes missing leaves it where it is, and one that is a black hole again
+//!   goes back to dead without a new SURB generation. Must not fight: common-mode outages, where no partner gets home
+//!   and nothing is judged.
 //! - **Invalid SURBs.** Trigger: a dead verdict, or probation. Effect: each session is told how many SURBs in its
 //!   counterparty's store run through that relayer; the balancer subtracts them from its level and sends replacements.
 //!   A lapsed verdict is only a timeout and the counterparty still holds the SURBs, probe SURBs included, so the
@@ -166,6 +174,9 @@ const PROBATION_HEALTH: f64 = 1e-3;
 /// wipes the counterparty's whole stock for nothing. Measured: one such wipe per ~7 scenario runs, always
 /// at cold start, always the same relayer. Waiting one flush costs a dead relayer one more second of
 /// replies into the void and costs a slow one nothing.
+///
+/// A relayer that still delivers over its other hop is not even judged at the first of the two flushes,
+/// only suspected: see [`RelayerHealth::has_stood`].
 const VERDICT_CONFIRMATION: Duration = Duration::from_millis(900);
 
 /// Expected/observed counts for one pair of legs, accumulated between flushes.
@@ -787,6 +798,14 @@ pub struct RelayerHealth {
     /// planner's exploration sent, not stock the counterparty held when it died; see
     /// [`SurbRoundTripRegistry::write_off_dead`].
     known_dead_since: DashMap<OffchainPublicKey, Instant>,
+    /// For a relayer judged dead while it still delivered over its other hop, the hop its verdict is
+    /// about: only a reply over that one lifts it (see [`Self::revive_by_reply`]). None for a relayer
+    /// that delivered nothing at all, which any reply through it revives. Kept from the verdict through
+    /// probation, removed with the death.
+    dead_over: DashMap<OffchainPublicKey, Hop>,
+    /// Relayers that would be judged over one of their hops while delivering over the other, and since
+    /// when: suspected, with nothing published or written off for them yet (see [`Self::has_stood`]).
+    suspected: DashMap<OffchainPublicKey, Instant>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
     /// When a reply last came home, through any relayer, for any session.
@@ -846,14 +865,33 @@ struct RaceHistory {
     /// Races whose partner is home while this relayer's reply is not, by the SURB still out. Each
     /// counts as lost by at least the time since the partner came home.
     open: HashMap<HoprSurbId, Race>,
+    /// The leg each of those replies is out on, and this relayer's position on it. Beside `open` and
+    /// not in it: a race is the same race over any leg, the leg only decides how long the reply is
+    /// given and which reply answers it (see [`unanswered`](Self::unanswered)).
+    open_legs: HashMap<HoprSurbId, (ReturnRelayers, usize)>,
     /// How far back its races count, set when it is judged; zero until then.
     memory: Duration,
-    /// When a reply last came home through this relayer, whether or not it settled a race.
-    last_home: Option<Instant>,
+    /// When a reply last came home through this relayer over each of its two hops, whether or not it
+    /// settled a race.
+    /// Forgotten after [`PENDING_SURB_TTL`], when no open race is old enough for it to matter.
+    last_home: HashMap<Hop, Instant>,
 }
 
 /// The fewest races whose median no single race decides.
 const MIN_RACES: usize = 3;
+
+/// The fewest overdue replies that make a relayer a black hole over one of its hops while it delivers
+/// over the other (see [`RaceHistory::hop_at_fault`]).
+///
+/// More than [`MIN_RACES`]. That it delivers at all says it is alive, so what is left to judge is
+/// one hop, on half its replies, and a verdict over one hop is acted on once that hop has been
+/// silent for a flush, which a hop carrying little is anyway. With replies lost at random,
+/// [`MIN_RACES`] in a row over one hop then come about by chance. Simulated on this code with every
+/// relayer healthy and 5 or 10 % of the replies lost: with return paths drawn at random among 30
+/// relayers, 13 verdicts acted on with three against 3 with four; with the planner's sets of eight
+/// paths it makes no difference (5 against 4). It is margin, and cheap: on a cluster a relayer cut
+/// off from the replier has a median of 9 replies overdue at the flush that first suspects it.
+const MIN_RACES_OVER_ONE_HOP: usize = 4;
 
 impl RaceHistory {
     fn forget_older_than(&mut self, memory: Duration) {
@@ -867,6 +905,24 @@ impl RaceHistory {
         self.races.iter().filter(|race| !race.lost())
     }
 
+    /// The bar this relayer's replies are held to: how late one usually is (see
+    /// [`usual_margin`](Self::usual_margin)), or, while it has settled too few races for that,
+    /// `fallback_usual` raised to whatever its own settled races measure. `None` while neither exists.
+    fn bar(&self, fallback_usual: Option<f64>) -> Option<f64> {
+        // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
+        // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
+        match (self.usual_margin(), fallback_usual) {
+            (Some(usual), _) => Some(usual),
+            (None, Some(fallback)) => Some(
+                self.finished()
+                    .map(|race| race.margin.abs())
+                    .fold(0.0, f64::max)
+                    .max(fallback),
+            ),
+            (None, None) => None,
+        }
+    }
+
     /// How late a reply of this relayer usually is: the largest margin of its settled races, or `None`
     /// until it has settled [`MIN_RACES`] of them, too few for the figure to mean anything.
     fn usual_margin(&self) -> Option<f64> {
@@ -874,9 +930,12 @@ impl RaceHistory {
             .then(|| self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max))
     }
 
-    /// A black hole: at least [`MIN_RACES`] replies through it are out for longer than its bar, and
-    /// nothing has come home through it since each of them fell due. The bar is the largest margin of
-    /// the races it finished, or, while it has finished too few, the borrowed one below.
+    /// The replies through it that are out for longer than its bar, with nothing home through it, over
+    /// the hop each of them is out on, since it fell due. At least [`MIN_RACES`] of them that nothing has
+    /// come home after over either hop make it a black hole (see [`unanswered_at_all`](Self::unanswered_at_all)),
+    /// and [`MIN_RACES_OVER_ONE_HOP`] over one hop while it delivers over the other make it one over that
+    /// hop (see [`hop_at_fault`](Self::hop_at_fault)). The bar is the largest margin of the races it
+    /// finished, or, while it has finished too few, the borrowed one below.
     ///
     /// A reply is overdue only if a reply came home, through any relayer, after its grace ran out
     /// (`last_reply`): the network was delivering while this relayer was not. Without that, nothing
@@ -890,8 +949,20 @@ impl RaceHistory {
     /// and races settle only in the abnormal order, so a clean history is common. It borrows
     /// `fallback_usual`, the bar of the best-measured relayer, raised to whatever its own settled races
     /// measure (`own.max(fallback)`), and is not judged at all while no relayer has one. "Home through
-    /// it" is a race it settled or any reply over a leg it is on; the relayer's own races that expired
-    /// open and were booked as lost are not replies that came home, and must not reset the clock.
+    /// it" is any reply over a leg it is on that reached it over the same hop as the overdue one would
+    /// (see [`Hop`]): from the replier when it is first on both legs, from another relayer when it is
+    /// not. The same hop, because that is what the overdue reply says something about. A relayer cut off
+    /// from the replier goes on delivering behind other relayers, and counting those replies kept it from
+    /// ever being a suspect: measured with that link cut, the relayer behind it on those legs was judged
+    /// in its place and stayed out for 90 s, or nobody was and the replier spent a quarter of its replies
+    /// into the cut for as long as its stock lasted. The relayer's own races that expired open and were
+    /// booked as lost are not replies that came home, and must not reset the clock.
+    ///
+    /// A reply is held to the bar of the slowest relayer on its leg, `bars` having every relayer's: it
+    /// can be no earlier than that relayer lets it be, whichever of them is asked. Held to its own bar,
+    /// a relayer behind a slower one had replies overdue that the slower one did not, and was the only
+    /// suspect. Measured on a cluster behind a relayer stalling for seconds: three such replies, the
+    /// relayer judged in the stalling one's place and out for 80 s, the stock wiped twice.
     ///
     /// Each overdue race is judged on its own: one that a reply through the relayer came home after is
     /// answered, the relayer was delivering after the reply it lost, which was then lost at random.
@@ -899,33 +970,143 @@ impl RaceHistory {
     /// replies already past the relayer when it died, hold a verdict back until that race expires, up
     /// to a minute.
     ///
-    /// Returns those replies, by SURB, empty while the relayer cannot be judged at all; whether they
-    /// make it a black hole is up to [`explain_away`], which sets aside the ones a relayer already
-    /// judged dead explains.
-    fn unanswered(&self, last_reply: Option<Instant>, fallback_usual: Option<f64>) -> Vec<HoprSurbId> {
-        let own = self.finished().map(|race| race.margin.abs()).fold(0.0, f64::max);
-        // No round-trip floor: a round trip includes the time the SURB waited in the replier's store,
-        // seconds to a minute after a drain, while both SURBs of a pair wait alike, so margins don't.
-        let usual = match (self.usual_margin(), fallback_usual) {
-            (Some(usual), _) => usual,
-            (None, Some(fallback)) => own.max(fallback),
-            (None, None) => return Vec::new(),
+    /// Returns those replies, by SURB and with when each fell due, empty while the relayer cannot be
+    /// judged at all; whether they make it a black hole is up to [`explain_away`], which sets aside the
+    /// ones a relayer already judged dead explains.
+    fn unanswered(
+        &self,
+        last_reply: Option<Instant>,
+        fallback_usual: Option<f64>,
+        bars: &HashMap<OffchainPublicKey, f64>,
+    ) -> Vec<(HoprSurbId, Instant)> {
+        let Some(own) = self.bar(fallback_usual) else {
+            return Vec::new();
         };
-        let grace = Duration::from_secs_f64(usual);
-        // Home through it: a race it settled, or any reply through it. A reply in the normal order
-        // settles no race, but it is the relayer delivering all the same; counting settled races alone
-        // undid the revival such a reply makes at the very next flush.
-        let latest_home = self.finished().map(|race| race.at).max().max(self.last_home);
         let now = Instant::now();
         self.open
             .iter()
-            .filter_map(|(surb, race)| race.at.checked_add(grace).map(|due| (*surb, due)))
+            .filter_map(|(surb, race)| {
+                // The bar of the slowest relayer on the reply's leg (see above).
+                let bar = self
+                    .open_legs
+                    .get(surb)
+                    .into_iter()
+                    .flat_map(|(leg, _)| relayers_of(leg))
+                    .filter_map(|relayer| bars.get(&relayer))
+                    .fold(own, |bar, other| bar.max(*other));
+                race.at
+                    .checked_add(Duration::from_secs_f64(bar))
+                    .map(|due| (*surb, due))
+            })
             // Due, and overdue while others delivered (see above)...
             .filter(|(_, due)| *due < now && last_reply.is_some_and(|reply| reply > *due))
-            // ...and nothing home through it since it fell due.
-            .filter(|(_, due)| latest_home.is_none_or(|home| home < *due))
-            .map(|(surb, _)| surb)
+            // ...and nothing home through it over the same hop since it fell due.
+            .filter(|(surb, due)| self.home_over_the_hop_of(surb).is_none_or(|home| home < *due))
             .collect()
+    }
+
+    /// Of the replies `unanswered` over the hop they are out on, those that nothing has come home after
+    /// through this relayer over either hop: what it is judged on as a whole.
+    ///
+    /// Any reply through it answers them, as before its hops were told apart, and not only one over
+    /// the same hop. Counting what is unanswered over each hop and adding the two up judged a
+    /// relayer for a reply lost here and two lost there while it delivered over both: simulated as
+    /// for [`Hop`], 13 wipes with the two added up against 4 this way, and 2 with the hops not told
+    /// apart at all.
+    fn unanswered_at_all(&self, unanswered: &[(HoprSurbId, Instant)]) -> Vec<HoprSurbId> {
+        let home = self.last_home.values().max().copied();
+        unanswered
+            .iter()
+            .filter(|(_, due)| home.is_none_or(|home| home < *due))
+            .map(|(surb, _)| *surb)
+            .collect()
+    }
+
+    /// The hop the replies `unanswered` are out on, if they are all out on the same one and the relayer
+    /// has delivered over the other since the oldest of them opened. Its verdict is then about that hop
+    /// and not about the relayer as a whole: the replier can no longer reach it, say, while other
+    /// relayers still can.
+    fn hop_at_fault(&self, unanswered: &[(HoprSurbId, Instant)]) -> Option<Hop> {
+        let mut hops = unanswered.iter().filter_map(|(surb, _)| self.hop_of(surb));
+        let hop = hops.next()?;
+        if hops.any(|other| other != hop) {
+            return None;
+        }
+        let oldest = unanswered
+            .iter()
+            .filter_map(|(surb, _)| self.open.get(surb))
+            .map(|race| race.at)
+            .min()?;
+        self.last_home
+            .iter()
+            .any(|(other, home)| *other != hop && *home >= oldest)
+            .then_some(hop)
+    }
+
+    /// When a reply last came home through this relayer over the hop the open race of `surb` waits on.
+    ///
+    /// Any reply over that hop counts, in the normal order too: it settles no race, but it is the
+    /// relayer delivering all the same.
+    fn home_over_the_hop_of(&self, surb: &HoprSurbId) -> Option<Instant> {
+        self.hop_of(surb).and_then(|hop| self.last_home.get(&hop)).copied()
+    }
+
+    /// The hop the open race of `surb` waits on.
+    fn hop_of(&self, surb: &HoprSurbId) -> Option<Hop> {
+        self.open_legs.get(surb).map(|(_, position)| Hop::at(*position))
+    }
+}
+
+/// A relayer whose overdue replies would make it a black hole.
+#[derive(Debug)]
+struct Suspect {
+    relayer: OffchainPublicKey,
+    /// Its unanswered replies.
+    unanswered: Vec<HoprSurbId>,
+    /// Every reply still out on a leg through it, with the relayer's position on that leg: those it
+    /// holds a race on, and those unanswered for another suspect (see [`Suspect::note_legs`]).
+    open: HashMap<HoprSurbId, usize>,
+}
+
+impl Suspect {
+    /// Adds the replies of `legs`, unanswered for some suspect, whose leg this relayer is on without
+    /// holding a race on them. It holds none where it is on the partner's leg over the same hop, yet the
+    /// reply went through it all the same, and a relayer that stalls passes one reply of a pair and
+    /// holds the other.
+    fn note_legs(&mut self, legs: &HashMap<HoprSurbId, ReturnRelayers>) {
+        for (surb, leg) in legs {
+            let on_the_leg =
+                hops_of(leg).find_map(|(relayer, _, position)| (relayer == self.relayer).then_some(position));
+            if let Some(position) = on_the_leg {
+                self.open.entry(*surb).or_insert(position);
+            }
+        }
+    }
+
+    /// How many of the replies `unanswered_for_any` suspect are out on a leg through this one, and how
+    /// far down those legs it sits (its positions on them, summed).
+    fn explains(&self, unanswered_for_any: &std::collections::HashSet<HoprSurbId>) -> (usize, usize) {
+        self.open
+            .iter()
+            .filter(|(surb, _)| unanswered_for_any.contains(*surb))
+            .fold((0, 0), |(explains, depth), (_, position)| {
+                (explains + 1, depth + position)
+            })
+    }
+
+    /// Whether the overdue replies do not tell this suspect from `other`: each explains as many, each
+    /// is on the leg of every reply the other has unanswered, and this one is not ahead of the other
+    /// on all the legs they share.
+    fn is_tied_with(&self, other: &Self, unanswered_for_any: &std::collections::HashSet<HoprSurbId>) -> bool {
+        self.explains(unanswered_for_any).0 == other.explains(unanswered_for_any).0
+            && self.unanswered.iter().all(|surb| other.open.contains_key(surb))
+            && other.unanswered.iter().all(|surb| self.open.contains_key(surb))
+            && !self
+                .open
+                .iter()
+                .filter(|(surb, _)| unanswered_for_any.contains(*surb))
+                .filter_map(|(surb, position)| other.open.get(surb).map(|behind| (position, behind)))
+                .all(|(position, behind)| position < behind)
     }
 }
 
@@ -939,36 +1120,95 @@ impl RaceHistory {
 /// (48 of 72) once the paths were spread over every first relayer, against one in four before.
 ///
 /// A dead relayer is on all the legs that failed through it, an innocent one only on those it
-/// shares with it, so the dead one has the most. They are taken in that order: one is a black hole
-/// if at least [`MIN_RACES`] of its unanswered replies are on legs through no relayer already taken,
-/// and every reply out on a leg through it is then explained. Two relayers dead at once are both
-/// taken while each has replies the other does not explain; one that only ever sat on legs through
-/// the other cannot be told from an innocent one, and waits until those legs are gone.
+/// shares with it, so the dead one explains the most: the most replies, unanswered for any suspect,
+/// that are out on a leg through it. They are taken in that order: one is a black hole if at least
+/// [`MIN_RACES`] of its unanswered replies are on legs through no relayer already taken, and every
+/// reply out on a leg through it is then explained. Two relayers dead at once are both taken while
+/// each has replies the other does not explain; one that only ever sat on legs through the other
+/// cannot be told from an innocent one, and waits until those legs are gone.
+///
+/// What a suspect explains, and not how many replies it has unanswered itself: each relayer counts
+/// those by its own bar, so of two relayers on the same legs the one with the shorter bar has more of
+/// them, whichever of the two lost them. Measured with the replier's link to a relayer cut: the relayer
+/// behind it on those legs, with a bar of 0.22 s against 0.38 s, had 4 unanswered replies to its 2 and
+/// then 12 to its 11, was taken first and confirmed, which cost two wipes of the stock and kept a
+/// healthy relayer out for the rest of the session.
 ///
 /// The fewest relayers that explain the overdue replies are taken, so the reverse also holds: a live
 /// relayer whose every leg ran through relayers that died collects all their overdue replies, more
 /// than any of them has, and is taken in their place, one dead relayer explaining the lateness as well
 /// as two. That takes a live relayer with nothing delivered through it since: one that also sits on a
 /// leg that delivers has its overdue replies answered (see [`RaceHistory::unanswered`]) and is no
-/// suspect. Ties of equal counts go by key.
+/// suspect.
+///
+/// A suspect explains a reply by being on its leg, whether or not it holds a race on it itself. A
+/// relayer on both legs of a pair over the same hop holds none (see [`RelayerHealth::open_race`]), and
+/// one that stalls is exactly that: it passes one reply and holds the other. Measured on a cluster,
+/// counting only the races held: the relayer behind a stalling one had 20 replies unanswered, at least
+/// three of them on legs where the stalling one held no race, so the stalling one did not explain them
+/// and the healthy one was judged, wiped for and kept out for 80 s, with the stalling one on every one
+/// of those legs.
+///
+/// Relayers that explain equally many are taken from the one further up the legs of those replies: a
+/// dead relayer and one that only ever follows it explain the same replies, and what the upstream one
+/// loses never reaches the other.
+///
+/// Two that explain the same replies with neither ahead of the other on all their legs are a tie the
+/// evidence does not decide, and neither is taken at this flush: their replies count as explained, so
+/// that nobody else is judged for them, and the next reply out on a leg through one alone decides.
+/// Taking one of them is a guess. Measured on a cluster, with the tie going to the smaller summed
+/// position: 5 such ties in 64 runs, the dead relayer taken in 2 and a healthy one in 3, each of those
+/// costing a wipe of the stock for nothing and a second one two to four seconds later. A relayer
+/// `known_dead` already is never set aside this way: its verdict stands, and explains the other's.
 fn explain_away(
-    mut suspects: Vec<(OffchainPublicKey, Vec<HoprSurbId>, Vec<HoprSurbId>)>,
+    mut suspects: Vec<Suspect>,
+    known_dead: impl Fn(&OffchainPublicKey) -> bool,
 ) -> std::collections::HashSet<OffchainPublicKey> {
-    suspects.sort_by_cached_key(|(relayer, unanswered, _)| (std::cmp::Reverse(unanswered.len()), relayer.to_string()));
+    let unanswered_for_any: std::collections::HashSet<HoprSurbId> = suspects
+        .iter()
+        .flat_map(|suspect| suspect.unanswered.iter().copied())
+        .collect();
+    suspects.sort_by_cached_key(|suspect| {
+        let (explains, depth) = suspect.explains(&unanswered_for_any);
+        (std::cmp::Reverse(explains), depth, suspect.relayer.to_string())
+    });
     let mut explained: std::collections::HashSet<HoprSurbId> = std::collections::HashSet::new();
     let mut black_holes = std::collections::HashSet::new();
-    for (relayer, unanswered, open) in suspects {
-        let own = unanswered.iter().filter(|surb| !explained.contains(*surb)).count();
-        if own >= MIN_RACES {
-            black_holes.insert(relayer);
-            explained.extend(open);
-        } else {
+    let mut set_aside = std::collections::HashSet::new();
+    for (rank, suspect) in suspects.iter().enumerate() {
+        let relayer = suspect.relayer;
+        if set_aside.contains(&relayer) {
+            continue;
+        }
+        let own = suspect
+            .unanswered
+            .iter()
+            .filter(|surb| !explained.contains(*surb))
+            .count();
+        if own < MIN_RACES {
             tracing::debug!(
                 %relayer,
-                unanswered = unanswered.len(),
+                unanswered = suspect.unanswered.len(),
                 own,
                 "overdue replies explained by a relayer judged dead on their legs"
             );
+            continue;
+        }
+        let tied = suspects[rank + 1..]
+            .iter()
+            .filter(|_| !known_dead(&relayer))
+            .find(|other| !set_aside.contains(&other.relayer) && suspect.is_tied_with(other, &unanswered_for_any));
+        let Some(other) = tied else {
+            black_holes.insert(relayer);
+            explained.extend(suspect.open.keys().copied());
+            continue;
+        };
+        set_aside.insert(other.relayer);
+        explained.extend(suspect.open.keys().chain(other.open.keys()).copied());
+        if known_dead(&other.relayer) {
+            black_holes.insert(other.relayer);
+        } else {
+            tracing::debug!(%relayer, other = %other.relayer, "overdue replies do not tell two relayers apart yet");
         }
     }
     black_holes
@@ -1002,6 +1242,45 @@ fn relayers_of(leg: &ReturnRelayers) -> impl Iterator<Item = OffchainPublicKey> 
     leg.iter().flatten().copied()
 }
 
+/// Where a reply reaches a relayer from on its return leg: the replier, when the relayer is the leg's
+/// first, or another relayer.
+///
+/// Two hops, and not one for every relayer that can come before it. The replies through a relayer
+/// are evidence about it only as far as other replies answer them (see
+/// [`RaceHistory::unanswered`]). Told apart by the relayer before it, they are split over as many
+/// hops as there are relayers: a reply lost at random then stays unanswered until the next one
+/// comes over the very same hop, and three of those, anywhere among its hops, are a verdict.
+/// Simulated on this code with every relayer healthy, 5 or 10 % of the replies lost at random and
+/// return paths taken from sets of eight that are redrawn every five seconds, as the planner keeps
+/// them (7 and 30 relayers, two and three hops, 20 and 130 replies a second, 5.3 hours in all):
+/// with a hop per relayer before it the stock was wiped for a healthy relayer 124 times, with these
+/// two hops 4 times, and twice where any reply through a relayer answers. A cluster of 7 relayers,
+/// whose planner keeps drawing the same few paths, shows none of it: no wipe in 30 minutes at 10 %
+/// loss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Hop {
+    FromReplier,
+    FromRelayer,
+}
+
+impl Hop {
+    /// The hop of the relayer at `position` on a leg.
+    fn at(position: usize) -> Self {
+        if position == 0 {
+            Self::FromReplier
+        } else {
+            Self::FromRelayer
+        }
+    }
+}
+
+/// The relayers of a leg, each with the hop a reply reaches it over and its position on the leg.
+fn hops_of(leg: &ReturnRelayers) -> impl Iterator<Item = (OffchainPublicKey, Hop, usize)> + '_ {
+    relayers_of(leg)
+        .enumerate()
+        .map(|(position, relayer)| (relayer, Hop::at(position), position))
+}
+
 impl RelayerHealth {
     /// Records that the reply over `later` came home `by` after the one over `earlier`, which took
     /// `winning_round_trip`, both on SURBs of one packet. Relayers on both legs cancel out.
@@ -1022,6 +1301,7 @@ impl RelayerHealth {
         for relayer in relayers_of(later) {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(&later_surb);
+                history.open_legs.remove(&later_surb);
             }
             if !earlier.contains(&Some(relayer)) {
                 self.record(relayer, race(by.as_secs_f64()));
@@ -1046,8 +1326,15 @@ impl RelayerHealth {
             margin: 0.0,
             winning_round_trip: winning_round_trip.as_secs_f64(),
         };
-        for relayer in relayers_of(waiting).filter(|relayer| !home.contains(&Some(*relayer))) {
-            self.relayers.entry(relayer).or_default().open.insert(surb, race);
+        // On both legs over the same hop, a relayer cancels out. Over its two hops it does not: the hop the
+        // reply is out on is not the one the partner came home over.
+        let on_both = |relayer: &OffchainPublicKey, hop: &Hop| {
+            hops_of(home).any(|(other, other_hop, _)| other == *relayer && other_hop == *hop)
+        };
+        for (relayer, _, position) in hops_of(waiting).filter(|(relayer, hop, _)| !on_both(relayer, hop)) {
+            let mut history = self.relayers.entry(relayer).or_default();
+            history.open.insert(surb, race);
+            history.open_legs.insert(surb, (*waiting, position));
         }
     }
 
@@ -1057,6 +1344,7 @@ impl RelayerHealth {
         for relayer in relayers_of(waiting) {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(surb);
+                history.open_legs.remove(surb);
             }
         }
     }
@@ -1067,6 +1355,7 @@ impl RelayerHealth {
         for relayer in relayers_of(waiting).filter(|relayer| self.is_fresh_for(relayer, minted_at)) {
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
                 history.open.remove(surb);
+                history.open_legs.remove(surb);
             }
         }
     }
@@ -1136,14 +1425,15 @@ impl RelayerHealth {
     }
 
     /// A reply on a SURB minted at `minted_at` came home over `leg`: every relayer on it that the reply
-    /// is news about (see [`Self::is_fresh_for`]) delivered. This is what "home since" means for a black
-    /// hole (see [`RaceHistory::unanswered`]), whether or not the reply settled a race.
+    /// is news about (see [`Self::is_fresh_for`]) delivered, over the hop it has on this leg. This is what
+    /// "home since" means for a black hole (see [`RaceHistory::unanswered`]), whether or not the reply
+    /// settled a race.
     fn note_home(&self, leg: &ReturnRelayers, minted_at: Instant) {
         let now = Instant::now();
-        for relayer in relayers_of(leg).filter(|relayer| self.is_fresh_for(relayer, minted_at)) {
+        for (relayer, hop, _) in hops_of(leg).filter(|(relayer, ..)| self.is_fresh_for(relayer, minted_at)) {
             // Only relayers with races can be black holes, and only they have a history.
             if let Some(mut history) = self.relayers.get_mut(&relayer) {
-                history.last_home = Some(now);
+                history.last_home.insert(hop, now);
             }
         }
     }
@@ -1154,6 +1444,33 @@ impl RelayerHealth {
         self.dead.insert(relayer);
         self.dead_since.insert(relayer, now);
         self.known_dead_since.insert(relayer, now);
+    }
+
+    /// Whether a relayer that is a black hole over `hop` only has been one for
+    /// [`VERDICT_CONFIRMATION`], with nothing home over it in between. It is suspected from the first
+    /// flush that finds it so, and judged at the first one that finds this.
+    ///
+    /// Over one hop a few late replies are all the evidence there is: only what travels that hop
+    /// answers them, not every reply through the relayer as for one judged as a whole. And a path is late
+    /// when it is first used, at the start of a session or after its stock was wiped, by up to a second on
+    /// a cluster. Measured there with a verdict at the first flush: 136 verdicts in 84 runs on relayers
+    /// that had nothing wrong with them, each steering the planner off the relayer, 129 of them gone by
+    /// the next flush and 6 lifted before it by a reply over the hop; of the 90 on the relayer that was
+    /// cut off, stalled or killed, 5 were gone. So the first flush only suspects, and the planner is not
+    /// told. The stock is written off no later for it: that waited for the second flush anyway.
+    fn has_stood(&self, relayer: &OffchainPublicKey, hop: Hop) -> bool {
+        let now = Instant::now();
+        let since = *self.suspected.entry(*relayer).or_insert(now);
+        let delivered = self
+            .relayers
+            .get(relayer)
+            .is_some_and(|history| history.last_home.get(&hop).is_some_and(|home| *home >= since));
+        if delivered {
+            // It delivers over it after all: what is overdue now has yet to stand.
+            self.suspected.insert(*relayer, now);
+            return false;
+        }
+        since.elapsed() >= VERDICT_CONFIRMATION
     }
 
     /// When the relayer's current death began, while it is known dead.
@@ -1174,18 +1491,25 @@ impl RelayerHealth {
 
     /// A reply on a SURB minted at `minted_at` came home over `leg`, so every relayer on it is
     /// delivering: any that was judged dead or on probation is alive again, unless the reply is not news
-    /// about it (see [`Self::is_fresh_for`]). Its health is then what its races say, which still holds
-    /// the ones it lost, so it recovers gradually as they are forgotten.
+    /// about it (see [`Self::is_fresh_for`]), or it was judged while delivering over its other hop and
+    /// this is that one (`dead_over`). Its health is then what its races say, which still holds the ones
+    /// it lost, so it recovers gradually as they are forgotten.
     fn revive_by_reply(&self, leg: &ReturnRelayers, minted_at: Instant) {
-        for relayer in relayers_of(leg) {
+        for (relayer, hop, _) in hops_of(leg) {
             // Looked up before it is taken out: this is on the path of every reply, and the sets are
             // empty nearly always.
             if !self.is_known_dead(&relayer) || !self.is_fresh_for(&relayer, minted_at) {
                 continue;
             }
+            // A verdict about one of its hops is not lifted over the other: it was reached while that one
+            // delivered, and a reply over it is what the relayer was doing all along.
+            if self.dead_over.get(&relayer).is_some_and(|dead_over| *dead_over != hop) {
+                continue;
+            }
             let was_dead = self.dead.remove(&relayer).is_some();
             self.dead_since.remove(&relayer);
             self.known_dead_since.remove(&relayer);
+            self.dead_over.remove(&relayer);
             self.confirmed.remove(&relayer);
             let was_on_probation = self.probation.remove(&relayer).is_some();
             if was_dead || was_on_probation {
@@ -1223,7 +1547,15 @@ impl RelayerHealth {
             .max_by(f64::total_cmp);
         // Relayers whose overdue replies would make them black holes: their unanswered replies, and every
         // reply still out on a leg through them.
-        let mut suspects: Vec<(OffchainPublicKey, Vec<HoprSurbId>, Vec<HoprSurbId>)> = Vec::new();
+        // Every relayer's bar: a reply is held to that of the slowest relayer on its leg.
+        let bars: HashMap<OffchainPublicKey, f64> = self
+            .relayers
+            .iter()
+            .filter_map(|entry| entry.bar(fallback_usual).map(|bar| (*entry.key(), bar)))
+            .collect();
+        let mut suspects: Vec<Suspect> = Vec::new();
+        let mut unanswered_legs: HashMap<HoprSurbId, ReturnRelayers> = HashMap::new();
+        let mut hop_at_fault: HashMap<OffchainPublicKey, Hop> = HashMap::new();
         for mut entry in self.relayers.iter_mut() {
             // A race open past the time a SURB is remembered is lost, by that long: the relayer keeps
             // a health that low until it proves otherwise, rather than being forgiven by expiry.
@@ -1240,12 +1572,47 @@ impl RelayerHealth {
                 open
             });
             entry.races.extend(lost);
-            let unanswered = entry.unanswered(last_reply, fallback_usual);
+            let RaceHistory {
+                open,
+                open_legs,
+                last_home,
+                ..
+            } = &mut *entry;
+            open_legs.retain(|surb, _| open.contains_key(surb));
+            // No race stays open for longer than that, so an older reply answers none.
+            last_home.retain(|_, home| home.elapsed() <= PENDING_SURB_TTL);
+            let unanswered = entry.unanswered(last_reply, fallback_usual, &bars);
+            let unanswered: Vec<HoprSurbId> = match entry.hop_at_fault(&unanswered) {
+                // Delivering over its other hop, and enough overdue over this one to suspect it over it.
+                Some(hop) if unanswered.len() >= MIN_RACES_OVER_ONE_HOP => {
+                    hop_at_fault.insert(*entry.key(), hop);
+                    unanswered.iter().map(|(surb, _)| *surb).collect()
+                }
+                // As a whole it is judged on the replies that nothing through it has come home after.
+                _ => entry.unanswered_at_all(&unanswered),
+            };
             if unanswered.len() >= MIN_RACES {
-                suspects.push((*entry.key(), unanswered, entry.open.keys().copied().collect()));
+                let open = entry
+                    .open
+                    .keys()
+                    .map(|surb| (*surb, entry.open_legs.get(surb).map_or(0, |(_, position)| *position)))
+                    .collect();
+                unanswered_legs.extend(
+                    unanswered
+                        .iter()
+                        .filter_map(|surb| entry.open_legs.get(surb).map(|(leg, _)| (*surb, *leg))),
+                );
+                suspects.push(Suspect {
+                    relayer: *entry.key(),
+                    unanswered,
+                    open,
+                });
             }
         }
-        let black_holes = explain_away(suspects);
+        for suspect in &mut suspects {
+            suspect.note_legs(&unanswered_legs);
+        }
+        let black_holes = explain_away(suspects, |relayer| self.is_known_dead(relayer));
         self.dead.retain(|relayer| {
             let still = black_holes.contains(relayer);
             if still {
@@ -1267,6 +1634,7 @@ impl RelayerHealth {
                 tracing::info!(%relayer, "dead verdict withdrawn before it was confirmed");
                 self.dead_since.remove(relayer);
                 self.known_dead_since.remove(relayer);
+                self.dead_over.remove(relayer);
             }
             still
         });
@@ -1289,12 +1657,31 @@ impl RelayerHealth {
                     .unwrap_or_else(Instant::now),
             );
         }
-        for relayer in black_holes {
-            if !self.is_known_dead(&relayer) {
-                tracing::info!(%relayer, "relayer judged dead");
-                self.mark_dead(relayer);
+        for relayer in &black_holes {
+            if self.is_known_dead(relayer) {
+                continue;
+            }
+            match hop_at_fault.remove(relayer) {
+                // Nothing home through it at all: judged now, and acted on if the next flush finds the
+                // verdict standing.
+                None => {
+                    tracing::info!(%relayer, "relayer judged dead");
+                    self.mark_dead(*relayer);
+                }
+                // Delivering over its other hop: judged once that has stood for a flush, which is the
+                // second look already, so it is acted on at this one.
+                Some(hop) if self.has_stood(relayer, hop) => {
+                    tracing::info!(%relayer, over = ?hop, "relayer judged dead");
+                    self.mark_dead(*relayer);
+                    self.confirmed.insert(*relayer);
+                    self.dead_over.insert(*relayer, hop);
+                }
+                Some(_) => {}
             }
         }
+        // A suspicion the next flush does not find standing is dropped; nothing was published for it.
+        self.suspected
+            .retain(|relayer, _| black_holes.contains(relayer) && !self.is_known_dead(relayer));
 
         let judged: HashMap<OffchainPublicKey, Judgement> = self
             .relayers
@@ -2018,6 +2405,24 @@ mod tests {
             .collect()
     }
 
+    /// Backdates every suspicion past `VERDICT_CONFIRMATION`, as the flush after it would find it.
+    fn let_suspicions_stand(health: &RelayerHealth) {
+        for mut since in health.suspected.iter_mut() {
+            *since.value_mut() = Instant::now()
+                .checked_sub(VERDICT_CONFIRMATION + Duration::from_millis(1))
+                .expect("monotonic clock too young");
+        }
+    }
+
+    /// The relayers judged dead by two flushes `VERDICT_CONFIRMATION` apart: one that still delivers over
+    /// its other hop is only suspected at the first.
+    fn judged_dead_by_the_second_flush(health: &RelayerHealth) -> Vec<OffchainPublicKey> {
+        let mut judged = judged_dead(&health.refresh(4));
+        let_suspicions_stand(health);
+        judged.extend(judged_dead(&health.refresh(4)));
+        judged
+    }
+
     fn judged_dead(changes: &[(OffchainPublicKey, f64, f64)]) -> Vec<OffchainPublicKey> {
         changes
             .iter()
@@ -2071,9 +2476,11 @@ mod tests {
         }
     }
 
+    /// Opens `count` races on `relayer` at `since`, each on a leg it is the first relayer of.
     fn open_since(health: &RelayerHealth, relayer: OffchainPublicKey, count: u8, since: Instant) {
         for seed in 1..=count {
-            health.relayers.entry(relayer).or_default().open.insert(
+            let mut history = health.relayers.entry(relayer).or_default();
+            history.open.insert(
                 surb_id(seed),
                 Race {
                     at: since,
@@ -2081,6 +2488,7 @@ mod tests {
                     winning_round_trip: ROUND_TRIP.as_secs_f64(),
                 },
             );
+            history.open_legs.insert(surb_id(seed), (leg(&[relayer]), 0));
         }
     }
 
@@ -2325,6 +2733,637 @@ mod tests {
             !health.is_dead(&innocent),
             "three overdue replies, all on legs through the dead one"
         );
+        Ok(())
+    }
+
+    /// A relayer the replier can no longer reach still delivers where it follows another relayer, and
+    /// every reply sent to it directly is lost. Measured on a cluster with that link cut: the relayer was
+    /// never a suspect, and the one behind it on those legs, with nothing else to its name, was judged
+    /// dead in its place and stayed out for 90 s.
+    #[test]
+    fn a_relayer_cut_off_from_the_replier_should_be_judged_not_the_relayer_behind_it() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [cut, behind, ahead, healthy] = [(); 4].map(|_| key());
+        settled_since(&health, cut, ago(Duration::from_secs(10))?, jitter(0));
+        let cut_off: &[OffchainPublicKey] = &[cut, behind];
+        overdue_legs(&health, &[cut_off; MIN_RACES_OVER_ONE_HOP], 1, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+        // It still delivers as a second relayer: a reply over `ahead -> cut` after those fell due.
+        health.note_home(&leg(&[ahead, cut]), Instant::now());
+
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "delivering over its other hop, it is only suspected at the first flush"
+        );
+        assert!(
+            health.published.iter().all(|health| *health > 0.0),
+            "and the planner is not told to steer around it"
+        );
+        let_suspicions_stand(&health);
+        assert_eq!(vec![cut], judged_dead(&health.refresh(4)));
+        assert!(
+            health.is_confirmed_dead(&cut),
+            "the second flush is the second look: its stock is written off now"
+        );
+        assert!(
+            !health.is_dead(&behind),
+            "its overdue replies are all on legs through the one cut off"
+        );
+
+        // The verdict is about the hop from the replier. Another reply behind `ahead` is what the relayer
+        // was doing all along and does not lift it; one that the replier got through to it does.
+        health.revive_by_reply(&leg(&[ahead, cut]), Instant::now());
+        assert!(health.is_dead(&cut), "a reply over a hop that always worked is no news");
+        health.revive_by_reply(&leg(&[cut, behind]), Instant::now());
+        assert!(
+            !health.is_dead(&cut),
+            "a reply over the hop the verdict is about lifts it"
+        );
+        Ok(())
+    }
+
+    /// In a pair, the relayer cut off from the replier is often on both legs: first on the one that is
+    /// out, behind another relayer on the one that is home. It is the same relayer over two hops, and
+    /// the race is about the one the reply is out on.
+    #[test]
+    fn a_relayer_on_both_legs_over_different_hops_should_still_race() {
+        let health = RelayerHealth::default();
+        let [cut, behind, ahead] = [(); 3].map(|_| key());
+
+        health.open_race(&leg(&[cut, behind]), surb_id(1), &leg(&[ahead, cut]), ROUND_TRIP);
+        assert_eq!(
+            1,
+            open_races_of(&health, &cut),
+            "out as the first relayer, home as the second"
+        );
+        assert_eq!(1, open_races_of(&health, &behind));
+
+        health.open_race(&leg(&[cut, behind]), surb_id(2), &leg(&[cut, ahead]), ROUND_TRIP);
+        assert_eq!(
+            1,
+            open_races_of(&health, &cut),
+            "first on both legs: the same hop, it cancels out"
+        );
+        assert_eq!(2, open_races_of(&health, &behind));
+
+        let [relayer, one, another] = [(); 3].map(|_| key());
+        health.open_race(&leg(&[one, relayer]), surb_id(3), &leg(&[another, relayer]), ROUND_TRIP);
+        assert_eq!(
+            0,
+            open_races_of(&health, &relayer),
+            "behind another relayer on both legs: the same hop, whichever relayer that is"
+        );
+        assert_eq!(1, open_races_of(&health, &one));
+    }
+
+    /// A path used for the first time is late, and over one hop only what travels it answers its
+    /// replies. Measured on a cluster: 129 of 136 such verdicts on healthy relayers were gone a flush later.
+    #[test]
+    fn a_relayer_suspected_over_one_hop_should_be_cleared_by_a_reply_over_it_before_the_next_flush()
+    -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, behind, other, healthy] = [(); 4].map(|_| key());
+        settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+        settled_since(&health, behind, ago(Duration::from_secs(10))?, jitter(0));
+        let late: &[OffchainPublicKey] = &[relayer, behind];
+        overdue_legs(&health, &[late; MIN_RACES_OVER_ONE_HOP], 1, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+        // Both deliver behind another relayer: what is late is what the replier hands to the first.
+        health.note_home(&leg(&[other, relayer]), Instant::now());
+        health.note_home(&leg(&[other, behind]), Instant::now());
+
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(
+            health.suspected.contains_key(&relayer),
+            "suspected over the hop from the replier"
+        );
+        assert!(
+            health.published.iter().all(|health| *health > 0.0),
+            "no relayer is published as dead for a suspicion"
+        );
+
+        // The late replies come home, as those of a path used for the first time do.
+        health.note_home(&leg(&[relayer, behind]), Instant::now());
+        let_suspicions_stand(&health);
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert!(!health.is_dead(&relayer));
+        assert!(health.suspected.is_empty(), "a suspicion that did not stand is dropped");
+        Ok(())
+    }
+
+    /// The last reply over a hop is remembered only while a race can still be open that it would answer.
+    #[test]
+    fn a_reply_older_than_any_open_race_should_be_forgotten() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, ahead] = [(); 2].map(|_| key());
+        settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+        health.note_home(&leg(&[ahead, relayer]), Instant::now());
+        health
+            .relayers
+            .get_mut(&relayer)
+            .expect("has races")
+            .last_home
+            .insert(Hop::FromReplier, ago(PENDING_SURB_TTL + Duration::from_secs(1))?);
+
+        health.refresh(4);
+
+        let history = health.relayers.get(&relayer).expect("still racing");
+        assert_eq!(
+            vec![Hop::FromRelayer],
+            history.last_home.keys().copied().collect::<Vec<_>>(),
+            "the hop used a minute ago is forgotten, the one used now is kept"
+        );
+        Ok(())
+    }
+
+    /// The second flush is the second look only if the hop stayed silent in between. A reply over it
+    /// since the relayer was first suspected means that what is overdue now fell due after it: that is
+    /// a new suspicion, with a flush of its own to stand for.
+    #[test]
+    fn a_reply_over_the_suspected_hop_should_start_the_suspicion_over() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, behind, other, healthy] = [(); 4].map(|_| key());
+        settled_since(&health, relayer, ago(Duration::from_secs(20))?, jitter(0));
+        settled_since(&health, behind, ago(Duration::from_secs(20))?, jitter(0));
+        let late: &[OffchainPublicKey] = &[relayer, behind];
+        overdue_legs(&health, &[late; MIN_RACES_OVER_ONE_HOP], 1, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+        health.note_home(&leg(&[other, relayer]), Instant::now());
+        health.note_home(&leg(&[other, behind]), Instant::now());
+        // Suspected ten seconds ago, and a reply came home over the hop two seconds later: before the
+        // replies now overdue fell due, so it answers none of them.
+        health.suspected.insert(relayer, ago(Duration::from_secs(10))?);
+        health
+            .relayers
+            .get_mut(&relayer)
+            .expect("has races")
+            .last_home
+            .insert(Hop::FromReplier, ago(Duration::from_secs(8))?);
+
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "ten seconds, but not ten seconds of silence over the hop"
+        );
+        assert!(health.suspected.contains_key(&relayer), "suspected anew");
+
+        let_suspicions_stand(&health);
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// What answers an overdue reply is a reply over the same hop: handed to the relayer by the replier
+    /// if that one was, by another relayer if it was. A reply that reached it the other way says nothing
+    /// about the hop the overdue one is out on.
+    #[test]
+    fn an_overdue_reply_should_be_answered_only_by_a_reply_over_the_same_hop() -> anyhow::Result<()> {
+        let [first, second, other, healthy] = [(); 4].map(|_| key());
+        let judged_after = |answers: &[&[OffchainPublicKey]]| -> anyhow::Result<Vec<OffchainPublicKey>> {
+            let health = RelayerHealth::default();
+            settled_since(&health, first, ago(Duration::from_secs(10))?, jitter(0));
+            settled_since(&health, second, ago(Duration::from_secs(10))?, jitter(0));
+            let overdue: &[OffchainPublicKey] = &[first, second];
+            overdue_legs(&health, &[overdue; MIN_RACES_OVER_ONE_HOP], 1, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+            for answer in answers {
+                health.note_home(&leg(answer), Instant::now());
+            }
+            Ok(judged_dead_by_the_second_flush(&health))
+        };
+
+        assert!(
+            judged_after(&[&[first, second]])?.is_empty(),
+            "a reply over the same leg answers both relayers"
+        );
+        assert!(
+            judged_after(&[&[first, other], &[other, second]])?.is_empty(),
+            "one from the replier, the other from another relayer, as on the overdue legs: both are answered"
+        );
+        assert_eq!(
+            vec![first],
+            judged_after(&[&[other, first], &[other, second]])?,
+            "the first one delivers behind another relayer only: what the replier hands it is what is lost"
+        );
+        assert_eq!(
+            vec![second],
+            judged_after(&[&[first, other], &[second, other]])?,
+            "the second one delivers as a first relayer only: what a relayer hands it is what is lost"
+        );
+        assert_eq!(
+            vec![first],
+            judged_after(&[&[other, second]])?,
+            "with nothing home through the first one at all, it explains the replies overdue behind it"
+        );
+        Ok(())
+    }
+
+    /// A relayer with replies overdue over both its hops is not delivering over the other one, whatever
+    /// came home over either before they fell due: it is judged as a whole, at the first flush.
+    #[test]
+    fn a_relayer_overdue_over_both_hops_should_be_judged_as_a_whole() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, ahead, behind, healthy] = [(); 4].map(|_| key());
+        settled_since(
+            &health,
+            relayer,
+            ago(Duration::from_secs(60))?,
+            Duration::from_millis(500),
+        );
+        // Replies the replier handed it, out for three seconds, and one a relayer did, out for two: together
+        // as many as would do over one hop.
+        let from_the_replier: &[OffchainPublicKey] = &[relayer, behind];
+        overdue_legs(&health, &[from_the_replier; MIN_RACES_OVER_ONE_HOP - 1], 1, healthy);
+        backdate_all_open(&health, ago(Duration::from_secs(3))?);
+        let from_a_relayer = MIN_RACES_OVER_ONE_HOP as u8;
+        overdue_legs(&health, &[&[ahead, relayer]], from_a_relayer, healthy);
+        for mut history in health.relayers.iter_mut() {
+            if let Some(race) = history.open.get_mut(&surb_id(from_a_relayer)) {
+                race.at = ago(Duration::from_secs(2))?;
+            }
+        }
+        health.record_reply();
+        // It delivered over both hops after the first of them went out, and before any of them fell due.
+        if let Some(mut history) = health.relayers.get_mut(&relayer) {
+            history
+                .last_home
+                .insert(Hop::FromReplier, ago(Duration::from_millis(2800))?);
+            history
+                .last_home
+                .insert(Hop::FromRelayer, ago(Duration::from_millis(2900))?);
+        }
+        // The other two are answered: they deliver over the hops their replies are out on.
+        health.note_home(&leg(&[ahead, healthy]), Instant::now());
+        health.note_home(&leg(&[healthy, behind]), Instant::now());
+
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        assert!(health.suspected.is_empty(), "judged, not suspected over one hop");
+        assert!(
+            !health.dead_over.contains_key(&relayer),
+            "any reply through it lifts the verdict"
+        );
+        Ok(())
+    }
+
+    /// As a whole a relayer is judged on the replies that nothing through it has come home after, over
+    /// either hop. Two lost over one hop and one over the other do not add up to a verdict on a relayer
+    /// that delivered in between.
+    #[test]
+    fn overdue_replies_over_both_hops_should_be_answered_by_a_reply_over_either() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, ahead, behind, healthy] = [(); 4].map(|_| key());
+        settled_since(
+            &health,
+            relayer,
+            ago(Duration::from_secs(60))?,
+            Duration::from_millis(500),
+        );
+        // Two replies the replier handed it, out for ten seconds, and one a relayer did, out for two.
+        overdue_legs(&health, &[&[relayer, behind], &[relayer, behind]], 1, healthy);
+        backdate_all_open(&health, ago(Duration::from_secs(10))?);
+        overdue_legs(&health, &[&[ahead, relayer]], 3, healthy);
+        for mut history in health.relayers.iter_mut() {
+            if let Some(race) = history.open.get_mut(&surb_id(3)) {
+                race.at = ago(Duration::from_secs(2))?;
+            }
+        }
+        health.record_reply();
+        // In between it handed on a reply from a relayer: after the first two fell due, before the third.
+        if let Some(mut history) = health.relayers.get_mut(&relayer) {
+            history.last_home.insert(Hop::FromRelayer, ago(Duration::from_secs(5))?);
+        }
+        // The other two are answered: they deliver over the hops their replies are out on.
+        health.note_home(&leg(&[ahead, healthy]), Instant::now());
+        health.note_home(&leg(&[healthy, behind]), Instant::now());
+
+        assert!(
+            judged_dead_by_the_second_flush(&health).is_empty(),
+            "one reply unanswered, not three"
+        );
+        assert!(health.suspected.is_empty());
+        Ok(())
+    }
+
+    /// A relayer that delivers over its other hop is alive, and a few replies lost over this one may be
+    /// lost at random: it takes [`MIN_RACES_OVER_ONE_HOP`] of them to suspect it, where [`MIN_RACES`] do
+    /// for one that delivers nothing.
+    #[test]
+    fn a_relayer_delivering_over_its_other_hop_should_take_more_overdue_replies_to_be_suspected() -> anyhow::Result<()>
+    {
+        let [relayer, behind, other, healthy] = [(); 4].map(|_| key());
+        let judged_with = |overdue: usize, delivers_behind_another: bool| -> anyhow::Result<Vec<OffchainPublicKey>> {
+            let health = RelayerHealth::default();
+            settled_since(&health, relayer, ago(Duration::from_secs(10))?, jitter(0));
+            settled_since(&health, behind, ago(Duration::from_secs(10))?, jitter(0));
+            let late: &[OffchainPublicKey] = &[relayer, behind];
+            overdue_legs(&health, &vec![late; overdue], 1, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+            health.note_home(&leg(&[other, behind]), Instant::now());
+            if delivers_behind_another {
+                health.note_home(&leg(&[other, relayer]), Instant::now());
+            }
+            let judged = judged_dead(&health.refresh(4));
+            assert_eq!(
+                delivers_behind_another && overdue >= MIN_RACES_OVER_ONE_HOP,
+                health.suspected.contains_key(&relayer),
+                "suspected over one hop only from {MIN_RACES_OVER_ONE_HOP} overdue replies on ({overdue})"
+            );
+            let_suspicions_stand(&health);
+            Ok(judged.into_iter().chain(judged_dead(&health.refresh(4))).collect())
+        };
+
+        assert!(judged_with(MIN_RACES_OVER_ONE_HOP - 1, true)?.is_empty());
+        assert_eq!(vec![relayer], judged_with(MIN_RACES_OVER_ONE_HOP, true)?);
+        assert_eq!(
+            vec![relayer],
+            judged_with(MIN_RACES, false)?,
+            "delivering nothing, it is judged as a whole"
+        );
+        Ok(())
+    }
+
+    /// Replies lost at random behind different relayers are not three replies lost over one hop:
+    /// the next reply a relayer hands on from any relayer answers them. With one hop per relayer
+    /// before it they stayed unanswered until that very relayer came up again, and three of them
+    /// were a verdict: simulated with replies lost at random and every relayer healthy, 124 wipes
+    /// in five hours against 4 (see [`Hop`]).
+    #[test]
+    fn replies_lost_behind_different_relayers_should_be_answered_by_a_reply_behind_any_relayer() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, one, two, three, fourth, healthy] = [(); 6].map(|_| key());
+        for settled in [relayer, one, two, three] {
+            settled_since(&health, settled, ago(Duration::from_secs(10))?, jitter(0));
+        }
+        overdue_legs(
+            &health,
+            &[&[one, relayer], &[two, relayer], &[three, relayer]],
+            1,
+            healthy,
+        );
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+        // Each of the three ahead delivers to another relayer, and the relayer hands on what a fourth gives it.
+        for ahead in [one, two, three] {
+            health.note_home(&leg(&[ahead, healthy]), Instant::now());
+        }
+        health.note_home(&leg(&[fourth, relayer]), Instant::now());
+
+        assert!(judged_dead_by_the_second_flush(&health).is_empty());
+        assert!(health.suspected.is_empty(), "answered, so not even suspected");
+        Ok(())
+    }
+
+    /// A dead relayer and the one that only ever follows it have the same replies overdue, and no reply
+    /// can answer either. The one further up their legs is the one that explains both.
+    #[test]
+    fn of_two_relayers_with_the_same_overdue_replies_the_one_upstream_should_be_judged() -> anyhow::Result<()> {
+        // By key the tie would go either way, so both orders of the two keys are tried.
+        for swap in [false, true] {
+            let health = RelayerHealth::default();
+            let (mut dead, mut behind) = (key(), key());
+            if (dead.to_string() < behind.to_string()) == swap {
+                std::mem::swap(&mut dead, &mut behind);
+            }
+            let healthy = key();
+            settled_since(&health, dead, ago(Duration::from_secs(10))?, jitter(0));
+            overdue_legs(
+                &health,
+                &[&[dead, behind], &[dead, behind], &[dead, behind]],
+                1,
+                healthy,
+            );
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+
+            assert_eq!(vec![dead], judged_dead(&health.refresh(4)), "swap = {swap}");
+            assert!(!health.is_dead(&behind));
+        }
+        Ok(())
+    }
+
+    /// The relayer behind a dead one can have more of the same replies unanswered than the dead one,
+    /// which delivered once more before it died and so has the earlier ones answered. Each of the two
+    /// explains them all, and counting the unanswered ones took the relayer behind.
+    #[test]
+    fn a_relayer_with_fewer_unanswered_replies_should_be_judged_if_it_explains_as_many_from_further_up()
+    -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [dead, behind, healthy] = [(); 3].map(|_| key());
+        settled_since(&health, dead, ago(Duration::from_secs(60))?, jitter(0));
+        settled_since(&health, behind, ago(Duration::from_secs(60))?, jitter(0));
+        let on_both: &[OffchainPublicKey] = &[dead, behind];
+        // Two replies out for twenty seconds, three for ten...
+        overdue_legs(&health, &[on_both; 2], 1, healthy);
+        backdate_all_open(&health, ago(Duration::from_secs(20))?);
+        overdue_legs(&health, &[on_both; 3], 3, healthy);
+        for mut history in health.relayers.iter_mut() {
+            for seed in 3..6 {
+                if let Some(race) = history.open.get_mut(&surb_id(seed)) {
+                    race.at = ago(Duration::from_secs(10))?;
+                }
+            }
+        }
+        health.record_reply();
+        // ...and in between the dead one handed on a reply from the replier, which answers its first two.
+        health
+            .relayers
+            .get_mut(&dead)
+            .expect("has races")
+            .last_home
+            .insert(Hop::FromReplier, ago(Duration::from_secs(15))?);
+
+        assert_eq!(vec![dead], judged_dead_by_the_second_flush(&health));
+        assert!(
+            !health.is_dead(&behind),
+            "five unanswered replies to three, all of them on legs through the dead one"
+        );
+        Ok(())
+    }
+
+    /// A reply can be no earlier than the slowest relayer on its leg lets it be. Measured on a cluster
+    /// behind a relayer stalling for seconds: held to its own bar, the relayer behind it had three
+    /// replies overdue that the stalling one did not, and was judged in its place.
+    #[test]
+    fn a_relayer_behind_a_slower_one_should_be_held_to_the_slower_ones_bar() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [slow, behind, healthy] = [(); 3].map(|_| key());
+        settled_since(&health, slow, ago(Duration::from_secs(60))?, Duration::from_secs(5));
+        settled_since(
+            &health,
+            behind,
+            ago(Duration::from_secs(60))?,
+            Duration::from_millis(100),
+        );
+        let on_both: &[OffchainPublicKey] = &[slow, behind];
+        overdue_legs(&health, &[on_both; 3], 1, healthy);
+        backdate_all_open(&health, ago(Duration::from_secs(2))?);
+        health.record_reply();
+
+        assert!(
+            judged_dead_by_the_second_flush(&health).is_empty(),
+            "two seconds is late for the relayer behind, not for a leg through one that takes five"
+        );
+
+        // Out for longer than the slow one takes, they are overdue for both, and it is the one further up.
+        backdate_all_open(&health, ago(Duration::from_secs(20))?);
+        health.record_reply();
+        assert_eq!(vec![slow], judged_dead_by_the_second_flush(&health));
+        assert!(!health.is_dead(&behind));
+        Ok(())
+    }
+
+    /// A relayer that stalls passes one reply of a pair and holds the other, towards the relayer behind
+    /// it. On both legs over the same hop, it holds no race on the held reply, and the relayer behind it
+    /// is the only one with that reply unanswered. Measured on a cluster: 20 such replies, the healthy
+    /// relayer judged and out for 80 s, the stalling one on every one of their legs.
+    #[test]
+    fn a_relayer_behind_a_stalling_one_should_not_be_judged_for_replies_the_stalling_one_held() -> anyhow::Result<()> {
+        // By key the two would be ranked either way, so both orders of their keys are tried.
+        for swap in [false, true] {
+            let health = RelayerHealth::default();
+            let (mut stalling, mut behind) = (key(), key());
+            if (stalling.to_string() < behind.to_string()) == swap {
+                std::mem::swap(&mut stalling, &mut behind);
+            }
+            let [ahead, elsewhere, healthy] = [(); 3].map(|_| key());
+            for relayer in [stalling, behind, ahead] {
+                settled_since(&health, relayer, ago(Duration::from_secs(60))?, jitter(0));
+            }
+            // Three replies held on their way to the relayer behind, their partners passed on elsewhere:
+            // the stalling one is first on both legs, and holds no race on them.
+            for seed in 1..4 {
+                health.open_race(
+                    &leg(&[stalling, behind]),
+                    surb_id(seed),
+                    &leg(&[stalling, elsewhere]),
+                    ROUND_TRIP,
+                );
+            }
+            assert!(
+                !health
+                    .relayers
+                    .get(&stalling)
+                    .is_some_and(|history| !history.open.is_empty()),
+                "on both legs over the same hop: no race (swap = {swap})"
+            );
+            // Three more it held itself, reached over another relayer, which delivers otherwise.
+            let reached_over_another: &[OffchainPublicKey] = &[ahead, stalling];
+            overdue_legs(&health, &[reached_over_another; 3], 4, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+            health
+                .relayers
+                .get_mut(&ahead)
+                .expect("has races")
+                .last_home
+                .insert(Hop::FromReplier, Instant::now());
+
+            assert_eq!(
+                vec![stalling],
+                judged_dead_by_the_second_flush(&health),
+                "swap = {swap}"
+            );
+            assert!(
+                !health.is_dead(&behind),
+                "its three replies are on legs through the stalling one (swap = {swap})"
+            );
+        }
+        Ok(())
+    }
+
+    /// Being on the leg of another's unanswered reply makes nobody a suspect: with nothing unanswered of
+    /// its own, the relayer ahead explains nothing, and the one cut off from it is judged.
+    #[test]
+    fn a_relayer_with_nothing_unanswered_of_its_own_should_not_explain_the_one_behind_it() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [ahead, cut_off, elsewhere] = [(); 3].map(|_| key());
+        for relayer in [ahead, cut_off] {
+            settled_since(&health, relayer, ago(Duration::from_secs(60))?, jitter(0));
+        }
+        for seed in 1..4 {
+            health.open_race(
+                &leg(&[ahead, cut_off]),
+                surb_id(seed),
+                &leg(&[ahead, elsewhere]),
+                ROUND_TRIP,
+            );
+        }
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+
+        assert_eq!(vec![cut_off], judged_dead_by_the_second_flush(&health));
+        assert!(!health.is_dead(&ahead));
+        Ok(())
+    }
+
+    /// Two relayers on all of each other's overdue legs, each ahead of the other on some: the dead one
+    /// and a healthy one cannot be told apart, and taking either is a guess. Measured on a cluster: the
+    /// healthy one in 3 of 5 such ties, each time at the price of a wipe for nothing and a second one.
+    #[test]
+    fn two_relayers_the_overdue_replies_do_not_tell_apart_should_wait_for_a_reply_that_does() -> anyhow::Result<()> {
+        // By key the two would be ranked either way, so both orders of their keys are tried.
+        for swap in [false, true] {
+            let health = RelayerHealth::default();
+            let (mut dead, mut other) = (key(), key());
+            if (dead.to_string() < other.to_string()) == swap {
+                std::mem::swap(&mut dead, &mut other);
+            }
+            let [third, healthy] = [(); 2].map(|_| key());
+            for relayer in [dead, other, third] {
+                settled_since(&health, relayer, ago(Duration::from_secs(60))?, jitter(0));
+            }
+            let (ahead, behind): (&[OffchainPublicKey], &[OffchainPublicKey]) = (&[dead, other], &[other, dead]);
+            overdue_legs(&health, &[ahead, ahead, behind, behind], 1, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+
+            assert!(
+                judged_dead_by_the_second_flush(&health).is_empty(),
+                "four replies each, on the same legs, each ahead on two (swap = {swap})"
+            );
+
+            // One more reply goes missing, on a leg through the dead one alone.
+            overdue_legs(&health, &[&[dead, third]], 5, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+            assert_eq!(vec![dead], judged_dead_by_the_second_flush(&health), "swap = {swap}");
+            assert!(!health.is_dead(&other));
+            assert!(!health.is_dead(&third));
+        }
+        Ok(())
+    }
+
+    /// A tie sets nobody aside whose verdict already stands: it explains the other's replies as before.
+    #[test]
+    fn a_relayer_already_judged_should_keep_its_verdict_in_a_tie() -> anyhow::Result<()> {
+        for swap in [false, true] {
+            let health = RelayerHealth::default();
+            let (mut dead, mut other) = (key(), key());
+            if (dead.to_string() < other.to_string()) == swap {
+                std::mem::swap(&mut dead, &mut other);
+            }
+            let healthy = key();
+            for relayer in [dead, other] {
+                settled_since(&health, relayer, ago(Duration::from_secs(60))?, jitter(0));
+            }
+            let (ahead, behind): (&[OffchainPublicKey], &[OffchainPublicKey]) = (&[dead, other], &[other, dead]);
+            overdue_legs(&health, &[ahead, ahead, behind, behind], 1, healthy);
+            backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+            health.record_reply();
+            judge_dead(&health, dead);
+
+            health.refresh(4);
+
+            assert!(health.is_dead(&dead), "swap = {swap}");
+            assert!(
+                !health.is_on_probation(&dead),
+                "its verdict did not lapse (swap = {swap})"
+            );
+            assert!(!health.is_dead(&other), "swap = {swap}");
+        }
         Ok(())
     }
 
@@ -4219,17 +5258,20 @@ mod tests {
         settled_since(&health, silent, ago(Duration::from_secs(40))?, jitter(0));
         // A reply lost at random long ago; its race stays open until a SURB is forgotten.
         let stale = ago(Duration::from_secs(50))?;
-        health.relayers.entry(silent).or_default().open.insert(
-            surb_id(100),
-            Race {
-                at: stale,
-                margin: 0.0,
-                winning_round_trip: ROUND_TRIP.as_secs_f64(),
-            },
-        );
-        // The relayer delivered after that, then went silent.
         if let Some(mut history) = health.relayers.get_mut(&silent) {
-            history.last_home = Some(ago(Duration::from_secs(20))?);
+            history.open.insert(
+                surb_id(100),
+                Race {
+                    at: stale,
+                    margin: 0.0,
+                    winning_round_trip: ROUND_TRIP.as_secs_f64(),
+                },
+            );
+            history.open_legs.insert(surb_id(100), (leg(&[silent]), 0));
+            // The relayer delivered after that, over the same hop, then went silent.
+            history
+                .last_home
+                .insert(Hop::FromReplier, ago(Duration::from_secs(20))?);
         }
         open_since(&health, silent, MIN_RACES as u8, ago(Duration::from_secs(5))?);
         // Others are delivering meanwhile.
@@ -4371,9 +5413,11 @@ mod tests {
             health.is_dead(&stalled),
             "a reply on a SURB minted before the confirmed verdict does not revive it"
         );
-        assert_eq!(
-            None,
-            health.relayers.get(&stalled).and_then(|history| history.last_home),
+        assert!(
+            health
+                .relayers
+                .get(&stalled)
+                .is_none_or(|history| history.last_home.is_empty()),
             "nor does it answer the races the verdict was about"
         );
         health.record_reply();
