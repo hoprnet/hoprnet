@@ -257,6 +257,7 @@ impl DiversityTracker {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context as _;
     use hopr_api::types::crypto::prelude::{Keypair, OffchainKeypair};
 
     use super::*;
@@ -395,9 +396,9 @@ mod tests {
 
     /// One WARN on the transition into the concentrated state, one INFO on leaving it, and nothing
     /// in between: a per-draw log would drown the node in warnings.
-    #[test]
+    #[tokio::test]
     #[serial_test::serial(routing_logs)]
-    fn the_threshold_logs_only_on_the_transitions() {
+    async fn the_threshold_logs_only_on_the_transitions() -> anyhow::Result<()> {
         let logs = crate::tests::support::Logs::default();
         let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
         // Keeps callsite interest out of the cached-`never` state that a lone scoped dispatcher
@@ -431,18 +432,22 @@ mod tests {
         for _ in 0..40 {
             tracker.record(key(), &[relayer(2)]);
         }
-        assert!(tracker.session_score(&key()).expect("drawn") > 1.5);
+        assert!(
+            tracker.session_score(&key()).context("drawn")? > 1.5,
+            "the spread draws must lift the score above the threshold"
+        );
         assert_eq!(
             1,
             logs.records("return-path relayer diversity recovered").len(),
             "the recovery must be logged once"
         );
+        anyhow::Ok(())
     }
 
     /// A zero threshold is the documented switch for the check, not a threshold nothing can miss.
-    #[test]
+    #[tokio::test]
     #[serial_test::serial(routing_logs)]
-    fn a_zero_threshold_logs_nothing() {
+    async fn a_zero_threshold_logs_nothing() {
         let logs = crate::tests::support::Logs::default();
         let _subscriber = tracing::subscriber::set_default(logs.subscriber(tracing::Level::TRACE));
         let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
