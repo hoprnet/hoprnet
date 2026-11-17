@@ -15,6 +15,7 @@
 | `hopr_packet_ticket_validation_errors`                    | MultiCounter    | Number of different ticket validation errors encountered during packet processing                                                                                                                                                                                                                                                                                                                    | keys: type                                                                         |
 | `hopr_packets_count`                                      | MultiCounter    | Number of processed packets of different types (sent, received, forwarded)                                                                                                                                                                                                                                                                                                                           | keys: type                                                                         |
 | `hopr_path_length`                                        | SimpleHistogram | Distribution of number of hops of sent messages                                                                                                                                                                                                                                                                                                                                                      | buckets: 0.0,1.0,2.0,3.0,4.0                                                       |
+| `hopr_path_relayer_diversity`                             | SimpleGauge     | Effective number of distinct first relayers (exp of the Shannon entropy) over the recent return-path draws, pooled over the sessions the path planner tracks                                                                                                                                                                                                                                         |                                                                                    |
 | `hopr_pix_admission_rejections_total`                     | MultiCounter    | Incoming PIX sessions refused before establishment, by reason                                                                                                                                                                                                                                                                                                                                        | keys: reason                                                                       |
 | `hopr_pix_closures_total`                                 | MultiCounter    | Sessions closed by the PIX supervisor, by reason                                                                                                                                                                                                                                                                                                                                                     | keys: reason                                                                       |
 | `hopr_pix_cycle_accepted_share_fraction`                  | MultiHistogram  | Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus                                                                                                                                                                                                                                                           | keys: outcome; buckets: 0.05,0.25,0.5,0.75,0.9,1.0,1.25,1.5,2.0,2.5,3.0,3.5,4.0    |
@@ -108,3 +109,26 @@
 | `hopr_tickets_unack_peers_total`                          | SimpleGauge     | Number of peers with unacknowledged tickets in cache                                                                                                                                                                                                                                                                                                                                                 |                                                                                    |
 | `hopr_tickets_unack_tickets_per_peer`                     | MultiGauge      | Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)                                                                                                                                                                                                                                                                                                       | keys: peer                                                                         |
 | `hopr_tickets_unack_tickets_total`                        | SimpleGauge     | Total number of unacknowledged tickets across all peer caches                                                                                                                                                                                                                                                                                                                                        |                                                                                    |
+
+## Return-path relayer diversity
+
+`hopr_path_relayer_diversity` is the effective number of distinct first relayers of the recent
+return-path draws, `exp(H)` for the Shannon entropy `H` of the draw distribution, pooled over the
+sessions the path planner tracks.
+
+- `1.0` means every recent draw went through one relayer: those sessions have no relay diversity,
+  whatever the candidate pool offers. The default threshold of `1.0` logs a WARN for that case.
+- The value rises towards the number of distinct relayers actually used as the draws even out, so
+  compare it against the size of the candidate pool, not against a fixed target.
+- It covers return-path draws only. `hopr_mixer_effective_anonymity_set` measures a different
+  thing: the mixer's occupancy, not the spread of relays a session's traffic passes through.
+
+Alert on a score that stays at the bottom of its range:
+
+```promql
+avg_over_time(hopr_path_relayer_diversity[15m]) <= 1.0
+```
+
+`path_planner.diversity_metric_window` sets how many recent draws the score covers (default
+`200`). `path_planner.min_return_path_diversity` sets the score at which a session logs one WARN,
+with one INFO when it recovers (default `1.0`; `0.0` disables the log).

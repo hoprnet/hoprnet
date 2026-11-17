@@ -19,6 +19,7 @@ use tracing::Instrument;
 use validator::{Validate, ValidationError};
 
 use super::{
+    diversity::DiversityTracker,
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
@@ -30,6 +31,14 @@ lazy_static::lazy_static! {
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
+    ).unwrap();
+    /// Effective number of distinct first relayers of the recent return-path draws, pooled over
+    /// every session the planner tracks: 1.0 means they all went through one relayer, and the
+    /// value approaches the number of distinct relayers as the draws even out. See
+    /// [`super::diversity`].
+    static ref METRIC_PATH_RELAYER_DIVERSITY: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
+        "hopr_path_relayer_diversity",
+        "Effective number of distinct first relayers (exp of the Shannon entropy) over recent return-path draws"
     ).unwrap();
 }
 
@@ -163,6 +172,21 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_unit_interval"))]
     #[default = 0.1]
     pub return_path_exploration: f64,
+    /// Number of recent return-path draws a session's relayer diversity score is computed over.
+    ///
+    /// Shorter windows follow a shift in the draw distribution quickly, longer ones keep the score
+    /// steady against the jitter of weighted draws. Must be at least 1.
+    #[default = 200]
+    #[validate(range(min = 1))]
+    pub diversity_metric_window: usize,
+    /// Diversity score at or below which a session's return-path draws count as concentrated.
+    ///
+    /// The score is the effective number of distinct first relayers, so 1.0 is every draw through
+    /// one relayer. A session that reaches this value logs one WARN on the transition and one INFO
+    /// when it recovers. `0.0` disables the check. Must be finite and non-negative.
+    #[default = 1.0]
+    #[validate(custom(function = "validate_diversity_threshold"))]
+    pub min_return_path_diversity: f64,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -229,6 +253,16 @@ fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError
         Ok(())
     } else {
         Err(ValidationError::new("value must be finite and in 0.0..=1.0"))
+    }
+}
+
+/// A diversity threshold below zero can never be reached, so it would silently switch off the log
+/// it exists to produce. Zero is the documented way to switch the check off, so it is accepted.
+fn validate_diversity_threshold(value: f64) -> std::result::Result<(), ValidationError> {
+    if value.is_finite() && value >= 0.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new("value must be finite and non-negative"))
     }
 }
 
@@ -494,6 +528,8 @@ struct PathBuilder<R, S> {
     /// Keys currently in the collapsed return-path diversity state, so the WARN fires once on the
     /// transition into it (and an INFO once on recovery) rather than on every rebuild (#8502).
     collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>>,
+    /// Recently drawn first relayers per session, the source of `hopr_path_relayer_diversity`.
+    return_path_diversity: Arc<Mutex<DiversityTracker>>,
 }
 
 impl<R, S> PathBuilder<R, S>
@@ -831,6 +867,10 @@ where
         // its record must stay. Cleanup is silent -- it is not a diversity recovery, so no INFO.
         let collapsed_diversity: Arc<Mutex<HashSet<PlannerCacheKey>>> = Arc::new(Mutex::new(HashSet::new()));
         let tracker_for_eviction = collapsed_diversity.clone();
+        let return_path_diversity = Arc::new(Mutex::new(DiversityTracker::new(
+            config.diversity_metric_window,
+            config.min_return_path_diversity,
+        )));
         let cache = moka::future::Cache::builder()
             .max_capacity(config.max_cache_capacity)
             .time_to_live(config.cache_ttl)
@@ -855,6 +895,7 @@ where
                 },
                 me,
                 collapsed_diversity,
+                return_path_diversity,
             }),
             cache,
             refresh_period: config.refresh_period,
@@ -910,6 +951,12 @@ where
     #[cfg(test)]
     fn collapsed_diversity_len(&self) -> usize {
         self.paths.collapsed_diversity.lock().len()
+    }
+
+    /// Test-only view of the score `hopr_path_relayer_diversity` would publish.
+    #[cfg(test)]
+    fn pooled_return_path_diversity(&self) -> Option<f64> {
+        self.paths.return_path_diversity.lock().pooled_score()
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -1281,7 +1328,35 @@ where
             "drew return paths"
         );
 
+        self.record_return_path_diversity(destination, u32::from(hops), &drawn)
+            .await;
+
         Ok(drawn)
+    }
+
+    /// Records the first relayer of every drawn return path and publishes the pooled diversity.
+    ///
+    /// A draw is where a session's relayer choice becomes real, so this is where the diversity
+    /// window is fed; the candidate pool would only say what was on offer. A destination this node
+    /// cannot resolve skips the observation instead of failing a draw that already succeeded.
+    async fn record_return_path_diversity(&self, destination: NodeId, hops: u32, drawn: &[ValidatedPath]) {
+        let relayers = drawn
+            .iter()
+            .filter_map(|path| path.first().copied())
+            .collect::<Vec<_>>();
+        if relayers.is_empty() {
+            return;
+        }
+        let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
+            return;
+        };
+
+        let mut tracker = self.paths.return_path_diversity.lock();
+        tracker.record((destination, hops), &relayers);
+        #[cfg(all(feature = "telemetry", not(test)))]
+        if let Some(score) = tracker.pooled_score() {
+            METRIC_PATH_RELAYER_DIVERSITY.set(score);
+        }
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -2410,6 +2485,15 @@ mod tests {
     /// A `me <- {a,b} <- dest` return topology with the given anonymity floor, so a test can watch
     /// the cap collapse the two relayers to one (or, at floor 0, keep both).
     fn two_relayer_return_planner_with_floor(floor: usize) -> (TestPlanner, ChannelGraph) {
+        two_relayer_return_planner_with_diversity_threshold(floor, small_config().min_return_path_diversity)
+    }
+
+    /// The same fixture with the return-path diversity threshold set, so a test can watch the
+    /// transition log of a session whose draws stay on one relayer.
+    fn two_relayer_return_planner_with_diversity_threshold(
+        floor: usize,
+        threshold: f64,
+    ) -> (TestPlanner, ChannelGraph) {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let b = pubkey(&SECRET_B);
@@ -2438,6 +2522,7 @@ mod tests {
 
         let cfg = PathPlannerConfig {
             min_paths_anonymity_floor: floor,
+            min_return_path_diversity: threshold,
             ..small_config()
         };
         let selector = HoprGraphPathSelector::new(
@@ -2622,6 +2707,101 @@ mod tests {
             0,
             "a diverse return path must not record a collapse"
         );
+    }
+
+    /// Draws are what the diversity window has to follow: the candidate pool describes what was on
+    /// offer, and a pool of two can still serve one relayer for every draw. The fixture's draws are
+    /// weighted over two interchangeable relayers, so the pooled score must settle between the two
+    /// ends of its range rather than at either of them.
+    #[tokio::test]
+    async fn drawn_return_paths_feed_the_relayer_diversity_tracker() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_return_planner_with_floor(0);
+        for _ in 0..20 {
+            planner
+                .resolve_diverse_return_paths(
+                    NodeId::Offchain(pubkey(&SECRET_DEST)),
+                    RoutingOptions::Hops(1.try_into()?),
+                    2,
+                )
+                .await?;
+        }
+
+        let score = planner
+            .pooled_return_path_diversity()
+            .context("a draw must have populated the window")?;
+        assert!(
+            score > 1.0 && score <= 2.0,
+            "a valuation spread over two relayers must score strictly between 1 and 2, got {score}"
+        );
+        anyhow::Ok(())
+    }
+
+    /// The threshold check runs on what a session actually drew, and like the collapse WARN it fires
+    /// on the transition only: a fixture whose pool holds one first relayer scores 1.0, so a
+    /// threshold above that warns once and stays quiet while the condition holds.
+    #[tokio::test]
+    #[serial_test::serial(routing_logs)]
+    async fn diversity_threshold_logs_fire_on_the_transition_only() -> anyhow::Result<()> {
+        use tracing::instrument::WithSubscriber;
+
+        // Floor 1 caps the two relayers onto one, so every draw goes through the same relayer.
+        let (planner, _graph) = two_relayer_return_planner_with_diversity_threshold(1, 2.0);
+        // Keep callsite interest responsive to the scoped subscriber below: a lone registered
+        // dispatch leaves callsites first reached on a worker thread cached as `never`.
+        let _other_dispatch = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let logs = crate::tests::support::Logs::default();
+        async {
+            for _ in 0..4 {
+                planner
+                    .resolve_diverse_return_paths(
+                        NodeId::Offchain(pubkey(&SECRET_DEST)),
+                        RoutingOptions::Hops(1.try_into()?),
+                        2,
+                    )
+                    .await?;
+            }
+            assert_eq!(
+                1,
+                logs.records("return-path relayer diversity at or below the configured minimum")
+                    .len(),
+                "a session held on one relayer must warn once, not once per draw"
+            );
+            anyhow::Ok(())
+        }
+        .with_subscriber(logs.subscriber(tracing::Level::DEBUG))
+        .await
+    }
+
+    /// The window sizes a score, so a zero one would leave every session unscoreable; the threshold
+    /// is compared against a score of at least 1.0, so a negative one would silently switch off the
+    /// log. Zero is the documented way to switch the check off, so only the negative side is refused.
+    #[test]
+    fn diversity_config_should_reject_a_zero_window_and_a_negative_threshold() {
+        let defaults = PathPlannerConfig::default();
+        assert_eq!(200, defaults.diversity_metric_window);
+        assert_eq!(1.0, defaults.min_return_path_diversity);
+        assert!(defaults.validate().is_ok());
+
+        let zero_window = PathPlannerConfig {
+            diversity_metric_window: 0,
+            ..PathPlannerConfig::default()
+        };
+        assert!(zero_window.validate().is_err(), "a zero window must be rejected");
+        for threshold in [-0.1, f64::NAN, f64::INFINITY] {
+            let cfg = PathPlannerConfig {
+                min_return_path_diversity: threshold,
+                ..PathPlannerConfig::default()
+            };
+            assert!(cfg.validate().is_err(), "a threshold of {threshold} must be rejected");
+        }
+
+        for threshold in [0.0, 1.5, 4.0] {
+            let cfg = PathPlannerConfig {
+                min_return_path_diversity: threshold,
+                ..PathPlannerConfig::default()
+            };
+            assert!(cfg.validate().is_ok(), "a threshold of {threshold} must be accepted");
+        }
     }
 
     /// The collapsed-key tracker is bounded by the cache: when a key's cache entry leaves, its

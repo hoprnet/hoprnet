@@ -9,6 +9,7 @@
 //! - [`PathPlannerConfig`][crate::path::PathPlannerConfig]: Configuration for the planner's cache and background
 //!   refresh.
 
+pub(crate) mod diversity;
 pub mod errors;
 pub mod planner;
 pub(crate) mod resolve;

@@ -1714,7 +1714,9 @@ mod tests {
                 "latency_halflife": "250ms",
                 "capacity_reference": 5000,
                 "edge_penalty": 0.8,
-                "return_path_weight_temper": 0.25
+                "return_path_weight_temper": 0.25,
+                "diversity_metric_window": 50,
+                "min_return_path_diversity": 1.5
             }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("path planner weights must deserialize");
@@ -1725,11 +1727,25 @@ mod tests {
         assert_eq!(5000, planner.capacity_reference);
         assert_eq!(0.8, planner.edge_penalty);
         assert_eq!(0.25, planner.return_path_weight_temper);
+        assert_eq!(50, planner.diversity_metric_window);
+        assert_eq!(1.5, planner.min_return_path_diversity);
         assert_eq!(
             defaults.min_ack_rate, planner.min_ack_rate,
             "unspecified planner fields must keep their defaults"
         );
         assert_eq!(defaults.cache_ttl, planner.cache_ttl);
+
+        // A config written before the diversity metric existed must still load, with the metric on.
+        let older: HoprProtocolConfig = serde_json::from_str(r#"{ "path_planner": { "edge_penalty": 0.8 } }"#)
+            .expect("an older config must deserialize");
+        assert_eq!(
+            defaults.diversity_metric_window,
+            older.path_planner.diversity_metric_window
+        );
+        assert_eq!(
+            defaults.min_return_path_diversity,
+            older.path_planner.min_return_path_diversity
+        );
         assert!(cfg.validate().is_ok());
 
         let bad_temper = r#"{ "path_planner": { "return_path_weight_temper": 1.5 } }"#;
