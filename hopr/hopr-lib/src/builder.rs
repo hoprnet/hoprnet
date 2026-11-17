@@ -824,12 +824,14 @@ where
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
         let health = transport_api.relayer_health();
+        let path_planner = transport_api.path_planner_handle();
         let net = network.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
                     let health = health.clone();
+                    let path_planner = path_planner.clone();
                     let net = net.clone();
                     async move {
                         let (peer_id, connected) = match event {
@@ -849,6 +851,13 @@ where
                             // telemetry flush re-plans around it.
                             if connected || !net.is_connected(&peer_id) {
                                 health.set_neighbour_connected(opk, connected);
+                            }
+
+                            // The connect has just put this peer's edge in the graph, so its paths
+                            // can be built now. Detached: the edge recording above must not wait
+                            // for a selector search.
+                            if connected {
+                                spawn(async move { path_planner.prewarm_forward_paths(&opk).await });
                             }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");

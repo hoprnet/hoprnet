@@ -1535,6 +1535,14 @@ where
         &self.path_planner.surb_store
     }
 
+    /// Returns a handle on the path planner, sharing the cache this transport resolves through.
+    ///
+    /// Exposed so that a connectivity event can pre-warm the paths to a peer that just connected,
+    /// without the caller owning the transport.
+    pub fn path_planner_handle(&self) -> PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>> {
+        self.path_planner.clone()
+    }
+
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network

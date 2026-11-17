@@ -9,7 +9,7 @@ use hopr_api::{
     types::{
         crypto::crypto_traits::Randomizable,
         internal::{errors::PathError, prelude::*},
-        primitive::traits::ToHex,
+        primitive::{bounded::BoundedSize, traits::ToHex},
     },
 };
 use hopr_crypto_packet::prelude::*;
@@ -1066,6 +1066,36 @@ where
             })
             .await
             .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Fills the forward cache for `peer` at every hop count the planner serves.
+    ///
+    /// Called when a peer connects. Without it the first packet to that peer pays the full selector
+    /// and chain-validation cost, because the background sweep only re-warms keys that are already
+    /// cached. A hop count with no route logs at debug and leaves its key empty, so the next resolve
+    /// recomputes it as usual.
+    ///
+    /// Hop 0 is skipped: a direct route is built as a short path and never reads the cache.
+    #[tracing::instrument(name = "planner.prewarm_forward_paths", level = "debug", skip_all, fields(peer = %peer))]
+    pub async fn prewarm_forward_paths(&self, peer: &OffchainPublicKey) {
+        for hops in 1..=RoutingOptions::MAX_INTERMEDIATE_HOPS {
+            let hops: BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }> = match hops.try_into() {
+                Ok(hops) => hops,
+                Err(error) => {
+                    tracing::debug!(%error, hops, "hop count the cache cannot key");
+                    continue;
+                }
+            };
+            let hops_usize: usize = hops.into();
+
+            match self
+                .cached_paths(NodeId::Offchain(self.me), NodeId::Offchain(*peer), hops)
+                .await
+            {
+                Ok(_) => tracing::trace!(hops = hops_usize, "pre-warmed forward path"),
+                Err(error) => tracing::debug!(%error, hops = hops_usize, "cannot pre-warm forward path"),
+            }
+        }
     }
 
     /// Runs one background sweep now: called when relayer health in the graph changes, so cached
@@ -3688,6 +3718,170 @@ mod tests {
             direction: PathDirection::Forward, destination, succeeded: false,
         } if *destination == unknown));
         Ok(())
+    }
+
+    // ── forward pre-warm on connect ───────────────────────────────────────────
+
+    /// A fourth node, so a full mesh of five leaves three relays for a three-hop route.
+    const SECRET_C: [u8; 32] = hex!("9b1d47c0f5a83e26d70b9412ac58f3176e0d8924bf7c15a306d8e2407c9f1b5a");
+
+    fn c_addr() -> Address {
+        Address::from_str("0x5000c8e31f7a98d246b0e5c19d3f7b8a21c6d4e0").expect("valid addr")
+    }
+
+    /// Full mesh over this node, three relayers and a destination.
+    ///
+    /// Every peer is reachable through one, two or three intermediate hops, so one topology covers
+    /// every hop count the pre-warm serves and also supplies several peers to fill the cache with.
+    fn full_mesh_forward_planner(max_cache_capacity: u64) -> TestPlanner {
+        let me = pubkey(&SECRET_ME);
+        let peers = [
+            (pubkey(&SECRET_A), a_addr()),
+            (pubkey(&SECRET_B), b_addr()),
+            (pubkey(&SECRET_C), c_addr()),
+            (pubkey(&SECRET_DEST), dest_addr()),
+        ];
+
+        let graph = ChannelGraph::new(me);
+        let nodes = std::iter::once(me)
+            .chain(peers.iter().map(|(key, _)| *key))
+            .collect::<Vec<_>>();
+        for node in &nodes[1..] {
+            graph.add_node(*node);
+        }
+        for src in &nodes {
+            for dst in &nodes {
+                if src == dst {
+                    continue;
+                }
+                graph.add_edge(src, dst).expect("edge should be addable");
+                mark_edge_full(&graph, src, dst);
+            }
+        }
+
+        let cfg = PathPlannerConfig {
+            max_cache_capacity,
+            ..small_config()
+        };
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+
+        let addresses = std::iter::once(me_addr())
+            .chain(peers.iter().map(|(_, addr)| *addr))
+            .collect::<Vec<_>>();
+        let mut chain_api = TestChainApi::new(me, me_addr(), peers.to_vec());
+        for src in &addresses {
+            for dst in &addresses {
+                if src != dst {
+                    chain_api = chain_api.with_open_channel(*src, *dst);
+                }
+            }
+        }
+
+        PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        )
+    }
+
+    /// AC 1: a connect fills the cache for the new peer at every hop count the planner serves.
+    #[tokio::test]
+    async fn prewarm_should_fill_the_cache_at_every_hop_count() {
+        let planner = full_mesh_forward_planner(small_config().max_cache_capacity);
+        let me = pubkey(&SECRET_ME);
+        let peer = pubkey(&SECRET_DEST);
+
+        planner.prewarm_forward_paths(&peer).await;
+
+        for hops in 1..=RoutingOptions::MAX_INTERMEDIATE_HOPS {
+            assert!(
+                planner.cache.get(&(me, peer, hops as u32)).await.is_some(),
+                "a route of {hops} intermediate hops should be cached"
+            );
+        }
+    }
+
+    /// AC 2: the first forward resolve after a connect is served from the pre-warmed entry.
+    #[tokio::test]
+    async fn first_resolve_after_prewarm_should_be_a_cache_hit() -> anyhow::Result<()> {
+        let planner = full_mesh_forward_planner(small_config().max_cache_capacity);
+        let me = pubkey(&SECRET_ME);
+        let peer = pubkey(&SECRET_DEST);
+
+        planner.prewarm_forward_paths(&peer).await;
+        let warmed = planner
+            .cache
+            .get(&(me, peer, 1))
+            .await
+            .context("the pre-warm should have cached one hop")?;
+
+        planner
+            .resolve_routing(
+                100,
+                0,
+                DestinationRouting::Forward {
+                    destination: Box::new(NodeId::Offchain(peer)),
+                    pseudonym: None,
+                    forward_options: RoutingOptions::Hops(1.try_into()?),
+                    return_options: None,
+                },
+            )
+            .await?;
+
+        let served = planner
+            .cache
+            .get(&(me, peer, 1))
+            .await
+            .context("the entry should still be cached after the resolve")?;
+        assert!(
+            Arc::ptr_eq(&warmed, &served),
+            "the first resolve must draw on the pre-warmed entry, not rebuild it"
+        );
+        Ok(())
+    }
+
+    /// AC 3: pre-warming more peers than the cache admits stays within its capacity.
+    #[tokio::test]
+    async fn prewarm_should_not_exceed_max_cache_capacity() {
+        let capacity = 4;
+        let planner = full_mesh_forward_planner(capacity);
+
+        for peer in [pubkey(&SECRET_A), pubkey(&SECRET_B), pubkey(&SECRET_C)] {
+            planner.prewarm_forward_paths(&peer).await;
+        }
+        planner.cache.run_pending_tasks().await;
+
+        assert!(
+            planner.cache.entry_count() <= capacity,
+            "the cache holds {} entries, above its capacity of {capacity}",
+            planner.cache.entry_count()
+        );
+    }
+
+    /// A connect of a peer with no route caches nothing and reports no error.
+    #[tokio::test]
+    async fn prewarm_of_an_unreachable_peer_should_cache_nothing() {
+        let planner = full_mesh_forward_planner(small_config().max_cache_capacity);
+        let me = pubkey(&SECRET_ME);
+        let isolated = pubkey(&[7; 32]);
+
+        planner.prewarm_forward_paths(&isolated).await;
+
+        for hops in 1..=RoutingOptions::MAX_INTERMEDIATE_HOPS {
+            assert!(
+                !planner.cache.contains_key(&(me, isolated, hops as u32)),
+                "an unreachable peer should not leave a {hops}-hop entry"
+            );
+        }
     }
 
     #[tokio::test]
