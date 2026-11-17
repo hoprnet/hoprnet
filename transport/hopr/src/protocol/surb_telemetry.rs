@@ -804,8 +804,9 @@ pub struct RelayerHealth {
     /// probation, removed with the death.
     dead_over: DashMap<OffchainPublicKey, Hop>,
     /// Relayers that would be judged over one of their hops while delivering over the other, and since
-    /// when: suspected, with nothing published or written off for them yet (see [`Self::has_stood`]).
-    suspected: DashMap<OffchainPublicKey, Instant>,
+    /// when: suspected, with nothing published or written off for them yet (see [`Self::has_stood`]). The
+    /// hop is the one they are suspected over: a suspicion over the other hop is a new one.
+    suspected: DashMap<OffchainPublicKey, (Hop, Instant)>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
     /// When a reply last came home, through any relayer, for any session.
@@ -1457,17 +1458,24 @@ impl RelayerHealth {
     /// that had nothing wrong with them, each steering the planner off the relayer, 129 of them gone by
     /// the next flush and 6 lifted before it by a reply over the hop; of the 90 on the relayer that was
     /// cut off, stalled or killed, 5 were gone. So the first flush only suspects, and the planner is not
-    /// told. The stock is written off no later for it: that waited for the second flush anyway.
+    /// told. The stock is written off no later for it: that waited for the second flush anyway. A relayer
+    /// suspected over the other hop is suspected anew over this one, and has a flush of its own to stand.
     fn has_stood(&self, relayer: &OffchainPublicKey, hop: Hop) -> bool {
         let now = Instant::now();
-        let since = *self.suspected.entry(*relayer).or_insert(now);
+        let (suspected_over, since) = *self.suspected.entry(*relayer).or_insert((hop, now));
+        if suspected_over != hop {
+            // A suspicion over the other hop says nothing about this one: this is a new suspicion, with a
+            // flush of its own to stand for, not the old one's timestamp.
+            self.suspected.insert(*relayer, (hop, now));
+            return false;
+        }
         let delivered = self
             .relayers
             .get(relayer)
             .is_some_and(|history| history.last_home.get(&hop).is_some_and(|home| *home >= since));
         if delivered {
             // It delivers over it after all: what is overdue now has yet to stand.
-            self.suspected.insert(*relayer, now);
+            self.suspected.insert(*relayer, (hop, now));
             return false;
         }
         since.elapsed() >= VERDICT_CONFIRMATION
@@ -2407,8 +2415,8 @@ mod tests {
 
     /// Backdates every suspicion past `VERDICT_CONFIRMATION`, as the flush after it would find it.
     fn let_suspicions_stand(health: &RelayerHealth) {
-        for mut since in health.suspected.iter_mut() {
-            *since.value_mut() = Instant::now()
+        for mut suspicion in health.suspected.iter_mut() {
+            suspicion.value_mut().1 = Instant::now()
                 .checked_sub(VERDICT_CONFIRMATION + Duration::from_millis(1))
                 .expect("monotonic clock too young");
         }
@@ -2895,7 +2903,9 @@ mod tests {
         health.note_home(&leg(&[other, behind]), Instant::now());
         // Suspected ten seconds ago, and a reply came home over the hop two seconds later: before the
         // replies now overdue fell due, so it answers none of them.
-        health.suspected.insert(relayer, ago(Duration::from_secs(10))?);
+        health
+            .suspected
+            .insert(relayer, (Hop::FromReplier, ago(Duration::from_secs(10))?));
         health
             .relayers
             .get_mut(&relayer)
@@ -2911,6 +2921,51 @@ mod tests {
 
         let_suspicions_stand(&health);
         assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        Ok(())
+    }
+
+    /// A suspicion over one hop is not one over the other: a relayer suspected over the hop from the replier
+    /// whose other hop is the one overdue now is suspected anew, with a flush of its own to stand for.
+    #[test]
+    fn a_suspicion_over_the_other_hop_should_have_a_flush_of_its_own_to_stand() -> anyhow::Result<()> {
+        let health = RelayerHealth::default();
+        let [relayer, behind, other, healthy] = [(); 4].map(|_| key());
+        settled_since(&health, relayer, ago(Duration::from_secs(20))?, jitter(0));
+        settled_since(&health, behind, ago(Duration::from_secs(20))?, jitter(0));
+        settled_since(&health, other, ago(Duration::from_secs(20))?, jitter(0));
+        // First flush: overdue on the legs where the relayer is first, delivering behind another relayer.
+        let first: &[OffchainPublicKey] = &[relayer, behind];
+        overdue_legs(&health, &[first; MIN_RACES_OVER_ONE_HOP], 1, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health.record_reply();
+        health.note_home(&leg(&[other, relayer]), Instant::now());
+        health.note_home(&leg(&[other, behind]), Instant::now());
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+        assert_eq!(Some(Hop::FromReplier), health.suspected.get(&relayer).map(|s| s.0));
+
+        // The hop from the replier delivers and answers those. Now the replies overdue are on legs where it
+        // is behind another relayer, and its last reply from a relayer is older than the first suspicion.
+        health.note_home(&leg(&[relayer, behind]), Instant::now());
+        let second: &[OffchainPublicKey] = &[other, relayer];
+        overdue_legs(&health, &[second; MIN_RACES_OVER_ONE_HOP], 20, healthy);
+        backdate_all_open(&health, ago(ROUND_TRIP * 2)?);
+        health
+            .relayers
+            .get_mut(&relayer)
+            .expect("has races")
+            .last_home
+            .insert(Hop::FromRelayer, ago(Duration::from_secs(30))?);
+
+        let_suspicions_stand(&health);
+        assert!(
+            judged_dead(&health.refresh(4)).is_empty(),
+            "the first suspicion stood, but it was over the other hop"
+        );
+        assert_eq!(Some(Hop::FromRelayer), health.suspected.get(&relayer).map(|s| s.0));
+
+        let_suspicions_stand(&health);
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        assert_eq!(Some(Hop::FromRelayer), health.dead_over.get(&relayer).map(|hop| *hop));
         Ok(())
     }
 
