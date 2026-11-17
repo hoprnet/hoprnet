@@ -120,8 +120,8 @@ pub(crate) struct DiversityTracker {
 }
 
 impl DiversityTracker {
-    /// `window` is the number of draws each session's score covers, `threshold` the score below
-    /// which a session is logged as concentrated (`0.0` disables the logging).
+    /// `window` is the number of draws each session's score covers, `threshold` the score at or
+    /// below which a session is logged as concentrated (`0.0` disables the logging).
     pub(crate) fn new(window: usize, threshold: f64) -> Self {
         Self {
             window: window.max(1),
@@ -180,8 +180,9 @@ impl DiversityTracker {
 
     /// Diversity score over the draws of every tracked session together.
     ///
-    /// This is the node-wide figure the gauge reports: a node whose sessions each spread their
-    /// draws but which only ever serves one relayer per session still scores 1.0 here.
+    /// This is the node-wide figure the gauge reports: it reads 1.0 only when every draw of every
+    /// session went through the same relayer, so it can look diverse even when each session
+    /// concentrates all its draws on a single relayer.
     #[cfg_attr(not(any(test, feature = "telemetry")), allow(dead_code))]
     pub(crate) fn pooled_score(&self) -> Option<f64> {
         effective_size(self.pooled.values(), self.pooled_drawn)
