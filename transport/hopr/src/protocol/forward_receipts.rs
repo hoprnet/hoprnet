@@ -703,6 +703,7 @@ mod tests {
     const FAST: Option<u64> = Some(20);
 
     #[test]
+    #[serial_test::serial(routing_logs)]
     fn a_dead_relayer_should_be_judged_after_the_confirmation_and_logged() -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
         let (sim, lines) = logged("relayer judged dead", || {
@@ -914,6 +915,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(routing_logs)]
     fn a_verdict_should_lapse_after_its_ttl_without_a_stale_rejudgement() -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
         logged("forward verdict lifted", || {
@@ -953,6 +955,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(routing_logs)]
     fn a_receipt_for_a_packet_sent_after_the_verdict_should_lift_it_early_and_a_relapse_skips_the_wait()
     -> anyhow::Result<()> {
         let [a, b, c] = [(); 3].map(|_| key());
@@ -1043,8 +1046,8 @@ mod tests {
         assert!(fr.state.lock().streams[&session].missing.is_empty());
     }
 
-    /// Two jumps whose missing receipts expire at the same arrival: the packets sent between them were
-    /// receipted by the receipt after the first jump, so they are evidence.
+    /// Two jumps whose missing receipts expire at the same arrival: what was sent before the second jump may have
+    /// been receipted by the receipt lost there, so it is no evidence.
     #[test]
     fn the_floor_should_be_the_latest_lost_gap() {
         let [x, y, exit] = [(); 3].map(|_| key());
