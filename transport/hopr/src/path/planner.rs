@@ -32,13 +32,19 @@ lazy_static::lazy_static! {
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
-    /// Effective number of distinct first relayers of the recent return-path draws, pooled over
-    /// every session the planner tracks: 1.0 means they all went through one relayer, and the
-    /// value approaches the number of distinct relayers as the draws even out. See
-    /// [`super::diversity`].
-    static ref METRIC_PATH_RELAYER_DIVERSITY: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
+    /// Effective number of distinct first relayers per direction, pooled over every session the
+    /// planner tracks: 1.0 means they all left through one relayer, and the value approaches the
+    /// number of distinct relayers as the draws even out. See [`super::diversity`].
+    static ref METRIC_PATH_RELAYER_DIVERSITY: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_path_relayer_diversity",
-        "Effective number of distinct first relayers (exp of the Shannon entropy) over recent return-path draws"
+        "Effective number of distinct first relayers (exp of the Shannon entropy) over recent path draws, one score per direction",
+        &["direction"]
+    ).unwrap();
+    /// Effective number of distinct whole routes, pooled over every session the planner tracks. A
+    /// route is a forward path together with the return path of one SURB.
+    static ref METRIC_PATH_ROUTE_DIVERSITY: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
+        "hopr_path_route_diversity",
+        "Effective number of distinct full routes (exp of the Shannon entropy) over recent packets"
     ).unwrap();
 }
 
@@ -179,14 +185,15 @@ pub struct PathPlannerConfig {
     #[default = 200]
     #[validate(range(min = 1))]
     pub diversity_metric_window: usize,
-    /// Diversity score at or below which a session's return-path draws count as concentrated.
+    /// First-hop diversity score at or below which a session's draws count as concentrated.
     ///
-    /// The score is the effective number of distinct first relayers, so 1.0 is every draw through
-    /// one relayer. A session that reaches this value logs one WARN on the transition and one INFO
-    /// when it recovers. `0.0` disables the check. Must be finite and non-negative.
+    /// Each direction is scored on its own: the score is the effective number of distinct first
+    /// relayers, so 1.0 is every draw through one relayer. A direction that reaches this value logs
+    /// one WARN on the transition and one INFO when it recovers. `0.0` disables the check. Must be
+    /// finite and non-negative.
     #[default = 1.0]
     #[validate(custom(function = "validate_diversity_threshold"))]
-    pub min_return_path_diversity: f64,
+    pub min_path_diversity: f64,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -725,6 +732,43 @@ type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
 type CandidateSet = (u64, hopr_utils::statistics::WeightedCollection<ValidatedPath>);
 type PlannerCacheValue = Arc<CandidateSet>;
 
+/// Identity of one whole route: the forward path together with the return path of one SURB.
+///
+/// Hashed rather than kept whole because the diversity window only needs equality: two packets that
+/// took the same route must hash the same, and the hash costs 8 bytes instead of two paths.
+fn route_hash(forward: &ValidatedPath, ret: &ValidatedPath) -> u64 {
+    use std::hash::{Hash as _, Hasher as _};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for key in forward.iter() {
+        key.hash(&mut hasher);
+    }
+    // Separator, so the legs cannot be confused with another split of the same keys.
+    hasher.write_u8(0);
+    for key in ret.iter() {
+        key.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+/// Publishes the pooled diversity scores on their gauges.
+#[cfg(all(feature = "telemetry", not(test)))]
+fn publish_path_diversity(scores: crate::path::diversity::Scores) {
+    if let Some(score) = scores.forward_first_hop {
+        METRIC_PATH_RELAYER_DIVERSITY.set(&["forward"], score);
+    }
+    if let Some(score) = scores.return_first_hop {
+        METRIC_PATH_RELAYER_DIVERSITY.set(&["return"], score);
+    }
+    if let Some(score) = scores.route {
+        METRIC_PATH_ROUTE_DIVERSITY.set(score);
+    }
+}
+
+/// Publishes the pooled diversity scores on their gauges.
+#[cfg(any(not(feature = "telemetry"), test))]
+fn publish_path_diversity(_scores: crate::path::diversity::Scores) {}
+
 /// Gives every rebuilt collection a new process-local ID before any dictionary records are emitted.
 /// All production rebuilds and test-created replacements use this constructor; cache hits reuse the
 /// pair through its Arc. The counter is shared across planners to keep their logs unambiguous.
@@ -869,7 +913,7 @@ where
         let tracker_for_eviction = collapsed_diversity.clone();
         let return_path_diversity = Arc::new(Mutex::new(DiversityTracker::new(
             config.diversity_metric_window,
-            config.min_return_path_diversity,
+            config.min_path_diversity,
         )));
         let cache = moka::future::Cache::builder()
             .max_capacity(config.max_cache_capacity)
@@ -953,10 +997,10 @@ where
         self.paths.collapsed_diversity.lock().len()
     }
 
-    /// Test-only view of the score `hopr_path_relayer_diversity` would publish.
+    /// Test-only view of the scores the diversity gauges would publish.
     #[cfg(test)]
-    fn pooled_return_path_diversity(&self) -> Option<f64> {
-        self.paths.return_path_diversity.lock().pooled_score()
+    fn path_diversity_scores(&self) -> crate::path::diversity::Scores {
+        self.paths.return_path_diversity.lock().scores()
     }
 
     /// Resolve a [`NodeId`] to an [`OffchainPublicKey`].
@@ -1351,12 +1395,41 @@ where
             return;
         };
 
-        let mut tracker = self.paths.return_path_diversity.lock();
-        tracker.record((destination, hops), &relayers);
-        #[cfg(all(feature = "telemetry", not(test)))]
-        if let Some(score) = tracker.pooled_score() {
-            METRIC_PATH_RELAYER_DIVERSITY.set(score);
-        }
+        let scores = {
+            let mut tracker = self.paths.return_path_diversity.lock();
+            tracker.record_returns((destination, hops), &relayers);
+            tracker.scores()
+        };
+        publish_path_diversity(scores);
+    }
+
+    /// Records the forward path and the whole routes of one packet: each SURB's forward path
+    /// together with the return path it was given.
+    ///
+    /// The route dimension is what catches a stable pair of relayers behind varied first hops, so
+    /// it is recorded where both legs are known. A destination this node cannot resolve skips the
+    /// observation instead of failing a packet that already resolved.
+    async fn record_route_diversity(
+        &self,
+        destination: NodeId,
+        hops: u32,
+        forward: &ValidatedPath,
+        return_paths: &[ValidatedPath],
+    ) {
+        let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
+            return;
+        };
+        let routes = return_paths
+            .iter()
+            .map(|ret| route_hash(forward, ret))
+            .collect::<Vec<_>>();
+
+        let scores = {
+            let mut tracker = self.paths.return_path_diversity.lock();
+            tracker.record_forward((destination, hops), forward.first().copied(), &routes);
+            tracker.scores()
+        };
+        publish_path_diversity(scores);
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -1377,6 +1450,17 @@ where
                 return_options,
             } => {
                 tracing::trace!(direction = "forward", %destination, "resolving forward path");
+
+                // The hop counts key the diversity windows; both legs are usually the same, and a
+                // packet that carries SURBs is scored under the return leg's count.
+                let forward_hops = match &forward_options {
+                    RoutingOptions::Hops(hops) => u32::from(*hops),
+                    _ => 0,
+                };
+                let return_hops = return_options.as_ref().and_then(|options| match options {
+                    RoutingOptions::Hops(hops) => Some(u32::from(*hops)),
+                    _ => None,
+                });
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
@@ -1431,6 +1515,16 @@ where
                 };
 
                 tracing::trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+
+                // Both legs are known only here, so this is where the forward first hop and the
+                // whole routes are recorded. A packet with no SURBs still has a forward first hop.
+                self.record_route_diversity(
+                    *destination,
+                    return_hops.unwrap_or(forward_hops),
+                    &forward_path,
+                    &return_paths,
+                )
+                .await;
 
                 Ok((
                     ResolvedTransportRouting::Forward {
@@ -2485,7 +2579,7 @@ mod tests {
     /// A `me <- {a,b} <- dest` return topology with the given anonymity floor, so a test can watch
     /// the cap collapse the two relayers to one (or, at floor 0, keep both).
     fn two_relayer_return_planner_with_floor(floor: usize) -> (TestPlanner, ChannelGraph) {
-        two_relayer_return_planner_with_diversity_threshold(floor, small_config().min_return_path_diversity)
+        two_relayer_return_planner_with_diversity_threshold(floor, small_config().min_path_diversity)
     }
 
     /// The same fixture with the return-path diversity threshold set, so a test can watch the
@@ -2522,7 +2616,7 @@ mod tests {
 
         let cfg = PathPlannerConfig {
             min_paths_anonymity_floor: floor,
-            min_return_path_diversity: threshold,
+            min_path_diversity: threshold,
             ..small_config()
         };
         let selector = HoprGraphPathSelector::new(
@@ -2727,11 +2821,118 @@ mod tests {
         }
 
         let score = planner
-            .pooled_return_path_diversity()
+            .path_diversity_scores()
+            .return_first_hop
             .context("a draw must have populated the window")?;
         assert!(
             score > 1.0 && score <= 2.0,
             "a valuation spread over two relayers must score strictly between 1 and 2, got {score}"
+        );
+        assert_eq!(
+            None,
+            planner.path_diversity_scores().forward_first_hop,
+            "a return-path draw alone must not populate the forward dimension"
+        );
+        anyhow::Ok(())
+    }
+
+    /// A `me <-> {a,b} <-> dest` topology: both legs exist, so one packet yields a forward path and
+    /// the return paths its SURBs take.
+    fn two_relayer_bidirectional_planner() -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [
+            (me, a),
+            (a, dest),
+            (me, b),
+            (b, dest),
+            (dest, a),
+            (a, me),
+            (dest, b),
+            (b, me),
+        ] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = PathPlannerConfig {
+            min_paths_anonymity_floor: 0,
+            ..small_config()
+        };
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(me_addr(), b_addr())
+            .with_open_channel(b_addr(), dest_addr())
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr())
+            .with_open_channel(dest_addr(), b_addr())
+            .with_open_channel(b_addr(), me_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
+    /// One resolved packet feeds all three dimensions: the forward first hop, the first hops of its
+    /// return paths, and the whole routes the SURBs were given.
+    #[tokio::test]
+    async fn a_resolved_packet_feeds_every_diversity_dimension() -> anyhow::Result<()> {
+        let (planner, _graph) = two_relayer_bidirectional_planner();
+        for _ in 0..20 {
+            planner
+                .resolve_routing(
+                    10,
+                    2,
+                    DestinationRouting::Forward {
+                        destination: Box::new(NodeId::Offchain(pubkey(&SECRET_DEST))),
+                        pseudonym: None,
+                        forward_options: RoutingOptions::Hops(1.try_into()?),
+                        return_options: Some(RoutingOptions::Hops(1.try_into()?)),
+                    },
+                )
+                .await?;
+        }
+
+        let scores = planner.path_diversity_scores();
+        let forward = scores.forward_first_hop.context("forward dimension")?;
+        let ret = scores.return_first_hop.context("return dimension")?;
+        let route = scores.route.context("route dimension")?;
+        for (name, score) in [("forward", forward), ("return", ret)] {
+            assert!(
+                (1.0..=2.0).contains(&score),
+                "{name} first-hop score {score} must lie within the two relayers the graph offers"
+            );
+        }
+        assert!(
+            forward > 1.0 && ret > 1.0,
+            "draws over two interchangeable relayers must use both, got forward {forward} and return {ret}"
+        );
+        // Two relayers either side give at most four distinct routes, and the route dimension is
+        // what sees that combination rather than either leg alone.
+        assert!(
+            (1.0..=4.0).contains(&route),
+            "route score {route} must lie within the four combinations the graph offers"
         );
         anyhow::Ok(())
     }
@@ -2762,7 +2963,7 @@ mod tests {
             }
             assert_eq!(
                 1,
-                logs.records("return-path relayer diversity at or below the configured minimum")
+                logs.records("path relayer diversity at or below the configured minimum")
                     .len(),
                 "a session held on one relayer must warn once, not once per draw"
             );
@@ -2779,7 +2980,7 @@ mod tests {
     fn diversity_config_should_reject_a_zero_window_and_a_negative_threshold() {
         let defaults = PathPlannerConfig::default();
         assert_eq!(200, defaults.diversity_metric_window);
-        assert_eq!(1.0, defaults.min_return_path_diversity);
+        assert_eq!(1.0, defaults.min_path_diversity);
         assert!(defaults.validate().is_ok());
 
         let zero_window = PathPlannerConfig {
@@ -2789,7 +2990,7 @@ mod tests {
         assert!(zero_window.validate().is_err(), "a zero window must be rejected");
         for threshold in [-0.1, f64::NAN, f64::INFINITY] {
             let cfg = PathPlannerConfig {
-                min_return_path_diversity: threshold,
+                min_path_diversity: threshold,
                 ..PathPlannerConfig::default()
             };
             assert!(cfg.validate().is_err(), "a threshold of {threshold} must be rejected");
@@ -2797,7 +2998,7 @@ mod tests {
 
         for threshold in [0.0, 1.5, 4.0] {
             let cfg = PathPlannerConfig {
-                min_return_path_diversity: threshold,
+                min_path_diversity: threshold,
                 ..PathPlannerConfig::default()
             };
             assert!(cfg.validate().is_ok(), "a threshold of {threshold} must be accepted");

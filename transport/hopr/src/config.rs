@@ -1716,7 +1716,7 @@ mod tests {
                 "edge_penalty": 0.8,
                 "return_path_weight_temper": 0.25,
                 "diversity_metric_window": 50,
-                "min_return_path_diversity": 1.5
+                "min_path_diversity": 1.5
             }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("path planner weights must deserialize");
@@ -1728,7 +1728,7 @@ mod tests {
         assert_eq!(0.8, planner.edge_penalty);
         assert_eq!(0.25, planner.return_path_weight_temper);
         assert_eq!(50, planner.diversity_metric_window);
-        assert_eq!(1.5, planner.min_return_path_diversity);
+        assert_eq!(1.5, planner.min_path_diversity);
         assert_eq!(
             defaults.min_ack_rate, planner.min_ack_rate,
             "unspecified planner fields must keep their defaults"
@@ -1742,10 +1742,7 @@ mod tests {
             defaults.diversity_metric_window,
             older.path_planner.diversity_metric_window
         );
-        assert_eq!(
-            defaults.min_return_path_diversity,
-            older.path_planner.min_return_path_diversity
-        );
+        assert_eq!(defaults.min_path_diversity, older.path_planner.min_path_diversity);
         assert!(cfg.validate().is_ok());
 
         let bad_temper = r#"{ "path_planner": { "return_path_weight_temper": 1.5 } }"#;

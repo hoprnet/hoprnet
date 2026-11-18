@@ -15,7 +15,8 @@
 | `hopr_packet_ticket_validation_errors`                    | MultiCounter    | Number of different ticket validation errors encountered during packet processing                                                                                                                                                                                                                                                                                                                    | keys: type                                                                         |
 | `hopr_packets_count`                                      | MultiCounter    | Number of processed packets of different types (sent, received, forwarded)                                                                                                                                                                                                                                                                                                                           | keys: type                                                                         |
 | `hopr_path_length`                                        | SimpleHistogram | Distribution of number of hops of sent messages                                                                                                                                                                                                                                                                                                                                                      | buckets: 0.0,1.0,2.0,3.0,4.0                                                       |
-| `hopr_path_relayer_diversity`                             | SimpleGauge     | Effective number of distinct first relayers (exp of the Shannon entropy) over the recent return-path draws, pooled over the sessions the path planner tracks                                                                                                                                                                                                                                         |                                                                                    |
+| `hopr_path_relayer_diversity`                             | MultiGauge      | Effective number of distinct first relayers (exp of the Shannon entropy) over the recent path draws, one score per direction                                                                                                                                                                                                                                                                         | keys: direction                                                                    |
+| `hopr_path_route_diversity`                               | SimpleGauge     | Effective number of distinct full routes (exp of the Shannon entropy) over the recent packets: a forward path together with the return path of one SURB                                                                                                                                                                                                                                              |                                                                                    |
 | `hopr_pix_admission_rejections_total`                     | MultiCounter    | Incoming PIX sessions refused before establishment, by reason                                                                                                                                                                                                                                                                                                                                        | keys: reason                                                                       |
 | `hopr_pix_closures_total`                                 | MultiCounter    | Sessions closed by the PIX supervisor, by reason                                                                                                                                                                                                                                                                                                                                                     | keys: reason                                                                       |
 | `hopr_pix_cycle_accepted_share_fraction`                  | MultiHistogram  | Shares accepted for an SSA cycle over its useful-share target, observed once at finalization; exceeds one for a conforming Entry's surplus                                                                                                                                                                                                                                                           | keys: outcome; buckets: 0.05,0.25,0.5,0.75,0.9,1.0,1.25,1.5,2.0,2.5,3.0,3.5,4.0    |
@@ -110,43 +111,55 @@
 | `hopr_tickets_unack_tickets_per_peer`                     | MultiGauge      | Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)                                                                                                                                                                                                                                                                                                       | keys: peer                                                                         |
 | `hopr_tickets_unack_tickets_total`                        | SimpleGauge     | Total number of unacknowledged tickets across all peer caches                                                                                                                                                                                                                                                                                                                                        |                                                                                    |
 
-## Return-path relayer diversity
+## Path relayer diversity
 
-`hopr_path_relayer_diversity` is the effective number of distinct first relayers of the recent
-return-path draws, `exp(H)` for the Shannon entropy `H` of the draw distribution, pooled over the
-sessions the path planner tracks.
+The planner's path choices are scored in the two dimensions an observer can use to tell sessions
+apart.
 
-- `1.0` means every recent draw of every tracked session went through the same relayer. The value
-  rises towards the number of distinct relayers actually used as the draws even out, so compare it
-  against the size of the candidate pool, not against a fixed target.
-- Two equally used sessions that each keep to their own single relayer score `2.0` here, because the
+`hopr_path_relayer_diversity` covers the first hop, separately per direction, as the effective
+number of distinct first relayers, `exp(H)` for the Shannon entropy `H` of the draw distribution,
+pooled over the sessions the planner tracks.
+
+- The first relayer of each leg is the one that learns who is talking to whom, so a low score in
+  either direction matters on its own: a session whose forward path always leaves through the same
+  relay is exposed even when its return paths vary.
+- `1.0` means every recent draw in that direction of every tracked session left through one
+  relayer. Compare the value against the number of candidates the graph offers, not against a fixed
+  target.
+- Two equally used sessions that each keep to their own single relayer score `2.0`, because the
   gauge reads the pool and not one session. Unequal draw counts pull the score towards the busier
-  relayer, so it reads below the number of relayers. It does not replace the per-session WARN below.
-- It covers the return paths the planner draws. An explicitly routed return path bypasses the
-  draw, so a workload that only uses explicit routes leaves the score untouched.
-  `hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not
-  the spread of relays a session's traffic passes through.
+  relayer, so it reads below the number of relayers.
 
-`path_planner.min_return_path_diversity` is a per-session check: every `(destination, hops)` key
-scores its own draws and logs one WARN when its score reaches the threshold, with one INFO when it
-recovers (default `1.0`; `0.0` disables the log). At that default, two sessions on separate single
-relayers each log a WARN, while the pooled gauge reads `2.0` only if both windows hold the same
-number of draws.
+`hopr_path_route_diversity` covers the whole route: one forward path together with the return path of
+one SURB. It catches what the first hops cannot show, such as a stable pair of relayers reused behind
+varied outer hops. It ranges from `1.0`, one route for every recent packet, up to the number of
+distinct forward-and-return combinations the graph offers.
 
-Alert on the pooled score staying at the bottom of its range, which is every session concentrated on
-one shared relayer:
+Both gauges cover paths the planner chooses. An explicitly routed path bypasses the draw, so a
+workload that only uses explicit routes leaves the scores untouched.
+`hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not the
+spread of relays a session's traffic passes through.
+
+`path_planner.min_path_diversity` is a per-session check on the first-hop scores: every
+`(destination, hops)` key scores each direction on its own draws and logs one WARN when that score
+reaches the threshold, with one INFO when it recovers (default `1.0`; `0.0` disables the log). At
+that default, a session whose forward paths all leave through one relayer warns while a second
+session elsewhere keeps the pooled gauge above `1.0`.
+
+Alert on a pooled first-hop score staying at the bottom of its range, which is every session
+concentrated on one shared relayer:
 
 ```yaml
 - alert: ReturnPathDiversityCollapsed
-  expr: hopr_path_relayer_diversity <= 1.0
+  expr: hopr_path_relayer_diversity{direction="return"} <= 1.0
   for: 15m
 ```
 
-The gauge only moves when the node actually draws a return path, so a steady score can mean that
-nothing was drawn rather than that traffic concentrated. The expression above reads the last
-published value; the `for` clause is what requires the condition to hold, and it fires on an idle
-node too. Read it together with the node's message volume.
+The gauges only move when the node actually resolves a path, so a steady score can mean that nothing
+was drawn rather than that traffic concentrated. The expressions read the last published value; the
+`for` clause is what requires the condition to hold, and it fires on an idle node too. Read them
+together with the node's message volume.
 
 `path_planner.diversity_metric_window` caps each `(destination, hops)` window at that many draws
-(default `200`), so the gauge pools up to that many draws per tracked session and can cover far more
-than the configured number.
+(default `200`), so a gauge pools up to that many draws per tracked session and direction and can
+cover far more than the configured number.
