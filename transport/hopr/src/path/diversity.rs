@@ -60,7 +60,9 @@ impl DiversityWindow {
         let capacity = capacity.max(1);
         Self {
             capacity,
-            drawn: VecDeque::with_capacity(capacity),
+            // Grown by the draws themselves: reserving the configured window up front would commit
+            // its whole length on the first draw, for a node that may never reach it.
+            drawn: VecDeque::new(),
             counts: HashMap::new(),
         }
     }
@@ -154,17 +156,23 @@ impl DiversityTracker {
             last_drawn: tick,
         });
         session.last_drawn = tick;
-        let mut evicted = Vec::with_capacity(relayers.len());
+        // In draw order: one draw of a batch can evict an earlier draw of the same batch, so the
+        // retraction of that earlier draw has to follow its insertion. Doing all retractions first
+        // leaves the retraction of a relayer the batch itself added uncounted, and the pooled total
+        // then keeps a draw the window has already dropped.
+        let mut pooled_updates = Vec::with_capacity(relayers.len());
         for relayer in relayers {
-            evicted.extend(session.window.record(*relayer));
+            pooled_updates.push((session.window.record(*relayer), *relayer));
         }
-
+        // The threshold is evaluated once the whole batch is in, so a batch that dips the score for
+        // a moment does not log a WARN immediately followed by an INFO.
         let score = session.window.score();
-        for gone in evicted {
-            self.retract(gone);
-        }
-        for relayer in relayers {
-            *self.pooled.entry(*relayer).or_insert(0) += 1;
+
+        for (evicted, drawn) in pooled_updates {
+            if let Some(evicted) = evicted {
+                self.retract(evicted);
+            }
+            *self.pooled.entry(drawn).or_insert(0) += 1;
             self.pooled_drawn += 1;
         }
         if let Some(score) = score {
@@ -283,41 +291,100 @@ mod tests {
     /// The score of an even spread is the number of distinct relayers it covers: that is what makes
     /// the gauge readable as an anonymity-set size rather than as raw entropy.
     #[test]
-    fn uniform_draws_score_the_number_of_distinct_relayers() {
+    fn uniform_draws_score_the_number_of_distinct_relayers() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(100, 0.0);
         for i in 0..100 {
             tracker.record(key(), &[relayer(i % 4)]);
         }
-        assert_close(4.0, tracker.session_score(&key()).expect("drawn"));
+        assert_close(
+            4.0,
+            tracker
+                .session_score(&key())
+                .context("score of an even spread over four relayers")?,
+        );
+        anyhow::Ok(())
     }
 
     /// Every draw through one relayer is the fully concentrated case, and scores exactly 1.0 so the
     /// default threshold of 1.0 catches it.
     #[test]
-    fn collapsed_window_scores_one() {
+    fn collapsed_window_scores_one() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(100, 0.0);
         for _ in 0..100 {
             tracker.record(key(), &[relayer(1)]);
         }
-        assert_close(1.0, tracker.session_score(&key()).expect("drawn"));
+        assert_close(
+            1.0,
+            tracker
+                .session_score(&key())
+                .context("score of a single-relayer window")?,
+        );
+        anyhow::Ok(())
     }
 
     /// The window is a window: draws that have fallen out of it must stop counting, or a relayer
     /// this node has not used in hundreds of draws would keep flattering the score.
     #[test]
-    fn window_eviction_drops_the_oldest_draws() {
+    fn window_eviction_drops_the_oldest_draws() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(4, 0.0);
         for _ in 0..4 {
             tracker.record(key(), &[relayer(1)]);
         }
         tracker.record(key(), &[relayer(2)]);
         // Three of relayer 1 and one of relayer 2: H = -(0.75 ln 0.75 + 0.25 ln 0.25).
-        assert_close(1.754_765_350_603_323_2, tracker.session_score(&key()).expect("drawn"));
+        assert_close(
+            1.754_765_350_603_323_2,
+            tracker
+                .session_score(&key())
+                .context("score of a partly turned-over window")?,
+        );
 
         for _ in 0..4 {
             tracker.record(key(), &[relayer(2)]);
         }
-        assert_close(1.0, tracker.session_score(&key()).expect("drawn"));
+        assert_close(
+            1.0,
+            tracker
+                .session_score(&key())
+                .context("score after the window turned over")?,
+        );
+        anyhow::Ok(())
+    }
+
+    /// A batch can evict its own earlier draws. The pooled total has to follow the window through
+    /// that in draw order, or it keeps a relayer the window has already dropped and reports a
+    /// spread that does not exist: with a window of 1, drawing `[A, B]` is one relayer, not two.
+    #[test]
+    fn a_batch_that_outgrows_the_window_leaves_no_trace_in_the_pooled_score() -> anyhow::Result<()> {
+        let mut tracker = DiversityTracker::new(1, 0.0);
+
+        tracker.record(key(), &[relayer(1), relayer(2)]);
+        assert_close(
+            1.0,
+            tracker
+                .session_score(&key())
+                .context("session score after drawing [A, B]")?,
+        );
+        assert_close(
+            1.0,
+            tracker.pooled_score().context("pooled score after drawing [A, B]")?,
+        );
+
+        // B is now replaced by C: still one draw in the window, still one relayer.
+        tracker.record(key(), &[relayer(3)]);
+        assert_close(
+            1.0,
+            tracker
+                .session_score(&key())
+                .context("session score after replacing B with C")?,
+        );
+        assert_close(
+            1.0,
+            tracker
+                .pooled_score()
+                .context("pooled score after replacing B with C")?,
+        );
+        anyhow::Ok(())
     }
 
     /// An empty window has no score. Reporting 0.0 or 1.0 there would put a fabricated reading on
@@ -332,20 +399,29 @@ mod tests {
     /// Sessions are scored on their own draws, so one session riding a single relayer cannot be
     /// hidden by another spreading its own.
     #[test]
-    fn sessions_keep_independent_windows() {
+    fn sessions_keep_independent_windows() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(10, 0.0);
         let other: DiversityKey = (relayer(0xfe), 2);
         for i in 0..10 {
             tracker.record(key(), &[relayer(i % 2)]);
             tracker.record(other, &[relayer(3)]);
         }
-        assert_close(2.0, tracker.session_score(&key()).expect("drawn"));
-        assert_close(1.0, tracker.session_score(&other).expect("drawn"));
+        assert_close(
+            2.0,
+            tracker.session_score(&key()).context("spread session's own score")?,
+        );
+        assert_close(
+            1.0,
+            tracker
+                .session_score(&other)
+                .context("concentrated session's own score")?,
+        );
 
         // Pooled over both sessions: ten draws each through relayers 1 and 2, twenty through
         // relayer 3, so the node-wide picture is more spread than either session's own.
-        let pooled = tracker.pooled_score().expect("drawn");
+        let pooled = tracker.pooled_score().context("pooled score over both sessions")?;
         assert!(pooled > 2.0, "pooled score {pooled} must cover every session's draws");
+        anyhow::Ok(())
     }
 
     /// The tracker is bounded: without eviction a node with a churning set of destinations would
@@ -373,13 +449,18 @@ mod tests {
     /// A session's draws leave the node-wide total when the session is evicted. Keeping them would
     /// let a relayer this node no longer uses hold the pooled score up.
     #[test]
-    fn evicting_a_session_drops_its_draws_from_the_pooled_score() {
+    fn evicting_a_session_drops_its_draws_from_the_pooled_score() -> anyhow::Result<()> {
         let mut tracker = DiversityTracker::new(10, 0.0);
         let own: DiversityKey = (relayer(1), 1);
         for _ in 0..10 {
             tracker.record(own, &[relayer(1)]);
         }
-        assert_close(1.0, tracker.pooled_score().expect("drawn"));
+        assert_close(
+            1.0,
+            tracker
+                .pooled_score()
+                .context("pooled score of one single-relayer session")?,
+        );
 
         for i in 0..(MAX_TRACKED_SESSIONS as u32) {
             let key: DiversityKey = (relayer((i % 200) as u8 + 2), 1 + i / 200);
@@ -391,7 +472,13 @@ mod tests {
             "the first session must be the one evicted"
         );
         // Only relayer 9 remains in the pooled total, so the node-wide score must be 1.0.
-        assert_close(1.0, tracker.pooled_score().expect("drawn"));
+        assert_close(
+            1.0,
+            tracker
+                .pooled_score()
+                .context("pooled score after the evicted session's draws left it")?,
+        );
+        anyhow::Ok(())
     }
 
     /// One WARN on the transition into the concentrated state, one INFO on leaving it, and nothing

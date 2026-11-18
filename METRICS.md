@@ -120,14 +120,23 @@ sessions the path planner tracks.
   whatever the candidate pool offers. The default threshold of `1.0` logs a WARN for that case.
 - The value rises towards the number of distinct relayers actually used as the draws even out, so
   compare it against the size of the candidate pool, not against a fixed target.
-- It covers return-path draws only. `hopr_mixer_effective_anonymity_set` measures a different
-  thing: the mixer's occupancy, not the spread of relays a session's traffic passes through.
+- It covers the return paths the planner draws. An explicitly routed return path bypasses the
+  draw, so a workload that only uses explicit routes leaves the score untouched.
+  `hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not
+  the spread of relays a session's traffic passes through.
 
 Alert on a score that stays at the bottom of its range:
 
-```promql
-avg_over_time(hopr_path_relayer_diversity[15m]) <= 1.0
+```yaml
+- alert: ReturnPathDiversityCollapsed
+  expr: hopr_path_relayer_diversity <= 1.0
+  for: 15m
 ```
+
+The gauge only moves when the node actually draws a return path, so a steady score can mean that
+nothing was drawn rather than that traffic concentrated. The expression above reads the last
+published value; the `for` clause is what requires the condition to hold, and it fires on an idle
+node too. Read it together with the node's message volume.
 
 `path_planner.diversity_metric_window` sets how many recent draws the score covers (default
 `200`). `path_planner.min_return_path_diversity` sets the score at which a session logs one WARN,
