@@ -32,8 +32,8 @@ use crate::{
 ///
 /// - [`HoprPacketPipelineBuilder::build_for_relay`] — full pipeline. Requires
 ///   [`HoprPacketPipelineBuilder::with_ticket_events`] to be called beforehand.
-/// - [`HoprPacketPipelineBuilder::build_for_entry`] — Entry nodes. Ticket events are not needed (and any value
-///   previously set is ignored).
+/// - [`HoprPacketPipelineBuilder::build_for_edge`] — Edge nodes. Ticket events are not needed (and any value previously
+///   set is ignored).
 /// - [`HoprPacketPipelineBuilder::build_for_exit`] — Exit nodes. Ticket events are not needed (and any value previously
 ///   set is ignored).
 ///
@@ -336,6 +336,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     /// Attaches the ticket events sink. Required for Relay nodes (see
     /// [`HoprPacketPipelineBuilder::build_for_relay`]); ignored by Entry and Exit nodes.
     #[must_use]
+    #[cfg(feature = "relay")]
     pub fn with_ticket_events<TEvt2>(
         self,
         ticket_events: TEvt2,
@@ -367,6 +368,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     /// Optional: when not called, the builder defaults to [`NopExitAcknowledgementShareProcessor`]
     /// and a draining sink ([`futures::sink::drain`]).
     #[must_use]
+    #[cfg(any(feature = "relay", feature = "exit"))]
     pub fn with_exit_ack_share_processing<A2, SEvt2>(
         self,
         exit_ack_proc: A2,
@@ -566,6 +568,7 @@ where
 }
 
 // Terminal: Relay
+#[cfg(feature = "relay")]
 impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
@@ -668,10 +671,11 @@ where
     AppIn: futures::Stream + Send + 'static,
     AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
-    /// Builds the pipeline configured for an Entry node.
+    /// Builds the pipeline configured for an Edge node.
     ///
     /// The incoming acknowledgement pipeline is not started; ticket events (if any) are ignored.
-    pub fn build_for_entry(self) -> AbortableList<HoprTransportProcess> {
+    #[cfg(feature = "edge")]
+    pub fn build_for_edge(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,
             wire_msg,
@@ -694,7 +698,7 @@ where
                 .api(api)
                 .with_counters(counters)
                 .with_config(cfg.pipeline)
-                .build_for_entry(),
+                .build_for_edge(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
                 .transport(wire_msg)
@@ -702,7 +706,7 @@ where
                 .api(api)
                 .with_counters(counters)
                 .with_config(cfg.pipeline)
-                .build_for_entry(),
+                .build_for_edge(),
         };
 
         processes.flat_map_extend_from(inner, HoprTransportProcess::Pipeline);
@@ -713,6 +717,7 @@ where
     ///
     /// The incoming acknowledgement pipeline is started but its acknowledgements are drained
     /// (never forwarded to a ticket processor); ticket events (if any) are ignored.
+    #[cfg(feature = "exit")]
     pub fn build_for_exit(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,

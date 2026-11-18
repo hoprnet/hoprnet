@@ -50,7 +50,14 @@ tokio-stream = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-lib = { workspace = true, features = ["session-client"] }
+# The workspace entry carries no defaults, so this crate states the ones it relies on: the PIX
+# curve and the announcement transport are part of the network-wide build choice, not of the
+# entity. `session-client` is the only Session surface this crate uses.
+hopr-lib = { workspace = true, features = [
+  "pix-bjj",
+  "session-client",
+  "transport-announce-quic",
+] }
 hopr-utils = { workspace = true, features = ["network-types"] }
 hopr-transport = { workspace = true }
 

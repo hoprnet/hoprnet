@@ -147,6 +147,20 @@
             cargoExtraArgs = "";
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
           };
+
+          # Builds the library with one entity's feature set. Every entity build goes through this one
+          # definition, so the source, the vendored dependency tree (`depsSrc`), the toolchain and
+          # every build input are the same derivation inputs as the release library build; the
+          # dependency graph is compiled once and cached, and only the final `hopr-lib` compilation
+          # differs per feature set.
+          entityLibrary =
+            cargoExtraArgs:
+            rust-builder-local.callPackage nixLib.mkRustPackage (
+              libraryBuildArgs
+              // {
+                inherit cargoExtraArgs;
+              }
+            );
           # `ticket-inspector` is a binary target of `hopr-ticket-manager`, which this
           # workspace consumes as a plain crates.io dependency, so the workspace build
           # (`cargo build -p hopr-ticket-manager`) cannot reach it and it needs a
@@ -326,6 +340,26 @@
                 runClippy = true;
               }
             );
+
+            # One library build per entity: the `hopr-lib` artifact a binary for that role links,
+            # so CI compiles the fence in every combination the entity documentation promises rather
+            # than only the default one. The basic division is edge <-> relay <-> exit, with
+            # `raw-exit` as the same Session server without the relay's ticket processing.
+            #
+            # All four come from this one definition, and differ only in `cargoExtraArgs`. That is
+            # what keeps them off each other's toes and shared with the release library build: the
+            # source, the vendored dependency tree (`depsSrc`), the toolchain and every build input
+            # are the same derivation inputs, so the expensive part — compiling the dependency graph —
+            # is one cache entry whether this builds one entity, all four, or the release artifact.
+            # Only the final `hopr-lib` compilation differs, because the feature set does.
+            #
+            # The PIX curve and the announcement transport are network-wide choices, not entity ones,
+            # so each set states them explicitly: the crate defaults carry them, and
+            # `--no-default-features` would otherwise drop them.
+            library-edge = entityLibrary "--no-default-features -F edge,pix-bjj,transport-announce-quic";
+            library-relay = entityLibrary "--no-default-features -F relay,pix-bjj,transport-announce-quic";
+            library-exit = entityLibrary "--no-default-features -F exit,pix-bjj,transport-announce-quic";
+            library-raw-exit = entityLibrary "--no-default-features -F raw-exit,pix-bjj,transport-announce-quic";
 
             # Build all workspace benchmarks without running them; copies binaries to $out/bin
             bench-build =
