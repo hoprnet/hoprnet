@@ -1,10 +1,11 @@
 # Perf results: Sphinx alpha deferral & single point encoding
 
-- **Branch:** `perf/sphinx-defer-alpha-and-single-compress`
-- **Commit:** `a075a107e2`
-- **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs` (+117 / −19)
+- **Branch:** `perf/sphinx-defer-alpha-and-single-compress` (PR #8700)
+- **Commits:** `b5debbb7fc` (the change), `c5acb053e2` (these results), `4c302b614d` (the
+  degenerate-alpha guard), `2d718ac599` (prettier + re-measured benchmarks)
+- **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs`
 - **Date:** 2026-11-18
-- **Commit is unsigned** (no ssh agent in the session; `git commit -S` failed with `Couldn't get agent socket?`, re-run without `-S` per environment rule).
+- **All commits are SSH-signed** with `git-signer`; GitHub reports `verified: true`.
 
 ## Motivation
 
