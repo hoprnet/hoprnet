@@ -260,9 +260,9 @@ jobs:
       contents: read
     steps:
       - name: Build every entity and verify the fence
-        uses: hoprnet/hopr-workflows/actions/nix-action@3ee95c480962bb3c1fc0061887da9ba735f537c7 # nix-action-v1
+        uses: hoprnet/hopr-workflows/actions/nix-action@43c833e72dffe4f2f3be60193733e5657f8aa0d7 # nix-action-v2.0.0
         with:
-          source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+          repo_sha: ${{ github.event.pull_request.head.sha || github.sha }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           command: |
             nix build -L --no-link .#library-edge .#library-relay .#library-exit .#library-raw-exit
