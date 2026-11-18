@@ -831,7 +831,7 @@ fn cluster_fixture_inner(
                         surb_balance_notify_period,
                     );
 
-                    let instance = crate::testing::wiring::build_full_with_chain(
+                    let instance = crate::testing::wiring::build_relay_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,
@@ -903,15 +903,24 @@ fn cluster_fixture_inner(
 /// Intermediate result from a `block_on` build — avoids moving `runtime` into the async block.
 enum RawRoleNode {
     Entry(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<
+            crate::HoprEntry<TestingConnector, hopr_network_graph::SharedChannelGraph, hopr_transport_p2p::HoprNetwork>,
+        >,
         TestingConnector,
     ),
     Relay(
-        Arc<crate::testing::wiring::FullHopr<TestingConnector>>,
+        Arc<
+            crate::HoprRelay<
+                TestingConnector,
+                hopr_network_graph::SharedChannelGraph,
+                hopr_transport_p2p::HoprNetwork,
+                crate::testing::wiring::SharedTicketManager,
+            >,
+        >,
         TestingConnector,
     ),
     Exit(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<crate::HoprExit<TestingConnector, hopr_network_graph::SharedChannelGraph, hopr_transport_p2p::HoprNetwork>>,
         TestingConnector,
     ),
 }
@@ -1091,7 +1100,7 @@ where
                         .await?;
                         Ok(RawRoleNode::Exit(instance, connector))
                     } else {
-                        let instance = crate::testing::wiring::build_full_with_chain(
+                        let instance = crate::testing::wiring::build_relay_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,
