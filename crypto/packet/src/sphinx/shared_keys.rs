@@ -143,30 +143,14 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         })
     }
 
-    /// Calculates the forward transformation given the local private key.
-    ///
-    /// Efficiency note: the `public_element_alpha` is a precomputed group element Alpha encoding associated with the
-    /// `private_scalar`.
-    ///
-    /// Kept as the complete transform even though the packet decoder now uses
-    /// [`SharedKeys::forward_transform_deferred`] and skips the alpha on the final hop: the suite test compares
-    /// the two, and that comparison is what keeps the split from quietly diverging.
-    #[cfg(test)]
-    pub(crate) fn forward_transform(
-        alpha: &Alpha<G::AlphaLen>,
-        private_scalar: &E,
-        public_element_alpha: &Alpha<G::AlphaLen>,
-    ) -> hopr_types::crypto::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
-        let (deferred, secret) = Self::forward_transform_deferred(alpha, private_scalar, public_element_alpha)?;
-        Ok((deferred.finalize()?, secret))
-    }
-
-    /// The first half of [`SharedKeys::forward_transform`]: everything but the blinded alpha.
+    /// The first half of the forward transform: everything but the blinded alpha.
     ///
     /// Blinding the alpha is a second variable-base scalar multiplication, and a packet's *last* hop
     /// never forwards, so that point is never read there. Deferring it lets a decode pay only the
     /// multiplication that derives the shared secret when the packet is addressed to this node,
     /// which is the common case for an Exit and for any node's own traffic.
+    ///
+    /// The caller that does forward must call [`DeferredAlpha::finalize`] to finish the transform.
     pub(crate) fn forward_transform_deferred(
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,
@@ -174,22 +158,22 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     ) -> hopr_types::crypto::errors::Result<(DeferredAlpha<E, G>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
-        let s_k = alpha_point.clone().mul(private_scalar);
-
-        // Reject a degenerate alpha here, on *every* hop, not only where the blinded alpha is
-        // finalized. A packet whose alpha encodes the identity point makes `s_k = identity * sk`
-        // independent of this node's private key: the shared secret - and so the header MAC the
-        // packet is checked against - becomes computable by anyone, which would let a sender address
-        // a *fully authenticated* packet to any node without knowing its key. The old eager
-        // `forward_transform` rejected such a packet through its output-alpha check; deferring that
-        // multiply must not move the guard off the final hop with it.
+        // Reject a degenerate alpha *before* the private-scalar multiplication, on every hop.
         //
-        // On Edwards the two checks coincide for the identity input (multiplying it by `b_k` leaves
-        // it the identity), so this preserves the old accept/reject set exactly rather than widening
-        // it.
-        if !s_k.is_valid() {
+        // The old eager `forward_transform` rejected it through its check on the *output* alpha, which
+        // the final hop no longer computes - but the reason to reject is the input. With a point of
+        // small order (the identity above all), `alpha * sk` is a small-order point too, and one that
+        // depends on `sk` only through the parity of the reduced scalar: for a clamped scalar the
+        // four subgroups' points come out the same for half the keys and negated for the other half.
+        // The KDF therefore sees only a couple of possible points, so the shared secret - and with it
+        // the header MAC - can be derived by a third party from public information rather than by the
+        // recipient alone. Checking the public input keeps that check on the final hop and also makes
+        // it independent of which group the suite computes in.
+        if !alpha_point.is_valid() {
             return Err(CryptoError::CalculationError);
         }
+
+        let s_k = alpha_point.clone().mul(private_scalar);
 
         // Encode the shared point once: both keys below come from it, and `to_alpha` costs a field
         // inversion on Edwards. This is the per-packet cost of relaying, so the second encoding is
@@ -199,10 +183,18 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         let b_k = G::extract_key_from_alpha(&s_k_alpha, HASH_KEY_SPHINX_BLINDING, alpha);
 
+        // Parse the blinding scalar here rather than in `finalize`, so that a KDF output the suite
+        // rejects is refused on *every* hop, as the eager transform refused it. secp256k1 is the case
+        // that matters: its `from_bytes` rejects a value at or above the group order, and zero is a
+        // valid encoding there (it yields the identity), so a check that lived only in `finalize`
+        // would let a final hop skip both the parse and the identity rejection. Parsing costs a
+        // scalar conversion, not the multiplication, so the final hop still saves the multiplication.
+        let b_k_checked = E::from_bytes(b_k.as_ref())?;
+
         Ok((
             DeferredAlpha {
                 alpha_point,
-                b_k,
+                b_k: b_k_checked,
                 _d: PhantomData,
             },
             secret,
@@ -216,16 +208,18 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 /// the packet is final need not pay for the multiplication whose result is then discarded.
 pub(crate) struct DeferredAlpha<E: Scalar, G: GroupElement<E>> {
     alpha_point: G,
-    /// Blinding factor `b_k`, kept in its raw KDF form so that [`Scalar`] need not be `Clone`.
-    b_k: SharedSecret,
+    /// Blinding factor `b_k`, already parsed by the first half of the transform.
+    b_k: E,
     _d: PhantomData<E>,
 }
 
 impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
-    /// Computes the blinded alpha, as [`SharedKeys::forward_transform`] would have.
+    /// Computes the blinded alpha, the second half of the forward transform.
+    ///
+    /// This is the multiplication [`SharedKeys::forward_transform_deferred`] leaves out; together the
+    /// two are what the eager (complete) transform used to do in one call.
     pub(crate) fn finalize(self) -> hopr_types::crypto::errors::Result<Alpha<G::AlphaLen>> {
-        let b_k_checked = E::from_bytes(self.b_k.as_ref())?;
-        let alpha_new = self.alpha_point.mul(&b_k_checked);
+        let alpha_new = self.alpha_point.mul(&self.b_k);
 
         if !alpha_new.is_valid() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
@@ -319,6 +313,7 @@ pub trait SphinxSuite {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use anyhow::Context;
     use subtle::ConstantTimeEq;
 
     use super::*;
@@ -348,37 +343,57 @@ pub(crate) mod tests {
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            // Both halves of the split transform are exercised here: the deferred form must yield the
-            // same secret as the eager one, and its `finalize` must yield the same alpha.
-            //
-            // Note the limits of this check: `forward_transform` now *delegates* to
-            // `forward_transform_deferred`, so this compares the deferral round-trip against itself,
-            // not against the pre-deferral implementation. Byte-equivalence with the old code was
-            // established separately (an A/B harness against the parent commit, all three suites);
-            // what this test pins is that the loop stays self-consistent and that no hop's alpha is
-            // dropped or reordered.
+            // Both halves of the split transform are exercised here, against a *reference*
+            // implementation of the pre-deferral eager transform written out below. A comparison
+            // against a helper that merely calls `forward_transform_deferred` + `finalize` would not
+            // do: a change to the blinding salt or the alpha encoding would move both sides and leave
+            // the assertion passing.
+            let (expected_alpha, expected_secret) =
+                reference_forward_transform::<S>(&alpha_cpy, &priv_key, &pub_keys[i].1);
+
             let (deferred, secret) =
                 SharedKeys::<S::E, S::G>::forward_transform_deferred(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
 
             assert_eq!(
                 secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(),
                 1,
-                "forward transform should yield the same shared secret"
+                "hop {i}: forward transform should yield the same shared secret"
             );
-
-            let (eager_alpha, eager_secret) =
-                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
             assert_eq!(
-                eager_secret.ct_eq(&secret).unwrap_u8(),
+                secret.ct_eq(&expected_secret).unwrap_u8(),
                 1,
-                "deferring the alpha must not change the secret"
+                "hop {i}: the deferred secret must match the reference transform"
             );
 
             let alpha = deferred.finalize().unwrap();
-            assert_eq!(alpha, eager_alpha, "deferring the alpha must not change it");
+            assert_eq!(
+                alpha, expected_alpha,
+                "hop {i}: the finalized alpha must match the reference transform"
+            );
 
             alpha_cpy = alpha;
         }
+    }
+
+    /// The pre-deferral eager forward transform, spelled out.
+    ///
+    /// Deliberately re-derived here from the operations in
+    /// [`SharedKeys::forward_transform_deferred`] plus [`DeferredAlpha::finalize`], rather than calling
+    /// either, so that the test above has an expectation that does not move when the implementation
+    /// moves.
+    #[allow(clippy::type_complexity)] // the alpha type is spelled out by the trait, not chosen here
+    fn reference_forward_transform<S: SphinxSuite>(
+        alpha: &Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+        private_scalar: &S::E,
+        public_element_alpha: &Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    ) -> (Alpha<<S::G as GroupElement<S::E>>::AlphaLen>, SharedSecret) {
+        let alpha_point = S::G::from_alpha(alpha.clone()).expect("valid alpha");
+        let s_k = alpha_point.clone().mul(private_scalar);
+        let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, public_element_alpha);
+        let b_k = s_k.extract_key(HASH_KEY_SPHINX_BLINDING, alpha);
+        let alpha_new = alpha_point.mul(&S::E::from_bytes(b_k.as_ref()).expect("valid blinding scalar"));
+        assert!(alpha_new.is_valid(), "reference transform produced an invalid alpha");
+        (alpha_new.to_alpha(), secret)
     }
 
     /// A degenerate (identity) alpha must be rejected on the **deferred** path too.
@@ -414,6 +429,79 @@ pub(crate) mod tests {
             result.is_err(),
             "the deferred transform must reject an identity alpha, as the eager transform did"
         );
+        Ok(())
+    }
+
+    /// A **nonidentity** small-order alpha must be rejected too.
+    ///
+    /// The identity is not the only degenerate input: a point of order 2 or 4 also makes `alpha * sk`
+    /// take only one or two values regardless of `sk`, so the shared secret, and the header MAC it
+    /// authenticates, is derivable by a third party. The identity-only check the code used to have
+    /// (`!is_identity()`) let these through. All eight small-order points are tried, so the check is
+    /// exercised against each torsion class rather than against the identity alone.
+    #[cfg(feature = "ed25519")]
+    #[test]
+    fn a_nonidentity_small_order_alpha_is_rejected() -> anyhow::Result<()> {
+        use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point};
+
+        let (pub_key, priv_key) = <Curve25519Point as GroupElement<Curve25519Scalar>>::random_pair();
+
+        // The eight points of the order-8 torsion subgroup, in compressed Edwards form. The first is
+        // the identity; the rest are the nonidentity classes the old guard admitted.
+        const SMALL_ORDER: [[u8; 32]; 8] = [
+            [
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+            [
+                0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
+            ],
+        ];
+
+        for (idx, bytes) in SMALL_ORDER.iter().enumerate() {
+            let point = Curve25519CompressedPoint(*bytes)
+                .decompress()
+                .with_context(|| format!("small-order point {idx} must decompress"))?;
+            assert!(
+                !<Curve25519Point as GroupElement<Curve25519Scalar>>::is_valid(&point),
+                "small-order point {idx} must be invalid"
+            );
+
+            let result = SharedKeys::<Curve25519Scalar, Curve25519Point>::forward_transform_deferred(
+                &point.to_alpha(),
+                &priv_key,
+                &pub_key.to_alpha(),
+            );
+            assert!(
+                result.is_err(),
+                "small-order alpha {idx} must be rejected before any key derivation"
+            );
+        }
         Ok(())
     }
 }

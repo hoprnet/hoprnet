@@ -3,7 +3,8 @@
 - **Branch:** `perf/sphinx-defer-alpha-and-single-compress` (PR #8700)
 - **Commits:** `b5debbb7fc` (the change), `c5acb053e2` (these results), `4c302b614d` (the
   degenerate-alpha guard), `2d718ac599` (prettier + re-measured benchmarks)
-- **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs`
+- **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs`,
+  `crypto/packet/src/sphinx/ec_groups.rs` (the last is review follow-up: the small-order `is_valid` fix)
 - **Date:** 2026-11-18
 - **All commits are SSH-signed** with `git-signer`; GitHub reports `verified: true`.
 
@@ -43,10 +44,15 @@ form yields the same secret and the same finalized alpha as the eager form.
 Isolated A/B: baseline built from `HEAD` (`ff0076efaa`) in a separate git worktree with its own
 `CARGO_TARGET_DIR`; the fixed build from the branch. Both binaries run back-to-back on a quiet box, one
 process at a time (an earlier attempt ran baseline and fixed concurrently and produced contaminated,
-noisy numbers — those were discarded). Criterion defaults otherwise; `--sample-size 30–60`.
-`change:` intervals reported by criterion, all `p < 0.001`.
+noisy numbers — those were discarded). Criterion defaults otherwise; `--sample-size 30–60`. The `change:` intervals are criterion's, with the
+`p` value quoted per row; every row except the `pix_on` one is `p < 0.001`.
 
-## Results (isolated A/B, significant)
+## Results (isolated A/B)
+
+The MiB/s figures are **normalized to the maximum payload capacity** (`HoprPacket::PAYLOAD_SIZE` per
+packet), which is what the benchmark's `Throughput` declares; the fixtures carry 300 application bytes
+per packet, so the application-level rate is lower — for the 5,000-packet e2e run, 1.5 MB in 184.15 ms
+≈ 7.8 MiB/s of application data. The relative speedups are unaffected by the normalization.
 
 | Benchmark                                                | Before                  | After                   | Δ                         |
 | -------------------------------------------------------- | ----------------------- | ----------------------- | ------------------------- |
@@ -102,17 +108,26 @@ The deferral moved more than the multiply: the old eager `forward_transform` als
 on **every** hop, and the new code left that check only in `finalize()` — i.e. on the relaying branch. On the
 final hop an identity-point alpha was therefore no longer rejected.
 
-This is not cosmetic. With an identity alpha, `s_k = identity · sk = identity` **independently of the node's
-private key**, so the shared secret — and hence the header MAC a packet is checked against — is computable by
-anyone. An attacker could address a _fully authenticated_ `Final` packet to any node without knowing its key
-(the old check was what stopped this). Opus reproduced it end-to-end and showed the secret is key-independent;
-Sonnet independently located the same gap and its tag-commit timing side effect on the relay hop.
+This is not cosmetic, though it is narrower than "an attacker can forge any packet". A Sphinx sender can
+already build a MAC-valid `Final` packet for any node by using that node's public key with its own scalar, so
+the ordinary case is not a forgery. What the identity alpha costs is **secrecy of that hop's shared secret**:
+`s_k = identity · sk = identity` regardless of the node's private key, so the secret — and the header MAC
+derived from it — is computable by a third party from public information alone, where normally only the
+recipient can compute it. The recipient's public key is still the KDF salt, but the salt is public, so it does
+not restore secrecy. Opus reproduced the gap end-to-end and showed the secret is key-independent; Sonnet
+independently located the same gap and its replay-tag commit-timing side effect on the relay hop.
 
-**Fix (in the same commit series):** run `is_valid()` on `s_k` in the _first half_ of the transform, so every
-hop still rejects a degenerate alpha. On Edwards the old and new accept/reject sets coincide exactly (multiplying
-the identity by `b_k` leaves it the identity), so this restores the previous behaviour rather than widening it.
-Regression test `a_degenerate_alpha_is_rejected_on_the_deferred_path` fails without the guard and passes with it
-(verified both ways).
+**Fix:** reject the degenerate alpha on the **public input** (`alpha_point.is_valid()`) in the first half of the
+transform, so every hop rejects it before the private-scalar multiplication. Because `is_valid` for the Edwards
+and Montgomery suites now excludes all small-order points — the identity _and_ the order-2/4/8 classes, which
+the old identity-only check let through — this is slightly stricter than the pre-deferral check, which is the
+intent: a small-order alpha makes `alpha · sk` independent of `sk` up to sign for any clamped scalar, so it has
+the same secrecy loss as the identity. The secp256k1 case, where a zero blinding scalar was previously rejected
+only through the identity check, is preserved by parsing the blinding scalar in the first half.
+
+Regression tests: `a_degenerate_alpha_is_rejected_on_the_deferred_path` (identity; fails without the guard) and
+`a_nonidentity_small_order_alpha_is_rejected` (all eight torsion classes). Both verified to fail without the
+guard and pass with it.
 
 **Cost of the guard:** `packet_forwarding` 74.87 → 75.23 µs (+0.5%), `packet_receiving` 36.92 → 36.98 µs
 (+0.5%). Negligible against the wins above.

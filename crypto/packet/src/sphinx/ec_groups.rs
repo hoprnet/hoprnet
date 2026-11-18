@@ -2,7 +2,7 @@ use hopr_types::crypto::errors::Result;
 #[cfg(feature = "x25519")]
 use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
-use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity};
+use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar};
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
 use hopr_types::crypto::types::{ExpandedOffchainPublicKey, OffchainPublicKey};
 #[cfg(feature = "secp256k1")]
@@ -126,8 +126,13 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
     }
 
     fn is_valid(&self) -> bool {
-        use IsIdentity;
-        !self.is_identity()
+        // `GroupElement` requires a valid element to exclude small-order points, not only the
+        // identity. A Montgomery coordinate also has no sign bit, so it can decode to a point of the
+        // wrong Edwards sign; that is harmless for the Montgomery ladder, but the point must still be
+        // torsion-free. `to_edwards` is only used here to reach `is_torsion_free`, which is a property
+        // of the Edwards representative and independent of which of the two it is.
+        use hopr_types::crypto::primitives::IsIdentity;
+        !self.is_identity() && self.0.to_edwards(0).is_none_or(|edwards| edwards.is_torsion_free())
     }
 }
 
@@ -150,11 +155,16 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
     }
 
     fn is_valid(&self) -> bool {
-        // Ed25519 scalars always come clamped (pre-multiplied by the curve's co-factor)
-        // and therefore cannot result into points of small order.
-        // See `x25519_scalar_from_bytes` for more details.
-        use IsIdentity;
-        !self.is_identity()
+        // The scalar is clamped (a multiple of the co-factor 8), so `generate` cannot produce a
+        // small-order point - but `is_valid` is also called on points that come in from the wire, in
+        // particular the packet's alpha before it is multiplied. A sender controls that byte string,
+        // so the check must be on the point, not on an argument about the scalar.
+        //
+        // `is_torsion_free` alone still admits the identity: it is a member of the prime-order
+        // subgroup. The identity is exactly the case that makes `alpha * sk` independent of `sk`, so
+        // it has to be excluded explicitly as well.
+        use hopr_types::crypto::primitives::IsIdentity;
+        !self.is_identity() && self.is_torsion_free()
     }
 }
 
