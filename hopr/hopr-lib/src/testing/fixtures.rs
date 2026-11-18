@@ -905,15 +905,15 @@ fn cluster_fixture_inner(
 /// Intermediate result from a `block_on` build — avoids moving `runtime` into the async block.
 enum RawRoleNode {
     Entry(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprEdge<TestingConnector>>,
         TestingConnector,
     ),
     Relay(
-        Arc<crate::testing::wiring::RelayHopr<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprRelay<TestingConnector>>,
         TestingConnector,
     ),
     Exit(
-        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprEdge<TestingConnector>>,
         TestingConnector,
     ),
 }
