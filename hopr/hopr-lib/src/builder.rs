@@ -107,7 +107,7 @@ type PeerDiscoveryRx =
 /// The session channels exist only when the session stack is compiled in, so a session-less entity
 /// has no field to fill and no channel to carry. The admission sink is optional even then, because
 /// a node built without a session server has nobody to ask.
-struct BuildParts<Chain, Graph, Net, Ct, #[cfg(feature = "state-dump")] Dump> {
+struct BuildParts<Chain, Graph, Net, Ct, Dump = ()> {
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct, Dump>,
     // Read only by the relay and exit builds; a source node hands the transport no session
     // channels at all.
