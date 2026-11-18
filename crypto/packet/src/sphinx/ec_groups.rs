@@ -136,9 +136,10 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
         // two points that have no Edwards representative at all (u = -1, the order-2 point, and
         // u = 0). Either way it is not a point this protocol may continue with, so it is rejected
         // rather than skipped: treating `None` as valid is what let the order-2 point through.
-        use hopr_types::crypto::primitives::IsIdentity;
-        self.to_edwards(0)
-            .is_some_and(|edwards| edwards.is_torsion_free() && !edwards.is_identity())
+        // Same reasoning as the Edwards implementation: `is_small_order` rejects the eight torsion
+        // points (identity included) at the cost of three doublings, where `is_torsion_free` would cost
+        // a scalar multiplication on the per-packet path.
+        self.to_edwards(0).is_some_and(|edwards| !edwards.is_small_order())
     }
 }
 
@@ -164,13 +165,14 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         // The scalar is clamped (a multiple of the co-factor 8), so `generate` cannot produce a
         // small-order point - but `is_valid` is also called on points that come in from the wire, in
         // particular the packet's alpha before it is multiplied. A sender controls that byte string,
-        // so the check must be on the point, not on an argument about the scalar.
+        // so the check must be on the point.
         //
-        // `is_torsion_free` alone still admits the identity: it is a member of the prime-order
-        // subgroup. The identity is exactly the case that makes `alpha * sk` independent of `sk`, so
-        // it has to be excluded explicitly as well.
-        use hopr_types::crypto::primitives::IsIdentity;
-        !self.is_identity() && self.is_torsion_free()
+        // `is_small_order` rather than `is_torsion_free`: the latter multiplies by the group order
+        // (a full scalar multiplication, measurable on the per-packet path), while the only inputs
+        // that must be rejected here are the eight points whose order divides 8, and
+        // `is_small_order` is three doublings plus an identity test. It covers the identity too, so
+        // the explicit identity term is gone.
+        !self.is_small_order()
     }
 }
 

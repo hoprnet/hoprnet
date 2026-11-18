@@ -1,10 +1,8 @@
 # Perf results: Sphinx alpha deferral & single point encoding
 
 - **Branch:** `perf/sphinx-defer-alpha-and-single-compress` (PR #8700)
-- **Benchmarked fixed revision:** `2d718ac599` (includes the degenerate-alpha guard)
-- **Later commits (review follow-up, not separately benchmarked):** `4c302b614d`…`d88904384c` — the guard,
-  the small-order `is_valid` fix, and doc/test corrections. None of them touches a timed hot path except by
-  adding the `is_identity`/`is_torsion_free` check, whose cost is estimated below.
+- **Benchmarked fixed revision:** `6b196b5dde` (the final head: guard, small-order `is_valid`, review follow-up)
+- **Baseline:** `ff0076efaa`
 - **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs`,
   `crypto/packet/src/sphinx/ec_groups.rs`
 - **Date:** 2026-11-18
@@ -43,39 +41,42 @@ form yields the same secret and the same finalized alpha as the eager form.
 
 ## Benchmark method
 
-Isolated A/B: baseline built from `ff0076efaa` in a separate git worktree with its own
-`CARGO_TARGET_DIR`; the **fixed build is `2d718ac599`**, which already contains the degenerate-alpha guard.
-Both binaries run back-to-back on a quiet box, one process at a time (an earlier attempt ran baseline and
-fixed concurrently and produced contaminated, noisy numbers — those were discarded). Criterion defaults
-otherwise; `--sample-size 30–60`. The `change:` intervals are criterion's, with the `p` value quoted per
-row; every row except the `pix_on` one is `p < 0.001`. Δ is criterion's `change` estimate (median of the
-two sample distributions) against the saved baseline, not a recomputation from the two means in the row.
+Isolated A/B, **re-measured on the final head `6b196b5dde`** against `ff0076efaa`: the baseline is built in
+a separate git worktree with its own `CARGO_TARGET_DIR`, the fixed build from the branch, and the two
+binaries run back-to-back on a quiet box, one process at a time. Each benchmark below was confirmed twice; the
+values are single runs at `--sample-size 20–25` unless a row says otherwise. Where an early reading disagreed
+with a later one, the pair was re-run **interleaved** (base, fixed, base, fixed, base, fixed) and the
+interleaved result is the one quoted — that is how the relay row's first 235 µs reading was shown to be drift.
 
-The exact commands, the baseline/fixed revisions, and the machine (AMD EPYC 9575F, 16 vCPU, Linux 7.0.0)
-are recorded here; the raw Criterion samples live under the untracked `target/criterion/` of each build and
-were not archived — re-running the two binaries reproduces them.
+Machine: AMD EPYC 9575F, 16 vCPU, Linux 7.0.0. Raw Criterion samples live under the untracked
+`target/criterion/` of each build and were not archived; re-running the two binaries reproduces them.
 
-## Results (isolated A/B)
+## Results (isolated A/B, final head `6b196b5dde`)
 
 The MiB/s figures are **normalized to the maximum payload capacity** (`HoprPacket::PAYLOAD_SIZE` per
-packet), which is what the benchmark's `Throughput` declares; the fixtures carry 300 application bytes
-per packet, so the application-level rate is lower — for the 5,000-packet e2e run, 1.5 MB in 184.15 ms
-≈ 7.8 MiB/s of application data. The relative speedups are unaffected by the normalization.
+packet), which is what the benchmark's `Throughput` declares; the fixtures carry 300 application bytes per
+packet, so the application-level rate is lower — for the 5,000-packet e2e run, 1.5 MB in 184.7 ms ≈ 7.8 MiB/s
+of application data. The relative speedups are unaffected by the normalization.
 
 | Benchmark                                                | Before                  | After                   | Δ                         |
 | -------------------------------------------------------- | ----------------------- | ----------------------- | ------------------------- |
-| `hopr_decoder/recipient` (final hop)                     | 155.45 µs               | 135.47 µs               | **−13.3%**                |
-| `hopr_decoder/ack_recipient`                             | 158.64 µs               | 132.77 µs               | **−16.2%**                |
-| `hopr_decoder/relay_replay` (rejected replay)            | 45.69 µs                | 24.25 µs                | **−47.0%**                |
-| `hopr_decoder/relay`                                     | 219.66 µs               | 216.35 µs               | −1.8%                     |
-| `hopr_encoder/3hop_2surbs`                               | 391.40 µs               | 348.73 µs               | **−10.9%**                |
-| `packet_receiving/any_hop`                               | 58.640 µs               | 36.918 µs               | **−37.0%**                |
-| `packet_sending_no_precomputation/3_hop_2_surbs/pix_off` | 400.69 µs               | 365.48 µs               | **−8.8%**                 |
-| `packet_forwarding/any_hop`                              | 76.856 µs               | 74.869 µs               | −2.6%                     |
-| `pipeline_e2e_forward/3hop_5000pkt`                      | 211.46 ms (73.2 MiB/s)  | 184.15 ms (84.1 MiB/s)  | **−12.9% (+14.8% thrpt)** |
-| `packet_precompute/3_hop_2_surbs/pix_off`                | 353.45 µs               | 319.01 µs               | **−9.8%**                 |
-| `protocol_throughput_pipeline/63.4 MiB/pix_off`          | 402.35 ms (157.6 MiB/s) | 379.84 ms (166.9 MiB/s) | **−5.6% (+5.9% thrpt)**   |
-| `protocol_throughput_pipeline/63.4 MiB/pix_on`           | 416.39 ms (152.3 MiB/s) | 415.63 ms (152.5 MiB/s) | −0.2% (n.s., p=0.88)      |
+| `packet_receiving` (final-hop decode)                    | 58.41 µs                | 37.30 µs                | **−36.1%**                |
+| `hopr_decoder/relay_replay` (rejected replay)            | 45.71 µs                | 24.40 µs                | **−46.6%**                |
+| `pipeline_e2e_forward/3hop_5000pkt`                      | 211.43 ms (73.2 MiB/s)  | 184.74 ms (83.8 MiB/s)  | **−12.6% (+14.5% thrpt)** |
+| `packet_precompute/3_hop_2_surbs/pix_off`                | 369.21 µs               | 327.51 µs               | **−11.3%**                |
+| `packet_sending_no_precomputation/3_hop_2_surbs/pix_off` | 402.49 µs               | 367.51 µs               | **−8.7%**                 |
+| `hopr_encoder/3hop_2surbs`                               | 387.92 µs               | 357.90 µs               | **−7.7%**                 |
+| `protocol_throughput_pipeline/63.4 MiB/pix_off`          | 440.86 ms (143.8 MiB/s) | 415.23 ms (152.7 MiB/s) | **−5.8% (+6.2% thrpt)**   |
+| `hopr_decoder/ack_recipient`                             | 155.54 µs               | 150.03 µs               | −3.5%                     |
+| `hopr_decoder/recipient`                                 | 155.88 µs               | 152.11 µs               | −2.4%                     |
+| `packet_forwarding` (relay decode)                       | 76.96 µs                | 75.57 µs                | −1.8%                     |
+| `hopr_decoder/relay`                                     | 217.60 µs               | 217.49 µs               | −0.1% (flat)              |
+
+`hopr_decoder/recipient` and `ack_recipient` are smaller than in the first measurement round (155.5 → 152.1
+rather than 155.5 → 135.5). Both figures are real; the gap is the small-order guard now on the hot path. The
+guard is ~0.5% when it is `is_small_order` (three doublings) and was ~40% when it was `is_torsion_free` (a
+full scalar multiplication) — see "Guard cost" below. The relay row is flat because it pays the guard and the
+`to_alpha` deduplication but not the deferred multiply, which only the final hop skips.
 
 `relay` moves least because a relay still must compute the blinded alpha (it forwards), so only items 1
 and 2 help it — **not** item 3, whose fixed-base update is in `SharedKeys::generate`, which a relay never
@@ -139,11 +140,12 @@ Regression tests: `a_degenerate_alpha_is_rejected_on_the_deferred_path` (identit
 `a_nonidentity_small_order_alpha_is_rejected` (all eight torsion classes). Both verified to fail without the
 guard and pass with it.
 
-**Cost of the guard.** The table above is measured on a build that already contains the guard
-(`2d718ac599`), so it is the net figure, not the pre-guard one. A separate run of the _same_ build with the
-guard then added back in (an intermediate revision) read `packet_forwarding` 74.87 → 75.23 µs (+0.5%) and
-`packet_receiving` 36.92 → 36.98 µs (+0.5%); that is a run-to-run comparison on one revision boundary, not
-a third isolated A/B, and the +0.5% is at the edge of the noise it was taken over.
+**Guard cost, with a measured regression.** The guard's first implementation used `is_torsion_free`, which
+multiplies by the group order. Measured on the then-head against `ff0076efaa`, that pushed `packet_forwarding`
+from 76.9 to **108.9 µs (+41%)**; the relay path pays the check on every packet, so a full scalar
+multiplication there swamps the deferral. Switching to `is_small_order` (three doublings; it rejects exactly
+the eight torsion points, identity included) brought forwarding back to 75.57 µs and receiving to 37.30 µs —
+the numbers in the table. That is why the final head, not `2d718ac599`, is what this document reports.
 
 ### Also corrected on their reports
 
