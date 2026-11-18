@@ -176,6 +176,21 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         let s_k = alpha_point.clone().mul(private_scalar);
 
+        // Reject a degenerate alpha here, on *every* hop, not only where the blinded alpha is
+        // finalized. A packet whose alpha encodes the identity point makes `s_k = identity * sk`
+        // independent of this node's private key: the shared secret - and so the header MAC the
+        // packet is checked against - becomes computable by anyone, which would let a sender address
+        // a *fully authenticated* packet to any node without knowing its key. The old eager
+        // `forward_transform` rejected such a packet through its output-alpha check; deferring that
+        // multiply must not move the guard off the final hop with it.
+        //
+        // On Edwards the two checks coincide for the identity input (multiplying it by `b_k` leaves
+        // it the identity), so this preserves the old accept/reject set exactly rather than widening
+        // it.
+        if !s_k.is_valid() {
+            return Err(CryptoError::CalculationError);
+        }
+
         // Encode the shared point once: both keys below come from it, and `to_alpha` costs a field
         // inversion on Edwards. This is the per-packet cost of relaying, so the second encoding is
         // worth avoiding.
@@ -334,8 +349,14 @@ pub(crate) mod tests {
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
             // Both halves of the split transform are exercised here: the deferred form must yield the
-            // same secret as the eager one, and its `finalize` must yield the same alpha. A packet's
-            // final hop uses only the first half, so this is what keeps the two from diverging.
+            // same secret as the eager one, and its `finalize` must yield the same alpha.
+            //
+            // Note the limits of this check: `forward_transform` now *delegates* to
+            // `forward_transform_deferred`, so this compares the deferral round-trip against itself,
+            // not against the pre-deferral implementation. Byte-equivalence with the old code was
+            // established separately (an A/B harness against the parent commit, all three suites);
+            // what this test pins is that the loop stays self-consistent and that no hop's alpha is
+            // dropped or reordered.
             let (deferred, secret) =
                 SharedKeys::<S::E, S::G>::forward_transform_deferred(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
 
@@ -358,5 +379,41 @@ pub(crate) mod tests {
 
             alpha_cpy = alpha;
         }
+    }
+
+    /// A degenerate (identity) alpha must be rejected on the **deferred** path too.
+    ///
+    /// This is the regression the deferral invites: the blinded alpha used to be checked on every
+    /// hop, and moving that multiply behind the final-hop branch would silently move the check off
+    /// the final hop with it. With an identity alpha, `s_k = identity * sk` is independent of the
+    /// private key, so the shared secret - and the header MAC it authenticates - is computable by
+    /// anyone: a sender could then address a fully authenticated packet to a node whose key it does
+    /// not know. The check must therefore live in the first half of the transform, not in `finalize`.
+    #[cfg(feature = "ed25519")]
+    #[test]
+    fn a_degenerate_alpha_is_rejected_on_the_deferred_path() -> anyhow::Result<()> {
+        use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point};
+
+        let (pub_key, priv_key) = <Curve25519Point as GroupElement<Curve25519Scalar>>::random_pair();
+
+        // Ed25519 compressed encoding of the identity point: y = 1, sign bit 0.
+        let mut identity_bytes = [0u8; 32];
+        identity_bytes[0] = 1;
+        let identity_alpha = Curve25519CompressedPoint(identity_bytes)
+            .decompress()
+            .unwrap()
+            .to_alpha();
+
+        let result = SharedKeys::<Curve25519Scalar, Curve25519Point>::forward_transform_deferred(
+            &identity_alpha,
+            &priv_key,
+            &pub_key.to_alpha(),
+        );
+
+        assert!(
+            result.is_err(),
+            "the deferred transform must reject an identity alpha, as the eager transform did"
+        );
+        Ok(())
     }
 }

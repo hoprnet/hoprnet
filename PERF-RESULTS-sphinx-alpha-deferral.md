@@ -72,13 +72,58 @@ the two per-packet scalar mults.
   final run was taken while the baseline bench was running and regressed to 440 ms — contaminated.
   **Re-measure in isolation before relying on it.**
 
+## Independent verification (two reviewers, parallel, same brief, neither saw the other)
+
+Both reviewers re-derived the analysis from scratch and ran their own A/B harnesses against the parent
+commit's verbatim code:
+
+| claim | Sonnet | Opus |
+|---|---|---|
+| 1. `alpha_prev = coeff_prev·G`; fixed-base `generate` is the same point | CONFIRMED (16 trials × 3 suites, byte-identical) | CONFIRMED (100 trials × 5 hops Ed25519; 20 each secp256k1/x25519) |
+| 2. single `to_alpha()` leaves secret + blinding factor byte-identical | CONFIRMED | CONFIRMED |
+| 3. deferral is output-preserving; no caller can cross-pair | CONFIRMED | CONFIRMED |
+
+Both confirmed `G::generate(s) == s·G` for all three suites (Ed25519 `mul_base`, secp256k1
+`mul_by_generator`, X25519 `mul_base(..).to_montgomery()`, where the Montgomery `u`-coordinate is invariant
+under negation). Both observed **267** tests after the fix below (266 before it) and clean clippy/fmt.
+
+### Defect they independently found, and the fix
+
+The deferral moved more than the multiply: the old eager `forward_transform` also ran `alpha_new.is_valid()`
+on **every** hop, and the new code left that check only in `finalize()` — i.e. on the relaying branch. On the
+final hop an identity-point alpha was therefore no longer rejected.
+
+This is not cosmetic. With an identity alpha, `s_k = identity · sk = identity` **independently of the node's
+private key**, so the shared secret — and hence the header MAC a packet is checked against — is computable by
+anyone. An attacker could address a *fully authenticated* `Final` packet to any node without knowing its key
+(the old check was what stopped this). Opus reproduced it end-to-end and showed the secret is key-independent;
+Sonnet independently located the same gap and its tag-commit timing side effect on the relay hop.
+
+**Fix (in the same commit series):** run `is_valid()` on `s_k` in the *first half* of the transform, so every
+hop still rejects a degenerate alpha. On Edwards the old and new accept/reject sets coincide exactly (multiplying
+the identity by `b_k` leaves it the identity), so this restores the previous behaviour rather than widening it.
+Regression test `a_degenerate_alpha_is_rejected_on_the_deferred_path` fails without the guard and passes with it
+(verified both ways).
+
+**Cost of the guard:** `packet_forwarding` 74.87 → 75.23 µs (+0.5%), `packet_receiving` 36.92 → 36.98 µs
+(+0.5%). Negligible against the wins above.
+
+### Also corrected on their reports
+
+- `forward_secret`'s doc comment still said it returns "the blinded alpha"; it now returns it deferred.
+- The in-tree "eager vs deferred" assertion was **weaker than its comment claimed**: `forward_transform` now
+  delegates to `forward_transform_deferred`, so the test compares the deferral against itself. The comment now
+  says so, and names the parent-commit A/B as the actual equivalence evidence.
+
 ## Test evidence
 
-- `cargo nextest run -p hopr-crypto-packet -p hopr-protocol-hopr --lib` → **266 passed, 0 failed**.
+- `cargo nextest run -p hopr-crypto-packet -p hopr-protocol-hopr --lib` → **267 passed, 0 failed** (266 before
+  the degenerate-alpha regression test).
 - `cargo nextest run -p hopr-transport --features testing --test '*' -j 1` → **61 passed, 0 failed**
   (includes `protocol_stress_throughput`, `protocol_msg_ack_workflows`, `pipeline_stage_isolation`).
 - `cargo clippy -p hopr-crypto-packet --all-targets` and `cargo fmt --check`: clean.
-- New coverage: the suite test compares deferred vs eager secret and alpha for every hop.
+- New coverage: the suite test compares deferred vs eager secret and alpha for every hop; and
+  `a_degenerate_alpha_is_rejected_on_the_deferred_path` pins the identity-alpha rejection.
 
 ## Caveats / things a reviewer should probe
 
@@ -88,7 +133,8 @@ the two per-packet scalar mults.
   (secret ↔ tag ↔ alpha) cannot be crossed by a caller. `ForwardSecret`'s fields stay private and the
   only external consumer is `.tag()`.
 - Constant-time: `to_alpha` is now called once instead of twice — same operation, fewer times; no new
-  branching introduced. `finalize()` is on the relayed branch, as the multiply was before.
+  branching on secret data. `finalize()` is on the relayed branch, as the multiply was before. The
+  `is_valid()` guard restored in the first half is the same identity test the eager path ran.
 - Pre-existing and unrelated: `cargo test --all-features` for `hopr-crypto-packet` fails to compile
   (ambiguous `X25519Suite` / `Secp256k1Suite` imports). Reproduced on clean `HEAD`.
 - An `expand_path` lock-batching attempt was measured at no significant gain (p≈0.27) and reverted.

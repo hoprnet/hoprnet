@@ -477,8 +477,11 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         &mut self.packet[base..base + PaddedPayload::<P>::SIZE]
     }
 
-    /// Derives the shared secret this packet was built for `node_keypair`, together with the blinded alpha the
-    /// next hop will see.
+    /// Derives the shared secret this packet was built for `node_keypair`.
+    ///
+    /// The blinded alpha the next hop will see is *not* computed here: it is carried deferred in the returned
+    /// [`ForwardSecret`] and finalized only by [`MetaPacket::into_forwarded_with_secret`]'s relaying branch, since
+    /// a final hop never forwards and would pay a scalar multiplication for a value it discards.
     ///
     /// This is the first and most expensive step of [`MetaPacket::into_forwarded`] - an elliptic-curve scalar
     /// multiplication - and it is also the only step needed to derive the packet's [`PacketTag`]. Splitting it out
