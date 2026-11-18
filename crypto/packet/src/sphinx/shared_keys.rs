@@ -52,7 +52,17 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
 
     /// Extract a keying material from a group element using a KDF
     fn extract_key(&self, context: &str, salt: &[u8]) -> SharedSecret {
-        let mut output = create_kdf_instance(&self.to_alpha(), context, Some(salt)).expect("invalid sphinx key length");
+        Self::extract_key_from_alpha(&self.to_alpha(), context, salt)
+    }
+
+    /// As [`GroupElement::extract_key`], but from an already-computed Alpha encoding.
+    ///
+    /// Deriving two keys from the same point (the secret and the blinding factor) would otherwise
+    /// call [`GroupElement::to_alpha`] twice, and on Edwards that encoding costs a field inversion.
+    /// Both the sender (once per hop of every path) and the relayer (once per packet) do exactly
+    /// that pair, so they encode the point once and reuse it.
+    fn extract_key_from_alpha(alpha: &Alpha<Self::AlphaLen>, context: &str, salt: &[u8]) -> SharedSecret {
+        let mut output = create_kdf_instance(alpha, context, Some(salt)).expect("invalid sphinx key length");
         let mut out = SharedSecret::default();
         output.fill(out.as_mut());
         out
@@ -91,8 +101,15 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             // Multiply the public key by the current coefficient
             let shared_secret = group_element.mul(&coeff_prev);
 
-            // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            shared_keys.push(shared_secret.extract_key(HASH_KEY_SPHINX_SECRET, salt.as_ref()));
+            // Extract the shared secret from the computed EC point and copy it into the shared keys structure.
+            // The point is encoded to Alpha once and reused for the blinding factor below, since
+            // `to_alpha` on Edwards costs a field inversion.
+            let shared_secret_alpha = shared_secret.to_alpha();
+            shared_keys.push(G::extract_key_from_alpha(
+                &shared_secret_alpha,
+                HASH_KEY_SPHINX_SECRET,
+                salt.as_ref(),
+            ));
 
             // Stop here, we don't need to compute anything more
             if i == keys_len - 1 {
@@ -100,12 +117,19 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             }
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
-            let b_k = shared_secret.extract_key(HASH_KEY_SPHINX_BLINDING, &alpha_prev.to_alpha());
+            let b_k = G::extract_key_from_alpha(&shared_secret_alpha, HASH_KEY_SPHINX_BLINDING, &alpha_prev.to_alpha());
             let b_k_checked = E::from_bytes(b_k.as_ref())?;
 
-            // Update coeff_prev and alpha
-            alpha_prev = alpha_prev.mul(&b_k_checked);
+            // Update coeff_prev and alpha.
+            //
+            // `alpha_prev` is `coeff_prev * G` by construction, so the new alpha is the *fixed-base*
+            // multiplication `coeff_prev_new * G`. Recomputing it that way instead of multiplying the
+            // old point by `b_k` is the same point (scalar multiplication is associative:
+            // `(coeff * G) * b = (coeff * b) * G`) but uses a precomputed base-point table, which is
+            // several times cheaper than a variable-base multiplication. The sender pays this once per
+            // hop on every packet it builds.
             coeff_prev = coeff_prev.mul(b_k_checked);
+            alpha_prev = G::generate(&coeff_prev);
 
             if !alpha_prev.is_valid() {
                 return Err(CryptoError::CalculationError);
@@ -123,27 +147,76 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     ///
     /// Efficiency note: the `public_element_alpha` is a precomputed group element Alpha encoding associated with the
     /// `private_scalar`.
+    ///
+    /// Kept as the complete transform even though the packet decoder now uses
+    /// [`SharedKeys::forward_transform_deferred`] and skips the alpha on the final hop: the suite test compares
+    /// the two, and that comparison is what keeps the split from quietly diverging.
+    #[cfg(test)]
     pub(crate) fn forward_transform(
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,
         public_element_alpha: &Alpha<G::AlphaLen>,
     ) -> hopr_types::crypto::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
+        let (deferred, secret) = Self::forward_transform_deferred(alpha, private_scalar, public_element_alpha)?;
+        Ok((deferred.finalize()?, secret))
+    }
+
+    /// The first half of [`SharedKeys::forward_transform`]: everything but the blinded alpha.
+    ///
+    /// Blinding the alpha is a second variable-base scalar multiplication, and a packet's *last* hop
+    /// never forwards, so that point is never read there. Deferring it lets a decode pay only the
+    /// multiplication that derives the shared secret when the packet is addressed to this node,
+    /// which is the common case for an Exit and for any node's own traffic.
+    pub(crate) fn forward_transform_deferred(
+        alpha: &Alpha<G::AlphaLen>,
+        private_scalar: &E,
+        public_element_alpha: &Alpha<G::AlphaLen>,
+    ) -> hopr_types::crypto::errors::Result<(DeferredAlpha<E, G>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(private_scalar);
 
-        let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, public_element_alpha);
+        // Encode the shared point once: both keys below come from it, and `to_alpha` costs a field
+        // inversion on Edwards. This is the per-packet cost of relaying, so the second encoding is
+        // worth avoiding.
+        let s_k_alpha = s_k.to_alpha();
+        let secret = G::extract_key_from_alpha(&s_k_alpha, HASH_KEY_SPHINX_SECRET, public_element_alpha);
 
-        let b_k = s_k.extract_key(HASH_KEY_SPHINX_BLINDING, alpha);
+        let b_k = G::extract_key_from_alpha(&s_k_alpha, HASH_KEY_SPHINX_BLINDING, alpha);
 
-        let b_k_checked = E::from_bytes(b_k.as_ref())?;
-        let alpha_new = alpha_point.mul(&b_k_checked);
+        Ok((
+            DeferredAlpha {
+                alpha_point,
+                b_k,
+                _d: PhantomData,
+            },
+            secret,
+        ))
+    }
+}
+
+/// The blinded alpha a [`SharedKeys::forward_transform_deferred`] has yet to compute.
+///
+/// Holds the point and the blinding factor it would be multiplied by, so that a caller who learns
+/// the packet is final need not pay for the multiplication whose result is then discarded.
+pub(crate) struct DeferredAlpha<E: Scalar, G: GroupElement<E>> {
+    alpha_point: G,
+    /// Blinding factor `b_k`, kept in its raw KDF form so that [`Scalar`] need not be `Clone`.
+    b_k: SharedSecret,
+    _d: PhantomData<E>,
+}
+
+impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
+    /// Computes the blinded alpha, as [`SharedKeys::forward_transform`] would have.
+    pub(crate) fn finalize(self) -> hopr_types::crypto::errors::Result<Alpha<G::AlphaLen>> {
+        let b_k_checked = E::from_bytes(self.b_k.as_ref())?;
+        let alpha_new = self.alpha_point.mul(&b_k_checked);
 
         if !alpha_new.is_valid() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
 
-        Ok((alpha_new.to_alpha(), secret))
+        Ok(alpha_new.to_alpha())
     }
 }
 
@@ -207,6 +280,8 @@ pub trait SphinxSuite {
     }
 
     /// As [`SphinxSuite::new_shared_keys`], but for a path that is already expanded.
+    ///
+    /// Kept next to [`SphinxSuite::new_shared_keys`] so the two cannot diverge.
     fn new_shared_keys_expanded<'a>(
         public_keys: &'a [Self::ExpandedPublic],
     ) -> hopr_types::crypto::errors::Result<SharedKeys<Self::E, Self::G>>
@@ -258,14 +333,28 @@ pub(crate) mod tests {
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) =
-                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
+            // Both halves of the split transform are exercised here: the deferred form must yield the
+            // same secret as the eager one, and its `finalize` must yield the same alpha. A packet's
+            // final hop uses only the first half, so this is what keeps the two from diverging.
+            let (deferred, secret) =
+                SharedKeys::<S::E, S::G>::forward_transform_deferred(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
 
             assert_eq!(
                 secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(),
                 1,
                 "forward transform should yield the same shared secret"
             );
+
+            let (eager_alpha, eager_secret) =
+                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
+            assert_eq!(
+                eager_secret.ct_eq(&secret).unwrap_u8(),
+                1,
+                "deferring the alpha must not change the secret"
+            );
+
+            let alpha = deferred.finalize().unwrap();
+            assert_eq!(alpha, eager_alpha, "deferring the alpha must not change it");
 
             alpha_cpy = alpha;
         }

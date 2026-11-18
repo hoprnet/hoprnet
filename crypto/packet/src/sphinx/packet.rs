@@ -17,7 +17,7 @@ use super::{
     derivation::derive_packet_tag,
     errors::SphinxError,
     routing::{ForwardedHeader, RoutingInfo, SphinxHeaderSpec, forward_header},
-    shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+    shared_keys::{Alpha, DeferredAlpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
     surb::{ReplyOpener, SURB},
 };
 
@@ -328,17 +328,22 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
 /// The fields are private and the tag is derived only here, so a caller cannot pair a tag with a secret it does not
 /// belong to - the invariant is carried by the type rather than by a doc comment.
 pub struct ForwardSecret<S: SphinxSuite> {
-    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    /// The blinded alpha, not yet computed.
+    ///
+    /// Computing it is a second variable-base scalar multiplication that only a *relayed* packet
+    /// consumes, so it is deferred past the point where the header says whether the packet is final.
+    alpha: DeferredAlpha<S::E, S::G>,
     secret: SharedSecret,
     tag: PacketTag,
 }
 
 /// The three fields of a [`ForwardSecret`], for the transform's internal destructuring.
 ///
-/// The tag is here as well as in `ForwardSecret`, so the pairing is decided inside `forward_secret` rather than by a
+/// The alpha stays deferred so that the final-hop branch can skip computing it; the tag is here as
+/// well as in `ForwardSecret`, so the pairing is decided inside `forward_secret` rather than by a
 /// caller.
 type ForwardSecretParts<S> = (
-    Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>,
+    DeferredAlpha<<S as SphinxSuite>::E, <S as SphinxSuite>::G>,
     SharedSecret,
     PacketTag,
 );
@@ -486,7 +491,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     {
         let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
             .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
-        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
+        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform_deferred(
             &alpha_arr,
             &(node_keypair.into()),
             node_keypair.public().into(),
@@ -552,7 +557,11 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => {
                 // The payload is already decrypted in place; write back the blinded alpha and the next header.
-                self.alpha_mut().copy_from_slice(&alpha);
+                //
+                // This is the only branch that consumes the blinded alpha, so it is the only one that pays
+                // for it: `alpha` was not computed by `forward_secret`, and a final-hop decode never gets
+                // here.
+                self.alpha_mut().copy_from_slice(&alpha.finalize()?);
                 self.routing_info_mut().copy_from_slice(next_header.as_ref());
 
                 ForwardedMetaPacket::Relayed {
