@@ -564,7 +564,7 @@ async fn pre_build_inner<
     Ct,
     #[cfg(feature = "state-dump")] Dump: StateDumpFactory<Chain, Graph, Net>,
 >(
-    parts: BuildParts<Chain, Graph, Net, Ct>,
+    parts: BuildParts<Chain, Graph, Net, Ct, Dump>,
 ) -> Result<(PreHopr<Chain, Graph, Net>, TransportInputs<Net, Ct>), HoprLibError>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
@@ -1545,11 +1545,17 @@ mod tests {
             peer_discovery_tx: builder.peer_discovery_tx,
         }
         .with_state_dump(ReporterProbe::new(valid, false, None).0);
-        let (session_tx, _session_rx) = futures::channel::mpsc::channel(1);
-        let error =
-            futures::executor::block_on(pre_build_inner(configured, session_tx, None, AbortableList::default()))
-                .err()
-                .context("startup should stop before constructing components")?;
+        let error = futures::executor::block_on(pre_build_inner(BuildParts {
+            configured,
+            session_tx: {
+                let (tx, _rx) = futures::channel::mpsc::channel(1);
+                tx
+            },
+            admission_tx: None,
+            processes: AbortableList::default(),
+        }))
+        .err()
+        .context("startup should stop before constructing components")?;
         if valid {
             assert!(
                 matches!(error, HoprLibError::BuilderError("missing chain factory")),
