@@ -37,12 +37,12 @@ tracing-context = ["hopr-utils-tracing/tracing-context"]
 # for one role does not carry the packet processing of the others. None of them is a default: role
 # selection is the consumer's decision, and `hopr-lib` turns on exactly the role its entity needs.
 #
-# The three roles are the basic functional division: `edge` (a source node that admits no incoming
-# Sessions), `relay` (the full ticket and incoming-acknowledgement pipeline) and `exit` (a
-# destination node: it accepts incoming Sessions and keeps the acknowledgement pipeline for PIX, but
-# processes no tickets).
+# The three roles: `entry` (a source node that admits no incoming Sessions), `relay` (the full ticket
+# and incoming-acknowledgement pipeline) and `exit` (a destination node: it accepts incoming Sessions
+# and keeps the acknowledgement pipeline for PIX, but processes no tickets). They are the transport
+# side of the entity split, whose entity sets in `hopr-lib` are `edge`, `relay` and `exit`.
 relay = []
-edge = ["session-client"]
+entry = ["session-client"]
 exit = ["session-server"]
 # The session stack: the `SessionManager` wiring, incoming-Session admission and the client-side
 # Session API. `session-server` implies `session-client` because both are served by one manager and
@@ -76,7 +76,7 @@ testing = [
   "dep:hopr-chain-connector",
   "dep:hopr-ticket-manager",
   "dep:tokio",
-  "edge",
+  "entry",
   "exit",
   "relay",
   "hopr-utils/runtime-tokio",

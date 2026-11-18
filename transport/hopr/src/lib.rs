@@ -16,7 +16,7 @@
 // wires that would have fed it are unused by construction. Only that combination is affected; any
 // real build enables one of `relay`, `entry` or `exit`.
 #![cfg_attr(
-    not(any(feature = "relay", feature = "edge", feature = "exit")),
+    not(any(feature = "relay", feature = "entry", feature = "exit")),
     allow(dead_code, unused_imports, unused_mut, unused_variables, unreachable_code)
 )]
 
@@ -881,13 +881,13 @@ where
         .await
     }
 
-    /// Execute all processes of the [`HoprTransport`] object as an **Edge** (source) node.
+    /// Execute all processes of the [`HoprTransport`] object as an **Entry** (source) node.
     ///
-    /// Edge nodes do not process tickets, do not start the incoming acknowledgement
+    /// Entry nodes do not process tickets, do not start the incoming acknowledgement
     /// pipeline, and do not accept incoming sessions — therefore, they require neither a
     /// `ticket_events` sink nor an `on_incoming_session` channel.
-    #[cfg(feature = "edge")]
-    pub async fn run_edge<TFact, Ct, PixEvt>(
+    #[cfg(feature = "entry")]
+    pub async fn run_entry<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
@@ -905,7 +905,7 @@ where
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         self.run_inner(
-            protocol::NodeType::Edge,
+            protocol::NodeType::Entry,
             cover_traffic,
             network,
             network_process,
@@ -923,7 +923,7 @@ where
     /// Branches on `role`:
     /// - [`protocol::NodeType::Relay`]: full packet pipeline + SessionManager.
     /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + incoming Sessions.
-    /// - [`protocol::NodeType::Edge`]: no ack pipeline, no incoming Sessions.
+    /// - [`protocol::NodeType::Entry`]: no ack pipeline, no incoming Sessions.
     #[allow(clippy::too_many_arguments)]
     async fn run_inner<T, TFact, Ct, PixEvt>(
         &self,
@@ -1290,8 +1290,8 @@ where
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
-            #[cfg(feature = "edge")]
-            (protocol::NodeType::Edge, Some(ref ssa_events)) => {
+            #[cfg(feature = "entry")]
+            (protocol::NodeType::Entry, Some(ref ssa_events)) => {
                 // Entry nodes need a bare-bones PixToolbox (share_generator only)
                 // to handle incoming SsaRequest messages from the Exit.
                 // No SSA reconstruction needed on Entry — forward events to the
@@ -1320,7 +1320,7 @@ where
                     ),
                 );
 
-                processes.extend_from(pipeline_builder.build_for_edge());
+                processes.extend_from(pipeline_builder.build_for_entry());
                 Some(pix_tools)
             }
             // Role combinations are decided at compile time, so in a single-role build the role
@@ -1333,8 +1333,8 @@ where
                     protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
                     #[cfg(feature = "exit")]
                     protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
-                    #[cfg(feature = "edge")]
-                    protocol::NodeType::Edge => pipeline_builder.build_for_edge(),
+                    #[cfg(feature = "entry")]
+                    protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
                 };
                 processes.extend_from(pipeline_processes);
                 None

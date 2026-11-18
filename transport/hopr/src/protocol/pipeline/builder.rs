@@ -32,7 +32,7 @@ pub struct Unset;
 /// Terminal methods for each node type are then exposed:
 /// - [`PacketPipelineBuilder::build_for_relay`] — full pipeline, requires ticket processing via
 ///   [`PacketPipelineBuilder::with_ticket_processing`].
-/// - [`PacketPipelineBuilder::build_for_edge`] — Entry nodes; the incoming acknowledgement pipeline is not started at
+/// - [`PacketPipelineBuilder::build_for_entry`] — Entry nodes; the incoming acknowledgement pipeline is not started at
 ///   all.
 /// - [`PacketPipelineBuilder::build_for_exit`] — Exit nodes; the incoming acknowledgement pipeline is started and
 ///   processes exit-acknowledgement shares.
@@ -315,10 +315,10 @@ where
     /// [`PacketPipelineBuilder::with_ticket_processing`] or
     /// [`PacketPipelineBuilder::with_exit_ack_share_processing`] is ignored.
     #[must_use]
-    #[cfg(feature = "edge")]
-    pub fn build_for_edge(self) -> AbortableList<PacketPipelineProcesses> {
+    #[cfg(feature = "entry")]
+    pub fn build_for_entry(self) -> AbortableList<PacketPipelineProcesses> {
         run_packet_pipeline_inner(
-            NodeType::Edge,
+            NodeType::Entry,
             self.packet_key,
             self.wire_msg,
             self.codec,
@@ -352,7 +352,7 @@ where
     /// Builds and starts the packet pipeline for a HOPR **Exit** node.
     ///
     /// Exit nodes do not process tickets. However, in contrast to
-    /// [`PacketPipelineBuilder::build_for_edge`], the incoming acknowledgement pipeline is kept
+    /// [`PacketPipelineBuilder::build_for_entry`], the incoming acknowledgement pipeline is kept
     /// running and processes the recovered SSA shares using the exit-acknowledgement share
     /// processor configured via [`PacketPipelineBuilder::with_exit_ack_share_processing`] (or the
     /// default no-op processor if not configured).

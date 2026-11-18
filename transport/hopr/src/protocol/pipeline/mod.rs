@@ -820,11 +820,11 @@ async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
 /// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
 ///
 /// Used by Edge and Exit nodes — neither processes incoming ticket acknowledgements.
-/// Edge nodes receive acks from relays (they pay for forwarding), Exit nodes keep
+/// Entry nodes receive acks from relays (they pay for forwarding), Exit nodes keep
 /// the pipeline alive for future PIX use. In both cases the queue must be actively
 /// drained; dropping the receiver causes every inbound ack dispatch to fail with
 /// `SendError(disconnected)`.
-#[cfg(feature = "edge")]
+#[cfg(feature = "entry")]
 async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
 where
     AckIn: futures::Stream + Send + 'static,
@@ -997,7 +997,8 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
 ///
 /// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
 /// * [`Relay`](NodeType::Relay) — full pipeline, processes tickets and incoming acknowledgements.
-/// * [`Edge`](NodeType::Edge) — does not process tickets and does not even start the incoming acknowledgement pipeline.
+/// * [`Entry`](NodeType::Entry) — does not process tickets and does not even start the incoming acknowledgement
+///   pipeline.
 /// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
 ///   only drains the stream) for future use.
 ///
@@ -1007,8 +1008,8 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
 pub enum NodeType {
     #[cfg(feature = "relay")]
     Relay,
-    #[cfg(feature = "edge")]
-    Edge,
+    #[cfg(feature = "entry")]
+    Entry,
     #[cfg(feature = "exit")]
     Exit,
 }
@@ -1018,15 +1019,15 @@ impl NodeType {
     ///
     /// Every role except a source (Edge) node does: a Relay forwards shares it cannot resolve and
     /// an Exit recovers them, while an Edge only produces them.
-    #[cfg(feature = "edge")]
+    #[cfg(feature = "entry")]
     const fn has_exit_ack_processor(self) -> bool {
-        !matches!(self, NodeType::Edge)
+        !matches!(self, NodeType::Entry)
     }
 
     /// Whether this role takes part in exit-acknowledgement (PIX) share processing.
     ///
     /// Without the `edge` role every compiled role does, so there is nothing to exclude.
-    #[cfg(not(feature = "edge"))]
+    #[cfg(not(feature = "entry"))]
     const fn has_exit_ack_processor(self) -> bool {
         true
     }
@@ -1035,15 +1036,15 @@ impl NodeType {
     ///
     /// A source (Edge) node only establishes Sessions, so it neither admits nor is asked about
     /// them.
-    #[cfg(all(feature = "edge", feature = "session-client"))]
+    #[cfg(all(feature = "entry", feature = "session-client"))]
     pub(crate) const fn accepts_incoming_sessions(self) -> bool {
-        !matches!(self, NodeType::Edge)
+        !matches!(self, NodeType::Entry)
     }
 
     /// Whether this role admits incoming Sessions and therefore needs a session admission channel.
     ///
     /// Without the `entry` role every compiled role does.
-    #[cfg(all(not(feature = "edge"), feature = "session-client"))]
+    #[cfg(all(not(feature = "entry"), feature = "session-client"))]
     pub(crate) const fn accepts_incoming_sessions(self) -> bool {
         true
     }
@@ -1244,7 +1245,7 @@ where
                 app_in,
                 encoder.clone(),
                 // Pass exit_ack_proc to any node that has an outgoing packet pipeline
-                // (Relay, Exit, or Relay+Exit). Edge nodes never have a processor.
+                // (Relay, Exit, or Relay+Exit). Entry nodes never have a processor.
                 // The Option inside already guards absent processors (e.g. pure Relay
                 // without PIX uses a no-op), so this is safe to pass unconditionally.
                 node_type.has_exit_ack_processor().then(|| exit_ack_proc.clone()),
@@ -1290,7 +1291,7 @@ where
         .filter(|&n| n > 0)
         .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
 
-    #[cfg(any(feature = "relay", feature = "edge", feature = "exit"))]
+    #[cfg(any(feature = "relay", feature = "entry", feature = "exit"))]
     match node_type {
         #[cfg(feature = "relay")]
         NodeType::Relay => {
@@ -1330,9 +1331,9 @@ where
                 ),
             );
         }
-        #[cfg(feature = "edge")]
-        NodeType::Edge => {
-            // Edge nodes do not process tickets, but they DO receive ticket acknowledgements
+        #[cfg(feature = "entry")]
+        NodeType::Entry => {
+            // Entry nodes do not process tickets, but they DO receive ticket acknowledgements
             // (they pay relays for forwarding). The queue must be actively drained so the
             // inbound dispatcher can keep sending without hitting `SendError(disconnected)`.
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
@@ -1349,7 +1350,7 @@ where
 
     // A build without any role has no packet pipeline to feed, but the channels above are still
     // constructed; naming them keeps that combination warning-free.
-    #[cfg(not(any(feature = "relay", feature = "edge", feature = "exit")))]
+    #[cfg(not(any(feature = "relay", feature = "entry", feature = "exit")))]
     let _ = (
         incoming_ack_rx,
         ssa_events,
@@ -1577,7 +1578,7 @@ mod tests {
     /// Each role starts all four workers, delivers application data and drains acknowledgements appropriately.
     #[cfg(feature = "tracing-context")]
     #[rstest::rstest]
-    #[case::edge(NodeType::Edge)]
+    #[case::edge(NodeType::Entry)]
     #[case::exit(NodeType::Exit)]
     #[case::relay(NodeType::Relay)]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1660,9 +1661,9 @@ mod tests {
                 )
             );
             assert_eq!(tickets.calls(), usize::from(role == NodeType::Relay));
-            assert_eq!(shares.calls(), usize::from(role != NodeType::Edge));
-            assert_eq!(resolutions.len(), usize::from(role != NodeType::Edge));
-            if role != NodeType::Edge {
+            assert_eq!(shares.calls(), usize::from(role != NodeType::Entry));
+            assert_eq!(resolutions.len(), usize::from(role != NodeType::Entry));
+            if role != NodeType::Entry {
                 assert_eq!(resolutions[0], HoprShareResolution::AlmostRecoveredSsa(ssa_id));
             }
             anyhow::Ok(())
@@ -2314,7 +2315,7 @@ mod tests {
 
     /// Regression test for the Edge-node ack-sink bug.
     ///
-    /// Before the fix, `NodeType::Edge` dropped `incoming_ack_rx` immediately at
+    /// Before the fix, `NodeType::Entry` dropped `incoming_ack_rx` immediately at
     /// pipeline startup. Every subsequent call to `incoming_ack_tx.send(…)` then
     /// returned `SendError(disconnected)`, flooding logs with ~300 errors per run.
     ///
