@@ -170,7 +170,7 @@ impl DiversityTracker {
 
         for (evicted, drawn) in pooled_updates {
             if let Some(evicted) = evicted {
-                self.retract(evicted);
+                self.retract(evicted, 1);
             }
             *self.pooled.entry(drawn).or_insert(0) += 1;
             self.pooled_drawn += 1;
@@ -215,25 +215,25 @@ impl DiversityTracker {
             return;
         };
         // The evicted session's draws leave the node-wide total with it: a relayer it alone used
-        // must not keep flattering the pooled score.
+        // must not keep flattering the pooled score. Counted down per relayer, not per draw: a
+        // window can hold one relayer thousands of times.
         for (relayer, count) in session.window.counts.iter() {
-            for _ in 0..*count {
-                self.retract(*relayer);
-            }
+            self.retract(*relayer, *count);
         }
         // A session that comes back must re-arm its WARN rather than be treated as still breached.
         self.breached.remove(&oldest);
     }
 
-    /// Removes one draw of `relayer` from the node-wide total.
-    fn retract(&mut self, relayer: OffchainPublicKey) {
+    /// Removes `drawn` draws of `relayer` from the node-wide total, dropping the entry once no
+    /// window contributes to it any more.
+    fn retract(&mut self, relayer: OffchainPublicKey, drawn: usize) {
+        self.pooled_drawn = self.pooled_drawn.saturating_sub(drawn);
         if let Some(count) = self.pooled.get_mut(&relayer) {
-            *count -= 1;
+            *count = count.saturating_sub(drawn);
             if *count == 0 {
                 self.pooled.remove(&relayer);
             }
         }
-        self.pooled_drawn = self.pooled_drawn.saturating_sub(1);
     }
 
     fn apply_threshold(&mut self, key: DiversityKey, score: f64) {

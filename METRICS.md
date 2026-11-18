@@ -145,5 +145,6 @@ nothing was drawn rather than that traffic concentrated. The expression above re
 published value; the `for` clause is what requires the condition to hold, and it fires on an idle
 node too. Read it together with the node's message volume.
 
-`path_planner.diversity_metric_window` sets how many recent draws the score covers (default
-`200`).
+`path_planner.diversity_metric_window` caps each `(destination, hops)` window at that many draws
+(default `200`), so the gauge pools up to that many draws per tracked session and can cover far more
+than the configured number.
