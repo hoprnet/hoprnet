@@ -120,15 +120,20 @@ apart.
 number of distinct first relayers, `exp(H)` for the Shannon entropy `H` of the draw distribution,
 pooled over the sessions the planner tracks.
 
-- The first relayer of each leg is the one that learns who is talking to whom, so a low score in
-  either direction matters on its own: a session whose forward path always leaves through the same
-  relay is exposed even when its return paths vary.
+- A relay on the route sees only its previous and next node, so the first relayer of a leg is what
+  puts the session next to the rest of that route. Keeping those relayers varied spreads that
+  position over peers instead of leaving it with one; a low score in either direction matters on
+  its own, because a forward leg that always leaves through the same relay is one peer's problem
+  however varied the return legs are.
 - `1.0` means every recent draw in that direction of every tracked session left through one
   relayer. Compare the value against the number of candidates the graph offers, not against a fixed
   target.
 - Two equally used sessions that each keep to their own single relayer score `2.0`, because the
   gauge reads the pool and not one session. Unequal draw counts pull the score towards the busier
   relayer, so it reads below the number of relayers.
+- A window stays in the pool until the least recently updated session is evicted at 256 tracked
+  sessions, not until its session goes idle, so a pooled score can include draws nothing is making
+  any more. Read it next to the node's traffic when a session ends.
 
 `hopr_path_route_diversity` covers the whole route: one forward path together with the return path of
 one SURB. It catches what the first hops cannot show, such as a stable pair of relayers reused behind

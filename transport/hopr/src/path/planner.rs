@@ -752,8 +752,12 @@ fn route_hash(forward: &ValidatedPath, ret: &ValidatedPath) -> u64 {
 }
 
 /// Publishes the pooled diversity scores on their gauges.
+///
+/// Reads the tracker directly so the scan of the pooled counts happens only where a gauge can be
+/// set: without telemetry this is a no-op and the packet path skips the work.
 #[cfg(all(feature = "telemetry", not(test)))]
-fn publish_path_diversity(scores: crate::path::diversity::Scores) {
+fn publish_path_diversity(tracker: &DiversityTracker) {
+    let scores = tracker.scores();
     if let Some(score) = scores.forward_first_hop {
         METRIC_PATH_RELAYER_DIVERSITY.set(&["forward"], score);
     }
@@ -767,7 +771,7 @@ fn publish_path_diversity(scores: crate::path::diversity::Scores) {
 
 /// Publishes the pooled diversity scores on their gauges.
 #[cfg(any(not(feature = "telemetry"), test))]
-fn publish_path_diversity(_scores: crate::path::diversity::Scores) {}
+fn publish_path_diversity(_tracker: &DiversityTracker) {}
 
 /// Gives every rebuilt collection a new process-local ID before any dictionary records are emitted.
 /// All production rebuilds and test-created replacements use this constructor; cache hits reuse the
@@ -1395,12 +1399,11 @@ where
             return;
         };
 
-        let scores = {
-            let mut tracker = self.paths.return_path_diversity.lock();
-            tracker.record_returns((destination, hops), &relayers);
-            tracker.scores()
-        };
-        publish_path_diversity(scores);
+        let mut tracker = self.paths.return_path_diversity.lock();
+        tracker.record_returns((destination, hops), &relayers);
+        // Published under the recording lock: releasing it first lets a later record publish a
+        // newer score that this call then overwrites with its older snapshot.
+        publish_path_diversity(&tracker);
     }
 
     /// Records the forward path and the whole routes of one packet: each SURB's forward path
@@ -1415,21 +1418,24 @@ where
         hops: u32,
         forward: &ValidatedPath,
         return_paths: &[ValidatedPath],
+        forward_planned: bool,
     ) {
         let Ok(destination) = self.resolve_node_id_to_offchain_key(&destination).await else {
             return;
         };
+        // A relay is what the score counts, so an explicit path the caller fixed contributes
+        // nothing to the first-hop dimension, and a single-hop path holds only the destination.
+        let first_relayer = (forward_planned && forward.len() > 1)
+            .then(|| forward.first().copied())
+            .flatten();
         let routes = return_paths
             .iter()
             .map(|ret| route_hash(forward, ret))
             .collect::<Vec<_>>();
 
-        let scores = {
-            let mut tracker = self.paths.return_path_diversity.lock();
-            tracker.record_forward((destination, hops), forward.first().copied(), &routes);
-            tracker.scores()
-        };
-        publish_path_diversity(scores);
+        let mut tracker = self.paths.return_path_diversity.lock();
+        tracker.record_forward((destination, hops), first_relayer, &routes);
+        publish_path_diversity(&tracker);
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -1458,9 +1464,12 @@ where
                     _ => 0,
                 };
                 let return_hops = return_options.as_ref().and_then(|options| match options {
-                    RoutingOptions::Hops(hops) => Some(u32::from(*hops)),
+                    RoutingOptions::Hops(hops) if u32::from(*hops) > 0 => Some(u32::from(*hops)),
                     _ => None,
                 });
+                // Only the legs the planner chooses say anything about its diversity: a fixed path
+                // is the caller's choice, and a direct route has no relayer to count.
+                let forward_planned = matches!(&forward_options, RoutingOptions::Hops(hops) if u32::from(*hops) > 0);
 
                 let forward_path = self
                     .resolve_path(NodeId::Offchain(self.me), *destination, forward_options)
@@ -1518,13 +1527,16 @@ where
 
                 // Both legs are known only here, so this is where the forward first hop and the
                 // whole routes are recorded. A packet with no SURBs still has a forward first hop.
-                self.record_route_diversity(
-                    *destination,
-                    return_hops.unwrap_or(forward_hops),
-                    &forward_path,
-                    &return_paths,
-                )
-                .await;
+                if forward_planned || return_hops.is_some() {
+                    self.record_route_diversity(
+                        *destination,
+                        return_hops.unwrap_or(forward_hops),
+                        &forward_path,
+                        &return_paths,
+                        forward_planned,
+                    )
+                    .await;
+                }
 
                 Ok((
                     ResolvedTransportRouting::Forward {
