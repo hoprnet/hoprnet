@@ -119,8 +119,9 @@ sessions the path planner tracks.
 - `1.0` means every recent draw of every tracked session went through the same relayer. The value
   rises towards the number of distinct relayers actually used as the draws even out, so compare it
   against the size of the candidate pool, not against a fixed target.
-- Two sessions that each keep to their own single relayer still score `2.0` here, because the gauge
-  reads the pool and not one session. It does not replace the per-session WARN below.
+- Two equally used sessions that each keep to their own single relayer score `2.0` here, because the
+  gauge reads the pool and not one session. Unequal draw counts pull the score towards the busier
+  relayer, so it reads below the number of relayers. It does not replace the per-session WARN below.
 - It covers the return paths the planner draws. An explicitly routed return path bypasses the
   draw, so a workload that only uses explicit routes leaves the score untouched.
   `hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not
@@ -129,7 +130,8 @@ sessions the path planner tracks.
 `path_planner.min_return_path_diversity` is a per-session check: every `(destination, hops)` key
 scores its own draws and logs one WARN when its score reaches the threshold, with one INFO when it
 recovers (default `1.0`; `0.0` disables the log). At that default, two sessions on separate single
-relayers each log a WARN while the pooled gauge stays at `2.0`.
+relayers each log a WARN, while the pooled gauge reads `2.0` only if both windows hold the same
+number of draws.
 
 Alert on the pooled score staying at the bottom of its range, which is every session concentrated on
 one shared relayer:
