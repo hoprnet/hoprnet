@@ -63,7 +63,7 @@ use crate::{
         ExitControlKind, ExitControlOutcome, ExitSessionKind, MIN_REFUSAL_REPLY_REFILL_PERIOD, RefusalReplyBucket,
         RefusalReplyBudget, record_exit_control,
     },
-    exit_receipts::ExitReceipts,
+    exit_receipts::{ExitReceipts, Receipt},
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
@@ -6542,15 +6542,20 @@ where
                 {
                     continue;
                 }
-                let Some((seq, tags)) = receipts.take_due(Instant::now()) else {
+                let Some(Receipt { seq, first_seq, tags }) = receipts.take_due(Instant::now()) else {
                     continue;
                 };
                 let count = tags.len();
-                let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage { session_id, seq, tags });
+                let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                    session_id,
+                    seq,
+                    first_seq,
+                    tags,
+                });
                 match send_via_msg_sender(&mut sender, routing.clone(), msg, "forward receipts").await {
                     Ok(()) => {
                         FORWARD_RECEIPTS_SENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, seq, tags = count, "forward receipts sent");
+                        debug!(%session_id, seq, first_seq, tags = count, "forward receipts sent");
                     }
                     Err(error) => debug!(%session_id, %error, "failed to send forward receipts"),
                 }
@@ -7315,7 +7320,7 @@ where
                     telemetry::record_session_surb_consumed(&pseudonym, 1);
                 }
                 if let Some(sink) = self.forward_receipt_sink.get() {
-                    sink.receipts(pseudonym, receipts.seq, &receipts.tags);
+                    sink.receipts(pseudonym, receipts.seq, receipts.first_seq, &receipts.tags);
                 }
                 FORWARD_RECEIPTS_RECEIVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 #[cfg(all(feature = "telemetry", not(test)))]
@@ -28776,12 +28781,15 @@ mod tests {
 
     // Forward receipts
 
+    /// What a receipt reported: (pseudonym, seq, first seq, tags).
+    type ReportedReceipt = (HoprPseudonym, u32, u32, Vec<u32>);
+
     #[derive(Default)]
-    struct RecordingSink(parking_lot::Mutex<Vec<(HoprPseudonym, u32, Vec<u32>)>>);
+    struct RecordingSink(parking_lot::Mutex<Vec<ReportedReceipt>>);
 
     impl ForwardReceiptSink for RecordingSink {
-        fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, tags: &[u32]) {
-            self.0.lock().push((pseudonym, seq, tags.to_vec()));
+        fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]) {
+            self.0.lock().push((pseudonym, seq, first_seq, tags.to_vec()));
         }
     }
 
@@ -29161,9 +29169,20 @@ mod tests {
         Ok(mgr)
     }
 
-    fn receipts_message(session_id: HoprPseudonym, seq: u32, tags: Vec<u32>) -> anyhow::Result<ApplicationDataIn> {
+    fn receipts_message(
+        session_id: HoprPseudonym,
+        seq: u32,
+        first_seq: u32,
+        tags: Vec<u32>,
+    ) -> anyhow::Result<ApplicationDataIn> {
         Ok(ApplicationDataIn {
-            data: HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage { session_id, seq, tags }).try_into()?,
+            data: HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                session_id,
+                seq,
+                first_seq,
+                tags,
+            })
+            .try_into()?,
             packet_info: Default::default(),
         })
     }
@@ -29177,10 +29196,10 @@ mod tests {
         let mgr = entry_with_sink(pseudonym, sink.clone())?;
         let received = FORWARD_RECEIPTS_RECEIVED.load(Relaxed);
 
-        let result = mgr.dispatch_message(pseudonym, receipts_message(pseudonym, 4, vec![7, 8, 9])?)?;
+        let result = mgr.dispatch_message(pseudonym, receipts_message(pseudonym, 4, 3, vec![7, 8, 9])?)?;
         assert!(matches!(result, DispatchResult::Processed));
 
-        assert_eq!(vec![(pseudonym, 4, vec![7, 8, 9])], *sink.0.lock());
+        assert_eq!(vec![(pseudonym, 4, 3, vec![7, 8, 9])], *sink.0.lock());
         let slot = mgr.sessions.get(&pseudonym).context("slot")?;
         assert_eq!(1, slot.surb_estimator.consumed.load(Relaxed));
         assert_eq!(
@@ -29206,7 +29225,7 @@ mod tests {
         // For no Session, and naming another Session than the one it arrived under
         let other = HoprPseudonym::random();
         for (arrived_under, session_id) in [(other, other), (pseudonym, other)] {
-            let result = mgr.dispatch_message(arrived_under, receipts_message(session_id, 1, vec![1])?)?;
+            let result = mgr.dispatch_message(arrived_under, receipts_message(session_id, 1, 1, vec![1])?)?;
             assert!(matches!(result, DispatchResult::Dropped(DropReason::StaleStartMessage)));
         }
         assert!(sink.0.lock().is_empty());

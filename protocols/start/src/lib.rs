@@ -437,9 +437,11 @@ pub const MAX_FORWARD_RECEIPT_TAGS: usize = 768;
 pub struct ForwardReceiptsMessage<I> {
     /// Session ID.
     pub session_id: I,
-    /// Receipt number, starting at 1; a jump tells the Entry that receipts were lost.
+    /// Receipt number, starting at 1; the last interval it covers.
     pub seq: u32,
-    /// Tags of the packets received, see `forward_receipt_tag` of the packet info.
+    /// The first interval it covers: it repeats the tags of `first_seq..=seq`, so that a lost receipt is covered.
+    pub first_seq: u32,
+    /// Tags of the packets received in those intervals, see `forward_receipt_tag` of the packet info.
     pub tags: Vec<u32>,
 }
 
@@ -674,6 +676,7 @@ where
                     return Err(StartProtocolError::ParseError("fr.too_many_tags".into()));
                 }
                 data.extend_from_slice(&receipts.seq.to_be_bytes());
+                data.extend_from_slice(&receipts.first_seq.to_be_bytes());
                 data.extend_from_slice(&(receipts.tags.len() as u16).to_be_bytes());
                 for tag in &receipts.tags {
                     data.extend_from_slice(&tag.to_be_bytes());
@@ -1000,13 +1003,18 @@ where
                     })
                 }
                 StartProtocolDiscriminants::ForwardReceipts => {
-                    const PREFIX: usize = size_of::<u32>() + size_of::<u16>();
+                    const PREFIX: usize = 2 * size_of::<u32>() + size_of::<u16>();
                     if body.len() < PREFIX {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     let seq = u32::from_be_bytes(body[..4].try_into().map_err(|_| StartProtocolError::InvalidLength)?);
+                    let first_seq =
+                        u32::from_be_bytes(body[4..8].try_into().map_err(|_| StartProtocolError::InvalidLength)?);
+                    if first_seq > seq {
+                        return Err(StartProtocolError::ParseError("fr.first_seq".into()));
+                    }
                     let count = u16::from_be_bytes(
-                        body[4..PREFIX]
+                        body[8..PREFIX]
                             .try_into()
                             .map_err(|_| StartProtocolError::InvalidLength)?,
                     ) as usize;
@@ -1020,6 +1028,7 @@ where
                     }
                     StartProtocol::ForwardReceipts(ForwardReceiptsMessage {
                         seq,
+                        first_seq,
                         tags: body[PREFIX..ids_end]
                             .chunks_exact(size_of::<u32>())
                             .map(|c| u32::from_be_bytes([c[0], c[1], c[2], c[3]]))
@@ -2474,6 +2483,7 @@ mod tests {
             let msg_1 = Msg::ForwardReceipts(ForwardReceiptsMessage {
                 session_id: SimplePseudonym::random(),
                 seq: 7,
+                first_seq: 3,
                 tags: (0..count as u32).map(|i| i.wrapping_mul(0x9e37_79b9)).collect(),
             });
             let (tag, msg) = msg_1.clone().encode()?;
@@ -2489,6 +2499,7 @@ mod tests {
             ForwardReceiptsMessage {
                 session_id: 10_u32,
                 seq: 1,
+                first_seq: 1,
                 tags: vec![0; MAX_FORWARD_RECEIPT_TAGS + 1],
             },
         );
@@ -2503,12 +2514,25 @@ mod tests {
     #[test]
     fn start_protocol_decode_should_reject_a_truncated_forward_receipts_list() {
         let mut body = 1_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&1_u32.to_be_bytes());
         body.extend_from_slice(&3_u16.to_be_bytes());
         body.extend_from_slice(&[0; 8]);
         body.push(0x0a);
         assert!(matches!(
             decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
             Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_a_forward_receipts_first_seq_after_its_seq() {
+        let mut body = 3_u32.to_be_bytes().to_vec();
+        body.extend_from_slice(&4_u32.to_be_bytes());
+        body.extend_from_slice(&0_u16.to_be_bytes());
+        body.push(0x0a);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::ForwardReceipts, &body),
+            Err(error) if is_parse_error(&error, "fr.first_seq")
         ));
     }
 

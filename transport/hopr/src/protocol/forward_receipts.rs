@@ -34,7 +34,7 @@ const FORWARD_VERDICT_TTL: Duration = Duration::from_secs(30);
 const MAX_FORWARD_VERDICTS_PER_EXIT: usize = 2;
 /// How long a stream or a delivery is kept without news.
 const STATE_TTL: Duration = Duration::from_secs(60);
-/// The most receipts one jump is held to have skipped; a larger jump is a loss.
+/// The most receipts one receipt is held to have skipped over; a larger gap is a loss.
 const MAX_MISSING: u32 = 16;
 /// The highest `seq` a new Session sends first (see the Exit's overflow jump).
 const NEW_SESSION_SEQ_MAX: u32 = 3;
@@ -151,8 +151,10 @@ impl ForwardReceipts {
         state.order.push_back((pseudonym, tag, sent_at));
     }
 
-    /// Takes the receipt numbered `seq` for `pseudonym`, listing the `tags` that reached the Exit.
-    fn receipts_at(&self, pseudonym: HoprPseudonym, seq: u32, tags: &[u32], now: Instant) {
+    /// Takes the receipt numbered `seq` for `pseudonym`, which lists the `tags` that reached the Exit in the
+    /// intervals `first_seq..=seq`.
+    fn receipts_at(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32], now: Instant) {
+        let first_seq = first_seq.min(seq);
         let mut state = self.state.lock();
 
         let mut gap = 0;
@@ -165,21 +167,18 @@ impl ForwardReceipts {
                 *stream = Stream::new(seq, now);
             }
             Some(stream) => {
-                gap = seq.saturating_sub(stream.last_seq).saturating_sub(1);
-                if seq > stream.last_seq.saturating_add(2) {
-                    // More than one receipt skipped over: they may only be late
-                    if gap > MAX_MISSING {
-                        stream.floor = now;
-                    } else {
-                        stream
-                            .missing
-                            .extend((stream.last_seq + 1..seq).map(|missing| (missing, now)));
-                    }
+                // The seqs between the last one and the first this receipt covers are skipped over: they may only be
+                // late
+                let next = stream.last_seq.saturating_add(1);
+                gap = first_seq.saturating_sub(next);
+                if gap > MAX_MISSING {
+                    stream.floor = now;
+                } else {
+                    stream.missing.extend((next..first_seq).map(|missing| (missing, now)));
                 }
-                // Receipt `seq` also carries the interval of `seq - 1`
                 stream
                     .missing
-                    .retain(|(missing, _)| *missing != seq && *missing + 1 != seq);
+                    .retain(|(missing, _)| !(first_seq..=seq).contains(missing));
                 // Still missing after the grace: lost. It can only have carried packets that reached the Exit
                 // before the jump, so the evidence from then on stays.
                 let lost = stream
@@ -206,7 +205,13 @@ impl ForwardReceipts {
         let watermark_before = state.streams.get(&pseudonym).and_then(|stream| stream.watermark);
         let mut matched = 0;
         let mut lifts = Vec::new();
-        for tag in tags {
+        // Nothing to match for a pseudonym with no records
+        let to_match = if state.records.contains_key(&pseudonym) {
+            tags
+        } else {
+            &[]
+        };
+        for tag in to_match {
             let Some(record) = state.remove(pseudonym, *tag) else {
                 continue;
             };
@@ -247,7 +252,7 @@ impl ForwardReceipts {
             state.evaluate(pseudonym, now)
         };
         state.publish(&self.excluded, &self.any_verdict);
-        tracing::debug!(%pseudonym, seq, tags = tags.len(), matched, gap, outstanding, "forward receipts received");
+        tracing::debug!(%pseudonym, seq, first_seq, tags = tags.len(), matched, gap, outstanding, "forward receipts received");
     }
 
     /// Lifts the verdicts that have run their course and forgets what has expired. Called once a second.
@@ -486,8 +491,8 @@ fn id_of(tag: u32) -> HoprSurbId {
 }
 
 impl ForwardReceiptSink for ForwardReceipts {
-    fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, tags: &[u32]) {
-        self.receipts_at(pseudonym, seq, tags, Instant::now());
+    fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]) {
+        self.receipts_at(pseudonym, seq, first_seq, tags, Instant::now());
     }
 }
 
@@ -562,12 +567,18 @@ mod tests {
         seq: u32,
         /// (tag, arrival at the Exit in ms, if it arrives)
         sent: Vec<(u32, Option<u64>)>,
-        /// When the last two receipts were made.
-        receipted: [u64; 2],
+        /// When the receipts were made, the lost ones included.
+        receipted: Vec<u64>,
+        /// How many intervals a receipt covers.
+        cover: usize,
+        /// The seq of the last overflow jump, and when the receipt before it was made: older intervals are not
+        /// repeated.
+        jump_base: (u32, u64),
         verdict_ms: Option<u64>,
-        /// How long the receipt with a `seq` is delayed, and the receipts delayed: (release in ms, seq, tags).
+        /// How long the receipt with a `seq` is delayed, and the receipts delayed: (release in ms, seq, first seq,
+        /// tags).
         late: Vec<(u32, u64)>,
-        held: Vec<(u64, u32, Vec<u32>)>,
+        held: Vec<(u64, u32, u32, Vec<u32>)>,
     }
 
     impl Sim {
@@ -584,7 +595,9 @@ mod tests {
                 next_tag: 0,
                 seq: 0,
                 sent: Vec::new(),
-                receipted: [0, 0],
+                receipted: Vec::new(),
+                cover: 2,
+                jump_base: (0, 0),
                 verdict_ms: None,
                 late: Vec::new(),
                 held: Vec::new(),
@@ -603,25 +616,36 @@ mod tests {
             self.next_tag += 1;
         }
 
-        /// Makes the receipt at `ms` with the next `seq` plus `jump`, listing what arrived since the one before
-        /// the last.
+        /// Makes the receipt at `ms` with the next `seq` plus `jump`, covering `cover` intervals but none from before
+        /// an Exit overflow (a jump), which repeats nothing.
         fn receipt(&mut self, ms: u64, jump: u32) {
             self.seq += 1 + jump;
+            let covered = if jump > 0 { 1 } else { self.cover };
+            if jump > 0 {
+                self.jump_base = (self.seq, self.receipted.last().copied().unwrap_or(0));
+            }
+            let first_seq = self.seq.saturating_sub(covered as u32 - 1).max(1).max(self.jump_base.0);
+            let cut = self
+                .receipted
+                .len()
+                .checked_sub(covered)
+                .map_or(0, |i| self.receipted[i])
+                .max(self.jump_base.1);
             let tags: Vec<u32> = self
                 .sent
                 .iter()
-                .filter(|(_, arrival)| arrival.is_some_and(|a| a <= ms && a > self.receipted[0]))
+                .filter(|(_, arrival)| arrival.is_some_and(|a| a <= ms && a > cut))
                 .map(|(tag, _)| *tag)
                 .collect();
-            self.receipted = [self.receipted[1], ms];
+            self.receipted.push(ms);
             match self.late.iter().find(|(seq, _)| *seq == self.seq) {
-                Some((_, delay)) => self.held.push((ms + delay, self.seq, tags)),
-                None => self.deliver(ms, self.seq, &tags),
+                Some((_, delay)) => self.held.push((ms + delay, self.seq, first_seq, tags)),
+                None => self.deliver(ms, self.seq, first_seq, &tags),
             }
         }
 
-        fn deliver(&mut self, ms: u64, seq: u32, tags: &[u32]) {
-            self.fr.receipts_at(self.pseudonym, seq, tags, self.at(ms));
+        fn deliver(&mut self, ms: u64, seq: u32, first_seq: u32, tags: &[u32]) {
+            self.fr.receipts_at(self.pseudonym, seq, first_seq, tags, self.at(ms));
             if self.verdict_ms.is_none() && !self.fr.excluded_relayers(&self.exit).is_empty() {
                 self.verdict_ms = Some(ms);
             }
@@ -633,8 +657,8 @@ mod tests {
                 .into_iter()
                 .partition(|(at, ..)| *at <= ms);
             self.held = held;
-            for (_, seq, tags) in due {
-                self.deliver(ms, seq, &tags);
+            for (_, seq, first_seq, tags) in due {
+                self.deliver(ms, seq, first_seq, &tags);
             }
         }
 
@@ -657,7 +681,7 @@ mod tests {
                 if ms % 250 == 0 && ms > 0 {
                     if lost(self.seq + 1) {
                         self.seq += 1;
-                        self.receipted = [self.receipted[1], ms];
+                        self.receipted.push(ms);
                     } else {
                         self.receipt(ms, 0);
                     }
@@ -803,7 +827,7 @@ mod tests {
         let [a, b] = [(); 2].map(|_| key());
         let mut sim = Sim::new();
         sim.run(0, 5_000, rotate(vec![vec![a], vec![b]]), |_| None, |_| true);
-        sim.fr.receipts_at(sim.pseudonym, 1, &[], sim.at(5_000));
+        sim.fr.receipts_at(sim.pseudonym, 1, 1, &[], sim.at(5_000));
         sim.fr.refresh_at(sim.at(5_000));
         assert!(sim.fr.excluded_relayers(&sim.exit).is_empty());
     }
@@ -1009,13 +1033,15 @@ mod tests {
         Ok(())
     }
 
-    /// Receipts 5 and 6 are overtaken by 7 and arrive within the grace, before the receipt that judges.
+    /// Receipts 5 and 6 are overtaken by 7 and arrive within the grace, before the receipt that judges; or, with a
+    /// coverage of 3, long after it.
     #[test]
     fn receipts_arriving_out_of_order_within_the_grace_should_judge_as_in_order() {
         let [a, b, c] = [(); 3].map(|_| key());
-        let verdict = |late: Vec<(u32, u64)>| {
+        let verdict = |late: Vec<(u32, u64)>, cover: usize| {
             let mut sim = Sim::new();
             sim.late = late;
+            sim.cover = cover;
             sim.run(
                 0,
                 4_000,
@@ -1025,9 +1051,14 @@ mod tests {
             );
             (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
         };
-        let in_order = verdict(vec![]);
+        let in_order = verdict(vec![], 2);
         assert!(in_order.0.is_some());
-        assert_eq!(in_order, verdict(vec![(5, 600), (6, 300)]));
+        assert_eq!(in_order, verdict(vec![(5, 600), (6, 300)], 2));
+
+        // Receipts that arrive long after the grace are still covered by the one that overtook them
+        let stalled = verdict(vec![], 3);
+        assert_eq!((Some(2_000), vec![a]), stalled);
+        assert_eq!(stalled, verdict(vec![(5, 2_000), (6, 2_000)], 3));
     }
 
     #[test]
@@ -1037,12 +1068,12 @@ mod tests {
         let t0 = Instant::now();
         let at = |ms| t0 + Duration::from_millis(ms);
         for seq in 1..=3 {
-            fr.receipts_at(session, seq, &[], at(0));
+            fr.receipts_at(session, seq, seq, &[], at(0));
         }
-        fr.receipts_at(session, 6, &[], at(100));
-        assert_eq!(at(0), fr.state.lock().streams[&session].floor, "4 is awaited");
-        fr.receipts_at(session, 7, &[], at(700));
-        assert_eq!(at(100), fr.state.lock().streams[&session].floor, "4 never came");
+        fr.receipts_at(session, 6, 6, &[], at(100));
+        assert_eq!(at(0), fr.state.lock().streams[&session].floor, "4 and 5 are awaited");
+        fr.receipts_at(session, 7, 7, &[], at(700));
+        assert_eq!(at(100), fr.state.lock().streams[&session].floor, "4 and 5 never came");
         assert!(fr.state.lock().streams[&session].missing.is_empty());
     }
 
@@ -1056,16 +1087,16 @@ mod tests {
         let t0 = Instant::now();
         let at = |ms| t0 + Duration::from_millis(ms);
         for seq in 1..=3 {
-            fr.receipts_at(session, seq, &[], at(0));
+            fr.receipts_at(session, seq, seq, &[], at(0));
         }
-        // 4 goes missing at 100 ms, and 7 at 300 ms; 5 and 8 are covered by their successors
-        fr.receipts_at(session, 6, &[], at(100));
+        // 4 and 5 go missing at 100 ms, and 7 and 8 at 300 ms
+        fr.receipts_at(session, 6, 6, &[], at(100));
         for tag in 1..=3 {
             fr.record_at(session, tag, &[x, exit], at(200));
         }
         fr.record_at(session, 99, &[y, exit], at(850));
-        fr.receipts_at(session, 9, &[], at(300));
-        fr.receipts_at(session, 10, &[99], at(900));
+        fr.receipts_at(session, 9, 9, &[], at(300));
+        fr.receipts_at(session, 10, 10, &[99], at(900));
 
         let state = fr.state.lock();
         assert_eq!(at(300), state.streams[&session].floor);
@@ -1075,22 +1106,122 @@ mod tests {
         );
     }
 
-    /// 6 overtakes, 5 arrives late and carries what 4 did: nothing is lost.
+    /// 6 overtakes, and 5 arrives late and covers 4 as well: nothing is lost.
     #[test]
-    fn a_late_receipt_should_cover_the_one_before_it() {
+    fn a_late_receipt_should_cover_the_intervals_it_repeats() {
         let fr = ForwardReceipts::default();
         let session = HoprPseudonym::random();
         let t0 = Instant::now();
         let at = |ms| t0 + Duration::from_millis(ms);
         for seq in 1..=3 {
-            fr.receipts_at(session, seq, &[], at(0));
+            fr.receipts_at(session, seq, seq, &[], at(0));
         }
-        fr.receipts_at(session, 6, &[], at(100));
-        fr.receipts_at(session, 5, &[], at(200));
-        fr.receipts_at(session, 7, &[], at(800));
+        fr.receipts_at(session, 6, 6, &[], at(100));
+        fr.receipts_at(session, 5, 4, &[], at(200));
+        fr.receipts_at(session, 7, 7, &[], at(800));
         let state = fr.state.lock();
         assert_eq!(at(0), state.streams[&session].floor);
         assert!(state.streams[&session].missing.is_empty());
+    }
+
+    /// Every receipt repeats the two intervals before it, so up to two lost receipts in a row lose nothing.
+    #[test]
+    fn as_many_lost_receipts_as_a_receipt_covers_should_lose_nothing() {
+        let [a, b, c] = [(); 3].map(|_| key());
+        let verdict_with = |lost: &'static [u32]| {
+            let mut sim = Sim::new();
+            sim.cover = 3;
+            sim.run(
+                0,
+                4_000,
+                rotate(vec![vec![a], vec![b], vec![c]]),
+                |path| if path.contains(&a) { None } else { FAST },
+                |seq| lost.contains(&seq),
+            );
+            (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
+        };
+        let expected = verdict_with(&[]);
+        assert_eq!((Some(2_000), vec![a]), expected);
+        assert_eq!(expected, verdict_with(&[6, 7]));
+    }
+
+    /// More receipts lost than a receipt covers hold judgement, and then floor at the jump.
+    #[test]
+    fn more_lost_receipts_than_a_receipt_covers_should_floor_at_the_jump() {
+        let [a, b, c] = [(); 3].map(|_| key());
+        let mut sim = Sim::new();
+        sim.cover = 3;
+        let route = rotate(vec![vec![a], vec![b], vec![c]]);
+        let fate = |path: &[Key]| if path.contains(&a) { None } else { FAST };
+        let lost = |seq: u32| (6..=9).contains(&seq);
+        // Receipt 10 at 2500 ms is the first to arrive after the four, and covers 8 to 10: 6 and 7 are missing
+        sim.run(0, 2_510, &route, fate, lost);
+        let missing: Vec<u32> = sim.fr.state.lock().streams[&sim.pseudonym]
+            .missing
+            .iter()
+            .map(|(seq, _)| *seq)
+            .collect();
+        assert_eq!(vec![6, 7], missing);
+        sim.run(2_510, 3_600, &route, fate, lost);
+        assert_eq!(sim.at(2_500), sim.fr.state.lock().streams[&sim.pseudonym].floor);
+    }
+
+    /// A gap of 16 is held, a larger one floors at once.
+    #[test]
+    fn a_gap_of_sixteen_should_be_held_and_a_larger_one_should_floor() {
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        for seq in 1..=9 {
+            fr.receipts_at(session, seq, seq, &[], at(0));
+        }
+        fr.receipts_at(session, 40, 26, &[], at(100));
+        {
+            let state = fr.state.lock();
+            assert_eq!(
+                (16, at(0)),
+                (state.streams[&session].missing.len(), state.streams[&session].floor)
+            );
+        }
+        fr.receipts_at(session, 60, 60, &[], at(200));
+        assert_eq!(at(200), fr.state.lock().streams[&session].floor);
+    }
+
+    /// A seq of `u32::MAX` must not overflow the next receipt.
+    #[test]
+    fn a_receipt_after_the_largest_seq_should_not_overflow() {
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        fr.receipts_at(session, u32::MAX, u32::MAX, &[], t0);
+        fr.receipts_at(session, u32::MAX, 1, &[], t0);
+        assert!(fr.state.lock().streams[&session].missing.is_empty());
+    }
+
+    #[test]
+    fn a_receipt_should_leave_only_the_seqs_before_its_first_seq_missing() {
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        for seq in 1..=3 {
+            fr.receipts_at(session, seq, seq, &[], t0);
+        }
+        fr.receipts_at(session, 9, 7, &[], t0);
+        let missing = |fr: &ForwardReceipts| -> Vec<u32> {
+            fr.state.lock().streams[&session]
+                .missing
+                .iter()
+                .map(|(seq, _)| *seq)
+                .collect()
+        };
+        assert_eq!(vec![4, 5, 6], missing(&fr));
+        fr.receipts_at(session, 5, 4, &[], t0);
+        assert_eq!(vec![6], missing(&fr), "5 covers 4 and 5");
+
+        // A gap beyond what is held is a loss at once
+        fr.receipts_at(session, 40, 40, &[], t0 + Duration::from_millis(10));
+        assert_eq!(t0 + Duration::from_millis(10), fr.state.lock().streams[&session].floor);
     }
 
     #[test]
@@ -1099,9 +1230,9 @@ mod tests {
         let session = HoprPseudonym::random();
         let t0 = Instant::now();
         for seq in 1..=10 {
-            fr.receipts_at(session, seq, &[], t0);
+            fr.receipts_at(session, seq, seq, &[], t0);
         }
-        fr.receipts_at(session, 7, &[], t0 + Duration::from_millis(10));
+        fr.receipts_at(session, 7, 7, &[], t0 + Duration::from_millis(10));
         assert_eq!((10, t0), {
             let state = fr.state.lock();
             (state.streams[&session].last_seq, state.streams[&session].floor)
@@ -1124,7 +1255,7 @@ mod tests {
         sim.send(verdict + 1, &[a], FAST);
         // The pseudonym is reused: its new stream has no watermark
         sim.fr
-            .receipts_at(sim.pseudonym, 1, &[sim.next_tag - 1], sim.at(verdict + 300));
+            .receipts_at(sim.pseudonym, 1, 1, &[sim.next_tag - 1], sim.at(verdict + 300));
         assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
         Ok(())
     }
@@ -1156,14 +1287,14 @@ mod tests {
         let session = HoprPseudonym::random();
         let t0 = Instant::now();
         for seq in 1..=5 {
-            fr.receipts_at(session, seq, &[], t0 + Duration::from_millis(250 * seq as u64));
+            fr.receipts_at(session, seq, seq, &[], t0 + Duration::from_millis(250 * seq as u64));
         }
         fr.record_at(session, 1, &[a, exit], t0);
-        fr.receipts_at(session, 6, &[1], t0 + Duration::from_secs(2));
+        fr.receipts_at(session, 6, 6, &[1], t0 + Duration::from_secs(2));
         assert!(fr.state.lock().streams[&session].watermark.is_some());
 
         let again = t0 + Duration::from_secs(3);
-        fr.receipts_at(session, 1, &[], again);
+        fr.receipts_at(session, 1, 1, &[], again);
         let state = fr.state.lock();
         let stream = &state.streams[&session];
         assert_eq!((1, None, again), (stream.last_seq, stream.watermark, stream.floor));
@@ -1175,15 +1306,15 @@ mod tests {
         let session = HoprPseudonym::random();
         let t0 = Instant::now();
         for seq in 1..=10 {
-            fr.receipts_at(session, seq, &[], t0);
+            fr.receipts_at(session, seq, seq, &[], t0);
         }
-        fr.receipts_at(session, 9, &[], t0);
+        fr.receipts_at(session, 9, 9, &[], t0);
         assert_eq!(
             10,
             fr.state.lock().streams[&session].last_seq,
             "a late receipt is no reset"
         );
-        fr.receipts_at(session, NEW_SESSION_SEQ_MAX, &[], t0);
+        fr.receipts_at(session, NEW_SESSION_SEQ_MAX, NEW_SESSION_SEQ_MAX, &[], t0);
         assert_eq!(NEW_SESSION_SEQ_MAX, fr.state.lock().streams[&session].last_seq);
     }
 }
