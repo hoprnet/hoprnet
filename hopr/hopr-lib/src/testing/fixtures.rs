@@ -911,7 +911,7 @@ enum RawRoleNode {
         TestingConnector,
     ),
     Exit(
-        Arc<crate::testing::wiring::HoprEntry<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprExit<TestingConnector>>,
         TestingConnector,
     ),
 }

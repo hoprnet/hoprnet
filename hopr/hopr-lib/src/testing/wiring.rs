@@ -19,6 +19,7 @@ use crate::{
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
+/// A relaying node: full ticket processing, no Session server of its own.
 pub type HoprRelay<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
@@ -26,11 +27,27 @@ pub type HoprRelay<
     TMgr = SharedTicketManager,
 > = Hopr<Chain, Graph, Net, TMgr>;
 
+/// A node that terminates Sessions without ticket processing — the non-relaying exit.
+pub type HoprExit<
+    Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+    Graph = SharedChannelGraph,
+    Net = HoprNetwork,
+> = Hopr<Chain, Graph, Net, ()>;
+
+/// A source node: no ticket processing, no incoming Sessions.
 pub type HoprEntry<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
 > = Hopr<Chain, Graph, Net, ()>;
+
+/// A node that terminates Sessions *and* relays: ticket processing plus the Session server.
+pub type HoprRelayExit<
+    Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
+    Graph = SharedChannelGraph,
+    Net = HoprNetwork,
+    TMgr = SharedTicketManager,
+> = Hopr<Chain, Graph, Net, TMgr>;
 
 type FullyConfiguredBuilder<Chain> = crate::builder::HoprBuilderConfigured<
     Chain,
@@ -200,7 +217,7 @@ pub async fn build_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<HoprEntry<Chain>>>
+) -> anyhow::Result<Arc<HoprExit<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
