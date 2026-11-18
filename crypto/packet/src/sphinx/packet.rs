@@ -327,6 +327,12 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
 ///
 /// The fields are private and the tag is derived only here, so a caller cannot pair a tag with a secret it does not
 /// belong to - the invariant is carried by the type rather than by a doc comment.
+///
+/// What the privacy does *not* enforce is that the state goes back to the packet it came from: a caller can
+/// take a `ForwardSecret` derived from one packet and pass it to
+/// [`MetaPacket::into_forwarded_with_secret`] on another. The result is a well-formed secret and tag that
+/// nevertheless belong to different bytes, so the header MAC check would then be checking the wrong secret.
+/// A caller must therefore hand each state back to the packet that produced it.
 pub struct ForwardSecret<S: SphinxSuite> {
     /// The blinded alpha, not yet computed.
     ///

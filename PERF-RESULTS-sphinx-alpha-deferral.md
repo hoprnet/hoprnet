@@ -1,10 +1,12 @@
 # Perf results: Sphinx alpha deferral & single point encoding
 
 - **Branch:** `perf/sphinx-defer-alpha-and-single-compress` (PR #8700)
-- **Commits:** `b5debbb7fc` (the change), `c5acb053e2` (these results), `4c302b614d` (the
-  degenerate-alpha guard), `2d718ac599` (prettier + re-measured benchmarks)
+- **Benchmarked fixed revision:** `2d718ac599` (includes the degenerate-alpha guard)
+- **Later commits (review follow-up, not separately benchmarked):** `4c302b614d`…`d88904384c` — the guard,
+  the small-order `is_valid` fix, and doc/test corrections. None of them touches a timed hot path except by
+  adding the `is_identity`/`is_torsion_free` check, whose cost is estimated below.
 - **Files:** `crypto/packet/src/sphinx/shared_keys.rs`, `crypto/packet/src/sphinx/packet.rs`,
-  `crypto/packet/src/sphinx/ec_groups.rs` (the last is review follow-up: the small-order `is_valid` fix)
+  `crypto/packet/src/sphinx/ec_groups.rs`
 - **Date:** 2026-11-18
 - **All commits are SSH-signed** with `git-signer`; GitHub reports `verified: true`.
 
@@ -41,11 +43,17 @@ form yields the same secret and the same finalized alpha as the eager form.
 
 ## Benchmark method
 
-Isolated A/B: baseline built from `HEAD` (`ff0076efaa`) in a separate git worktree with its own
-`CARGO_TARGET_DIR`; the fixed build from the branch. Both binaries run back-to-back on a quiet box, one
-process at a time (an earlier attempt ran baseline and fixed concurrently and produced contaminated,
-noisy numbers — those were discarded). Criterion defaults otherwise; `--sample-size 30–60`. The `change:` intervals are criterion's, with the
-`p` value quoted per row; every row except the `pix_on` one is `p < 0.001`.
+Isolated A/B: baseline built from `ff0076efaa` in a separate git worktree with its own
+`CARGO_TARGET_DIR`; the **fixed build is `2d718ac599`**, which already contains the degenerate-alpha guard.
+Both binaries run back-to-back on a quiet box, one process at a time (an earlier attempt ran baseline and
+fixed concurrently and produced contaminated, noisy numbers — those were discarded). Criterion defaults
+otherwise; `--sample-size 30–60`. The `change:` intervals are criterion's, with the `p` value quoted per
+row; every row except the `pix_on` one is `p < 0.001`. Δ is criterion's `change` estimate (median of the
+two sample distributions) against the saved baseline, not a recomputation from the two means in the row.
+
+The exact commands, the baseline/fixed revisions, and the machine (AMD EPYC 9575F, 16 vCPU, Linux 7.0.0)
+are recorded here; the raw Criterion samples live under the untracked `target/criterion/` of each build and
+were not archived — re-running the two binaries reproduces them.
 
 ## Results (isolated A/B)
 
@@ -69,9 +77,11 @@ per packet, so the application-level rate is lower — for the 5,000-packet e2e 
 | `protocol_throughput_pipeline/63.4 MiB/pix_off`          | 402.35 ms (157.6 MiB/s) | 379.84 ms (166.9 MiB/s) | **−5.6% (+5.9% thrpt)**   |
 | `protocol_throughput_pipeline/63.4 MiB/pix_on`           | 416.39 ms (152.3 MiB/s) | 415.63 ms (152.5 MiB/s) | −0.2% (n.s., p=0.88)      |
 
-`relay` moves least because a relay still must compute the blinded alpha (it forwards); the win there is
-items 2 and 3 only. `recipient` / `packet_receiving` move most because the deferred multiply is one of
-the two per-packet scalar mults.
+`relay` moves least because a relay still must compute the blinded alpha (it forwards), so only items 1
+and 2 help it — **not** item 3, whose fixed-base update is in `SharedKeys::generate`, which a relay never
+calls. `recipient` / `packet_receiving` move most because the deferred multiply is one of their two
+per-packet scalar mults. `packet_precompute` pays `SharedKeys::generate` once per path, which is why
+item 3 shows up there.
 
 `protocol_throughput_pipeline/pix_on` showing no change is expected rather than disappointing: with PIX
 on, each SURB also carries a share, so share generation dilutes the fixed Sphinx saving. Its `pix_off`
@@ -129,8 +139,11 @@ Regression tests: `a_degenerate_alpha_is_rejected_on_the_deferred_path` (identit
 `a_nonidentity_small_order_alpha_is_rejected` (all eight torsion classes). Both verified to fail without the
 guard and pass with it.
 
-**Cost of the guard:** `packet_forwarding` 74.87 → 75.23 µs (+0.5%), `packet_receiving` 36.92 → 36.98 µs
-(+0.5%). Negligible against the wins above.
+**Cost of the guard.** The table above is measured on a build that already contains the guard
+(`2d718ac599`), so it is the net figure, not the pre-guard one. A separate run of the _same_ build with the
+guard then added back in (an intermediate revision) read `packet_forwarding` 74.87 → 75.23 µs (+0.5%) and
+`packet_receiving` 36.92 → 36.98 µs (+0.5%); that is a run-to-run comparison on one revision boundary, not
+a third isolated A/B, and the +0.5% is at the edge of the noise it was taken over.
 
 ### Also corrected on their reports
 
