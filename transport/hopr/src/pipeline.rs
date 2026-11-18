@@ -32,8 +32,8 @@ use crate::{
 ///
 /// - [`HoprPacketPipelineBuilder::build_for_relay`] — full pipeline. Requires
 ///   [`HoprPacketPipelineBuilder::with_ticket_events`] to be called beforehand.
-/// - [`HoprPacketPipelineBuilder::build_for_edge`] — Edge nodes. Ticket events are not needed (and any value previously
-///   set is ignored).
+/// - [`HoprPacketPipelineBuilder::build_for_entry`] — Entry nodes. Ticket events are not needed (and any value
+///   previously set is ignored).
 /// - [`HoprPacketPipelineBuilder::build_for_exit`] — Exit nodes. Ticket events are not needed (and any value previously
 ///   set is ignored).
 ///
@@ -671,11 +671,11 @@ where
     AppIn: futures::Stream + Send + 'static,
     AppIn::Item: Into<WithContext<(ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>> + Send,
 {
-    /// Builds the pipeline configured for an Edge node.
+    /// Builds the pipeline configured for an Entry node.
     ///
     /// The incoming acknowledgement pipeline is not started; ticket events (if any) are ignored.
-    #[cfg(feature = "edge")]
-    pub fn build_for_edge(self) -> AbortableList<HoprTransportProcess> {
+    #[cfg(feature = "entry")]
+    pub fn build_for_entry(self) -> AbortableList<HoprTransportProcess> {
         let (
             packet_key,
             wire_msg,
@@ -698,7 +698,7 @@ where
                 .api(api)
                 .with_counters(counters)
                 .with_config(cfg.pipeline)
-                .build_for_edge(),
+                .build_for_entry(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
                 .transport(wire_msg)
@@ -706,7 +706,7 @@ where
                 .api(api)
                 .with_counters(counters)
                 .with_config(cfg.pipeline)
-                .build_for_edge(),
+                .build_for_entry(),
         };
 
         processes.flat_map_extend_from(inner, HoprTransportProcess::Pipeline);

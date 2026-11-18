@@ -6,7 +6,7 @@
 //! 2. **Configuration** — `HoprBuilderWithIdentity::with_config`
 //! 3. **Component factories** — chain API, graph, network, and cover-traffic
 //! 4. **Session server** (when the `session-server` feature is enabled) — `HoprBuilderConfigured::with_session_server`
-//! 5. **Build** — `build_edge` for an entry/exit node or `build_full` for a relay node with ticket management.
+//! 5. **Build** — `build_edge` for the source edge, `build_relay` for a relay, `build_exit` for a non-relaying exit.
 //!
 //! # Example
 //!
@@ -208,9 +208,9 @@ impl HoprBuilderWithIdentity {
 ///
 /// When the `session-server` feature is enabled, `with_session_server`
 /// must be called before building — it returns a `HoprBuilderWithSession` which
-/// has the `build_edge` / `build_full` methods.
+/// has the `build_edge` / `build_relay` / `build_exit` methods.
 ///
-/// When the feature is disabled, `build_edge` / `build_full` are available directly.
+/// When the feature is disabled, `build_edge` / `build_relay` are available directly.
 pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = (), Dump = ()> {
     ctx: BuildCtx,
     state_dump_factory: Dump,
@@ -341,7 +341,7 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
     /// Attaches a session server for handling incoming sessions.
     ///
     /// Eagerly spawns the server task and returns a [`HoprBuilderWithSession`]
-    /// that has the `build_edge` / `build_full` methods.
+    /// that has the `build_edge` / `build_relay` / `build_exit` methods.
     ///
     /// Two tasks are spawned, not one, because the server is consulted at two different points in a
     /// Session's life. `admit` is asked while the peer's request is still being negotiated and no
@@ -447,7 +447,7 @@ impl<Chain, Graph, Net, Ct, Dump> HoprBuilderConfigured<Chain, Graph, Net, Ct, D
 // HoprBuilderWithSession — session server attached, ready to build
 // ---------------------------------------------------------------------------
 
-/// Builder with a session server attached. Has `build_edge` / `build_full`.
+/// Builder with a session server attached. Has `build_edge` / `build_relay` / `build_exit`.
 ///
 /// Only exists when the `session-server` feature is enabled.
 #[cfg(feature = "session-server")]
@@ -1042,7 +1042,7 @@ macro_rules! impl_build_methods {
             tracing::info!("{}", starting_log);
             let (socket, transport_processes) = pre
                 .transport_api
-                .run_edge(
+                .run_entry(
                     cover_traffic,
                     network,
                     network_process,
@@ -1062,8 +1062,8 @@ macro_rules! impl_build_methods {
 
         /// Builds an edge (source) [`Hopr`] node.
         ///
-        /// Edge nodes do not process tickets, do not have ticket manager state, and do not accept
-        /// incoming sessions. This is the `edge` entity.
+        /// The edge entity runs the transport's Entry role: it does not process tickets, has no
+        /// ticket manager state, and accepts no incoming sessions.
         #[cfg(feature = "edge")]
         pub async fn build_edge<TFact>(
             self,

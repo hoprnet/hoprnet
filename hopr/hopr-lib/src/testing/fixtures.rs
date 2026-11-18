@@ -936,7 +936,7 @@ pub struct RoleClusterGuard {
 
 /// Builds a role-typed cluster with one Entry, N Relays, and one Exit.
 ///
-/// Each node is built with the correct transport role (`run_edge` / `run_relay` / `run_exit`).
+/// Each node is built with the correct transport role (`run_entry` / `run_relay` / `run_exit`).
 /// Entry and Exit nodes use `()` as their ticket manager (no ticket processing).
 /// Relay nodes use `SharedTicketManager` (full ticket processing).
 ///
