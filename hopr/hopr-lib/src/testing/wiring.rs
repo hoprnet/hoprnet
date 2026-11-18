@@ -368,7 +368,7 @@ pub(crate) mod tests {
                 )
             })
             .with_session_server(crate::testing::dummies::EchoServer::default())
-            .build_entry(ticket_factory)
+            .build_edge(ticket_factory)
             .await?;
 
         let started = tokio::time::timeout(std::time::Duration::from_secs(5), started_rx)
