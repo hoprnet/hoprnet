@@ -116,16 +116,23 @@
 return-path draws, `exp(H)` for the Shannon entropy `H` of the draw distribution, pooled over the
 sessions the path planner tracks.
 
-- `1.0` means every recent draw went through one relayer: those sessions have no relay diversity,
-  whatever the candidate pool offers. The default threshold of `1.0` logs a WARN for that case.
-- The value rises towards the number of distinct relayers actually used as the draws even out, so
-  compare it against the size of the candidate pool, not against a fixed target.
+- `1.0` means every recent draw of every tracked session went through the same relayer. The value
+  rises towards the number of distinct relayers actually used as the draws even out, so compare it
+  against the size of the candidate pool, not against a fixed target.
+- Two sessions that each keep to their own single relayer still score `2.0` here, because the gauge
+  reads the pool and not one session. It does not replace the per-session WARN below.
 - It covers the return paths the planner draws. An explicitly routed return path bypasses the
   draw, so a workload that only uses explicit routes leaves the score untouched.
   `hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not
   the spread of relays a session's traffic passes through.
 
-Alert on a score that stays at the bottom of its range:
+`path_planner.min_return_path_diversity` is a per-session check: every `(destination, hops)` key
+scores its own draws and logs one WARN when its score reaches the threshold, with one INFO when it
+recovers (default `1.0`; `0.0` disables the log). At that default, two sessions on separate single
+relayers each log a WARN while the pooled gauge stays at `2.0`.
+
+Alert on the pooled score staying at the bottom of its range, which is every session concentrated on
+one shared relayer:
 
 ```yaml
 - alert: ReturnPathDiversityCollapsed
@@ -139,5 +146,4 @@ published value; the `for` clause is what requires the condition to hold, and it
 node too. Read it together with the node's message volume.
 
 `path_planner.diversity_metric_window` sets how many recent draws the score covers (default
-`200`). `path_planner.min_return_path_diversity` sets the score at which a session logs one WARN,
-with one INFO when it recovers (default `1.0`; `0.0` disables the log).
+`200`).
