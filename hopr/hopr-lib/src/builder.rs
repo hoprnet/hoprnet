@@ -853,11 +853,15 @@ where
                                 health.set_neighbour_connected(opk, connected);
                             }
 
-                            // The connect has just put this peer's edge in the graph, so its paths
-                            // can be built now. Detached: the edge recording above must not wait
-                            // for a selector search.
+                            // Only a peer the network still tracks as connected is warmed. The
+                            // check runs inside the detached task, because the peer can drop
+                            // between the event and the task that serves it.
                             if connected {
-                                spawn(async move { path_planner.prewarm_forward_paths(&opk).await });
+                                spawn(async move {
+                                    if net.is_connected(&peer_id) {
+                                        path_planner.prewarm_forward_paths(&opk).await;
+                                    }
+                                });
                             }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
