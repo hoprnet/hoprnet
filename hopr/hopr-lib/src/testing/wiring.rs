@@ -19,14 +19,14 @@ use crate::{
 
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
 
-pub type RelayHopr<
+pub type HoprRelay<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
     TMgr = SharedTicketManager,
 > = Hopr<Chain, Graph, Net, TMgr>;
 
-pub type EdgeHopr<
+pub type HoprEdge<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
@@ -114,7 +114,7 @@ pub async fn build_edge_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprEdge<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -154,7 +154,7 @@ pub async fn build_relay_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<RelayHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprRelay<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -200,7 +200,7 @@ pub async fn build_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+) -> anyhow::Result<Arc<HoprEdge<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
