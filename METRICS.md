@@ -142,8 +142,9 @@ none, so a packet carrying ten SURBs weighs ten times one carrying a single SURB
 from `1.0`, one route for every recent SURB, up to the number of distinct forward-and-return
 combinations the graph offers.
 
-Both gauges cover paths the planner chooses. An explicitly routed path bypasses the draw, so a
-workload that only uses explicit routes leaves the scores untouched.
+A path the caller fixes contributes nothing to the first-hop score, because the planner did not
+choose it. The route score still counts those packets whenever the return leg is the planner's, so
+on an explicit forward path keep reading `hopr_path_route_diversity` for the return choice.
 `hopr_mixer_effective_anonymity_set` measures something else again: the mixer's occupancy, not the
 spread of relays a session's traffic passes through.
 
