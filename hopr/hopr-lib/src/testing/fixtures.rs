@@ -905,7 +905,7 @@ fn cluster_fixture_inner(
 /// Intermediate result from a `block_on` build — avoids moving `runtime` into the async block.
 enum RawRoleNode {
     Entry(
-        Arc<crate::testing::wiring::HoprEdge<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprEntry<TestingConnector>>,
         TestingConnector,
     ),
     Relay(
@@ -913,7 +913,7 @@ enum RawRoleNode {
         TestingConnector,
     ),
     Exit(
-        Arc<crate::testing::wiring::HoprEdge<TestingConnector>>,
+        Arc<crate::testing::wiring::HoprEntry<TestingConnector>>,
         TestingConnector,
     ),
 }
@@ -1069,7 +1069,7 @@ where
                     let prober = Some(hopr_ct_full_network::EgressConfig::default());
 
                     let node: anyhow::Result<RawRoleNode> = if is_entry {
-                        let instance = crate::testing::wiring::build_edge_with_chain(
+                        let instance = crate::testing::wiring::build_entry_with_chain(
                             &onchain_keys[i],
                             &offchain_keys[i],
                             config,

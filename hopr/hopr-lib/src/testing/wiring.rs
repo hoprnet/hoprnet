@@ -26,7 +26,7 @@ pub type HoprRelay<
     TMgr = SharedTicketManager,
 > = Hopr<Chain, Graph, Net, TMgr>;
 
-pub type HoprEdge<
+pub type HoprEntry<
     Chain = Arc<hopr_chain_connector::HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>>,
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
@@ -102,8 +102,8 @@ where
     Ok(builder)
 }
 
-/// Builds an edge (source) HOPR node with a custom chain connector.
-pub async fn build_edge_with_chain<
+/// Builds an entry (source) HOPR node with a custom chain connector.
+pub async fn build_entry_with_chain<
     Chain,
     Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
         + Clone
@@ -117,7 +117,7 @@ pub async fn build_edge_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<HoprEdge<Chain>>>
+) -> anyhow::Result<Arc<HoprEntry<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
@@ -203,7 +203,7 @@ pub async fn build_exit_with_chain<
     probe_cfg: Option<hopr_ct_full_network::EgressConfig>,
     chain_connector: Chain,
     server: Srv,
-) -> anyhow::Result<Arc<HoprEdge<Chain>>>
+) -> anyhow::Result<Arc<HoprEntry<Chain>>>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
