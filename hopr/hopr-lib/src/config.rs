@@ -1,3 +1,4 @@
+#[cfg(feature = "relay")]
 use std::time::Duration;
 
 use hopr_api::types::primitive::prelude::*;
@@ -87,6 +88,9 @@ pub struct HoprLibConfig {
     /// be creating invalid outgoing tickets.
     ///
     /// Default is 15 seconds, minimum is 1 second.
+    ///
+    /// Only a relay emits tickets, so only a build with the `relay` feature carries the setting.
+    #[cfg(feature = "relay")]
     #[default(default_out_index_sync_period())]
     #[validate(custom(function = "validate_out_index_sync_period"))]
     #[cfg_attr(
@@ -109,8 +113,10 @@ pub struct HoprLibConfig {
     pub disable_protocol_checks: bool,
 }
 
+#[cfg(feature = "relay")]
 const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
 
+#[cfg(feature = "relay")]
 fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationError> {
     if lifetime < &MINIMUM_OUT_SYNC_PERIOD {
         Err(ValidationError::new("out_index_sync_period is too low"))
@@ -119,6 +125,7 @@ fn validate_out_index_sync_period(lifetime: &Duration) -> Result<(), ValidationE
     }
 }
 
+#[cfg(feature = "relay")]
 fn default_out_index_sync_period() -> Duration {
     Duration::from_secs(15)
 }
