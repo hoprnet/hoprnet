@@ -390,6 +390,28 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) processes: AbortableList<HoprLibProcess>,
 }
 
+/// A source node: establishes Sessions, relays nothing, admits none.
+///
+/// The ticket manager parameter is `()`, so a node of this type cannot process tickets even
+/// accidentally. Built by [`builder::HoprBuilder`]'s `build_edge`.
+pub type HoprEntry<Chain = (), Graph = (), Net = ()> = Hopr<Chain, Graph, Net, ()>;
+
+/// An exit that terminates Sessions without processing tickets.
+///
+/// The `raw-exit` entity: a Session server with no ticket manager. Built by
+/// [`builder::HoprBuilder`]'s `build_exit`.
+pub type HoprExit<Chain = (), Graph = (), Net = ()> = Hopr<Chain, Graph, Net, ()>;
+
+/// A relay: full ticket processing and forwarding, no Session server of its own.
+///
+/// Built by [`builder::HoprBuilder`]'s `build_relay`.
+pub type HoprRelay<Chain = (), Graph = (), Net = (), TMgr = ()> = Hopr<Chain, Graph, Net, TMgr>;
+
+/// An exit that both relays and terminates Sessions: ticket processing plus the Session server.
+///
+/// Same shape as [`HoprRelay`], named for what the node is when it also terminates Sessions.
+pub type HoprRelayExit<Chain = (), Graph = (), Net = (), TMgr = ()> = Hopr<Chain, Graph, Net, TMgr>;
+
 impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Hopr")
