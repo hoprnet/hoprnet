@@ -995,11 +995,10 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
 /// Node type for which the packet processing pipeline is being constructed.
 ///
 /// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
-/// * [`Relay`](NodeType::Relay) — full pipeline, processes tickets and incoming acknowledgements.
-/// * [`Entry`](NodeType::Entry) — does not process tickets and does not even start the incoming acknowledgement
-///   pipeline.
-/// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
-///   only drains the stream) for future use.
+/// * `NodeType::Relay` — full pipeline, processes tickets and incoming acknowledgements.
+/// * `NodeType::Entry` — does not process tickets and does not even start the incoming acknowledgement pipeline.
+/// * `NodeType::Exit` — does not process tickets, but still runs the incoming acknowledgement pipeline (which only
+///   drains the stream) for future use.
 ///
 /// A variant exists only when its role feature is on, so a build for one role carries neither the
 /// variant nor the pipeline it selects.
