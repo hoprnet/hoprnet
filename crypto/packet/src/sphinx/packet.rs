@@ -552,13 +552,20 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
 
-        // Finish every fallible step of the forward transform *before* telling the caller the packet
-        // authenticated. `on_authenticated` is what makes a decode commit the packet tag to its replay
-        // filter, and the eager transform used to have nothing fallible left at that point; the deferred
-        // one does - blinding the alpha can fail. Validating it after the callback instead would let a
-        // packet that the caller then rejects for a local reason still occupy a filter slot, so its
-        // retry would be reported as a replay rather than as the same local failure.
-        let alpha = alpha.finalize()?;
+        // Blind the alpha only when this node forwards, and finish it *before* telling the caller the
+        // packet authenticated.
+        //
+        // Conditional: a final hop never forwards, so computing the blinded alpha there would pay a
+        // variable-base multiplication for a value it discards - the whole point of deferring it.
+        // Before `on_authenticated`: that callback is what makes a decode commit the packet tag to its
+        // replay filter, and the eager transform had nothing fallible left at that point while this one
+        // has the alpha check. Finalizing after the callback instead would let a packet the caller then
+        // rejects for a local reason still occupy a filter slot, so its retry would be reported as a
+        // replay rather than as the same local failure.
+        let alpha = match &fwd_header {
+            ForwardedHeader::Relayed { .. } => Some(alpha.finalize()?),
+            ForwardedHeader::Final { .. } => None,
+        };
         on_authenticated();
 
         // Perform initial decryption over the payload
@@ -574,8 +581,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => {
                 // The payload is already decrypted in place; write back the blinded alpha and the next header.
-                // `alpha` was finalized above, before `on_authenticated`.
-                self.alpha_mut().copy_from_slice(&alpha);
+                // `alpha` was finalized above, before `on_authenticated`, in this same branch.
+                self.alpha_mut()
+                    .copy_from_slice(&alpha.expect("the relaying branch finalized the alpha above"));
                 self.routing_info_mut().copy_from_slice(next_header.as_ref());
 
                 ForwardedMetaPacket::Relayed {

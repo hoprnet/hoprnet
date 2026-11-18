@@ -320,20 +320,23 @@ mod tests {
 
     #[cfg(feature = "secp256k1")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_secp256k1_suite(nodes: usize) {
-        generic_sphinx_suite_test::<crate::Secp256k1Suite>(nodes)
+    fn test_secp256k1_suite(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::Secp256k1Suite>(nodes)?;
+        Ok(())
     }
 
     #[cfg(feature = "ed25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_ed25519_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<crate::Ed25519Suite>(nodes)
+    fn test_ed25519_shared_keys(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::Ed25519Suite>(nodes)?;
+        Ok(())
     }
 
     #[cfg(feature = "x25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_montgomery_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<crate::X25519Suite>(nodes)
+    fn test_montgomery_shared_keys(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::X25519Suite>(nodes)?;
+        Ok(())
     }
 }
 
@@ -367,5 +370,26 @@ mod montgomery_is_valid {
             9u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
         assert!(good.is_valid(), "the Montgomery basepoint must be valid");
+
+        // A successful conversion: an alpha this suite produces (a real curve point) must pass. This is
+        // the case `is_valid` is called with on the packet path, and it exercises the `Some` arm.
+        let (alpha, _) = <Curve25519MontgomeryPoint as GroupElement<Curve25519Scalar>>::random_pair();
+        assert!(alpha.is_valid(), "a generated Montgomery alpha must be valid");
+
+        // A failed conversion: a coordinate with no Edwards representative must be rejected, not
+        // skipped. `to_edwards` returns `Option`, and treating `None` as valid is what the first
+        // version of this check got wrong for the order-2 point.
+        let mut u_minus_one = [0xffu8; 32];
+        u_minus_one[0] = 0xec;
+        u_minus_one[31] = 0x7f;
+        let no_representative = Curve25519MontgomeryPoint(u_minus_one);
+        assert!(
+            no_representative.to_edwards(0).is_none(),
+            "u = -1 is the order-2 point and has no Edwards representative"
+        );
+        assert!(
+            !no_representative.is_valid(),
+            "a coordinate with no Edwards representative must be invalid"
+        );
     }
 }

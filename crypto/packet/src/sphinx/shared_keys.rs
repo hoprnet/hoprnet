@@ -189,12 +189,15 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         // valid encoding there (it yields the identity), so a check that lived only in `finalize`
         // would let a final hop skip both the parse and the identity rejection. Parsing costs a
         // scalar conversion, not the multiplication, so the final hop still saves the multiplication.
-        let b_k_checked = E::from_bytes(b_k.as_ref())?;
+        // Parsed here, discarded, and re-parsed in `finalize`: the parse validates the KDF output on
+        // *every* hop (secp256k1 rejects a value at or above the order, and zero is a valid encoding
+        // there), while the raw `SharedSecret` is what the struct retains so that it is zeroized.
+        E::from_bytes(b_k.as_ref())?;
 
         Ok((
             DeferredAlpha {
                 alpha_point,
-                b_k: b_k_checked,
+                b_k,
                 _d: PhantomData,
             },
             secret,
@@ -208,8 +211,13 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 /// the packet is final need not pay for the multiplication whose result is then discarded.
 pub(crate) struct DeferredAlpha<E: Scalar, G: GroupElement<E>> {
     alpha_point: G,
-    /// Blinding factor `b_k`, already parsed by the first half of the transform.
-    b_k: E,
+    /// Blinding factor `b_k`, kept in its raw KDF form.
+    ///
+    /// Kept as a [`SharedSecret`] rather than as a parsed `E` so that it is zeroized on drop: `E` is a
+    /// bare curve scalar with no `ZeroizeOnDrop`. That it parses at all is checked in the first half of
+    /// the transform, on every hop, so keeping the raw bytes here does not delay a malformed-scalar
+    /// rejection to whoever finalizes.
+    b_k: SharedSecret,
     _d: PhantomData<E>,
 }
 
@@ -219,7 +227,8 @@ impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
     /// This is the multiplication [`SharedKeys::forward_transform_deferred`] leaves out; together the
     /// two are what the eager (complete) transform used to do in one call.
     pub(crate) fn finalize(self) -> hopr_types::crypto::errors::Result<Alpha<G::AlphaLen>> {
-        let alpha_new = self.alpha_point.mul(&self.b_k);
+        let b_k_checked = E::from_bytes(self.b_k.as_ref())?;
+        let alpha_new = self.alpha_point.mul(&b_k_checked);
 
         if !alpha_new.is_valid() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
@@ -319,7 +328,7 @@ pub(crate) mod tests {
     use super::*;
 
     #[allow(clippy::type_complexity)]
-    pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
+    pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) -> anyhow::Result<()> {
         let (pub_keys, priv_keys): (Vec<(S::G, Alpha<<S::G as GroupElement<S::E>>::AlphaLen>)>, Vec<S::E>) = (0
             ..node_count)
             .map(|_| {
@@ -334,7 +343,7 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys_alpha.clone()).unwrap();
+        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys_alpha.clone())?;
         assert_eq!(
             node_count,
             generated_shares.secrets.len(),
@@ -349,10 +358,12 @@ pub(crate) mod tests {
             // do: a change to the blinding salt or the alpha encoding would move both sides and leave
             // the assertion passing.
             let (expected_alpha, expected_secret) =
-                reference_forward_transform::<S>(&alpha_cpy, &priv_key, &pub_keys[i].1);
+                reference_forward_transform::<S>(&alpha_cpy, &priv_key, &pub_keys[i].1)
+                    .with_context(|| format!("hop {i}: reference transform"))?;
 
             let (deferred, secret) =
-                SharedKeys::<S::E, S::G>::forward_transform_deferred(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
+                SharedKeys::<S::E, S::G>::forward_transform_deferred(&alpha_cpy, &priv_key, &pub_keys[i].1)
+                    .with_context(|| format!("hop {i}: deferred transform"))?;
 
             assert_eq!(
                 secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(),
@@ -365,7 +376,7 @@ pub(crate) mod tests {
                 "hop {i}: the deferred secret must match the reference transform"
             );
 
-            let alpha = deferred.finalize().unwrap();
+            let alpha = deferred.finalize().with_context(|| format!("hop {i}: finalize"))?;
             assert_eq!(
                 alpha, expected_alpha,
                 "hop {i}: the finalized alpha must match the reference transform"
@@ -373,6 +384,7 @@ pub(crate) mod tests {
 
             alpha_cpy = alpha;
         }
+        Ok(())
     }
 
     /// The pre-deferral eager forward transform, spelled out.
@@ -386,14 +398,15 @@ pub(crate) mod tests {
         alpha: &Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
         private_scalar: &S::E,
         public_element_alpha: &Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
-    ) -> (Alpha<<S::G as GroupElement<S::E>>::AlphaLen>, SharedSecret) {
-        let alpha_point = S::G::from_alpha(alpha.clone()).expect("valid alpha");
+    ) -> anyhow::Result<(Alpha<<S::G as GroupElement<S::E>>::AlphaLen>, SharedSecret)> {
+        let alpha_point = S::G::from_alpha(alpha.clone()).context("reference: decode the alpha")?;
         let s_k = alpha_point.clone().mul(private_scalar);
         let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, public_element_alpha);
         let b_k = s_k.extract_key(HASH_KEY_SPHINX_BLINDING, alpha);
-        let alpha_new = alpha_point.mul(&S::E::from_bytes(b_k.as_ref()).expect("valid blinding scalar"));
-        assert!(alpha_new.is_valid(), "reference transform produced an invalid alpha");
-        (alpha_new.to_alpha(), secret)
+        let b_k = S::E::from_bytes(b_k.as_ref()).context("reference: parse the blinding scalar")?;
+        let alpha_new = alpha_point.mul(&b_k);
+        anyhow::ensure!(alpha_new.is_valid(), "reference transform produced an invalid alpha");
+        Ok((alpha_new.to_alpha(), secret))
     }
 
     /// A degenerate (identity) alpha must be rejected on the **deferred** path too.
@@ -450,11 +463,15 @@ pub(crate) mod tests {
         // the identity; the rest are the nonidentity classes the old guard admitted.
         const SMALL_ORDER: [[u8; 32]; 8] = [
             [
-                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ],
             [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+            ],
+            [
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ],
             [
@@ -462,26 +479,43 @@ pub(crate) mod tests {
                 0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
             ],
             [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x85,
+            ],
+            [
                 0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
                 0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0xfa,
             ],
             [
                 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
             ],
-            [
-                0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
-            ],
-            [
-                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
-                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
-            ],
-            [
-                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
-                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
-            ],
         ];
+
+        // The fixture must be eight *distinct* canonical encodings, or the loop silently tests fewer
+        // torsion classes than it claims: duplicate entries would make it pass while leaving a class
+        // uncovered.
+        let distinct: std::collections::BTreeSet<_> = SMALL_ORDER.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            8,
+            "the torsion fixtures must be eight distinct encodings"
+        );
+        for (idx, bytes) in SMALL_ORDER.iter().enumerate() {
+            // Canonicality: re-compressing a decompressed point must give the same bytes back.
+            let p = Curve25519CompressedPoint(*bytes)
+                .decompress()
+                .with_context(|| format!("small-order point {idx} must decompress"))?;
+            assert_eq!(
+                p.compress().0,
+                *bytes,
+                "small-order fixture {idx} is not the canonical encoding of its point"
+            );
+        }
 
         for (idx, bytes) in SMALL_ORDER.iter().enumerate() {
             let point = Curve25519CompressedPoint(*bytes)
