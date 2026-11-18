@@ -264,6 +264,8 @@ pub enum HoprTransportProcess {
     #[cfg(feature = "runtime-tokio")]
     #[strum(to_string = "path cache refresh")]
     PathRefresh,
+    #[strum(to_string = "forward path cache pre-warm on peer connect")]
+    PathPrewarm,
     #[strum(to_string = "pix protocol event transformation")]
     PixEvents,
     #[strum(to_string = "sync of outgoing ticket indices")]
@@ -840,6 +842,45 @@ where
 
         let transport_network = network;
         let transport_layer_process = network_process;
+
+        // -- forward path cache pre-warm on peer connect
+        //
+        // Subscribed here, before the network process starts, because a subscription created after
+        // the network starts processing misses the events it needs. One task serialises the work, so
+        // a burst of connects cannot run several selector searches at once, and on-demand
+        // resolution never waits for it.
+        {
+            let network_events = transport_network.subscribe_network_events();
+            let path_planner = self.path_planner.clone();
+            let connected = transport_network.clone();
+            processes.insert(
+                HoprTransportProcess::PathPrewarm,
+                hopr_utils::spawn_as_abortable!(network_events.for_each(move |event| {
+                    let path_planner = path_planner.clone();
+                    let connected = connected.clone();
+                    async move {
+                        match event {
+                            hopr_api::network::NetworkEvent::PeerConnected(peer) => {
+                                match OffchainPublicKey::from_peerid(&peer) {
+                                    // Only a peer the network still tracks as connected is warmed,
+                                    // because the event can be followed by a disconnect.
+                                    Ok(opk) if connected.is_connected(&peer) => {
+                                        path_planner.prewarm_forward_paths(&opk).await
+                                    }
+                                    Ok(_) => {}
+                                    Err(error) => tracing::error!(
+                                        %peer,
+                                        %error,
+                                        "failed to convert peer ID to public key for pre-warm"
+                                    ),
+                                }
+                            }
+                            hopr_api::network::NetworkEvent::PeerDisconnected(_) => {}
+                        }
+                    }
+                })),
+            );
+        }
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
@@ -1533,14 +1574,6 @@ where
     /// starts with a relayer this node can no longer pay.
     pub fn surb_store(&self) -> &MemorySurbStore {
         &self.path_planner.surb_store
-    }
-
-    /// Returns a handle on the path planner, sharing the cache this transport resolves through.
-    ///
-    /// Exposed so that a connectivity event can pre-warm the paths to a peer that just connected,
-    /// without the caller owning the transport.
-    pub fn path_planner_handle(&self) -> PathPlanner<MemorySurbStore, Chain, HoprGraphPathSelector<Graph>> {
-        self.path_planner.clone()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

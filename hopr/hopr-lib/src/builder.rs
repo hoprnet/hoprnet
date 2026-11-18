@@ -824,14 +824,12 @@ where
         let network_events = network.subscribe_network_events();
         let graph_updater = graph.clone();
         let health = transport_api.relayer_health();
-        let path_planner = transport_api.path_planner_handle();
         let net = network.clone();
         spawn(async move {
             network_events
                 .for_each(|event| {
                     let graph_updater = graph_updater.clone();
                     let health = health.clone();
-                    let path_planner = path_planner.clone();
                     let net = net.clone();
                     async move {
                         let (peer_id, connected) = match event {
@@ -851,17 +849,6 @@ where
                             // telemetry flush re-plans around it.
                             if connected || !net.is_connected(&peer_id) {
                                 health.set_neighbour_connected(opk, connected);
-                            }
-
-                            // Only a peer the network still tracks as connected is warmed. The
-                            // check runs inside the detached task, because the peer can drop
-                            // between the event and the task that serves it.
-                            if connected {
-                                spawn(async move {
-                                    if net.is_connected(&peer_id) {
-                                        path_planner.prewarm_forward_paths(&opk).await;
-                                    }
-                                });
                             }
                         } else {
                             tracing::error!(%peer_id, "failed to convert peer ID to public key for graph update");
