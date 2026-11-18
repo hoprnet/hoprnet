@@ -281,6 +281,36 @@ pub enum HoprTransportProcess {
     Capture,
 }
 
+/// Warms the forward path cache for every peer that connects while the network still tracks it.
+///
+/// Runs in one task, so a burst of connects cannot start several selector searches at once and
+/// on-demand resolution never waits for it. A hop count with no route is skipped by the planner.
+async fn prewarm_forward_paths_on_connect<S, N, F, Fut>(events: S, network: N, warm: F)
+where
+    S: futures::Stream<Item = hopr_api::network::NetworkEvent>,
+    N: NetworkView,
+    F: Fn(OffchainPublicKey) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    futures::pin_mut!(events);
+    while let Some(event) = events.next().await {
+        match event {
+            hopr_api::network::NetworkEvent::PeerConnected(peer) => match OffchainPublicKey::from_peerid(&peer) {
+                // The event can be followed by a disconnect before this runs, so ask the network
+                // rather than trust the event alone.
+                Ok(opk) if network.is_connected(&peer) => warm(opk).await,
+                Ok(_) => {}
+                Err(error) => tracing::error!(
+                    %peer,
+                    %error,
+                    "failed to convert peer ID to public key for pre-warm"
+                ),
+            },
+            hopr_api::network::NetworkEvent::PeerDisconnected(_) => {}
+        }
+    }
+}
+
 /// Classifies probes and dispatches session traffic while retaining each packet's context.
 /// Unrelated data reaches the application sink; a closed sink does not stop ingress.
 async fn dispatch_incoming_messages<G, In, Out>(
@@ -846,39 +876,21 @@ where
         // -- forward path cache pre-warm on peer connect
         //
         // Subscribed here, before the network process starts, because a subscription created after
-        // the network starts processing misses the events it needs. One task serialises the work, so
-        // a burst of connects cannot run several selector searches at once, and on-demand
-        // resolution never waits for it.
+        // the network starts processing misses the events it needs.
         {
             let network_events = transport_network.subscribe_network_events();
             let path_planner = self.path_planner.clone();
-            let connected = transport_network.clone();
+            let tracked = transport_network.clone();
             processes.insert(
                 HoprTransportProcess::PathPrewarm,
-                hopr_utils::spawn_as_abortable!(network_events.for_each(move |event| {
-                    let path_planner = path_planner.clone();
-                    let connected = connected.clone();
-                    async move {
-                        match event {
-                            hopr_api::network::NetworkEvent::PeerConnected(peer) => {
-                                match OffchainPublicKey::from_peerid(&peer) {
-                                    // Only a peer the network still tracks as connected is warmed,
-                                    // because the event can be followed by a disconnect.
-                                    Ok(opk) if connected.is_connected(&peer) => {
-                                        path_planner.prewarm_forward_paths(&opk).await
-                                    }
-                                    Ok(_) => {}
-                                    Err(error) => tracing::error!(
-                                        %peer,
-                                        %error,
-                                        "failed to convert peer ID to public key for pre-warm"
-                                    ),
-                                }
-                            }
-                            hopr_api::network::NetworkEvent::PeerDisconnected(_) => {}
-                        }
+                hopr_utils::spawn_as_abortable!(prewarm_forward_paths_on_connect(
+                    network_events,
+                    tracked,
+                    move |opk| {
+                        let path_planner = path_planner.clone();
+                        async move { path_planner.prewarm_forward_paths(&opk).await }
                     }
-                })),
+                )),
             );
         }
 
@@ -2138,6 +2150,7 @@ mod pix_recovery_event_tests {
 #[cfg(test)]
 mod tests {
     mod dispatch;
+    mod prewarm;
 
     pub(crate) mod support {
         //! Capture structured records and formatted ancestry using the same subscriber.
