@@ -129,10 +129,16 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
         // `GroupElement` requires a valid element to exclude small-order points, not only the
         // identity. A Montgomery coordinate also has no sign bit, so it can decode to a point of the
         // wrong Edwards sign; that is harmless for the Montgomery ladder, but the point must still be
-        // torsion-free. `to_edwards` is only used here to reach `is_torsion_free`, which is a property
-        // of the Edwards representative and independent of which of the two it is.
+        // torsion-free. `to_edwards` is used only to reach `is_torsion_free`, which is a property of
+        // the Edwards representative and independent of which of the two it is.
+        //
+        // `to_edwards` returning `None` means the coordinate is not on the curve *or* is one of the
+        // two points that have no Edwards representative at all (u = -1, the order-2 point, and
+        // u = 0). Either way it is not a point this protocol may continue with, so it is rejected
+        // rather than skipped: treating `None` as valid is what let the order-2 point through.
         use hopr_types::crypto::primitives::IsIdentity;
-        !self.is_identity() && self.0.to_edwards(0).is_none_or(|edwards| edwards.is_torsion_free())
+        self.to_edwards(0)
+            .is_some_and(|edwards| edwards.is_torsion_free() && !edwards.is_identity())
     }
 }
 
@@ -315,7 +321,7 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_secp256k1_suite(nodes: usize) {
-        generic_sphinx_suite_test::<super::Secp256k1Suite>(nodes)
+        generic_sphinx_suite_test::<crate::Secp256k1Suite>(nodes)
     }
 
     #[cfg(feature = "ed25519")]
@@ -327,6 +333,39 @@ mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_montgomery_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<super::X25519Suite>(nodes)
+        generic_sphinx_suite_test::<crate::X25519Suite>(nodes)
+    }
+}
+
+#[cfg(all(test, feature = "x25519"))]
+mod montgomery_is_valid {
+    use super::*;
+
+    #[test]
+    fn small_order_montgomery_points_are_rejected() {
+        let small: [[u8; 32]; 4] = [
+            [0u8; 32],
+            [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            [
+                236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
+            ],
+            [
+                238, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
+            ],
+        ];
+        // The Montgomery ladder has no sign bit, so these come from the compressed `u`-coordinate
+        // classes directly; the identity, order-2 and the two order-4 classes are covered.
+        for (i, s) in small.into_iter().enumerate() {
+            let p = Curve25519MontgomeryPoint(s);
+            assert!(!p.is_valid(), "small-order Montgomery point {i} passed is_valid");
+        }
+        let good = Curve25519MontgomeryPoint([
+            9u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ]);
+        assert!(good.is_valid(), "the Montgomery basepoint must be valid");
     }
 }
