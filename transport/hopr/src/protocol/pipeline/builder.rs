@@ -30,11 +30,11 @@ pub struct Unset;
 /// [`PacketPipelineBuilder::api`] builder methods.
 ///
 /// Terminal methods for each node type are then exposed:
-/// - [`PacketPipelineBuilder::build_for_relay`] — full pipeline, requires ticket processing via
+/// - `PacketPipelineBuilder::build_for_relay` — full pipeline, requires ticket processing via
 ///   [`PacketPipelineBuilder::with_ticket_processing`].
-/// - [`PacketPipelineBuilder::build_for_entry`] — Entry nodes; the incoming acknowledgement pipeline is not started at
+/// - `PacketPipelineBuilder::build_for_entry` — Entry nodes; the incoming acknowledgement pipeline is not started at
 ///   all.
-/// - [`PacketPipelineBuilder::build_for_exit`] — Exit nodes; the incoming acknowledgement pipeline is started and
+/// - `PacketPipelineBuilder::build_for_exit` — Exit nodes; the incoming acknowledgement pipeline is started and
 ///   processes exit-acknowledgement shares.
 ///
 /// The exit-acknowledgement share processor and the recovered-SSA events sink can be configured via
@@ -82,12 +82,12 @@ impl
     /// defaults to an empty one; use [`PacketPipelineBuilder::with_counters`] to override it.
     ///
     /// Use [`PacketPipelineBuilder::with_ticket_processing`] to attach ticket processing
-    /// before calling [`PacketPipelineBuilder::build_for_relay`].
+    /// before calling `PacketPipelineBuilder::build_for_relay`.
     ///
     /// Use [`PacketPipelineBuilder::with_exit_ack_share_processing`] to override the default
     /// no-op exit-acknowledgement share processor and the default draining recovered-SSA events
-    /// sink before calling [`PacketPipelineBuilder::build_for_relay`] or
-    /// [`PacketPipelineBuilder::build_for_exit`].
+    /// sink before calling `PacketPipelineBuilder::build_for_relay` or
+    /// `PacketPipelineBuilder::build_for_exit`.
     pub fn new(packet_key: OffchainKeypair) -> Self {
         Self {
             packet_key,
@@ -183,7 +183,7 @@ impl<WIn, WOut, C, D, T, TEvt, A, SEvt, AppOut, AppIn>
 
     /// Attaches a ticket processor and a ticket-events sink to the builder.
     ///
-    /// Required before calling [`PacketPipelineBuilder::build_for_relay`]. Has no effect on
+    /// Required before calling `PacketPipelineBuilder::build_for_relay`. Has no effect on
     /// Entry/Exit builds, which never process tickets.
     #[must_use]
     pub fn with_ticket_processing<T2, TEvt2>(
@@ -352,7 +352,7 @@ where
     /// Builds and starts the packet pipeline for a HOPR **Exit** node.
     ///
     /// Exit nodes do not process tickets. However, in contrast to
-    /// [`PacketPipelineBuilder::build_for_entry`], the incoming acknowledgement pipeline is kept
+    /// `PacketPipelineBuilder::build_for_entry`, the incoming acknowledgement pipeline is kept
     /// running and processes the recovered SSA shares using the exit-acknowledgement share
     /// processor configured via [`PacketPipelineBuilder::with_exit_ack_share_processing`] (or the
     /// default no-op processor if not configured).
