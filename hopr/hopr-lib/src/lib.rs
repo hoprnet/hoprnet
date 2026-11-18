@@ -392,25 +392,36 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
 
 /// A source node: establishes Sessions, relays nothing, admits none.
 ///
-/// The ticket manager parameter is `()`, so a node of this type cannot process tickets even
-/// accidentally. Built by [`builder::HoprBuilder`]'s `build_edge`.
-pub type HoprEntry<Chain = (), Graph = (), Net = ()> = Hopr<Chain, Graph, Net, ()>;
+/// - `Chain` is the connector the builder was given, which must satisfy [`HoprChainApi`] as the build does.
+/// - `Graph` and `Net` are the graph and network the builder assembled.
+/// - The ticket manager is fixed to `()`. That is the role's limitation, not a default: a source node has no ticket
+///   manager, so it can neither process nor emit tickets.
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_edge`.
+pub type HoprEntry<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 
 /// An exit that terminates Sessions without processing tickets.
 ///
-/// The `raw-exit` entity: a Session server with no ticket manager. Built by
-/// [`builder::HoprBuilder`]'s `build_exit`.
-pub type HoprExit<Chain = (), Graph = (), Net = ()> = Hopr<Chain, Graph, Net, ()>;
+/// The `raw-exit` entity: a Session server with no ticket manager, so — like [`HoprEntry`] — it
+/// cannot process tickets. `Chain`, `Graph` and `Net` carry the same requirements as there.
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_exit`.
+pub type HoprExit<Chain, Graph, Net> = Hopr<Chain, Graph, Net, ()>;
 
 /// A relay: full ticket processing and forwarding, no Session server of its own.
 ///
-/// Built by [`builder::HoprBuilder`]'s `build_relay`.
-pub type HoprRelay<Chain = (), Graph = (), Net = (), TMgr = ()> = Hopr<Chain, Graph, Net, TMgr>;
+/// `TMgr` is the node's ticket manager and must implement [`TicketManagement`]; without one the
+/// builder has nothing to process tickets with. `Chain`, `Graph` and `Net` carry the same requirements as
+/// [`HoprEntry`]'s.
+///
+/// Produced by [`builder::HoprBuilder`]'s `build_relay`.
+pub type HoprRelay<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
 
 /// An exit that both relays and terminates Sessions: ticket processing plus the Session server.
 ///
-/// Same shape as [`HoprRelay`], named for what the node is when it also terminates Sessions.
-pub type HoprRelayExit<Chain = (), Graph = (), Net = (), TMgr = ()> = Hopr<Chain, Graph, Net, TMgr>;
+/// Same parameters and the same `TMgr` requirement as [`HoprRelay`]; named for what the node is
+/// when it also terminates Sessions.
+pub type HoprRelayExit<Chain, Graph, Net, TMgr> = Hopr<Chain, Graph, Net, TMgr>;
 
 impl<Chain, Graph, Net, TMgr> std::fmt::Debug for Hopr<Chain, Graph, Net, TMgr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
