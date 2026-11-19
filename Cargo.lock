@@ -4219,7 +4219,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "2.2.0"
+version = "2.3.0"
 dependencies = [
  "anyhow",
  "bimap",
