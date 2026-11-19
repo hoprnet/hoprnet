@@ -155,11 +155,12 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = G::generate(&coeff_prev);
 
-            // `alpha_prev` is `coeff * G` for a scalar `coeff` that `E::from_bytes` already rejected
-            // if non-canonical, so it is in the prime-order subgroup by construction. The full
-            // `is_valid` (three doublings) would re-establish that; only the identity has to be
-            // excluded here, because a `coeff` that is a multiple of the group order gives `O`. The
-            // wire input is where the full check belongs, and `forward_transform_deferred` does it.
+            // `alpha_prev` is `coeff * G`: a multiple of the generator, so it is in the prime-order
+            // subgroup by construction and cannot be a nonidentity small-order point. Only the
+            // identity has to be excluded, which a `coeff` that is a multiple of the group order
+            // gives. Note that this is *not* what `is_valid` would establish - that predicate admits
+            // mixed-order points - which is why the cheaper derived-point check is the correct one
+            // here rather than a merely faster substitute for it.
             if !alpha_prev.is_valid_derived() {
                 return Err(CryptoError::CalculationError);
             }
@@ -203,10 +204,11 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         //
         // On `ff0076efaa` the eager transform validated the *blinded output* instead: it computed
         // `P * b_k` from the KDF-derived blinding scalar and rejected only that being the identity.
-        // Measured against 200 random keys with the order-2 point as alpha, it accepted **200 of 200**,
-        // because the blinded product is essentially never the identity - the identity check on the
-        // output caught nothing here. So the base did not reject small-order alphas at all; rejecting
-        // them on the *input*, on every hop, is this PR's change.
+        // So it rejected an *identity* alpha on every key (the blinded output is the identity for
+        // any `b_k`), and accepted the nonidentity small-order classes: for the order-2 input, it
+        // accepted all 200 sampled keys, because the blinded product is essentially never the
+        // identity (0 of 200) and the check therefore caught nothing. This PR rejects every
+        // small-order input before deriving the hop secret, on every hop.
         //
         // The same run shows what the alpha costs if it is *not* rejected: `P * sk` was small order
         // for all 200 keys and the identity for 103 of them, since `P * sk` depends only on `sk mod 2`.
