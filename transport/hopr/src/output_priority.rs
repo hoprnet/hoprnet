@@ -64,8 +64,10 @@ pub struct OutputPriorityConfig {
     /// The value is a fraction of all slots, so the longest run of session slots follows as
     /// `max_session_run`: `0.1` allows 9 session slots between two probe slots.
     ///
-    /// `0.0` gives probes a slot only while the session lane is empty. `1.0` gives probes the
-    /// first slot of every run, which is one probe slot for every session slot.
+    /// `0.0` gives probes a slot only while the session lane is empty. Above `0.5` the derived run is
+    /// 0, so the probe lane is polled first on every slot and session data is served only while the
+    /// probe lane is empty; `1.0` is therefore probes first, not a one-to-one alternation. Whether to
+    /// accept shares above `0.5` at all is an open point on hoprnet#8704.
     ///
     /// Valid values are finite and in `0.0..=1.0`.
     #[default = 0.1]
@@ -88,8 +90,10 @@ fn validate_probe_share(share: f64) -> Result<(), validator::ValidationError> {
 /// Longest run of session slots that may precede one probe slot, for a probe share of `share`.
 ///
 /// The share `f` is a fraction of all emission slots, so the run is `floor((1 - f) / f)`: `9` at
-/// `0.1`, `4` at `0.2`, `3` at `0.25` and `1` at `0.5`. A share of `0.0` returns [`usize::MAX`],
-/// which means probes take a slot only while the session lane is empty.
+/// `0.1`, `4` at `0.2`, `3` at `0.25` and `1` at `0.5`. Flooring can only shorten the run, so the
+/// probe lane never takes less than `f` of the slots. A share of `0.0` returns [`usize::MAX`],
+/// which means probes take a slot only while the session lane is empty; a share of `1.0` returns 0,
+/// which means the probe lane is polled first on every slot.
 fn max_session_run(share: f64) -> usize {
     // A share of zero, and the `NaN` that no validated config carries but that must not reach the
     // cast, both mean: probes take a slot only while the session lane is empty.
@@ -225,9 +229,14 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        // Count first, then hand the item over, and take the count back if the sink refuses it. The
+        // other order loses one count per refusal: the receiver can lower the depth between the
+        // accepted item and the `raise`, and the later `raise` then leaves a non-zero depth behind
+        // an empty lane.
+        self.depth.raise();
         let accepted = Pin::new(&mut self.inner).start_send(item);
-        if accepted.is_ok() {
-            self.depth.raise();
+        if accepted.is_err() {
+            self.depth.lower();
         }
         accepted
     }
@@ -752,6 +761,82 @@ mod tests {
         let mut stream = DepthStream::new(futures::stream::iter([1u32]), depth.clone());
         assert_eq!(Some(1), draw(&mut stream));
         assert_eq!(0, depth.get());
+    }
+
+    /// A refused item must take the depth back, or the count drifts up once per refusal.
+    #[test]
+    fn a_refused_send_leaves_the_lane_depth_alone() {
+        struct RefusingSink;
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct Refused;
+
+        impl Sink<u32> for RefusingSink {
+            type Error = Refused;
+
+            fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn start_send(self: Pin<&mut Self>, _item: u32) -> Result<(), Self::Error> {
+                Err(Refused)
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        let depth = LaneDepth::default();
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        let mut sink = DepthSink::new(RefusingSink, depth.clone());
+
+        assert!(matches!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Ready(Ok(()))));
+        assert!(Sink::start_send(Pin::new(&mut sink), 1).is_err());
+        assert_eq!(0, depth.get(), "a refused item must not raise the depth");
+    }
+
+    /// The lanes the transport builds: a send must wake a pending merge, and the session lane
+    /// closing must leave the probe lane serving it.
+    #[tokio::test]
+    async fn a_real_lane_pair_wakes_the_merge_and_survives_the_other_lane_closing() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use futures::{SinkExt, StreamExt};
+
+        let (session_tx, session_rx) =
+            hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<u8>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let (probe_tx, probe_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<u8>(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE,
+        );
+        let depth = LaneDepth::default();
+        let mut probe_tx = DepthSink::new(probe_tx, depth.clone());
+        let probe_rx = DepthStream::new(probe_rx, depth.clone());
+
+        let mut merged = Box::pin(merge_lanes(session_rx, probe_rx, futures::stream::pending::<u8>(), 0.1));
+
+        // Both lanes empty: the merge is pending, not finished.
+        assert!(matches!(futures::poll!(merged.next()), Poll::Pending));
+
+        let mut session_tx = session_tx;
+        session_tx.send(1u8).await.context("session lane send")?;
+        assert_eq!(Some(1), merged.next().await);
+
+        // A probe send wakes the pending merge, and the depth follows the item through the lane.
+        probe_tx.send(2u8).await.context("probe lane send")?;
+        assert_eq!(1, depth.get());
+        assert_eq!(Some(2), merged.next().await);
+        assert_eq!(0, depth.get());
+
+        // The session lane closing leaves the probe lane serving the merge.
+        drop(session_tx);
+        probe_tx.send(3u8).await.context("probe lane send")?;
+        assert_eq!(Some(3), merged.next().await);
+        Ok(())
     }
 
     /// Longest run of consecutive session slots in the emitted sequence.

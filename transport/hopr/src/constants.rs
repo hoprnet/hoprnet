@@ -15,9 +15,14 @@ pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 /// Maximum number of probes buffered in the probe lane before the probe emitter observes
 /// backpressure.
 ///
-/// A probe round is several hundred packets emitted in one burst, so the lane has to absorb a whole
-/// round: a smaller lane would stall the emitter mid-round instead of pacing it beside session data.
-/// 1,024 slots bound the buffered probes at about 3.8 MB (1,024 × 3,669 B per packet).
+/// Sized to one probe round, so the emitter never stalls inside a round: a round is several hundred
+/// packets and 1,024 slots cover it, at about 3.8 MB (1,024 × 3,669 B per packet).
+///
+/// The buffer is not free. A probe enters the lane after its 3 s timeout started, because
+/// `continuously_scan` inserts the timer once the send returns, so a lane this deep lets a whole
+/// round start its timers together and then wait in the lane. A lane near `max_parallel_probes`
+/// would keep the timer honest through backpressure instead. Which side wins is an open point on
+/// hoprnet#8704 ("probe timeout starts too early"); this value follows the issue's stated capacity.
 pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 1_024;
 
 /// Time within Start protocol must finish session initiation.
