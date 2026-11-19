@@ -209,18 +209,15 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         // `T` one of the eight torsion points), which `is_torsion_free` would exclude. That is the
         // intended input policy, not an oversight:
         // - secrecy is preserved. What secrecy needs is a bound on how many candidate alphas a fixed peer's shared
-        //   point can stand for. `alpha * sk = sk*Q + sk*T`, so two alphas `Q + T` and `Q + T'` give the same shared
-        //   point exactly when `sk*(T - T') = O`; the torsion points plus `O` form the order-8 group and `sk*(T - T')`
-        //   stays in it, so this happens only when `sk` is a multiple of `T - T'`'s order. Measured over 40 random
-        //   keys, the eight torsion variants of one alpha produced 8 distinct shared points for 20 keys, 4 for 9, and 2
-        //   for 11
-        //   - never 1, because a clamped scalar is never zero modulo 8 (bit 2 stays free while bits
-        //   0-1 are cleared). So the hop secret is exposed by a small, fixed set of candidate alphas
-        //   per peer, the same small-public-set property the identity class already has - not a
-        //   collapse to one value regardless of the key.
-        //   (Counting distinct outputs *across* random keys, as an earlier draft did, does not show
-        //   this: those outputs differ in their prime-order parts, which a single peer's knowledge
-        //   does not depend on.)
+        //   point can stand for. `alpha * sk = sk*Q + sk*T`, so `Q + T` and `Q + T'` give the same shared point exactly
+        //   when `sk*(T - T') = O`; the torsion points plus `O` form the order-8 group and `sk*(T - T')` stays in it,
+        //   so that happens only when `sk` is a multiple of `T - T'`'s order. Measured over 40 random keys, the eight
+        //   torsion variants of one alpha gave 8 distinct shared points for 20 keys, 4 for 9 and 2 for 11 - never 1.
+        //   That is consistent with the clamp, which clears bits 0-1 of the seed but leaves bit 2 free, so `sk mod 8`
+        //   is 0 or 4. The hop secret is therefore exposed by a small fixed set of candidate alphas per peer - the same
+        //   small-public-set property the identity class already has - rather than collapsing to one value regardless
+        //   of the key. (Counting distinct outputs *across* random keys, as an earlier draft did, does not show this:
+        //   those outputs differ in their prime-order parts, which a single peer's knowledge does not depend on.)
         // - rejecting them would change the wire format: a peer that sends a mixed-order alpha (this implementation
         //   never does, it derives alphas from the basepoint) would go from accepted to rejected on upgrade.
         // Enforcing prime-order membership would instead cost the variable-base multiply the deferral
