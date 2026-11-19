@@ -143,11 +143,13 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
         // wrong Edwards sign; that is harmless for the ladder, and it does not change whether the
         // point is small order.
         //
-        // `to_edwards` returning `None` means the coordinate is not on the curve, *or* is one of the
-        // points with no Edwards representative at all (u = 0 and u = -1, the latter being the
-        // order-2 point). Either way it is not a point this protocol may continue with, so it is
-        // rejected rather than skipped: treating `None` as valid is what let the order-2 point
-        // through in the first version of this check.
+        // `to_edwards` returning `None` means the coordinate is on the twist rather than the curve,
+        // which in practice is the `u = -1` class. Rejecting it rather than skipping it is what the
+        // first version of this check got wrong when it treated `None` as valid.
+        //
+        // The order-2 point is a separate case, and it is *not* `u = -1`: dalek maps `u = 0` to the
+        // Edwards order-2 point, so it decodes to `Some` and is caught by the `is_small_order` test
+        // below rather than by the `None` arm.
         //
         // `is_small_order` (three doublings) rather than `is_torsion_free` (a full scalar
         // multiplication by the group order) for the same reason as on the Edwards side: this runs on
@@ -470,20 +472,27 @@ mod montgomery_is_valid {
         let (alpha, _) = <Curve25519MontgomeryPoint as GroupElement<Curve25519Scalar>>::random_pair();
         assert!(alpha.is_valid(), "a generated Montgomery alpha must be valid");
 
-        // A failed conversion: a coordinate with no Edwards representative must be rejected, not
-        // skipped. `to_edwards` returns `Option`, and treating `None` as valid is what the first
-        // version of this check got wrong for the order-2 point.
+        // A failed conversion: a twist coordinate must be rejected, not skipped. `to_edwards` returns
+        // `None` for `u = -1`, whose right-hand side `486660` is a non-square, so it lies on the twist
+        // rather than the curve. Treating `None` as valid is what the first version of this check got
+        // wrong.
         let mut u_minus_one = [0xffu8; 32];
         u_minus_one[0] = 0xec;
         u_minus_one[31] = 0x7f;
-        let no_representative = Curve25519MontgomeryPoint(u_minus_one);
+        let twist_coordinate = Curve25519MontgomeryPoint(u_minus_one);
         assert!(
-            no_representative.to_edwards(0).is_none(),
-            "u = -1 is the order-2 point and has no Edwards representative"
+            twist_coordinate.to_edwards(0).is_none(),
+            "u = -1 is a twist coordinate, so it has no Edwards representative"
         );
-        assert!(
-            !no_representative.is_valid(),
-            "a coordinate with no Edwards representative must be invalid"
-        );
+        assert!(!twist_coordinate.is_valid(), "a twist coordinate must be invalid");
+
+        // The order-2 point is reached through `u = 0`, and it takes the `Some` arm: dalek maps it to
+        // the Edwards order-2 point, so it is rejected by `is_small_order` rather than by `None`.
+        let order_two = Curve25519MontgomeryPoint([0u8; 32]);
+        let edwards = order_two
+            .to_edwards(0)
+            .expect("u = 0 must map to the Edwards order-2 point");
+        assert!(edwards.is_small_order(), "u = 0 must be a small-order point");
+        assert!(!order_two.is_valid(), "u = 0 must be invalid");
     }
 }

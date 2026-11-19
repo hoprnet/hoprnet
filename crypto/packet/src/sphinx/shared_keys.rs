@@ -20,10 +20,13 @@ pub trait Scalar: Mul<Output = Self> + Sized {
 
     /// Whether this scalar is the additive identity.
     ///
-    /// `from_bytes` does not always exclude it: secp256k1 accepts a 32-zero-byte encoding, and the
-    /// Curve25519 parser clamps and then reduces modulo the group order, which maps a clamped value
-    /// that is a multiple of the order to zero. A zero blinding factor would blind the alpha away
-    /// to the identity, which no hop may continue with, so the transform rejects it explicitly.
+    /// `from_bytes` does not always exclude it: secp256k1 accepts a 32-zero-byte encoding, and zero
+    /// blinds the alpha away to the identity, which no hop may continue with, so the transform rejects
+    /// it explicitly.
+    ///
+    /// This cannot arise from the Curve25519 suites' clamping parser: a clamped value is a positive
+    /// multiple of eight below `2^255`, while eight times the subgroup order already exceeds `2^255`,
+    /// so no clamped byte string reduces to zero modulo the group order.
     fn is_zero(&self) -> bool;
 }
 
@@ -188,19 +191,24 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         //
         // The reason to reject is the input, not the output the eager transform happened to check.
         // With a point `P` of order `d` as alpha, `P * sk` depends on `sk` only through `sk mod d`, so
-        // the KDF sees at most `d` different points however the private key is chosen: for the
-        // identity (`d = 1`) exactly one, for the order-2 point the two values `P` and `-P` by parity
-        // of the reduced scalar, and for the order-4 and order-8 classes up to four and eight. All of
-        // them are small, public sets, so the shared secret - and with it the header MAC - can be
-        // derived by a third party from public information rather than by the recipient alone.
+        // the KDF sees at most `d` different points however the private key is chosen: one for the
+        // identity (`d = 1`), and at most two, four or eight for `d = 2, 4, 8`. The order-2 case is
+        // worth stating exactly, because `-P = P` there: the two products are `O` and `P`, i.e. the
+        // identity for an even reduced scalar and `P` for an odd one - not `P` and `-P`.
         //
-        // On `ff0076efaa` the eager transform rejected only an *identity output point*, so it refused
-        // a small-order alpha whenever `sk mod d` happened to be zero and accepted it otherwise
-        // (measured: 92 of 200 random keys for the order-2 point). Rejecting the whole small-order set
-        // on the input is therefore both broader than what the old code did and independent of the key
-        // - this PR introduces that broader rejection. Checking the public input also keeps the check
-        // on the final hop, which no longer computes an output point, and makes it independent of
-        // which group the suite computes in.
+        // The products are therefore small and public sets. That the honest sender and recipient both
+        // know the hop secret is not the issue; what an attacker gains is *third-party* knowledge,
+        // since anyone can compute these candidate points without the node's key. The recipient's
+        // public key is still the KDF salt, so it is not a secret either.
+        //
+        // On `ff0076efaa` the eager transform checked the *blinded output*, i.e. `P * b_k` for the
+        // KDF-derived blinding scalar, and rejected it only when that was the identity. It therefore
+        // accepted a small-order alpha whenever the blinding scalar was even modulo the point's order
+        // and rejected it otherwise (measured: 92 of 200 random keys accepted the order-2 point).
+        // Rejecting the whole small-order set on the *input* is both broader than that and independent
+        // of the key, and this PR introduces it. Checking the public input also keeps the check on the
+        // final hop, which no longer computes an output point, and makes it independent of which group
+        // the suite computes in.
         if !alpha_point.is_valid() {
             return Err(CryptoError::CalculationError);
         }
@@ -236,9 +244,10 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     ///
     /// Two cases matter and `from_bytes` alone covers only the first:
     /// - secp256k1 `from_bytes` rejects a value at or above the group order.
-    /// - zero is a *valid* encoding in both suites, and it blinds the alpha to the identity, which the eager transform
-    ///   then rejected on every hop. Without the explicit [`Scalar::is_zero`] the zero case would slip through the
-    ///   final hop. It is extremely rare (one KDF output in 2^256) but it is a behaviour change.
+    /// - secp256k1 also *accepts* an all-zero encoding, and zero blinds the alpha to the identity, which the eager
+    ///   transform then rejected on every hop. Without the explicit [`Scalar::is_zero`] that case would slip through
+    ///   the final hop. It is extremely rare (one KDF output in 2^256) but it is a behaviour change. The Curve25519
+    ///   suites cannot reach it, since their clamping parser never yields zero from a byte string.
     ///
     /// Parsing plus a zero test costs a scalar conversion, not the multiplication, so the final hop
     /// still saves the multiplication. The scalar is parsed here, discarded, and re-parsed in
@@ -279,11 +288,13 @@ impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
 
         // The result is `b * P` for the validated wire point `P` and a nonzero `b`. That is not a
         // claim that it lies in the prime-order subgroup: `is_valid` rejects the small-order set but
-        // admits mixed-order points, which keep a nonzero prime-order component once multiplied by a
-        // nonzero scalar. The component is what the protocol needs, and the only further thing that
-        // could go wrong is `b * P` collapsing to the identity (both `P` and `b` nonzero makes that
-        // possible only when a small-order component cancels), so the identity test is the right
-        // derived-point check here.
+        // admits mixed-order points `P = T + Q` with `T` small order and `Q` of prime order.
+        //
+        // Since `T` and `Q` generate distinct subgroups, `b * P = b * T + b * Q` keeps a nonzero
+        // `b * Q` for any `b` that is nonzero modulo the prime order - so the small-order component
+        // cannot cancel it and the result is never the identity. The identity test here is therefore
+        // a defensive check rather than the guard that makes the output usable; the property that
+        // matters comes from `b` being nonzero, which the first half of the transform establishes.
         if !alpha_new.is_valid_derived() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
@@ -579,11 +590,12 @@ pub(crate) mod tests {
 
     /// A **nonidentity** small-order alpha must be rejected too.
     ///
-    /// The identity is not the only degenerate input: a point of order 2 or 4 also makes `alpha * sk`
-    /// take only one or two values regardless of `sk`, so the shared secret, and the header MAC it
-    /// authenticates, is derivable by a third party. The identity-only check the code used to have
-    /// (`!is_identity()`) let these through. All eight small-order points are tried, so the check is
-    /// exercised against each torsion class rather than against the identity alone.
+    /// The identity is not the only degenerate input: for a point of order `d`, `alpha * sk` takes at
+    /// most `d` values regardless of `sk` (in particular two for `d = 2`, four for `d = 4`), so the
+    /// shared secret, and the header MAC it authenticates, is derivable by a third party. The
+    /// identity-only check the code used to have (`!is_identity()`) let these through. All eight
+    /// small-order points are tried, so the check is exercised against each torsion class rather than
+    /// against the identity alone.
     #[cfg(feature = "ed25519")]
     #[test]
     fn a_nonidentity_small_order_alpha_is_rejected() -> anyhow::Result<()> {
