@@ -62,27 +62,29 @@ pub struct OutputPriorityConfig {
     /// Share of the emission slots the probe lane keeps while session data is queued.
     ///
     /// The value is a fraction of all slots, so the longest run of session slots follows as
-    /// `max_session_run`: `0.1` allows 9 session slots between two probe slots.
+    /// `max_session_run`: `0.1` allows 9 session slots between two probe slots, and the maximum
+    /// accepted value of `0.5` allows 1.
     ///
-    /// `0.0` gives probes a slot only while the session lane is empty. Above `0.5` the derived run is
-    /// 0, so the probe lane is polled first on every slot and session data is served only while the
-    /// probe lane is empty; `1.0` is therefore probes first, not a one-to-one alternation. Whether to
-    /// accept shares above `0.5` at all is an open point on hoprnet#8704.
-    ///
-    /// Valid values are finite and in `0.0..=1.0`.
+    /// `0.0` gives probes a slot only while the session lane is empty. Valid values are finite and in
+    /// `0.0..=0.5`: a larger share leaves no session slot in the derived run, which would serve
+    /// session data only while the probe lane is empty.
     #[default = 0.1]
     #[validate(custom(function = "validate_probe_share"))]
     pub probe_share: f64,
 }
 
-/// Rejects a probe share outside `0.0..=1.0`, and the non-finite values that would otherwise pass a
+/// Rejects a probe share outside `0.0..=0.5`, and the non-finite values that would otherwise pass a
 /// plain range check.
+///
+/// `0.5` is the largest share the scheduler can honour: above it the derived session run is 0, so the
+/// probe lane would be polled first on every slot and session data would be served only while that
+/// lane is empty.
 fn validate_probe_share(share: f64) -> Result<(), validator::ValidationError> {
-    if share.is_finite() && (0.0..=1.0).contains(&share) {
+    if share.is_finite() && (0.0..=0.5).contains(&share) {
         Ok(())
     } else {
         let mut error = validator::ValidationError::new("probe_share_out_of_range");
-        error.message = Some(format!("probe share {share} must be finite and in 0.0..=1.0").into());
+        error.message = Some(format!("probe share {share} must be finite and in 0.0..=0.5").into());
         Err(error)
     }
 }
@@ -91,9 +93,9 @@ fn validate_probe_share(share: f64) -> Result<(), validator::ValidationError> {
 ///
 /// The share `f` is a fraction of all emission slots, so the run is `floor((1 - f) / f)`: `9` at
 /// `0.1`, `4` at `0.2`, `3` at `0.25` and `1` at `0.5`. Flooring can only shorten the run, so the
-/// probe lane never takes less than `f` of the slots. A share of `0.0` returns [`usize::MAX`],
-/// which means probes take a slot only while the session lane is empty; a share of `1.0` returns 0,
-/// which means the probe lane is polled first on every slot.
+/// probe lane never takes less than `f` of the slots. A share of `0.0` returns [`usize::MAX`], which
+/// means probes take a slot only while the session lane is empty; the configuration validation caps
+/// the share at `0.5`, so the run is never shorter than 1.
 fn max_session_run(share: f64) -> usize {
     // A share of zero, and the `NaN` that no validated config carries but that must not reach the
     // cast, both mean: probes take a slot only while the session lane is empty.
@@ -279,6 +281,8 @@ impl<S: Stream + Unpin> Stream for DepthStream<S> {
 mod tests {
     use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
+    use anyhow::Context as _;
+
     use super::*;
     use crate::constants::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
 
@@ -439,7 +443,7 @@ mod tests {
     /// A1: with both lanes continuously queued, the probe lane gets its configured share and no
     /// session run exceeds the derived bound.
     #[test]
-    fn probe_share_holds_while_both_lanes_are_queued() {
+    fn probe_share_holds_while_both_lanes_are_queued() -> anyhow::Result<()> {
         let lanes = Lanes::new();
         lanes.session.keep_full(Class::Session);
         lanes.probes.keep_full(Class::Probe);
@@ -453,7 +457,7 @@ mod tests {
 
         let mut emitted = Vec::with_capacity(1_000);
         for _ in 0..1_000 {
-            emitted.push(draw(&mut merged).expect("a queued lane must always yield a slot"));
+            emitted.push(draw(&mut merged).context("a queued lane must always yield a slot")?);
             lanes.session.keep_full(Class::Session);
             lanes.probes.keep_full(Class::Probe);
         }
@@ -472,6 +476,7 @@ mod tests {
             !emitted.contains(&Class::Noise),
             "noise must not take a slot while another lane is queued"
         );
+        Ok(())
     }
 
     /// A3 (first part): an idle session lane gives the probe lane every slot.
@@ -535,7 +540,7 @@ mod tests {
 
     /// A4: a probe never starves behind a session lane that is always queued.
     #[test]
-    fn a_queued_probe_waits_at_most_one_session_run() {
+    fn a_queued_probe_waits_at_most_one_session_run() -> anyhow::Result<()> {
         for phase in 0..10 {
             let lanes = Lanes::new();
             lanes.session.keep_full(Class::Session);
@@ -555,7 +560,7 @@ mod tests {
             let mut waited = 0;
             loop {
                 waited += 1;
-                let item = draw(&mut merged).expect("the session lane is queued");
+                let item = draw(&mut merged).context("the session lane is queued")?;
                 lanes.session.keep_full(Class::Session);
                 if item == Class::Probe {
                     break;
@@ -570,12 +575,13 @@ mod tests {
                 "phase {phase}: the probe waited {waited} slots, more than one session run plus its own slot"
             );
         }
+        Ok(())
     }
 
     /// A5: a pong queued behind a full session lane is emitted inside one lane depth plus the probe
     /// slots owed between them, and no probe that is not owed overtakes it.
     #[test]
-    fn a_pong_waits_inside_one_session_lane_depth() {
+    fn a_pong_waits_inside_one_session_lane_depth() -> anyhow::Result<()> {
         let lanes = Lanes::new();
         for _ in 0..MAXIMUM_MSG_OUTGOING_BUFFER_SIZE - 1 {
             assert!(lanes.session.push(Class::Session));
@@ -595,7 +601,7 @@ mod tests {
         let mut probes_ahead = 0;
         loop {
             slots += 1;
-            let item = draw(&mut merged).expect("a queued lane must always yield a slot");
+            let item = draw(&mut merged).context("a queued lane must always yield a slot")?;
             lanes.probes.keep_full(Class::Probe);
             match item {
                 Class::Pong => break,
@@ -611,11 +617,12 @@ mod tests {
             probes_ahead <= 28,
             "{probes_ahead} probes overtook the pong, more than the probe slots owed over one lane depth"
         );
+        Ok(())
     }
 
     /// A8: with all three classes queued the order is session, then probe, then noise.
     #[test]
-    fn the_class_order_is_session_then_probe_then_noise() {
+    fn the_class_order_is_session_then_probe_then_noise() -> anyhow::Result<()> {
         let lanes = Lanes::new();
         lanes.session.keep_full(Class::Session);
         lanes.probes.keep_full(Class::Probe);
@@ -630,7 +637,7 @@ mod tests {
         // One full pacing cycle, both other lanes staying queued.
         let mut cycle = Vec::with_capacity(10);
         for _ in 0..10 {
-            cycle.push(draw(&mut merged).expect("a queued lane must always yield a slot"));
+            cycle.push(draw(&mut merged).context("a queued lane must always yield a slot")?);
             lanes.session.keep_full(Class::Session);
             lanes.probes.keep_full(Class::Probe);
             lanes.noise.keep_full(Class::Noise);
@@ -666,6 +673,7 @@ mod tests {
         for _ in 0..2 {
             assert_eq!(Some(Class::Noise), draw(&mut merged));
         }
+        Ok(())
     }
 
     /// A7: a share of `0.0` gives probes a slot only while the session lane is empty.
@@ -698,7 +706,7 @@ mod tests {
     }
 
     /// A7: the derived run length is pinned, because the f64 division can land one below an exact
-    /// integer and shorten the run by one slot.
+    /// integer and shorten the run by one slot. Only shares the configuration accepts are pinned.
     #[test]
     fn max_session_run_follows_the_probe_share() {
         for (share, expected) in [(0.1, 9), (0.2, 4), (0.25, 3), (0.5, 1)] {
@@ -709,21 +717,20 @@ mod tests {
             max_session_run(0.0),
             "a zero share means probes wait for an idle session lane"
         );
-        assert_eq!(0, max_session_run(1.0), "a share of one gives probes the first slot");
     }
 
-    /// A7: the default is a tenth, and the range is closed at both ends.
+    /// A7: the default is a tenth, and the range is capped at one probe slot for every session slot.
     #[test]
-    fn probe_share_defaults_to_a_tenth_and_must_be_a_finite_share_of_one() {
+    fn probe_share_defaults_to_a_tenth_and_accepts_half_at_most() {
         let default = OutputPriorityConfig::default();
         assert_eq!(0.1, default.probe_share);
         assert!(default.validate().is_ok(), "the default must be valid");
 
-        for share in [0.0, 0.1, 0.5, 1.0] {
+        for share in [0.0, 0.1, 0.5] {
             let cfg = OutputPriorityConfig { probe_share: share };
             assert!(cfg.validate().is_ok(), "a share of {share} must be accepted");
         }
-        for share in [-0.1, 1.1, f64::NAN, f64::INFINITY] {
+        for share in [-0.1, 0.51, 1.0, 1.1, f64::NAN, f64::INFINITY] {
             let cfg = OutputPriorityConfig { probe_share: share };
             assert!(cfg.validate().is_err(), "a share of {share} must be rejected");
         }
@@ -738,7 +745,7 @@ mod tests {
 
     /// A9: the lane depth follows what was enqueued and not yet emitted.
     #[test]
-    fn lane_depth_follows_enqueued_and_emitted_items() {
+    fn lane_depth_follows_enqueued_and_emitted_items() -> anyhow::Result<()> {
         let depth = LaneDepth::default();
         let waker = futures::task::noop_waker();
         let mut cx = Context::from_waker(&waker);
@@ -746,7 +753,7 @@ mod tests {
         let mut sink = DepthSink::new(futures::sink::drain::<u32>(), depth.clone());
         for value in 0..3u32 {
             assert!(matches!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Ready(Ok(()))));
-            Sink::start_send(Pin::new(&mut sink), value).expect("drain accepts every item");
+            Sink::start_send(Pin::new(&mut sink), value).context("drain accepts every item")?;
         }
         assert_eq!(3, depth.get(), "three enqueued items must raise the depth");
 
@@ -761,6 +768,7 @@ mod tests {
         let mut stream = DepthStream::new(futures::stream::iter([1u32]), depth.clone());
         assert_eq!(Some(1), draw(&mut stream));
         assert_eq!(0, depth.get());
+        Ok(())
     }
 
     /// A refused item must take the depth back, or the count drifts up once per refusal.
