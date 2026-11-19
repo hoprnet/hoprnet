@@ -191,9 +191,14 @@ impl Probe {
     /// Returns the abortable list of background tasks (probe emission) and a
     /// [`ProbeClassifierState`] for inline classification of incoming messages.
     /// Use [`ProbeClassifierState::filter_stream`] to wrap the incoming stream.
+    ///
+    /// `api_out` is the probe lane and carries outgoing probes only. Pongs do not use it:
+    /// [`ProbeClassifierState::classify`] sends a pong through the sink its caller passes, which is
+    /// the session lane. A pong therefore never queues behind a probe burst, and the probe lane
+    /// stays a probe burst of a known bound.
     pub async fn continuously_scan<T, V, Tr, G>(
         self,
-        api_out: T,       // lower tx channel for sending outgoing probes and pong replies
+        api_out: T,       // probe lane: outgoing probes only, pongs go through `classify`
         manual_events: V, // explicit requests from the API
         probing_traffic_generator: Tr,
         network_graph: G,

@@ -223,6 +223,13 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub probe: ProbeConfig,
+    /// Priority scheduling of the outgoing traffic classes.
+    ///
+    /// The class order is fixed: session data (pongs included), then probes, then noise. The probe
+    /// share is the only configurable part.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub output_priority: crate::output_priority::OutputPriorityConfig,
     /// Session protocol global configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -1234,6 +1241,29 @@ mod tests {
             *incoming.quota_range.end(),
             "the accepted range must be anchored at the nominal default quota"
         );
+    }
+
+    /// The probe share is reachable from a node's configuration file, rejects a value outside
+    /// `0.0..=1.0`, and defaults when the file omits it. The behavioural side of the share lives
+    /// with the scheduler in [`crate::output_priority`].
+    #[test]
+    fn output_priority_config_is_nested_and_validated() {
+        assert!(HoprProtocolConfig::default().validate().is_ok());
+
+        let rejected = HoprProtocolConfig {
+            output_priority: crate::output_priority::OutputPriorityConfig { probe_share: 1.1 },
+            ..Default::default()
+        };
+        assert!(
+            rejected.validate().is_err(),
+            "a probe share above one must be rejected through the parent config"
+        );
+
+        let accepted = HoprProtocolConfig {
+            output_priority: crate::output_priority::OutputPriorityConfig { probe_share: 0.0 },
+            ..Default::default()
+        };
+        assert!(accepted.validate().is_ok());
     }
 
     #[test]

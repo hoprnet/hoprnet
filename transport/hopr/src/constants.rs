@@ -12,13 +12,21 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// machines with up to ~36 cores. Safe formula: `≤ 7 × available_parallelism()`.
 pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 
+/// Maximum number of probes buffered in the probe lane before the probe emitter observes
+/// backpressure.
+///
+/// A probe round is several hundred packets emitted in one burst, so the lane has to absorb a whole
+/// round: a smaller lane would stall the emitter mid-round instead of pacing it beside session data.
+/// 1,024 slots bound the buffered probes at about 3.8 MB (1,024 × 3,669 B per packet).
+pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 1_024;
+
 /// Time within Start protocol must finish session initiation.
 /// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
 pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
 mod tests {
-    use super::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+    use super::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
 
     /// Guard against accidentally inflating `MAXIMUM_MSG_OUTGOING_BUFFER_SIZE` back to a large
     /// value that would overflow the Rayon encoding queue.
@@ -35,6 +43,23 @@ mod tests {
             MAXIMUM_MSG_OUTGOING_BUFFER_SIZE <= 256,
             "MAXIMUM_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_MSG_OUTGOING_BUFFER_SIZE} exceeds the safe threshold; tail \
              packets will exceed PACKET_ENCODING_TIMEOUT under burst writes"
+        );
+    }
+
+    /// Guard against inflating the probe lane past what one probe round needs. Every slot holds a
+    /// full 3,669 B packet, so 1,024 slots already cap the lane at about 3.8 MB, and a larger lane
+    /// only lets probes queue further behind session data.
+    #[allow(clippy::assertions_on_constants)]
+    #[test]
+    fn probe_lane_capacity_covers_one_round_within_its_memory_bound() {
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE <= 1_024,
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} exceeds one probe round \
+             (1,024 packets, about 3.8 MB)"
+        );
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE > MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
+            "the probe lane has to hold a whole probe round, which the session lane cannot"
         );
     }
 

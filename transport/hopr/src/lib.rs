@@ -19,6 +19,8 @@ pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
 pub mod observer;
+/// Priority scheduling of the outgoing traffic classes (session data, probes, noise).
+pub mod output_priority;
 /// Graph-based path planning for the HOPR transport layer.
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
@@ -45,8 +47,8 @@ use std::{
     time::Duration,
 };
 
-use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender, stream::select_with_strategy};
+use constants::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
+use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender};
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
     Multiaddr, PeerId,
@@ -836,6 +838,19 @@ where
         >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
         let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
+        // The probe lane. Session data and pongs keep the lane above; only outgoing probes enter
+        // this one, so a probe round cannot delay session packets. The depth is tracked on both
+        // endpoints, because the scheduler needs no accounting of its own for the gauge.
+        let (probe_msg_tx, probe_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE);
+        let probe_lane_depth = output_priority::LaneDepth::default();
+        let probe_msg_tx = output_priority::DepthSink::new(
+            trace_context::ContextSender::new(probe_msg_tx),
+            probe_lane_depth.clone(),
+        );
+        let probe_msg_rx = output_priority::DepthStream::new(probe_msg_rx, probe_lane_depth);
+
         // -- transport medium
 
         let transport_network = network;
@@ -1002,11 +1017,14 @@ where
             })
         });
 
-        // merge cover traffic with other outgoing data
-        let merged_unresolved_output_data =
-            select_with_strategy(unresolved_routing_msg_rx, cover_traffic_stream, |_: &mut ()| {
-                futures::stream::PollNext::Left
-            });
+        // merge cover traffic with the two prioritized lanes: session data first, then probes, then
+        // cover traffic as the last resort
+        let merged_unresolved_output_data = output_priority::merge_lanes(
+            unresolved_routing_msg_rx,
+            probe_msg_rx,
+            cover_traffic_stream,
+            self.cfg.output_priority.probe_share,
+        );
 
         // === END === cover traffic control
 
@@ -1372,12 +1390,7 @@ where
         let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
 
         let (probing_processes, probe_classifier) = probe
-            .continuously_scan(
-                unresolved_routing_msg_tx.clone(),
-                manual_ping_rx,
-                cover_traffic,
-                self.graph.clone(),
-            )
+            .continuously_scan(probe_msg_tx.clone(), manual_ping_rx, cover_traffic, self.graph.clone())
             .await;
 
         processes.flat_map_extend_from(probing_processes, HoprTransportProcess::Probing);
