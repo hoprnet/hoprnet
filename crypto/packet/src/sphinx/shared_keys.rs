@@ -701,15 +701,14 @@ pub(crate) mod tests {
         );
 
         // And a nonzero scalar must still be accepted, so the guard does not reject everything.
+        // k256 scalars are big-endian, so the scalar one is a trailing 1.
         let mut one_bytes = [0u8; 32];
-        one_bytes[31] = 1; // k256 scalars are big-endian
+        one_bytes[31] = 1;
         let one = <Secp256k1Scalar as Scalar>::from_bytes(&one_bytes).context("one must parse")?;
         assert!(!one.is_zero(), "a nonzero scalar must not report as zero");
+        let one_secret = SharedSecret::try_from(one_bytes.as_slice()).context("one is 32 bytes")?;
         assert!(
-            SharedKeys::<Secp256k1Scalar, Secp256k1Point>::parse_blinding_scalar(&SharedSecret::from(
-                Alpha::<hopr_types::primitive::typenum::U32>::try_from(one_bytes.as_slice()).expect("one is 32 bytes")
-            ))
-            .is_ok(),
+            SharedKeys::<Secp256k1Scalar, Secp256k1Point>::parse_blinding_scalar(&one_secret).is_ok(),
             "a nonzero blinding scalar must be accepted"
         );
 
