@@ -39,6 +39,17 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Create a group element using the group generator and the given scalar
     fn generate(scalar: &E) -> Self;
 
+    /// Whether a group element this crate *derived itself* from a validated scalar is usable.
+    ///
+    /// Distinct from [`GroupElement::is_valid`], which validates untrusted wire input: a point
+    /// produced as `s * G` for an already-parsed scalar is in the prime-order subgroup by
+    /// construction, so only the identity (a scalar that is a multiple of the group order) can be
+    /// wrong. Suites whose `is_valid` is more than an identity test can override this to skip that
+    /// extra work on the per-packet path.
+    fn is_valid_derived(&self) -> bool {
+        self.is_valid()
+    }
+
     /// Group element is considered valid if it is not a neutral element and also not a torsion element of small order.
     fn is_valid(&self) -> bool;
 
@@ -131,7 +142,12 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = G::generate(&coeff_prev);
 
-            if !alpha_prev.is_valid() {
+            // `alpha_prev` is `coeff * G` for a scalar `coeff` that `E::from_bytes` already rejected
+            // if non-canonical, so it is in the prime-order subgroup by construction. The full
+            // `is_valid` (three doublings) would re-establish that; only the identity has to be
+            // excluded here, because a `coeff` that is a multiple of the group order gives `O`. The
+            // wire input is where the full check belongs, and `forward_transform_deferred` does it.
+            if !alpha_prev.is_valid_derived() {
                 return Err(CryptoError::CalculationError);
             }
         }
@@ -230,7 +246,9 @@ impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
         let b_k_checked = E::from_bytes(self.b_k.as_ref())?;
         let alpha_new = self.alpha_point.mul(&b_k_checked);
 
-        if !alpha_new.is_valid() {
+        // As in `generate`: a scalar multiple of an already-validated point is in the prime-order
+        // subgroup, so only the identity has to be excluded here.
+        if !alpha_new.is_valid_derived() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
 
@@ -383,6 +401,70 @@ pub(crate) mod tests {
             );
 
             alpha_cpy = alpha;
+        }
+        Ok(())
+    }
+
+    /// Known-answer test pinning the wire format of the relay transform.
+    ///
+    /// The expected bytes were produced by the pre-change implementation (`ff0076efaa`) from the same
+    /// fixed alpha and key pair, so every value here is opaque to the implementation under test: the
+    /// per-hop shared secret and the blinded alpha handed to the next hop. The round-trip test above
+    /// compares the deferral against itself and so cannot see a change to the KDF context or the
+    /// blinding salt; this one does, because a different salt moves these bytes. A change that broke
+    /// compatibility with existing nodes would fail here.
+    ///
+    /// The sender's `new_shared_keys` cannot be pinned the same way - it starts from a random alpha -
+    /// so the alpha below is the one the pre-change implementation emitted, used as a fixed input.
+    #[cfg(feature = "ed25519")]
+    #[test]
+    fn the_relay_transform_matches_the_pre_deferral_known_answers() -> anyhow::Result<()> {
+        use hopr_types::crypto::keypairs::OffchainKeypair;
+        use hopr_types::primitive::typenum::U32;
+
+        // Alpha and key pair from the pre-change run; all three are inputs, not derived here.
+        let alpha: Alpha<U32> = const_hex::decode("a8c8f046aea14953474ca0787e7eb3d908439f2fd66ef019d54cfa92301483bc")
+            .context("alpha hex")?
+            .as_slice()
+            .try_into()
+            .expect("alpha is 32 bytes");
+        let keys: Vec<OffchainKeypair> = [[0x11u8; 32], [0x22u8; 32]]
+            .iter()
+            .map(|s| OffchainKeypair::from_secret(s).expect("valid fixed secret"))
+            .collect();
+
+        let expected = [
+            (
+                "7f639766b036db9f885db049f738e45448e125395b0f4ffab2dc6df62fa8c96c",
+                "0e3558196aa341329cd97a7d1c880ecc34d96f715fa094bd5c44d6273c318860",
+            ),
+            (
+                "b0402a50cd8cb78afdd812d5f5dcd09bc0270ac69b4f439de72248df151c4ebe",
+                "ad91af7c908b70209abbe42b770b08871482f8f33d512893188c960509c66ba8",
+            ),
+        ];
+
+        let mut alpha = alpha;
+        for (hop, (kp, (want_alpha, want_secret))) in keys.iter().zip(expected).enumerate() {
+            let pubkey = *kp.public();
+            let pub_alpha: &Alpha<U32> = (&pubkey).into();
+            let (deferred, secret) = SharedKeys::<Curve25519Scalar, Curve25519Point>::forward_transform_deferred(
+                &alpha,
+                &kp.into(),
+                pub_alpha,
+            )
+            .with_context(|| format!("hop {hop}: deferred transform"))?;
+            assert_eq!(
+                const_hex::encode(secret.as_ref()),
+                want_secret,
+                "hop {hop}: shared secret changed"
+            );
+            alpha = deferred.finalize().with_context(|| format!("hop {hop}: finalize"))?;
+            assert_eq!(
+                const_hex::encode(AsRef::<[u8]>::as_ref(&alpha)),
+                want_alpha,
+                "hop {hop}: blinded alpha changed"
+            );
         }
         Ok(())
     }

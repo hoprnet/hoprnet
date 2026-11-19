@@ -141,6 +141,13 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
         // a scalar multiplication on the per-packet path.
         self.to_edwards(0).is_some_and(|edwards| !edwards.is_small_order())
     }
+
+    /// Derived points are `s * G` or a multiple of one, so only the identity can be wrong: the
+    /// `to_edwards` round trip that a wire coordinate needs is not required for our own arithmetic.
+    fn is_valid_derived(&self) -> bool {
+        use hopr_types::crypto::primitives::IsIdentity;
+        !self.is_identity()
+    }
 }
 
 #[cfg(feature = "ed25519")]
@@ -173,6 +180,13 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         // `is_small_order` is three doublings plus an identity test. It covers the identity too, so
         // the explicit identity term is gone.
         !self.is_small_order()
+    }
+
+    /// As for the Montgomery implementation: a derived point is in the prime-order subgroup by
+    /// construction, so the three-doubling `is_small_order` check is not needed for it.
+    fn is_valid_derived(&self) -> bool {
+        use hopr_types::crypto::primitives::IsIdentity;
+        !self.is_identity()
     }
 }
 
@@ -368,6 +382,62 @@ mod montgomery_is_valid {
             let p = Curve25519MontgomeryPoint(s);
             assert!(!p.is_valid(), "small-order Montgomery point {i} passed is_valid");
         }
+
+        // The order-8 classes are most reliably reached by *projecting* the Edwards eight-torsion set
+        // onto Montgomery coordinates, which also exercises the `to_montgomery`/`to_edwards` pair the
+        // check relies on. Each projected point must be rejected.
+        let edwards_torsion: [[u8; 32]; 8] = [
+            // identity, order 2, four of order 4/8 on the main curve (canonical compressed forms)
+            [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            [0u8; 32],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x85,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0xfa,
+            ],
+            [
+                0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+            [
+                0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+        ];
+        let mut projected = std::collections::BTreeSet::new();
+        for (i, bytes) in edwards_torsion.into_iter().enumerate() {
+            let edwards = Curve25519CompressedPoint(bytes)
+                .decompress()
+                .unwrap_or_else(|| panic!("torsion fixture {i} must decompress"));
+            assert!(edwards.is_small_order(), "fixture {i} must be small order");
+            let montgomery = edwards.to_montgomery();
+            projected.insert(montgomery.0);
+            assert!(
+                !montgomery.is_valid(),
+                "projected torsion point {i} passed the Montgomery is_valid"
+            );
+        }
+        // The eight Edwards torsion points project onto four distinct `u` values, because `u` has no
+        // sign: P and -P collapse. Asserting the count keeps a broken fixture from silently shrinking
+        // the set.
+        assert_eq!(
+            projected.len(),
+            4,
+            "the torsion subgroup must project onto four distinct u values"
+        );
         let good = Curve25519MontgomeryPoint([
             9u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
