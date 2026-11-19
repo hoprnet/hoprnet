@@ -826,6 +826,8 @@ pub struct RelayerHealth {
     suspected: DashMap<OffchainPublicKey, (Hop, Instant)>,
     /// Health last handed to the graph, below `1.0` only.
     published: DashMap<OffchainPublicKey, f64>,
+    /// Relayers with an active forward verdict, set by the flush: one overdue reply makes them a suspect.
+    forward_judged: parking_lot::RwLock<std::collections::HashSet<OffchainPublicKey>>,
     /// When a reply last came home, through any relayer, for any session.
     last_reply: LastReply,
 }
@@ -1570,6 +1572,7 @@ impl RelayerHealth {
     /// `is_fresh_for`), a probe's above all. One on probation that is a black hole again is dead again.
     pub fn refresh(&self, memory: u32) -> Vec<(OffchainPublicKey, f64, f64)> {
         let last_reply = self.last_reply();
+        let forward_judged = self.forward_judged.read();
         // The bar of the best-measured relayer, for those with too short a history of their own.
         let fallback_usual = self
             .relayers
@@ -1613,17 +1616,20 @@ impl RelayerHealth {
             // No race stays open for longer than that, so an older reply answers none.
             last_home.retain(|_, home| home.elapsed() <= PENDING_SURB_TTL);
             let unanswered = entry.unanswered(last_reply, fallback_usual, &bars);
+            // A relayer the forward receipts have judged is a suspect on one overdue reply
+            let (min_races, min_over_one_hop) = if forward_judged.contains(entry.key()) {
+                (1, 1)
+            } else {
+                (MIN_RACES, MIN_RACES_OVER_ONE_HOP)
+            };
             let (unanswered, needed): (Vec<HoprSurbId>, usize) = match entry.hop_at_fault(&unanswered) {
                 // Delivering over its other hop, and enough overdue over this one to suspect it over it.
-                Some(hop) if unanswered.len() >= MIN_RACES_OVER_ONE_HOP => {
+                Some(hop) if unanswered.len() >= min_over_one_hop => {
                     hop_at_fault.insert(*entry.key(), hop);
-                    (
-                        unanswered.iter().map(|(surb, _)| *surb).collect(),
-                        MIN_RACES_OVER_ONE_HOP,
-                    )
+                    (unanswered.iter().map(|(surb, _)| *surb).collect(), min_over_one_hop)
                 }
                 // As a whole it is judged on the replies that nothing through it has come home after.
-                _ => (entry.unanswered_at_all(&unanswered), MIN_RACES),
+                _ => (entry.unanswered_at_all(&unanswered), min_races),
             };
             if unanswered.len() >= needed {
                 let open = entry
@@ -1968,6 +1974,9 @@ where
     F: std::future::Future<Output = ()>,
 {
     let health = &registry.relayer_health;
+    if let Some(forward) = registry.forward() {
+        *health.forward_judged.write() = forward.judged_relayers();
+    }
     let changed = health.refresh(memory);
     // The verdicts themselves are logged where they are reached, in `refresh`.
     for (relayer, previous, current) in &changed {
@@ -2801,6 +2810,65 @@ mod tests {
             "only new verdicts are reported"
         );
         Ok(())
+    }
+
+    /// A relayer with `count` replies overdue through it, the network delivering through `healthy`.
+    fn black_hole_candidate(count: u8) -> (RelayerHealth, OffchainPublicKey) {
+        let health = RelayerHealth::default();
+        let [entry, black_hole, exit, healthy] = [(); 4].map(|_| key());
+        settled_since(
+            &health,
+            black_hole,
+            ago(Duration::from_secs(10)).expect("clock"),
+            jitter(0),
+        );
+        for seed in 1..=count {
+            health.open_race(
+                &leg(&[entry, black_hole, exit]),
+                surb_id(seed),
+                &leg(&[entry, healthy, exit]),
+                ROUND_TRIP,
+            );
+        }
+        backdate_open(&health, black_hole, ago(ROUND_TRIP * 2).expect("clock"));
+        health.record_reply();
+        (health, black_hole)
+    }
+
+    fn forward_judged(health: &RelayerHealth, relayers: &[OffchainPublicKey]) {
+        *health.forward_judged.write() = relayers.iter().copied().collect();
+    }
+
+    /// A forward verdict makes one overdue reply enough, then the usual confirmation applies.
+    #[test]
+    fn a_forward_judged_relayer_should_be_judged_on_one_overdue_reply() {
+        let (health, relayer) = black_hole_candidate(1);
+        forward_judged(&health, &[relayer]);
+        assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
+        assert!(
+            !health.is_confirmed_dead(&relayer),
+            "confirmed only after VERDICT_CONFIRMATION"
+        );
+        confirm_verdicts(&health);
+        health.refresh(4);
+        assert!(health.is_confirmed_dead(&relayer));
+    }
+
+    #[test]
+    fn one_overdue_reply_should_judge_nobody_without_a_forward_verdict() {
+        let (health, _) = black_hole_candidate(1);
+        assert!(judged_dead(&health.refresh(4)).is_empty());
+    }
+
+    /// Once the forward verdict has lapsed the reply rule needs its three replies again.
+    #[test]
+    fn the_reply_threshold_should_be_back_after_the_forward_verdict_lapses() {
+        for (count, judged) in [(1, false), (2, false), (MIN_RACES as u8, true)] {
+            let (health, relayer) = black_hole_candidate(count);
+            forward_judged(&health, &[relayer]);
+            forward_judged(&health, &[]);
+            assert_eq!(judged, !judged_dead(&health.refresh(4)).is_empty(), "{count} overdue");
+        }
     }
 
     /// Opens one overdue race per leg, each against a home leg through `healthy` alone.

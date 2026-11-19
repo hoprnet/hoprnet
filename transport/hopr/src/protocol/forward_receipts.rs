@@ -127,6 +127,14 @@ impl ForwardReceipts {
         self.excluded.read().get(exit).cloned().unwrap_or_default()
     }
 
+    /// The relayers with a forward verdict for any Exit; cheap while there is none.
+    pub fn judged_relayers(&self) -> std::collections::HashSet<Key> {
+        if !self.any_verdict.load(Ordering::Relaxed) {
+            return Default::default();
+        }
+        self.excluded.read().values().flatten().copied().collect()
+    }
+
     /// Records a Session packet sent over `path`, the relayers and then the Exit.
     pub fn record(&self, pseudonym: HoprPseudonym, tag: u32, path: &[Key]) {
         self.record_at(pseudonym, tag, path, Instant::now());
@@ -1472,6 +1480,22 @@ mod tests {
         fr.record_at(session, 60, &[a, exit], at(1_500));
         fr.receipts_at(session, 3, 3, &[60, 51], at(1_800));
         assert!(fr.excluded_relayers(&exit).is_empty());
+    }
+
+    #[test]
+    fn the_judged_relayers_should_be_those_with_a_verdict_for_any_exit() -> anyhow::Result<()> {
+        let [a, b, c] = [(); 3].map(|_| key());
+        let mut sim = Sim::new();
+        assert!(sim.fr.judged_relayers().is_empty());
+        sim.run(
+            0,
+            2_000,
+            rotate(vec![vec![a], vec![b], vec![c]]),
+            |path| if path.contains(&a) { None } else { FAST },
+            lose_nothing,
+        );
+        assert_eq!(std::collections::HashSet::from([a]), sim.fr.judged_relayers());
+        Ok(())
     }
 
     /// The return side keeps its own, longer confirmation.
