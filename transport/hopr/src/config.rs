@@ -21,7 +21,7 @@ use hopr_transport_session::{
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
-use crate::{errors::HoprTransportError, protocol::PacketPipelineConfig};
+use crate::{errors::HoprTransportError, output_priority::DEFAULT_PROBE_SHARE, protocol::PacketPipelineConfig};
 
 const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 
@@ -202,6 +202,31 @@ pub struct TransitLatencyConfig {
     pub std_dev: Duration,
 }
 
+/// Outgoing traffic scheduling configuration.
+///
+/// The three outgoing classes are served in this order: session data, probes, then cover traffic
+/// (noise). Probes keep a minimum share of the emission slots while session data is queued, so a
+/// probe round still advances under sustained load and never starves. Noise flows only while both
+/// data classes are idle.
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct OutputPriorityConfig {
+    /// Share of the emission slots probes get while session data is queued.
+    ///
+    /// Must be a finite value in `0.0..=1.0`. At `0.0` probes are sent only while the session lane
+    /// is idle; at `1.0` probes are sent first and session data only when the probe lane is empty.
+    /// The longest run of session slots between two probe slots is `floor((1 - share) / share)`,
+    /// which is 9 at the default.
+    #[validate(custom(function = "validate_probe_share"))]
+    #[default(default_probe_share())]
+    #[cfg_attr(feature = "serde", serde(default = "default_probe_share"))]
+    pub probe_share: f64,
+}
+
 /// Complete configuration of the HOPR protocol stack.
 #[derive(Debug, smart_default::SmartDefault, Validate, Clone, PartialEq)]
 #[cfg_attr(
@@ -286,6 +311,10 @@ pub struct HoprProtocolConfig {
     #[validate(custom(function = "validate_relayer_health_weight"))]
     #[cfg_attr(feature = "serde", serde(default = "default_relayer_health_weight"))]
     pub relayer_health_weight: f64,
+    /// Outgoing traffic scheduling configuration.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub output_priority: OutputPriorityConfig,
 }
 
 fn default_latency_race_memory() -> u32 {
@@ -294,6 +323,24 @@ fn default_latency_race_memory() -> u32 {
 
 fn default_relayer_health_weight() -> f64 {
     1.0
+}
+
+/// Default share of the outgoing emission slots given to probes while session data is queued.
+fn default_probe_share() -> f64 {
+    DEFAULT_PROBE_SHARE
+}
+
+/// Rejects a `probe_share` outside `0.0..=1.0`, NaN and the infinities included.
+///
+/// The check is written as an accepted range, not as a rejection of out-of-range values: every
+/// comparison against NaN is false, so `if share < 0.0 || share > 1.0 { reject }` would let NaN
+/// through and the scheduler would derive a nonsense run length from it.
+fn validate_probe_share(value: f64) -> Result<(), ValidationError> {
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("probe share must be finite and within 0.0..=1.0"))
+    }
 }
 
 /// Rejects a negative or non-finite `relayer_health_weight`. A minimum alone lets NaN and `+inf` through:
@@ -1252,6 +1299,45 @@ mod tests {
             };
             assert!(config.validate().is_err(), "a weight of {weight} must be rejected");
         }
+    }
+
+    #[test]
+    fn probe_share_within_the_unit_range_is_accepted() {
+        for share in [0.0, DEFAULT_PROBE_SHARE, 0.2, 0.5, 1.0] {
+            let config = OutputPriorityConfig { probe_share: share };
+            assert!(config.validate().is_ok(), "a probe share of {share} must be accepted");
+        }
+    }
+
+    #[test]
+    fn probe_share_outside_the_unit_range_or_non_finite_is_rejected() {
+        for share in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let config = OutputPriorityConfig { probe_share: share };
+            assert!(config.validate().is_err(), "a probe share of {share} must be rejected");
+        }
+    }
+
+    /// The default share decides how long a session packet can queue behind a probe burst, so a
+    /// change to it must be a deliberate one, visible in the snapshot.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn output_priority_defaults_are_pinned() {
+        insta::assert_yaml_snapshot!(OutputPriorityConfig::default());
+    }
+
+    /// A configuration file written before the field existed keeps the default share.
+    #[cfg(feature = "serde")]
+    #[test]
+    fn output_priority_defaults_parse_from_an_empty_mapping() -> anyhow::Result<()> {
+        let config: HoprProtocolConfig =
+            serde_saphyr::from_str("output_priority: {}\n").context("an empty block must parse")?;
+        assert_eq!(DEFAULT_PROBE_SHARE, config.output_priority.probe_share);
+        assert_eq!(
+            DEFAULT_PROBE_SHARE,
+            HoprProtocolConfig::default().output_priority.probe_share
+        );
+
+        Ok(())
     }
 
     #[test]

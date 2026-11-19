@@ -29,6 +29,8 @@ pub mod protocol;
 pub mod testing;
 
 mod multiaddrs;
+/// Ordering of session data, probes and cover traffic in the outgoing stream.
+mod output_priority;
 /// Context propagation for locally originated packets.
 pub mod trace_context;
 
@@ -45,7 +47,7 @@ use std::{
     time::Duration,
 };
 
-use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+use constants::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
 use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender, stream::select_with_strategy};
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
@@ -125,6 +127,7 @@ use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE,
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
+    output_priority::{note_probe_lane_emitted, paced_probe_share, probe_lane_sink},
     path::{HoprGraphPathSelector, PathPlanner},
     pipeline::HoprPacketPipelineBuilder,
     socket::HoprSocket,
@@ -836,6 +839,16 @@ where
         >(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
         let unresolved_routing_msg_tx = trace_context::ContextSender::new(unresolved_routing_msg_tx);
 
+        // Probes have their own lane. A probe round is hundreds of packets in one burst, so a
+        // shared FIFO put every session packet behind the burst and recorded the queueing time as
+        // probe latency. The two lanes are merged in priority order below; pongs stay on the
+        // session lane because a peer waits on them.
+        let (unresolved_probe_msg_tx, unresolved_probe_msg_rx) = bounded_sink_channel::<
+            trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
+        >(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE);
+        let unresolved_probe_msg_tx =
+            probe_lane_sink(trace_context::ContextSender::new(unresolved_probe_msg_tx));
+
         // -- transport medium
 
         let transport_network = network;
@@ -1002,9 +1015,18 @@ where
             })
         });
 
-        // merge cover traffic with other outgoing data
+        // Session data first, probes next. The paced strategy gives the probe lane one slot after
+        // at most `max_session_run(probe_share)` session slots, so a probe burst cannot delay
+        // session data by more than one owed probe slot, and probes never starve.
+        let merged_session_and_probe_output = select_with_strategy(
+            unresolved_routing_msg_rx,
+            unresolved_probe_msg_rx.inspect(|_| note_probe_lane_emitted()),
+            paced_probe_share(self.cfg.output_priority.probe_share),
+        );
+
+        // merge cover traffic with other outgoing data, last in precedence
         let merged_unresolved_output_data =
-            select_with_strategy(unresolved_routing_msg_rx, cover_traffic_stream, |_: &mut ()| {
+            select_with_strategy(merged_session_and_probe_output, cover_traffic_stream, |_: &mut ()| {
                 futures::stream::PollNext::Left
             });
 
@@ -1373,7 +1395,7 @@ where
 
         let (probing_processes, probe_classifier) = probe
             .continuously_scan(
-                unresolved_routing_msg_tx.clone(),
+                unresolved_probe_msg_tx.clone(),
                 manual_ping_rx,
                 cover_traffic,
                 self.graph.clone(),

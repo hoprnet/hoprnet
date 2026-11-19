@@ -1,0 +1,5 @@
+---
+source: transport/hopr/src/config.rs
+expression: "OutputPriorityConfig::default()"
+---
+probe_share: 0.1

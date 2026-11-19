@@ -12,13 +12,21 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// machines with up to ~36 cores. Safe formula: `≤ 7 × available_parallelism()`.
 pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 
+/// Maximum number of outgoing probe packets buffered in the probe lane.
+///
+/// Probes have their own lane so that a probe burst cannot queue ahead of session packets. One
+/// probe round is a few hundred packets in one burst (about 650 on a 300-node network), so 1,024
+/// slots hold a whole round without blocking the generator. At 3,669 bytes per packet the lane
+/// holds at most about 3.8 MB.
+pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 1024;
+
 /// Time within Start protocol must finish session initiation.
 /// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
 pub(crate) const SESSION_INITIATION_TIMEOUT_BASE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
 mod tests {
-    use super::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+    use super::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
 
     /// Guard against accidentally inflating `MAXIMUM_MSG_OUTGOING_BUFFER_SIZE` back to a large
     /// value that would overflow the Rayon encoding queue.
@@ -35,6 +43,30 @@ mod tests {
             MAXIMUM_MSG_OUTGOING_BUFFER_SIZE <= 256,
             "MAXIMUM_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_MSG_OUTGOING_BUFFER_SIZE} exceeds the safe threshold; tail \
              packets will exceed PACKET_ENCODING_TIMEOUT under burst writes"
+        );
+    }
+
+    /// Keep the probe lane large enough for one probe round and small enough to bound its memory.
+    ///
+    /// A round is about 650 packets; shrinking the lane below that would make the probe generator
+    /// wait on the channel mid-round. Above 1,024 slots the lane holds more than 4 MB of packets,
+    /// which buys nothing: it is a delay buffer, not a queue for sustained load.
+    #[allow(clippy::assertions_on_constants)]
+    #[test]
+    fn probe_buffer_size_holds_one_round_within_the_byte_budget() {
+        const PACKET_SIZE_BYTES: usize = 3_669;
+        const PROBE_ROUND_PACKETS: usize = 650;
+        const MAXIMUM_LANE_BYTES: usize = 4 * 1024 * 1024;
+
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE >= PROBE_ROUND_PACKETS,
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} is smaller than one probe \
+             round, so the generator blocks mid-round"
+        );
+        assert!(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE * PACKET_SIZE_BYTES <= MAXIMUM_LANE_BYTES,
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} holds more than 4 MB of \
+             queued probes"
         );
     }
 
