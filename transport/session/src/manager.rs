@@ -6553,8 +6553,14 @@ where
                 };
                 let count = tags.len();
                 // Two copies inside a burst window, where the receipts are the ones that judge and the paths are
-                // not yet known to be good
-                let copies = if receipts.burst_open_at(Instant::now()) { 2 } else { 1 };
+                // not yet known to be good, if the stock stays above the reserve after the first
+                let copies = if receipts.burst_open_at(Instant::now())
+                    && estimator.saturating_diff() > current_keep_alive_surb_reserve(&balancer) + 1
+                {
+                    2
+                } else {
+                    1
+                };
                 for _ in 0..copies {
                     let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
                         session_id,
@@ -29083,16 +29089,44 @@ mod tests {
         let inside = receipts_during(&mut rx, pseudonym, Duration::from_millis(400)).await;
         assert_eq!(vec![1, 1], inside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
 
-        // Past the window (1 s after it opened; a packet every 0.4 s keeps it from reopening) one copy
-        for tag in [11, 12] {
-            tokio::time::sleep(Duration::from_millis(400)).await;
-            deliver_tagged_data(&mgr, pseudonym, tag, 1)?;
-        }
+        // Past the window (the cooldown keeps it from reopening) one copy
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        deliver_tagged_data(&mgr, pseudonym, 11, 1)?;
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        deliver_tagged_data(&mgr, pseudonym, 12, 1)?;
         deliver_tagged_data(&mgr, pseudonym, 13, 60)?;
         let outside = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
         assert_eq!(vec![2], outside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
 
         assert_eq!(consumed + 3, estimator.consumed.load(Relaxed), "every copy is counted");
+        Ok(())
+    }
+
+    /// The second copy needs the stock to stay above the keep-alive reserve after the first.
+    #[test_log::test(tokio::test)]
+    async fn the_second_copy_should_keep_the_stock_above_the_reserve() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        // The stock is the reserve plus 1 (one copy) or plus 2 (two)
+        for (above_reserve, copies) in [(1u64, 1), (2, 2)] {
+            let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000).await?;
+            let slot = mgr.sessions.get(&pseudonym).context("slot")?;
+            let target = current_keep_alive_surb_reserve(&slot.surb_mgmt) + above_reserve;
+            let estimator = slot.surb_estimator.clone();
+            let held = estimator.saturating_diff();
+            if held > target {
+                estimator.consumed.fetch_add(held - target, Relaxed);
+            } else {
+                estimator.produced.fetch_add(target - held, Relaxed);
+            }
+            drop(slot);
+
+            deliver_tagged_data(&mgr, pseudonym, 0, 1)?;
+            tokio::time::sleep(Duration::from_millis(1_100)).await;
+            deliver_tagged_data(&mgr, pseudonym, 1, 10)?;
+            let sent = receipts_during(&mut rx, pseudonym, Duration::from_millis(400)).await;
+            assert_eq!(copies, sent.len(), "{above_reserve} above the reserve");
+        }
         Ok(())
     }
 

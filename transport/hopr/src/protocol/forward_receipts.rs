@@ -36,11 +36,12 @@ const MAX_FORWARD_VERDICTS_PER_EXIT: usize = 2;
 const FORWARD_CONFIRMATION: Duration = Duration::from_millis(500);
 /// How long a delivery is kept without news.
 const STATE_TTL: Duration = Duration::from_secs(60);
-/// How long a receipt stream is kept without news: longer than a Session's idle timeout, so that the first receipt
-/// after an idle continues it.
+/// How long a receipt stream is kept without news: longer than the default idle timeout (3 min), so that the first
+/// receipt after an idle continues it.
 const STREAM_TTL: Duration = Duration::from_secs(600);
-/// How old a stream must be to be reset by a reused pseudonym: a copy of an early receipt is no new Session.
-const RESET_AFTER: Duration = Duration::from_secs(2);
+/// How old a stream must be to be reset by a reused pseudonym: a copy of an early receipt, delayed on a stalled return
+/// path, is no new Session.
+const RESET_AFTER: Duration = RECORD_TTL;
 /// The most receipts one receipt is held to have skipped over; a larger gap is a loss.
 const MAX_MISSING: u32 = 16;
 /// The highest `seq` a new Session sends first (see the Exit's overflow jump).
@@ -167,6 +168,10 @@ impl ForwardReceipts {
         let mut state = self.state.lock();
 
         let mut gap = 0;
+        let before = state
+            .streams
+            .get(&pseudonym)
+            .map(|stream| (stream.last_seq, stream.missing.clone()));
         match state.streams.get_mut(&pseudonym) {
             // The pseudonym was reused: a new Session numbers from 1, or a little above it. Not a copy of an early
             // receipt that arrives late, though.
@@ -178,8 +183,7 @@ impl ForwardReceipts {
                 *stream = Stream::new(seq, now);
             }
             Some(stream) => {
-                // The seqs between the last one and the first this receipt covers are skipped over: they may only be
-                // late
+                // The seqs after the last one and before the first this receipt covers are skipped over: maybe late
                 let next = stream.last_seq.saturating_add(1);
                 gap = first_seq.saturating_sub(next);
                 if gap > MAX_MISSING {
@@ -253,11 +257,18 @@ impl ForwardReceipts {
         for (exit, relayer) in lifts {
             state.lift(exit, relayer, now);
         }
+        let after = state
+            .streams
+            .get(&pseudonym)
+            .map(|stream| (stream.last_seq, stream.missing.clone()));
         let waiting = state
             .streams
             .get(&pseudonym)
             .is_some_and(|stream| !stream.missing.is_empty());
-        let outstanding = if waiting {
+        // A copy of a receipt already taken tells nothing new: it must not let a confirmation mature ahead of the
+        // next real receipt
+        let nothing_new = matched == 0 && before == after;
+        let outstanding = if waiting || nothing_new {
             state.records.get(&pseudonym).map_or(0, HashMap::len)
         } else {
             state.evaluate(pseudonym, now)
@@ -809,13 +820,13 @@ mod tests {
             (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
         };
         let (expected, _) = verdict_with(0);
-        for lost in [3, 5, 7] {
+        for lost in [3, 5] {
             assert_eq!((expected, vec![a]), verdict_with(lost), "receipt {lost} lost");
         }
     }
 
-    /// More than one receipt lost, or an overflow at the Exit, make the evidence before them void: only the
-    /// packets sent after it can judge, which takes until after 2 s here, against 1.5 s without the jump.
+    /// More receipts lost than a receipt covers, or an overflow at the Exit, make the evidence before them void: only
+    /// the packets sent after it can judge, which takes until after 2 s here, against 1.5 s without the jump.
     #[test]
     fn a_larger_gap_or_an_overflow_should_judge_nobody() {
         let [a, b, c] = [(); 3].map(|_| key());
@@ -1045,10 +1056,10 @@ mod tests {
         Ok(())
     }
 
-    /// Receipts 5 and 6 are overtaken by 7 and arrive within the grace, before the receipt that judges; or, with a
-    /// coverage of 3, long after it.
+    /// Receipts 5 and 6 are overtaken by 7. Arriving within the grace, they delay the verdict by one receipt; arriving
+    /// long after it, with a coverage of 3, the same: neither floors the evidence, which would take until after 2.2 s.
     #[test]
-    fn receipts_arriving_out_of_order_within_the_grace_should_judge_as_in_order() {
+    fn overtaken_receipts_should_delay_the_verdict_by_a_receipt_and_not_floor_the_evidence() {
         let [a, b, c] = [(); 3].map(|_| key());
         let verdict = |late: Vec<(u32, u64)>, cover: usize| {
             let mut sim = Sim::new();
@@ -1272,10 +1283,10 @@ mod tests {
             lose_nothing,
         );
         let verdict = sim.verdict_ms.context("judged")?;
-        sim.send(verdict + 1, &[a], FAST);
-        // The pseudonym is reused: its new stream has no watermark
-        sim.fr
-            .receipts_at(sim.pseudonym, 1, 1, &[sim.next_tag - 1], sim.at(verdict + 3_000));
+        // Another Session through the same Exit: its stream has no watermark yet
+        let other = HoprPseudonym::random();
+        sim.fr.record_at(other, 1, &[a, sim.exit], sim.at(verdict + 1));
+        sim.fr.receipts_at(other, 1, 1, &[1], sim.at(verdict + 300));
         assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
         Ok(())
     }
@@ -1313,7 +1324,7 @@ mod tests {
         fr.receipts_at(session, 6, 6, &[1], t0 + Duration::from_secs(2));
         assert!(fr.state.lock().streams[&session].watermark.is_some());
 
-        let again = t0 + Duration::from_secs(3);
+        let again = t0 + Duration::from_secs(11);
         fr.receipts_at(session, 1, 1, &[], again);
         let state = fr.state.lock();
         let stream = &state.streams[&session];
@@ -1334,7 +1345,7 @@ mod tests {
             fr.state.lock().streams[&session].last_seq,
             "a late receipt is no reset"
         );
-        let later = t0 + Duration::from_secs(3);
+        let later = t0 + Duration::from_secs(11);
         fr.receipts_at(
             session,
             NEW_SESSION_SEQ_MAX,
@@ -1365,14 +1376,15 @@ mod tests {
 
         let mut idle = Sim::new();
         idle.run(0, 1_000, &route, healthy, lose_nothing);
-        let start = 150_000;
+        // Off the receipts' 250 ms grid, so that the first receipt after the idle comes 150 ms in
+        let start = 150_100;
         idle.fr.refresh_at(idle.at(start));
         idle.verdict_ms = None;
         idle.run(start, start + 3_000, &route, dead, lose_nothing);
 
         let (fresh, idle_verdict) = (fresh.verdict_ms, idle.verdict_ms.map(|ms| ms - start));
         assert_eq!(Some(1_500), fresh);
-        assert_eq!(Some(1_250), idle_verdict, "no floor from the idle");
+        assert_eq!(Some(1_150), idle_verdict, "no floor from the idle");
         assert_eq!(idle.at(250), idle.fr.state.lock().streams[&idle.pseudonym].floor);
     }
 
@@ -1426,13 +1438,40 @@ mod tests {
         fr.receipts_at(session, 1, 1, &[7], at(100));
         fr.receipts_at(session, 2, 1, &[], at(200));
         fr.receipts_at(session, 3, 2, &[], at(300));
-        fr.receipts_at(session, 1, 1, &[], at(400));
+        fr.receipts_at(session, 1, 1, &[], at(3_000));
         let state = fr.state.lock();
         let stream = &state.streams[&session];
         assert_eq!(
             (3, at(100), Some(at(0))),
             (stream.last_seq, stream.floor, stream.watermark)
         );
+    }
+
+    /// A copy of a receipt must not let the confirmation mature ahead of the next real receipt, which may answer
+    /// the suspect.
+    #[test]
+    fn a_duplicate_receipt_should_not_run_the_judgement() {
+        let [a, b, exit] = [(); 3].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        fr.receipts_at(session, 1, 1, &[], at(0));
+        for tag in 1..=3 {
+            fr.record_at(session, tag, &[a, exit], at(10));
+        }
+        for (tag, ms) in [(50, 700), (51, 1_300)] {
+            fr.record_at(session, tag, &[b, exit], at(ms));
+        }
+        // A suspect from 1210 ms: three overdue packets through it, none delivered
+        fr.receipts_at(session, 2, 2, &[50], at(1_210));
+        // The copy at 1750 ms would mature the 500 ms confirmation, but tells nothing new
+        fr.receipts_at(session, 2, 2, &[50], at(1_750));
+        assert!(fr.excluded_relayers(&exit).is_empty(), "not judged by a copy");
+        // The next real receipt answers the suspect
+        fr.record_at(session, 60, &[a, exit], at(1_500));
+        fr.receipts_at(session, 3, 3, &[60, 51], at(1_800));
+        assert!(fr.excluded_relayers(&exit).is_empty());
     }
 
     /// The return side keeps its own, longer confirmation.

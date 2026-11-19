@@ -15,6 +15,8 @@ pub(crate) const RECEIPT_MIN_INTERVAL: Duration = Duration::from_millis(250);
 const BURST_QUIET: Duration = Duration::from_secs(1);
 /// How long a burst window stays open.
 const BURST_WINDOW: Duration = Duration::from_secs(1);
+/// The least time between the starts of two windows, so that a trickle of packets does not keep one open.
+const BURST_COOLDOWN: Duration = Duration::from_secs(10);
 /// Packets and time that make a receipt due inside a burst window.
 const BURST_MIN_PACKETS: usize = 10;
 const BURST_MIN_INTERVAL: Duration = Duration::from_millis(100);
@@ -45,6 +47,7 @@ struct State {
     last_note: Option<Instant>,
     /// The end of the burst window: the first receipts after a quiet period are the ones that judge.
     burst_until: Option<Instant>,
+    burst_started: Option<Instant>,
 }
 
 /// Tags of the Session packets received by an Exit, and when to report them.
@@ -68,6 +71,7 @@ impl ExitReceipts {
                 last_sent: now,
                 last_note: None,
                 burst_until: None,
+                burst_started: None,
             }),
         }
     }
@@ -90,20 +94,26 @@ impl ExitReceipts {
 
     fn note_at(&self, tag: u32, now: Instant) {
         let mut state = self.state.lock();
-        // A packet after a quiet period (not a Session's first) opens a burst window
+        // A packet after a quiet period (not a Session's first) opens a burst window, but not within the cooldown of
+        // the last one
         let burst_opened = state
             .last_note
-            .is_some_and(|last| now.saturating_duration_since(last) >= BURST_QUIET);
+            .is_some_and(|last| now.saturating_duration_since(last) >= BURST_QUIET)
+            && state
+                .burst_started
+                .is_none_or(|started| now.saturating_duration_since(started) >= BURST_COOLDOWN);
         if burst_opened {
             state.burst_until = Some(now + BURST_WINDOW);
+            state.burst_started = Some(now);
         }
         state.last_note = Some(now);
-        if state.current.len() >= INTERVAL_TAGS {
+        let full = state.current.len() >= INTERVAL_TAGS;
+        if full {
             state.overflowed = true;
-            return;
+        } else {
+            state.current.push(tag);
         }
-        state.current.push(tag);
-        let wake = state.current.len() == WAKE_TAGS || burst_opened;
+        let wake = burst_opened || (!full && state.current.len() == WAKE_TAGS);
         drop(state);
         if wake {
             // A full channel already holds a wake-up
@@ -288,19 +298,19 @@ mod tests {
     fn a_receipt_should_be_due_at_10_packets_and_100_ms_inside_a_burst_window_only() -> anyhow::Result<()> {
         let t0 = Instant::now();
         let start = t0 + Duration::from_secs(2);
-        let receipts = receipts_at(start);
-        receipts.note_at(0, t0);
-        for tag in 1..=10 {
-            receipts.note_at(tag, start);
+        // The first packet (tag 0) opens no window; the others do, and make 9 or 10 in all
+        for (others, due) in [(8, false), (9, true)] {
+            let receipts = receipts_at(start);
+            receipts.note_at(0, t0);
+            for tag in 1..=others {
+                receipts.note_at(tag, start);
+            }
+            assert!(
+                receipts.take_due(start + Duration::from_millis(99)).is_none(),
+                "too early"
+            );
+            assert_eq!(due, receipts.take_due(start + Duration::from_millis(100)).is_some());
         }
-        assert!(
-            receipts.take_due(start + Duration::from_millis(99)).is_none(),
-            "too early"
-        );
-        let receipt = receipts
-            .take_due(start + Duration::from_millis(100))
-            .context("due in the window")?;
-        assert_eq!(11, receipt.tags.len());
 
         // Without a window the 50 packets and 250 ms apply
         let receipts = receipts_at(start);
@@ -319,6 +329,34 @@ mod tests {
             "too early"
         );
         assert!(receipts.take_due(start + Duration::from_millis(250)).is_some());
+        Ok(())
+    }
+
+    /// A packet per 1.1 s opens one window per 10 s, not one per packet.
+    #[test]
+    fn a_trickle_should_open_at_most_one_window_per_cooldown() {
+        let t0 = Instant::now();
+        let receipts = receipts_at(t0);
+        let mut windows = 0;
+        for i in 0..30 {
+            let now = t0 + Duration::from_millis(1_100 * i);
+            receipts.note_at(i as u32, now);
+            windows += usize::from(receipts.burst_open_at(now));
+        }
+        assert_eq!(3, windows, "30 packets over 33 s");
+    }
+
+    #[test]
+    fn a_window_should_wake_the_sender_even_into_a_full_interval() -> anyhow::Result<()> {
+        let t0 = Instant::now();
+        let receipts = receipts_at(t0);
+        let mut woken = receipts.take_wake().context("wake")?;
+        for tag in 0..INTERVAL_TAGS as u32 {
+            receipts.note_at(tag, t0);
+        }
+        while woken.try_recv().is_ok() {}
+        receipts.note_at(0, t0 + Duration::from_secs(2));
+        assert!(woken.try_recv().is_ok(), "a window opens into a full interval");
         Ok(())
     }
 
