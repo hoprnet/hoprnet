@@ -24,10 +24,12 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     /// blinds the alpha away to the identity, which no hop may continue with, so the transform rejects
     /// it explicitly.
     ///
-    /// This cannot arise from the Curve25519 suites' clamping parser: the clamped value is taken from
-    /// the low 255 bits with its bottom three cleared, and reduction modulo the prime order cannot
-    /// carry it to zero, since the largest such value is below `2^255` and the smallest nonzero
-    /// multiple of the order that could be reached is `8L > 2^255`.
+    /// This cannot arise from the Curve25519 suites' clamping parser. Clamping sets bit 254 and
+    /// clears bit 255 and the three lowest bits, so the clamped integer is a *positive* multiple of
+    /// eight below `2^255` - positive even for an all-zero input, which clamps to exactly `2^254`.
+    /// The subgroup order `L` is odd, so the smallest positive multiple of it that is divisible by
+    /// eight is `8L > 2^255`; reducing a value in `[2^254, 2^255)` modulo `L` therefore yields a
+    /// nonzero scalar.
     fn is_zero(&self) -> bool;
 }
 
