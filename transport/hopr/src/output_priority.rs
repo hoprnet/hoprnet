@@ -712,6 +712,11 @@ mod tests {
         for (share, expected) in [(0.1, 9), (0.2, 4), (0.25, 3), (0.5, 1)] {
             assert_eq!(expected, max_session_run(share), "share {share}");
         }
+        // Shares whose run is not a whole number floor down, so the probe lane keeps more than its
+        // share: 0.3 gives 2.33, and the run is 2.
+        for (share, expected) in [(0.3, 2), (0.35, 1), (0.4, 1)] {
+            assert_eq!(expected, max_session_run(share), "share {share}");
+        }
         assert_eq!(
             usize::MAX,
             max_session_run(0.0),
