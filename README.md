@@ -2,8 +2,10 @@
 
 Paired measurements for base `ff0076efaa` vs head `be3078a607`.
 
-- `raw_samples.tar.gz` — 96 `sample.json` files, one per harness/group/pass, holding the
+- `raw_samples.tar.gz` — 48 `sample.json` files, one per harness/group/pass, holding the
   individual per-sample times (`times`) and iteration counts (`iters`) Criterion recorded.
+  (Criterion writes the same file under both `base/` and `new/`; only `new/` is included, so
+  the 48 records are 48 distinct files, not 96 with 48 byte-identical copies.)
   Layout: `rawsamples/<harness>_<side>_<pass>/<group>.json`.
 - `estimates.json` — the `mean.point_estimate` (µs) from each run's `estimates.json`.
 - `sample_counts.json` — number of samples actually collected per group. The `packet_bench`
