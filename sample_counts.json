@@ -1,0 +1,66 @@
+{
+ "codec_base_1": {
+  "hopr_decoder/ack_recipient": 20,
+  "hopr_decoder/recipient": 20,
+  "hopr_decoder/relay": 20,
+  "hopr_decoder/relay_replay": 20,
+  "hopr_encoder/3hop_2surbs_2442b": 20,
+  "hopr_encoder/ack_batch_10": 20
+ },
+ "codec_base_2": {
+  "hopr_decoder/ack_recipient": 20,
+  "hopr_decoder/recipient": 20,
+  "hopr_decoder/relay": 20,
+  "hopr_decoder/relay_replay": 20,
+  "hopr_encoder/3hop_2surbs_2442b": 20,
+  "hopr_encoder/ack_batch_10": 20
+ },
+ "codec_head_1": {
+  "hopr_decoder/ack_recipient": 20,
+  "hopr_decoder/recipient": 20,
+  "hopr_decoder/relay": 20,
+  "hopr_decoder/relay_replay": 20,
+  "hopr_encoder/3hop_2surbs_2442b": 20,
+  "hopr_encoder/ack_batch_10": 20
+ },
+ "codec_head_2": {
+  "hopr_decoder/ack_recipient": 20,
+  "hopr_decoder/recipient": 20,
+  "hopr_decoder/relay": 20,
+  "hopr_decoder/relay_replay": 20,
+  "hopr_encoder/3hop_2surbs_2442b": 20,
+  "hopr_encoder/ack_batch_10": 20
+ },
+ "pkt_base_1": {
+  "packet_forwarding/any_hop": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_off": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_on": 100000,
+  "packet_receiving/any_hop": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 100000
+ },
+ "pkt_base_2": {
+  "packet_forwarding/any_hop": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_off": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_on": 100000,
+  "packet_receiving/any_hop": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 100000
+ },
+ "pkt_head_1": {
+  "packet_forwarding/any_hop": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_off": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_on": 100000,
+  "packet_receiving/any_hop": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 100000
+ },
+ "pkt_head_2": {
+  "packet_forwarding/any_hop": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_off": 100000,
+  "packet_precompute/3_hop_2_surbs_pix_on": 100000,
+  "packet_receiving/any_hop": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 100000,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 100000
+ }
+}

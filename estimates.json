@@ -1,0 +1,66 @@
+{
+ "codec_base_1": {
+  "hopr_decoder/ack_recipient": 148.53559947946192,
+  "hopr_decoder/recipient": 148.0353843758837,
+  "hopr_decoder/relay": 211.09794380144464,
+  "hopr_decoder/relay_replay": 45.53367803433599,
+  "hopr_encoder/3hop_2surbs_2442b": 802.601433319771,
+  "hopr_encoder/ack_batch_10": 68.2526216232766
+ },
+ "codec_base_2": {
+  "hopr_decoder/ack_recipient": 160.3205298910787,
+  "hopr_decoder/recipient": 149.22229507067166,
+  "hopr_decoder/relay": 210.25694124503335,
+  "hopr_decoder/relay_replay": 46.059119968736866,
+  "hopr_encoder/3hop_2surbs_2442b": 813.1634281849637,
+  "hopr_encoder/ack_batch_10": 68.34435067967992
+ },
+ "codec_head_1": {
+  "hopr_decoder/ack_recipient": 125.35033083147684,
+  "hopr_decoder/recipient": 125.56980337508926,
+  "hopr_decoder/relay": 208.77239341637116,
+  "hopr_decoder/relay_replay": 24.458680032748624,
+  "hopr_encoder/3hop_2surbs_2442b": 696.1651508195147,
+  "hopr_encoder/ack_batch_10": 67.74861976024562
+ },
+ "codec_head_2": {
+  "hopr_decoder/ack_recipient": 126.38842153041547,
+  "hopr_decoder/recipient": 126.57391848361046,
+  "hopr_decoder/relay": 209.97569449859918,
+  "hopr_decoder/relay_replay": 24.47491298762555,
+  "hopr_encoder/3hop_2surbs_2442b": 713.5877114567779,
+  "hopr_encoder/ack_batch_10": 68.59764161424508
+ },
+ "pkt_base_1": {
+  "packet_forwarding/any_hop": 77.38278944999999,
+  "packet_precompute/3_hop_2_surbs_pix_off": 802.21568551,
+  "packet_precompute/3_hop_2_surbs_pix_on": 809.15484534,
+  "packet_receiving/any_hop": 58.53019848500041,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 840.2369489700001,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 850.8134249
+ },
+ "pkt_base_2": {
+  "packet_forwarding/any_hop": 77.220255305,
+  "packet_precompute/3_hop_2_surbs_pix_off": 802.89522175,
+  "packet_precompute/3_hop_2_surbs_pix_on": 802.97762171,
+  "packet_receiving/any_hop": 58.66708071166678,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 839.1628941600001,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 844.9498300299999
+ },
+ "pkt_head_1": {
+  "packet_forwarding/any_hop": 75.5962004625,
+  "packet_precompute/3_hop_2_surbs_pix_off": 692.6650304799999,
+  "packet_precompute/3_hop_2_surbs_pix_on": 701.04359594,
+  "packet_receiving/any_hop": 37.355417823332964,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 729.39881801,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 737.23661266
+ },
+ "pkt_head_2": {
+  "packet_forwarding/any_hop": 76.24533632250001,
+  "packet_precompute/3_hop_2_surbs_pix_off": 694.92693987,
+  "packet_precompute/3_hop_2_surbs_pix_on": 703.57668484,
+  "packet_receiving/any_hop": 37.45624416625,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_off": 732.08714063,
+  "packet_sending_no_precomputation/3_hop_2_surbs_pix_on": 738.05973241
+ }
+}
