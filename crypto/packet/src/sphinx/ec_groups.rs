@@ -194,10 +194,12 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
     }
 
     fn is_valid(&self) -> bool {
-        // The scalar is clamped (a multiple of the co-factor 8), so `generate` cannot produce a
-        // small-order point - but `is_valid` is also called on points that come in from the wire, in
-        // particular the packet's alpha before it is multiplied. A sender controls that byte string,
-        // so the check must be on the point.
+        // `generate` multiplies the prime-order basepoint, so a nonzero scalar produces a point of
+        // prime order. (Not because the parser leaves a multiple of eight: it clears the low bits and
+        // then reduces modulo the prime order, which can change them. The guaranteed-subgroup
+        // property comes from the basepoint, not from the scalar's low bits.) A wire alpha comes from
+        // `from_alpha` instead, so it needs its own validation - and a sender controls those bytes,
+        // which is why the check has to be on the point.
         //
         // `is_small_order` rather than `is_torsion_free`: the latter multiplies by the group order
         // (a full scalar multiplication, measurable on the per-packet path), while the only inputs
@@ -453,7 +455,7 @@ mod montgomery_is_valid {
                 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
             ],
-            // y = 0 with the sign bit set: the eighth point, distinct from the `y = 0` entry above.
+            // The two signs at y = 0 are the order-four pair; they project to one Montgomery coordinate.
             [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,

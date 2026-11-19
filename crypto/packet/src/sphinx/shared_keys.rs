@@ -24,9 +24,10 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     /// blinds the alpha away to the identity, which no hop may continue with, so the transform rejects
     /// it explicitly.
     ///
-    /// This cannot arise from the Curve25519 suites' clamping parser: a clamped value is a positive
-    /// multiple of eight below `2^255`, while eight times the subgroup order already exceeds `2^255`,
-    /// so no clamped byte string reduces to zero modulo the group order.
+    /// This cannot arise from the Curve25519 suites' clamping parser: the clamped value is taken from
+    /// the low 255 bits with its bottom three cleared, and reduction modulo the prime order cannot
+    /// carry it to zero, since the largest such value is below `2^255` and the smallest nonzero
+    /// multiple of the order that could be reached is `8L > 2^255`.
     fn is_zero(&self) -> bool;
 }
 
@@ -797,15 +798,20 @@ pub(crate) mod tests {
                 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
             ],
-            // y = 0 with sign bit 0: the other representative of the order-2 class.
+            // The two signs at y = 0 are the order-four pair; they project to one Montgomery coordinate.
             [0x00; 32],
         ];
 
         let mut coords = std::collections::BTreeSet::new();
+        let mut edwards_points = std::collections::BTreeSet::new();
         for (idx, bytes) in EDWARDS_TORSION.into_iter().enumerate() {
             let edwards = Curve25519CompressedPoint(bytes)
                 .decompress()
                 .with_context(|| format!("torsion fixture {idx} must decompress"))?;
+            // Count the decompressed points, not just the projected coordinates: the four-`u` check
+            // below cannot see a duplicated Edwards entry that projects onto a coordinate the table
+            // already has, which is how an earlier version of this fixture silently held seven.
+            edwards_points.insert(edwards.compress().0);
             let montgomery = edwards.to_montgomery();
             coords.insert(montgomery.0);
 
@@ -819,6 +825,11 @@ pub(crate) mod tests {
                 "small-order Montgomery alpha from fixture {idx} must be rejected by the transform"
             );
         }
+        assert_eq!(
+            edwards_points.len(),
+            8,
+            "the fixture must be eight distinct Edwards torsion points"
+        );
         assert_eq!(
             coords.len(),
             4,
