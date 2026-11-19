@@ -3,3 +3,4 @@ source: transport/hopr/src/output_priority.rs
 expression: "OutputPriorityConfig::default()"
 ---
 probe_share: 0.1
+probe_lane_capacity: 16

@@ -1251,7 +1251,10 @@ mod tests {
         assert!(HoprProtocolConfig::default().validate().is_ok());
 
         let rejected = HoprProtocolConfig {
-            output_priority: crate::output_priority::OutputPriorityConfig { probe_share: 1.1 },
+            output_priority: crate::output_priority::OutputPriorityConfig {
+                probe_share: 1.1,
+                ..Default::default()
+            },
             ..Default::default()
         };
         assert!(
@@ -1260,7 +1263,10 @@ mod tests {
         );
 
         let accepted = HoprProtocolConfig {
-            output_priority: crate::output_priority::OutputPriorityConfig { probe_share: 0.0 },
+            output_priority: crate::output_priority::OutputPriorityConfig {
+                probe_share: 0.0,
+                ..Default::default()
+            },
             ..Default::default()
         };
         assert!(accepted.validate().is_ok());

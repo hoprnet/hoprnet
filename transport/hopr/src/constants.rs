@@ -12,8 +12,8 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// machines with up to ~36 cores. Safe formula: `≤ 7 × available_parallelism()`.
 pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 
-/// Maximum number of probes buffered in the probe lane before the probe emitter observes
-/// backpressure.
+/// Default number of probes buffered in the probe lane before the probe emitter observes
+/// backpressure. Operators set `output_priority.probe_lane_capacity` to change it.
 ///
 /// The lane is small on purpose. `continuously_scan` records a probe in its timeout cache only once
 /// the send returns, so whatever a probe waits in this lane is already inside its 3 s timeout. A lane
@@ -47,9 +47,10 @@ mod tests {
         );
     }
 
-    /// Guard against growing the probe lane. `continuously_scan` starts a probe's timeout before the
-    /// probe waits in this lane, so every queued slot is timeout budget a probe spends not being sent.
-    /// The lane stays small enough that the back-pressure, not the buffer, paces the emitter.
+    /// Guard against growing the default probe lane. `continuously_scan` starts a probe's timeout
+    /// before the probe waits in this lane, so every queued slot is timeout budget a probe spends not
+    /// being sent. The lane stays small enough that the back-pressure, not the buffer, paces the
+    /// emitter, and `output_priority.probe_lane_capacity` accepts no larger value.
     #[allow(clippy::assertions_on_constants)]
     #[test]
     fn probe_lane_stays_small_enough_to_keep_the_probe_timeout_honest() {

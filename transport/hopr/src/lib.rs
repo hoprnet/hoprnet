@@ -47,7 +47,7 @@ use std::{
     time::Duration,
 };
 
-use constants::{MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE};
+use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender};
 use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
@@ -843,7 +843,7 @@ where
         // endpoints, because the scheduler needs no accounting of its own for the gauge.
         let (probe_msg_tx, probe_msg_rx) = bounded_sink_channel::<
             trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
-        >(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE);
+        >(self.cfg.output_priority.probe_lane_capacity);
         let probe_lane_depth = output_priority::LaneDepth::default();
         let probe_msg_tx = output_priority::DepthSink::new(
             trace_context::ContextSender::new(probe_msg_tx),

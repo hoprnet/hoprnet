@@ -48,10 +48,16 @@ lazy_static::lazy_static! {
         .unwrap();
 }
 
+/// Largest probe lane the configuration accepts.
+///
+/// The lane size is timeout budget: every probe a full lane holds counts against a timeout that has
+/// already started, so the ceiling keeps the bound this mechanism was introduced for.
+pub const MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY: usize = 32;
+
 /// Scheduling configuration for the outgoing traffic classes.
 ///
 /// The class order is fixed and not configurable: session data (pongs included), then probes, then
-/// noise. Only the probe share is configurable.
+/// noise. The probe share and the probe lane capacity are configurable.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
 #[cfg_attr(
     feature = "serde",
@@ -71,6 +77,23 @@ pub struct OutputPriorityConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_probe_share"))]
     pub probe_share: f64,
+
+    /// Probes the probe lane may queue before the probe emitter observes backpressure.
+    ///
+    /// The lane is small on purpose. `continuously_scan` records a probe in its timeout cache only
+    /// once the send returns, so whatever a probe waits in this lane is already inside its timeout:
+    /// every slot is budget a probe spends not being sent. A small lane keeps that wait short and
+    /// holds the emitter back instead, while the scheduler applies the share.
+    ///
+    /// Defaults to `MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE`, which is 16.
+    /// Valid values are in `1..=MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY`.
+    #[default(default_probe_lane_capacity())]
+    #[validate(range(min = 1, max = MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY))]
+    pub probe_lane_capacity: usize,
+}
+
+fn default_probe_lane_capacity() -> usize {
+    crate::constants::MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE
 }
 
 /// Rejects a probe share outside `0.0..=0.5`, and the non-finite values that would otherwise pass a
@@ -733,12 +756,54 @@ mod tests {
         assert!(default.validate().is_ok(), "the default must be valid");
 
         for share in [0.0, 0.1, 0.5] {
-            let cfg = OutputPriorityConfig { probe_share: share };
+            let cfg = OutputPriorityConfig {
+                probe_share: share,
+                ..Default::default()
+            };
             assert!(cfg.validate().is_ok(), "a share of {share} must be accepted");
         }
         for share in [-0.1, 0.51, 1.0, 1.1, f64::NAN, f64::INFINITY] {
-            let cfg = OutputPriorityConfig { probe_share: share };
+            let cfg = OutputPriorityConfig {
+                probe_share: share,
+                ..Default::default()
+            };
             assert!(cfg.validate().is_err(), "a share of {share} must be rejected");
+        }
+    }
+
+    /// The probe lane capacity defaults to the constant and cannot grow past the ceiling that keeps
+    /// the probe timeout honest.
+    #[test]
+    fn probe_lane_capacity_defaults_to_the_constant_and_has_a_ceiling() {
+        let default = OutputPriorityConfig::default();
+        assert_eq!(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE, default.probe_lane_capacity);
+        assert!(default.validate().is_ok(), "the default must be valid");
+
+        for capacity in [
+            1,
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE,
+            MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY,
+        ] {
+            let cfg = OutputPriorityConfig {
+                probe_lane_capacity: capacity,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_ok(), "a lane of {capacity} must be accepted");
+        }
+        for capacity in [0, MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY + 1] {
+            let cfg = OutputPriorityConfig {
+                probe_lane_capacity: capacity,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "a lane of {capacity} must be rejected");
+        }
+        // Constant by construction, and that is what the guard is for.
+        #[allow(clippy::assertions_on_constants)]
+        {
+            assert!(
+                MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE <= MAXIMUM_CONFIGURED_PROBE_LANE_CAPACITY,
+                "the default must fit inside the accepted range"
+            );
         }
     }
 
