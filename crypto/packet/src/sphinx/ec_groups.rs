@@ -208,16 +208,13 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         // This deliberately still admits *mixed-order* alphas (`P = Q + T` with `Q` of prime order and
         // `T` one of the eight torsion points), which `is_torsion_free` would exclude. That is the
         // intended input policy, not an oversight:
-        // - secrecy is preserved. What secrecy needs is a bound on how many candidate alphas a fixed peer's shared
-        //   point can stand for. `alpha * sk = sk*Q + sk*T`, so `Q + T` and `Q + T'` give the same shared point exactly
-        //   when `sk*(T - T') = O`; the torsion points plus `O` form the order-8 group and `sk*(T - T')` stays in it,
-        //   so that happens only when `sk` is a multiple of `T - T'`'s order. Measured over 40 random keys, the eight
-        //   torsion variants of one alpha gave 8 distinct shared points for 20 keys, 4 for 9 and 2 for 11 - never 1.
-        //   That is consistent with the clamp, which clears bits 0-1 of the seed but leaves bit 2 free, so `sk mod 8`
-        //   is 0 or 4. The hop secret is therefore exposed by a small fixed set of candidate alphas per peer - the same
-        //   small-public-set property the identity class already has - rather than collapsing to one value regardless
-        //   of the key. (Counting distinct outputs *across* random keys, as an earlier draft did, does not show this:
-        //   those outputs differ in their prime-order parts, which a single peer's knowledge does not depend on.)
+        // - the accept set is a compatibility decision, not a security one. `alpha * sk = sk*Q + sk*T`, so two torsion
+        //   variants `Q + T` and `Q + T'` give the same shared point exactly when `sk*(T - T') = O`, which happens when
+        //   `sk` is a multiple of `T - T'`'s order. Measured over 40 random keys, the eight torsion variants of one
+        //   alpha gave 8 distinct shared points for 20 keys, 4 for 9 and 2 for 11 - never 1. That describes which input
+        //   variants coincide for a given key; it is not a secrecy claim, and it does not show what a peer can compute.
+        //   (Counting distinct outputs *across* random keys, as an earlier draft did, shows even less: those differ in
+        //   their prime-order parts, which a single peer's knowledge does not depend on.)
         // - rejecting them would change the wire format: a peer that sends a mixed-order alpha (this implementation
         //   never does, it derives alphas from the basepoint) would go from accepted to rejected on upgrade.
         // Enforcing prime-order membership would instead cost the variable-base multiply the deferral
@@ -456,17 +453,23 @@ mod montgomery_is_valid {
                 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
             ],
+            // y = 0 with the sign bit set: the eighth point, distinct from the `y = 0` entry above.
             [
-                0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
             ],
         ];
         let mut projected = std::collections::BTreeSet::new();
+        let mut edwards_points = std::collections::BTreeSet::new();
         for (i, bytes) in edwards_torsion.into_iter().enumerate() {
             let edwards = Curve25519CompressedPoint(bytes)
                 .decompress()
                 .unwrap_or_else(|| panic!("torsion fixture {i} must decompress"));
             assert!(edwards.is_small_order(), "fixture {i} must be small order");
+            // Track the decompressed points, not only the projected `u` values: two torsion entries
+            // can project onto the same coordinate *and* be the same point (a duplicated identity),
+            // which the count of four below cannot tell apart. This check caught exactly that.
+            edwards_points.insert(edwards.compress().0);
             let montgomery = edwards.to_montgomery();
             projected.insert(montgomery.0);
             assert!(
@@ -474,9 +477,12 @@ mod montgomery_is_valid {
                 "projected torsion point {i} passed the Montgomery is_valid"
             );
         }
-        // The eight Edwards torsion points project onto four distinct `u` values, because `u` has no
-        // sign: P and -P collapse. Asserting the count keeps a broken fixture from silently shrinking
-        // the set.
+        assert_eq!(
+            edwards_points.len(),
+            8,
+            "the fixture must be eight distinct Edwards torsion points"
+        );
+        // They project onto four distinct `u` values, because `u` has no sign: P and -P collapse.
         assert_eq!(
             projected.len(),
             4,
