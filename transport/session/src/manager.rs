@@ -63,7 +63,7 @@ use crate::{
         ExitControlKind, ExitControlOutcome, ExitSessionKind, MIN_REFUSAL_REPLY_REFILL_PERIOD, RefusalReplyBucket,
         RefusalReplyBudget, record_exit_control,
     },
-    exit_receipts::{ExitReceipts, Receipt},
+    exit_receipts::{BURST_POLL, ExitReceipts, Receipt},
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
@@ -6531,9 +6531,15 @@ where
 
         let handle = hopr_utils::spawn_as_abortable!(async move {
             loop {
-                // Also when an interval fills up, so that a fast Session does not overflow it
+                // Also when an interval fills up, so that a fast Session does not overflow it, or a burst window
+                // opens; and faster while it is open
+                let poll = if receipts.burst_open_at(Instant::now()) {
+                    BURST_POLL
+                } else {
+                    FORWARD_RECEIPT_POLL
+                };
                 futures::select! {
-                    _ = futures::FutureExt::fuse(hopr_utils::runtime::prelude::sleep(FORWARD_RECEIPT_POLL)) => {}
+                    _ = futures::FutureExt::fuse(hopr_utils::runtime::prelude::sleep(poll)) => {}
                     _ = futures::StreamExt::next(&mut woken) => {}
                 }
                 if !balancer.counterparty_refills()
@@ -6546,18 +6552,23 @@ where
                     continue;
                 };
                 let count = tags.len();
-                let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
-                    session_id,
-                    seq,
-                    first_seq,
-                    tags,
-                });
-                match send_via_msg_sender(&mut sender, routing.clone(), msg, "forward receipts").await {
-                    Ok(()) => {
-                        FORWARD_RECEIPTS_SENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        debug!(%session_id, seq, first_seq, tags = count, "forward receipts sent");
+                // Two copies inside a burst window, where the receipts are the ones that judge and the paths are
+                // not yet known to be good
+                let copies = if receipts.burst_open_at(Instant::now()) { 2 } else { 1 };
+                for _ in 0..copies {
+                    let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                        session_id,
+                        seq,
+                        first_seq,
+                        tags: tags.clone(),
+                    });
+                    match send_via_msg_sender(&mut sender, routing.clone(), msg, "forward receipts").await {
+                        Ok(()) => {
+                            FORWARD_RECEIPTS_SENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            debug!(%session_id, seq, first_seq, tags = count, "forward receipts sent");
+                        }
+                        Err(error) => debug!(%session_id, %error, "failed to send forward receipts"),
                     }
-                    Err(error) => debug!(%session_id, %error, "failed to send forward receipts"),
                 }
             }
         });
@@ -29053,6 +29064,35 @@ mod tests {
         anyhow::ensure!(receipts.len() >= 3, "{} receipts", receipts.len());
         let seqs: Vec<u32> = receipts.iter().map(|(seq, ..)| *seq).collect();
         assert_eq!((1..=seqs.len() as u32).collect::<Vec<_>>(), seqs, "no overflow jump");
+        Ok(())
+    }
+
+    /// A receipt is sent twice while a burst window is open, and once otherwise; every copy is counted.
+    #[test_log::test(tokio::test)]
+    async fn a_receipt_should_be_sent_twice_inside_a_burst_window_and_once_outside() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000_000).await?;
+        let estimator = mgr.sessions.get(&pseudonym).context("slot")?.surb_estimator.clone();
+        let consumed = estimator.consumed.load(Relaxed);
+
+        // The first packet opens no window; after a quiet second the next ones do
+        deliver_tagged_data(&mgr, pseudonym, 0, 1)?;
+        tokio::time::sleep(Duration::from_millis(1_100)).await;
+        deliver_tagged_data(&mgr, pseudonym, 1, 10)?;
+        let inside = receipts_during(&mut rx, pseudonym, Duration::from_millis(400)).await;
+        assert_eq!(vec![1, 1], inside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
+
+        // Past the window (1 s after it opened; a packet every 0.4 s keeps it from reopening) one copy
+        for tag in [11, 12] {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            deliver_tagged_data(&mgr, pseudonym, tag, 1)?;
+        }
+        deliver_tagged_data(&mgr, pseudonym, 13, 60)?;
+        let outside = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
+        assert_eq!(vec![2], outside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
+
+        assert_eq!(consumed + 3, estimator.consumed.load(Relaxed), "every copy is counted");
         Ok(())
     }
 

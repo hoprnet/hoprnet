@@ -3,7 +3,7 @@
 //! Each Session packet sent over a forward path is recorded with its secret-derived tag. A receipt lists the tags
 //! that reached the Exit; a packet still unreceipted once later packets of the same Session are (`FORWARD_GRACE`)
 //! is overdue, and counts against the relayers on its path that nothing has been delivered through since. A relayer
-//! that the overdue packets point at, after `explain_away` and `VERDICT_CONFIRMATION`, is excluded from the forward
+//! that the overdue packets point at, after `explain_away` and `FORWARD_CONFIRMATION`, is excluded from the forward
 //! draws to that Exit until the verdict is lifted. Everything is judged within one pseudonym, so a Session's receipts
 //! never judge another Session's packets.
 
@@ -20,7 +20,7 @@ use hopr_api::types::{
 use hopr_transport_session::ForwardReceiptSink;
 use parking_lot::{Mutex, RwLock};
 
-use super::surb_telemetry::{MIN_RACES, Suspect, VERDICT_CONFIRMATION, explain_away};
+use super::surb_telemetry::{MIN_RACES, Suspect, explain_away};
 
 /// The most packets recorded at once; the oldest is evicted first.
 const MAX_RECORDS: usize = 16_384;
@@ -32,8 +32,15 @@ const FORWARD_GRACE: Duration = Duration::from_millis(500);
 const FORWARD_VERDICT_TTL: Duration = Duration::from_secs(30);
 /// The most relayers excluded for one Exit at once, which bounds how far a lying Exit can steer.
 const MAX_FORWARD_VERDICTS_PER_EXIT: usize = 2;
-/// How long a stream or a delivery is kept without news.
+/// How long a suspect stands as a black hole before it is judged.
+const FORWARD_CONFIRMATION: Duration = Duration::from_millis(500);
+/// How long a delivery is kept without news.
 const STATE_TTL: Duration = Duration::from_secs(60);
+/// How long a receipt stream is kept without news: longer than a Session's idle timeout, so that the first receipt
+/// after an idle continues it.
+const STREAM_TTL: Duration = Duration::from_secs(600);
+/// How old a stream must be to be reset by a reused pseudonym: a copy of an early receipt is no new Session.
+const RESET_AFTER: Duration = Duration::from_secs(2);
 /// The most receipts one receipt is held to have skipped over; a larger gap is a loss.
 const MAX_MISSING: u32 = 16;
 /// The highest `seq` a new Session sends first (see the Exit's overflow jump).
@@ -62,6 +69,8 @@ struct Stream {
     /// The latest send time among the packets receipted.
     watermark: Option<Instant>,
     seen: Instant,
+    /// When the stream began.
+    started: Instant,
     /// Receipts skipped over, and since when; they may only be late, so nothing is judged while they are awaited.
     missing: Vec<(u32, Instant)>,
 }
@@ -88,7 +97,7 @@ struct State {
     verdicts: HashMap<(Key, Key), Instant>,
     /// When each verdict was last lifted; a relapse within the TTL is judged without the wait.
     lifted: HashMap<(Key, Key), Instant>,
-    /// The relayers that are black holes but have not yet stood for `VERDICT_CONFIRMATION`.
+    /// The relayers that are black holes but have not yet stood for `FORWARD_CONFIRMATION`.
     suspected: HashMap<(Key, Key), Suspicion>,
     /// Whether the verdicts changed since they were last published.
     changed: bool,
@@ -159,10 +168,12 @@ impl ForwardReceipts {
 
         let mut gap = 0;
         match state.streams.get_mut(&pseudonym) {
-            // The pseudonym was reused: a new Session numbers from 1, or a little above it
+            // The pseudonym was reused: a new Session numbers from 1, or a little above it. Not a copy of an early
+            // receipt that arrives late, though.
             Some(stream)
-                if (seq == 1 && stream.last_seq > 1)
-                    || (seq <= NEW_SESSION_SEQ_MAX && seq.saturating_add(2) < stream.last_seq) =>
+                if now.saturating_duration_since(stream.started) > RESET_AFTER
+                    && ((seq == 1 && stream.last_seq > 1)
+                        || (seq <= NEW_SESSION_SEQ_MAX && seq.saturating_add(2) < stream.last_seq)) =>
             {
                 *stream = Stream::new(seq, now);
             }
@@ -275,7 +286,7 @@ impl ForwardReceipts {
         state.prune_order(now);
         state
             .streams
-            .retain(|_, stream| now.saturating_duration_since(stream.seen) <= STATE_TTL);
+            .retain(|_, stream| now.saturating_duration_since(stream.seen) <= STREAM_TTL);
         state
             .delivered
             .retain(|_, at| now.saturating_duration_since(*at) <= STATE_TTL);
@@ -296,6 +307,7 @@ impl Stream {
             floor: now,
             watermark: None,
             seen: now,
+            started: now,
             missing: Vec::new(),
         }
     }
@@ -451,7 +463,7 @@ impl State {
                 .lifted
                 .get(key)
                 .is_some_and(|at| now.saturating_duration_since(*at) < FORWARD_VERDICT_TTL);
-            if !relapse && now.saturating_duration_since(suspicion.since) < VERDICT_CONFIRMATION {
+            if !relapse && now.saturating_duration_since(suspicion.since) < FORWARD_CONFIRMATION {
                 continue;
             }
             if self.verdicts.keys().filter(|(exit, _)| *exit == key.0).count() >= MAX_FORWARD_VERDICTS_PER_EXIT {
@@ -743,9 +755,9 @@ mod tests {
         })?;
 
         assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
-        // The first receipt that finds it a black hole is at 1000 ms: it stands 900 ms after that.
+        // The first receipt that finds it a black hole is at 1000 ms: it stands 500 ms after that.
         let verdict = sim.verdict_ms.context("judged")?;
-        assert!((1_900..=2_250).contains(&verdict), "judged at {verdict} ms");
+        assert_eq!(1_500, verdict, "judged after 500 ms of standing, not before");
         let judged: Vec<_> = lines
             .iter()
             .filter(|line| line.contains("relayer judged dead"))
@@ -797,28 +809,28 @@ mod tests {
             (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
         };
         let (expected, _) = verdict_with(0);
-        for lost in [3, 5, 6] {
+        for lost in [3, 5, 7] {
             assert_eq!((expected, vec![a]), verdict_with(lost), "receipt {lost} lost");
         }
     }
 
     /// More than one receipt lost, or an overflow at the Exit, make the evidence before them void: only the
-    /// packets sent after it can judge, which takes until after 2.5 s here, against 2 s without the jump.
+    /// packets sent after it can judge, which takes until after 2 s here, against 1.5 s without the jump.
     #[test]
     fn a_larger_gap_or_an_overflow_should_judge_nobody() {
         let [a, b, c] = [(); 3].map(|_| key());
-        let judge_at_2500 = |jump: u32| {
+        let judge_at_2000 = |jump: u32| {
             let mut sim = Sim::new();
             let route = rotate(vec![vec![a], vec![b], vec![c]]);
             let fate = |path: &[Key]| if path.contains(&a) { None } else { FAST };
             sim.run(0, 1_000, &route, fate, lose_nothing);
             sim.receipt(1_000, jump);
-            sim.run(1_010, 2_500, &route, fate, lose_nothing);
+            sim.run(1_010, 2_000, &route, fate, lose_nothing);
             sim.fr.excluded_relayers(&sim.exit)
         };
-        assert_eq!(vec![a], judge_at_2500(0), "the control run judges");
+        assert_eq!(vec![a], judge_at_2000(0), "the control run judges");
         for jump in [3, 5] {
-            assert!(judge_at_2500(jump).is_empty(), "jump {jump}");
+            assert!(judge_at_2000(jump).is_empty(), "jump {jump}");
         }
     }
 
@@ -1051,14 +1063,16 @@ mod tests {
             );
             (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
         };
-        let in_order = verdict(vec![], 2);
-        assert!(in_order.0.is_some());
-        assert_eq!(in_order, verdict(vec![(5, 600), (6, 300)], 2));
+        // The receipts that carry the verdict (6 at 1.5 s) arrive late or are overtaken: judged a receipt later, not
+        // floored (which would take until after 2.2 s)
+        let (in_order, _) = verdict(vec![], 2);
+        assert_eq!(Some(1_500), in_order);
+        let (reordered, excluded) = verdict(vec![(5, 600), (6, 300)], 2);
+        assert_eq!((Some(1_800), vec![a]), (reordered, excluded));
 
         // Receipts that arrive long after the grace are still covered by the one that overtook them
-        let stalled = verdict(vec![], 3);
-        assert_eq!((Some(2_000), vec![a]), stalled);
-        assert_eq!(stalled, verdict(vec![(5, 2_000), (6, 2_000)], 3));
+        let (stalled, excluded) = verdict(vec![(5, 2_000), (6, 2_000)], 3);
+        assert_eq!((Some(1_750), vec![a]), (stalled, excluded));
     }
 
     #[test]
@@ -1124,11 +1138,12 @@ mod tests {
         assert!(state.streams[&session].missing.is_empty());
     }
 
-    /// Every receipt repeats the two intervals before it, so up to two lost receipts in a row lose nothing.
+    /// Every receipt repeats the two intervals before it, so up to two lost receipts in a row lose nothing: the
+    /// floor stays and the receipt after them judges.
     #[test]
     fn as_many_lost_receipts_as_a_receipt_covers_should_lose_nothing() {
         let [a, b, c] = [(); 3].map(|_| key());
-        let verdict_with = |lost: &'static [u32]| {
+        let run = |lost: &'static [u32]| {
             let mut sim = Sim::new();
             sim.cover = 3;
             sim.run(
@@ -1138,11 +1153,16 @@ mod tests {
                 |path| if path.contains(&a) { None } else { FAST },
                 |seq| lost.contains(&seq),
             );
-            (sim.verdict_ms, sim.fr.excluded_relayers(&sim.exit))
+            let floor = sim.fr.state.lock().streams[&sim.pseudonym].floor;
+            (
+                sim.verdict_ms,
+                sim.fr.excluded_relayers(&sim.exit),
+                floor == sim.at(250),
+            )
         };
-        let expected = verdict_with(&[]);
-        assert_eq!((Some(2_000), vec![a]), expected);
-        assert_eq!(expected, verdict_with(&[6, 7]));
+        assert_eq!((Some(1_500), vec![a], true), run(&[]));
+        // 5 and 6 lost: the verdict waits for 7 (1.75 s), which covers 5 to 7
+        assert_eq!((Some(1_750), vec![a], true), run(&[5, 6]));
     }
 
     /// More receipts lost than a receipt covers hold judgement, and then floor at the jump.
@@ -1255,7 +1275,7 @@ mod tests {
         sim.send(verdict + 1, &[a], FAST);
         // The pseudonym is reused: its new stream has no watermark
         sim.fr
-            .receipts_at(sim.pseudonym, 1, 1, &[sim.next_tag - 1], sim.at(verdict + 300));
+            .receipts_at(sim.pseudonym, 1, 1, &[sim.next_tag - 1], sim.at(verdict + 3_000));
         assert_eq!(vec![a], sim.fr.excluded_relayers(&sim.exit));
         Ok(())
     }
@@ -1314,7 +1334,114 @@ mod tests {
             fr.state.lock().streams[&session].last_seq,
             "a late receipt is no reset"
         );
-        fr.receipts_at(session, NEW_SESSION_SEQ_MAX, NEW_SESSION_SEQ_MAX, &[], t0);
+        let later = t0 + Duration::from_secs(3);
+        fr.receipts_at(
+            session,
+            NEW_SESSION_SEQ_MAX,
+            NEW_SESSION_SEQ_MAX,
+            &[],
+            t0 + Duration::from_secs(1),
+        );
+        assert_eq!(
+            10,
+            fr.state.lock().streams[&session].last_seq,
+            "a young stream is not reset"
+        );
+        fr.receipts_at(session, NEW_SESSION_SEQ_MAX, NEW_SESSION_SEQ_MAX, &[], later);
         assert_eq!(NEW_SESSION_SEQ_MAX, fr.state.lock().streams[&session].last_seq);
+    }
+
+    /// 150 s without traffic: the stream continues, so the evidence of the first packets after it is usable at
+    /// once, which is faster than a run that has just started.
+    #[test]
+    fn the_receipt_stream_should_survive_an_idle() {
+        let [a, b, c] = [(); 3].map(|_| key());
+        let route = rotate(vec![vec![a], vec![b], vec![c]]);
+        let healthy = |_: &[Key]| FAST;
+        let dead = |path: &[Key]| if path.contains(&a) { None } else { FAST };
+
+        let mut fresh = Sim::new();
+        fresh.run(0, 3_000, &route, dead, lose_nothing);
+
+        let mut idle = Sim::new();
+        idle.run(0, 1_000, &route, healthy, lose_nothing);
+        let start = 150_000;
+        idle.fr.refresh_at(idle.at(start));
+        idle.verdict_ms = None;
+        idle.run(start, start + 3_000, &route, dead, lose_nothing);
+
+        let (fresh, idle_verdict) = (fresh.verdict_ms, idle.verdict_ms.map(|ms| ms - start));
+        assert_eq!(Some(1_500), fresh);
+        assert_eq!(Some(1_250), idle_verdict, "no floor from the idle");
+        assert_eq!(idle.at(250), idle.fr.state.lock().streams[&idle.pseudonym].floor);
+    }
+
+    #[test]
+    fn a_stream_should_be_gone_after_its_ttl() {
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        fr.receipts_at(session, 1, 1, &[], t0);
+        fr.refresh_at(t0 + STREAM_TTL);
+        assert!(fr.state.lock().streams.contains_key(&session));
+        fr.refresh_at(t0 + STREAM_TTL + Duration::from_secs(1));
+        assert!(!fr.state.lock().streams.contains_key(&session));
+    }
+
+    #[test]
+    fn a_duplicate_receipt_should_change_nothing() {
+        let [x, exit] = [(); 2].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        fr.record_at(session, 7, &[x, exit], at(0));
+        fr.receipts_at(session, 1, 1, &[7], at(100));
+        fr.receipts_at(session, 2, 1, &[], at(200));
+        let snapshot = |fr: &ForwardReceipts| {
+            let state = fr.state.lock();
+            let stream = &state.streams[&session];
+            (
+                stream.last_seq,
+                stream.floor,
+                stream.watermark,
+                stream.missing.len(),
+                state.count,
+            )
+        };
+        let before = snapshot(&fr);
+        fr.receipts_at(session, 2, 1, &[7], at(210));
+        assert_eq!(before, snapshot(&fr));
+    }
+
+    /// A copy of receipt 1 (sent twice in a burst window) that arrives after higher seqs is no reused pseudonym.
+    #[test]
+    fn a_late_copy_of_the_first_receipt_should_not_reset_the_stream() {
+        let [x, exit] = [(); 2].map(|_| key());
+        let fr = ForwardReceipts::default();
+        let session = HoprPseudonym::random();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        fr.record_at(session, 7, &[x, exit], at(0));
+        fr.receipts_at(session, 1, 1, &[7], at(100));
+        fr.receipts_at(session, 2, 1, &[], at(200));
+        fr.receipts_at(session, 3, 2, &[], at(300));
+        fr.receipts_at(session, 1, 1, &[], at(400));
+        let state = fr.state.lock();
+        let stream = &state.streams[&session];
+        assert_eq!(
+            (3, at(100), Some(at(0))),
+            (stream.last_seq, stream.floor, stream.watermark)
+        );
+    }
+
+    /// The return side keeps its own, longer confirmation.
+    #[test]
+    fn the_return_side_confirmation_should_stay_900_ms() {
+        assert_eq!(
+            Duration::from_millis(900),
+            super::super::surb_telemetry::VERDICT_CONFIRMATION
+        );
+        assert!(FORWARD_CONFIRMATION < super::super::surb_telemetry::VERDICT_CONFIRMATION);
     }
 }
