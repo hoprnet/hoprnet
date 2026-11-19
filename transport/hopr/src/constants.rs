@@ -49,7 +49,7 @@ mod tests {
     /// Keep the probe lane large enough for one probe round and small enough to bound its memory.
     ///
     /// A round is about 650 packets; shrinking the lane below that would make the probe generator
-    /// wait on the channel mid-round. Above 1,024 slots the lane holds more than 4 MB of packets,
+    /// wait on the channel mid-round. Above 1,024 slots the lane holds close to 4 MB of packets,
     /// which buys nothing: it is a delay buffer, not a queue for sustained load.
     #[allow(clippy::assertions_on_constants)]
     #[test]
