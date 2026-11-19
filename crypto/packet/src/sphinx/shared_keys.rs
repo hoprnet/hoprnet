@@ -10,13 +10,21 @@ use super::derivation::{create_kdf_instance, generate_key_iv};
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<hopr_types::primitive::typenum::U32>;
 
-/// Types representing a valid non-zero scalar of an additive abelian group.
+/// Types representing a scalar of an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
     /// Generates a random scalar using a cryptographically secure RNG.
     fn random() -> Self;
 
     /// Create scalar from bytes
     fn from_bytes(bytes: &[u8]) -> hopr_types::crypto::errors::Result<Self>;
+
+    /// Whether this scalar is the additive identity.
+    ///
+    /// `from_bytes` does not always exclude it: secp256k1 accepts a 32-zero-byte encoding, and the
+    /// Curve25519 parser clamps and then reduces modulo the group order, which maps a clamped value
+    /// that is a multiple of the order to zero. A zero blinding factor would blind the alpha away
+    /// to the identity, which no hop may continue with, so the transform rejects it explicitly.
+    fn is_zero(&self) -> bool;
 }
 
 /// Represents the Alpha value of a certain length in the Sphinx protocol
@@ -129,7 +137,9 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = G::extract_key_from_alpha(&shared_secret_alpha, HASH_KEY_SPHINX_BLINDING, &alpha_prev.to_alpha());
-            let b_k_checked = E::from_bytes(b_k.as_ref())?;
+            // The same validation the relay path applies: a zero blinding factor would make the next
+            // alpha the identity, and secp256k1 accepts an all-zero encoding.
+            let b_k_checked = Self::parse_blinding_scalar(&b_k)?;
 
             // Update coeff_prev and alpha.
             //
@@ -176,15 +186,21 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         // Reject a degenerate alpha *before* the private-scalar multiplication, on every hop.
         //
-        // The old eager `forward_transform` rejected it through its check on the *output* alpha, which
-        // the final hop no longer computes - but the reason to reject is the input. With a point of
-        // small order (the identity above all), `alpha * sk` is a small-order point too, and one that
-        // depends on `sk` only through the parity of the reduced scalar: for a clamped scalar the
-        // four subgroups' points come out the same for half the keys and negated for the other half.
-        // The KDF therefore sees only a couple of possible points, so the shared secret - and with it
-        // the header MAC - can be derived by a third party from public information rather than by the
-        // recipient alone. Checking the public input keeps that check on the final hop and also makes
-        // it independent of which group the suite computes in.
+        // The reason to reject is the input, not the output the eager transform happened to check.
+        // With a point `P` of order `d` as alpha, `P * sk` depends on `sk` only through `sk mod d`, so
+        // the KDF sees at most `d` different points however the private key is chosen: for the
+        // identity (`d = 1`) exactly one, for the order-2 point the two values `P` and `-P` by parity
+        // of the reduced scalar, and for the order-4 and order-8 classes up to four and eight. All of
+        // them are small, public sets, so the shared secret - and with it the header MAC - can be
+        // derived by a third party from public information rather than by the recipient alone.
+        //
+        // On `ff0076efaa` the eager transform rejected only an *identity output point*, so it refused
+        // a small-order alpha whenever `sk mod d` happened to be zero and accepted it otherwise
+        // (measured: 92 of 200 random keys for the order-2 point). Rejecting the whole small-order set
+        // on the input is therefore both broader than what the old code did and independent of the key
+        // - this PR introduces that broader rejection. Checking the public input also keeps the check
+        // on the final hop, which no longer computes an output point, and makes it independent of
+        // which group the suite computes in.
         if !alpha_point.is_valid() {
             return Err(CryptoError::CalculationError);
         }
@@ -199,16 +215,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         let b_k = G::extract_key_from_alpha(&s_k_alpha, HASH_KEY_SPHINX_BLINDING, alpha);
 
-        // Parse the blinding scalar here rather than in `finalize`, so that a KDF output the suite
-        // rejects is refused on *every* hop, as the eager transform refused it. secp256k1 is the case
-        // that matters: its `from_bytes` rejects a value at or above the group order, and zero is a
-        // valid encoding there (it yields the identity), so a check that lived only in `finalize`
-        // would let a final hop skip both the parse and the identity rejection. Parsing costs a
-        // scalar conversion, not the multiplication, so the final hop still saves the multiplication.
-        // Parsed here, discarded, and re-parsed in `finalize`: the parse validates the KDF output on
-        // *every* hop (secp256k1 rejects a value at or above the order, and zero is a valid encoding
-        // there), while the raw `SharedSecret` is what the struct retains so that it is zeroized.
-        E::from_bytes(b_k.as_ref())?;
+        Self::parse_blinding_scalar(&b_k)?;
 
         Ok((
             DeferredAlpha {
@@ -218,6 +225,30 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             },
             secret,
         ))
+    }
+
+    /// Validates a KDF output as a blinding scalar, on every hop.
+    ///
+    /// Done in the first half of the transform rather than in [`DeferredAlpha::finalize`], so that a
+    /// KDF output the suite rejects is refused on *every* hop, as the eager transform refused it.
+    /// A final hop drops `DeferredAlpha` without finalizing, so anything left to `finalize` is skipped
+    /// there.
+    ///
+    /// Two cases matter and `from_bytes` alone covers only the first:
+    /// - secp256k1 `from_bytes` rejects a value at or above the group order.
+    /// - zero is a *valid* encoding in both suites, and it blinds the alpha to the identity, which the eager transform
+    ///   then rejected on every hop. Without the explicit [`Scalar::is_zero`] the zero case would slip through the
+    ///   final hop. It is extremely rare (one KDF output in 2^256) but it is a behaviour change.
+    ///
+    /// Parsing plus a zero test costs a scalar conversion, not the multiplication, so the final hop
+    /// still saves the multiplication. The scalar is parsed here, discarded, and re-parsed in
+    /// `finalize`; the raw [`SharedSecret`] is what the struct retains so that it is zeroized.
+    fn parse_blinding_scalar(b_k: &SharedSecret) -> hopr_types::crypto::errors::Result<E> {
+        let b_k = E::from_bytes(b_k.as_ref())?;
+        if b_k.is_zero() {
+            return Err(CryptoError::CalculationError);
+        }
+        Ok(b_k)
     }
 }
 
@@ -230,9 +261,9 @@ pub(crate) struct DeferredAlpha<E: Scalar, G: GroupElement<E>> {
     /// Blinding factor `b_k`, kept in its raw KDF form.
     ///
     /// Kept as a [`SharedSecret`] rather than as a parsed `E` so that it is zeroized on drop: `E` is a
-    /// bare curve scalar with no `ZeroizeOnDrop`. That it parses at all is checked in the first half of
-    /// the transform, on every hop, so keeping the raw bytes here does not delay a malformed-scalar
-    /// rejection to whoever finalizes.
+    /// bare curve scalar with no `ZeroizeOnDrop`. That it parses and is nonzero is checked in the first
+    /// half of the transform, on every hop, so keeping the raw bytes here does not delay a
+    /// malformed-scalar rejection to whoever finalizes.
     b_k: SharedSecret,
     _d: PhantomData<E>,
 }
@@ -243,16 +274,35 @@ impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
     /// This is the multiplication [`SharedKeys::forward_transform_deferred`] leaves out; together the
     /// two are what the eager (complete) transform used to do in one call.
     pub(crate) fn finalize(self) -> hopr_types::crypto::errors::Result<Alpha<G::AlphaLen>> {
-        let b_k_checked = E::from_bytes(self.b_k.as_ref())?;
+        let b_k_checked = SharedKeys::<E, G>::parse_blinding_scalar(&self.b_k)?;
         let alpha_new = self.alpha_point.mul(&b_k_checked);
 
-        // As in `generate`: a scalar multiple of an already-validated point is in the prime-order
-        // subgroup, so only the identity has to be excluded here.
+        // The result is `b * P` for the validated wire point `P` and a nonzero `b`. That is not a
+        // claim that it lies in the prime-order subgroup: `is_valid` rejects the small-order set but
+        // admits mixed-order points, which keep a nonzero prime-order component once multiplied by a
+        // nonzero scalar. The component is what the protocol needs, and the only further thing that
+        // could go wrong is `b * P` collapsing to the identity (both `P` and `b` nonzero makes that
+        // possible only when a small-order component cancels), so the identity test is the right
+        // derived-point check here.
         if !alpha_new.is_valid_derived() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
 
         Ok(alpha_new.to_alpha())
+    }
+
+    /// Builds a deferred alpha from its parts, so that tests can drive a `finalize` failure.
+    ///
+    /// The first half of the transform validates the blinding scalar, so on the packet path
+    /// `finalize` only fails when the resulting point is the identity. Arranging that needs an
+    /// identity `alpha_point` and any nonzero scalar, neither of which a real packet supplies.
+    #[cfg(test)]
+    pub(crate) fn for_test(alpha_point: G, b_k: SharedSecret) -> Self {
+        Self {
+            alpha_point,
+            b_k,
+            _d: PhantomData,
+        }
     }
 }
 
@@ -361,7 +411,8 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys_alpha.clone())?;
+        let generated_shares =
+            SharedKeys::<S::E, S::G>::generate(pub_keys_alpha.clone()).context("sender: generate the shared keys")?;
         assert_eq!(
             node_count,
             generated_shares.secrets.len(),
@@ -419,8 +470,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[test]
     fn the_relay_transform_matches_the_pre_deferral_known_answers() -> anyhow::Result<()> {
-        use hopr_types::crypto::keypairs::OffchainKeypair;
-        use hopr_types::primitive::typenum::U32;
+        use hopr_types::{crypto::keypairs::OffchainKeypair, primitive::typenum::U32};
 
         // Alpha and key pair from the pre-change run; all three are inputs, not derived here.
         let alpha: Alpha<U32> = const_hex::decode("a8c8f046aea14953474ca0787e7eb3d908439f2fd66ef019d54cfa92301483bc")
@@ -618,6 +668,159 @@ pub(crate) mod tests {
                 "small-order alpha {idx} must be rejected before any key derivation"
             );
         }
+        Ok(())
+    }
+
+    /// A zero blinding scalar must be rejected in the first half of the transform.
+    ///
+    /// `Secp256k1Scalar::from_bytes` accepts 32 zero bytes, and zero blinds the alpha to the
+    /// identity. On `ff0076efaa` the eager transform rejected that identity output on *every* hop.
+    /// The final hop no longer computes the output, so the zero case has to be refused where the
+    /// scalar is parsed - otherwise a final hop would accept a packet the eager transform rejected.
+    ///
+    /// Driven through the check the transform itself calls, since a zero KDF output is a one-in-2^256
+    /// event and cannot be produced by choosing an alpha.
+    #[cfg(feature = "secp256k1")]
+    #[test]
+    fn a_zero_blinding_scalar_is_rejected() -> anyhow::Result<()> {
+        use crate::sphinx::ec_groups::{Secp256k1Point, Secp256k1Scalar};
+
+        // The premise: `from_bytes` really does accept an all-zero encoding, so the value is
+        // reachable from a KDF output rather than only from an uninitialised scalar.
+        let zero_bytes = SharedSecret::default();
+        let parsed = <Secp256k1Scalar as Scalar>::from_bytes(zero_bytes.as_ref())
+            .expect("secp256k1 accepts an all-zero scalar encoding");
+        assert!(parsed.is_zero(), "an all-zero encoding must parse to zero");
+        assert!(Secp256k1Scalar::default().is_zero(), "the default scalar must be zero");
+
+        // The check under test must reject it. This is the assertion the fix exists for: without the
+        // `is_zero` term the parse alone succeeds and a final hop accepts the packet.
+        assert!(
+            SharedKeys::<Secp256k1Scalar, Secp256k1Point>::parse_blinding_scalar(&zero_bytes).is_err(),
+            "a zero blinding scalar must be rejected on every hop"
+        );
+
+        // And a nonzero scalar must still be accepted, so the guard does not reject everything.
+        let mut one_bytes = [0u8; 32];
+        one_bytes[31] = 1; // k256 scalars are big-endian
+        let one = <Secp256k1Scalar as Scalar>::from_bytes(&one_bytes).context("one must parse")?;
+        assert!(!one.is_zero(), "a nonzero scalar must not report as zero");
+        assert!(
+            SharedKeys::<Secp256k1Scalar, Secp256k1Point>::parse_blinding_scalar(&SharedSecret::from(
+                Alpha::<hopr_types::primitive::typenum::U32>::try_from(one_bytes.as_slice()).expect("one is 32 bytes")
+            ))
+            .is_ok(),
+            "a nonzero blinding scalar must be accepted"
+        );
+
+        // Zero really does blind the alpha away to the identity, which is what makes it unacceptable:
+        // `P * 0 = O` for every alpha.
+        use hopr_types::primitive::typenum::U33;
+
+        let mut alpha_bytes = Alpha::<U33>::default();
+        alpha_bytes.copy_from_slice(
+            const_hex::decode("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+                .context("secp256k1 generator in compressed SEC1 form")?
+                .as_slice(),
+        );
+        let generator = <Secp256k1Point as GroupElement<Secp256k1Scalar>>::from_alpha(alpha_bytes)
+            .context("the generator must decode")?;
+        let blinded = generator.mul(&parsed);
+        assert!(
+            !blinded.is_valid_derived(),
+            "multiplying by a zero scalar must give the identity, which the derived check rejects"
+        );
+        Ok(())
+    }
+
+    /// A small-order alpha must be rejected by the **Montgomery** transform, not only by its
+    /// `is_valid`.
+    ///
+    /// The `montgomery_is_valid` test in `ec_groups` covers the check in isolation; this one drives
+    /// the same points through `forward_transform_deferred`, which is what the packet path calls.
+    /// `X25519Suite::from_alpha` accepts any 32-byte coordinate, so the rejection has to come from
+    /// the guard inside the transform rather than from decoding.
+    #[cfg(feature = "x25519")]
+    #[test]
+    fn a_small_order_montgomery_alpha_is_rejected_by_the_transform() -> anyhow::Result<()> {
+        use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519MontgomeryPoint};
+
+        let (pub_key, priv_key) = <Curve25519MontgomeryPoint as GroupElement<Curve25519Scalar>>::random_pair();
+
+        // The eight Edwards torsion points, projected onto their Montgomery `u` coordinates. The
+        // projection collapses `P` and `-P`, so this yields four distinct coordinates covering every
+        // torsion class; taking them through the Edwards side keeps the fixture tied to the group
+        // structure rather than to hand-copied constants.
+        const EDWARDS_TORSION: [[u8; 32]; 8] = [
+            [
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x85,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0xfa,
+            ],
+            [
+                0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+            [
+                0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+        ];
+
+        let mut coords = std::collections::BTreeSet::new();
+        for (idx, bytes) in EDWARDS_TORSION.into_iter().enumerate() {
+            let edwards = Curve25519CompressedPoint(bytes)
+                .decompress()
+                .with_context(|| format!("torsion fixture {idx} must decompress"))?;
+            let montgomery = edwards.to_montgomery();
+            coords.insert(montgomery.0);
+
+            let result = SharedKeys::<Curve25519Scalar, Curve25519MontgomeryPoint>::forward_transform_deferred(
+                &montgomery.to_alpha(),
+                &priv_key,
+                &pub_key.to_alpha(),
+            );
+            assert!(
+                result.is_err(),
+                "small-order Montgomery alpha from fixture {idx} must be rejected by the transform"
+            );
+        }
+        assert_eq!(
+            coords.len(),
+            4,
+            "the eight torsion points must project onto four distinct u coordinates"
+        );
+
+        // Control: an alpha this suite generates must still go through.
+        let (alpha, _) = <Curve25519MontgomeryPoint as GroupElement<Curve25519Scalar>>::random_pair();
+        assert!(
+            SharedKeys::<Curve25519Scalar, Curve25519MontgomeryPoint>::forward_transform_deferred(
+                &alpha.to_alpha(),
+                &priv_key,
+                &pub_key.to_alpha(),
+            )
+            .is_ok(),
+            "a generated Montgomery alpha must still be accepted"
+        );
         Ok(())
     }
 }

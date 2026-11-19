@@ -81,6 +81,11 @@ impl Scalar for Curve25519Scalar {
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         hopr_types::crypto::utils::x25519_scalar_from_bytes(bytes)
     }
+
+    fn is_zero(&self) -> bool {
+        // `PartialEq` on this scalar is constant-time (`ct_eq` under the hood).
+        *self == Self::ZERO
+    }
 }
 
 #[cfg(feature = "secp256k1")]
@@ -107,6 +112,13 @@ impl Scalar for Secp256k1Scalar {
             bytes,
         )?))
     }
+
+    fn is_zero(&self) -> bool {
+        // `k256_scalar_from_bytes` accepts an all-zero encoding, so this is reachable from a KDF
+        // output and not only from an empty value. `Scalar::is_zero` here is `ff::Field::is_zero`,
+        // which is constant-time.
+        self.0.is_zero().into()
+    }
 }
 
 #[cfg(feature = "x25519")]
@@ -127,23 +139,32 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
 
     fn is_valid(&self) -> bool {
         // `GroupElement` requires a valid element to exclude small-order points, not only the
-        // identity. A Montgomery coordinate also has no sign bit, so it can decode to a point of the
-        // wrong Edwards sign; that is harmless for the Montgomery ladder, but the point must still be
-        // torsion-free. `to_edwards` is used only to reach `is_torsion_free`, which is a property of
-        // the Edwards representative and independent of which of the two it is.
+        // identity. A Montgomery coordinate also has no sign bit, so it may decode to a point of the
+        // wrong Edwards sign; that is harmless for the ladder, and it does not change whether the
+        // point is small order.
         //
-        // `to_edwards` returning `None` means the coordinate is not on the curve *or* is one of the
-        // two points that have no Edwards representative at all (u = -1, the order-2 point, and
-        // u = 0). Either way it is not a point this protocol may continue with, so it is rejected
-        // rather than skipped: treating `None` as valid is what let the order-2 point through.
-        // Same reasoning as the Edwards implementation: `is_small_order` rejects the eight torsion
-        // points (identity included) at the cost of three doublings, where `is_torsion_free` would cost
-        // a scalar multiplication on the per-packet path.
+        // `to_edwards` returning `None` means the coordinate is not on the curve, *or* is one of the
+        // points with no Edwards representative at all (u = 0 and u = -1, the latter being the
+        // order-2 point). Either way it is not a point this protocol may continue with, so it is
+        // rejected rather than skipped: treating `None` as valid is what let the order-2 point
+        // through in the first version of this check.
+        //
+        // `is_small_order` (three doublings) rather than `is_torsion_free` (a full scalar
+        // multiplication by the group order) for the same reason as on the Edwards side: this runs on
+        // the per-packet path, and the points that must be rejected are exactly the eight of order
+        // dividing 8.
+        //
+        // Note that this admits *mixed-order* points, i.e. a curve point with a nonzero prime-order
+        // component and a nonzero small-order one. That is enough for what the protocol does with an
+        // accepted alpha: multiplying it by a nonzero scalar keeps the prime-order component nonzero,
+        // so the shared point does not collapse to a small set. See `DeferredAlpha::finalize`.
         self.to_edwards(0).is_some_and(|edwards| !edwards.is_small_order())
     }
 
-    /// Derived points are `s * G` or a multiple of one, so only the identity can be wrong: the
-    /// `to_edwards` round trip that a wire coordinate needs is not required for our own arithmetic.
+    /// A derived point is a multiple of one this crate already validated, so only the identity can be
+    /// wrong: the `to_edwards` conversion a wire coordinate needs is not required for our own
+    /// arithmetic, and neither is the small-order test on a value that a nonzero scalar keeps
+    /// out of reach.
     fn is_valid_derived(&self) -> bool {
         use hopr_types::crypto::primitives::IsIdentity;
         !self.is_identity()
@@ -182,8 +203,9 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         !self.is_small_order()
     }
 
-    /// As for the Montgomery implementation: a derived point is in the prime-order subgroup by
-    /// construction, so the three-doubling `is_small_order` check is not needed for it.
+    /// As for the Montgomery implementation: a derived point is a scalar multiple of one already
+    /// validated, so the three-doubling `is_small_order` check is not needed for it - only the
+    /// identity, which a multiple of the group order produces.
     fn is_valid_derived(&self) -> bool {
         use hopr_types::crypto::primitives::IsIdentity;
         !self.is_identity()

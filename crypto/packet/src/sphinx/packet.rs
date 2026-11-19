@@ -367,6 +367,16 @@ impl<S: SphinxSuite> ForwardSecret<S> {
     fn into_parts(self) -> ForwardSecretParts<S> {
         (self.alpha, self.secret, self.tag)
     }
+
+    /// Replaces the deferred alpha, keeping the secret and tag.
+    ///
+    /// Lets a test take a state derived from a real packet - so the header MAC still verifies and the
+    /// relay branch is reached - and make only the finalization fail.
+    #[cfg(test)]
+    pub(crate) fn with_alpha_for_test(mut self, alpha: DeferredAlpha<S::E, S::G>) -> Self {
+        self.alpha = alpha;
+        self
+    }
 }
 
 impl<S: SphinxSuite> std::fmt::Debug for ForwardSecret<S> {
@@ -703,6 +713,7 @@ pub(crate) mod tests {
         super::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes},
         *,
     };
+    use crate::Ed25519Suite;
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -773,12 +784,12 @@ pub(crate) mod tests {
         for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
             From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
-        let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
+        let pubkeys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
         let mapper = SimpleBiMapper::<S, TestHeader<S>>(
             keypairs
                 .iter()
                 .enumerate()
-                .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+                .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
                 .collect::<BiHashMap<_, _>>(),
         );
 
@@ -1007,5 +1018,79 @@ pub(crate) mod tests {
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
         )
+    }
+
+    /// A relay whose alpha finalization fails must not have told the caller the packet authenticated.
+    ///
+    /// `into_forwarded_with_secret` runs `finalize()` inside the relaying branch and *before*
+    /// `on_authenticated()`, and that ordering is what this pins: the callback is what makes the
+    /// caller commit the packet tag to its replay filter, so a packet the relay then rejects for a
+    /// local reason would occupy a filter slot and its retry would be reported as `PacketReplay`
+    /// instead of as the same local failure.
+    ///
+    /// The state is derived from the real packet, so the header MAC verifies and the relaying branch
+    /// really is reached; only the deferred alpha is replaced, with an identity point that
+    /// `finalize()` rejects through its derived-point check. That is the only way to make a *relay*
+    /// finalization fail once the transform has succeeded, so it is the case to drive.
+    #[test]
+    fn a_failed_relay_finalization_must_not_report_authentication() -> anyhow::Result<()> {
+        let keypairs: Vec<hopr_types::crypto::keypairs::OffchainKeypair> = (0..3)
+            .map(|_| hopr_types::crypto::keypairs::OffchainKeypair::random())
+            .collect();
+        let pubkeys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
+        let mapper = SimpleBiMapper::<crate::sphinx::ec_groups::Ed25519Suite, TestHeader<Ed25519Suite>>(
+            keypairs
+                .iter()
+                .enumerate()
+                .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
+                .collect::<BiHashMap<_, _>>(),
+        );
+
+        let shared_keys = Ed25519Suite::new_shared_keys(&pubkeys)?;
+        let por_strings = vec![WrappedBytes::<53>::default(); shared_keys.secrets.len() - 1];
+        let pseudonym = SimplePseudonym::random();
+
+        let mp = MetaPacket::<Ed25519Suite, TestHeader<Ed25519Suite>, PAYLOAD_SIZE>::new(
+            PaddedPayload::new(b"relay finalization")?,
+            MetaPacketRouting::ForwardPath {
+                shared_keys,
+                forward_path: &pubkeys,
+                additional_data_relayer: &por_strings,
+                receiver_data: &pseudonym,
+                no_ack: false,
+            },
+            &mapper,
+        )?;
+
+        // The state comes from the real packet, so the payload decryption and the header MAC both
+        // succeed and the relay branch really is reached; only the deferred alpha is replaced, with
+        // an identity point. `finalize()` rejects that through its identity check.
+        //
+        // An identity point rather than a zero blinding factor: the Curve25519 scalar parser clamps,
+        // so an all-zero byte string parses to a nonzero scalar and the zero factor the guard rejects
+        // has no direct successor here.
+        let mut identity_alpha = Alpha::<hopr_types::primitive::typenum::U32>::default();
+        identity_alpha[0] = 1; // compressed Edwards identity: y = 1, sign bit 0
+        let identity_point =
+            <hopr_types::crypto::primitives::Curve25519Point as GroupElement<Curve25519Scalar>>::from_alpha(
+                identity_alpha,
+            )
+            .expect("the Edwards identity must decode");
+        let state = mp
+            .forward_secret(&keypairs[0])?
+            .with_alpha_for_test(DeferredAlpha::for_test(identity_point, SharedSecret::default()));
+
+        let mut authenticated = 0;
+        let result = mp.into_forwarded_with_secret(state, &mapper, |_| None, || authenticated += 1);
+
+        assert!(
+            result.is_err(),
+            "an identity deferred alpha must fail relay finalization"
+        );
+        assert_eq!(
+            0, authenticated,
+            "authentication must not be reported when relay finalization fails"
+        );
+        Ok(())
     }
 }
