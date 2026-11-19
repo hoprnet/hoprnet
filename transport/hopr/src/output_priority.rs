@@ -4,10 +4,9 @@
 //! reach the routing stage through two nested `select_with_strategy` merges, so their precedence
 //! is fixed and explicit:
 //!
-//! 1. **Session data** first. Pongs count as session data: a peer waits on a pong, and a late one
-//!    records a failed probe on the other side.
-//! 2. **Probes** take a minimum share of the slots while session data is queued, and every free
-//!    slot when it is not.
+//! 1. **Session data** first. Pongs count as session data: a peer waits on a pong, and a late one records a failed
+//!    probe on the other side.
+//! 2. **Probes** take a minimum share of the slots while session data is queued, and every free slot when it is not.
 //! 3. **Noise** only when the session and probe lanes are both empty.
 //!
 //! A *slot* is one item the merged stream yields to the routing stage. Every packet is 3,669
@@ -22,15 +21,15 @@
 //! strategy counts choices, not emissions: when the chosen lane is empty, the merge falls through
 //! to the other lane unseen by the counter, so transient occupancy only favours probes.
 
-use futures::stream::PollNext;
-
-#[cfg(all(feature = "telemetry", not(test)))]
-use futures::Sink;
 #[cfg(all(feature = "telemetry", not(test)))]
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+#[cfg(all(feature = "telemetry", not(test)))]
+use futures::Sink;
+use futures::stream::PollNext;
 
 /// Default share of the slots given to probes while session data is queued.
 pub const DEFAULT_PROBE_SHARE: f64 = 0.1;

@@ -846,8 +846,7 @@ where
         let (unresolved_probe_msg_tx, unresolved_probe_msg_rx) = bounded_sink_channel::<
             trace_context::WithContext<(DestinationRouting, ApplicationDataOut)>,
         >(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE);
-        let unresolved_probe_msg_tx =
-            probe_lane_sink(trace_context::ContextSender::new(unresolved_probe_msg_tx));
+        let unresolved_probe_msg_tx = probe_lane_sink(trace_context::ContextSender::new(unresolved_probe_msg_tx));
 
         // -- transport medium
 

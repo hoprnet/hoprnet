@@ -60,8 +60,8 @@ mod tests {
 
         assert!(
             MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE >= PROBE_ROUND_PACKETS,
-            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} is smaller than one probe \
-             round, so the generator blocks mid-round"
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} is smaller than one \
+             probe round, so the generator blocks mid-round"
         );
         assert!(
             MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE * PACKET_SIZE_BYTES <= MAXIMUM_LANE_BYTES,
