@@ -12,8 +12,8 @@
 //! A *slot* is one item the merged stream yields to the routing stage. Every packet is 3,669
 //! bytes, so a share of slots is a share of bytes.
 //!
-//! Probes are paced rather than starved: [`paced_probe_share`] grants the probe lane one slot
-//! after at most [`max_session_run`] consecutive session slots. That bounds both the wait of a
+//! Probes are paced rather than starved: `paced_probe_share` grants the probe lane one slot after
+//! at most `max_session_run` consecutive session slots. That bounds both the wait of a
 //! probe behind a saturated session lane and the wait of a session packet behind a queued probe
 //! burst, which is one owed probe slot.
 //!
