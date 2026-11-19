@@ -172,8 +172,13 @@ hopr-chain-connector = { version = "0.33.0" }
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.8.0", default-features = false }
 hopr-transport-p2p = { version = "0.15.0", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.11.0", default-features = false }
-hopr-network-graph = { version = "0.12.1", default-features = false }
+hopr-ct-full-network = { version = "0.12.0", default-features = false, features = ["noise"] }
+hopr-network-graph = { version = "0.13.0", default-features = false }
+
+# Experimental: hopr-impls#118 (lazy, dial-driven probing) until it is released.
+[patch.crates-io]
+hopr-ct-full-network = { git = "https://github.com/hoprnet/hopr-impls", branch = "bot/lazy-dial-driven-probing" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", branch = "bot/lazy-dial-driven-probing" }
 
 [profile.dev]
 panic = "abort"
