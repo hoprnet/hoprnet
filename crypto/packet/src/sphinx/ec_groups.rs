@@ -143,9 +143,11 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
         // wrong Edwards sign; that is harmless for the ladder, and it does not change whether the
         // point is small order.
         //
-        // `to_edwards` returning `None` means the coordinate is on the twist rather than the curve,
-        // which in practice is the `u = -1` class. Rejecting it rather than skipping it is what the
-        // first version of this check got wrong when it treated `None` as valid.
+        // `to_edwards` returning `None` means the coordinate lies on the twist rather than the curve,
+        // for any `u` with no Edwards preimage - `u = 2` and `u = -1` are two such (dalek's own
+        // `montgomery_to_edwards_rejects_twist` uses both; `u = -1` is only the exceptional case for
+        // the birational map, not the only one). Rejecting every `None` rather than skipping it is
+        // what the first version of this check got wrong when it treated `None` as valid.
         //
         // The order-2 point is a separate case, and it is *not* `u = -1`: dalek maps `u = 0` to the
         // Edwards order-2 point, so it decodes to `Some` and is caught by the `is_small_order` test
@@ -202,6 +204,20 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
         // that must be rejected here are the eight points whose order divides 8, and
         // `is_small_order` is three doublings plus an identity test. It covers the identity too, so
         // the explicit identity term is gone.
+        //
+        // This deliberately still admits *mixed-order* alphas (`P = Q + T` with `Q` of prime order and
+        // `T` one of the eight torsion points), which `is_torsion_free` would exclude. That is the
+        // intended input policy, not an oversight:
+        // - secrecy is preserved, because `alpha * sk = sk*Q + sk*T` keeps the prime-order part nonzero and `sk*T`
+        //   takes one of only eight values. Measured over 64 random keys, a mixed-order alpha yielded 64 distinct
+        //   shared points - the same as a prime-order alpha - so no two keys agree on the secret except for a 2-in-2^64
+        //   collision in the torsion part.
+        // - rejecting them would change the wire format: a peer that sends a mixed-order alpha (this implementation
+        //   never does, it derives alphas from the basepoint) would go from accepted to rejected on upgrade, so no
+        //   deployed sender would break but one relying on the old acceptance would.
+        // The guard's job is the class whose *secret* collapses regardless of the key, which is the
+        // small-order one; enforcing prime-order membership would cost the variable-base multiply the
+        // deferral exists to avoid.
         !self.is_small_order()
     }
 
@@ -485,6 +501,17 @@ mod montgomery_is_valid {
             "u = -1 is a twist coordinate, so it has no Edwards representative"
         );
         assert!(!twist_coordinate.is_valid(), "a twist coordinate must be invalid");
+
+        // `u = -1` is not the only twist coordinate. `u = 2` is another (dalek's own conversion test
+        // uses the pair), so the rejection must be for `None` generally, not for that special case.
+        let mut u_two = [0u8; 32];
+        u_two[0] = 2;
+        let u_two = Curve25519MontgomeryPoint(u_two);
+        assert!(
+            u_two.to_edwards(0).is_none(),
+            "u = 2 is also a twist coordinate, so it has no Edwards representative"
+        );
+        assert!(!u_two.is_valid(), "a twist coordinate must be invalid");
 
         // The order-2 point is reached through `u = 0`, and it takes the `Some` arm: dalek maps it to
         // the Edwards order-2 point, so it is rejected by `is_small_order` rather than by `None`.

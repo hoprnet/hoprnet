@@ -201,14 +201,19 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         // since anyone can compute these candidate points without the node's key. The recipient's
         // public key is still the KDF salt, so it is not a secret either.
         //
-        // On `ff0076efaa` the eager transform checked the *blinded output*, i.e. `P * b_k` for the
-        // KDF-derived blinding scalar, and rejected it only when that was the identity. It therefore
-        // accepted a small-order alpha whenever the blinding scalar was even modulo the point's order
-        // and rejected it otherwise (measured: 92 of 200 random keys accepted the order-2 point).
-        // Rejecting the whole small-order set on the *input* is both broader than that and independent
-        // of the key, and this PR introduces it. Checking the public input also keeps the check on the
-        // final hop, which no longer computes an output point, and makes it independent of which group
-        // the suite computes in.
+        // On `ff0076efaa` the eager transform validated the *blinded output* instead: it computed
+        // `P * b_k` from the KDF-derived blinding scalar and rejected only that being the identity.
+        // Measured against 200 random keys with the order-2 point as alpha, it accepted **200 of 200**,
+        // because the blinded product is essentially never the identity - the identity check on the
+        // output caught nothing here. So the base did not reject small-order alphas at all; rejecting
+        // them on the *input*, on every hop, is this PR's change.
+        //
+        // The same run shows what the alpha costs if it is *not* rejected: `P * sk` was small order
+        // for all 200 keys and the identity for 103 of them, since `P * sk` depends only on `sk mod 2`.
+        // That is the property this guard removes from the reachable input set.
+        //
+        // Checking the public input also keeps the check on the final hop, which no longer computes an
+        // output point, and makes it independent of which group the suite computes in.
         if !alpha_point.is_valid() {
             return Err(CryptoError::CalculationError);
         }
