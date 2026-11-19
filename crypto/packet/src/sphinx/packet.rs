@@ -328,16 +328,10 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
 /// The fields are private and the tag is derived only here, so a caller cannot pair a tag with a secret it does not
 /// belong to - the invariant is carried by the type rather than by a doc comment.
 ///
-/// What the privacy does *not* enforce is that the state goes back to the packet it came from: a caller can
-/// take a `ForwardSecret` derived from one packet and pass it to
-/// [`MetaPacket::into_forwarded_with_secret`] on another. The result is a well-formed secret and tag that
-/// nevertheless belong to different bytes, so the header MAC check would then be checking the wrong secret.
-/// A caller must therefore hand each state back to the packet that produced it.
+/// It does not bind the state to its packet: a caller must pass each `ForwardSecret` back to the packet
+/// that produced it, or the header MAC is checked against a secret for different bytes.
 pub struct ForwardSecret<S: SphinxSuite> {
-    /// The blinded alpha, not yet computed.
-    ///
-    /// Computing it is a second variable-base scalar multiplication that only a *relayed* packet
-    /// consumes, so it is deferred past the point where the header says whether the packet is final.
+    /// The blinded alpha, not yet computed: only a relayed packet consumes it.
     alpha: DeferredAlpha<S::E, S::G>,
     secret: SharedSecret,
     tag: PacketTag,
@@ -345,8 +339,7 @@ pub struct ForwardSecret<S: SphinxSuite> {
 
 /// The three fields of a [`ForwardSecret`], for the transform's internal destructuring.
 ///
-/// The alpha stays deferred so that the final-hop branch can skip computing it; the tag is here as
-/// well as in `ForwardSecret`, so the pairing is decided inside `forward_secret` rather than by a
+/// The tag is here as well as in `ForwardSecret` so the pairing is decided in `forward_secret`, not by a
 /// caller.
 type ForwardSecretParts<S> = (
     DeferredAlpha<<S as SphinxSuite>::E, <S as SphinxSuite>::G>,
@@ -368,10 +361,7 @@ impl<S: SphinxSuite> ForwardSecret<S> {
         (self.alpha, self.secret, self.tag)
     }
 
-    /// Replaces the deferred alpha, keeping the secret and tag.
-    ///
-    /// Lets a test take a state derived from a real packet - so the header MAC still verifies and the
-    /// relay branch is reached - and make only the finalization fail.
+    /// Lets a test make only the finalization fail, keeping a real secret and tag.
     #[cfg(test)]
     pub(crate) fn with_alpha_for_test(mut self, alpha: DeferredAlpha<S::E, S::G>) -> Self {
         self.alpha = alpha;
@@ -495,9 +485,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
     /// Derives the shared secret this packet was built for `node_keypair`.
     ///
-    /// The blinded alpha the next hop will see is *not* computed here: it is carried deferred in the returned
-    /// [`ForwardSecret`] and finalized only by [`MetaPacket::into_forwarded_with_secret`]'s relaying branch, since
-    /// a final hop never forwards and would pay a scalar multiplication for a value it discards.
+    /// The blinded alpha is deferred: [`MetaPacket::into_forwarded_with_secret`]'s relaying branch
+    /// computes it, so a final hop never pays for one.
     ///
     /// This is the first and most expensive step of [`MetaPacket::into_forwarded`] - an elliptic-curve scalar
     /// multiplication - and it is also the only step needed to derive the packet's [`PacketTag`]. Splitting it out
@@ -562,16 +551,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
 
-        // Blind the alpha only when this node forwards, and finish it *before* telling the caller the
-        // packet authenticated.
-        //
-        // Conditional: a final hop never forwards, so computing the blinded alpha there would pay a
-        // variable-base multiplication for a value it discards - the whole point of deferring it.
-        // Before `on_authenticated`: that callback is what makes a decode commit the packet tag to its
-        // replay filter, and the eager transform had nothing fallible left at that point while this one
-        // has the alpha check. Finalizing after the callback instead would let a packet the caller then
-        // rejects for a local reason still occupy a filter slot, so its retry would be reported as a
-        // replay rather than as the same local failure.
+        // Blind only when forwarding, and *before* `on_authenticated`: that callback commits the tag
+        // to the caller's replay filter, so finalizing after it would let a packet then rejected for
+        // a local reason still occupy a slot.
         let alpha = match &fwd_header {
             ForwardedHeader::Relayed { .. } => Some(alpha.finalize()?),
             ForwardedHeader::Final { .. } => None,
@@ -591,7 +573,6 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => {
                 // The payload is already decrypted in place; write back the blinded alpha and the next header.
-                // `alpha` was finalized above, before `on_authenticated`, in this same branch.
                 self.alpha_mut()
                     .copy_from_slice(&alpha.expect("the relaying branch finalized the alpha above"));
                 self.routing_info_mut().copy_from_slice(next_header.as_ref());
@@ -1020,18 +1001,8 @@ pub(crate) mod tests {
         )
     }
 
-    /// A relay whose alpha finalization fails must not have told the caller the packet authenticated.
-    ///
-    /// `into_forwarded_with_secret` runs `finalize()` inside the relaying branch and *before*
-    /// `on_authenticated()`, and that ordering is what this pins: the callback is what makes the
-    /// caller commit the packet tag to its replay filter, so a packet the relay then rejects for a
-    /// local reason would occupy a filter slot and its retry would be reported as `PacketReplay`
-    /// instead of as the same local failure.
-    ///
-    /// The state is derived from the real packet, so the header MAC verifies and the relaying branch
-    /// really is reached; only the deferred alpha is replaced, with an identity point that
-    /// `finalize()` rejects through its derived-point check. That is the only way to make a *relay*
-    /// finalization fail once the transform has succeeded, so it is the case to drive.
+    /// A relay whose finalization fails must not have reported authentication, or the tag would
+    /// occupy a replay-filter slot.
     #[test]
     fn a_failed_relay_finalization_must_not_report_authentication() -> anyhow::Result<()> {
         let keypairs: Vec<hopr_types::crypto::keypairs::OffchainKeypair> = (0..3)
@@ -1062,13 +1033,8 @@ pub(crate) mod tests {
             &mapper,
         )?;
 
-        // The state comes from the real packet, so the payload decryption and the header MAC both
-        // succeed and the relay branch really is reached; only the deferred alpha is replaced, with
-        // an identity point. `finalize()` rejects that through its identity check.
-        //
-        // An identity point rather than a zero blinding factor: the Curve25519 scalar parser clamps,
-        // so an all-zero byte string parses to a nonzero scalar and the zero factor the guard rejects
-        // has no direct successor here.
+        // Real secret and tag, so the MAC verifies and the relay branch is reached; only the alpha is
+        // replaced, with an identity point that `finalize` rejects.
         let mut identity_alpha = Alpha::<hopr_types::primitive::typenum::U32>::default();
         identity_alpha[0] = 1; // compressed Edwards identity: y = 1, sign bit 0
         let identity_point =

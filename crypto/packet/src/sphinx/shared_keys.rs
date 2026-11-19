@@ -18,18 +18,12 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     /// Create scalar from bytes
     fn from_bytes(bytes: &[u8]) -> hopr_types::crypto::errors::Result<Self>;
 
-    /// Whether this scalar is the additive identity.
+    /// Whether this scalar is the additive identity. `from_bytes` does not always exclude it:
+    /// secp256k1 accepts an all-zero encoding, and zero blinds the alpha to the identity.
     ///
-    /// `from_bytes` does not always exclude it: secp256k1 accepts a 32-zero-byte encoding, and zero
-    /// blinds the alpha away to the identity, which no hop may continue with, so the transform rejects
-    /// it explicitly.
-    ///
-    /// This cannot arise from the Curve25519 suites' clamping parser. Clamping sets bit 254 and
-    /// clears bit 255 and the three lowest bits, so the clamped integer is a *positive* multiple of
-    /// eight below `2^255` - positive even for an all-zero input, which clamps to exactly `2^254`.
-    /// The subgroup order `L` is odd, so the smallest positive multiple of it that is divisible by
-    /// eight is `8L > 2^255`; reducing a value in `[2^254, 2^255)` modulo `L` therefore yields a
-    /// nonzero scalar.
+    /// Curve25519 clamping cannot produce it: clamping sets bit 254, so the value is a positive
+    /// multiple of eight in `[2^254, 2^255)`, and the order `L` is odd, so its first multiple
+    /// divisible by eight is `8L > 2^255`. Reduction modulo `L` is therefore never zero.
     fn is_zero(&self) -> bool;
 }
 
@@ -126,9 +120,8 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             // Multiply the public key by the current coefficient
             let shared_secret = group_element.mul(&coeff_prev);
 
-            // Extract the shared secret from the computed EC point and copy it into the shared keys structure.
-            // The point is encoded to Alpha once and reused for the blinding factor below, since
-            // `to_alpha` on Edwards costs a field inversion.
+            // Encoded once and reused for the blinding factor: `to_alpha` is a field inversion on
+            // Edwards.
             let shared_secret_alpha = shared_secret.to_alpha();
             shared_keys.push(G::extract_key_from_alpha(
                 &shared_secret_alpha,
@@ -143,27 +136,15 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = G::extract_key_from_alpha(&shared_secret_alpha, HASH_KEY_SPHINX_BLINDING, &alpha_prev.to_alpha());
-            // The same validation the relay path applies: a zero blinding factor would make the next
-            // alpha the identity, and secp256k1 accepts an all-zero encoding.
             let b_k_checked = Self::parse_blinding_scalar(&b_k)?;
 
-            // Update coeff_prev and alpha.
-            //
-            // `alpha_prev` is `coeff_prev * G` by construction, so the new alpha is the *fixed-base*
-            // multiplication `coeff_prev_new * G`. Recomputing it that way instead of multiplying the
-            // old point by `b_k` is the same point (scalar multiplication is associative:
-            // `(coeff * G) * b = (coeff * b) * G`) but uses a precomputed base-point table, which is
-            // several times cheaper than a variable-base multiplication. The sender pays this once per
-            // hop on every packet it builds.
+            // Same point as `alpha_prev * b_k` by associativity, but as a fixed-base multiply
+            // `(coeff * b) * G`, which uses the precomputed base-point table. Once per hop, per packet.
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = G::generate(&coeff_prev);
 
-            // `alpha_prev` is `coeff * G`: a multiple of the generator, so it is in the prime-order
-            // subgroup by construction and cannot be a nonidentity small-order point. Only the
-            // identity has to be excluded, which a `coeff` that is a multiple of the group order
-            // gives. Note that this is *not* what `is_valid` would establish - that predicate admits
-            // mixed-order points - which is why the cheaper derived-point check is the correct one
-            // here rather than a merely faster substitute for it.
+            // A multiple of the generator, so only the identity can be wrong - and `is_valid` would
+            // not even establish that much, since it admits mixed-order points.
             if !alpha_prev.is_valid_derived() {
                 return Err(CryptoError::CalculationError);
             }
@@ -193,31 +174,12 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         // Reject a degenerate alpha *before* the private-scalar multiplication, on every hop.
         //
-        // The reason to reject is the input, not the output the eager transform happened to check.
-        // With a point `P` of order `d` as alpha, `P * sk` depends on `sk` only through `sk mod d`, so
-        // the KDF sees at most `d` different points however the private key is chosen: one for the
-        // identity (`d = 1`), and at most two, four or eight for `d = 2, 4, 8`. The order-2 case is
-        // worth stating exactly, because `-P = P` there: the two products are `O` and `P`, i.e. the
-        // identity for an even reduced scalar and `P` for an odd one - not `P` and `-P`.
+        // For alpha `P` of order `d`, `P * sk` takes at most `d` values (and for `d = 2`, `-P = P`,
+        // so just `O` or `P`), however the key was chosen. A third party can compute those candidates
+        // without the node's key, so the hop secret and header MAC stop being secret.
         //
-        // The products are therefore small and public sets. That the honest sender and recipient both
-        // know the hop secret is not the issue; what an attacker gains is *third-party* knowledge,
-        // since anyone can compute these candidate points without the node's key. The recipient's
-        // public key is still the KDF salt, so it is not a secret either.
-        //
-        // The base (`ff0076efaa`) validated the *blinded output* instead: it rejected an identity
-        // blinded output. For the fixed order-2 input tested, it accepted all 200 sampled keys - the
-        // blinded product was the identity in 0 of them. Those 200 keys exercise at most two distinct
-        // inputs to the blinding KDF (parity of the reduced scalar), so this measures that one input,
-        // not the order-4 or order-8 classes. This PR rejects every small-order input before deriving
-        // the hop secret, on every hop.
-        //
-        // The same run shows what the alpha costs if it is *not* rejected: `P * sk` was small order
-        // for all 200 keys and the identity for 103 of them, since `P * sk` depends only on `sk mod 2`.
-        // That is the property this guard removes from the reachable input set.
-        //
-        // Checking the public input also keeps the check on the final hop, which no longer computes an
-        // output point, and makes it independent of which group the suite computes in.
+        // The base validated the *blinded output* instead, which caught only the identity; it accepted
+        // all 200 sampled keys for an order-2 input. Rejecting the whole class on the input is new.
         if !alpha_point.is_valid() {
             return Err(CryptoError::CalculationError);
         }
@@ -244,23 +206,13 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         ))
     }
 
-    /// Validates a KDF output as a blinding scalar, on every hop.
+    /// Validates a KDF output as a blinding scalar, in the first half of the transform on every hop.
     ///
-    /// Done in the first half of the transform rather than in [`DeferredAlpha::finalize`], so that a
-    /// KDF output the suite rejects is refused on *every* hop, as the eager transform refused it.
-    /// A final hop drops `DeferredAlpha` without finalizing, so anything left to `finalize` is skipped
-    /// there.
-    ///
-    /// Two cases matter and `from_bytes` alone covers only the first:
-    /// - secp256k1 `from_bytes` rejects a value at or above the group order.
-    /// - secp256k1 also *accepts* an all-zero encoding, and zero blinds the alpha to the identity, which the eager
-    ///   transform then rejected on every hop. Without the explicit [`Scalar::is_zero`] that case would slip through
-    ///   the final hop. It is extremely rare (one KDF output in 2^256) but it is a behaviour change. The Curve25519
-    ///   suites cannot reach it, since their clamping parser never yields zero from a byte string.
-    ///
-    /// Parsing plus a zero test costs a scalar conversion, not the multiplication, so the final hop
-    /// still saves the multiplication. The scalar is parsed here, discarded, and re-parsed in
-    /// `finalize`; the raw [`SharedSecret`] is what the struct retains so that it is zeroized.
+    /// It cannot live in [`DeferredAlpha::finalize`]: a final hop never calls that, so a rejected KDF
+    /// output would be accepted there. secp256k1 both rejects values at or above the group order and
+    /// *accepts* all-zero, and zero blinds the alpha to the identity - which the eager transform
+    /// refused on every hop, so the explicit zero test preserves that. (Curve25519 clamping cannot
+    /// produce zero; see [`Scalar::is_zero`].)
     fn parse_blinding_scalar(b_k: &SharedSecret) -> hopr_types::crypto::errors::Result<E> {
         let b_k = E::from_bytes(b_k.as_ref())?;
         if b_k.is_zero() {
@@ -272,38 +224,24 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
 /// The blinded alpha a [`SharedKeys::forward_transform_deferred`] has yet to compute.
 ///
-/// Holds the point and the blinding factor it would be multiplied by, so that a caller who learns
-/// the packet is final need not pay for the multiplication whose result is then discarded.
+/// A final hop discards it, so it never pays the multiplication.
 pub(crate) struct DeferredAlpha<E: Scalar, G: GroupElement<E>> {
     alpha_point: G,
-    /// Blinding factor `b_k`, kept in its raw KDF form.
-    ///
-    /// Kept as a [`SharedSecret`] rather than as a parsed `E` so that it is zeroized on drop: `E` is a
-    /// bare curve scalar with no `ZeroizeOnDrop`. That it parses and is nonzero is checked in the first
-    /// half of the transform, on every hop, so keeping the raw bytes here does not delay a
-    /// malformed-scalar rejection to whoever finalizes.
+    /// Blinding factor `b_k` in raw KDF form, so it is zeroized on drop (`E` has no `ZeroizeOnDrop`).
+    /// Already parsed and checked nonzero in the first half.
     b_k: SharedSecret,
     _d: PhantomData<E>,
 }
 
 impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
-    /// Computes the blinded alpha, the second half of the forward transform.
-    ///
-    /// This is the multiplication [`SharedKeys::forward_transform_deferred`] leaves out; together the
-    /// two are what the eager (complete) transform used to do in one call.
+    /// Computes the blinded alpha - the multiplication the first half leaves out.
     pub(crate) fn finalize(self) -> hopr_types::crypto::errors::Result<Alpha<G::AlphaLen>> {
         let b_k_checked = SharedKeys::<E, G>::parse_blinding_scalar(&self.b_k)?;
         let alpha_new = self.alpha_point.mul(&b_k_checked);
 
-        // The result is `b * P` for the validated wire point `P` and a nonzero `b`. That is not a
-        // claim that it lies in the prime-order subgroup: `is_valid` rejects the small-order set but
-        // admits mixed-order points `P = T + Q` with `T` small order and `Q` of prime order.
-        //
-        // Since `T` and `Q` generate distinct subgroups, `b * P = b * T + b * Q` keeps a nonzero
-        // `b * Q` for any `b` that is nonzero modulo the prime order - so the small-order component
-        // cannot cancel it and the result is never the identity. The identity test here is therefore
-        // a defensive check rather than the guard that makes the output usable; the property that
-        // matters comes from `b` being nonzero, which the first half of the transform establishes.
+        // Not the prime-order subgroup: `is_valid` admits mixed-order points. But for `P = T + Q`
+        // with `T` small order and `Q` of prime order, `b * P` keeps a nonzero `b * Q` for any
+        // nonzero `b mod L`, so this can never be the identity. The check is defensive.
         if !alpha_new.is_valid_derived() {
             return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
@@ -311,11 +249,7 @@ impl<E: Scalar, G: GroupElement<E>> DeferredAlpha<E, G> {
         Ok(alpha_new.to_alpha())
     }
 
-    /// Builds a deferred alpha from its parts, so that tests can drive a `finalize` failure.
-    ///
-    /// The first half of the transform validates the blinding scalar, so on the packet path
-    /// `finalize` only fails when the resulting point is the identity. Arranging that needs an
-    /// identity `alpha_point` and any nonzero scalar, neither of which a real packet supplies.
+    /// Lets a test build the state that makes `finalize` fail (an identity point).
     #[cfg(test)]
     pub(crate) fn for_test(alpha_point: G, b_k: SharedSecret) -> Self {
         Self {
@@ -476,17 +410,10 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    /// Known-answer test pinning the wire format of the relay transform.
+    /// Pins the relay transform's wire bytes against values `ff0076efaa` emitted.
     ///
-    /// The expected bytes were produced by the pre-change implementation (`ff0076efaa`) from the same
-    /// fixed alpha and key pair, so every value here is opaque to the implementation under test: the
-    /// per-hop shared secret and the blinded alpha handed to the next hop. The round-trip test above
-    /// compares the deferral against itself and so cannot see a change to the KDF context or the
-    /// blinding salt; this one does, because a different salt moves these bytes. A change that broke
-    /// compatibility with existing nodes would fail here.
-    ///
-    /// The sender's `new_shared_keys` cannot be pinned the same way - it starts from a random alpha -
-    /// so the alpha below is the one the pre-change implementation emitted, used as a fixed input.
+    /// The round-trip test compares the deferral against itself and cannot see a changed KDF context
+    /// or blinding salt; these bytes can.
     #[cfg(feature = "ed25519")]
     #[test]
     fn the_relay_transform_matches_the_pre_deferral_known_answers() -> anyhow::Result<()> {
@@ -539,12 +466,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    /// The pre-deferral eager forward transform, spelled out.
-    ///
-    /// Deliberately re-derived here from the operations in
-    /// [`SharedKeys::forward_transform_deferred`] plus [`DeferredAlpha::finalize`], rather than calling
-    /// either, so that the test above has an expectation that does not move when the implementation
-    /// moves.
+    /// The pre-deferral eager transform, re-derived rather than calling the code under test.
     #[allow(clippy::type_complexity)] // the alpha type is spelled out by the trait, not chosen here
     fn reference_forward_transform<S: SphinxSuite>(
         alpha: &Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
@@ -561,14 +483,7 @@ pub(crate) mod tests {
         Ok((alpha_new.to_alpha(), secret))
     }
 
-    /// A degenerate (identity) alpha must be rejected on the **deferred** path too.
-    ///
-    /// This is the regression the deferral invites: the blinded alpha used to be checked on every
-    /// hop, and moving that multiply behind the final-hop branch would silently move the check off
-    /// the final hop with it. With an identity alpha, `s_k = identity * sk` is independent of the
-    /// private key, so the shared secret - and the header MAC it authenticates - is computable by
-    /// anyone: a sender could then address a fully authenticated packet to a node whose key it does
-    /// not know. The check must therefore live in the first half of the transform, not in `finalize`.
+    /// An identity alpha must be rejected on the deferred path, where `finalize` no longer runs.
     #[cfg(feature = "ed25519")]
     #[test]
     fn a_degenerate_alpha_is_rejected_on_the_deferred_path() -> anyhow::Result<()> {
@@ -597,14 +512,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    /// A **nonidentity** small-order alpha must be rejected too.
-    ///
-    /// The identity is not the only degenerate input: for a point of order `d`, `alpha * sk` takes at
-    /// most `d` values regardless of `sk` (in particular two for `d = 2`, four for `d = 4`), so the
-    /// shared secret, and the header MAC it authenticates, is derivable by a third party. The
-    /// identity-only check the code used to have (`!is_identity()`) let these through. All eight
-    /// small-order points are tried, so the check is exercised against each torsion class rather than
-    /// against the identity alone.
+    /// Each of the eight small-order classes must be rejected, not just the identity.
     #[cfg(feature = "ed25519")]
     #[test]
     fn a_nonidentity_small_order_alpha_is_rejected() -> anyhow::Result<()> {
@@ -692,15 +600,8 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    /// A zero blinding scalar must be rejected in the first half of the transform.
-    ///
-    /// `Secp256k1Scalar::from_bytes` accepts 32 zero bytes, and zero blinds the alpha to the
-    /// identity. On `ff0076efaa` the eager transform rejected that identity output on *every* hop.
-    /// The final hop no longer computes the output, so the zero case has to be refused where the
-    /// scalar is parsed - otherwise a final hop would accept a packet the eager transform rejected.
-    ///
-    /// Driven through the check the transform itself calls, since a zero KDF output is a one-in-2^256
-    /// event and cannot be produced by choosing an alpha.
+    /// A zero blinding scalar must be rejected on every hop, including the final one, where
+    /// `finalize` no longer runs to catch the identity it produces.
     #[cfg(feature = "secp256k1")]
     #[test]
     fn a_zero_blinding_scalar_is_rejected() -> anyhow::Result<()> {
@@ -753,13 +654,8 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    /// A small-order alpha must be rejected by the **Montgomery** transform, not only by its
-    /// `is_valid`.
-    ///
-    /// The `montgomery_is_valid` test in `ec_groups` covers the check in isolation; this one drives
-    /// the same points through `forward_transform_deferred`, which is what the packet path calls.
-    /// `X25519Suite::from_alpha` accepts any 32-byte coordinate, so the rejection has to come from
-    /// the guard inside the transform rather than from decoding.
+    /// The Montgomery *transform* must reject small-order alphas too: its `from_alpha` accepts any
+    /// 32-byte coordinate, so the rejection has to come from the guard inside the transform.
     #[cfg(feature = "x25519")]
     #[test]
     fn a_small_order_montgomery_alpha_is_rejected_by_the_transform() -> anyhow::Result<()> {
