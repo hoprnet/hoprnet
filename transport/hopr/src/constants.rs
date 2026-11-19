@@ -15,15 +15,11 @@ pub(crate) const MAXIMUM_MSG_OUTGOING_BUFFER_SIZE: usize = 256;
 /// Maximum number of probes buffered in the probe lane before the probe emitter observes
 /// backpressure.
 ///
-/// Sized to one probe round, so the emitter never stalls inside a round: a round is several hundred
-/// packets and 1,024 slots cover it, at about 3.8 MB (1,024 × 3,669 B per packet).
-///
-/// The buffer is not free. A probe enters the lane after its 3 s timeout started, because
-/// `continuously_scan` inserts the timer once the send returns, so a lane this deep lets a whole
-/// round start its timers together and then wait in the lane. A lane near `max_parallel_probes`
-/// would keep the timer honest through backpressure instead. Which side wins is an open point on
-/// hoprnet#8704 ("probe timeout starts too early"); this value follows the issue's stated capacity.
-pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 1_024;
+/// The lane is small on purpose. `continuously_scan` records a probe in its timeout cache only once
+/// the send returns, so whatever a probe waits in this lane is already inside its 3 s timeout. A lane
+/// of 16 bounds that wait to 16 probes, at most 59 kB (16 × 3,669 B), and the back-pressure holds the
+/// emitter instead: the probe share is applied by the scheduler, which is where the pacing belongs.
+pub(crate) const MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE: usize = 16;
 
 /// Time within Start protocol must finish session initiation.
 /// This base value is always multiplied by the (max) number of hops, times 2 (for both-ways).
@@ -51,20 +47,20 @@ mod tests {
         );
     }
 
-    /// Guard against inflating the probe lane past what one probe round needs. Every slot holds a
-    /// full 3,669 B packet, so 1,024 slots already cap the lane at about 3.8 MB, and a larger lane
-    /// only lets probes queue further behind session data.
+    /// Guard against growing the probe lane. `continuously_scan` starts a probe's timeout before the
+    /// probe waits in this lane, so every queued slot is timeout budget a probe spends not being sent.
+    /// The lane stays small enough that the back-pressure, not the buffer, paces the emitter.
     #[allow(clippy::assertions_on_constants)]
     #[test]
-    fn probe_lane_capacity_covers_one_round_within_its_memory_bound() {
+    fn probe_lane_stays_small_enough_to_keep_the_probe_timeout_honest() {
         assert!(
-            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE <= 1_024,
-            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} exceeds one probe round \
-             (1,024 packets, about 3.8 MB)"
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE > 0,
+            "a zero-sized probe lane would stall the emitter on every probe"
         );
         assert!(
-            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE > MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
-            "the probe lane has to hold a whole probe round, which the session lane cannot"
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE <= 32,
+            "MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE} lets probes queue past \
+             the probe timeout they already started"
         );
     }
 

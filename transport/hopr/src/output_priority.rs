@@ -390,53 +390,54 @@ mod tests {
         }
     }
 
-    /// A2: a queued burst of probes must not hold back one session packet, whatever its size and
-    /// whatever the point of the pacing cycle the packet arrives in.
+    /// A2: a full probe lane must not hold back one session packet, whatever point of the pacing
+    /// cycle the packet arrives in. The burst is the lane itself, which is the most the lane can hold
+    /// at one time; a longer round is paced by back-pressure and covered by
+    /// [`a_probe_round_never_queues_more_than_the_probe_lane_holds`].
     #[test]
     fn session_packet_enters_ahead_of_a_probe_burst() {
-        for burst in [650, MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE] {
-            for phase in 0..10 {
-                let lanes = Lanes::new();
-                for _ in 0..burst {
-                    assert!(lanes.probes.push(Class::Probe), "the burst must fit the probe lane");
-                }
-                let mut merged = Box::pin(merge_lanes(
-                    lanes.session.stream(),
-                    lanes.probes.stream(),
-                    lanes.noise.stream(),
-                    0.1,
-                ));
-
-                // Drain `phase` slots first, so every position of the pacing cycle is covered. With
-                // an idle session lane every slot is a probe.
-                let mut drawn_probes = 0;
-                for _ in 0..phase {
-                    assert_eq!(Some(Class::Probe), draw(&mut merged));
-                    drawn_probes += 1;
-                }
-
-                assert!(lanes.session.push(Class::Session));
-                let mut waited = 0;
-                loop {
-                    waited += 1;
-                    assert!(
-                        waited <= 2,
-                        "burst {burst} phase {phase}: the session packet is still queued after {waited} slots, more \
-                         than the one owed probe slot"
-                    );
-                    match draw(&mut merged) {
-                        Some(Class::Session) => break,
-                        Some(Class::Probe) => drawn_probes += 1,
-                        other => panic!("burst {burst} phase {phase}: unexpected slot {other:?}"),
-                    }
-                }
-                assert!(waited <= 2, "the session packet took {waited} slots");
-                assert_eq!(
-                    burst - drawn_probes,
-                    lanes.probes.len(),
-                    "burst {burst} phase {phase}: the session packet must not consume the burst"
-                );
+        let burst = MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE;
+        for phase in 0..10 {
+            let lanes = Lanes::new();
+            for _ in 0..burst {
+                assert!(lanes.probes.push(Class::Probe), "the burst must fit the probe lane");
             }
+            let mut merged = Box::pin(merge_lanes(
+                lanes.session.stream(),
+                lanes.probes.stream(),
+                lanes.noise.stream(),
+                0.1,
+            ));
+
+            // Drain `phase` slots first, so every position of the pacing cycle is covered. With an
+            // idle session lane every slot is a probe.
+            let mut drawn_probes = 0;
+            for _ in 0..phase {
+                assert_eq!(Some(Class::Probe), draw(&mut merged));
+                drawn_probes += 1;
+            }
+
+            assert!(lanes.session.push(Class::Session));
+            let mut waited = 0;
+            loop {
+                waited += 1;
+                assert!(
+                    waited <= 2,
+                    "phase {phase}: the session packet is still queued after {waited} slots, more than the one owed \
+                     probe slot"
+                );
+                match draw(&mut merged) {
+                    Some(Class::Session) => break,
+                    Some(Class::Probe) => drawn_probes += 1,
+                    other => panic!("phase {phase}: unexpected slot {other:?}"),
+                }
+            }
+            assert!(waited <= 2, "the session packet took {waited} slots");
+            assert_eq!(
+                burst - drawn_probes,
+                lanes.probes.len(),
+                "phase {phase}: the session packet must not consume the burst"
+            );
         }
     }
 
@@ -849,6 +850,315 @@ mod tests {
         drop(session_tx);
         probe_tx.send(3u8).await.context("probe lane send")?;
         assert_eq!(Some(3), merged.next().await);
+        Ok(())
+    }
+
+    /// A slot drawn from a merge of the real probe lane and a synthetic session lane.
+    ///
+    /// A probe carries its index, so the test can match an emission to its send.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Slot {
+        Session,
+        Probe(usize),
+    }
+
+    /// A quiet-time probe round: `count` neighbor probes to one destination.
+    struct ProbeRound {
+        destination: hopr_api::types::crypto::types::OffchainPublicKey,
+        pseudonym: hopr_api::types::internal::prelude::HoprPseudonym,
+        hops: hopr_api::types::internal::routing::RoutingOptions,
+        count: usize,
+    }
+
+    impl hopr_api::ct::ProbingTrafficGeneration for ProbeRound {
+        fn build(&self) -> futures::stream::BoxStream<'static, hopr_api::ct::ProbeRouting> {
+            use futures::StreamExt as _;
+            use hopr_api::ct::ProbeRouting;
+
+            let destination = self.destination;
+            let pseudonym = self.pseudonym;
+            let hops = self.hops.clone();
+            futures::stream::iter(0..self.count)
+                .map(move |_| {
+                    ProbeRouting::Neighbor(hopr_api::types::internal::routing::DestinationRouting::Forward {
+                        destination: Box::new(destination.into()),
+                        pseudonym: Some(pseudonym),
+                        forward_options: hops.clone(),
+                        return_options: Some(hops.clone()),
+                    })
+                })
+                .boxed()
+        }
+    }
+
+    /// A saturated session lane merged with the probe lane as the transport builds it.
+    struct RealLanes {
+        merged: std::pin::Pin<Box<dyn Stream<Item = Slot>>>,
+        session: LaneHandle<Slot>,
+        probe_tx: DepthSink<hopr_utils::network_types::crossfire_sink::CrossfireSink<Slot>>,
+        depth: LaneDepth,
+    }
+
+    fn real_lanes() -> RealLanes {
+        let session = LaneHandle::<Slot>::new(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        session.keep_full(Slot::Session);
+        let (probe_tx, probe_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<Slot>(
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE,
+        );
+        let depth = LaneDepth::default();
+        let probe_tx = DepthSink::new(probe_tx, depth.clone());
+        let probe_rx = DepthStream::new(probe_rx, depth.clone());
+        RealLanes {
+            merged: Box::pin(merge_lanes(
+                session.stream(),
+                probe_rx,
+                futures::stream::pending::<Slot>(),
+                0.1,
+            )),
+            session,
+            probe_tx,
+            depth,
+        }
+    }
+
+    /// Waits until a producer has filled the probe lane.
+    ///
+    /// Without it a draw can start against a lane that is empty only because the producer task has
+    /// not been scheduled yet, which measures the harness rather than the lane.
+    async fn wait_for_full_lane(depth: &LaneDepth) -> anyhow::Result<()> {
+        for _ in 0..100_000 {
+            if depth.get() >= MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE {
+                return Ok(());
+            }
+            tokio::task::yield_now().await;
+        }
+        anyhow::bail!("the probe lane never filled")
+    }
+
+    /// A10: a 650-probe round against a saturated session lane never leaves more than one lane of
+    /// probes waiting, and no probe waits longer than one full lane can take at the default share.
+    ///
+    /// The lane is the real bounded channel, so the producer blocks once it is full and the round is
+    /// paced by back-pressure instead of queueing as a whole.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_probe_round_never_queues_more_than_the_probe_lane_holds() -> anyhow::Result<()> {
+        use std::sync::atomic::AtomicUsize;
+
+        use anyhow::Context as _;
+        use futures::{SinkExt, StreamExt};
+
+        const ROUND: usize = 650;
+        // A probe that just left its send has at most one full lane of probes ahead of it, and each
+        // probe slot is at most `max_session_run + 1` = 10 slots away.
+        const BOUND_SLOTS: usize = MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE * 10;
+
+        let lanes = real_lanes();
+        let RealLanes {
+            mut merged,
+            session,
+            mut probe_tx,
+            depth,
+        } = lanes;
+
+        let slots = Arc::new(AtomicUsize::new(0));
+        let sent_at: Arc<Vec<AtomicUsize>> = Arc::new((0..ROUND).map(|_| AtomicUsize::new(usize::MAX)).collect());
+
+        let producer = {
+            let slots = Arc::clone(&slots);
+            let sent_at = Arc::clone(&sent_at);
+            tokio::spawn(async move {
+                let mut sent = 0;
+                for index in 0..ROUND {
+                    if probe_tx.send(Slot::Probe(index)).await.is_err() {
+                        break;
+                    }
+                    // The slot count once the send returned: the probe's timer starts here. A probe
+                    // the consumer takes before this store lands was emitted at once, so the read
+                    // below falls back to no wait instead of a negative one.
+                    sent_at[index].store(slots.load(Ordering::SeqCst), Ordering::SeqCst);
+                    sent += 1;
+                }
+                sent
+            })
+        };
+
+        wait_for_full_lane(&depth).await?;
+
+        let mut received = 0;
+        let mut deepest = 0;
+        while received < ROUND {
+            slots.fetch_add(1, Ordering::SeqCst);
+            let item = merged.next().await.context("the session lane is always queued")?;
+            session.keep_full(Slot::Session);
+            deepest = deepest.max(depth.get());
+            if let Slot::Probe(index) = item {
+                let sent = sent_at[index].load(Ordering::SeqCst);
+                let waited = if sent == usize::MAX {
+                    0
+                } else {
+                    slots.load(Ordering::SeqCst).saturating_sub(sent)
+                };
+                assert!(
+                    waited <= BOUND_SLOTS,
+                    "probe {index} waited {waited} slots after its send returned, above the {BOUND_SLOTS} bound"
+                );
+                received += 1;
+            }
+        }
+        let sent = producer.await.context("the producer task panicked")?;
+        assert_eq!(ROUND, sent, "the producer must have sent the whole round");
+        assert!(
+            deepest <= MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE + 1,
+            "{deepest} probes were counted in the lane, above the {} the lane and its sink can hold",
+            MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE + 1
+        );
+        Ok(())
+    }
+
+    /// A11, first half: the real lane keeps the probe share when the producer always has a probe
+    /// waiting.
+    ///
+    /// The producer is polled once per slot, which is a fair share of the scheduler and removes the
+    /// runtime from the measurement: what is measured is how many slots a refill costs after a pop.
+    /// A real slot runs the routing and encoding stages, so a producer is never slower than that.
+    #[tokio::test]
+    async fn the_real_probe_lane_keeps_its_share_with_a_producer_that_never_waits() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use futures::{SinkExt, StreamExt};
+
+        let RealLanes {
+            mut merged,
+            session,
+            mut probe_tx,
+            depth,
+        } = real_lanes();
+
+        // The producer always has the next probe ready.
+        let producer = async {
+            let mut index = 0usize;
+            while probe_tx.send(Slot::Probe(index)).await.is_ok() {
+                index += 1;
+            }
+        };
+        futures::pin_mut!(producer);
+
+        // Fill the lane before the first draw, so the run does not measure the producer's start-up.
+        for _ in 0..1_000 {
+            if depth.get() >= MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE {
+                break;
+            }
+            let _ = futures::poll!(producer.as_mut());
+        }
+        assert!(
+            depth.get() >= MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE,
+            "the producer could not fill the probe lane"
+        );
+
+        let mut probes = 0;
+        for _ in 0..1_000 {
+            let _ = futures::poll!(producer.as_mut());
+            if let Slot::Probe(_) = merged.next().await.context("the session lane is always queued")? {
+                probes += 1;
+            }
+            session.keep_full(Slot::Session);
+        }
+        assert!(
+            (99..=101).contains(&probes),
+            "the real probe lane delivered {probes} probes in 1,000 slots at a share of 0.1"
+        );
+        Ok(())
+    }
+
+    /// A11, second half: the real probe emitter, with `max_parallel_probes` sends in flight, also
+    /// keeps the share.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_real_probe_emitter_keeps_its_share() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use futures::StreamExt;
+        use hopr_api::types::internal::{prelude::HoprPseudonym, routing::DestinationRouting};
+        use hopr_protocol_app::prelude::ReservedTag;
+
+        use crate::Keypair;
+
+        const ROUND: usize = 650;
+
+        let allocator = hopr_transport_tag_allocator::create_allocators_from_config(&Default::default())?
+            .pop()
+            .context("missing probe tag allocator")?
+            .1;
+        let destination = *crate::OffchainKeypair::from_secret(&[0x11; 32])
+            .context("valid destination secret")?
+            .public();
+        let graph = hopr_network_graph::ChannelGraph::new(
+            *crate::OffchainKeypair::from_secret(&[0x22; 32])
+                .context("valid graph secret")?
+                .public(),
+        );
+        let pseudonym = HoprPseudonym::from([0x33u8; 10]);
+        let hops =
+            hopr_api::types::internal::routing::RoutingOptions::Hops(0u8.try_into().context("0 is a valid hop count")?);
+
+        let (probe_tx, probe_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(
+            DestinationRouting,
+            crate::ApplicationDataOut,
+        )>(MAXIMUM_PROBE_MSG_OUTGOING_BUFFER_SIZE);
+        let depth = LaneDepth::default();
+        let probe_tx = DepthSink::new(probe_tx, depth.clone());
+        let probe_rx = DepthStream::new(probe_rx, depth.clone());
+
+        let (processes, _classifier) = crate::Probe::new(crate::config::ProbeConfig::default(), allocator)
+            .continuously_scan(
+                probe_tx,
+                futures::stream::pending(),
+                ProbeRound {
+                    destination,
+                    pseudonym,
+                    hops: hops.clone(),
+                    count: ROUND,
+                },
+                graph,
+            )
+            .await;
+
+        // The probe lane carries probes only, so a session item is told apart by its tag.
+        let session_item = (
+            DestinationRouting::Forward {
+                destination: Box::new(destination.into()),
+                pseudonym: Some(pseudonym),
+                forward_options: hops.clone(),
+                return_options: Some(hops),
+            },
+            crate::ApplicationDataOut::with_no_packet_info(crate::ApplicationData::new(1234u64, b"session data")?),
+        );
+        let is_probe = |item: &(DestinationRouting, crate::ApplicationDataOut)| {
+            item.1.data.application_tag == ReservedTag::Ping.into()
+        };
+
+        let mut merged = Box::pin(merge_lanes(
+            futures::stream::repeat(session_item),
+            probe_rx,
+            futures::stream::pending(),
+            0.1,
+        ));
+
+        wait_for_full_lane(&depth).await?;
+
+        let mut probes = 0;
+        for _ in 0..1_000 {
+            let item = merged.next().await.context("the session lane is always queued")?;
+            if is_probe(&item) {
+                probes += 1;
+            }
+            // One slot costs the routing and encoding stages in the transport. Even this much delay
+            // already beats the emitter by two orders of magnitude, so the emitter is not the
+            // bottleneck the test could accidentally measure.
+            futures_timer::Delay::new(std::time::Duration::from_micros(20)).await;
+        }
+        processes.abort_all();
+        assert!(
+            (99..=101).contains(&probes),
+            "the real probe emitter delivered {probes} probes in 1,000 slots at a share of 0.1"
+        );
         Ok(())
     }
 
