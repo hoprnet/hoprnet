@@ -2,7 +2,7 @@ use hopr_types::crypto::errors::Result;
 #[cfg(feature = "x25519")]
 use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
-use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity};
+use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar};
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
 use hopr_types::crypto::types::{ExpandedOffchainPublicKey, OffchainPublicKey};
 #[cfg(feature = "secp256k1")]
@@ -81,6 +81,11 @@ impl Scalar for Curve25519Scalar {
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         hopr_types::crypto::utils::x25519_scalar_from_bytes(bytes)
     }
+
+    fn is_zero(&self) -> bool {
+        // `PartialEq` on this scalar is constant-time (`ct_eq` under the hood).
+        *self == Self::ZERO
+    }
 }
 
 #[cfg(feature = "secp256k1")]
@@ -107,6 +112,13 @@ impl Scalar for Secp256k1Scalar {
             bytes,
         )?))
     }
+
+    fn is_zero(&self) -> bool {
+        // `k256_scalar_from_bytes` accepts an all-zero encoding, so this is reachable from a KDF
+        // output and not only from an empty value. `Scalar::is_zero` here is `ff::Field::is_zero`,
+        // which is constant-time.
+        self.0.is_zero().into()
+    }
 }
 
 #[cfg(feature = "x25519")]
@@ -126,7 +138,19 @@ impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
     }
 
     fn is_valid(&self) -> bool {
-        use IsIdentity;
+        // Must reject small-order points, not just the identity. `None` from `to_edwards` means a
+        // twist coordinate (`u = 2`, `u = -1`, ...) and must be rejected, not skipped. Note `u = 0`
+        // maps to the Edwards order-2 point, so it arrives via `Some` and is caught below.
+        //
+        // `is_small_order` (three doublings) rather than `is_torsion_free` (a scalar multiply): this
+        // runs per packet. It admits mixed-order points, which is the intended policy - see the
+        // Edwards `is_valid` below.
+        self.to_edwards(0).is_some_and(|edwards| !edwards.is_small_order())
+    }
+
+    /// A multiple of an already-validated point: only the identity can be wrong.
+    fn is_valid_derived(&self) -> bool {
+        use hopr_types::crypto::primitives::IsIdentity;
         !self.is_identity()
     }
 }
@@ -150,10 +174,19 @@ impl GroupElement<Curve25519Scalar> for Curve25519Point {
     }
 
     fn is_valid(&self) -> bool {
-        // Ed25519 scalars always come clamped (pre-multiplied by the curve's co-factor)
-        // and therefore cannot result into points of small order.
-        // See `x25519_scalar_from_bytes` for more details.
-        use IsIdentity;
+        // This runs on wire input, which a sender controls, so it must be on the point.
+        //
+        // `is_small_order` (three doublings) rather than `is_torsion_free` (a scalar multiply): this
+        // is per packet. It admits mixed-order points (`Q + T`, `Q` of prime order) by choice:
+        // rejecting them would change the accept set for peers that send them, and costs the
+        // variable-base multiply the deferral exists to avoid. Only the small-order class, whose
+        // secret collapses for every key, is refused.
+        !self.is_small_order()
+    }
+
+    /// As for the Montgomery implementation: only the identity can be wrong here.
+    fn is_valid_derived(&self) -> bool {
+        use hopr_types::crypto::primitives::IsIdentity;
         !self.is_identity()
     }
 }
@@ -304,19 +337,159 @@ mod tests {
 
     #[cfg(feature = "secp256k1")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_secp256k1_suite(nodes: usize) {
-        generic_sphinx_suite_test::<super::Secp256k1Suite>(nodes)
+    fn test_secp256k1_suite(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::Secp256k1Suite>(nodes)?;
+        Ok(())
     }
 
     #[cfg(feature = "ed25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_ed25519_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<crate::Ed25519Suite>(nodes)
+    fn test_ed25519_shared_keys(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::Ed25519Suite>(nodes)?;
+        Ok(())
     }
 
     #[cfg(feature = "x25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
-    fn test_montgomery_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<super::X25519Suite>(nodes)
+    fn test_montgomery_shared_keys(nodes: usize) -> anyhow::Result<()> {
+        generic_sphinx_suite_test::<crate::X25519Suite>(nodes)?;
+        Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "x25519"))]
+mod montgomery_is_valid {
+    use super::*;
+
+    #[test]
+    fn small_order_montgomery_points_are_rejected() {
+        let small: [[u8; 32]; 4] = [
+            [0u8; 32],
+            [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            [
+                236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
+            ],
+            [
+                238, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
+            ],
+        ];
+        // The Montgomery ladder has no sign bit, so these come from the compressed `u`-coordinate
+        // classes directly; the identity, order-2 and the two order-4 classes are covered.
+        for (i, s) in small.into_iter().enumerate() {
+            let p = Curve25519MontgomeryPoint(s);
+            assert!(!p.is_valid(), "small-order Montgomery point {i} passed is_valid");
+        }
+
+        // The order-8 classes are most reliably reached by *projecting* the Edwards eight-torsion set
+        // onto Montgomery coordinates, which also exercises the `to_montgomery`/`to_edwards` pair the
+        // check relies on. Each projected point must be rejected.
+        let edwards_torsion: [[u8; 32]; 8] = [
+            // identity, order 2, four of order 4/8 on the main curve (canonical compressed forms)
+            [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            [0u8; 32],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05,
+            ],
+            [
+                0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5,
+                0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x85,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a,
+            ],
+            [
+                0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a,
+                0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0xfa,
+            ],
+            [
+                0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+            ],
+            // The two signs at y = 0 are the order-four pair; they project to one Montgomery coordinate.
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+            ],
+        ];
+        let mut projected = std::collections::BTreeSet::new();
+        let mut edwards_points = std::collections::BTreeSet::new();
+        for (i, bytes) in edwards_torsion.into_iter().enumerate() {
+            let edwards = Curve25519CompressedPoint(bytes)
+                .decompress()
+                .unwrap_or_else(|| panic!("torsion fixture {i} must decompress"));
+            assert!(edwards.is_small_order(), "fixture {i} must be small order");
+            // Track the decompressed points, not only the projected `u` values: two torsion entries
+            // can project onto the same coordinate *and* be the same point (a duplicated identity),
+            // which the count of four below cannot tell apart. This check caught exactly that.
+            edwards_points.insert(edwards.compress().0);
+            let montgomery = edwards.to_montgomery();
+            projected.insert(montgomery.0);
+            assert!(
+                !montgomery.is_valid(),
+                "projected torsion point {i} passed the Montgomery is_valid"
+            );
+        }
+        assert_eq!(
+            edwards_points.len(),
+            8,
+            "the fixture must be eight distinct Edwards torsion points"
+        );
+        // They project onto four distinct `u` values, because `u` has no sign: P and -P collapse.
+        assert_eq!(
+            projected.len(),
+            4,
+            "the torsion subgroup must project onto four distinct u values"
+        );
+        let good = Curve25519MontgomeryPoint([
+            9u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ]);
+        assert!(good.is_valid(), "the Montgomery basepoint must be valid");
+
+        // A successful conversion: an alpha this suite produces (a real curve point) must pass. This is
+        // the case `is_valid` is called with on the packet path, and it exercises the `Some` arm.
+        let (alpha, _) = <Curve25519MontgomeryPoint as GroupElement<Curve25519Scalar>>::random_pair();
+        assert!(alpha.is_valid(), "a generated Montgomery alpha must be valid");
+
+        // A failed conversion: a twist coordinate must be rejected, not skipped. `to_edwards` returns
+        // `None` for `u = -1`, whose right-hand side `486660` is a non-square, so it lies on the twist
+        // rather than the curve. Treating `None` as valid is what the first version of this check got
+        // wrong.
+        let mut u_minus_one = [0xffu8; 32];
+        u_minus_one[0] = 0xec;
+        u_minus_one[31] = 0x7f;
+        let twist_coordinate = Curve25519MontgomeryPoint(u_minus_one);
+        assert!(
+            twist_coordinate.to_edwards(0).is_none(),
+            "u = -1 is a twist coordinate, so it has no Edwards representative"
+        );
+        assert!(!twist_coordinate.is_valid(), "a twist coordinate must be invalid");
+
+        // `u = -1` is not the only twist coordinate. `u = 2` is another (dalek's own conversion test
+        // uses the pair), so the rejection must be for `None` generally, not for that special case.
+        let mut u_two = [0u8; 32];
+        u_two[0] = 2;
+        let u_two = Curve25519MontgomeryPoint(u_two);
+        assert!(
+            u_two.to_edwards(0).is_none(),
+            "u = 2 is also a twist coordinate, so it has no Edwards representative"
+        );
+        assert!(!u_two.is_valid(), "a twist coordinate must be invalid");
+
+        // The order-2 point is reached through `u = 0`, and it takes the `Some` arm: dalek maps it to
+        // the Edwards order-2 point, so it is rejected by `is_small_order` rather than by `None`.
+        let order_two = Curve25519MontgomeryPoint([0u8; 32]);
+        let edwards = order_two
+            .to_edwards(0)
+            .expect("u = 0 must map to the Edwards order-2 point");
+        assert!(edwards.is_small_order(), "u = 0 must be a small-order point");
+        assert!(!order_two.is_valid(), "u = 0 must be invalid");
     }
 }

@@ -18,10 +18,15 @@ ignore = [
   "RUSTSEC-2026-0530", # hickory-proto: parent-side NSEC at a zone cut accepted as proof of nonexistence
   "RUSTSEC-2026-0531", # hickory-proto: child-side NSEC or NSEC3 record accepted as proof that a delegation has no DS record
   "RUSTSEC-2026-0532", # hickory-proto: parent-side NSEC3 at a zone cut accepted as proof of nonexistence
+  "RUSTSEC-2026-0549", # hickory-proto: NSEC3 NODATA at a zone apex accepted without an NSEC3 record matching the query name
+  "RUSTSEC-2026-0550", # hickory-proto: unsigned NSEC or NSEC3 record used in a nonexistence proof
+  "RUSTSEC-2026-0551", # hickory-proto: records with a DNS class other than the query's marked secure without being validated
   "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained, pulled by alloy-sol-macro 1.6.0 and aquamarine 0.6.0; validator_derive uses proc-macro-error3, not this crate
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
   "RUSTSEC-2026-0249", # `smartstring` unmaintained, requires `opentelemetry-prometheus-text-exporter` > 0.3.0
+  "RUSTSEC-2026-0542", # `humantime` unmaintained, pulled by humantime-serde 1.1.1 (via hopr-transport-session); no maintained replacement wired up yet
+  "RUSTSEC-2026-0543", # `chrono` unmaintained, pulled by the alloy signer stack; migration is tracked separately
   "RUSTSEC-2026-0387", # `crypto-bigint` 0.5.5 timing variability, pulled by elliptic-curve 0.13.8 -> k256 0.13.4 (alloy's signer stack); fix needs elliptic-curve 0.14.x / k256 0.14.x, needs an alloy bump
 ]
 informational_warnings = ["unmaintained"]
