@@ -784,12 +784,12 @@ pub(crate) mod tests {
         for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
             From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
-        let pubkeys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
+        let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let mapper = SimpleBiMapper::<S, TestHeader<S>>(
             keypairs
                 .iter()
                 .enumerate()
-                .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
+                .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
                 .collect::<BiHashMap<_, _>>(),
         );
 
