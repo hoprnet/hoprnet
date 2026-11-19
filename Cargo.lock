@@ -4247,9 +4247,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a8b9c0b368425475e7ee9aa005909fb12ada2b161796dadd874b67fca01de6f"
+version = "0.12.0"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=bot%2Flazy-dial-driven-probing#597e8c32291df95d8951bd9a999a78512e70a966"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4316,9 +4315,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0947dbc8e4e435e0b77c720dc6761ba832d39a2b2ac12003e413f6395a611ca"
+version = "0.13.0"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=bot%2Flazy-dial-driven-probing#597e8c32291df95d8951bd9a999a78512e70a966"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4326,6 +4324,7 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-utilities",
+ "humantime-serde",
  "indexmap 2.14.2",
  "lazy_static",
  "parking_lot 0.12.5",
@@ -4334,8 +4333,10 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "smart-default",
  "thiserror 2.0.21",
  "tracing",
+ "validator",
 ]
 
 [[package]]
