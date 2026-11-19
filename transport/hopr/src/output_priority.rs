@@ -6,14 +6,14 @@
 //!
 //! The order comes from two merges:
 //!
-//! 1. [`select_with_strategy`] merges the session and the probe lane. [`PacedPollState`] chooses the session lane for
-//!    at most [`max_session_run`] slots in a row, then yields one probe slot. The probe lane therefore keeps the
-//!    configured share of the slots while session data is queued, and gets every free slot while it is not.
+//! 1. `select_with_strategy` merges the session and the probe lane. `PacedPollState` chooses the session lane for at
+//!    most `max_session_run` slots in a row, then yields one probe slot. The probe lane therefore keeps the configured
+//!    share of the slots while session data is queued, and gets every free slot while it is not.
 //! 2. The result is merged with the noise lane behind a constant preference for the left input, so noise takes a slot
 //!    only when the session and the probe lane are both empty.
 //!
 //! The strategy counts choices, not emissions: when the chosen lane has nothing to yield,
-//! [`select_with_strategy`] falls through to the other lane, unseen by the counter. Both guarantees
+//! `select_with_strategy` falls through to the other lane, unseen by the counter. Both guarantees
 //! hold while both lanes are queued, which is what the tests drive. Transient occupancy just
 //! favours probes.
 //!
@@ -62,7 +62,7 @@ pub struct OutputPriorityConfig {
     /// Share of the emission slots the probe lane keeps while session data is queued.
     ///
     /// The value is a fraction of all slots, so the longest run of session slots follows as
-    /// [`max_session_run`]: `0.1` allows 9 session slots between two probe slots.
+    /// `max_session_run`: `0.1` allows 9 session slots between two probe slots.
     ///
     /// `0.0` gives probes a slot only while the session lane is empty. `1.0` gives probes the
     /// first slot of every run, which is one probe slot for every session slot.
@@ -109,7 +109,7 @@ fn max_session_run(share: f64) -> usize {
 }
 
 /// Chooses the lane to poll first on the next slot, holding the session lane to
-/// [`max_session_run`] slots in a row.
+/// `max_session_run` slots in a row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PacedPollState {
     max_session_run: usize,
