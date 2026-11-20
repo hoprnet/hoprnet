@@ -2843,7 +2843,7 @@ mod tests {
 
     /// A forward verdict makes one overdue reply enough, then the usual confirmation applies.
     #[test]
-    fn a_forward_judged_relayer_should_be_judged_on_one_overdue_reply() {
+    fn a_forward_judged_relayer_should_be_judged_on_one_overdue_reply() -> anyhow::Result<()> {
         let (health, relayer) = black_hole_candidate(1);
         forward_judged(&health, &[relayer]);
         assert_eq!(vec![relayer], judged_dead(&health.refresh(4)));
@@ -2851,9 +2851,13 @@ mod tests {
             !health.is_confirmed_dead(&relayer),
             "confirmed only after VERDICT_CONFIRMATION"
         );
-        confirm_verdicts(&health);
+        // A flush VERDICT_CONFIRMATION later, the forward verdict still active: that refresh confirms it
+        for mut since in health.dead_since.iter_mut() {
+            *since.value_mut() = ago(VERDICT_CONFIRMATION + Duration::from_millis(1))?;
+        }
         health.refresh(4);
-        assert!(health.is_confirmed_dead(&relayer));
+        assert!(health.dead.contains(&relayer) && health.confirmed.contains(&relayer));
+        Ok(())
     }
 
     #[test]
