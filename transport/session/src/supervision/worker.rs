@@ -250,6 +250,17 @@ async fn worker_loop(
     }
 
     loop {
+        // The level the slot keeps on the gate, fed to the supervisor on every turn. A turn that only
+        // exists because of a nudge (`SessionPixEvent::DataPlaneChanged`) ends up here.
+        if supervisor.detach_level_differs(gate.data_plane_detached()) {
+            let actions = supervisor.set_data_plane_detached(gate.data_plane_detached(), Instant::now());
+            let keep_running = dispatch(&actions, supervisor.closed, &action_tx, &gate);
+            publish_telemetry(&mut supervisor, &gate, &telemetry);
+            if !keep_running {
+                return;
+            }
+        }
+
         // Two independent timers, one wake-up. The deadline sweep is the lifecycle's, the fill tick
         // is the rate planner's, and neither may starve the other — so the loop always sleeps until
         // the earlier of the two and lets `handle_timers` decide which of them was actually due.

@@ -319,6 +319,13 @@ pub struct SessionPixSupervisor {
     paid_recovery_tail: Option<PaidRecoveryTail>,
     /// A successor batch was earned but could not yet fit the two-generation reservation.
     successor_request_deferred: bool,
+    /// Whether the Session's data plane is detached, awaiting its client's return.
+    ///
+    /// A *new* successor request is not started while it is: the Entry that is still alive would fund
+    /// it, and a detach that then ends in a drain or a close would strand that deposit. Re-sends of a
+    /// request already outstanding go on (they are what lets a returning Entry answer), and the
+    /// deferred request is issued when the plane is attached again.
+    data_plane_detached: bool,
     /// The successor batch that has been requested, has not been answered in full, and is being asked
     /// for again.
     ///
@@ -493,6 +500,7 @@ impl SessionPixSupervisor {
             paid_front_handoff: false,
             paid_recovery_tail: None,
             successor_request_deferred: false,
+            data_plane_detached: false,
             resend: None,
             resend_decided_batch: None,
             ssas: Vec::with_capacity(2),
@@ -532,6 +540,8 @@ impl SessionPixSupervisor {
                 peer,
             } => self.on_unverifiable_shares(ssa_id, *observed_total, peer, now),
             SessionPixEvent::SessionClosed { drainable_surbs } => self.on_session_closed(*drainable_surbs, now),
+            // A wake-up only: the level is fed through `set_data_plane_detached`.
+            SessionPixEvent::DataPlaneChanged => Vec::new(),
         };
 
         let mut lifecycle_actions = actions;
@@ -730,8 +740,31 @@ impl SessionPixSupervisor {
             .saturating_mul(crate::MAX_OVERLAPPING_BATCHES as usize)
     }
 
+    /// Whether `detached` differs from what this supervisor was last told, so a worker can skip the
+    /// call on the common turn.
+    pub fn detach_level_differs(&self, detached: bool) -> bool {
+        !self.closed && self.data_plane_detached != detached
+    }
+
+    /// Records that the Session's data plane is detached (`true`) or attached again (`false`).
+    ///
+    /// While detached, no new successor request is started: one that is earned is deferred, exactly
+    /// as one the reservation cannot fit is. Attaching issues the deferred request at once. Never an
+    /// opening request: a successor only exists behind a cycle that was already requested.
+    pub fn set_data_plane_detached(&mut self, detached: bool, now: Instant) -> Vec<SessionPixAction> {
+        if self.closed || self.data_plane_detached == detached {
+            return Vec::new();
+        }
+        self.data_plane_detached = detached;
+        let actions = self.retry_deferred_successor_request(now);
+        let mut out = self.sync_service_gate();
+        out.extend(actions);
+        self.refresh_share_order_front();
+        out
+    }
+
     fn retry_deferred_successor_request(&mut self, now: Instant) -> Vec<SessionPixAction> {
-        if self.closed || !self.successor_request_deferred {
+        if self.closed || self.data_plane_detached || !self.successor_request_deferred {
             return Vec::new();
         }
 
@@ -2467,6 +2500,14 @@ impl SessionPixSupervisor {
         // at each of the four call sites — the early signal, the recovered transition, the deferred
         // retry and the deposit replay — so no route into a request can be missed.
         if self.draining {
+            return Vec::new();
+        }
+
+        // Nor while the data plane is detached: see `data_plane_detached`. Deferred, so that the
+        // request is issued when the plane is attached again.
+        if self.data_plane_detached {
+            self.successor_request_deferred = true;
+            tracing::debug!("deferring a successor SSA batch while the data plane is detached");
             return Vec::new();
         }
 
@@ -4772,6 +4813,45 @@ mod tests {
             sup.reserved_cycle_slots(),
             "two full batches sit exactly on the admission reservation"
         );
+    }
+
+    /// While the data plane is detached a successor request that is earned is deferred, and it is
+    /// issued as soon as the plane is attached again. The re-sends of a request already out go on.
+    #[test]
+    fn a_successor_earned_while_detached_is_deferred_until_the_plane_is_attached() {
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, now);
+        fund_batch(&mut sup, p, 1, now);
+
+        assert!(
+            sup.set_data_plane_detached(true, now).is_empty(),
+            "detaching asks for nothing"
+        );
+        let early = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 1)), now, 0);
+        assert!(
+            early.iter().all(|a| !matches!(a, SessionPixAction::RequestSsa { .. })),
+            "no new request while detached, got {early:?}"
+        );
+        assert_eq!(1, sup.ssas.len(), "and no cycle was allocated for it");
+        // Nothing is re-tried on every event while detached.
+        for _ in 0..3 {
+            assert!(
+                sup.handle_event(&SessionPixEvent::DataPlaneChanged, now, 0)
+                    .iter()
+                    .all(|a| !matches!(a, SessionPixAction::RequestSsa { .. }))
+            );
+        }
+        assert!(sup.set_data_plane_detached(true, now).is_empty(), "idempotent");
+
+        let attached = sup.set_data_plane_detached(false, now);
+        assert!(
+            attached.iter().any(
+                |a| matches!(a, SessionPixAction::RequestSsa { ssa_ids, .. } if ssa_ids[0].ssa_index().get() == 2)
+            ),
+            "the deferred request goes out at once on attach, got {attached:?}"
+        );
+        assert!(sup.set_data_plane_detached(false, now).is_empty(), "and only once");
     }
 
     #[test]

@@ -1492,6 +1492,14 @@ pub enum SessionPixEvent {
     /// the whole remaining emission rather than a discounted one, and why the deadlines remain the
     /// backstop for a drain admitted on a figure that turns out to have been optimistic.
     SessionClosed { drainable_surbs: u64 },
+    /// The Session's data plane was detached or attached; a wake-up and nothing more.
+    ///
+    /// The state itself is [`ServiceGate::data_plane_detached`], which the worker reads on every turn
+    /// and feeds to the supervisor (see
+    /// [`SessionPixSupervisor::set_data_plane_detached`](supervisor::SessionPixSupervisor)). A level,
+    /// not an edge, so that a full command channel can lose neither a detach nor an attach, nor see
+    /// them reordered: this event only makes an otherwise idle worker take a turn.
+    DataPlaneChanged,
 }
 
 // ---------------------------------------------------------------------------

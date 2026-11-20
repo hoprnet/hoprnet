@@ -344,19 +344,39 @@ async fn establish_pix_session_under(
     hops: usize,
     pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
 ) -> anyhow::Result<hopr_lib::HoprSession> {
-    try_establish_pix_session_under(cluster, hops, pseudonym)
+    establish_pix_session_under_with(cluster, hops, pseudonym, None, false).await
+}
+
+/// As [`establish_pix_session_under`], with the Entry's SURB balancer and the Exit's rate control under
+/// the caller's control (see [`establish_pix_session_with`]).
+#[cfg(feature = "session-client")]
+async fn establish_pix_session_under_with(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+    pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
+    surb_management: Option<hopr_lib::SurbBalancerConfig>,
+    rate_control: bool,
+) -> anyhow::Result<hopr_lib::HoprSession> {
+    try_establish_pix_session_under_with(cluster, hops, pseudonym, surb_management, rate_control)
         .await?
         .context("session connection failed")
 }
 
-/// [`establish_pix_session_under`], keeping the library's own error (the outer error is a timeout).
+/// [`establish_pix_session_under_with`], keeping the library's own error (the outer error is a timeout).
 #[cfg(feature = "session-client")]
-async fn try_establish_pix_session_under(
+async fn try_establish_pix_session_under_with(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
     pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
+    surb_management: Option<hopr_lib::SurbBalancerConfig>,
+    rate_control: bool,
 ) -> anyhow::Result<Result<hopr_lib::HoprSession, hopr_lib::errors::HoprLibError>> {
     let routing = hops.try_into()?;
+    let capabilities = if rate_control {
+        SessionCapability::Segmentation | SessionCapability::UsePIX
+    } else {
+        SessionCapability::Segmentation | SessionCapability::NoRateControl | SessionCapability::UsePIX
+    };
     let connected = tokio::time::timeout(
         Duration::from_secs(120),
         cluster.entry.inner().connect_to(
@@ -365,11 +385,9 @@ async fn try_establish_pix_session_under(
             HoprSessionClientConfig {
                 forward_path: routing,
                 return_path: routing,
-                capabilities: SessionCapability::Segmentation
-                    | SessionCapability::NoRateControl
-                    | SessionCapability::UsePIX,
+                capabilities,
                 pseudonym,
-                surb_management: None,
+                surb_management,
                 max_surbs_per_data_packet: 1,
                 flow_control: None,
                 max_frames_behind_gap: None,
@@ -400,6 +418,7 @@ async fn try_establish_pix_session_under(
 #[cfg(feature = "session-client")]
 fn fill_pix_config(fill: hopr_lib::exports::transport::session::PixFillConfig) -> IncomingSessionPixConfig {
     IncomingSessionPixConfig {
+        resume_window: IncomingSessionPixConfig::default().resume_window,
         quota_range: 0..=PIX_QUOTA_PER_SSA,
         enforce_pix: false,
         max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
@@ -705,6 +724,7 @@ async fn capture_n_hop_pix_session(
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
@@ -915,6 +935,7 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
@@ -1087,6 +1108,7 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
@@ -1227,6 +1249,7 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
@@ -1750,6 +1773,7 @@ async fn recovery_hard_deadline_closes_a_session_fill_cannot_supply(#[case] hops
     let cluster = build_pix_cluster(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: 0..=PIX_QUOTA_PER_SSA,
             enforce_pix: false,
             max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
@@ -1945,6 +1969,7 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
     let cluster = build_pix_cluster_with_entry_cap(
         hops,
         IncomingSessionPixConfig {
+            resume_window: IncomingSessionPixConfig::default().resume_window,
             quota_range: accepted_batch_quota..=accepted_batch_quota,
             enforce_pix: false,
             // Not what any of these tests is about; the shipped ceiling is far above one cluster
@@ -2242,15 +2267,16 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
     Ok(())
 }
 
-/// A client reconnecting under the pseudonym it used before, after the Exit has closed the old Session,
-/// is refused as not resumable, without retries; a fresh pseudonym is served.
+/// A client reconnecting under the pseudonym it used before, after the Exit has forgotten the old
+/// Session, is refused as not resumable, without retries; a fresh pseudonym is served.
 ///
 /// The Entry still holds PIX state for the pseudonym and so asks to resume. This Exit cannot resume a
 /// Session: it answers every attempt with `NotResumable`, which `connect_to` does not retry.
 ///
 /// ## Steps
 /// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
-/// 2. The Session is dropped and its close ends it on the Exit, which is given time to process it.
+/// 2. The Exit closes the Session explicitly, with no resume window and no drain, so that it has forgotten it (an idle
+///    eviction cannot be relied on: the Exit's keep-alive and fill keep the slot alive).
 /// 3. A Session is opened under `p`: it fails with `Rejected(NotResumable)`. The Entry's retry delay is far beyond the
 ///    connect timeout, so a retry would show as a timeout rather than as a slow success.
 /// 4. A Session under a fresh pseudonym `p'` is funded at `(p', 1)` and echoes.
@@ -2268,16 +2294,23 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_closed_the_session_
         exports::transport::{StartErrorReason, TransportSessionError},
     };
 
-    // Applies to both ends; the wait below is a multiple of it.
-    const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
-    let exit_pix = fill_pix_config(Default::default());
+    // The Exit must forget the Session for certain, and not leave it to an idle eviction that its
+    // keep-alive and fill keep from happening: no resume window and no drain, then an operator-style
+    // close of the Session at the Exit.
+    let mut exit_pix = fill_pix_config(hopr_lib::exports::transport::session::PixFillConfig {
+        drain_after_close: false,
+        ..Default::default()
+    });
+    exit_pix.resume_window = Duration::ZERO;
+    let (exit_server, captured) = CaptureThenEchoServer::new();
     let cluster = build_pix_cluster_with(
         hops,
         exit_pix,
         IDLE_TIMEOUT,
         hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request,
-        hopr_lib::testing::dummies::EchoServer::new(),
+        exit_server,
         // Far beyond the 120 s connect timeout: a retry after the refusal cannot succeed in time.
         Some(Duration::from_secs(3600)),
     )
@@ -2298,13 +2331,24 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_closed_the_session_
         "the first Session's deposit was never signalled: {seen:?}"
     );
 
+    // The Exit closes the Session, and with nothing to drain or wait for, forgets it.
+    let mut exit_side = captured
+        .lock()
+        .map_err(|_| anyhow::anyhow!("the captured-session mutex was poisoned"))?
+        .take()
+        .context("the Exit's session server must have captured the incoming session")?;
+    tokio::time::timeout(Duration::from_secs(30), exit_side.session.close())
+        .await
+        .context("closing the exit-side session timed out")?
+        .context("closing the exit-side session failed")?;
     drop(first);
-    tracing::info!(%pseudonym, "first Session dropped; waiting for the Exit to close it");
-    tokio::time::sleep(IDLE_TIMEOUT * 2).await;
+    tracing::info!(%pseudonym, "the Exit closed the Session; letting it wind down");
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Whatever the first Session's wind-down reported, only what follows the reconnect counts.
     while milestones.try_recv().is_ok() {}
 
     // A retry would wait out the one-hour retry delay, and so fail as a timeout here.
-    let refused = try_establish_pix_session_under(&cluster, hops, Some(pseudonym))
+    let refused = try_establish_pix_session_under_with(&cluster, hops, Some(pseudonym), None, false)
         .await
         .context("the refusal was retried instead of being final")?;
     match refused {
@@ -2334,4 +2378,406 @@ async fn a_reconnect_under_the_same_pseudonym_after_the_exit_closed_the_session_
         "the fresh Session must carry traffic, but only {completed} of {ECHOES} echo round trips finished"
     );
     Ok(())
+}
+
+/// An echo server that counts the Sessions it holds and the ones that have ended.
+#[cfg(feature = "session-client")]
+#[derive(Clone, Default)]
+struct TrackingEchoServer {
+    started: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    ended: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[cfg(feature = "session-client")]
+#[async_trait::async_trait]
+impl hopr_api::node::HoprSessionServer for TrackingEchoServer {
+    type Error = hopr_lib::errors::HoprLibError;
+    type Session = hopr_lib::exports::transport::IncomingSession;
+
+    async fn process(&self, session: Self::Session) -> Result<(), Self::Error> {
+        use std::sync::atomic::Ordering;
+        self.started.fetch_add(1, Ordering::SeqCst);
+        let ended = self.ended.clone();
+        tokio::spawn(async move {
+            let (mut reader, mut writer) = session.session.split();
+            let mut buf = vec![0u8; 8192];
+            loop {
+                let n = match reader.read(&mut buf).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => n,
+                };
+                if writer.write_all(&buf[..n]).await.is_err() || writer.flush().await.is_err() {
+                    break;
+                }
+            }
+            ended.fetch_add(1, Ordering::SeqCst);
+        });
+        Ok(())
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TrackingEchoServer {
+    /// Sessions the server holds right now.
+    fn live(&self) -> usize {
+        use std::sync::atomic::Ordering;
+        self.started
+            .load(Ordering::SeqCst)
+            .saturating_sub(self.ended.load(Ordering::SeqCst))
+    }
+}
+
+/// What the two nodes' PIX event streams said about one pseudonym, as they said it.
+#[cfg(feature = "session-client")]
+#[derive(Default, Debug)]
+struct PixTally {
+    /// Deposit-data requests the Exit made, by SSA index.
+    deposit_data_requests: Vec<u32>,
+    /// Deposit addresses the Exit was handed, by SSA index.
+    exit_addresses: Vec<u32>,
+    /// `NewDepositAddress` events on the Entry, by SSA index: the Entry's deposits.
+    entry_deposits: Vec<u32>,
+    /// Cycles the Exit recovered, by SSA index.
+    recovered: Vec<u32>,
+}
+
+/// Answers the Exit's PIX events as [`spawn_exit_pix_driver`] does, and tallies the events of both
+/// nodes for `pseudonym`.
+#[cfg(feature = "session-client")]
+fn spawn_pix_tally(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    pseudonym: hopr_lib::api::types::internal::protocol::HoprPseudonym,
+) -> (tokio::task::JoinHandle<()>, std::sync::Arc<std::sync::Mutex<PixTally>>) {
+    let tally = std::sync::Arc::new(std::sync::Mutex::new(PixTally::default()));
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let mut entry_events = Box::pin(cluster.entry.inner().subscribe_pix_events());
+    let shared = tally.clone();
+    let handle = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                Some(event) = entry_events.next() => {
+                    if let PixEvent::NewDepositAddress(data) = event
+                        && data.id.session_id() == pseudonym
+                    {
+                        shared.lock().unwrap().entry_deposits.push(data.id.ssa_index().get());
+                    }
+                }
+                Some(event) = exit_events.next() => match event {
+                    PixEvent::DepositAddressReceived(data) => {
+                        let mut notifier = data.deposit_updated;
+                        let _ = notifier.send((data.id, HoprBalance::new_base(1))).await;
+                        if data.id.session_id() == pseudonym {
+                            shared.lock().unwrap().exit_addresses.push(data.id.ssa_index().get());
+                        }
+                    }
+                    PixEvent::PrivateKeyRecovered(data) if data.id.session_id() == pseudonym => {
+                        shared.lock().unwrap().recovered.push(data.id.ssa_index().get());
+                    }
+                    PixEvent::DepositDataRequest(request) => {
+                        let mut created = request.deposit_data_created;
+                        for id in request.deposit_ids {
+                            if id.session_id() == pseudonym {
+                                shared.lock().unwrap().deposit_data_requests.push(id.ssa_index().get());
+                            }
+                            if created.send(PixDepositData { id, data: Box::default() }).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                else => break,
+            }
+        }
+    });
+    (handle, tally)
+}
+
+/// How a client leaves the Session it will reconnect from.
+#[cfg(feature = "session-client")]
+#[derive(Clone, Copy, Debug)]
+enum Leave {
+    /// A clean close, whose terminating segment reaches the Exit.
+    Close,
+    /// Dropped without a close: nothing tells the Exit, which still holds the live Session.
+    Drop,
+}
+
+/// A client that reconnects in place under its paid pseudonym gets its funded Session back: no second
+/// deposit for `(p, 1)`, one Session on the Exit, and the cycle goes on.
+///
+/// ## Steps
+/// 1. A PIX Session is opened under `p`, rate-controlled and with a SURB balancer (the gnosis VPN shape).
+/// 2. It echoes until the Exit has signalled the deposit for `(p, 1)`, and a few round trips after.
+/// 3. It is closed cleanly (or dropped). A Session under `p` is opened again, which must complete in under 10 s.
+/// 4. It echoes again.
+/// 5. The Exit asked for no deposit data, handed out no address, and the Entry made no deposit, for `(p, 1)` a second
+///    time; the Exit holds exactly one Session and the first has ended; and `(p, 1)` later recovers, after which the
+///    next request is for SSA 2.
+///
+/// Compiled here, to be run on a cluster.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1, Leave::Close)]
+#[case(1, Leave::Drop)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_reconnect_under_the_same_pseudonym_takes_over_the_paid_session(
+    #[case] hops: usize,
+    #[case] leave: Leave,
+) -> anyhow::Result<()> {
+    use std::sync::atomic::Ordering;
+
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+    const REOPEN_BUDGET: Duration = Duration::from_secs(10);
+
+    let mut exit_pix = fill_pix_config(Default::default());
+    exit_pix.resume_window = Duration::from_secs(60);
+    let server = TrackingEchoServer::default();
+    let cluster = build_pix_cluster_with(
+        hops,
+        exit_pix,
+        IDLE_TIMEOUT,
+        hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request,
+        server.clone(),
+        None,
+    )
+    .await?;
+
+    // The pseudonym is chosen here, so the tally can follow it before the Session exists.
+    use hopr_lib::api::types::crypto_random::Randomizable as _;
+    let pseudonym = hopr_lib::api::types::internal::protocol::HoprPseudonym::random();
+    let (driver, tally) = spawn_pix_tally(&cluster, pseudonym);
+
+    let mut first =
+        establish_pix_session_under_with(&cluster, hops, Some(pseudonym), Some(idle_surb_balancer()), true).await?;
+    assert_eq!(pseudonym, *first.id());
+
+    // Echo until the first cycle is funded.
+    let funded = |tally: &std::sync::Mutex<PixTally>| tally.lock().unwrap().exit_addresses.contains(&1);
+    let started = std::time::Instant::now();
+    while !funded(&tally) && started.elapsed() < Duration::from_secs(60) {
+        echo_n(&mut first, 1, Duration::from_millis(200)).await;
+    }
+    anyhow::ensure!(
+        funded(&tally),
+        "the first cycle was never funded: {:?}",
+        tally.lock().unwrap()
+    );
+    anyhow::ensure!(
+        echo_n(&mut first, 3, Duration::from_millis(200)).await == 3,
+        "the first Session must carry traffic"
+    );
+    anyhow::ensure!(server.live() == 1, "the Exit holds one Session before the reconnect");
+    let before = {
+        let t = tally.lock().unwrap();
+        (
+            t.deposit_data_requests.len(),
+            t.exit_addresses.len(),
+            t.entry_deposits.len(),
+        )
+    };
+
+    match leave {
+        Leave::Close => {
+            // The Exit sees the end of the stream and detaches the Session; the takeover may even
+            // overtake that FIN, and then takes the live Session over.
+            use futures::AsyncWriteExt as _;
+            first.close().await.context("closing the first Session")?;
+        }
+        Leave::Drop => {
+            // Nothing tells the Exit, which still holds the Session live. The reconnect's challenge is
+            // greater than the one the Session was established by, which is what lets it take the live
+            // Session over (see `SessionClientConfig::pseudonym`).
+            drop(first);
+        }
+    }
+
+    let reopened_at = std::time::Instant::now();
+    let mut second = tokio::time::timeout(
+        REOPEN_BUDGET,
+        establish_pix_session_under_with(&cluster, hops, Some(pseudonym), Some(idle_surb_balancer()), true),
+    )
+    .await
+    .context("the reconnect under the paid pseudonym must complete in under 10 s")??;
+    tracing::info!(took = ?reopened_at.elapsed(), "reconnected");
+    assert_eq!(pseudonym, *second.id());
+
+    let completed = echo_n(&mut second, 5, Duration::from_millis(200)).await;
+    assert_eq!(5, completed, "the taken-over Session must carry traffic");
+
+    // Nothing was paid for twice.
+    {
+        let t = tally.lock().unwrap();
+        assert_eq!(
+            before.0,
+            t.deposit_data_requests.len(),
+            "no further deposit-data request: {t:?}"
+        );
+        assert_eq!(before.1, t.exit_addresses.len(), "no further deposit address: {t:?}");
+        assert_eq!(before.2, t.entry_deposits.len(), "no further Entry deposit: {t:?}");
+    }
+
+    // One Session on the Exit, and the first one ended.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while server.started.load(Ordering::SeqCst) < 2 || server.ended.load(Ordering::SeqCst) < 1 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .context("the Exit must have handed over a second Session and ended the first")?;
+    assert_eq!(1, server.live(), "the Exit holds exactly one Session");
+
+    // The paid cycle is recovered on the taken-over Session, and the next request is for SSA 2.
+    let started = std::time::Instant::now();
+    loop {
+        {
+            let t = tally.lock().unwrap();
+            if t.recovered.contains(&1) && t.exit_addresses.contains(&2) {
+                break;
+            }
+        }
+        anyhow::ensure!(
+            started.elapsed() < Duration::from_secs(120),
+            "(p, 1) never recovered and led to SSA 2: {:?}",
+            tally.lock().unwrap()
+        );
+        echo_n(&mut second, 1, Duration::from_millis(100)).await;
+    }
+    {
+        let t = tally.lock().unwrap();
+        assert_eq!(1, t.exit_addresses.iter().filter(|index| **index == 1).count(), "{t:?}");
+        assert_eq!(1, t.entry_deposits.iter().filter(|index| **index == 1).count(), "{t:?}");
+    }
+    driver.abort();
+    Ok(())
+}
+
+/// A client that closes cleanly and never comes back: the detached Session ends at the window as it
+/// would have without one, and no successor cycle is funded in between.
+///
+/// ## Steps
+/// 1. A PIX Session is opened under `p` and echoes until the Exit has signalled the deposit for `(p, 1)`.
+/// 2. It is closed cleanly. The Exit detaches it, for a short window (3 s).
+/// 3. Nobody returns. Past the window the Exit has closed the Session, or drained it into the funded cycle if its SURB
+///    stock covered the rest.
+/// 4. The Exit asked for no deposit data and was handed no deposit address beyond `(p, 1)` at any point: no successor
+///    cycle was funded during the window, which the drain or close would have stranded.
+///
+/// Compiled here, to be run on a cluster.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_closed_session_that_never_returns_ends_at_the_window_and_funds_no_successor(
+    #[case] hops: usize,
+) -> anyhow::Result<()> {
+    use futures::AsyncWriteExt as _;
+    use hopr_lib::api::types::crypto_random::Randomizable as _;
+
+    const WINDOW: Duration = Duration::from_secs(3);
+
+    let mut exit_pix = fill_pix_config(Default::default());
+    exit_pix.resume_window = WINDOW;
+    let cluster = build_pix_cluster_with(
+        hops,
+        exit_pix,
+        Duration::from_secs(120),
+        hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request,
+        TrackingEchoServer::default(),
+        None,
+    )
+    .await?;
+    let pseudonym = hopr_lib::api::types::internal::protocol::HoprPseudonym::random();
+    let (driver, tally) = spawn_pix_tally(&cluster, pseudonym);
+
+    let mut session =
+        establish_pix_session_under_with(&cluster, hops, Some(pseudonym), Some(idle_surb_balancer()), true).await?;
+    let started = std::time::Instant::now();
+    while !tally.lock().unwrap().exit_addresses.contains(&1) && started.elapsed() < Duration::from_secs(60) {
+        echo_n(&mut session, 1, Duration::from_millis(200)).await;
+    }
+    anyhow::ensure!(
+        tally.lock().unwrap().exit_addresses.contains(&1),
+        "the first cycle was never funded: {:?}",
+        tally.lock().unwrap()
+    );
+    let before = {
+        let t = tally.lock().unwrap();
+        (
+            t.deposit_data_requests.len(),
+            t.exit_addresses.len(),
+            t.entry_deposits.len(),
+        )
+    };
+
+    session.close().await.context("closing the Session")?;
+
+    // The window, and the drain or close it ends in, with the same budget as a close with no window.
+    tokio::time::sleep(WINDOW + Duration::from_secs(30)).await;
+    {
+        let t = tally.lock().unwrap();
+        assert_eq!(
+            before.0,
+            t.deposit_data_requests.len(),
+            "no successor deposit-data request: {t:?}"
+        );
+        assert_eq!(before.1, t.exit_addresses.len(), "no successor deposit address: {t:?}");
+        assert_eq!(before.2, t.entry_deposits.len(), "no successor Entry deposit: {t:?}");
+    }
+    driver.abort();
+    Ok(())
+}
+
+/// Captures the first incoming Session, so that a test can close it on the Exit, and echoes every later one.
+#[cfg(feature = "session-client")]
+#[derive(Clone)]
+struct CaptureThenEchoServer {
+    captured: std::sync::Arc<std::sync::Mutex<Option<hopr_lib::exports::transport::IncomingSession>>>,
+    seen: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+#[cfg(feature = "session-client")]
+impl CaptureThenEchoServer {
+    #[allow(clippy::type_complexity)]
+    fn new() -> (
+        Self,
+        std::sync::Arc<std::sync::Mutex<Option<hopr_lib::exports::transport::IncomingSession>>>,
+    ) {
+        let captured = std::sync::Arc::new(std::sync::Mutex::new(None));
+        (
+            Self {
+                captured: captured.clone(),
+                seen: Default::default(),
+            },
+            captured,
+        )
+    }
+}
+
+#[cfg(feature = "session-client")]
+#[async_trait::async_trait]
+impl hopr_api::node::HoprSessionServer for CaptureThenEchoServer {
+    type Error = hopr_lib::errors::HoprLibError;
+    type Session = hopr_lib::exports::transport::IncomingSession;
+
+    async fn process(&self, session: Self::Session) -> Result<(), Self::Error> {
+        if !self.seen.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            *self.captured.lock().unwrap() = Some(session);
+            return Ok(());
+        }
+        tokio::spawn(async move {
+            let (mut reader, mut writer) = session.session.split();
+            let mut buf = vec![0u8; 8192];
+            while let Ok(n @ 1..) = reader.read(&mut buf).await {
+                if writer.write_all(&buf[..n]).await.is_err() || writer.flush().await.is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(())
+    }
 }

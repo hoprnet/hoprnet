@@ -282,6 +282,11 @@ pub enum PixAdmissionRejection {
     LiveCycleCapacity,
     /// The node is already managing `maximum_sessions`, or this pseudonym already holds a slot.
     NoSessionSlot,
+    /// This pseudonym holds a PIX Session slot that the request may not take over: it is not
+    /// established, was established by this very request, is draining or poisoned, was never paid
+    /// for, or was negotiated on other terms. Told apart from [`NoSessionSlot`](Self::NoSessionSlot)
+    /// because it is the refusal of a reconnecting Entry, not of a node at its limit.
+    TakeoverIneligible,
     /// This node could not decide right now — the session server did not answer in time, or its
     /// request channel was full.
     Busy,
@@ -1387,6 +1392,10 @@ mod tests {
         );
         assert_eq!("no_pix_support", PixAdmissionRejection::NoPixSupport.to_string());
         assert_eq!(
+            "takeover_ineligible",
+            PixAdmissionRejection::TakeoverIneligible.to_string()
+        );
+        assert_eq!(
             "direct_return_path",
             PixAdmissionRejection::DirectReturnPath.to_string()
         );
@@ -1410,6 +1419,7 @@ mod tests {
             PixAdmissionRejection::TargetPolicy,
             PixAdmissionRejection::LiveCycleCapacity,
             PixAdmissionRejection::NoSessionSlot,
+            PixAdmissionRejection::TakeoverIneligible,
             PixAdmissionRejection::Busy,
             PixAdmissionRejection::DirectReturnPath,
             PixAdmissionRejection::NotResumable,
