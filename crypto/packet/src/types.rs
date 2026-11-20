@@ -185,7 +185,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
         }
 
         let surbs = data[1..1 + surb_end]
-            .chunks_exact(SURB::<S, H>::SIZE)
+            .as_chunks::<SURB<S, H>::SIZE>()
+            .0
+            .iter()
             .map(SURB::<S, H>::try_from)
             .collect::<Result<Vec<_>, _>>()?;
 
