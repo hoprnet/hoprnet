@@ -26679,24 +26679,21 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a PIX Session whose Entry never answers the `SsaRequest` is closed when the
-    /// commitment deadline expires.
+    /// A PIX Session whose Entry never answers the `SsaRequest` has the request re-sent once, byte for
+    /// byte, and is then closed once the commitment deadline expires.
     ///
-    /// This used to be spelled as a deposit-timeout test, with `max_ssa_delivery_time: 0` and a
-    /// 50 ms `max_deposit_wait`. A zero delivery time makes the *commitment* deadline fire
-    /// immediately, so the assertion held whatever the deposit deadline did — it would have passed
-    /// with that deadline removed entirely. The deposit deadline cannot be reached from this
-    /// fixture at all: arming it needs a `CommitmentVerified`, and a mock transport has no Entry to
-    /// send one. That path is covered end-to-end by `hopr-lib`'s `deposit_timeout_closes_session`.
-    ///
-    /// So `max_deposit_wait` is set far out of reach here, leaving the commitment deadline as the
-    /// only thing that can close the Session.
+    /// The deposit pool answers and the Session holds SURBs, so the request goes out and its re-send is
+    /// not skipped. With a 500 ms deadline and a 200 ms interval the first re-send is due at about 200 ms
+    /// and the second, at 600 ms, would fall past the deadline, so it is not sent. `max_deposit_wait` is
+    /// far out of reach: arming it needs a `CommitmentVerified`, which a mock transport cannot send.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_when_the_entry_never_commits() -> anyhow::Result<()> {
-        use std::time::Duration;
+        use std::time::{Duration, Instant};
 
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
+
+        const DELIVERY: Duration = Duration::from_millis(500);
 
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
@@ -26704,7 +26701,7 @@ mod tests {
             surplus_shares: 1,
         };
 
-        let (pix_toolbox, _) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(ssa_gen_config).into(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
@@ -26713,17 +26710,10 @@ mod tests {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
                 supervision: SupervisorConfig {
-                    // Short, so the deadline under test fires quickly.
-                    max_ssa_delivery_time: Duration::from_millis(50),
-                    // Scaled with it, since it has to stay under the delivery deadline. Nothing arms
-                    // it here — the Entry sends no commitment at all, so there is no scope to
-                    // re-request and the deadline under test is the only one that can fire.
-                    commitment_recommit_interval: Duration::from_millis(10),
-                    // Under the delivery deadline for the same reason.
-                    ssa_request_resend_interval: Duration::from_millis(20),
-                    // The default cap stays on, so this also covers an opening request whose re-sends go
-                    // unanswered: the Session still closes on its commitment deadline. When it closes, and that
-                    // re-sends never move that deadline, is pinned by the supervisor tests.
+                    max_ssa_delivery_time: DELIVERY,
+                    // Nothing arms it: the Entry sends no commitment, so there is nothing to re-request.
+                    commitment_recommit_interval: Duration::from_millis(100),
+                    ssa_request_resend_interval: Duration::from_millis(200),
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
@@ -26733,25 +26723,17 @@ mod tests {
             ..Default::default()
         });
 
-        let mut bob_transport = MockMsgSender::new();
-        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest (2 messages).
-        bob_transport
-            .expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-        bob_transport
-            .expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-
-        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (bob_sender, mut sent) = futures::channel::mpsc::unbounded();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()), None)?;
+        mgr.start(bob_sender, new_session_tx, Some(pix_toolbox), None)?;
 
         let alice_pseudonym = HoprPseudonym::random();
-
+        // Taken before the deadline can be armed, so the lower bound below holds whatever the scheduling.
+        let started = Instant::now();
         mgr.handle_incoming_session_initiation(
             alice_pseudonym,
             StartInitiation {
@@ -26762,24 +26744,68 @@ mod tests {
             },
         )
         .await?;
-
-        // Session is active after establishment.
         assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
 
-        // The supervisor arms the commitment deadline once the `SsaRequest` goes out and closes the
-        // Session 50 ms later; the teardown that follows is asynchronous.
-        tokio::time::timeout(Duration::from_secs(2), async {
+        // Stock the Session with SURBs, or the driver skips the re-send for lack of one to send it over.
+        {
+            let slot = mgr
+                .sessions
+                .get(&alice_pseudonym)
+                .context("the session slot must exist")?;
+            slot.surb_estimator
+                .produced
+                .fetch_add(1_000, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        let mut next_message = async || {
+            tokio::time::timeout(Duration::from_secs(10), sent.next())
+                .await
+                .context("timed out waiting for a message from Bob")?
+                .context("Bob's sender closed")
+                .map(|(_, data)| data)
+        };
+
+        let established = next_message().await?;
+        assert!(
+            msg_type(&established, StartProtocolDiscriminants::SessionEstablished),
+            "the first message is SessionEstablished"
+        );
+        let request = next_message().await?;
+        assert!(
+            msg_type(&request, StartProtocolDiscriminants::SsaRequest),
+            "the second message is the opening SsaRequest"
+        );
+        let resend = next_message().await?;
+        assert!(
+            msg_type(&resend, StartProtocolDiscriminants::SsaRequest),
+            "the third message is a re-send of the request"
+        );
+        assert_eq!(
+            (request.data.application_tag, &request.data.plain_text),
+            (resend.data.application_tag, &resend.data.plain_text),
+            "the re-send is the request byte for byte"
+        );
+
+        tokio::time::timeout(Duration::from_secs(10), async {
             while mgr.num_active_sessions() > 0 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
         .await
         .context("session should be closed once the commitment deadline expires")?;
+        assert!(
+            started.elapsed() >= DELIVERY,
+            "the Session closed after {:?}, earlier than the {DELIVERY:?} deadline counted from before the initiation",
+            started.elapsed()
+        );
 
-        assert!(mgr.active_sessions().is_empty());
-
-        bob_sender.close_channel();
-        bob_handle.await??;
+        // The re-send due at 600 ms is past the deadline and is not sent.
+        while let Ok((_, data)) = sent.try_recv() {
+            assert!(
+                !msg_type(&data, StartProtocolDiscriminants::SsaRequest),
+                "no second re-send may follow"
+            );
+        }
 
         Ok(())
     }
