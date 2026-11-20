@@ -518,6 +518,7 @@ mod tests {
             max_ssa_delivery_time: Duration::from_secs(20),
             commitment_recommit_interval: Duration::from_secs(3),
             ssa_request_resend_interval: Duration::from_secs(3),
+            max_opening_ssa_request_resends: 3,
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(10),
             max_recovery_time: Duration::from_secs(3600),

@@ -1195,14 +1195,15 @@ struct SessionSsaState {
     /// publishes every member still owed, not only the one named. A member with *no message of it out*
     /// has nothing to re-request, and only a repeat can reach it. The Exit repeats a successor batch,
     /// whole, for as long as any member of it has reported nothing, **but only while the batch is behind
-    /// the front**: a batch at the front is never re-sent (the opening batch is at the front from the
-    /// start, and a successor admitted just before the front moved joins it). So, per member, nothing
+    /// the front**: a batch at the front is never re-sent (a successor admitted just before the front
+    /// moved joins it). The opening batch is the exception, as it has no front to reach: it is repeated a
+    /// bounded number of times, whatever the front. So, per member, nothing
     /// prompts a resumption in two cases, and a third is given up on:
     ///
-    /// * a member with no message of it out whose batch holds the front: the opening batch always, or any member after
-    ///   a cut that lands exactly on a member boundary there, when no earlier member of the batch is itself still owed
-    ///   (its own burst cut part-way), whose re-request would resume it too. The member times out on its commitment
-    ///   deadline;
+    /// * a member with no message of it out whose batch holds the front, or an opening batch whose re-sends are spent:
+    ///   any member after a cut that lands exactly on a member boundary there, when no earlier member of the batch is
+    ///   itself still owed (its own burst cut part-way), whose re-request would resume it too. The member times out on
+    ///   its commitment deadline;
     /// * a burst that went out whole whose `ReadyToDeposit` could not be queued because the PIX event channel was
     ///   full. The Exit then holds a complete commitment and never asks again. The member is kept owed, in case
     ///   something does;
@@ -1214,9 +1215,9 @@ struct SessionSsaState {
     /// lost. The Exit then has no part it could re-request, so only a repeat reaches the member. A
     /// repeat that arrives more than [`SSA_REPEAT_RESEND_GRACE`] after the batch last went out has the
     /// whole burst of every announced member sent again, and nothing announced (see
-    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a batch at the
-    /// front is never repeated, so a lost opening burst is not recovered, and each re-send spends one
-    /// of the cycle's retransmissions.
+    /// [`OwedPublications::announced`]). The limits are the same as for a resumption: a successor batch
+    /// at the front is never repeated, an opening batch is repeated only as often as its cap allows, and each re-send
+    /// spends one of the cycle's retransmissions.
     ///
     /// None of these strands a deposit, because nothing was announced for the member concerned: the
     /// Exit's own deadline ends the cycle. The opposite hazard exists, though. A resumed burst answers a
@@ -3728,7 +3729,9 @@ impl PixToolbox {
 /// size, because a batch asks the Entry for that many commitment sets and that many deposits before
 /// any of them can fairly be called late.
 ///
-/// The opening request is sent once. A *successor* request is not: the Entry's successor gate drops
+/// The opening request is re-sent too, but on its own rule: it has no predecessor, and so a bounded number of
+/// times (`max_opening_ssa_request_resends`) with gaps that double, since only a loss on the return path can
+/// keep it unanswered. A *successor* request is re-sent without a count: the Entry's successor gate drops
 /// one that comes before its predecessor's returned packets have earned it, and says nothing, and a
 /// request can equally be lost on the return path. So while a successor batch is unanswered — none
 /// of its commitment has arrived — and an earlier generation is still being served, the supervisor
@@ -26446,9 +26449,11 @@ mod tests {
                     // it here — the Entry sends no commitment at all, so there is no scope to
                     // re-request and the deadline under test is the only one that can fire.
                     commitment_recommit_interval: Duration::from_millis(10),
-                    // Under the delivery deadline for the same reason. It would not fire here in any
-                    // case — this is the opening batch, which is never re-sent.
+                    // Under the delivery deadline for the same reason.
                     ssa_request_resend_interval: Duration::from_millis(20),
+                    // This test is about the opening request's own deadline closing the Session, which
+                    // opening re-sends would push; they are exercised in the supervisor and pix tests.
+                    max_opening_ssa_request_resends: 0,
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
