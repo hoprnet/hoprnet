@@ -149,20 +149,21 @@
 //! was wrong. This is a different mechanism from the **deferred** request below, which holds a request *back* until
 //! the two-generation reservation has room; the re-send repeats one that has already gone out.
 //!
-//! What bounds it is the predecessor, not the interval: the batch is behind the front only while an earlier generation
-//! is live, so the re-sends end with that generation's recovery hard deadline, its service-gated idle deadline, or the
-//! paid tail's idle and hard deadlines. `max_served_without_progress` is not one of these: it only halts service, and
-//! both idle deadlines are service-gated, so halting service re-arms them rather than closing; the hard deadline, the
-//! tail's own for a tail, is the bound that always holds. With a successor the Entry never admits, the Session then
-//! ends on those recovery deadlines (`RecoveryIdle`, `RecoveryDeadline`) rather than on `CommitmentTimeout` — but only
-//! while the paid tail never runs out, which is what a lossy return path does, since the Exit never sees every share.
-//! When the Exit does see every share, `on_recovered_tail_progress` releases the tail, the batch reaches the front, the
-//! re-sends stop, and the Session closes on `CommitmentTimeout` within one (batch-scaled) delivery window of the last
-//! re-send. The worst case is a predecessor that stays alive and idle for its whole `max_recovery_time` of four hours:
-//! about 4800 re-sends at the 3 s default, one SURB each. Two assumptions are the operator's. The re-sent request
-//! carries the deposit data the pool supplied the first time, which this node cannot read, so the pool is assumed to
-//! keep it valid for as long as the request is outstanding; and each re-send refreshes the Exit's pending reconstructor
-//! registration, which the validated interval keeps alive across one missed re-send (twice the interval is under
+//! For a successor, what bounds it is the predecessor, not the interval (the opening re-sends are bounded by their
+//! count): the batch is behind the front only while an earlier generation is live, so the re-sends end with that
+//! generation's recovery hard deadline, its service-gated idle deadline, or the paid tail's idle and hard deadlines.
+//! `max_served_without_progress` is not one of these: it only halts service, and both idle deadlines are service-gated,
+//! so halting service re-arms them rather than closing; the hard deadline, the tail's own for a tail, is the bound that
+//! always holds. With a successor the Entry never admits, the Session then ends on those recovery deadlines
+//! (`RecoveryIdle`, `RecoveryDeadline`) rather than on `CommitmentTimeout` — but only while the paid tail never runs
+//! out, which is what a lossy return path does, since the Exit never sees every share. When the Exit does see every
+//! share, `on_recovered_tail_progress` releases the tail, the batch reaches the front, the re-sends stop, and the
+//! Session closes on `CommitmentTimeout` within one (batch-scaled) delivery window of the last re-send. The worst case
+//! is a predecessor that stays alive and idle for its whole `max_recovery_time` of four hours: about 4800 re-sends at
+//! the 3 s default, one SURB each. Two assumptions are the operator's. The re-sent request carries the deposit data the
+//! pool supplied the first time, which this node cannot read, so the pool is assumed to keep it valid for as long as
+//! the request is outstanding; and each re-send refreshes the Exit's pending reconstructor registration, which the
+//! validated interval keeps alive across one missed re-send (twice the interval is under
 //! `incomplete_commitment_lifetime`). A re-send is coalescible, so one dropped on a full action channel refreshes
 //! nothing; this assumes the driver otherwise keeps up, and a longer run of dropped re-sends can still let the
 //! registration lapse. The driver then reports it gone, the re-sends end and the batch is left to its own deadline;

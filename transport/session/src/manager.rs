@@ -1381,10 +1381,10 @@ struct SessionSsaState {
     /// bounded number of times, whatever the front. So, per member, nothing
     /// prompts a resumption in two cases, and a third is given up on:
     ///
-    /// * a member with no message of it out whose batch holds the front, or an opening batch whose re-sends are spent:
-    ///   any member after a cut that lands exactly on a member boundary there, when no earlier member of the batch is
-    ///   itself still owed (its own burst cut part-way), whose re-request would resume it too. The member times out on
-    ///   its commitment deadline;
+    /// * a member with no message of it out that nothing will repeat for: any member of the opening batch once its
+    ///   re-sends are spent, or, in a successor batch at the front, a member after a cut that lands exactly on a
+    ///   member boundary there, when no earlier member of the batch is itself still owed (its own burst cut part-way),
+    ///   whose re-request would resume it too. The member times out on its commitment deadline;
     /// * a burst that went out whole whose `ReadyToDeposit` could not be queued because the PIX event channel was
     ///   full. The Exit then holds a complete commitment and never asks again. The member is kept owed, in case
     ///   something does;

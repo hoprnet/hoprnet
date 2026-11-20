@@ -235,12 +235,14 @@ struct PaidRecoveryTail {
     hard_deadline: Option<Instant>,
 }
 
-/// A successor batch the Entry has not fully answered, which the supervisor keeps asking for.
+/// A batch the Entry has not fully answered, which the supervisor keeps asking for: a successor, or the opening
+/// batch while it has re-sends left.
 ///
 /// The supervisor holds this in a single slot, not a set: arming a newer batch replaces whatever the
-/// slot held. One slot is enough because a successor is requested only by the last cycle of the batch
-/// before it, once the reconstructor has verified that cycle's commitment and it has reached its
-/// early-recovery signal. That does not by itself prove every *earlier* member of that batch has
+/// slot held. The opening batch is armed first and is answered, or out of re-sends, long before any successor is
+/// requested, so it never shares the slot with one. One slot is enough because a successor is requested only by the
+/// last cycle of the batch before it, once the reconstructor has verified that cycle's commitment and it has reached
+/// its early-recovery signal. That does not by itself prove every *earlier* member of that batch has
 /// answered — under the per-member rule the last member could be verified while an earlier one has
 /// seen nothing — but three mechanisms elsewhere keep it from happening:
 ///
@@ -336,8 +338,8 @@ pub struct SessionPixSupervisor {
     /// The mirrored level is synced before the worker acts on each command, but the slot can detach in the
     /// time between that sync and the decision to ask for a successor; the decision reads the gate itself.
     detach_gate: Option<std::sync::Arc<super::gate::ServiceGate>>,
-    /// The successor batch that has been requested, has not been answered in full, and is being asked
-    /// for again.
+    /// The batch — a successor, or the opening batch — that has been requested, has not been answered in
+    /// full, and is being asked for again.
     ///
     /// The Entry admits a successor only once its predecessor's returned packets have earned the
     /// request, and drops it otherwise without a word — so a request sent at the Exit's early signal
@@ -362,8 +364,11 @@ pub struct SessionPixSupervisor {
     /// [`SessionPixAction::ResendSsaRequest`] every
     /// [`ssa_request_resend_interval`](SupervisorConfig::ssa_request_resend_interval), always naming
     /// the whole batch, and each emission pushes the `commitment_deadline` of every member that has
-    /// reported nothing to at least `now` plus the batch-scaled delivery budget. Members that have
-    /// reported a part keep their own clocks — the re-request timer, then the deposit deadline — which
+    /// reported nothing to at least `now` plus the batch-scaled delivery budget. The opening batch is never
+    /// behind the front; it is instead re-sent while unanswered at most
+    /// [`max_opening_ssa_request_resends`](SupervisorConfig::max_opening_ssa_request_resends) times, at gaps
+    /// doubling from the interval and clamped below the delivery window, with the same deadline push. Members that
+    /// have reported a part keep their own clocks — the re-request timer, then the deposit deadline — which
     /// measure a commitment that is under way. So a re-send the Entry admits always has a whole window
     /// to deliver in, and a batch that is not yet needed cannot time out. Repeating the whole batch
     /// for the members that are done is harmless: the Entry's repeat branch publishes only the members
