@@ -20,6 +20,7 @@
 
 pub mod config;
 pub mod content;
+pub mod control;
 pub mod errors;
 pub mod ping;
 pub mod probe;
