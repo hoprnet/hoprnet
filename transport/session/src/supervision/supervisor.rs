@@ -1380,9 +1380,9 @@ impl SessionPixSupervisor {
     /// Whether the unanswered batch `batch_id`, already re-sent `resends_done` times, can still be re-sent.
     ///
     /// A successor must be behind the front — an earlier generation is still being served, which is
-    /// what the Entry's gate is waiting on. The opening batch has nothing to be behind, so only
-    /// it is bounded by [`max_opening_ssa_request_resends`](SupervisorConfig::max_opening_ssa_request_resends)
-    /// instead. Either way the paid tail's hard deadline must not be within a delivery window. Every
+    /// what the Entry's gate is waiting on. The opening batch has nothing to be behind, so it is
+    /// bounded by [`max_opening_ssa_request_resends`](SupervisorConfig::max_opening_ssa_request_resends)
+    /// alone. Either way the paid tail's hard deadline must not be within a delivery window. Every
     /// one of these is permanent: the front only advances, the tail's deadline never moves, and the
     /// count only grows, so where one fails the batch is treated exactly as one that has reached the
     /// front. Nothing is re-sent, its deadline stops moving, and it is left to that deadline. This is
