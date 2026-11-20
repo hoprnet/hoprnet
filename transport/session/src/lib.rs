@@ -147,11 +147,17 @@ pub struct SessionClientConfig {
     /// Giving one is how a client reconnects under a pseudonym it used before in this process:
     ///
     /// * a live local Session under it is closed, and the new one takes its place;
-    /// * for a PIX Session the accounting continues where the previous Session left off (the commitments made and the
-    ///   packets served against them), as long as the Exit continues the same accounting. If the Exit started over,
-    ///   its opening request resets the Entry's side with it;
-    /// * the new socket ignores, for a short while, frames far ahead of its own stream, which can only be leftovers of
-    ///   the previous Session's.
+    /// * for a PIX Session the accounting (the commitments made and the packets served against them) is kept per
+    ///   pseudonym, and continues where the previous Session left off when the Exit resumes the Session it held (it
+    ///   answers `SessionResumed`). The new socket then numbers its stream from the base the Exit chose, so the
+    ///   predecessor's frames cannot be mistaken for its own. Resuming is offered to every Exit (the Entry announces
+    ///   it in each initiation) and works on stateless Sessions only; an Exit that cannot or will not resume answers
+    ///   `SessionEstablished` as for any new Session;
+    /// * when the Exit answers `SessionEstablished` to a pseudonym this Entry has accounting for, it started over, and
+    ///   the Entry resets its accounting for the pseudonym right at establishment;
+    /// * who may take a Session over is decided by the pseudonym alone; see hoprnet#8723 for binding it to a secret.
+    ///
+    /// The accounting of a Session that ended is kept for 30 minutes from its end; a live Session never loses it.
     ///
     /// Reusing a pseudonym across process restarts is **not** supported: the share generator, the reply
     /// openers and the SURB generation are all held in memory, and the Exit's SURB ring may treat the

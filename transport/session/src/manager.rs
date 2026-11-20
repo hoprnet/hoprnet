@@ -34,10 +34,10 @@ use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec,
     SsaCommitmentGuard, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
 };
-use hopr_protocol_session::{DEFAULT_SUCCESSOR_GUARD_PERIOD, DEFAULT_SUCCESSOR_START_WINDOW, FrameLossSignal};
+use hopr_protocol_session::{FrameLossSignal, MAX_STREAM_BASE};
 use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartResumed,
 };
 use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
@@ -691,6 +691,11 @@ fn release_session_slot(
     // The data plane is gone: a `HoprSession` still held for it must not send any more.
     session_data.instance.supersede();
 
+    // The Entry's PIX ledger leaves the slot for the retention cache here, on every teardown path
+    // (scoped close, idle eviction, supersede by a reconnect, rollback of a failed initiation), so
+    // its retention starts now and not when the Session was initiated.
+    session_data.instance.park_ledger(session_id);
+
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
         debug!("data tx channel closed on session");
@@ -1116,8 +1121,41 @@ const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 // The Session initiation cache is only present on the Entry (client) side.
 type SessionInitiationCache = moka::sync::Cache<
     StartChallenge,
-    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType<SessionId>>>>,
+    crossfire::MTx<crossfire::mpsc::One<Result<InitiationReply, StartErrorType<SessionId>>>>,
 >;
+
+/// What the Exit answered to an initiation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum InitiationReply {
+    /// A fresh Session: the Exit holds nothing of a predecessor's.
+    Established(StartEstablished<SessionId>),
+    /// The Exit took over a Session it still held: both sides number the stream from `stream_base`.
+    Resumed(StartResumed<SessionId>),
+}
+
+impl InitiationReply {
+    fn session_id(&self) -> SessionId {
+        match self {
+            Self::Established(est) => est.session_id,
+            Self::Resumed(res) => res.session_id,
+        }
+    }
+
+    fn orig_challenge(&self) -> StartChallenge {
+        match self {
+            Self::Established(est) => est.orig_challenge,
+            Self::Resumed(res) => res.orig_challenge,
+        }
+    }
+
+    /// The agreed stream base, `None` for a fresh Session.
+    fn stream_base(&self) -> Option<u32> {
+        match self {
+            Self::Established(_) => None,
+            Self::Resumed(res) => Some(res.stream_base),
+        }
+    }
+}
 
 /// Handles to streams and tasks spawned by the Session.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1195,6 +1233,12 @@ struct SessionSsaState {
     /// any deposit exists. Crediting that prefix would let the Exit bank unpaid service against the
     /// first cycle it *is* paid for. Everything after this point rides a share.
     returned_at_first_commit: std::sync::atomic::AtomicU64,
+    /// Set by [`reset`](Self::reset), cleared by the first commitment after it: the ledger was reset
+    /// because a fresh Exit replaced one it had accounted with, so until that Exit's opening batch is
+    /// committed, a request for any later index can only be a leftover of the previous Exit's and is not
+    /// admitted. Never set on a ledger that was not reset, where a first request for a later index is
+    /// not this Entry's to doubt.
+    awaiting_opening: std::sync::atomic::AtomicBool,
     /// Lowest SSA index of the request this Session most recently committed to, `0` before the first.
     ///
     /// What lets the Entry tell a *repeat* of a request it already served from a *stale* one. Both
@@ -1369,6 +1413,7 @@ impl SessionSsaState {
             params,
             committed_ssa_watermark: std::sync::atomic::AtomicU32::new(0),
             returned_at_first_commit: std::sync::atomic::AtomicU64::new(0),
+            awaiting_opening: std::sync::atomic::AtomicBool::new(false),
             last_committed_first: std::sync::atomic::AtomicU32::new(0),
             unpublished: Default::default(),
             last_refusal: std::sync::atomic::AtomicU64::new(0),
@@ -1417,6 +1462,13 @@ impl SessionSsaState {
         if self.committed_ssa_watermark.fetch_max(index.get(), Ordering::Relaxed) == 0 {
             self.returned_at_first_commit.store(returned_packets, Ordering::Relaxed);
         }
+        self.awaiting_opening.store(false, Ordering::Relaxed);
+    }
+
+    /// Whether the ledger was reset and has not committed since; see the field.
+    #[inline]
+    fn awaiting_opening(&self) -> bool {
+        self.awaiting_opening.load(Ordering::Relaxed)
     }
 
     /// Lowest index of the request last committed to, `None` before the first.
@@ -1548,6 +1600,7 @@ impl SessionSsaState {
     pub fn reset(&self) {
         self.committed_ssa_watermark.store(0, Ordering::Relaxed);
         self.returned_at_first_commit.store(0, Ordering::Relaxed);
+        self.awaiting_opening.store(true, Ordering::Relaxed);
         self.last_committed_first.store(0, Ordering::Relaxed);
         self.last_refusal.store(0, Ordering::Relaxed);
         {
@@ -1570,12 +1623,12 @@ impl SessionSsaState {
     }
 }
 
-/// How long an Entry keeps the PIX accounting of a pseudonym after its last Session used it.
+/// How long an Entry keeps the PIX accounting of a pseudonym after its last Session ended.
 ///
-/// Equal to the idle retention of the share generator's per-pseudonym state
-/// (`SsaShareGenerator`, 1800 s): the ledger and that state are two halves of one fact, the commitments
-/// made and the service they were measured against, and one outliving the other is exactly the
-/// mismatch [`classify_ssa_request`] has to repair.
+/// Counted from the teardown of the Session (a live Session carries its ledger itself), and equal to
+/// the idle retention of the share generator's per-pseudonym state (`SsaShareGenerator`, 1800 s): the
+/// ledger and that state are two halves of one fact, the commitments made and the service they were
+/// measured against, and one outliving the other is a mismatch the Entry has to repair.
 const PIX_LEDGER_IDLE_RETENTION: Duration = Duration::from_secs(1800);
 
 /// How many ledgers the cache holds per permitted Session. A ledger outlives its Session by
@@ -1608,43 +1661,50 @@ impl EntryPixLedger {
     fn params(&self) -> Option<PixParams> {
         self.ssa_state.get().map(|state| state.params)
     }
+
+    /// Whether the ledger remembers a committed cycle.
+    fn has_watermark(&self) -> bool {
+        self.ssa_state
+            .get()
+            .is_some_and(|state| state.committed_watermark().is_some())
+    }
 }
 
-/// What `handle_ssa_request` is to do about the relation between a request, the Session's PIX ledger
-/// and the generator's state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SsaRequestClass {
-    /// The Exit started over: forget the generator's state and the ledger, then treat the request as
-    /// an ordinary opening batch.
-    Reset,
-    /// The request can never be served: refuse it and close the Session.
-    Terminal,
-    /// Judge the request as usual.
-    Proceed,
+/// The retention cache of ledgers no live Session holds.
+type PixLedgerCache = moka::sync::Cache<HoprPseudonym, EntryPixLedger>;
+
+/// Where an Entry slot's ledger goes at teardown.
+///
+/// The slot carries its ledger for its whole lifetime, so a live Session's accounting cannot expire; only
+/// when the slot is torn down is the ledger put into the [`PixLedgerCache`], and its retention starts
+/// there.
+struct LedgerHome {
+    ledger: EntryPixLedger,
+    cache: PixLedgerCache,
 }
 
-/// Classifies an SSA request (one asking for commitments) against what this Entry remembers.
+/// A ledger `new_session` has taken for an initiation that has not produced a slot yet.
 ///
-/// A Session reconnecting under a pseudonym inherits a ledger and a generator state from its
-/// predecessor. The first request it receives tells which Exit it faces:
-///
-/// * an *opening* request (first index [`SsaIndex::MIN`]) as the first request, with anything remembered, is an Exit
-///   that started over: `Reset`;
-/// * a non-opening request while the generator holds state but the ledger has no watermark would skip the served-packet
-///   half of the successor gate, which has nothing to measure: `Terminal`;
-/// * anything else is today's logic: `Proceed`. A later opening request is a stale or repeated one, never a reset.
-fn classify_ssa_request(
-    is_opening: bool,
-    first_on_session: bool,
-    ledger_has_watermark: bool,
-    generator_has_state: bool,
-) -> SsaRequestClass {
-    if is_opening && first_on_session && (ledger_has_watermark || generator_has_state) {
-        SsaRequestClass::Reset
-    } else if !is_opening && !ledger_has_watermark && generator_has_state {
-        SsaRequestClass::Terminal
-    } else {
-        SsaRequestClass::Proceed
+/// Parks the ledger again when dropped, so that a failed initiation leaves the ledger where a retry
+/// finds it. Defused once a slot carries the ledger: its teardown parks it from then on.
+struct LedgerClaim {
+    ledger: EntryPixLedger,
+    cache: PixLedgerCache,
+    pseudonym: HoprPseudonym,
+    armed: bool,
+}
+
+impl LedgerClaim {
+    fn defuse(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for LedgerClaim {
+    fn drop(&mut self) {
+        if self.armed {
+            self.cache.insert(self.pseudonym, self.ledger.clone());
+        }
     }
 }
 
@@ -1675,9 +1735,8 @@ pub(crate) struct SlotInstance {
     created: std::time::Instant,
     /// Milliseconds after `created` at which an Entry write last refreshed the slot's idle timer.
     last_refresh_ms: std::sync::atomic::AtomicU64,
-    /// Set by the first SSA request this slot's Session receives, see
-    /// [`SlotInstance::note_ssa_request`].
-    ssa_request_seen: std::sync::atomic::AtomicBool,
+    /// Where an Entry slot's PIX ledger goes when the slot is torn down, see [`LedgerHome`].
+    ledger_home: OnceLock<LedgerHome>,
 }
 
 impl SlotInstance {
@@ -1690,7 +1749,7 @@ impl SlotInstance {
             superseded: std::sync::atomic::AtomicBool::new(false),
             created: std::time::Instant::now(),
             last_refresh_ms: std::sync::atomic::AtomicU64::new(0),
-            ssa_request_seen: std::sync::atomic::AtomicBool::new(false),
+            ledger_home: OnceLock::new(),
         })
     }
 
@@ -1716,13 +1775,23 @@ impl SlotInstance {
         }
     }
 
-    /// Records that an SSA request (one that asks for commitments, not a re-request of parts) reached
-    /// this Session, returning whether it is the first.
+    /// Binds the Entry's PIX ledger to this slot instance, to be parked in `cache` when the slot is torn down.
+    fn attach_ledger(&self, ledger: EntryPixLedger, cache: PixLedgerCache) {
+        let _ = self.ledger_home.set(LedgerHome { ledger, cache });
+    }
+
+    /// The PIX ledger this slot carries, if it is an Entry slot with one.
+    fn ledger(&self) -> Option<EntryPixLedger> {
+        self.ledger_home.get().map(|home| home.ledger.clone())
+    }
+
+    /// Parks the slot's ledger in the retention cache under `pseudonym`, starting its retention now.
     ///
-    /// Per Session rather than per pseudonym: the PIX ledger outlives the Session, so only this can
-    /// tell the opening request of a reconnected Session from a later one. See [`classify_ssa_request`].
-    fn note_ssa_request(&self) -> bool {
-        !self.ssa_request_seen.swap(true, std::sync::atomic::Ordering::AcqRel)
+    /// Called by every teardown of the slot, and a no-op for a slot without a ledger.
+    fn park_ledger(&self, pseudonym: HoprPseudonym) {
+        if let Some(home) = self.ledger_home.get() {
+            home.cache.insert(pseudonym, home.ledger.clone());
+        }
     }
 
     pub(crate) fn id(&self) -> u64 {
@@ -3306,8 +3375,27 @@ impl EffectivePixAdmission {
 /// above them are unused and always sent as `0`.
 const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
 
+/// Bit of `StartInitiation::additional_data` announcing that the Entry is resume-capable: it understands
+/// `SessionResumed` and agreed stream bases (see [`StartResumed`]).
+///
+/// Sits in the unused half of the reserved least significant 64 bits (bit 32, just above the idle
+/// timeout). An Exit that predates it ignores the bit; an Exit takes a held Session over only for an
+/// Entry that set it, so an Entry without it is refused as before. Bits 33 to 63 stay reserved for a
+/// resume MAC that would bind a takeover to a secret rather than to the pseudonym alone, see
+/// hoprnet#8723.
+const INITIATION_RESUME_CAPABLE: u128 = 1 << 32;
+
+/// Whether the Entry announced resume capability in `additional_data`; see [`INITIATION_RESUME_CAPABLE`].
+// Read by the Exit side of the handshake (hoprnet#8721).
+#[allow(dead_code)]
+#[inline]
+pub(crate) const fn announced_resume_capable(additional_data: u128) -> bool {
+    additional_data & INITIATION_RESUME_CAPABLE != 0
+}
+
 /// Packs the 64-bit options word into the most significant half of `StartInitiation::additional_data`, and
-/// the Entry's idle timeout into its lowest 32 bits.
+/// the Entry's idle timeout into its lowest 32 bits. The resume-capable bit ([`INITIATION_RESUME_CAPABLE`]) is
+/// always set: every Session this Entry opens understands `SessionResumed`.
 ///
 /// The timeout is in whole seconds, at least 1 for a nonzero one, saturating at `u32::MAX`; `0` means it is
 /// not announced. The Exit bounds its idle report backoff by it (see [`session_idle_notify_cap`]).
@@ -3318,7 +3406,7 @@ fn into_initiation_additional_data(options: u64, entry_idle_timeout: Duration) -
     } else {
         entry_idle_timeout.as_secs().clamp(1, u32::MAX as u64) as u32
     };
-    ((options as u128) << INITIATION_OPTIONS_SHIFT) | idle_secs as u128
+    ((options as u128) << INITIATION_OPTIONS_SHIFT) | INITIATION_RESUME_CAPABLE | idle_secs as u128
 }
 
 /// Inverse of [`into_initiation_additional_data`] for the options word, ignoring the least significant half.
@@ -4348,21 +4436,8 @@ fn session_config_with(
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
         max_frames_behind_gap: (!can_retransmit).then_some(bound).flatten(),
-        successor_start_window: None,
-        successor_guard_period: DEFAULT_SUCCESSOR_GUARD_PERIOD,
+        stream_base: None,
     }
-}
-
-/// Arms the socket's successor guard when the Session reuses a pseudonym chosen by the caller.
-///
-/// A fresh explicit pseudonym is harmless: the guard only drops frames more than the window ahead
-/// during its first [`DEFAULT_SUCCESSOR_GUARD_PERIOD`].
-fn with_successor_guard(mut cfg: HoprSessionConfig, enabled: bool) -> HoprSessionConfig {
-    if enabled {
-        cfg.successor_start_window = Some(DEFAULT_SUCCESSOR_START_WINDOW);
-        cfg.successor_guard_period = DEFAULT_SUCCESSOR_GUARD_PERIOD;
-    }
-    cfg
 }
 
 #[cfg(feature = "telemetry")]
@@ -5435,7 +5510,12 @@ where
                                 async move {
                                     let result = match protocol_msg {
                                         HoprStartProtocol::SessionEstablished(est) => {
-                                            myself.handle_session_established(est).await
+                                            myself
+                                                .handle_session_established(InitiationReply::Established(est))
+                                                .await
+                                        }
+                                        HoprStartProtocol::SessionResumed(res) => {
+                                            myself.handle_session_established(InitiationReply::Resumed(res)).await
                                         }
                                         HoprStartProtocol::SessionError(error_type) => {
                                             myself.handle_session_error(pseudonym, error_type).await
@@ -5585,31 +5665,86 @@ where
         }
     }
 
-    /// The PIX ledger of `pseudonym`, created on first use.
+    /// The established outgoing Session under `pseudonym` that the initiation `challenge` opened, if any.
     ///
-    /// A ledger whose dimensions differ from the generator's current ones is replaced, and the
-    /// generator's state for the pseudonym forgotten with it: neither describes the other any more.
-    fn pix_ledger_for(&self, pseudonym: HoprPseudonym, params: PixParams) -> EntryPixLedger {
-        let mut replaced = false;
-        let result = self.pix_ledgers.entry(pseudonym).and_compute_with(
-            |entry: Option<moka::Entry<HoprPseudonym, EntryPixLedger>>| match entry {
-                Some(entry) if entry.value().params() == Some(params) => moka::ops::compute::Op::Nop,
-                Some(_) => {
-                    replaced = true;
-                    moka::ops::compute::Op::Put(EntryPixLedger::new(params))
+    /// What scopes a challenge-named post-establishment error: the pseudonym is reusable, so the challenge
+    /// is what tells the Session the error is about from its predecessors and successors.
+    fn established_forward_instance(
+        &self,
+        pseudonym: &HoprPseudonym,
+        challenge: StartChallenge,
+    ) -> Option<Arc<SlotInstance>> {
+        self.sessions
+            .get(pseudonym)
+            .filter(|slot| {
+                matches!(slot.routing_opts, DestinationRouting::Forward { .. })
+                    && slot.instance.challenge == challenge
+                    && slot.instance.is_established()
+            })
+            .map(|slot| slot.instance.clone())
+    }
+
+    /// Takes the PIX ledger of `pseudonym` for a new initiation: the one `live` (the superseded local
+    /// Session's own) carries, else the one parked in the retention cache, else a new one.
+    ///
+    /// The cache entry is taken out, so a Session that is live holds its ledger alone; the claim parks it
+    /// again if the initiation fails before a slot carries it. A ledger whose dimensions differ from the
+    /// generator's current ones is replaced, and the generator's state for the pseudonym forgotten with
+    /// it: neither describes the other any more.
+    fn claim_pix_ledger(
+        &self,
+        pseudonym: HoprPseudonym,
+        params: PixParams,
+        live: Option<EntryPixLedger>,
+    ) -> LedgerClaim {
+        let parked = self.pix_ledgers.remove(&pseudonym);
+        let ledger = match live.or(parked) {
+            Some(ledger) if ledger.params() == Some(params) => ledger,
+            replaced => {
+                if replaced.is_some()
+                    && let Some(toolbox) = self.pix_toolbox.get()
+                {
+                    toolbox.share_generator.forget(&pseudonym);
                 }
-                None => moka::ops::compute::Op::Put(EntryPixLedger::new(params)),
-            },
-        );
-        if replaced && let Some(toolbox) = self.pix_toolbox.get() {
-            toolbox.share_generator.forget(&pseudonym);
+                EntryPixLedger::new(params)
+            }
+        };
+        LedgerClaim {
+            ledger,
+            cache: self.pix_ledgers.clone(),
+            pseudonym,
+            armed: true,
         }
-        match result {
-            moka::ops::compute::CompResult::Inserted(entry)
-            | moka::ops::compute::CompResult::ReplacedWith(entry)
-            | moka::ops::compute::CompResult::Unchanged(entry) => entry.into_value(),
-            // Neither `Remove` nor a missing entry with `Nop` can come out of the closure above.
-            _ => EntryPixLedger::new(params),
+    }
+
+    /// The Exit answered a fresh `SessionEstablished` under a pseudonym this Entry has PIX state for: it
+    /// started over, so the Entry starts over with it.
+    ///
+    /// Done at establishment, before the Session's slot exists and so before any of its requests: the order
+    /// in which the new Exit's requests arrive then decides nothing, and a delayed request of the previous
+    /// Exit cannot pass for the new one's. A `SessionResumed` skips this and keeps the state.
+    async fn reset_pix_accounting_of_fresh_exit(&self, pseudonym: HoprPseudonym, ledger: &EntryPixLedger) {
+        let Some(toolbox) = self.pix_toolbox.get() else {
+            return;
+        };
+        let generator_has_state = toolbox.share_generator.emission_progress(&pseudonym).is_some();
+        if !ledger.has_watermark() && !generator_has_state {
+            return;
+        }
+
+        // Under the per-pseudonym request lock, as the reset requires.
+        let request_lock = self
+            .ssa_request_locks
+            .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
+            .await;
+        let _guard = request_lock.lock().await;
+        info!(
+            %pseudonym, watermark = ledger.has_watermark(), generator_has_state,
+            "the Exit established a fresh Session under a pseudonym this Entry has PIX state for — resetting it"
+        );
+        toolbox.share_generator.forget(&pseudonym);
+        if let Some(state) = ledger.ssa_state.get() {
+            state.reset();
         }
     }
 
@@ -5775,9 +5910,12 @@ where
         // under the pseudonym is not ours to replace and keeps failing as a loopback below.
         //
         // Before the capacity check: replacing a Session does not take another slot.
+        let mut live_ledger = None;
         if let Some(live) = self.sessions.get(&pseudonym)
             && matches!(live.routing_opts, DestinationRouting::Forward { .. })
         {
+            // Read before the close, which parks the ledger in the retention cache.
+            live_ledger = live.instance.ledger();
             info!(%pseudonym, "closing the live Session this reconnect under the same pseudonym replaces");
             self.close_session_scoped(
                 &pseudonym,
@@ -5793,17 +5931,11 @@ where
 
         // Taken only once this initiation is certain to be sent: it may replace a ledger, and with it
         // the generator's state.
-        let (current_ssa_state, returned_packets) = match pix_params {
-            Some(params) => {
-                let ledger = self.pix_ledger_for(pseudonym, params);
-                (ledger.ssa_state, ledger.returned_packets)
-            }
+        let mut ledger_claim = pix_params.map(|params| self.claim_pix_ledger(pseudonym, params, live_ledger));
+        let (current_ssa_state, returned_packets) = match &ledger_claim {
+            Some(claim) => (claim.ledger.ssa_state.clone(), claim.ledger.returned_packets.clone()),
             None => Default::default(),
         };
-
-        // A pseudonym the caller chose may be one a predecessor used, whose stream may still have
-        // frames in flight to this socket.
-        let successor_guard = cfg.pseudonym.is_some();
 
         let forward_routing = DestinationRouting::Forward {
             destination: Box::new(destination.into()),
@@ -5845,8 +5977,45 @@ where
         {
             Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
-                let session_id = est.session_id;
-                debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
+                let session_id = est.session_id();
+                let stream_base = est.stream_base();
+                debug!(
+                    challenge = est.orig_challenge(),
+                    ?session_id,
+                    ?stream_base,
+                    "started a new session"
+                );
+
+                // A base the Exit and this Entry cannot number a stream from fails the establishment;
+                // the ledger claim parks the ledger again on the way out.
+                if let Some(base) = stream_base {
+                    if base == 0 || base > MAX_STREAM_BASE {
+                        error!(%session_id, base, "the Exit resumed the Session with an invalid stream base");
+                        return Err(SessionManagerError::Unacceptable(format!(
+                            "the Exit resumed the Session with stream base {base}, outside of 1..={MAX_STREAM_BASE}"
+                        ))
+                        .into());
+                    }
+                    // Only the stateless socket numbers its stream from a base.
+                    if cfg.capabilities.contains(Capability::RetransmissionAck)
+                        || cfg.capabilities.contains(Capability::RetransmissionNack)
+                    {
+                        error!(%session_id, base, "the Exit resumed a Session with a stateful socket");
+                        return Err(SessionManagerError::Unacceptable(
+                            "the Exit resumed a Session whose capabilities select the stateful socket, which cannot \
+                             number its stream from a base"
+                                .into(),
+                        )
+                        .into());
+                    }
+                }
+
+                // A fresh Exit under a pseudonym with remembered PIX state started over.
+                if stream_base.is_none()
+                    && let Some(claim) = &ledger_claim
+                {
+                    self.reset_pix_accounting_of_fresh_exit(pseudonym, &claim.ledger).await;
+                }
 
                 let (session_tx, session_rx) =
                     crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
@@ -5858,6 +6027,9 @@ where
                 // Created before the notifier so the notifier names *this* establishment: a close it
                 // reports later is ignored once the pseudonym belongs to a successor.
                 let instance = SlotInstance::new(challenge);
+                if let Some(claim) = &ledger_claim {
+                    instance.attach_ledger(claim.ledger.clone(), self.pix_ledgers.clone());
+                }
 
                 let notifier = self
                     .session_notifiers
@@ -6013,6 +6185,10 @@ where
                             // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+                    // From here the slot's teardown parks the ledger.
+                    if let Some(claim) = ledger_claim.as_mut() {
+                        claim.defuse();
+                    }
 
                     // The slot now exists, so inbound traffic for this Session passes the dispatch
                     // filter on the session registry alone; the pending-initiation marker has served
@@ -6068,10 +6244,10 @@ where
                     let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
-                        with_successor_guard(
-                            session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
-                            successor_guard,
-                        ),
+                        HoprSessionConfig {
+                            stream_base,
+                            ..session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap)
+                        },
                         (
                             reduced_surb_scoring_sender,
                             session_rx.inspect(move |_| {
@@ -6172,6 +6348,10 @@ where
                             // guard removes the marker keyed by the pseudonym it was inserted under.
                             SessionManagerError::Loopback
                         })?;
+                    // From here the slot's teardown parks the ledger.
+                    if let Some(claim) = ledger_claim.as_mut() {
+                        claim.defuse();
+                    }
 
                     // The slot now exists, so inbound traffic for this Session passes the dispatch
                     // filter on the session registry alone; the pending-initiation marker has served
@@ -6202,10 +6382,10 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        with_successor_guard(
-                            session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
-                            successor_guard,
-                        ),
+                        HoprSessionConfig {
+                            stream_base,
+                            ..session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap)
+                        },
                         (
                             reduced_surb_sender,
                             session_rx.inspect(move |_| {
@@ -7714,8 +7894,14 @@ where
             // for `SessionError` only — a post-establishment error naming a registered Session by
             // its id.
             HoprStartProtocol::SessionEstablished(est) => self.session_initiations.contains_key(&est.orig_challenge),
+            HoprStartProtocol::SessionResumed(res) => self.session_initiations.contains_key(&res.orig_challenge),
             HoprStartProtocol::SessionError(err) => match err.identifier {
-                ErrorIdentifier::Challenge(challenge) => self.session_initiations.contains_key(&challenge),
+                // A pending initiation, or an established Session of this node under the sender's
+                // pseudonym that this very challenge opened (a challenge-scoped post-establishment error).
+                ErrorIdentifier::Challenge(challenge) => {
+                    self.session_initiations.contains_key(&challenge)
+                        || self.established_forward_instance(pseudonym, challenge).is_some()
+                }
                 ErrorIdentifier::SessionId(id) => id == *pseudonym && self.sessions.contains_key(&id),
             },
         }
@@ -8926,13 +9112,14 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self, est))]
-    async fn handle_session_established(&self, est: StartEstablished<SessionId>) -> errors::Result<()> {
+    async fn handle_session_established(&self, est: InitiationReply) -> errors::Result<()> {
         debug!(
-            session_id = ?est.session_id,
+            session_id = ?est.session_id(),
+            stream_base = ?est.stream_base(),
             "received session establishment confirmation"
         );
-        let challenge = est.orig_challenge;
-        let session_id = est.session_id;
+        let challenge = est.orig_challenge();
+        let session_id = est.session_id();
 
         if let Some(tx_est) = self.session_initiations.remove(&challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
@@ -8962,10 +9149,19 @@ where
                         return Err(SessionManagerError::other(error).into());
                     }
                     error!(%challenge, "session establishment error received");
-                } else {
+                } else if let Some(instance) = self.established_forward_instance(&pseudonym, challenge) {
+                    // A post-establishment error an Exit sends to a resume-capable Entry, scoped to the
+                    // Session instance this challenge opened: the pseudonym is reusable, so an error
+                    // that names a challenge of an earlier Session of it must not close this one.
                     error!(
-                        %challenge,
-                        "session establishment attempt expired before error could be delivered"
+                        %pseudonym, %challenge, %reason,
+                        "received post-establishment session error naming the challenge of this Session — closing it"
+                    );
+                    self.close_session_scoped(&pseudonym, ClosureReason::Eviction, CloseScope::Instance(&instance));
+                } else {
+                    debug!(
+                        %pseudonym, %challenge,
+                        "dropping a session error naming a challenge that is neither pending nor this Session's"
                     );
                 }
             }
@@ -9725,29 +9921,19 @@ where
         // The opening batch has no watermark and passes this untouched.
         let first_asked = msg.commitments.keys().next().copied();
 
-        // Whether this request is the one that tells a reconnected Session which Exit it faces. The
-        // ledger and the generator outlive the Session they were built for (see `EntryPixLedger`), so
-        // an opening request as the first this Session receives, against remembered state, is an Exit
-        // that started over; and a non-opening one against a ledger that cannot measure it is one the
-        // served-packet gate below would wave through. See `classify_ssa_request`.
+        // Which Exit a reconnected Session faces is decided at establishment, not here: a
+        // `SessionResumed` keeps the ledger and the generator, a fresh `SessionEstablished` resets them
+        // (see `reset_pix_accounting_of_fresh_exit`). So an opening request on a resumed Session is
+        // judged below like any other, as a repeat or a stale one.
+        //
+        // What remains is a request the ledger cannot measure: a later index than the opening batch,
+        // against a ledger without a watermark. With the generator holding state, the served-packet half
+        // of the successor gate has nothing to measure: terminal. On a ledger that was just reset for a
+        // fresh Exit it is a delayed request of the previous Exit, which must not take the place of the
+        // opening batch of the Exit that is actually served: dropped.
         let is_opening = first_asked == Some(SsaIndex::MIN);
-        let first_on_session = session_slot.instance.note_ssa_request();
-        let generator_has_state = pix_toolbox.share_generator.emission_progress(&pseudonym).is_some();
-        match classify_ssa_request(
-            is_opening,
-            first_on_session,
-            ssa_state.committed_watermark().is_some(),
-            generator_has_state,
-        ) {
-            SsaRequestClass::Reset => {
-                tracing::info!(
-                    session_id = %msg.session_id, watermark = ?ssa_state.committed_watermark(), generator_has_state,
-                    "an opening SSA request on a reconnected Session — the Exit started over, resetting the PIX accounting"
-                );
-                pix_toolbox.share_generator.forget(&pseudonym);
-                ssa_state.reset();
-            }
-            SsaRequestClass::Terminal => {
+        if !is_opening && ssa_state.committed_watermark().is_none() {
+            if pix_toolbox.share_generator.emission_progress(&pseudonym).is_some() {
                 let error = SessionManagerError::Unacceptable(format!(
                     "Exit asked for SSAs from {first_asked:?} on a Session whose ledger has no committed cycle, while \
                      the generator still holds state for {pseudonym}; the successor cannot be measured"
@@ -9757,7 +9943,19 @@ where
                     .await;
                 return Err(error.into());
             }
-            SsaRequestClass::Proceed => {}
+            if ssa_state.awaiting_opening() {
+                let error = SessionManagerError::NotAdmitted(format!(
+                    "Exit asked for SSAs from {first_asked:?} before the opening batch of the Exit this Session was \
+                     reset for; the opening batch starts at {}",
+                    SsaIndex::MIN
+                ));
+                SsaRefusal::Stale.log(
+                    ssa_state.note_refusal(first_asked, SsaRefusal::Stale),
+                    &msg.session_id,
+                    &error,
+                );
+                return Err(error.into());
+            }
         }
         if let Some(first) = first_asked
             && let Some(watermark) = ssa_state.committed_watermark()
@@ -20075,7 +20273,7 @@ mod tests {
             .context("establishment worker must deliver its reply")??;
         assert!(matches!(
             established_reply,
-            Ok(StartEstablished { orig_challenge, session_id })
+            Ok(InitiationReply::Established(StartEstablished { orig_challenge, session_id }))
                 if orig_challenge == established_challenge && session_id == replier
         ));
         let error_reply = timeout(Duration::from_secs(2), receivers[1].recv())
@@ -29990,39 +30188,6 @@ mod tests {
     // -- Entry PIX continuity: a reconnect under the same pseudonym. --
 
     #[test]
-    fn the_ssa_request_classifier_follows_its_truth_table() {
-        use SsaRequestClass::*;
-        // (is_opening, first_on_session, ledger_has_watermark, generator_has_state) => class
-        for (opening, first, watermark, generator, expected) in [
-            // A brand-new Session: nothing remembered anywhere.
-            (true, true, false, false, Proceed),
-            (false, true, false, false, Proceed),
-            // The Exit started over, against remembered state of either kind.
-            (true, true, true, true, Reset),
-            (true, true, true, false, Reset),
-            (true, true, false, true, Reset),
-            // An opening request that is not the Session's first is stale or a repeat, never a reset.
-            (true, false, true, true, Proceed),
-            (true, false, true, false, Proceed),
-            (true, false, false, true, Proceed),
-            (true, false, false, false, Proceed),
-            // A successor the ledger can measure.
-            (false, true, true, true, Proceed),
-            (false, false, true, true, Proceed),
-            (false, true, true, false, Proceed),
-            // A successor the ledger cannot measure, with generator state behind it.
-            (false, true, false, true, Terminal),
-            (false, false, false, true, Terminal),
-        ] {
-            assert_eq!(
-                expected,
-                classify_ssa_request(opening, first, watermark, generator),
-                "opening={opening} first={first} watermark={watermark} generator={generator}"
-            );
-        }
-    }
-
-    #[test]
     fn resetting_the_ssa_state_forgets_the_exits_accounting() -> anyhow::Result<()> {
         let state = SessionSsaState::new(small_pix_params());
         let index = SsaIndex::new(3).context("non-zero")?;
@@ -30039,6 +30204,10 @@ mod tests {
 
         state.reset();
 
+        assert!(
+            state.awaiting_opening(),
+            "a reset ledger awaits the fresh Exit's opening batch"
+        );
         assert_eq!(None, state.committed_watermark());
         assert_eq!(None, state.last_committed_first());
         assert!(
@@ -30058,21 +30227,43 @@ mod tests {
             state.served_since_first_commit(95),
             "the baseline is retaken at the next commit"
         );
+        assert!(!state.awaiting_opening(), "the opening batch ended the wait");
         Ok(())
     }
 
+    /// What the stub Exit of a [`ReconnectRig`] answers to a `StartSession`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum StubReply {
+        /// `SessionEstablished`: a fresh Session.
+        Established,
+        /// `SessionResumed` with the given stream base.
+        Resumed(u32),
+    }
+
     /// An Entry whose generator and ledger are the manager's own, and whose Exit is a stub that
-    /// answers every `StartSession` with `SessionEstablished`.
+    /// answers every `StartSession` as set by [`ReconnectRig::reply_with`] (`SessionEstablished` by default).
     struct ReconnectRig {
         mgr: RecordingManager,
         generator: Arc<SsaShareGenerator<HoprPixSpec>>,
         events: std::pin::Pin<Box<dyn futures::Stream<Item = HoprSessionOutPixEvent> + Send>>,
         wire: Arc<WireRecord>,
         params: PixParams,
+        reply: Arc<parking_lot::Mutex<StubReply>>,
+        /// The `additional_data` of every `StartSession` the Entry sent.
+        initiations: Arc<parking_lot::Mutex<Vec<u128>>>,
         _stub_exit: AbortOnDrop,
     }
 
     async fn reconnect_rig(params: PixParams, cfg: SessionManagerConfig) -> anyhow::Result<ReconnectRig> {
+        reconnect_rig_retaining(params, cfg, PIX_LEDGER_IDLE_RETENTION).await
+    }
+
+    /// [`reconnect_rig`] with the retention of parked ledgers shortened to `retention`.
+    async fn reconnect_rig_retaining(
+        params: PixParams,
+        cfg: SessionManagerConfig,
+        retention: Duration,
+    ) -> anyhow::Result<ReconnectRig> {
         let generator = Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
             polynomials_per_ssa: params.polys_per_ssa(),
             threshold: params.shares_per_poly(),
@@ -30080,15 +30271,24 @@ mod tests {
         }));
         let (pix_toolbox, events) =
             PixToolbox::new(generator.clone(), SsaReconstructor::new(Default::default()).into());
-        let mgr = RecordingManager::new(cfg);
+        let mut mgr = RecordingManager::new(cfg);
+        // Before the manager is cloned into its tasks.
+        mgr.pix_ledgers = moka::sync::Cache::builder()
+            .max_capacity(64)
+            .time_to_idle(retention)
+            .build();
         let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
         let (new_session_tx, _new_sessions) = futures::channel::mpsc::channel(4);
         mgr.start(msg_tx, new_session_tx, Some(pix_toolbox), None)?;
 
         let wire = Arc::new(WireRecord::default());
+        let reply = Arc::new(parking_lot::Mutex::new(StubReply::Established));
+        let initiations = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let stub_exit = hopr_utils::runtime::prelude::spawn({
             let mgr = mgr.clone();
             let wire = wire.clone();
+            let reply = reply.clone();
+            let initiations = initiations.clone();
             async move {
                 while let Some((routing, data)) = msg_rx.next().await {
                     let Ok(message) = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
@@ -30098,12 +30298,22 @@ mod tests {
                     wire.sent.lock().push(StartProtocolDiscriminants::from(&message));
                     if let (StartProtocol::StartSession(init), DestinationRouting::Forward { pseudonym: Some(p), .. }) =
                         (message, routing)
-                        && let Ok(packet) = start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
-                            orig_challenge: init.challenge,
-                            session_id: p,
-                        }))
                     {
-                        let _ = mgr.dispatch_message(p, packet);
+                        initiations.lock().push(init.additional_data);
+                        let answer = match *reply.lock() {
+                            StubReply::Established => HoprStartProtocol::SessionEstablished(StartEstablished {
+                                orig_challenge: init.challenge,
+                                session_id: p,
+                            }),
+                            StubReply::Resumed(stream_base) => HoprStartProtocol::SessionResumed(StartResumed {
+                                orig_challenge: init.challenge,
+                                session_id: p,
+                                stream_base,
+                            }),
+                        };
+                        if let Ok(packet) = start_packet(answer) {
+                            let _ = mgr.dispatch_message(p, packet);
+                        }
                     }
                 }
             }
@@ -30114,6 +30324,8 @@ mod tests {
             events: Box::pin(events),
             wire,
             params,
+            reply,
+            initiations,
             _stub_exit: stub_exit.into(),
         })
     }
@@ -30129,7 +30341,21 @@ mod tests {
         }
     }
 
+    /// A stream base of the size the Exit adds above the predecessor's highest frame.
+    const TEST_STREAM_BASE: u32 = 1 << 16;
+
     impl ReconnectRig {
+        /// Sets what the stub Exit answers to the next `StartSession`s.
+        fn reply_with(&self, reply: StubReply) {
+            *self.reply.lock() = reply;
+        }
+
+        /// The ledger parked in the retention cache for `pseudonym`, if any.
+        fn parked_ledger(&self, pseudonym: &HoprPseudonym) -> Option<EntryPixLedger> {
+            self.mgr.pix_ledgers.run_pending_tasks();
+            self.mgr.pix_ledgers.get(pseudonym)
+        }
+
         async fn connect(&self, cfg: SessionClientConfig) -> anyhow::Result<HoprSession> {
             timeout(
                 Duration::from_secs(5),
@@ -30198,6 +30424,7 @@ mod tests {
         rig.emit_cycle(&pseudonym)?;
         let old_instance = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.clone();
 
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let second = rig.connect_pix(Some(pseudonym)).await?;
         assert!(old_instance.is_superseded(), "the predecessor is closed");
         assert_ne!(first.slot_instance(), second.slot_instance());
@@ -30236,6 +30463,7 @@ mod tests {
         rig.emit_cycle(&pseudonym)?;
         credit_returned_packets(&rig.mgr, &pseudonym, required_returned_packets(&rig.params, 1));
 
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let _second = rig.connect_pix(Some(pseudonym)).await?;
         rig.request(pseudonym, 2)
             .await
@@ -30244,10 +30472,16 @@ mod tests {
         Ok(())
     }
 
-    /// Reconnecting under a pseudonym with an Exit that started over: its opening request resets the
-    /// Entry's side, SSA 1 is committed again, and a second opening request is a repeat.
+    /// A fresh Exit under a pseudonym the Entry has PIX state for started over: the Entry resets at
+    /// establishment, and the Exit's opening request commits SSA 1 anew.
+    ///
+    /// ## Steps
+    /// 1. A paid Session under a pseudonym: SSA 1 committed, a cycle emitted, packets returned.
+    /// 2. The Exit answers the reconnect with `SessionEstablished`: the ledger and the generator are reset at once, the
+    ///    socket has no base.
+    /// 3. The opening request commits SSA 1 again, and a second one is a repeat.
     #[test_log::test(tokio::test)]
-    async fn a_reconnect_with_an_exit_that_started_over_resets_on_its_opening_request() -> anyhow::Result<()> {
+    async fn a_fresh_exit_resets_the_pix_state_at_establishment() -> anyhow::Result<()> {
         let mut rig = reconnect_rig(small_pix_params(), Default::default()).await?;
         let pseudonym = HoprPseudonym::random();
         let _first = rig.connect_pix(Some(pseudonym)).await?;
@@ -30255,7 +30489,7 @@ mod tests {
         assert_eq!(1, rig.deposits().await);
         rig.emit_cycle(&pseudonym)?;
         credit_returned_packets(&rig.mgr, &pseudonym, 1_000);
-        let returned_before = rig
+        let returned = rig
             .mgr
             .sessions
             .get(&pseudonym)
@@ -30263,20 +30497,24 @@ mod tests {
             .returned_packets
             .clone();
 
-        let _second = rig.connect_pix(Some(pseudonym)).await?;
-        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
+        let second = rig.connect_pix(Some(pseudonym)).await?;
+        assert_eq!(None, second.config().stream_base, "a fresh Exit starts the stream at 1");
+        assert_eq!(
+            None,
+            rig.watermark(&pseudonym),
+            "reset at establishment, before any request"
+        );
+        assert!(
+            rig.generator.emission_progress(&pseudonym).is_none(),
+            "the generator was forgotten at establishment"
+        );
 
         rig.request(pseudonym, 1)
             .await
-            .context("an opening request on a reconnected Session is the Exit starting over")?;
+            .context("the fresh Exit's opening request")?;
         assert_eq!(1, rig.deposits().await, "SSA 1 is committed and announced anew");
-        let progress = rig.generator.emission_progress(&pseudonym).context("committed anew")?;
-        assert_eq!(
-            None, progress.highest_emitted,
-            "the generator was forgotten, then committed from scratch"
-        );
         assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
-        let state_served = rig
+        let served = rig
             .mgr
             .sessions
             .get(&pseudonym)
@@ -30284,21 +30522,17 @@ mod tests {
             .current_ssa_state
             .get()
             .context("state")?
-            .served_since_first_commit(returned_before.load(Ordering::Relaxed));
-        assert_eq!(0, state_served, "the served baseline restarts with the Exit");
+            .served_since_first_commit(returned.load(Ordering::Relaxed));
+        assert_eq!(0, served, "the served baseline restarts with the Exit");
 
-        // Emitting a share and asking again shows the second request is a repeat: no new commitment,
-        // no new deposit, no second reset.
+        // The second opening request is a repeat: no new commitment, no new deposit.
         rig.generator.next_share(&pseudonym, &1u32.to_be_bytes())?;
         let emitted = rig
             .generator
             .emission_progress(&pseudonym)
             .context("state")?
             .highest_emitted;
-        assert!(emitted.is_some());
-        rig.request(pseudonym, 1)
-            .await
-            .context("a repeat of the committed opening")?;
+        rig.request(pseudonym, 1).await.context("a repeat of the opening")?;
         assert_eq!(0, rig.deposits().await);
         assert_eq!(
             emitted,
@@ -30311,33 +30545,94 @@ mod tests {
         Ok(())
     }
 
-    /// A generator that remembers a pseudonym whose ledger does not (the ledger was evicted, or
-    /// replaced): an opening request proceeds as a reset, a successor is terminal.
+    /// The reviewer's scenario: a delayed SSA-2 request of the previous Exit reaches the new Session
+    /// before the fresh Exit's opening request. The order decides nothing: SSA 1 is committed.
     #[test_log::test(tokio::test)]
-    async fn a_stale_generator_with_a_fresh_ledger_opens_but_cannot_serve_a_successor() -> anyhow::Result<()> {
+    async fn a_delayed_repeat_does_not_make_a_fresh_exits_opening_request_stale() -> anyhow::Result<()> {
+        let mut rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        rig.request(pseudonym, 1).await?;
+        assert_eq!(1, rig.deposits().await);
+        rig.emit_cycle(&pseudonym)?;
+        credit_returned_packets(&rig.mgr, &pseudonym, required_returned_packets(&rig.params, 1));
+
+        let _second = rig.connect_pix(Some(pseudonym)).await?;
+
+        let err = rig
+            .request(pseudonym, 2)
+            .await
+            .expect_err("a request of the previous Exit cannot open the new one's accounting");
+        assert!(
+            matches!(err, TransportSessionError::Manager(SessionManagerError::NotAdmitted(_))),
+            "expected a non-fatal refusal, got {err:?}"
+        );
+        assert_eq!(None, rig.watermark(&pseudonym), "nothing was committed for it");
+        assert_eq!(0, rig.deposits().await);
+
+        rig.request(pseudonym, 1)
+            .await
+            .context("the fresh Exit's opening request must commit SSA 1")?;
+        assert_eq!(1, rig.deposits().await);
+        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
+        assert_eq!(vec![pseudonym], rig.mgr.active_sessions());
+        Ok(())
+    }
+
+    /// `SessionResumed` keeps the ledger and the generator and hands the base to the socket.
+    #[test_log::test(tokio::test)]
+    async fn a_resumed_session_keeps_the_ledger_and_numbers_its_stream_from_the_base() -> anyhow::Result<()> {
+        let mut rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let first = rig.connect_pix(Some(pseudonym)).await?;
+        assert_eq!(None, first.config().stream_base);
+        rig.request(pseudonym, 1).await?;
+        assert_eq!(1, rig.deposits().await);
+        rig.emit_cycle(&pseudonym)?;
+        let ledger = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.ledger();
+        let ledger = ledger.context("an Entry slot carries its ledger")?;
+
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
+        let second = rig.connect_pix(Some(pseudonym)).await?;
+        assert_eq!(Some(TEST_STREAM_BASE), second.config().stream_base);
+        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym), "the ledger is kept");
+        assert!(
+            rig.generator.emission_progress(&pseudonym).is_some(),
+            "the generator is kept"
+        );
+        let carried = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.ledger();
+        assert!(
+            Arc::ptr_eq(
+                &ledger.ssa_state,
+                &carried.context("the successor carries a ledger")?.ssa_state
+            ),
+            "the same ledger"
+        );
+        Ok(())
+    }
+
+    /// A generator that remembers a pseudonym whose ledger does not (the ledger was evicted while the
+    /// Exit resumed): a successor the ledger cannot measure is terminal.
+    #[test_log::test(tokio::test)]
+    async fn a_stale_generator_with_a_fresh_ledger_cannot_serve_a_successor() -> anyhow::Result<()> {
         let mut rig = reconnect_rig(small_pix_params(), Default::default()).await?;
         let pseudonym = HoprPseudonym::random();
         let _first = rig.connect_pix(Some(pseudonym)).await?;
         rig.request(pseudonym, 1).await?;
         assert_eq!(1, rig.deposits().await);
 
+        assert!(rig.mgr.close_session(&pseudonym));
+        assert!(rig.parked_ledger(&pseudonym).is_some());
         rig.mgr.pix_ledgers.invalidate(&pseudonym);
         rig.mgr.pix_ledgers.run_pending_tasks();
+
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let _second = rig.connect_pix(Some(pseudonym)).await?;
         assert_eq!(None, rig.watermark(&pseudonym), "the fresh ledger has no watermark");
         assert!(
             rig.generator.emission_progress(&pseudonym).is_some(),
             "the generator remembers"
         );
-        rig.request(pseudonym, 1)
-            .await
-            .context("an opening request must succeed")?;
-        assert_eq!(1, rig.deposits().await);
-
-        // And the successor variant, on a third Session with another fresh ledger.
-        rig.mgr.pix_ledgers.invalidate(&pseudonym);
-        rig.mgr.pix_ledgers.run_pending_tasks();
-        let _third = rig.connect_pix(Some(pseudonym)).await?;
         let err = rig
             .request(pseudonym, 2)
             .await
@@ -30363,19 +30658,28 @@ mod tests {
         let _first = rig.connect_pix(Some(pseudonym)).await?;
         rig.request(pseudonym, 1).await?;
         assert!(rig.generator.emission_progress(&pseudonym).is_some());
+        assert!(rig.mgr.close_session(&pseudonym));
+        assert!(rig.parked_ledger(&pseudonym).is_some());
 
         let other = PixParams::try_new(3, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?;
-        let ledger = rig.mgr.pix_ledger_for(pseudonym, other);
-        assert_eq!(Some(other), ledger.params());
+        let claim = rig.mgr.claim_pix_ledger(pseudonym, other, None);
+        assert_eq!(Some(other), claim.ledger.params());
         assert_eq!(
             None,
-            ledger.ssa_state.get().and_then(SessionSsaState::committed_watermark)
+            claim
+                .ledger
+                .ssa_state
+                .get()
+                .and_then(SessionSsaState::committed_watermark)
         );
         assert!(rig.generator.emission_progress(&pseudonym).is_none());
+        let ssa_state = claim.ledger.ssa_state.clone();
+        drop(claim);
 
-        let same = rig.mgr.pix_ledger_for(pseudonym, other);
+        // Dropped unattached, the claim parks the ledger again, and matching dimensions reuse it.
+        let same = rig.mgr.claim_pix_ledger(pseudonym, other, None);
         assert!(
-            Arc::ptr_eq(&ledger.ssa_state, &same.ssa_state),
+            Arc::ptr_eq(&ssa_state, &same.ledger.ssa_state),
             "matching dimensions reuse the ledger"
         );
         Ok(())
@@ -30393,6 +30697,7 @@ mod tests {
         let burst = settled_commit_count(&rig.wire).await;
         assert!(burst > 0);
 
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
         let _second = rig.connect_pix(Some(pseudonym)).await?;
         rig.mgr
             .handle_ssa_request(pseudonym, rerequest(pseudonym, rig.params, 1, 2))
@@ -30488,28 +30793,239 @@ mod tests {
         Ok(())
     }
 
-    /// Only a pseudonym the caller chose arms the successor guard on the new socket.
-    #[test]
-    fn the_successor_guard_is_armed_only_for_an_explicit_pseudonym() {
-        let plain = session_config(&SessionManagerConfig::default(), Capabilities::empty());
-        assert_eq!(None, with_successor_guard(plain, false).successor_start_window);
-        let guarded = with_successor_guard(plain, true);
-        assert_eq!(Some(DEFAULT_SUCCESSOR_START_WINDOW), guarded.successor_start_window);
-        assert_eq!(DEFAULT_SUCCESSOR_GUARD_PERIOD, guarded.successor_guard_period);
+    /// Every `StartSession` announces resume capability, and the accessor reads it.
+    #[test_log::test(tokio::test)]
+    async fn every_initiation_announces_resume_capability() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let _plain = rig.connect(entry_cfg(Capabilities::empty(), None)).await?;
+        let _pix = rig.connect_pix(None).await?;
+        let sent = rig.initiations.lock().clone();
+        assert_eq!(2, sent.len());
+        for additional_data in sent {
+            assert!(announced_resume_capable(additional_data), "{additional_data:#x}");
+            assert_eq!(1 << 32, additional_data & (0xffff_ffff << 32), "no other reserved bit");
+        }
+        Ok(())
     }
 
+    #[test]
+    fn the_resume_capable_bit_is_bit_32_and_leaves_the_other_fields_alone() {
+        assert_eq!(1u128 << 32, INITIATION_RESUME_CAPABLE);
+        for (options, idle) in [(0u64, Duration::ZERO), (0xdead_beef_0000_0001, Duration::from_secs(90))] {
+            let data = into_initiation_additional_data(options, idle);
+            assert!(announced_resume_capable(data));
+            assert_eq!(options, initiation_options(data));
+            assert_eq!((!idle.is_zero()).then_some(idle), announced_idle_timeout(data));
+        }
+        assert!(!announced_resume_capable(0));
+        assert!(!announced_resume_capable(!INITIATION_RESUME_CAPABLE));
+        assert!(announced_resume_capable(INITIATION_RESUME_CAPABLE));
+    }
+
+    /// A base the socket cannot number a stream from, or a stateful socket, fails the establishment
+    /// cleanly: no Session, no slot, no pending state, and the ledger is parked for a retry.
     #[test_log::test(tokio::test)]
-    async fn an_explicit_pseudonym_arms_the_successor_guard_on_the_new_session() -> anyhow::Result<()> {
+    async fn an_invalid_resume_fails_the_establishment_cleanly() -> anyhow::Result<()> {
         let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
-        let random = rig.connect(entry_cfg(Capabilities::empty(), None)).await?;
-        assert_eq!(None, random.config().successor_start_window);
-        let chosen = rig
-            .connect(entry_cfg(Capabilities::empty(), Some(HoprPseudonym::random())))
-            .await?;
+        for (case, reply, capabilities) in [
+            (
+                "a zero base",
+                StubReply::Resumed(0),
+                Capabilities::from(Capability::Segmentation),
+            ),
+            (
+                "a base above the maximum",
+                StubReply::Resumed(MAX_STREAM_BASE + 1),
+                Capabilities::from(Capability::Segmentation),
+            ),
+            (
+                "a stateful socket",
+                StubReply::Resumed(TEST_STREAM_BASE),
+                Capabilities::from(Capability::RetransmissionAck),
+            ),
+        ] {
+            let pseudonym = HoprPseudonym::random();
+            rig.reply_with(reply);
+            let err = rig
+                .connect(entry_cfg(capabilities | Capability::UsePIX, Some(pseudonym)))
+                .await
+                .expect_err(case);
+            assert!(
+                matches!(
+                    err.downcast_ref::<TransportSessionError>(),
+                    Some(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+                ),
+                "{case}: got {err:?}"
+            );
+            assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "{case}: no slot");
+            assert_eq!(0, rig.mgr.num_active_sessions(), "{case}");
+            rig.mgr.session_initiations.run_pending_tasks();
+            assert_eq!(
+                0,
+                rig.mgr.session_initiations.entry_count(),
+                "{case}: no pending initiation"
+            );
+            rig.mgr.pending_outgoing.run_pending_tasks();
+            assert_eq!(0, rig.mgr.pending_outgoing.entry_count(), "{case}: no pending claim");
+            assert!(
+                rig.parked_ledger(&pseudonym).is_some(),
+                "{case}: the ledger is parked for a retry"
+            );
+        }
+
+        // The boundary values are valid.
+        for base in [1, MAX_STREAM_BASE] {
+            rig.reply_with(StubReply::Resumed(base));
+            let session = rig.connect(entry_cfg(Capabilities::empty(), None)).await?;
+            assert_eq!(Some(base), session.config().stream_base);
+        }
+        Ok(())
+    }
+
+    /// The ledger stays in the slot for the whole life of the Session, and its retention starts at
+    /// the teardown: a Session that outlives the retention still finds its ledger after it ends, a
+    /// reconnect continues it, and a parked ledger expires after the retention.
+    #[test_log::test(tokio::test)]
+    async fn ledger_retention_starts_at_teardown() -> anyhow::Result<()> {
+        let retention = Duration::from_millis(400);
+        let mut rig = reconnect_rig_retaining(small_pix_params(), Default::default(), retention).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect_pix(Some(pseudonym)).await?;
+        rig.request(pseudonym, 1).await?;
+        assert_eq!(1, rig.deposits().await);
+
+        // The Session outlives the retention twice over.
+        tokio::time::sleep(retention * 2).await;
         assert_eq!(
-            Some(DEFAULT_SUCCESSOR_START_WINDOW),
-            chosen.config().successor_start_window
+            Some(SsaIndex::MIN),
+            rig.watermark(&pseudonym),
+            "still live, still accounted"
         );
+        assert!(rig.mgr.close_session(&pseudonym));
+        assert!(
+            rig.parked_ledger(&pseudonym).is_some(),
+            "the retention starts at the teardown"
+        );
+
+        // A reconnect inside the retention continues it.
+        rig.reply_with(StubReply::Resumed(TEST_STREAM_BASE));
+        let _second = rig.connect_pix(Some(pseudonym)).await?;
+        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
+        assert!(
+            rig.parked_ledger(&pseudonym).is_none(),
+            "a live Session holds its ledger alone"
+        );
+
+        // A reconnect that supersedes the live Session takes the ledger from it.
+        let _third = rig.connect_pix(Some(pseudonym)).await?;
+        assert_eq!(Some(SsaIndex::MIN), rig.watermark(&pseudonym));
+
+        // The retention, once the last Session is gone, runs out.
+        assert!(rig.mgr.close_session(&pseudonym));
+        assert!(rig.parked_ledger(&pseudonym).is_some());
+        tokio::time::sleep(retention * 2).await;
+        assert!(rig.parked_ledger(&pseudonym).is_none(), "the parked ledger expired");
+        Ok(())
+    }
+
+    /// Every teardown parks the ledger: the idle-eviction path and the instance-scoped close.
+    #[test_log::test(tokio::test)]
+    async fn every_teardown_parks_the_ledger() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+
+        let scoped = HoprPseudonym::random();
+        let session = rig.connect_pix(Some(scoped)).await?;
+        let instance_id = session.slot_instance().context("instance")?;
+        assert!(rig.parked_ledger(&scoped).is_none());
+        assert!(rig.mgr.close_session_instance(&scoped, instance_id));
+        assert!(rig.parked_ledger(&scoped).is_some(), "scoped close");
+
+        // Supersede: the predecessor parks, the successor takes it back out.
+        let superseded = HoprPseudonym::random();
+        let _a = rig.connect_pix(Some(superseded)).await?;
+        let predecessor = rig.mgr.sessions.get(&superseded).context("slot")?.instance.clone();
+        let _b = rig.connect_pix(Some(superseded)).await?;
+        assert!(predecessor.is_superseded());
+        let live = rig.mgr.sessions.get(&superseded).context("slot")?.instance.ledger();
+        let live = live.context("ledger")?;
+        assert!(Arc::ptr_eq(
+            &live.ssa_state,
+            &predecessor.ledger().context("ledger")?.ssa_state
+        ));
+        Ok(())
+    }
+
+    /// Idle eviction parks the ledger too.
+    #[test_log::test(tokio::test)]
+    async fn idle_eviction_parks_the_ledger() -> anyhow::Result<()> {
+        let rig = reconnect_rig(
+            small_pix_params(),
+            SessionManagerConfig {
+                idle_timeout: Duration::from_millis(300),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let pseudonym = HoprPseudonym::random();
+        let _session = rig.connect_pix(Some(pseudonym)).await?;
+        assert!(rig.parked_ledger(&pseudonym).is_none());
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        rig.mgr.sessions.run_pending_tasks();
+        assert!(rig.mgr.sessions.get(&pseudonym).is_none(), "evicted");
+        assert!(rig.parked_ledger(&pseudonym).is_some(), "eviction parks the ledger");
+        Ok(())
+    }
+
+    /// A post-establishment `SessionError` naming a challenge closes the Session that challenge opened and
+    /// nothing else; a stale challenge is dropped.
+    #[test_log::test(tokio::test)]
+    async fn a_challenge_scoped_session_error_closes_only_the_matching_instance() -> anyhow::Result<()> {
+        let rig = reconnect_rig(small_pix_params(), Default::default()).await?;
+        let pseudonym = HoprPseudonym::random();
+        let _first = rig.connect(entry_cfg(Capabilities::empty(), Some(pseudonym))).await?;
+        let first_challenge = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.challenge;
+        let _second = rig.connect(entry_cfg(Capabilities::empty(), Some(pseudonym))).await?;
+        let second = rig.mgr.sessions.get(&pseudonym).context("slot")?.instance.clone();
+        assert_ne!(first_challenge, second.challenge);
+
+        let error = |challenge: StartChallenge| StartErrorType {
+            identifier: ErrorIdentifier::Challenge(challenge),
+            reason: StartErrorReason::Unknown,
+        };
+
+        // At dispatch, a challenge of a Session that is gone names no local state.
+        let stale = rig.mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionError(error(first_challenge)))?,
+        );
+        assert!(
+            matches!(stale, Ok(DispatchResult::Dropped(DropReason::StaleStartMessage))),
+            "got {stale:?}"
+        );
+        // And the handler itself, given one anyway, leaves the Session alone.
+        rig.mgr.handle_session_error(pseudonym, error(first_challenge)).await?;
+        let alive = rig
+            .mgr
+            .sessions
+            .get(&pseudonym)
+            .context("the stale challenge must not close it")?;
+        assert!(Arc::ptr_eq(&alive.instance, &second));
+        // Nor does one under another pseudonym.
+        rig.mgr
+            .handle_session_error(HoprPseudonym::random(), error(second.challenge))
+            .await?;
+        assert!(rig.mgr.sessions.get(&pseudonym).is_some());
+
+        let accepted = rig.mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::SessionError(error(second.challenge)))?,
+        );
+        assert!(matches!(accepted, Ok(DispatchResult::Processed)), "got {accepted:?}");
+        assert!(
+            wait_for_no_active_sessions(&rig.mgr).await,
+            "the matching instance is closed"
+        );
+        assert!(second.is_superseded());
         Ok(())
     }
 }
