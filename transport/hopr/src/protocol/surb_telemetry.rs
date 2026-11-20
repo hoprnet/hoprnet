@@ -2866,14 +2866,21 @@ mod tests {
         assert!(judged_dead(&health.refresh(4)).is_empty());
     }
 
-    /// Once the forward verdict has lapsed the reply rule needs its three replies again.
+    /// Once the forward verdict has lapsed the reply rule needs its three replies again: a verdict on fewer, not
+    /// yet confirmed, is withdrawn.
     #[test]
     fn the_reply_threshold_should_be_back_after_the_forward_verdict_lapses() {
-        for (count, judged) in [(1, false), (2, false), (MIN_RACES as u8, true)] {
+        for (count, stands) in [(1, false), (2, false), (MIN_RACES as u8, true)] {
             let (health, relayer) = black_hole_candidate(count);
             forward_judged(&health, &[relayer]);
+            assert_eq!(vec![relayer], judged_dead(&health.refresh(4)), "{count} overdue");
             forward_judged(&health, &[]);
-            assert_eq!(judged, !judged_dead(&health.refresh(4)).is_empty(), "{count} overdue");
+            health.refresh(4);
+            assert_eq!(
+                stands,
+                health.is_known_dead(&relayer),
+                "{count} overdue, after the lapse"
+            );
         }
     }
 
