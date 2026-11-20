@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
+use futures::{Sink, SinkExt, StreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
     node::{
@@ -100,6 +100,10 @@ lazy_static::lazy_static! {
         "hopr_session_dispatched_messages",
         "Number dispatched HOPR session messages and their classification",
         &["kind"]
+    ).unwrap();
+    static ref METRIC_START_SESSION_RESENT: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_session_start_session_resent_total",
+        "Number of times an Entry repeated a StartSession the Exit had not answered"
     ).unwrap();
     static ref METRIC_SENT_SESSION_ERRS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_session_sent_error_count",
@@ -1616,6 +1620,15 @@ pub(crate) struct SessionSlot {
     /// Entry announced it again. The commit applies this figure too, and every later raise widens the
     /// ring on the spot (see [`SurbAdmissionControl::raise_target`]).
     raised_surb_target: Arc<std::sync::atomic::AtomicUsize>,
+    /// The `StartSession` an Exit admitted this Session for; `None` on the Entry side.
+    opening: Option<Arc<ExitOpening>>,
+}
+
+/// The challenge an Exit slot was opened under, which marks a repeated `StartSession` as a repeat.
+pub(crate) struct ExitOpening {
+    challenge: StartChallenge,
+    /// How many repeats of the opening have been answered so far.
+    answered_repeats: std::sync::atomic::AtomicU32,
 }
 
 impl SessionSlot {
@@ -3225,6 +3238,18 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_millis(500))]
     pub initiation_timeout_base: Duration,
 
+    /// The first gap before the Entry repeats an unanswered `StartSession`; each further gap doubles.
+    ///
+    /// A repeat is sent only before the initiation deadline, which does not move. Default is 1 second.
+    #[default(Duration::from_secs(1))]
+    pub initiation_resend_interval: Duration,
+
+    /// How many times the Entry repeats an unanswered `StartSession`.
+    ///
+    /// Default is 3; 0 sends the request once, as before.
+    #[default(3)]
+    pub max_initiation_resends: u32,
+
     /// Timeout for Session to be closed due to inactivity.
     ///
     /// Default is 180 seconds.
@@ -3886,6 +3911,8 @@ pub struct SessionManager<S> {
     /// per-claim token, which lets [`PendingOutgoingGuard`] tell its own claim from a newer one
     /// that reused the name after the TTL backstop expired the older marker.
     pending_outgoing: moka::sync::Cache<HoprPseudonym, PendingOutgoingToken>,
+    /// Challenges of incoming `StartSession`s being admitted, by pseudonym, so a repeat is not admitted twice.
+    incoming_openings: moka::sync::Cache<HoprPseudonym, StartChallenge>,
     /// Serialises `handle_ssa_request` per pseudonym.
     ///
     /// Start messages are processed under `for_each_concurrent`, so without this several
@@ -3954,6 +3981,7 @@ impl<S> Clone for SessionManager<S> {
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
             pending_outgoing: self.pending_outgoing.clone(),
+            incoming_openings: self.incoming_openings.clone(),
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
             surb_admission: self.surb_admission.clone(),
@@ -4197,6 +4225,37 @@ impl PendingOutgoingToken {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))
     }
+}
+
+/// How many repeats of one `StartSession` an Exit answers with a `SessionEstablished`.
+const MAX_ANSWERED_START_REPEATS: u32 = 4;
+
+/// Releases an Exit's claim on a pseudonym's opening in `incoming_openings` when the handler is done.
+struct IncomingOpeningGuard {
+    openings: moka::sync::Cache<HoprPseudonym, StartChallenge>,
+    pseudonym: HoprPseudonym,
+    challenge: StartChallenge,
+}
+
+impl Drop for IncomingOpeningGuard {
+    fn drop(&mut self) {
+        self.openings.entry(self.pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, StartChallenge>>| match entry {
+                Some(entry) if *entry.value() == self.challenge => moka::ops::compute::Op::Remove,
+                _ => moka::ops::compute::Op::Nop,
+            },
+        );
+    }
+}
+
+/// What an Exit made of an incoming `StartSession`, before any admission work.
+enum OpeningClaim {
+    /// The same opening is being admitted right now; its handler will answer.
+    InFlightRepeat,
+    /// The Session for this opening exists already; the slot is the one to answer through.
+    EstablishedRepeat(Box<SessionSlot>, IncomingOpeningGuard),
+    /// Not a repeat; the guard, if any, holds the claim until the handler returns.
+    New(Option<IncomingOpeningGuard>),
 }
 
 async fn send_via_msg_sender<S, D>(
@@ -4885,6 +4944,10 @@ where
                 .max_capacity(maximum_sessions as u64)
                 .time_to_live(initiation_timeout)
                 .build(),
+            incoming_openings: moka::sync::Cache::builder()
+                .max_capacity(maximum_sessions as u64)
+                .time_to_live(initiation_timeout)
+                .build(),
             // Idle rather than live TTL, and generous: the entry only has to outlive the requests that
             // race for it, and one evicted between two cycles is simply recreated by the next request.
             // Matches the generator's own per-pseudonym cache, which is what the guarded region reads.
@@ -5072,6 +5135,27 @@ where
                                     // Routing puts only `StartSession` on this lane.
                                     let HoprStartProtocol::StartSession(session_req) = protocol_msg else {
                                         unreachable!("only StartSession is routed to the session lane")
+                                    };
+                                    // Before any refusal or admission work: a repeat must not be admitted again.
+                                    let _opening_guard = match myself.claim_opening(pseudonym, session_req.challenge) {
+                                        OpeningClaim::InFlightRepeat => {
+                                            crate::counters::START_SESSION_REPEATS_RECEIVED
+                                                .fetch_add(1, Ordering::Relaxed);
+                                            debug!(
+                                                challenge = session_req.challenge,
+                                                "dropping a repeated session request: the original is still being \
+                                                 admitted"
+                                            );
+                                            return;
+                                        }
+                                        OpeningClaim::EstablishedRepeat(slot, guard) => {
+                                            let result =
+                                                myself.answer_repeated_opening(pseudonym, &session_req, &slot).await;
+                                            drop(guard);
+                                            report_start_result(result);
+                                            return;
+                                        }
+                                        OpeningClaim::New(guard) => guard,
                                     };
                                     let result = match myself
                                         .refuse_pix_over_direct_return_path(
@@ -5289,7 +5373,8 @@ where
     ///
     /// If the Session's counterparty does not respond within
     /// the [configured](SessionManagerConfig) period,
-    /// this method returns [`TransportSessionError::Timeout`].
+    /// this method returns [`TransportSessionError::Timeout`]. Until then it repeats an unanswered
+    /// request, see [`initiation_resend_interval`](SessionManagerConfig::initiation_resend_interval).
     ///
     /// It will also fail if the instance has not been [started](SessionManager::start).
     pub async fn new_session(
@@ -5454,7 +5539,7 @@ where
         send_via_msg_sender(
             &mut msg_sender,
             forward_routing.clone(),
-            start_session_msg,
+            start_session_msg.clone(),
             "session request message",
         )
         .await
@@ -5463,23 +5548,55 @@ where
             TransportSessionError::packet_sending(error)
         })?;
 
-        // The timeout is given by the number of hops requested
-        let initiation_timeout: futures_time::time::Duration = initiation_wait(
-            self.cfg.initiation_timeout_base,
-            cfg.forward_path_options.count_hops(),
-            cfg.return_path_options.count_hops(),
-        )
-        .into();
+        // The deadline is given by the number of hops requested, and is fixed once the request is out
+        let started = Instant::now();
+        let deadline = started
+            + initiation_wait(
+                self.cfg.initiation_timeout_base,
+                cfg.forward_path_options.count_hops(),
+                cfg.return_path_options.count_hops(),
+            );
 
-        // Await session establishment response from the Exit node or timeout
-
+        // Await session establishment response from the Exit node or timeout, repeating the request meanwhile
         trace!(challenge, "awaiting session establishment");
-        match rx_initiation_done
-            .into_stream()
-            .try_next()
-            .timeout(initiation_timeout)
-            .await
-        {
+        let mut resends = 0_u32;
+        let mut next_resend = self.next_initiation_resend(started, resends, deadline);
+        let outcome = loop {
+            let wake = next_resend.unwrap_or(deadline);
+            let wait = hopr_utils::runtime::prelude::sleep(wake.saturating_duration_since(Instant::now()));
+            futures::pin_mut!(wait);
+            // `recv` is cancel-safe, so losing the race to the timer drops no answer.
+            match futures::future::select(rx_initiation_done.recv(), wait).await {
+                futures::future::Either::Left((Ok(Ok(est)), _)) => break Ok(Ok(Some(est))),
+                futures::future::Either::Left((Ok(Err(error)), _)) => break Ok(Err(error)),
+                futures::future::Either::Left((Err(_), _)) => break Ok(Ok(None)),
+                futures::future::Either::Right(_) if next_resend.is_none() => break Err(()),
+                futures::future::Either::Right(_) => {
+                    resends += 1;
+                    info!(
+                        challenge,
+                        resend = resends,
+                        of = self.cfg.max_initiation_resends,
+                        "the Exit has not answered the session request — repeating it"
+                    );
+                    crate::counters::START_SESSION_RESENDS.fetch_add(1, Ordering::Relaxed);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_START_SESSION_RESENT.increment();
+                    if let Err(error) = send_via_msg_sender(
+                        &mut msg_sender,
+                        forward_routing.clone(),
+                        start_session_msg.clone(),
+                        "repeated session request message",
+                    )
+                    .await
+                    {
+                        debug!(challenge, %error, "failed to repeat the session request");
+                    }
+                    next_resend = self.next_initiation_resend(started, resends, deadline);
+                }
+            }
+        };
+        match outcome {
             Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
@@ -5622,6 +5739,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                opening: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -5776,6 +5894,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                opening: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -5874,6 +5993,95 @@ where
                 Err(TransportSessionError::Timeout)
             }
         }
+    }
+
+    /// Classifies an incoming `StartSession` as a repeat of an opening in flight, of an established Session, or new.
+    ///
+    /// The claim is put-if-absent and made before the slot is looked up, so an original finishing in between
+    /// is still seen as established. A different challenge under a used pseudonym is not a repeat.
+    fn claim_opening(&self, pseudonym: HoprPseudonym, challenge: StartChallenge) -> OpeningClaim {
+        use moka::ops::compute::{CompResult, Op};
+
+        let claim = self.incoming_openings.entry(pseudonym).and_compute_with(
+            |entry: Option<moka::Entry<HoprPseudonym, StartChallenge>>| {
+                if entry.is_none() { Op::Put(challenge) } else { Op::Nop }
+            },
+        );
+        match claim {
+            CompResult::Inserted(_) => {
+                let guard = IncomingOpeningGuard {
+                    openings: self.incoming_openings.clone(),
+                    pseudonym,
+                    challenge,
+                };
+                match self.sessions.get(&pseudonym) {
+                    Some(slot)
+                        if slot
+                            .opening
+                            .as_ref()
+                            .is_some_and(|opening| opening.challenge == challenge) =>
+                    {
+                        OpeningClaim::EstablishedRepeat(Box::new(slot), guard)
+                    }
+                    _ => OpeningClaim::New(Some(guard)),
+                }
+            }
+            CompResult::Unchanged(entry) if *entry.value() == challenge => OpeningClaim::InFlightRepeat,
+            _ => OpeningClaim::New(None),
+        }
+    }
+
+    /// Answers a repeated `StartSession` for an established Session with `SessionEstablished` alone, up to a cap.
+    async fn answer_repeated_opening(
+        &self,
+        pseudonym: HoprPseudonym,
+        session_req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+        slot: &SessionSlot,
+    ) -> errors::Result<()> {
+        crate::counters::START_SESSION_REPEATS_RECEIVED.fetch_add(1, Ordering::Relaxed);
+        let answered = slot.opening.as_ref().map_or(MAX_ANSWERED_START_REPEATS, |opening| {
+            opening.answered_repeats.fetch_add(1, Ordering::Relaxed)
+        });
+        if answered >= MAX_ANSWERED_START_REPEATS {
+            debug!(
+                challenge = session_req.challenge,
+                "dropping a repeated session request past the cap"
+            );
+            return Ok(());
+        }
+
+        info!(challenge = session_req.challenge, %pseudonym, "repeated session request — answering it again");
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        // The oldest stored SURB is spent, which need not be one this repeat brought (FIFO store).
+        count_exit_control_send(
+            ExitControlKind::SessionEstablishedReplay,
+            ExitSessionKind::of(session_req.capabilities.0),
+            send_counted_via_msg_sender(
+                &mut msg_sender,
+                slot.routing_opts.clone(),
+                HoprStartProtocol::SessionEstablished(StartEstablished {
+                    orig_challenge: session_req.challenge,
+                    session_id: pseudonym,
+                }),
+                &slot.surb_estimator,
+                &pseudonym,
+                "repeated session establishment message",
+            )
+            .await,
+        )
+    }
+
+    /// When the next `StartSession` repeat is due, if one still is.
+    ///
+    /// Repeat `k` (from 0) goes out `interval * (2^(k+1) - 1)` after the first send, and only before `deadline`.
+    fn next_initiation_resend(&self, started: Instant, resends: u32, deadline: Instant) -> Option<Instant> {
+        if resends >= self.cfg.max_initiation_resends {
+            return None;
+        }
+        let factor = 2_u32.saturating_pow(resends + 1) - 1;
+        started
+            .checked_add(self.cfg.initiation_resend_interval.saturating_mul(factor))
+            .filter(|at| *at < deadline)
     }
 
     /// Sends a keep-alive packet with the given [`SessionId`].
@@ -7497,6 +7705,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            opening: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -7533,6 +7742,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            opening: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -8008,6 +8218,10 @@ where
             cycle_budget,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            opening: Some(Arc::new(ExitOpening {
+                challenge: session_req.challenge,
+                answered_repeats: Default::default(),
+            })),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -8431,7 +8645,8 @@ where
             }
             debug!(?session_id, challenge, "session establishment complete");
         } else {
-            error!(%session_id, challenge, "unknown session establishment attempt or expired");
+            // Expected once a repeated `StartSession` has been answered more than once.
+            debug!(%session_id, challenge, "unknown session establishment attempt or expired");
         }
         Ok(())
     }
@@ -10473,6 +10688,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             },
         );
 
@@ -10670,6 +10886,241 @@ mod tests {
             "an SsaRequest for a failed initiation's pseudonym must be stale, got {refused:?}"
         );
 
+        Ok(())
+    }
+
+    /// When a `StartSession` was sent, and its bytes.
+    type SentRequest = (Instant, Vec<u8>);
+
+    /// What the Entry-side repeat tests need: a manager whose transport records every `StartSession` it is given.
+    struct RepeatingEntry {
+        mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        sent: Arc<parking_lot::Mutex<Vec<SentRequest>>>,
+        pseudonym: HoprPseudonym,
+        bob: Address,
+        _transport: tokio::task::JoinHandle<anyhow::Result<()>>,
+    }
+
+    /// An Entry that repeats after `interval` at most `max_resends` times, waiting `base * 2` for an answer.
+    fn repeating_entry(base: Duration, interval: Duration, max_resends: u32) -> anyhow::Result<RepeatingEntry> {
+        let mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: base,
+            initiation_resend_interval: interval,
+            max_initiation_resends: max_resends,
+            ..Default::default()
+        });
+        let sent = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let recorded = sent.clone();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().returning(move |_, data| {
+            recorded.lock().push((Instant::now(), data.data.plain_text.to_vec()));
+            Box::pin(async { Ok(()) })
+        });
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (sender, handle) = mock_packet_planning(transport);
+        mgr.start(sender, new_session_tx, None, None)?;
+        Ok(RepeatingEntry {
+            mgr,
+            sent,
+            pseudonym: HoprPseudonym::random(),
+            bob: (&ChainKeypair::random()).into(),
+            _transport: handle,
+        })
+    }
+
+    impl RepeatingEntry {
+        async fn new_session(&self) -> errors::Result<HoprSession> {
+            self.mgr
+                .new_session(
+                    self.bob,
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().expect("valid address"))),
+                    SessionClientConfig {
+                        capabilities: None.into(),
+                        pseudonym: self.pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+        }
+
+        async fn wait_for_sends(&self, count: usize) -> anyhow::Result<()> {
+            timeout(Duration::from_secs(5), async {
+                while self.sent.lock().len() < count {
+                    tokio::time::sleep(Duration::from_millis(2)).await;
+                }
+            })
+            .await
+            .with_context(|| format!("only {} StartSessions were sent, not {count}", self.sent.lock().len()))
+        }
+    }
+
+    /// An unanswered `StartSession` is repeated, byte for byte, at doubling gaps, and the attempt still times out.
+    #[test_log::test(tokio::test)]
+    async fn an_unanswered_start_session_is_repeated_with_doubling_gaps() -> anyhow::Result<()> {
+        let entry = repeating_entry(Duration::from_millis(500), Duration::from_millis(50), 3)?;
+
+        let began = Instant::now();
+        let result = entry.new_session().await;
+        let elapsed = began.elapsed();
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert!(
+            elapsed >= Duration::from_secs(1),
+            "the deadline must not move, took {elapsed:?}"
+        );
+        let sent = entry.sent.lock();
+        assert_eq!(4, sent.len(), "the request and its three repeats");
+        assert!(
+            sent.iter().all(|(_, bytes)| bytes == &sent[0].1),
+            "every repeat is identical"
+        );
+        // Repeats are due 50, 150 and 350 ms after the first send; a little slack for the clock read.
+        for (at, due) in sent[1..].iter().map(|(at, _)| at).zip([50, 150, 350]) {
+            assert!(
+                at.duration_since(sent[0].0) + Duration::from_millis(10) >= Duration::from_millis(due),
+                "a repeat came before {due} ms"
+            );
+        }
+        Ok(())
+    }
+
+    /// A repeat that would fall at or after the deadline is not sent.
+    #[test_log::test(tokio::test)]
+    async fn a_start_session_repeat_due_at_or_after_the_deadline_is_not_sent() -> anyhow::Result<()> {
+        // The wait is 100 ms; repeats would be due at 50, 150, 350 ... ms.
+        let entry = repeating_entry(Duration::from_millis(50), Duration::from_millis(50), 10)?;
+
+        let result = entry.new_session().await;
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!(2, entry.sent.lock().len(), "only the repeat due before the deadline");
+        Ok(())
+    }
+
+    /// Once the Exit answers, no further repeat goes out and the Session is returned.
+    #[test_log::test(tokio::test)]
+    async fn the_start_session_repeats_stop_once_the_exit_answers() -> anyhow::Result<()> {
+        let entry = repeating_entry(Duration::from_millis(500), Duration::from_millis(50), 3)?;
+        let attempt = tokio::spawn({
+            let mgr = entry.mgr.clone();
+            let (bob, pseudonym) = (entry.bob, entry.pseudonym);
+            async move {
+                mgr.new_session(
+                    bob,
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        capabilities: None.into(),
+                        pseudonym: pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .map_err(anyhow::Error::from)
+            }
+        });
+
+        entry.wait_for_sends(2).await?;
+        let Some(HoprStartProtocol::StartSession(request)) = entry.sent.lock().first().and_then(|(_, bytes)| {
+            HoprStartProtocol::decode(HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG, bytes).ok()
+        }) else {
+            anyhow::bail!("the first message must be a StartSession");
+        };
+        entry.mgr.dispatch_message(
+            entry.pseudonym,
+            start_packet(HoprStartProtocol::SessionEstablished(StartEstablished {
+                orig_challenge: request.challenge,
+                session_id: entry.pseudonym,
+            }))?,
+        )?;
+
+        let session = timeout(Duration::from_secs(5), attempt)
+            .await
+            .context("the attempt never finished")??
+            .context("the attempt must succeed once answered")?;
+        // The next repeat would have been due 100 ms after the previous one.
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        assert_eq!(2, entry.sent.lock().len(), "no repeat after the answer");
+        drop(session);
+        Ok(())
+    }
+
+    /// A cap of 0 sends the `StartSession` once, as before repeats existed.
+    #[test_log::test(tokio::test)]
+    async fn a_zero_repeat_cap_sends_the_start_session_once() -> anyhow::Result<()> {
+        let entry = repeating_entry(Duration::from_millis(100), Duration::from_millis(10), 0)?;
+
+        let result = entry.new_session().await;
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!(1, entry.sent.lock().len());
+        Ok(())
+    }
+
+    /// A repeat the transport fails to send is logged and skipped; the attempt runs on to the later ones.
+    #[test_log::test(tokio::test)]
+    async fn a_failed_repeat_does_not_end_the_initiation() -> anyhow::Result<()> {
+        let mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(250),
+            initiation_resend_interval: Duration::from_millis(30),
+            max_initiation_resends: 2,
+            ..Default::default()
+        });
+        use std::{
+            pin::Pin,
+            task::{Context, Poll},
+        };
+
+        // A sink that refuses its second item, which is the first repeat.
+        #[derive(Clone)]
+        struct FlakySink(Arc<std::sync::atomic::AtomicUsize>);
+        impl Sink<(DestinationRouting, ApplicationDataOut)> for FlakySink {
+            type Error = futures::channel::mpsc::SendError;
+
+            fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn start_send(
+                self: Pin<&mut Self>,
+                _: (DestinationRouting, ApplicationDataOut),
+            ) -> Result<(), Self::Error> {
+                if self.0.fetch_add(1, Ordering::Relaxed) == 1 {
+                    let (mut closed, receiver) = futures::channel::mpsc::unbounded::<()>();
+                    drop(receiver);
+                    return closed.start_send(());
+                }
+                Ok(())
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let sender = FlakySink(attempts.clone());
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        mgr.start(sender, new_session_tx, None, None)?;
+
+        let result = mgr
+            .new_session(
+                (&ChainKeypair::random()).into(),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)), "got {result:?}");
+        assert_eq!(3, attempts.load(Ordering::Relaxed), "the second repeat is still sent");
         Ok(())
     }
 
@@ -14423,6 +14874,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             },
         );
         Ok((mgr, control))
@@ -20043,6 +20495,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             },
         );
 
@@ -20136,6 +20589,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             }
         };
 
@@ -20208,6 +20662,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             },
         );
 
@@ -20301,6 +20756,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                opening: None,
             },
         );
         (mgr, estimator)
@@ -20563,6 +21019,7 @@ mod tests {
         let (mock_sender, mut sent) = futures::channel::mpsc::unbounded();
         let _ahs = mgr.start(mock_sender, new_session_tx, None, None)?;
 
+        // The pre-inserted slot has no `opening`, so this is not a recognised repeat and is refused as before.
         let mut packet = start_packet(HoprStartProtocol::StartSession(no_pix_offer()))?;
         packet.packet_info.num_saved_surbs = 2;
         packet.packet_info.num_evicted_surbs = 1;
@@ -20584,6 +21041,249 @@ mod tests {
 
         assert_eq!(carried, estimator.produced.load(Relaxed), "booked once");
         assert_eq!(1, estimator.evicted.load(Relaxed), "and its eviction once");
+        Ok(())
+    }
+
+    /// A started PIX-capable Exit whose every sent message arrives on the returned receiver.
+    fn exit_answering_repeats(
+        admission: Option<SessionAdmissionSink>,
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+    )> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 1..=small_params_quota(),
+                ..Default::default()
+            },
+            session_admission_timeout: Duration::from_secs(5),
+            ..Default::default()
+        });
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: TEST_SURPLUS_SHARES,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let (mock_sender, sent) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_sessions) = futures::channel::mpsc::channel(16);
+        mgr.start(mock_sender, new_session_tx, Some(pix_toolbox), admission)?;
+        Ok((mgr, sent, new_sessions))
+    }
+
+    /// Takes sent messages until one of kind `want` arrives; a `SessionError` on the way fails the test.
+    async fn next_start_message(
+        sent: &mut Originated,
+        want: StartProtocolDiscriminants,
+    ) -> anyhow::Result<HoprStartProtocol> {
+        timeout(Duration::from_secs(5), async {
+            while let Some((_, data)) = sent.next().await {
+                let msg = HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)?;
+                if StartProtocolDiscriminants::from(msg.clone()) == want {
+                    return Ok(msg);
+                }
+                anyhow::ensure!(
+                    !matches!(msg, HoprStartProtocol::SessionError(_)),
+                    "unexpected refusal: {msg:?}"
+                );
+            }
+            anyhow::bail!("the manager's sender closed")
+        })
+        .await
+        .with_context(|| format!("no {want:?} was sent"))?
+    }
+
+    /// Waits until the Exit has released its claim on `pseudonym`'s opening, i.e. the handler is done.
+    async fn opening_released(mgr: &RecordingManager, pseudonym: HoprPseudonym) -> anyhow::Result<()> {
+        timeout(Duration::from_secs(5), async {
+            while mgr.incoming_openings.contains_key(&pseudonym) {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .context("the opening's claim was never released")
+    }
+
+    /// Everything sent that is a `SessionError` or a `SessionEstablished`, after letting the Exit settle.
+    async fn settled_answers(sent: &mut Originated) -> Vec<HoprStartProtocol> {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let mut answers = Vec::new();
+        while let Ok((_, data)) = sent.try_recv() {
+            if let Ok(msg @ (HoprStartProtocol::SessionError(_) | HoprStartProtocol::SessionEstablished(_))) =
+                HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+            {
+                answers.push(msg);
+            }
+        }
+        answers
+    }
+
+    /// A repeated `StartSession` for an established Session gets one more `SessionEstablished` and nothing else.
+    #[test_log::test(tokio::test)]
+    async fn a_repeated_start_session_is_answered_with_session_established() -> anyhow::Result<()> {
+        use crate::supervision::telemetry::probe;
+
+        probe::reset();
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (admission, handler) = spawn_admission_handler({
+            let asked = asked.clone();
+            move |_| {
+                asked.fetch_add(1, Ordering::Relaxed);
+                Ok(SessionAdmissionDecision::default())
+            }
+        });
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(Some(admission))?;
+        let pseudonym = HoprPseudonym::random();
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+        let reserved = mgr.live_cycle_bytes.load(Ordering::Relaxed);
+        assert!(reserved > 0, "fixture: a PIX Session holds cycle budget");
+        let _ = settled_answers(&mut sent).await;
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        let HoprStartProtocol::SessionEstablished(est) =
+            next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?
+        else {
+            anyhow::bail!("not a SessionEstablished");
+        };
+        assert_eq!((MIN_CHALLENGE, pseudonym), (est.orig_challenge, est.session_id));
+        opening_released(&mgr, pseudonym).await?;
+
+        assert!(
+            settled_answers(&mut sent).await.is_empty(),
+            "no second answer and no refusal"
+        );
+        assert_eq!(1, asked.load(Ordering::Relaxed), "the session server is asked once");
+        assert_eq!(
+            reserved,
+            mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "no further budget"
+        );
+        assert_eq!(1, mgr.num_active_sessions());
+        assert_eq!(1, probe::get("exit_control/session_established/pix/sent"));
+        assert_eq!(1, probe::get("exit_control/session_established_replay/pix/sent"));
+        assert_eq!(0, probe::get("exit_control/refusal_no_session_slot/pix/sent"));
+        handler.abort();
+        Ok(())
+    }
+
+    /// Only the same challenge marks a repeat: another one under a held pseudonym is refused as before.
+    #[test_log::test(tokio::test)]
+    async fn a_start_session_with_a_different_challenge_under_a_held_pseudonym_is_still_refused() -> anyhow::Result<()>
+    {
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+
+        mgr.dispatch_message(
+            pseudonym,
+            start_packet(HoprStartProtocol::StartSession(StartInitiation {
+                challenge: MIN_CHALLENGE + 1,
+                ..pix_offer()
+            }))?,
+        )?;
+        let refusal = timeout(Duration::from_secs(5), async {
+            while let Some((_, data)) = sent.next().await {
+                if let HoprStartProtocol::SessionError(error) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)?
+                {
+                    return Ok::<_, anyhow::Error>(error);
+                }
+            }
+            anyhow::bail!("the manager's sender closed")
+        })
+        .await
+        .context("no refusal was sent")??;
+
+        assert_eq!(ErrorIdentifier::Challenge(MIN_CHALLENGE + 1), refusal.identifier);
+        assert_eq!(StartErrorReason::NoSlotsAvailable, refusal.reason);
+        Ok(())
+    }
+
+    /// A repeat that arrives while the original is still being admitted is dropped; the original answers.
+    #[test_log::test(tokio::test)]
+    async fn a_repeat_arriving_while_the_original_is_admitted_is_dropped() -> anyhow::Result<()> {
+        let (admission_tx, mut admission_rx) =
+            futures::channel::mpsc::channel::<(SessionAdmissionRequest, crate::types::SessionAdmissionReply)>(4);
+        let (release_tx, release_rx) = oneshot::channel::<()>();
+        let handler = tokio::spawn(async move {
+            if let Some((_, reply)) = admission_rx.next().await {
+                let _ = release_rx.await;
+                let _ = reply.send(Ok(SessionAdmissionDecision::default()));
+            }
+        });
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(Some(admission_tx))?;
+        let pseudonym = HoprPseudonym::random();
+        let repeats_before = crate::counters::START_SESSION_REPEATS_RECEIVED.load(Ordering::Relaxed);
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        timeout(Duration::from_secs(5), async {
+            while !mgr.incoming_openings.contains_key(&pseudonym) {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .context("the original was never claimed")?;
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        timeout(Duration::from_secs(5), async {
+            while crate::counters::START_SESSION_REPEATS_RECEIVED.load(Ordering::Relaxed) == repeats_before {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .context("the repeat was never handled")?;
+        release_tx
+            .send(())
+            .map_err(|_| anyhow!("the admission handler is gone"))?;
+
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+        let answers = settled_answers(&mut sent).await;
+        assert!(
+            answers.is_empty(),
+            "exactly one SessionEstablished and no SessionError, got {answers:?}"
+        );
+        assert_eq!(1, mgr.num_active_sessions());
+        handler.abort();
+        Ok(())
+    }
+
+    /// Past `MAX_ANSWERED_START_REPEATS`, further repeats are dropped unanswered.
+    #[test_log::test(tokio::test)]
+    async fn repeats_beyond_the_cap_are_not_answered() -> anyhow::Result<()> {
+        let (mgr, mut sent, _incoming) = exit_answering_repeats(None)?;
+        let pseudonym = HoprPseudonym::random();
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+        opening_released(&mgr, pseudonym).await?;
+
+        for _ in 0..MAX_ANSWERED_START_REPEATS {
+            mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+            next_start_message(&mut sent, StartProtocolDiscriminants::SessionEstablished).await?;
+            opening_released(&mgr, pseudonym).await?;
+        }
+        let _ = settled_answers(&mut sent).await;
+
+        mgr.dispatch_message(pseudonym, start_packet(HoprStartProtocol::StartSession(pix_offer()))?)?;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        opening_released(&mgr, pseudonym).await?;
+        let answers = settled_answers(&mut sent).await;
+        assert!(
+            answers.is_empty(),
+            "the repeat past the cap is not answered, got {answers:?}"
+        );
         Ok(())
     }
 
@@ -27222,6 +27922,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            opening: None,
         };
         let guard = mgr.allocate_session_slot(session_id, slot.clone());
         assert!(guard.is_some(), "slot allocation must succeed");
@@ -27255,6 +27956,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            opening: None,
         }
     }
 

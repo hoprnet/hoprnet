@@ -899,3 +899,125 @@ async fn an_entry_without_a_surb_balancer_should_get_the_reply_to_its_requests()
 
     Ok(())
 }
+
+/// The Exit's first `SessionEstablished` is lost, and the Entry's repeated `StartSession` recovers the Session (#8728).
+///
+/// ## Steps
+/// 1. Bob's transport drops the first `SessionEstablished`; Alice repeats her `StartSession` every 100 ms or so and
+///    waits far longer than that.
+/// 2. `new_session` succeeds, Bob holds exactly one Session, and nobody sent a `SessionError`.
+#[test(tokio::test)]
+async fn a_lost_session_established_is_recovered_by_repeating_the_start_session() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let alice_mgr = SessionManager::new(SessionManagerConfig {
+        initiation_timeout_base: Duration::from_secs(2),
+        initiation_resend_interval: Duration::from_millis(100),
+        ..Default::default()
+    });
+    let bob_mgr = SessionManager::new(Default::default());
+
+    let established_sent = Arc::new(AtomicUsize::new(0));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let bob_mgr = bob_mgr_for_alice.clone();
+            Box::pin(async move {
+                bob_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
+
+    let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
+    let established_counter = established_sent.clone();
+    let errors_counter = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let mut dropped = false;
+            if msg_type(&data, StartProtocolDiscriminants::SessionEstablished) {
+                // Only the first one is lost.
+                dropped = established_counter.fetch_add(1, Ordering::Relaxed) == 0;
+            } else if msg_type(&data, StartProtocolDiscriminants::SessionError) {
+                errors_counter.fetch_add(1, Ordering::Relaxed);
+            }
+            let alice_mgr = alice_mgr_for_bob.clone();
+            Box::pin(async move {
+                if !dropped {
+                    alice_mgr.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
+                }
+                Ok(())
+            })
+        });
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None, None)?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None, None)?);
+
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio::time::timeout(
+        Duration::from_secs(10),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation,
+                    surb_management: None,
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .context("timeout establishing the session")?;
+    let alice_session = alice_session.context("the repeated StartSession must recover the Session")?;
+    let bob_session = bob_session.context("bob must get an incoming session")?;
+
+    assert!(
+        established_sent.load(Ordering::Relaxed) >= 2,
+        "the first answer was lost and one more sent"
+    );
+    assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
+    assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
+    assert_eq!(alice_session.id(), bob_session.session.id());
+    assert_eq!(0, session_errors.load(Ordering::Relaxed));
+
+    for ah in ahs {
+        ah.abort();
+    }
+    drop((alice_session, bob_session));
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+    Ok(())
+}
