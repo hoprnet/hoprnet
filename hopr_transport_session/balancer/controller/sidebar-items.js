@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CAPACITY_PLATEAU_THRESHOLD","REFILL_PACING_SECS","REPLY_STREAM_WINDOW","REPORT_LAG","SILENCE_SUSTAIN_AFTER"],"struct":["ActivityEpoch","BalancerStateValues","ProducedHistory","SurbBalancer","SurbBalancerConfig"]};

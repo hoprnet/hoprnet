@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EXPANDED_KEY_CACHE_CAPACITY","MAX_ACKNOWLEDGEMENTS_BATCH_SIZE"],"struct":["CachingKeyExpander","HoprEncoder"]};

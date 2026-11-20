@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_REFUSAL_REPLY_BURST","DEFAULT_REFUSAL_REPLY_REFILL_PERIOD","MIN_REFUSAL_REPLY_REFILL_PERIOD"],"enum":["ExitControlKind","ExitControlOutcome","ExitSessionKind"],"fn":["record_exit_control"],"struct":["BucketState","RefusalReplyBucket","RefusalReplyBudget"]};
