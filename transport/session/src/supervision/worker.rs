@@ -173,6 +173,7 @@ pub fn spawn_supervisor_worker(
     };
 
     let (mut supervisor, initial_actions) = SessionPixSupervisor::new(cfg, dims, pseudonym, now);
+    supervisor.attach_gate(gate.clone());
 
     // Published here rather than left to the worker's first turn, because the worker is spawned and
     // this function returns before it is scheduled. A Session torn down inside that window —
@@ -220,15 +221,11 @@ async fn worker_loop(
     }
 
     loop {
-        // The level the slot keeps on the gate, fed to the supervisor on every turn. A turn that only
-        // exists because of a nudge (`SessionPixEvent::DataPlaneChanged`) ends up here.
-        if supervisor.detach_level_differs(gate.data_plane_detached()) {
-            let actions = supervisor.set_data_plane_detached(gate.data_plane_detached(), Instant::now());
-            let keep_running = dispatch(&actions, supervisor.closed, &action_tx, &gate);
-            publish_telemetry(&mut supervisor, &gate, &telemetry);
-            if !keep_running {
-                return;
-            }
+        // The level the slot keeps on the gate. A turn that only exists because of a nudge
+        // (`SessionPixEvent::DataPlaneChanged`) ends up here; every other turn syncs it again right before
+        // it acts (see `sync_detach_level`).
+        if !sync_detach_level(&mut supervisor, &action_tx, &gate, &telemetry) {
+            return;
         }
 
         // Two independent timers, one wake-up. The deadline sweep is the lifecycle's, the fill tick
@@ -244,6 +241,9 @@ async fn worker_loop(
         if let Some(dl) = deadline {
             let now = Instant::now();
             if now >= dl {
+                if !sync_detach_level(&mut supervisor, &action_tx, &gate, &telemetry) {
+                    return;
+                }
                 let actions = supervisor.handle_timers(now, gate.served_total());
                 report_fill_stall(&mut supervisor);
                 let keep_running = dispatch(&actions, supervisor.closed, &action_tx, &gate);
@@ -267,6 +267,9 @@ async fn worker_loop(
                     }
                 }
                 Err(_) => {
+                    if !sync_detach_level(&mut supervisor, &action_tx, &gate, &telemetry) {
+                        return;
+                    }
                     let now = Instant::now();
                     let actions = supervisor.handle_timers(now, gate.served_total());
                     report_fill_stall(&mut supervisor);
@@ -324,6 +327,27 @@ fn publish_telemetry(
     telemetry.publish(snapshot, supervisor.take_telemetry_events());
 }
 
+/// Feeds the supervisor the level of the gate's detached flag if it differs from the one it works to.
+///
+/// Called right before the worker acts on anything (a command, an event, a timer), because the slot can
+/// detach or attach at any moment and an event queued before that would otherwise be acted on with a stale
+/// view: a successor request issued during the window. Returns `false` if the worker should stop.
+fn sync_detach_level(
+    supervisor: &mut SessionPixSupervisor,
+    action_tx: &ActionTx,
+    gate: &Arc<ServiceGate>,
+    telemetry: &Arc<PixSessionTelemetry>,
+) -> bool {
+    let detached = gate.data_plane_detached();
+    if !supervisor.detach_level_differs(detached) {
+        return true;
+    }
+    let actions = supervisor.set_data_plane_detached(detached, Instant::now());
+    let keep_running = dispatch(&actions, supervisor.closed, action_tx, gate);
+    publish_telemetry(supervisor, gate, telemetry);
+    keep_running
+}
+
 /// Handle a received command from the handle.
 ///
 /// Returns `false` to signal the worker loop to stop.
@@ -347,6 +371,12 @@ async fn process_cmd(
             return dispatch(&actions, true, action_tx, gate);
         }
     };
+
+    // The slot may have detached or attached while this command waited in the queue: act on the level as it
+    // is now, not as it was at the top of the loop.
+    if !sync_detach_level(supervisor, action_tx, gate, telemetry) {
+        return false;
+    }
 
     let keep_running = match cmd {
         WorkerCommand::Event(ev) => {
@@ -1135,6 +1165,51 @@ mod tests {
                 amount: HoprBalance::new_base(1000),
             })
             .await
+    }
+
+    /// An event queued before a detach is acted on with the detached level, not the one the worker last
+    /// looked at: `AlmostRecovered` queued while the plane is attached, the slot detaching before the worker
+    /// runs, must not issue a successor request during the window. It is issued on attach.
+    #[tokio::test]
+    async fn an_event_queued_before_a_detach_does_not_request_a_successor_during_the_window() -> anyhow::Result<()> {
+        let p = HoprPseudonym::random();
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+        let first = SsaId::new(p, SsaIndex::new(1).expect("index one is non-zero"));
+
+        let initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv()).await??;
+        assert!(matches!(initial, SessionPixAction::RequestSsa { .. }));
+        fund_first_cycle(&handle, p)
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        poll_until("the paid front opens the gate", || handle.gate.funded()).await;
+        // The worker is idle, parked on its queue: past the top of its loop, with the attached level.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Detach and queue the event in one go, with nothing in between for the worker to run in.
+        handle.gate.set_data_plane_detached(true);
+        assert!(handle.try_send_event(SessionPixEvent::AlmostRecovered(first)));
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        while let Ok(action) = action_rx.try_recv() {
+            assert!(
+                !matches!(action, SessionPixAction::RequestSsa { .. }),
+                "no successor request during the window, got {action:?}"
+            );
+        }
+
+        handle.gate.set_data_plane_detached(false);
+        assert!(handle.try_send_event(SessionPixEvent::DataPlaneChanged));
+        let attached = loop {
+            let action = tokio::time::timeout(Duration::from_secs(2), action_rx.recv()).await??;
+            if let SessionPixAction::RequestSsa { ssa_ids, .. } = action {
+                break ssa_ids;
+            }
+        };
+        assert_eq!(
+            2,
+            attached[0].ssa_index().get(),
+            "the deferred request goes out on attach"
+        );
+        Ok(())
     }
 
     /// The planner is only useful if the worker actually wakes for it.

@@ -33,7 +33,8 @@ use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
     protocol::{
-        FrameId, OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage, stop_on_invalid_header,
+        FrameId, OrderedFrame, Segment, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage,
+        stop_on_invalid_header,
     },
     session_frame_size,
 };
@@ -154,6 +155,38 @@ pub struct SessionSocketConfig {
     pub stream_base: Option<FrameId>,
 }
 
+/// The progress of a stateless socket's stream, shared with whoever holds a clone.
+///
+/// Lets a manager that may replace the socket (see [`SessionSocketConfig::stream_base`]) learn the highest frame id
+/// either direction has used, without reading anything from the socket itself. Both counters only ever grow, and
+/// read `0` until the first segment.
+#[derive(Debug, Clone, Default)]
+pub struct StreamProgress {
+    received: Arc<AtomicU32>,
+    sent: Arc<AtomicU32>,
+}
+
+impl StreamProgress {
+    /// A progress that starts at the given highest frame ids, as of a stream known up to them.
+    pub fn starting_at(highest_received: FrameId, highest_sent: FrameId) -> Self {
+        Self {
+            received: Arc::new(AtomicU32::new(highest_received)),
+            sent: Arc::new(AtomicU32::new(highest_sent)),
+        }
+    }
+
+    /// The highest frame id of any segment received so far, whether or not its frame was ever completed or
+    /// delivered.
+    pub fn highest_received(&self) -> FrameId {
+        self.received.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The highest frame id of any segment sent so far.
+    pub fn highest_sent(&self) -> FrameId {
+        self.sent.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
 /// The highest allowed [`SessionSocketConfig::stream_base`], 2^31.
 ///
 /// It leaves half of the `u32` frame id space (2^31 frames) to the stream, which cannot be
@@ -246,6 +279,32 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        Self::new_stateless_tracked(
+            id,
+            transport,
+            cfg,
+            loss_signal,
+            None,
+            #[cfg(feature = "telemetry")]
+            stats,
+        )
+    }
+
+    /// Like [`new_stateless`](Self::new_stateless), and additionally publishes the stream's progress in `progress`:
+    /// the highest frame id of any segment received, and of any segment sent (see [`StreamProgress`]).
+    pub fn new_stateless_tracked<T, I>(
+        id: I,
+        transport: T,
+        cfg: SessionSocketConfig,
+        loss_signal: Option<Arc<FrameLossSignal>>,
+        progress: Option<StreamProgress>,
+        #[cfg(feature = "telemetry")] stats: impl SessionTelemetryTracker + Clone + Send + 'static,
+    ) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display + Clone,
+    {
+        let progress_out = progress.clone();
         let first_frame_id = first_frame_id(cfg.stream_base)?;
         let span = tracing::debug_span!("session.socket");
         let _entered = span.enter();
@@ -269,9 +328,14 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
-            .with(move |segment| {
+            .with(move |segment: Segment| {
                 #[cfg(feature = "telemetry")]
                 s0.outgoing_message(SessionMessageDiscriminants::Segment);
+                if let Some(progress) = &progress_out {
+                    progress
+                        .sent
+                        .fetch_max(segment.frame_id, std::sync::atomic::Ordering::Relaxed);
+                }
 
                 future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
             })
@@ -313,6 +377,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             #[cfg(feature = "telemetry")]
                             s1.incoming_message(SessionMessageDiscriminants::Segment);
 
+                            if let Some(progress) = &progress {
+                                progress
+                                    .received
+                                    .fetch_max(s.frame_id, std::sync::atomic::Ordering::Relaxed);
+                            }
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
@@ -2321,6 +2390,50 @@ mod tests {
             "timed out waiting for data",
         )??;
         assert_eq!(expected, buf.as_slice());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stream_progress_should_track_the_highest_frame_id_in_both_directions() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+        let alice_progress = StreamProgress::default();
+        let bob_progress = StreamProgress::default();
+        let cfg = SessionSocketConfig {
+            stream_base: Some(100),
+            ..Default::default()
+        };
+        let mut alice = SessionSocket::<MTU, _>::new_stateless_tracked(
+            "alice",
+            alice,
+            cfg,
+            None,
+            Some(alice_progress.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob = SessionSocket::<MTU, _>::new_stateless_tracked(
+            "bob",
+            bob,
+            cfg,
+            None,
+            Some(bob_progress.clone()),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        assert_eq!(
+            (0, 0),
+            (alice_progress.highest_received(), alice_progress.highest_sent())
+        );
+
+        for data in [b"one".as_slice(), b"two", b"three"] {
+            alice.write_all(data).await?;
+            alice.flush().await?;
+            expect_read(&mut bob, data).await?;
+        }
+        assert_eq!(102, alice_progress.highest_sent());
+        assert_eq!(102, bob_progress.highest_received());
+        assert_eq!(0, bob_progress.highest_sent());
+        assert_eq!(0, alice_progress.highest_received());
         Ok(())
     }
 
