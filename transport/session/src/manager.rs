@@ -2555,6 +2555,11 @@ impl SessionSlot {
 /// estimator itself, so it reaches the Session that counted the packet whatever has happened to the
 /// Session's slot since, and it never touches the slot.
 ///
+/// Not only Session data and keep-alives: the Exit's own Start-protocol sends on a Session
+/// (`SessionEstablished`, the SSA requests and their re-sends, the commitment re-requests) are return
+/// packets that take a SURB too, and are counted through [`send_counted_via_msg_sender`]. Left
+/// uncounted they would leave the estimate showing SURBs the handshake has already spent.
+///
 /// The refund restores the held count the fill reserve and the drain budget read, and nothing else:
 /// the balancer's level, which the egress rate and the level reports follow, saturates at zero and
 /// has already absorbed a count made while it was empty (see
@@ -5245,6 +5250,61 @@ where
     Ok(())
 }
 
+/// Refreshes the pending registration of every member of a batch, and says whether all of them still exist.
+///
+/// A read of a registration postpones its expiry (see `SsaReconstructor::missing_commitment_runs`), which
+/// is what keeps one alive while the Entry is silent. Every member is read, not only up to the first one
+/// that is gone.
+fn refresh_registrations(reconstructor: &SsaReconstructor<HoprPixSpec>, ssa_ids: &[SsaId<HoprPseudonym>]) -> bool {
+    // Collected first, so that no short-circuit leaves a later member unread.
+    let present: Vec<bool> = ssa_ids
+        .iter()
+        .map(|ssa_id| reconstructor.missing_commitment_runs(ssa_id, 1).is_some())
+        .collect();
+    present.into_iter().all(|present| present)
+}
+
+/// As [`send_via_msg_sender`], for an Exit's Start-protocol send over a Session's return path: the packet
+/// takes a SURB, so it is counted in the Session's `estimator` (see [`count_return_packet_surb`]) and
+/// the resolver gives the count back if it drops the packet for want of a SURB.
+///
+/// `routing` must be the Session's return routing; a forward-routed send takes no SURB and must go
+/// through [`send_via_msg_sender`].
+async fn send_counted_via_msg_sender<S, D>(
+    msg_sender: &mut S,
+    routing: DestinationRouting,
+    data: D,
+    estimator: &AtomicSurbFlowEstimator,
+    session_id: &SessionId,
+    error_context: &'static str,
+) -> errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    D: TryInto<ApplicationData>,
+    D::Error: std::error::Error + Send + Sync + 'static,
+{
+    let app_data: ApplicationData = data.try_into().map_err(SessionManagerError::other)?;
+    let data = count_return_packet_surb(estimator, ApplicationDataOut::with_no_packet_info(app_data));
+    #[cfg(feature = "telemetry")]
+    telemetry::record_session_surb_consumed(session_id, 1);
+    #[cfg(not(feature = "telemetry"))]
+    let _ = session_id;
+    msg_sender
+        .send((routing, data))
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await
+        .map_err(|_| {
+            error!("timeout sending {error_context}");
+            TransportSessionError::Timeout
+        })?
+        .map_err(|error| {
+            error!(%error, "failed to send {error_context}");
+            SessionManagerError::other(error)
+        })?;
+    Ok(())
+}
+
 /// Counts a send's outcome in `hopr_exit_control_packets_total`, passing the result through.
 fn count_exit_control_send(
     kind: ExitControlKind,
@@ -7367,6 +7427,9 @@ where
                             Ok((guards, request)) => {
                                 owned_ssas.extend(guards);
                                 last_request = Some((ssa_ids.clone(), request));
+                                // The deadline starts when the supervisor sees the event below, and the
+                                // send took time: refresh again so the answer has the whole lifetime.
+                                refresh_registrations(&share_processor, &ssa_ids);
                                 // One confirmation per index: the supervisor arms each cycle's
                                 // commitment deadline on its own `SsaRequestSent`, and they were all
                                 // put on the wire by the one send that just succeeded.
@@ -7497,6 +7560,8 @@ where
                         // A re-send is best-effort, and a return packet that finds no SURB is retried
                         // for up to `surb_resolution_wait` while everything else this node originates
                         // queues behind it, so one is not sent while the Session holds none. The
+                        // estimate is trustworthy for this because the Exit counts its control sends
+                        // (`SessionEstablished`, the SSA requests) as consumed, like its data. The
                         // registration was refreshed above all the same. Nothing is reported back: the
                         // attempt counts against the supervisor's cap and the next one tries again.
                         if surb_estimator.saturating_diff() == 0 {
@@ -7516,10 +7581,12 @@ where
                                 if let Err(error) = count_exit_control_send(
                                     ExitControlKind::SsaRequestResend,
                                     ExitSessionKind::Pix,
-                                    send_via_msg_sender(
+                                    send_counted_via_msg_sender(
                                         &mut msg_sender,
                                         reply_routing.clone(),
                                         message.clone(),
+                                        &surb_estimator,
+                                        &session_id,
                                         "re-sent session SSA commitment request message",
                                     )
                                     .await,
@@ -8227,6 +8294,18 @@ where
             ssa_state.remember_sent_deposit_data(&deposit_data);
         }
 
+        // The pool may have taken a good part of the registrations' lifetime, and the commitment
+        // deadline only starts at `SsaRequestSent`, after this send. Reading each registration
+        // refreshes it, so the answer to this request gets the whole lifetime after the send. One that
+        // lapsed while the pool answered is not sent for: the Entry would answer a request the Exit can
+        // no longer match, after it has been told to deposit.
+        if !refresh_registrations(&pix_toolbox_local.share_processor, ssa_ids) {
+            return Err(SessionManagerError::Other(anyhow!(
+                "the commitment registration of session {session_id} lapsed while the deposit pool answered"
+            ))
+            .into());
+        }
+
         // Construct and send the Exit SSA commitment request message.
         // The parameters were previously verified to be acceptable.
         let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
@@ -8240,10 +8319,12 @@ where
         count_exit_control_send(
             ExitControlKind::SsaRequest,
             ExitSessionKind::Pix,
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 slot.routing_opts.clone(),
                 data.clone(),
+                &slot.surb_estimator,
+                &session_id,
                 "session SSA commitment request message",
             )
             .await,
@@ -8308,7 +8389,7 @@ where
         count_exit_control_send(
             ExitControlKind::CommitmentRetransmissionRequest,
             ExitSessionKind::Pix,
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 slot.routing_opts.clone(),
                 HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::recommit(
@@ -8316,6 +8397,8 @@ where
                     params,
                     [(ssa_id.ssa_index(), runs)],
                 )),
+                &slot.surb_estimator,
+                &session_id,
                 "ssa commitment retransmission request",
             )
             .await,
@@ -10726,10 +10809,12 @@ where
         count_exit_control_send(
             ExitControlKind::SessionEstablished,
             ExitSessionKind::of(session_req.capabilities.0),
-            send_via_msg_sender(
+            send_counted_via_msg_sender(
                 &mut msg_sender,
                 reply_routing.clone(),
                 data,
+                &slot.surb_estimator,
+                &session_id,
                 "session establishment message",
             )
             .await,

@@ -26,7 +26,7 @@ use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SupervisorConfig, SurbBalancerConfig,
-    testing::{answering_deposit_pool, mock_packet_planning, msg_type},
+    testing::{answering_deposit_pool, answering_deposit_pool_after, mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -1379,6 +1379,24 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
     let mut alice_session = alice_session?;
     let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
 
+    // Every re-send takes a SURB, which Bob counts and skips the re-send without, and Alice sends few
+    // packets here. Keep-alives carrying SURBs, as hers do on the wire, keep him supplied for the wait.
+    for _ in 0..64 {
+        let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            session_id: alice_pseudonym,
+            flags: KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+        .try_into()?;
+        let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(keep_alive.total_len());
+        let mut incoming = ApplicationDataIn {
+            data: keep_alive,
+            packet_info: Default::default(),
+        };
+        incoming.packet_info.num_saved_surbs = saved;
+        bob_mgr.dispatch_message(alice_pseudonym, incoming)?;
+    }
+
     pin_mut!(pix_alice_rx);
     pin_mut!(pix_bob_rx);
 
@@ -1654,18 +1672,22 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
 /// *not* happen come after the positive condition they depend on.
 #[test(tokio::test)]
 async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()> {
-    lost_opening_request_scenario(true).await
+    lost_opening_request_scenario(2, true).await
 }
 
-/// The same loss, but Bob holds no SURB: a re-send would hold up everything else his node originates while
-/// the return packet looks for one, so it is skipped, and the Session ends on the deadline it was given.
+/// The same loss, but the `StartSession` brought exactly the two SURBs that `SessionEstablished` and the first
+/// `SsaRequest` then used, and nothing since has brought any: Bob counts his own control sends as consumed, so he sees
+/// no SURB left. A re-send would hold up everything else his node originates while the return packet looks for
+/// one, so it is skipped, and the Session ends on the deadline it was given.
 #[test(tokio::test)]
-async fn a_lost_opening_request_is_not_resent_without_a_surb() -> Result<()> {
-    lost_opening_request_scenario(false).await
+async fn a_lost_opening_request_is_not_resent_once_the_handshake_spent_its_surbs() -> Result<()> {
+    lost_opening_request_scenario(2, false).await
 }
 
-/// The body of the two tests above. `with_surbs` is whether Alice's packets carry SURBs to Bob, as every real one does.
-async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
+/// The body of the two tests above. `start_surbs` is the number of SURBs Alice's `StartSession` carries, and
+/// `keep_alive` whether a keep-alive carrying more reaches Bob after establishment, as Alice's do on the wire; the
+/// mock relays otherwise carry none.
+async fn lost_opening_request_scenario(start_surbs: usize, keep_alive: bool) -> Result<()> {
     use std::{
         sync::{
             Mutex,
@@ -1730,14 +1752,21 @@ async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
                 _ => {}
             }
             let bob_mgr = bob_mgr_relay.clone();
+            let saved = if matches!(
+                HoprStartProtocol::try_from(data.data.clone()),
+                Ok(HoprStartProtocol::StartSession(_))
+            ) {
+                start_surbs
+            } else {
+                0
+            };
             Box::pin(async move {
-                let _ = bob_mgr.dispatch_message(
-                    alice_pseudonym,
-                    ApplicationDataIn {
-                        data: data.data,
-                        packet_info: Default::default(),
-                    },
-                );
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
                 Ok(())
             })
         });
@@ -1833,9 +1862,9 @@ async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
     pin_mut!(pix_alice_rx);
     pin_mut!(pix_bob_rx);
 
-    // Bob re-sends only over a SURB he holds, and the mock relays carry none, so what the handshake
-    // consumed is not replaced. A keep-alive carrying SURBs, as Alice's do, stands in for them.
-    if with_surbs {
+    // Bob re-sends only over a SURB he holds. The handshake used the two the `StartSession` brought, so a
+    // keep-alive carrying more, as Alice's do on the wire, is what leaves him a positive estimate.
+    if keep_alive {
         let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(hopr_protocol_start::KeepAliveMessage {
             session_id: alice_pseudonym,
             flags: hopr_protocol_start::KeepAliveFlag::BalancerState.into(),
@@ -1853,7 +1882,7 @@ async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
 
     // Without a SURB Bob skips the re-sends, so the dropped request is the only one and the Session ends
     // on the commitment deadline it was given.
-    if !with_surbs {
+    if !keep_alive {
         eventually("bob to close the Session on its commitment deadline", || {
             !bob_mgr.active_sessions().contains(&alice_pseudonym)
         })
@@ -1972,6 +2001,227 @@ async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
     alice_handle.await??;
     bob_handle.await??;
 
+    Ok(())
+}
+
+/// A deposit pool that answers late must not eat into the registration the Entry's answer is matched against.
+///
+/// The Exit registers its commitments, then waits for the pool, and only then sends the request and starts the
+/// commitment deadline. With a registration lifetime of 1.8 s, a delivery time of 1.5 s and a pool answering after 1.7
+/// s, the registration was nearly gone when the request went out; the Entry's commitment, 350 ms later and well inside
+/// the deadline, found nothing to match and the Exit closed the Session after the Entry was told to deposit. The Exit
+/// now refreshes the registration just before the send, so the answer has the whole lifetime. With a pool slower than
+/// the lifetime itself the registration is gone and nothing is sent at all.
+///
+/// `commit_delay` is how long Alice's commitments take to reach Bob. Returns whether Bob received `DepositNeeded`, how
+/// many requests went on the wire and whether any `SessionError` was sent.
+async fn slow_pool_scenario(pool_delay: Duration, commit_delay: Duration) -> Result<(bool, usize, usize)> {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 64,
+        threshold: 16,
+        surplus_shares: 4,
+    };
+    let params = PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?;
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=cycle_quota(&params),
+            supervision: SupervisorConfig {
+                ssa_request_resend_interval: RESEND_INTERVAL,
+                max_ssa_delivery_time: Duration::from_millis(1500),
+                commitment_recommit_interval: Duration::from_millis(500),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let requests = Arc::new(Mutex::new(0usize));
+    let session_errors = Arc::new(AtomicUsize::new(0));
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let session_errors_alice = session_errors.clone();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let decoded = HoprStartProtocol::try_from(data.data.clone());
+            let delay = match &decoded {
+                Ok(HoprStartProtocol::SsaCommit(_)) => commit_delay,
+                _ => Duration::ZERO,
+            };
+            if matches!(decoded, Ok(HoprStartProtocol::SessionError(_))) {
+                session_errors_alice.fetch_add(1, Ordering::Relaxed);
+            }
+            // The SURBs Bob needs for his control sends, which the mock relays do not bring.
+            let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+            let bob_mgr = bob_mgr_relay.clone();
+            Box::pin(async move {
+                if !delay.is_zero() {
+                    tokio_time::sleep(delay).await;
+                }
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let requests_relay = requests.clone();
+    let session_errors_bob = session_errors.clone();
+    bob_transport
+        .expect_send_message()
+        .times(0..)
+        .returning(move |_, data| {
+            match HoprStartProtocol::try_from(data.data.clone()) {
+                Ok(HoprStartProtocol::SsaRequest(request)) if request.missing.is_empty() => {
+                    *requests_relay.lock().unwrap() += 1;
+                }
+                Ok(HoprStartProtocol::SessionError(_)) => {
+                    session_errors_bob.fetch_add(1, Ordering::Relaxed);
+                }
+                _ => {}
+            }
+            let alice_mgr = alice_mgr_relay.clone();
+            Box::pin(async move {
+                let _ = alice_mgr.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    // Bob's registrations idle out after 1.8 s, which his 1.5 s delivery window fits inside.
+    let bob_rec_config = SsaReconstructorConfig {
+        incomplete_commitment_lifetime: Duration::from_millis(1800),
+        ..Default::default()
+    };
+    let (pix_toolbox_alice, _pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(bob_rec_config).into(),
+    );
+    let pix_bob_rx = answering_deposit_pool_after(pix_bob_rx, pool_delay, |_| Vec::new());
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(
+        alice_sender.clone(),
+        new_session_tx_alice,
+        Some(pix_toolbox_alice),
+        None,
+    )?);
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob), None)?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio_time::timeout(
+        DEADLINE,
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout establishing the session: {e}"))?;
+    let mut alice_session = alice_session?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+    pin_mut!(pix_bob_rx);
+
+    // Either Bob is told to deposit, or his Session ends: both are well inside the deadline.
+    let needed = {
+        use futures::FutureExt;
+        let mut got = false;
+        let end = std::time::Instant::now() + Duration::from_secs(8);
+        while std::time::Instant::now() < end {
+            if let Some(Some(HoprSessionOutPixEvent::DepositNeeded(..))) = pix_bob_rx.next().now_or_never() {
+                got = true;
+                break;
+            }
+            if !bob_mgr.active_sessions().contains(&alice_pseudonym) {
+                break;
+            }
+            tokio_time::sleep(POLL).await;
+        }
+        got
+    };
+    let result = (
+        needed,
+        *requests.lock().unwrap(),
+        session_errors.load(Ordering::Relaxed),
+    );
+
+    let _ = alice_session.close().await;
+    for ah in ahs {
+        ah.abort();
+    }
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    let _ = alice_handle.await;
+    let _ = bob_handle.await;
+    Ok(result)
+}
+
+/// A pool answering at 1.7 s against a registration lifetime of 1.8 s, with the Entry's commitment arriving 350 ms
+/// after the request: the Session commits and nobody sends a `SessionError`.
+#[test(tokio::test)]
+async fn a_slow_deposit_pool_does_not_cost_the_request_its_registration() -> Result<()> {
+    let (needed, requests, session_errors) =
+        slow_pool_scenario(Duration::from_millis(1700), Duration::from_millis(350)).await?;
+    assert!(
+        needed,
+        "bob must be told to deposit once the Entry's commitment arrived"
+    );
+    assert!(requests >= 1, "the request went out");
+    assert_eq!(0, session_errors, "the Session is not lost to a lapsed registration");
+    Ok(())
+}
+
+/// A pool slower than the registration's lifetime itself: the registration lapsed while it answered, so nothing is
+/// sent, and the Session ends rather than inviting an answer it cannot match.
+#[test(tokio::test)]
+async fn a_deposit_pool_slower_than_the_registration_lifetime_sends_nothing() -> Result<()> {
+    let (needed, requests, _) = slow_pool_scenario(Duration::from_millis(2500), Duration::ZERO).await?;
+    assert!(!needed, "no request went out, so there is nothing to deposit");
+    assert_eq!(
+        0, requests,
+        "no SsaRequest may go on the wire for a registration that lapsed"
+    );
     Ok(())
 }
 
