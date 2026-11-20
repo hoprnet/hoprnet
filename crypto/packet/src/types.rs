@@ -184,10 +184,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
 
+        // `as_chunks` needs a const generic argument, which cannot depend on the generics `S` and `H`
+        #[allow(clippy::chunks_exact_to_as_chunks)]
         let surbs = data[1..1 + surb_end]
-            .as_chunks::<SURB<S, H>::SIZE>()
-            .0
-            .iter()
+            .chunks_exact(SURB::<S, H>::SIZE)
             .map(SURB::<S, H>::try_from)
             .collect::<Result<Vec<_>, _>>()?;
 
