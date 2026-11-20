@@ -197,6 +197,8 @@ const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
 /// adapter adds no policy of its own.
 struct StoreSurbAdmission {
     store: MemorySurbStore,
+    /// Its pending SURBs are written off when a new generation wipes the counterparty's stock.
+    round_trips: protocol::surb_telemetry::SurbRoundTripRegistry,
 }
 
 impl SurbAdmissionControl for StoreSurbAdmission {
@@ -211,6 +213,24 @@ impl SurbAdmissionControl for StoreSurbAdmission {
     fn raise_target(&self, pseudonym: &SessionId, token: AdmissionToken, expected_surbs: usize) {
         self.store
             .raise_admitted_capacity(pseudonym, token.into_raw(), expected_surbs);
+    }
+
+    fn advance_generation(&self, pseudonym: &SessionId) {
+        // Taken first: only SURBs minted before it are stale, the repeat's own are not.
+        let cutoff = std::time::Instant::now();
+        self.store.bump_generation(pseudonym);
+        // The registry walk is too long for a runtime worker.
+        let (registry, pseudonym) = (self.round_trips.clone(), *pseudonym);
+        hopr_utils::runtime::prelude::spawn(async move {
+            if let Err(error) = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || registry.write_off_pending(&pseudonym, cutoff),
+                "surb_write_off_pending",
+            )
+            .await
+            {
+                tracing::warn!(%error, "pending SURBs were not written off after a new SURB generation");
+            }
+        });
     }
 }
 
@@ -666,6 +686,7 @@ where
         // manager is freshly constructed here, so nothing can have set it yet.
         let _ = smgr.set_surb_admission(Arc::new(StoreSurbAdmission {
             store: path_planner.surb_store.clone(),
+            round_trips: surb_round_trips.clone(),
         }));
 
         if let Some(forward) = surb_round_trips.forward() {
@@ -2332,6 +2353,28 @@ mod tests {
         assert_eq!(expected, surb_degraded_notify_period_override(raw, configured));
     }
 
+    /// `advance_generation` starts a new SURB generation in the store, once per call.
+    #[tokio::test]
+    async fn surb_admission_advance_generation_bumps_the_stores_generation() -> anyhow::Result<()> {
+        use hopr_api::types::{crypto::crypto_traits::Randomizable, internal::prelude::HoprPseudonym};
+        use hopr_protocol_hopr::SurbStoreConfig;
+
+        use super::{MemorySurbStore, StoreSurbAdmission, SurbAdmissionControl, SurbStore};
+
+        let admission = StoreSurbAdmission {
+            store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
+        };
+        let pseudonym: super::SessionId = HoprPseudonym::random();
+        let before = admission.store.current_generation(&pseudonym);
+
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(1), admission.store.current_generation(&pseudonym));
+        admission.advance_generation(&pseudonym);
+        assert_eq!(before.wrapping_add(2), admission.store.current_generation(&pseudonym));
+        Ok(())
+    }
+
     /// The admission seam's `raise_target` must reach the store, and only for the admission it names.
     ///
     /// `StoreSurbAdmission` is pure delegation, so this pins the wiring the SessionManager relies on:
@@ -2347,6 +2390,7 @@ mod tests {
 
         let admission = StoreSurbAdmission {
             store: MemorySurbStore::new(SurbStoreConfig::default()),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 
@@ -2415,6 +2459,7 @@ mod tests {
                 rb_capacity,
                 ..Default::default()
             }),
+            round_trips: Default::default(),
         };
         let pseudonym: super::SessionId = HoprPseudonym::random();
 
