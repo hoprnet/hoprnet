@@ -25,8 +25,8 @@ use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, FrameLossSignal, ReliableSocket,
-    SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, DEFAULT_SUCCESSOR_GUARD_PERIOD,
+    FrameLossSignal, ReliableSocket, SegmentRequest, SeqIndicator, SessionSocketConfig, UnreliableSocket,
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
     session_frame_size,
 };
@@ -601,6 +601,18 @@ pub struct HoprSessionConfig {
     /// may still arrive, this bounds how much already-received data is held while it waits. `None`
     /// keeps the timeout as the only rule.
     pub max_frames_behind_gap: Option<usize>,
+    /// Guards the socket against the stale frames of a previous Session under the same pseudonym;
+    /// see [`SessionSocketConfig::successor_start_window`].
+    ///
+    /// Default is `None`: no guard. Not serialised: it is wiring set by the manager, not a Session property.
+    #[serde(skip_serializing)]
+    pub successor_start_window: Option<u32>,
+    /// How long the [`Self::successor_start_window`] guard lasts. No effect without a window.
+    ///
+    /// Default is [`DEFAULT_SUCCESSOR_GUARD_PERIOD`].
+    #[default(DEFAULT_SUCCESSOR_GUARD_PERIOD)]
+    #[serde(skip_serializing)]
+    pub successor_guard_period: Duration,
 }
 
 /// A write sink that stays failed once it has failed.
@@ -816,6 +828,8 @@ impl HoprSession {
                 // that is never coming and holds everything already received behind it. The
                 // sessions that need this bound most are exactly the ones flow control excludes.
                 max_frames_behind_gap: cfg.max_frames_behind_gap,
+                successor_start_window: cfg.successor_start_window,
+                successor_guard_period: cfg.successor_guard_period,
                 ..Default::default()
             };
 

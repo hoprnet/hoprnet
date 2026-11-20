@@ -334,6 +334,38 @@ async fn establish_pix_session_with_surbs(
     Ok(session)
 }
 
+/// As [`establish_pix_session`], but under a pseudonym the caller names, the way a client reconnects.
+#[cfg(feature = "session-client")]
+async fn establish_pix_session_under(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+    pseudonym: Option<hopr_lib::api::types::internal::protocol::HoprPseudonym>,
+) -> anyhow::Result<hopr_lib::HoprSession> {
+    let routing = hops.try_into()?;
+    let (session, _) = tokio::time::timeout(
+        Duration::from_secs(120),
+        cluster.entry.inner().connect_to(
+            cluster.exit.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(IpOrHost::from_str(":0")?)),
+            HoprSessionClientConfig {
+                forward_path: routing,
+                return_path: routing,
+                capabilities: SessionCapability::Segmentation
+                    | SessionCapability::NoRateControl
+                    | SessionCapability::UsePIX,
+                pseudonym,
+                surb_management: None,
+                max_surbs_per_data_packet: 1,
+                flow_control: None,
+                max_frames_behind_gap: None,
+            },
+        ),
+    )
+    .await
+    .context("session connection timed out after 120s")??;
+    Ok(session)
+}
+
 /// The Exit-side PIX configuration the fill tests share.
 ///
 /// `max_recovery_time` is the budget fill plans against, and 60 s is as short as a legal pair gets
@@ -2192,5 +2224,78 @@ async fn a_raised_surb_target_widens_the_exits_ring(#[case] hops: usize) -> anyh
         "the Exit's ring must reach the announced target: ceiling {widened}, target {main_target}"
     );
 
+    Ok(())
+}
+
+/// A client reconnecting under the pseudonym it used before, after the Exit has idle-evicted the old
+/// Session, starts over at SSA 1 and is served.
+///
+/// The Entry keeps its PIX accounting for the pseudonym (the commitments made and the packets served
+/// against them), and the share generator its state, for half an hour. A fresh Exit opens with SSA 1,
+/// which the generator refuses to commit again: before the Entry reset on an opening request, the
+/// reconnect failed and the Session timed out on its commitment.
+///
+/// ## Steps
+/// 1. A Session is opened and its first deposit, `(p, 1)`, is signalled on the Exit.
+/// 2. The Session is dropped, and the Exit left to evict it on its short `idle_timeout`.
+/// 3. A Session is opened under `p`. The Exit signals a fresh `(p, 1)` and the Session echoes.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn a_reconnect_under_the_same_pseudonym_after_the_exit_evicted_the_session_starts_over(
+    #[case] hops: usize,
+) -> anyhow::Result<()> {
+    // Short, so that the Exit evicts the first Session within the test. Applies to both ends.
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
+
+    let exit_pix = fill_pix_config(Default::default());
+    let cluster = build_pix_cluster(hops, exit_pix, IDLE_TIMEOUT).await?;
+    let (_driver, mut milestones) = spawn_exit_pix_driver(&cluster);
+
+    let first = establish_pix_session_under(&cluster, hops, None).await?;
+    let pseudonym = *first.id();
+    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1))
+    })
+    .await;
+    anyhow::ensure!(
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1)),
+        "the first Session's deposit was never signalled: {seen:?}"
+    );
+
+    drop(first);
+    tracing::info!(%pseudonym, "first Session dropped; waiting for the Exit to evict it");
+    tokio::time::sleep(IDLE_TIMEOUT * 2).await;
+    // Whatever the first Session's wind-down reported, only what follows the reconnect counts.
+    while milestones.try_recv().is_ok() {}
+
+    let mut second = establish_pix_session_under(&cluster, hops, Some(pseudonym)).await?;
+    assert_eq!(
+        pseudonym,
+        *second.id(),
+        "the reconnect must be under the same pseudonym"
+    );
+    let seen = await_milestones(&mut milestones, Duration::from_secs(60), |seen| {
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1))
+    })
+    .await;
+    anyhow::ensure!(
+        seen.iter()
+            .any(|(milestone, _)| matches!(milestone, PixMilestone::Funded(id) if id.session_id() == pseudonym && id.ssa_index().get() == 1)),
+        "the reconnected Session got no fresh (p, 1) deposit: {seen:?}"
+    );
+
+    const ECHOES: usize = 3;
+    let completed = echo_n(&mut second, ECHOES, Duration::from_millis(200)).await;
+    assert_eq!(
+        ECHOES, completed,
+        "the reconnected Session must carry traffic, but only {completed} of {ECHOES} echo round trips finished"
+    );
     Ok(())
 }
