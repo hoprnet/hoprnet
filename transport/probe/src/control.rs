@@ -249,6 +249,31 @@ mod tests {
         assert_eq!(polled.load(Ordering::SeqCst), 1);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn the_stream_keeps_running_when_every_handle_is_dropped() {
+        let control = ProbeControl::default();
+        let (inner, _) = counting();
+        let mut stream = std::pin::pin!(paced(inner, &control, PACE));
+        drop(control);
+
+        for _ in 0..3 {
+            assert!(stream.next().await.is_some(), "the dial is on, so probing goes on");
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_dial_near_zero_waits_a_bounded_time_instead_of_panicking() {
+        let control = ProbeControl::default();
+        control.set_dial(Dial::new(1e-30));
+        let (inner, _) = counting();
+        let mut stream = std::pin::pin!(paced(inner, &control, Duration::MAX));
+
+        stream.next().await;
+        let held = tokio::time::timeout(Duration::from_secs(1), stream.next()).await;
+
+        assert!(held.is_err());
+    }
+
     #[test]
     fn a_dial_must_be_a_positive_finite_number() {
         assert!(Dial::new(0.0).is_none());
