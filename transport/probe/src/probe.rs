@@ -21,6 +21,7 @@ use crate::{
     HoprProbeProcess,
     config::ProbeConfig,
     content::Message,
+    control::ProbeControl,
     ping::PingQueryReplier,
     types::{NeighborProbe, NeighborTelemetry, PathTelemetry},
 };
@@ -179,11 +180,30 @@ pub struct Probe {
     cfg: ProbeConfig,
     /// Tag allocator for probing telemetry tags.
     tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
+    /// Handle that sets the rate of generated probes while the process runs.
+    control: ProbeControl,
 }
 
 impl Probe {
     pub fn new(cfg: ProbeConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
-        Self { cfg, tag_allocator }
+        Self {
+            cfg,
+            tag_allocator,
+            control: ProbeControl::default(),
+        }
+    }
+
+    /// Replaces the handle that sets the rate of generated probes.
+    ///
+    /// Use it to share one handle between the probe process and the code that owns the dial.
+    pub fn with_control(mut self, control: ProbeControl) -> Self {
+        self.control = control;
+        self
+    }
+
+    /// The handle that sets the rate of generated probes while the process runs.
+    pub fn control(&self) -> ProbeControl {
+        self.control.clone()
     }
 
     /// The main function that assembles and starts the probing process.
@@ -788,6 +808,19 @@ mod tests {
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
     {
+        test_with_probing_control(cfg, ProbeControl::default(), store, test).await
+    }
+
+    async fn test_with_probing_control<F, Fut>(
+        cfg: ProbeConfig,
+        control: ProbeControl,
+        store: PeerStore,
+        test: F,
+    ) -> anyhow::Result<()>
+    where
+        Fut: std::future::Future<Output = anyhow::Result<()>>,
+        F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
+    {
         let tag_allocators = hopr_transport_tag_allocator::create_allocators(
             ReservedTag::range().end..u16::MAX as u64 + 1,
             [
@@ -802,7 +835,7 @@ mod tests {
             .find_map(|(u, alloc)| matches!(u, hopr_transport_tag_allocator::Usage::ProvingTelemetry).then_some(alloc))
             .expect("probing allocator should exist");
 
-        let probe = Probe::new(cfg, probing_allocator);
+        let probe = Probe::new(cfg, probing_allocator).with_control(control);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
             futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
@@ -1084,6 +1117,84 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    fn paced_store() -> PeerStore {
+        PeerStore {
+            me: *OFFCHAIN_KEYPAIR.public(),
+            get_peers: Arc::new(RwLock::new({
+                let mut neighbors = VecDeque::new();
+                neighbors.push_back(NEIGHBOURS.clone());
+                neighbors
+            })),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn probe_should_space_generated_probes_by_the_pace_divided_by_the_dial() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        const PACE: Duration = Duration::from_secs(1);
+        anyhow::ensure!(NEIGHBOURS.len() >= 4, "the test needs 4 generated probes");
+
+        let cfg = ProbeConfig {
+            pace: PACE,
+            ..Default::default()
+        };
+        let control = ProbeControl::default();
+
+        test_with_probing_control(cfg, control.clone(), paced_store(), move |iface: TestInterface| {
+            let control = control.clone();
+            async move {
+                let mut rx = iface.from_probing_to_network_rx;
+                let start = tokio::time::Instant::now();
+                let mut next = async || -> anyhow::Result<Duration> {
+                    rx.next().await.context("a probe is emitted")?;
+                    Ok(start.elapsed())
+                };
+
+                let first = next().await?;
+                let second = next().await?;
+                control.set_dial(Some(crate::Dial::ULTRA));
+                let third = next().await?;
+                control.set_dial(Some(crate::Dial::LOW));
+                let fourth = next().await?;
+
+                anyhow::ensure!(first == Duration::ZERO, "the first probe is immediate, was {first:?}");
+                anyhow::ensure!(second - first == PACE, "dial 1.0 gap was {:?}", second - first);
+                anyhow::ensure!(third - second == PACE / 2, "dial 2.0 gap was {:?}", third - second);
+                anyhow::ensure!(fourth - third == PACE * 10, "dial 0.1 gap was {:?}", fourth - third);
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn probe_should_emit_no_generated_probe_while_the_dial_is_off() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let control = ProbeControl::default();
+        control.set_dial(None);
+
+        test_with_probing_control(ProbeConfig::default(), control.clone(), paced_store(), move |iface| {
+            let control = control.clone();
+            async move {
+                let mut rx = iface.from_probing_to_network_rx;
+
+                let held = tokio::time::timeout(Duration::from_secs(60), rx.next()).await;
+                anyhow::ensure!(held.is_err(), "no probe may be emitted while the dial is off");
+
+                control.set_dial(Some(crate::Dial::HIGH));
+                tokio::time::timeout(Duration::from_secs(60), rx.next())
+                    .await
+                    .context("probing resumes once a dial is set")?
+                    .context("a probe is emitted")?;
+                Ok(())
+            }
+        })
+        .await
     }
 
     #[tokio::test]

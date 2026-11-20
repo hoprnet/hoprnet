@@ -34,6 +34,7 @@ pub use hopr_api::{
 pub use crate::{
     config::ProbeConfig,
     content::Message as TrafficReturnedObservation,
+    control::{Dial, ProbeControl},
     probe::{Probe, ProbeClassifierState, ProbeDispatch},
     types::{NeighborTelemetry, PathTelemetry},
 };
