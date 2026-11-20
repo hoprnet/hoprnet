@@ -381,8 +381,9 @@ type HoprSessionManager = SessionManager<HoprMessageSender>;
 #[derive(Debug, Clone)]
 pub struct HoprSessionConfigurator {
     id: SessionId,
-    /// The slot instance of the Session this configurator was handed out with, so that
-    /// [`close`](Self::close) can never close a successor that has since taken the same pseudonym.
+    /// The slot instance of the Session this configurator was handed out with, so that none of its
+    /// operations can reach a successor that has since taken the same (reused) pseudonym: they fail
+    /// as for a non-existing Session, and [`close`](Self::close) returns `false`.
     instance: Option<u64>,
     // Makes sure configurator does not extend lifetime of the SessionManager.
     smgr: std::sync::Weak<HoprSessionManager>,
@@ -407,12 +408,15 @@ impl HoprSessionConfigurator {
     /// NOTE: This operation only sends the Session Keep-Alive packet and **DOES NOT** guarantee the other side
     /// has received it.
     pub async fn ping(&self) -> errors::Result<()> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .ping_session(&self.id)
-            .await?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        match self.instance {
+            Some(instance) => smgr.ping_session_instance(&self.id, instance).await?,
+            None => smgr.ping_session(&self.id).await?,
+        }
+        Ok(())
     }
 
     /// Gets the configuration of the SURB balancer.
@@ -421,11 +425,14 @@ impl HoprSessionConfigurator {
     ///
     /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
     pub fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .get_surb_balancer_config(&self.id)?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        Ok(match self.instance {
+            Some(instance) => smgr.get_surb_balancer_config_instance(&self.id, instance)?,
+            None => smgr.get_surb_balancer_config(&self.id)?,
+        })
     }
 
     /// Updates the configuration of the SURB balancer.
@@ -433,11 +440,15 @@ impl HoprSessionConfigurator {
     /// Returns an error if the Session is closed, the Session manager is gone, or the
     /// Session has been created without a SURB balancer.
     pub fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
-        Ok(self
+        let smgr = self
             .smgr
             .upgrade()
-            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .update_surb_balancer_config(&self.id, config)?)
+            .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?;
+        match self.instance {
+            Some(instance) => smgr.update_surb_balancer_config_instance(&self.id, instance, config)?,
+            None => smgr.update_surb_balancer_config(&self.id, config)?,
+        }
+        Ok(())
     }
 
     /// Explicitly closes the underlying Session in the [`SessionManager`].
