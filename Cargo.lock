@@ -4248,7 +4248,7 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.12.0"
-source = "git+https://github.com/hoprnet/hopr-impls?branch=bot%2Flazy-dial-driven-probing#597e8c32291df95d8951bd9a999a78512e70a966"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=kauki%2Ffix%2Fct%2Fprobe-rate-is-the-consumers#cb7a80fa27f47ec99cbf1f6e6f563898ff21a935"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4316,7 +4316,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.13.0"
-source = "git+https://github.com/hoprnet/hopr-impls?branch=bot%2Flazy-dial-driven-probing#597e8c32291df95d8951bd9a999a78512e70a966"
+source = "git+https://github.com/hoprnet/hopr-impls?branch=kauki%2Ffix%2Fct%2Fprobe-rate-is-the-consumers#cb7a80fa27f47ec99cbf1f6e6f563898ff21a935"
 dependencies = [
  "anyhow",
  "bimap",
@@ -7404,7 +7404,7 @@ dependencies = [
  "quinn-udp 0.5.16",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7444,7 +7444,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -7457,7 +7457,7 @@ checksum = "47091c86514c2e11452cb228dee77037334b99d92a23e4c69aa5982261f39247"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 
