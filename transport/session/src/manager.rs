@@ -36,8 +36,8 @@ use hopr_protocol_pix::{
 };
 use hopr_protocol_session::FrameLossSignal;
 use hopr_protocol_start::{
-    ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+    ErrorIdentifier, ForwardReceiptsMessage, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage,
+    SsaServerCommitmentMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::{Instrument, debug, error, info, instrument::WithSubscriber, trace, warn};
@@ -48,20 +48,22 @@ use crate::telemetry::{
     set_session_state,
 };
 use crate::{
-    AdmissionToken, AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession,
-    SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbAdmissionControl, SurbBalancerConfig,
+    AdmissionToken, AgreedSsaQuota, Capabilities, Capability, ForwardReceiptSink, HoprSession, HoprSessionOutPixEvent,
+    IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbAdmissionControl,
+    SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, MAX_WAIT_CHUNK, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection, SurbFlowEstimator,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
-    counters::{START_REFUSAL_REPLY_DROPS, START_REFUSALS},
+    counters::{FORWARD_RECEIPTS_RECEIVED, FORWARD_RECEIPTS_SENT, START_REFUSAL_REPLY_DROPS, START_REFUSALS},
     errors::{self, SessionManagerError, TransportSessionError},
     exit_control::{
         ExitControlKind, ExitControlOutcome, ExitSessionKind, MIN_REFUSAL_REPLY_REFILL_PERIOD, RefusalReplyBucket,
         RefusalReplyBudget, record_exit_control,
     },
+    exit_receipts::{BURST_POLL, ExitReceipts, Receipt},
     supervision::{
         ActionRx, FillRate, GateVerdict, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent,
         SessionPixSupervisorHandle, SupervisorConfig, spawn_supervisor_worker,
@@ -294,6 +296,9 @@ fn defer_admission_retire(
 
 /// How often a data packet held back for the keep-alive reserve looks at the SURB estimate again.
 const SURB_RESERVE_POLL: Duration = Duration::from_millis(50);
+
+/// How often an Exit checks whether a forward receipt is due.
+const FORWARD_RECEIPT_POLL: Duration = Duration::from_millis(250);
 
 /// SURBs the Exit keeps back from its data, so that its keep-alives can still be sent.
 ///
@@ -1100,6 +1105,8 @@ enum SessionHandles {
     /// Carries the inner `SsaIndex` value so that each cycle's observer is independent — pipelining
     /// must not cancel an earlier cycle's.
     PixDepositObserver(u32),
+    /// Handle to the task that sends forward receipts to the Entry.
+    ForwardReceipts,
 }
 
 impl std::fmt::Display for SessionHandles {
@@ -1112,6 +1119,7 @@ impl std::fmt::Display for SessionHandles {
             Self::Balancer => write!(f, "Balancer"),
             Self::PixActionDriver => write!(f, "PixActionDriver"),
             Self::PixDepositObserver(idx) => write!(f, "PixDepositObserver({idx})"),
+            Self::ForwardReceipts => write!(f, "ForwardReceipts"),
         }
     }
 }
@@ -1615,6 +1623,10 @@ pub(crate) struct SessionSlot {
     /// Entry announced it again. The commit applies this figure too, and every later raise widens the
     /// ring on the spot (see [`SurbAdmissionControl::raise_target`]).
     raised_surb_target: Arc<std::sync::atomic::AtomicUsize>,
+    /// Tags of the Session packets received, where the Entry asked for forward receipts.
+    ///
+    /// Exit-side only.
+    forward_receipts: Option<Arc<ExitReceipts>>,
 }
 
 impl SessionSlot {
@@ -2958,6 +2970,11 @@ impl EffectivePixAdmission {
 /// above them are unused and always sent as `0`.
 const INITIATION_OPTIONS_SHIFT: u32 = u64::BITS;
 
+/// Set in `StartInitiation::additional_data` by an Entry that wants forward receipts.
+///
+/// It sits in the reserved bits 32-63, which every Exit ignores.
+const FORWARD_RECEIPTS_REQUESTED: u128 = 1 << 32;
+
 /// Packs the 64-bit options word into the most significant half of `StartInitiation::additional_data`, and
 /// the Entry's idle timeout into its lowest 32 bits.
 ///
@@ -3423,6 +3440,12 @@ pub struct SessionManagerConfig {
     /// Default is [`RefusalReplyBudget::default`].
     #[default(Some(RefusalReplyBudget::default()))]
     pub refusal_reply_budget: Option<RefusalReplyBudget>,
+
+    /// Whether an Entry asks for forward receipts and an Exit sends them.
+    ///
+    /// Default is true.
+    #[default(true)]
+    pub forward_receipts: bool,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -3923,6 +3946,8 @@ pub struct SessionManager<S> {
     /// [`set_surb_admission`](Self::set_surb_admission) exists and why a missed call is observable
     /// in the store's own admission metrics rather than silent here.
     surb_admission: Arc<OnceLock<Arc<dyn SurbAdmissionControl>>>,
+    /// Where the Entry hands the forward receipts of its Sessions, set once by the composition root.
+    forward_receipt_sink: Arc<OnceLock<Arc<dyn ForwardReceiptSink>>>,
     /// Permits for concurrent session-server admission waits, so a slow server refuses with `Busy`
     /// instead of parking every `StartSession` handler.
     admission_permits: Arc<hopr_utils::runtime::prelude::Semaphore>,
@@ -3948,6 +3973,7 @@ impl<S> Clone for SessionManager<S> {
             ssa_request_locks: self.ssa_request_locks.clone(),
             admission_tx: self.admission_tx.clone(),
             surb_admission: self.surb_admission.clone(),
+            forward_receipt_sink: self.forward_receipt_sink.clone(),
             admission_permits: self.admission_permits.clone(),
             refusal_replies: self.refusal_replies.clone(),
         }
@@ -4803,6 +4829,7 @@ where
                 .build(),
             admission_tx: Arc::new(OnceLock::new()),
             surb_admission: surb_admission_in_struct,
+            forward_receipt_sink: Arc::new(OnceLock::new()),
             admission_permits: Arc::new(hopr_utils::runtime::prelude::Semaphore::new(
                 START_SESSION_ADMISSION_CONCURRENCY,
             )),
@@ -5061,6 +5088,8 @@ where
                                         HoprStartProtocol::SsaRequest(server_commit_msg) => {
                                             myself.handle_ssa_request(pseudonym, server_commit_msg).await
                                         }
+                                        // Handled in `dispatch_message`.
+                                        HoprStartProtocol::ForwardReceipts(_) => Ok(()),
                                         // Routing puts `StartSession` on the session lane.
                                         HoprStartProtocol::StartSession(_) => {
                                             unreachable!("StartSession is never routed to the control lane")
@@ -5104,6 +5133,13 @@ where
     /// controller that would hide the absence.
     pub fn set_surb_admission(&self, ctl: Arc<dyn SurbAdmissionControl>) -> bool {
         self.surb_admission.set(ctl).is_ok()
+    }
+
+    /// Installs the sink for the forward receipts of outgoing Sessions; `false` if one was installed already.
+    ///
+    /// Without one, no Session asks its Exit for receipts.
+    pub fn set_forward_receipt_sink(&self, sink: Arc<dyn ForwardReceiptSink>) -> bool {
+        self.forward_receipt_sink.set(sink).is_ok()
     }
 
     /// Atomically allocates a new [`SessionSlot`] for `session_id` and returns an RAII
@@ -5288,6 +5324,13 @@ where
             additional_data = params.into_additional_data(additional_data as u32);
         }
 
+        // Only an Entry with a SURB balancer refills the SURBs that the receipts take
+        let wants_forward_receipts = self.cfg.forward_receipts
+            && self.forward_receipt_sink.get().is_some()
+            && !cfg.capabilities.contains(Capability::NoRateControl)
+            && cfg.surb_management.is_some()
+            && matches!(cfg.forward_path_options, RoutingOptions::Hops(hops) if u32::from(hops) > 0);
+
         let (challenge, _) = insert_into_next_slot(
             &self.session_initiations,
             |ch| {
@@ -5308,7 +5351,12 @@ where
             challenge,
             target,
             capabilities: HoprSessionCapabilities(cfg.capabilities),
-            additional_data: into_initiation_additional_data(additional_data, self.cfg.idle_timeout),
+            additional_data: into_initiation_additional_data(additional_data, self.cfg.idle_timeout)
+                | if wants_forward_receipts {
+                    FORWARD_RECEIPTS_REQUESTED
+                } else {
+                    0
+                },
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -5532,6 +5580,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                forward_receipts: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -5686,6 +5735,7 @@ where
                                 cycle_budget: None,
                                 admission_token: Default::default(),
                                 raised_surb_target: Default::default(),
+                                forward_receipts: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -6452,6 +6502,87 @@ where
         );
     }
 
+    /// Starts the task that sends the Session's forward receipts to the Entry, if the Entry asked for them.
+    ///
+    /// Sends only while the Entry refills SURBs, the stock is above the keep-alive reserve and PIX is not
+    /// draining, and counts each receipt like a keep-alive.
+    fn spawn_exit_forward_receipts(&self, session_id: SessionId, slot: &SessionSlot, msg_sender: S) {
+        let Some(receipts) = slot.forward_receipts.clone() else {
+            return;
+        };
+        let Some(mut woken) = receipts.take_wake() else {
+            return;
+        };
+        let (estimator, balancer, fill) = (
+            slot.surb_estimator.clone(),
+            slot.surb_mgmt.clone(),
+            slot.pix_fill.clone(),
+        );
+        let routing = slot.routing_opts.clone();
+        let mut sender = {
+            let estimator = estimator.clone();
+            msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                let data = count_return_packet_surb(&estimator, data);
+                #[cfg(feature = "telemetry")]
+                telemetry::record_session_surb_consumed(&session_id, 1);
+                futures::future::ok::<_, S::Error>((routing, data))
+            })
+        };
+
+        let handle = hopr_utils::spawn_as_abortable!(async move {
+            loop {
+                // Also when an interval fills up, so that a fast Session does not overflow it, or a burst window
+                // opens; and faster while it is open
+                let poll = if receipts.burst_open_at(Instant::now()) {
+                    BURST_POLL
+                } else {
+                    FORWARD_RECEIPT_POLL
+                };
+                futures::select! {
+                    _ = futures::FutureExt::fuse(hopr_utils::runtime::prelude::sleep(poll)) => {}
+                    _ = futures::StreamExt::next(&mut woken) => {}
+                }
+                if !balancer.counterparty_refills()
+                    || estimator.saturating_diff() <= current_keep_alive_surb_reserve(&balancer)
+                    || fill.get().is_some_and(|control| control.is_draining())
+                {
+                    continue;
+                }
+                let Some(Receipt { seq, first_seq, tags }) = receipts.take_due(Instant::now()) else {
+                    continue;
+                };
+                let count = tags.len();
+                // Two copies inside a burst window, where the receipts are the ones that judge and the paths are
+                // not yet known to be good, if the stock stays above the reserve after the first
+                let copies = if receipts.burst_open_at(Instant::now())
+                    && estimator.saturating_diff() > current_keep_alive_surb_reserve(&balancer) + 1
+                {
+                    2
+                } else {
+                    1
+                };
+                for _ in 0..copies {
+                    let msg = HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                        session_id,
+                        seq,
+                        first_seq,
+                        tags: tags.clone(),
+                    });
+                    match send_via_msg_sender(&mut sender, routing.clone(), msg, "forward receipts").await {
+                        Ok(()) => {
+                            FORWARD_RECEIPTS_SENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            debug!(%session_id, seq, first_seq, tags = count, "forward receipts sent");
+                        }
+                        Err(error) => debug!(%session_id, %error, "failed to send forward receipts"),
+                    }
+                }
+            }
+        });
+        slot.abort_handles
+            .lock()
+            .insert(SessionHandles::ForwardReceipts, handle);
+    }
+
     /// Silences a Session's PIX fill, leaving its SURB-level notification alone.
     ///
     /// Called on every path that is about to tear a Session down. `close_session` aborts the stream
@@ -7080,6 +7211,15 @@ where
             HoprStartProtocol::KeepAlive(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
             HoprStartProtocol::SsaCommit(m) => m.session_id == *pseudonym && self.sessions.contains_key(&m.session_id),
 
+            // From the Exit, so for an outgoing Session only.
+            HoprStartProtocol::ForwardReceipts(m) => {
+                m.session_id == *pseudonym
+                    && self
+                        .sessions
+                        .get(&m.session_id)
+                        .is_some_and(|slot| matches!(slot.routing_opts, DestinationRouting::Forward { .. }))
+            }
+
             // Only the Exit asks for SSA commitments, and only of its own Entry: an outgoing
             // (Forward) Session, or one this node is still initiating. An Exit-side (Return) slot
             // never legitimately receives one.
@@ -7188,6 +7328,23 @@ where
                 return Ok(DispatchResult::Dropped(DropReason::StaleStartMessage));
             }
 
+            // Forward receipts are handled here: they only feed the sink, and they cost the Entry a SURB.
+            if let HoprStartProtocol::ForwardReceipts(receipts) = &msg {
+                if let Some(slot) = self.sessions.get(&pseudonym) {
+                    // Spent like a keep-alive, not a reply: it must not count as one heard
+                    slot.surb_mgmt.note_keep_alive_consumed(&slot.surb_estimator);
+                    #[cfg(feature = "telemetry")]
+                    telemetry::record_session_surb_consumed(&pseudonym, 1);
+                }
+                if let Some(sink) = self.forward_receipt_sink.get() {
+                    sink.receipts(pseudonym, receipts.seq, receipts.first_seq, &receipts.tags);
+                }
+                FORWARD_RECEIPTS_RECEIVED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_DISPATCHED_MSGS.increment_by(&["processed"], 1);
+                return Ok(DispatchResult::Processed);
+            }
+
             // This is a Start protocol message, so we send it to the handler, with the packet info
             // and what the packet did to the SURB store. `StartSession` parks on admission, so it
             // gets its own lane; a flood of it must not delay a live Session's control traffic.
@@ -7264,6 +7421,12 @@ where
                     session_slot
                         .surb_mgmt
                         .observe_counterparty_signals(in_data.packet_info.signals_from_sender);
+                }
+
+                if let (Some(receipts), Some(tag)) =
+                    (&session_slot.forward_receipts, in_data.packet_info.forward_receipt_tag)
+                {
+                    receipts.note(tag);
                 }
 
                 match session_slot.session_tx.try_send(in_data) {
@@ -7368,6 +7531,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            forward_receipts: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -7404,6 +7568,7 @@ where
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            forward_receipts: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -7864,6 +8029,9 @@ where
             crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
         let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
+        let wants_forward_receipts =
+            self.cfg.forward_receipts && session_req.additional_data & FORWARD_RECEIPTS_REQUESTED != 0;
+        let forward_receipts = wants_forward_receipts.then(|| Arc::new(ExitReceipts::new(Instant::now())));
         let slot = SessionSlot {
             session_tx,
             routing_opts: reply_routing.clone(),
@@ -7879,6 +8047,7 @@ where
             cycle_budget,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            forward_receipts,
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -8197,6 +8366,8 @@ where
 
             session
         };
+
+        self.spawn_exit_forward_receipts(session_id, &slot, msg_sender.clone());
 
         // Extract useful information about the session from the Start protocol message
         let incoming_session = IncomingSession {
@@ -10206,6 +10377,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             },
         );
 
@@ -14156,6 +14328,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             },
         );
         Ok((mgr, control))
@@ -19776,6 +19949,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             },
         );
 
@@ -19869,6 +20043,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             }
         };
 
@@ -19941,6 +20116,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             },
         );
 
@@ -20034,6 +20210,7 @@ mod tests {
                 cycle_budget: None,
                 admission_token: Default::default(),
                 raised_surb_target: Default::default(),
+                forward_receipts: None,
             },
         );
         (mgr, estimator)
@@ -26921,6 +27098,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            forward_receipts: None,
         };
         let guard = mgr.allocate_session_slot(session_id, slot.clone());
         assert!(guard.is_some(), "slot allocation must succeed");
@@ -26954,6 +27132,7 @@ mod tests {
             cycle_budget: None,
             admission_token: Default::default(),
             raised_surb_target: Default::default(),
+            forward_receipts: None,
         }
     }
 
@@ -28614,6 +28793,516 @@ mod tests {
             probe::get("gate_block_observations/predeposit_exhausted"),
             "closed on its own series too"
         );
+        Ok(())
+    }
+
+    // Forward receipts
+
+    /// What a receipt reported: (pseudonym, seq, first seq, tags).
+    type ReportedReceipt = (HoprPseudonym, u32, u32, Vec<u32>);
+
+    #[derive(Default)]
+    struct RecordingSink(parking_lot::Mutex<Vec<ReportedReceipt>>);
+
+    impl ForwardReceiptSink for RecordingSink {
+        fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]) {
+            self.0.lock().push((pseudonym, seq, first_seq, tags.to_vec()));
+        }
+    }
+
+    /// The `StartSession` an Entry sends, for a config that sets `forward_receipts` and optionally installs a sink.
+    async fn start_session_sent_by_entry(
+        forward_receipts: bool,
+        with_sink: bool,
+        client: SessionClientConfig,
+    ) -> anyhow::Result<StartInitiation<SessionTarget, HoprSessionCapabilities>> {
+        let mgr = SessionManager::new(SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            idle_timeout: Duration::from_secs(120),
+            forward_receipts,
+            ..Default::default()
+        });
+        if with_sink {
+            assert!(mgr.set_forward_receipt_sink(Arc::new(RecordingSink::default())));
+        }
+
+        let sent: Arc<parking_lot::Mutex<Vec<StartInitiation<SessionTarget, HoprSessionCapabilities>>>> =
+            Default::default();
+        let captured = sent.clone();
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .once()
+            .withf(move |_, data| msg_type(data, StartProtocolDiscriminants::StartSession))
+            .returning(move |_, data| {
+                if let Ok(StartProtocol::StartSession(init)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    captured.lock().push(init);
+                }
+                Box::pin(async { Ok(()) })
+            });
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender, new_session_tx, None, None)?;
+
+        let peer: Address = (&ChainKeypair::random()).into();
+        let _ = mgr
+            .new_session(
+                peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: HoprPseudonym::random().into(),
+                    ..client
+                },
+            )
+            .await;
+
+        let mut sent = sent.lock();
+        anyhow::ensure!(sent.len() == 1, "exactly one StartSession must have been sent");
+        Ok(sent.remove(0))
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_entry_should_request_forward_receipts_only_when_enabled() -> anyhow::Result<()> {
+        use hopr_api::types::primitive::bounded::BoundedSize;
+
+        let one: BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }> = 1.try_into()?;
+        let relay: Address = (&ChainKeypair::random()).into();
+        let client = || SessionClientConfig {
+            capabilities: None.into(),
+            forward_path_options: RoutingOptions::Hops(one),
+            ..Default::default()
+        };
+        let cases = [
+            ("enabled", true, true, client(), true),
+            ("flag off", false, true, client(), false),
+            ("no sink", true, false, client(), false),
+            (
+                "no SURB management",
+                true,
+                true,
+                SessionClientConfig {
+                    surb_management: None,
+                    ..client()
+                },
+                false,
+            ),
+            (
+                "no rate control",
+                true,
+                true,
+                SessionClientConfig {
+                    capabilities: Capability::NoRateControl.into(),
+                    ..client()
+                },
+                false,
+            ),
+            (
+                "zero hops",
+                true,
+                true,
+                SessionClientConfig {
+                    forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                    ..client()
+                },
+                false,
+            ),
+            (
+                "explicit path",
+                true,
+                true,
+                SessionClientConfig {
+                    forward_path_options: RoutingOptions::IntermediatePath(vec![relay.into()].try_into()?),
+                    ..client()
+                },
+                false,
+            ),
+        ];
+        for (name, flag, sink, client, requested) in cases {
+            let init = start_session_sent_by_entry(flag, sink, client).await?;
+            assert_eq!(
+                requested,
+                init.additional_data & FORWARD_RECEIPTS_REQUESTED != 0,
+                "{name}"
+            );
+        }
+        Ok(())
+    }
+
+    /// An Exit that predates the bit reads the options and the idle timeout from the other bits.
+    #[test]
+    fn the_forward_receipts_bit_should_not_change_what_an_old_exit_reads() {
+        let options = 0xdead_beef_0123_4567u64;
+        let idle = Duration::from_secs(120);
+        let plain = into_initiation_additional_data(options, idle);
+        let with_bit = plain | FORWARD_RECEIPTS_REQUESTED;
+        assert_eq!(initiation_options(plain), initiation_options(with_bit));
+        assert_eq!(announced_idle_timeout(plain), announced_idle_timeout(with_bit));
+        assert_eq!(Some(idle), announced_idle_timeout(with_bit));
+    }
+
+    /// An Exit Session whose Entry asks for forward receipts (`bit`), with the stock held at `stock` SURBs.
+    async fn exit_session_for_receipts(
+        forward_receipts: bool,
+        bit: bool,
+        entry_refills: bool,
+        stock: u64,
+    ) -> anyhow::Result<(
+        RecordingManager,
+        Originated,
+        futures::channel::mpsc::Receiver<IncomingSession>,
+        HoprPseudonym,
+    )> {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            forward_receipts,
+            ..Default::default()
+        });
+        let (msg_tx, msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx, None, None)?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::Segmentation.into()),
+                additional_data: into_initiation_additional_data(64, Duration::ZERO)
+                    | if bit { FORWARD_RECEIPTS_REQUESTED } else { 0 },
+            },
+        )
+        .await?;
+
+        if entry_refills {
+            dispatch_entry_keep_alive(&mgr, pseudonym, KeepAliveFlag::BalancerTarget.into(), 0, 0)?;
+            wait_for_counterparty_refills(&mgr, &pseudonym).await?;
+        }
+        mgr.sessions
+            .get(&pseudonym)
+            .context("the session slot must exist")?
+            .surb_estimator
+            .produced
+            .fetch_add(stock, std::sync::atomic::Ordering::Relaxed);
+        Ok((mgr, msg_rx, new_session_rx, pseudonym))
+    }
+
+    /// Delivers `count` Session data packets with consecutive tags from `first`.
+    fn deliver_tagged_data(
+        mgr: &RecordingManager,
+        pseudonym: HoprPseudonym,
+        first: u32,
+        count: u32,
+    ) -> anyhow::Result<()> {
+        for tag in first..first + count {
+            mgr.dispatch_message(
+                pseudonym,
+                ApplicationDataIn {
+                    data: ApplicationData::new(SESSION_APPLICATION_TAG, vec![0u8; 8])?,
+                    packet_info: IncomingPacketInfo {
+                        forward_receipt_tag: Some(tag),
+                        ..Default::default()
+                    },
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    /// The forward receipts originated for `pseudonym` over `window`, as `(seq, tags, data)`.
+    async fn receipts_during(
+        rx: &mut Originated,
+        pseudonym: HoprPseudonym,
+        window: Duration,
+    ) -> Vec<(u32, Vec<u32>, ApplicationDataOut)> {
+        originated_during(rx, window)
+            .await
+            .into_iter()
+            .filter(|(routing, _)| matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == pseudonym))
+            .filter_map(|(_, data)| {
+                match HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text).ok()? {
+                    StartProtocol::ForwardReceipts(m) => Some((m.seq, m.tags, data)),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_exit_should_send_a_receipt_that_is_counted_and_refundable() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000).await?;
+        let estimator = mgr.sessions.get(&pseudonym).context("slot")?.surb_estimator.clone();
+        let consumed = estimator.consumed.load(Relaxed);
+
+        deliver_tagged_data(&mgr, pseudonym, 100, 60)?;
+        let receipts = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
+
+        anyhow::ensure!(!receipts.is_empty(), "no receipt was sent");
+        let (seq, tags, data) = &receipts[0];
+        assert_eq!(1, *seq);
+        assert_eq!((100..160).collect::<Vec<_>>(), *tags);
+        assert!(data.surb_refund.is_counted(), "a receipt carries its refund");
+        assert_eq!(consumed + receipts.len() as u64, estimator.consumed.load(Relaxed));
+        data.surb_refund.give_back();
+        assert_eq!(
+            1,
+            estimator.refunded.load(Relaxed),
+            "a dropped receipt gives its SURB back"
+        );
+        Ok(())
+    }
+
+    /// Bursts of 250 awaiting the task, which cross the half-full mark mid-burst: the receipt must not wait for the
+    /// 250 ms poll, or the packets that arrive meanwhile overflow the interval.
+    #[test_log::test(tokio::test)]
+    async fn a_fast_session_should_overflow_no_interval() -> anyhow::Result<()> {
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000_000).await?;
+        let mut next = 0;
+        let mut receipts = Vec::new();
+        for _ in 0..12 {
+            deliver_tagged_data(&mgr, pseudonym, next, 250)?;
+            next += 250;
+            receipts.extend(receipts_during(&mut rx, pseudonym, Duration::from_millis(30)).await);
+        }
+        anyhow::ensure!(receipts.len() >= 3, "{} receipts", receipts.len());
+        let seqs: Vec<u32> = receipts.iter().map(|(seq, ..)| *seq).collect();
+        assert_eq!((1..=seqs.len() as u32).collect::<Vec<_>>(), seqs, "no overflow jump");
+        Ok(())
+    }
+
+    /// A receipt is sent twice while a burst window is open, and once otherwise; every copy is counted.
+    #[test_log::test(tokio::test)]
+    async fn a_receipt_should_be_sent_twice_inside_a_burst_window_and_once_outside() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000_000).await?;
+        let estimator = mgr.sessions.get(&pseudonym).context("slot")?.surb_estimator.clone();
+        let consumed = estimator.consumed.load(Relaxed);
+
+        // The first packet opens no window; after a quiet second the next ones do
+        deliver_tagged_data(&mgr, pseudonym, 0, 1)?;
+        tokio::time::sleep(Duration::from_millis(1_100)).await;
+        deliver_tagged_data(&mgr, pseudonym, 1, 10)?;
+        let inside = receipts_during(&mut rx, pseudonym, Duration::from_millis(400)).await;
+        assert_eq!(vec![1, 1], inside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
+
+        // Past the window (the cooldown keeps it from reopening) one copy
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        deliver_tagged_data(&mgr, pseudonym, 11, 1)?;
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        deliver_tagged_data(&mgr, pseudonym, 12, 1)?;
+        deliver_tagged_data(&mgr, pseudonym, 13, 60)?;
+        let outside = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
+        assert_eq!(vec![2], outside.iter().map(|(seq, ..)| *seq).collect::<Vec<_>>());
+
+        assert_eq!(consumed + 3, estimator.consumed.load(Relaxed), "every copy is counted");
+        Ok(())
+    }
+
+    /// The second copy needs the stock to stay above the keep-alive reserve after the first.
+    #[test_log::test(tokio::test)]
+    async fn the_second_copy_should_keep_the_stock_above_the_reserve() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        // The stock is the reserve plus 1 (one copy) or plus 2 (two)
+        for (above_reserve, copies) in [(1u64, 1), (2, 2)] {
+            let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000).await?;
+            let slot = mgr.sessions.get(&pseudonym).context("slot")?;
+            let target = current_keep_alive_surb_reserve(&slot.surb_mgmt) + above_reserve;
+            let estimator = slot.surb_estimator.clone();
+            let held = estimator.saturating_diff();
+            if held > target {
+                estimator.consumed.fetch_add(held - target, Relaxed);
+            } else {
+                estimator.produced.fetch_add(target - held, Relaxed);
+            }
+            drop(slot);
+
+            deliver_tagged_data(&mgr, pseudonym, 0, 1)?;
+            tokio::time::sleep(Duration::from_millis(1_100)).await;
+            deliver_tagged_data(&mgr, pseudonym, 1, 10)?;
+            let sent = receipts_during(&mut rx, pseudonym, Duration::from_millis(400)).await;
+            assert_eq!(copies, sent.len(), "{above_reserve} above the reserve");
+        }
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_exit_should_send_no_receipts_when_its_flag_is_off_or_the_entry_did_not_ask() -> anyhow::Result<()> {
+        for (flag, bit) in [(false, true), (true, false)] {
+            let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(flag, bit, true, 1_000).await?;
+            deliver_tagged_data(&mgr, pseudonym, 0, 60)?;
+            let receipts = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
+            assert!(receipts.is_empty(), "flag {flag}, bit {bit}");
+        }
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_exit_should_hold_receipts_while_the_stock_is_at_the_reserve() -> anyhow::Result<()> {
+        // The stock stays below the reserve (16 for the announced target of 64)
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 0).await?;
+        deliver_tagged_data(&mgr, pseudonym, 0, 60)?;
+        assert!(
+            receipts_during(&mut rx, pseudonym, Duration::from_millis(800))
+                .await
+                .is_empty()
+        );
+
+        mgr.sessions
+            .get(&pseudonym)
+            .context("slot")?
+            .surb_estimator
+            .produced
+            .fetch_add(1_000, std::sync::atomic::Ordering::Relaxed);
+        let receipts = receipts_during(&mut rx, pseudonym, Duration::from_millis(800)).await;
+        anyhow::ensure!(
+            !receipts.is_empty(),
+            "the held receipt must go out once the stock recovers"
+        );
+        assert_eq!(60, receipts[0].1.len());
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_exit_should_send_no_receipts_to_an_entry_that_does_not_refill() -> anyhow::Result<()> {
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, false, 1_000).await?;
+        deliver_tagged_data(&mgr, pseudonym, 0, 60)?;
+        assert!(
+            receipts_during(&mut rx, pseudonym, Duration::from_millis(800))
+                .await
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn the_receipts_task_should_stop_when_the_session_closes() -> anyhow::Result<()> {
+        let (mgr, mut rx, _incoming, pseudonym) = exit_session_for_receipts(true, true, true, 1_000).await?;
+        deliver_tagged_data(&mgr, pseudonym, 0, 60)?;
+        anyhow::ensure!(
+            !receipts_during(&mut rx, pseudonym, Duration::from_millis(800))
+                .await
+                .is_empty(),
+            "the task must be running"
+        );
+
+        let slot = mgr.sessions.get(&pseudonym).context("slot")?;
+        let receipts = slot.forward_receipts.clone().context("opted in")?;
+        drop(slot);
+        assert!(mgr.close_session(&pseudonym));
+        for tag in 0..60 {
+            receipts.note(tag);
+        }
+        assert!(
+            receipts_during(&mut rx, pseudonym, Duration::from_millis(800))
+                .await
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    /// An Entry-side slot for `pseudonym` on a started manager that has `sink` installed.
+    fn entry_with_sink(pseudonym: HoprPseudonym, sink: Arc<RecordingSink>) -> anyhow::Result<RecordingManager> {
+        let mgr = RecordingManager::new(Default::default());
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _) = futures::channel::mpsc::unbounded();
+        mgr.start(mock_sender, new_session_tx, None, None)?;
+        assert!(mgr.set_forward_receipt_sink(sink));
+
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        let peer: Address = (&ChainKeypair::random()).into();
+        mgr.sessions.insert(
+            pseudonym,
+            SessionSlot {
+                session_tx: dummy_tx,
+                routing_opts: DestinationRouting::Forward {
+                    destination: Box::new(peer.into()),
+                    pseudonym: Some(pseudonym),
+                    forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+                    return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
+                },
+                abort_handles: Default::default(),
+                surb_mgmt: Default::default(),
+                surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
+                pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
+                pix_fill: Default::default(),
+                exit_loss_signal: Default::default(),
+                returned_packets: Default::default(),
+                cycle_budget: None,
+                admission_token: Default::default(),
+                raised_surb_target: Default::default(),
+                forward_receipts: None,
+            },
+        );
+        Ok(mgr)
+    }
+
+    fn receipts_message(
+        session_id: HoprPseudonym,
+        seq: u32,
+        first_seq: u32,
+        tags: Vec<u32>,
+    ) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: HoprStartProtocol::ForwardReceipts(ForwardReceiptsMessage {
+                session_id,
+                seq,
+                first_seq,
+                tags,
+            })
+            .try_into()?,
+            packet_info: Default::default(),
+        })
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_entry_should_pass_receipts_to_the_sink_and_count_the_surb() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let pseudonym = HoprPseudonym::random();
+        let sink = Arc::new(RecordingSink::default());
+        let mgr = entry_with_sink(pseudonym, sink.clone())?;
+        let received = FORWARD_RECEIPTS_RECEIVED.load(Relaxed);
+
+        let result = mgr.dispatch_message(pseudonym, receipts_message(pseudonym, 4, 3, vec![7, 8, 9])?)?;
+        assert!(matches!(result, DispatchResult::Processed));
+
+        assert_eq!(vec![(pseudonym, 4, 3, vec![7, 8, 9])], *sink.0.lock());
+        let slot = mgr.sessions.get(&pseudonym).context("slot")?;
+        assert_eq!(1, slot.surb_estimator.consumed.load(Relaxed));
+        assert_eq!(
+            1,
+            slot.surb_mgmt.keep_alives_consumed(),
+            "booked as a keep-alive, not a reply"
+        );
+        assert_eq!(
+            1,
+            slot.returned_packets.load(Relaxed),
+            "it also counts as returned service"
+        );
+        assert!(FORWARD_RECEIPTS_RECEIVED.load(Relaxed) > received);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn an_entry_should_drop_stale_receipts() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let sink = Arc::new(RecordingSink::default());
+        let mgr = entry_with_sink(pseudonym, sink.clone())?;
+
+        // For no Session, and naming another Session than the one it arrived under
+        let other = HoprPseudonym::random();
+        for (arrived_under, session_id) in [(other, other), (pseudonym, other)] {
+            let result = mgr.dispatch_message(arrived_under, receipts_message(session_id, 1, 1, vec![1])?)?;
+            assert!(matches!(result, DispatchResult::Dropped(DropReason::StaleStartMessage)));
+        }
+        assert!(sink.0.lock().is_empty());
         Ok(())
     }
 }

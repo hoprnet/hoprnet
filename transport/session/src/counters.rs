@@ -189,3 +189,9 @@ pub static START_REFUSALS: AtomicUsize = AtomicUsize::new(0);
 pub fn start_refusal_count() -> usize {
     START_REFUSALS.load(Ordering::Relaxed)
 }
+
+/// Cumulative count of forward receipts sent by Exits.
+pub static FORWARD_RECEIPTS_SENT: AtomicUsize = AtomicUsize::new(0);
+
+/// Cumulative count of forward receipts received by Entries.
+pub static FORWARD_RECEIPTS_RECEIVED: AtomicUsize = AtomicUsize::new(0);

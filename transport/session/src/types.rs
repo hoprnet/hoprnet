@@ -567,6 +567,16 @@ pub trait SurbAdmissionControl: Send + Sync + 'static {
     fn raise_target(&self, _pseudonym: &SessionId, _token: AdmissionToken, _expected_surbs: usize) {}
 }
 
+/// Receives the forward receipts an Exit sent for an outgoing Session.
+///
+/// Implemented by `hopr-transport`, which matches the tags against the packets it sent. Called from the
+/// packet dispatch, so it must return quickly and may take only brief locks.
+pub trait ForwardReceiptSink: Send + Sync + 'static {
+    /// A receipt from the Exit of the Session `pseudonym`, with the `tags` it received in the intervals
+    /// `first_seq..=seq`.
+    fn receipts(&self, pseudonym: HoprPseudonym, seq: u32, first_seq: u32, tags: &[u32]);
+}
+
 /// Configures the Session protocol socket over HOPR.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
 pub struct HoprSessionConfig {

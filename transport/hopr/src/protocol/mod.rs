@@ -22,6 +22,9 @@ pub mod errors;
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
 
+/// Judges forward relayers from the Exit's receipts.
+pub mod forward_receipts;
+
 /// Packet pipeline for the HOPR protocol.
 mod pipeline;
 /// Stream processing utilities

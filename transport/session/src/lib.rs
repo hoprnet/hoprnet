@@ -11,6 +11,7 @@ pub(crate) mod balancer;
 pub mod counters;
 pub mod errors;
 pub(crate) mod exit_control;
+mod exit_receipts;
 pub mod flow_control;
 mod manager;
 /// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
@@ -58,10 +59,10 @@ pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
     AdmissionToken, AgreedSsaQuota, ClosureReason, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY,
-    DEFAULT_PIX_SSA_QUOTA, DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig,
-    HoprSessionInPixEvent, HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE,
-    PIX_QUOTA_BYTES_PER_SHARE, ServiceId, SessionAdmissionReply, SessionAdmissionSink, SessionId, SessionTarget,
-    SurbAdmissionControl,
+    DEFAULT_PIX_SSA_QUOTA, DEFAULT_PIX_SURPLUS_SHARES, ForwardReceiptSink, HoprSession, HoprSessionCapabilities,
+    HoprSessionConfig, HoprSessionInPixEvent, HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession,
+    LOCAL_PIX_SUITE, PIX_QUOTA_BYTES_PER_SHARE, ServiceId, SessionAdmissionReply, SessionAdmissionSink, SessionId,
+    SessionTarget, SurbAdmissionControl,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::{transfer_session, transfer_session_datagram};

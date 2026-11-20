@@ -644,6 +644,53 @@ mod tests {
         Ok(())
     }
 
+    /// The Exit reads the same tag the Entry computed at the encoder, and a SURB reply carries none.
+    #[tokio::test]
+    async fn the_encoder_tag_should_equal_the_decoder_tag_and_replies_should_carry_none() -> anyhow::Result<()> {
+        let f = PixTestFixture::new().await?;
+        let pseudonym = HoprPseudonym::random();
+        let out_packet = f.sender_encoder.encode_packet(
+            b"some random message to encode and decode",
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path: f.forward_path.clone(),
+                return_paths: vec![f.return_path.clone()],
+            },
+            None,
+            None,
+        )?;
+        let sent_tag = out_packet.forward_receipt_tag;
+        assert!(sent_tag.is_some());
+
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.sender.offchain_key.public().into(), out_packet.data)?;
+        let fwd_packet = fwd_packet
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+        let in_packet = f
+            .receiver_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet.data)?;
+        let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+        assert_eq!(sent_tag, in_packet.info.forward_receipt_tag);
+
+        let reply = f.surb_reply(pseudonym, b"reply")?;
+        assert_eq!(None, reply.forward_receipt_tag);
+        let fwd_packet = f
+            .relay_decoder
+            .decode(f.receiver.offchain_key.public().into(), reply.data)?;
+        let fwd_packet = fwd_packet
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+        let in_packet = f
+            .sender_decoder
+            .decode(f.relay.offchain_key.public().into(), fwd_packet.data)?;
+        let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+        assert_eq!(None, in_packet.info.forward_receipt_tag);
+
+        Ok(())
+    }
+
     /// Counts the events by level. `enabled` is always true, so the logging macros' bodies actually run.
     #[derive(Default)]
     struct LevelCounter {
