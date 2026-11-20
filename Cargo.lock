@@ -1813,9 +1813,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.37.1"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "972d9fa491797d67e9262d2ee12c35cb4a77d0f241d7ad25e64f7a204db910bd"
+checksum = "9c8b0be9b290271b659bda763f72f2dc05b5c70ddecf93ae6ac1a3ca92a61bb4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1838,6 +1838,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smart-default",
+ "strum",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -4186,9 +4187,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.33.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78529ed81814e91606f74426b20fe46c7d63ebadea6ec7a4dd3fdd851748cf17"
+checksum = "c49f06a99e6926d2d2fa06dead8eb4822344d75f4c2f0a2da432989ff9a38bd5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4202,7 +4203,7 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hopr-api",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "moka",
  "parking_lot 0.12.5",
  "petgraph",
@@ -4230,7 +4231,7 @@ dependencies = [
  "hex-literal",
  "hopr-protocol-pix",
  "hopr-types 6.0.1",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4257,7 +4258,7 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-network-graph",
- "hopr-utilities",
+ "hopr-utilities 0.20.0",
  "smart-default",
  "tokio",
  "tracing",
@@ -4287,7 +4288,7 @@ dependencies = [
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4325,7 +4326,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hopr-api",
- "hopr-utilities",
+ "hopr-utilities 0.20.0",
  "indexmap 2.14.2",
  "lazy_static",
  "parking_lot 0.12.5",
@@ -4368,7 +4369,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-protocol-pix",
  "hopr-ticket-manager",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "humantime-serde",
  "lazy_static",
  "moka",
@@ -4399,7 +4400,7 @@ dependencies = [
  "criterion",
  "elliptic-curve-tools",
  "hopr-types 6.0.1",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "moka",
  "parking_lot 0.12.5",
  "rand 0.10.4",
@@ -4435,7 +4436,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-types 6.0.1",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "indexmap 2.14.2",
  "insta",
  "lazy_static",
@@ -4489,7 +4490,7 @@ dependencies = [
  "futures",
  "hashbrown 0.17.1",
  "hopr-api",
- "hopr-utilities",
+ "hopr-utilities 0.20.0",
  "parking_lot 0.12.5",
  "postcard",
  "redb",
@@ -4534,7 +4535,7 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "hopr-utils-tracing",
  "humantime-serde",
  "indexmap 2.14.2",
@@ -4604,7 +4605,7 @@ dependencies = [
  "futures-time",
  "futures-timer",
  "hopr-api",
- "hopr-utilities",
+ "hopr-utilities 0.20.0",
  "libp2p",
  "libp2p-stream",
  "pin-project",
@@ -4630,7 +4631,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-transport-tag-allocator",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4666,7 +4667,7 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-session",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4826,6 +4827,35 @@ version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "825b377e33396ca5254dfe961dc7d45270de33f800753d413be18c303392a5fd"
 dependencies = [
+ "arrayvec",
+ "auto_impl",
+ "const-hex",
+ "crossfire",
+ "flume",
+ "futures",
+ "futures-time",
+ "hickory-resolver 0.26.3",
+ "hopr-types 6.0.1",
+ "indexmap 2.14.2",
+ "lazy_static",
+ "libp2p-identity",
+ "multiaddr",
+ "pin-project",
+ "rand 0.10.4",
+ "serde_json",
+ "socket2 0.6.5",
+ "strum",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-utilities"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ed1c4a451c00ed120c634720701b8773a028e8d60d2795f13084fd894bc1a69"
+dependencies = [
  "anyhow",
  "arrayvec",
  "async-broadcast",
@@ -4876,7 +4906,7 @@ dependencies = [
  "hopr-api",
  "hopr-lib",
  "hopr-transport",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "human-bandwidth",
  "lazy_static",
  "parking_lot 0.12.5",
@@ -4896,7 +4926,7 @@ dependencies = [
  "anyhow",
  "crossfire",
  "futures",
- "hopr-utilities",
+ "hopr-utilities 0.21.0",
  "test-log",
  "tokio",
  "tracing",
