@@ -1274,13 +1274,14 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
             let bob_mgr = bob_mgr_relay.clone();
             Box::pin(async move {
                 // Session data segments are unrelated here and are simply dropped by the dispatcher.
-                let _ = bob_mgr.dispatch_message(
-                    alice_pseudonym,
-                    ApplicationDataIn {
-                        data: data.data,
-                        packet_info: Default::default(),
-                    },
-                );
+                // Alice's packets carry SURBs, as they do on the wire: Bob re-sends only over a SURB he holds.
+                let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(data.data.total_len());
+                let mut incoming = ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                };
+                incoming.packet_info.num_saved_surbs = saved;
+                let _ = bob_mgr.dispatch_message(alice_pseudonym, incoming);
                 Ok(())
             })
         });
@@ -1653,6 +1654,18 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
 /// *not* happen come after the positive condition they depend on.
 #[test(tokio::test)]
 async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()> {
+    lost_opening_request_scenario(true).await
+}
+
+/// The same loss, but Bob holds no SURB: a re-send would hold up everything else his node originates while
+/// the return packet looks for one, so it is skipped, and the Session ends on the deadline it was given.
+#[test(tokio::test)]
+async fn a_lost_opening_request_is_not_resent_without_a_surb() -> Result<()> {
+    lost_opening_request_scenario(false).await
+}
+
+/// The body of the two tests above. `with_surbs` is whether Alice's packets carry SURBs to Bob, as every real one does.
+async fn lost_opening_request_scenario(with_surbs: bool) -> Result<()> {
     use std::{
         sync::{
             Mutex,
@@ -1819,6 +1832,48 @@ async fn a_lost_opening_request_is_resent_and_the_session_commits() -> Result<()
 
     pin_mut!(pix_alice_rx);
     pin_mut!(pix_bob_rx);
+
+    // Bob re-sends only over a SURB he holds, and the mock relays carry none, so what the handshake
+    // consumed is not replaced. A keep-alive carrying SURBs, as Alice's do, stands in for them.
+    if with_surbs {
+        let keep_alive: ApplicationData = HoprStartProtocol::KeepAlive(hopr_protocol_start::KeepAliveMessage {
+            session_id: alice_pseudonym,
+            flags: hopr_protocol_start::KeepAliveFlag::BalancerState.into(),
+            additional_data: 0,
+        })
+        .try_into()?;
+        let saved = hopr_crypto_packet::prelude::HoprPacket::max_surbs_with_message(keep_alive.total_len());
+        let mut incoming = ApplicationDataIn {
+            data: keep_alive,
+            packet_info: Default::default(),
+        };
+        incoming.packet_info.num_saved_surbs = saved;
+        bob_mgr.dispatch_message(alice_pseudonym, incoming)?;
+    }
+
+    // Without a SURB Bob skips the re-sends, so the dropped request is the only one and the Session ends
+    // on the commitment deadline it was given.
+    if !with_surbs {
+        eventually("bob to close the Session on its commitment deadline", || {
+            !bob_mgr.active_sessions().contains(&alice_pseudonym)
+        })
+        .await?;
+        assert_eq!(
+            1,
+            opening_requests.lock().unwrap().len(),
+            "bob holds no SURB, so the opening request is not re-sent"
+        );
+        assert!(
+            pix_alice_rx.next().now_or_never().is_none(),
+            "alice was never asked, so announced nothing"
+        );
+        for ah in ahs {
+            ah.abort();
+        }
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        return Ok(());
+    }
 
     // Step 2 — the re-send is admitted: one announcement on each side, naming one deposit address.
     let HoprSessionOutPixEvent::ReadyToDeposit(alice_ready) = tokio_time::timeout(DEADLINE, pix_alice_rx.next())

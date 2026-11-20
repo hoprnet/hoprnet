@@ -616,8 +616,11 @@
 //! max_ack_await_time`; `max_recovery_idle < unused_verifier_lifetime`;
 //! `commitment_recommit_interval < max_ssa_delivery_time`; `ssa_request_resend_interval` non-zero, `<
 //! max_ssa_delivery_time` and `< incomplete_commitment_lifetime / 2`; `max_opening_ssa_request_resends <=
-//! MAX_COMMITMENT_RETRANSMISSIONS` and its largest doubled gap (clamped as at runtime) `<
-//! incomplete_commitment_lifetime / 2`; `ssas_per_request` in `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24
+//! MAX_COMMITMENT_RETRANSMISSIONS` and, from a cap of 2, its last two doubled gaps (clamped as at runtime) summing to
+//! `< incomplete_commitment_lifetime`; the scaled delivery window (`max_ssa_delivery_time * ssas_per_request`) `<
+//! incomplete_commitment_lifetime`, so that a request answered late in its window still finds its registration — at the
+//! defaults (20 s, 120 s) a `ssas_per_request` of 6 or more is rejected unless the deadline is lowered or the lifetime
+//! raised; `ssas_per_request` in `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24
 //! h; non-zero durations; a share fraction in `0.0..=1.0`; and non-zero `max_served_without_progress`,
 //! `min_share_order_sample` and `max_failed_cycles`. The 3 s default of `ssa_request_resend_interval` fails its two
 //! upper bounds for a configuration whose `max_ssa_delivery_time` is 3 s or less, or whose
@@ -687,7 +690,7 @@
 //! | `ssas_per_request` | **1** | The 85 % early signal leaves an 8 499-packet runway — **14 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 226.9 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_opening_ssa_request_resends` | 3 | Shipped value. Three doubling re-sends (3, 9, 21 s) cost three SURBs and cover a first request lost once or twice, including to a return path whose dead relayers the Entry only marks 3–4 s in, while the latest `CommitmentTimeout` stays at about 41 s |
-//! | `ssa_request_resend_interval` | 3 s | Shipped value. Each re-send costs one SURB and a few hundred bytes, and the Entry answers a repeat of a request it has published in full with a no-op unless the batch went out more than 3 s before, when the bursts must have been lost and it sends them again (one whose publication was cut short it finishes instead), so the cadence only sets how soon after the Entry's bar is met the request is admitted, or a lost burst is sent again; 3 s of the 14 s runway above still leaves room for the 6 s of settlement and a commitment round trip |
+//! | `ssa_request_resend_interval` | 3 s | Shipped value. Each re-send costs one SURB (and is skipped while the Session holds none) and a few hundred bytes, and the Entry answers a repeat of a request it has published in full with a no-op unless the batch went out more than 3 s before, when the bursts must have been lost and it sends them again (one whose publication was cut short it finishes instead), so the cadence only sets how soon after the Entry's bar is met the request is admitted, or a lost burst is sent again; 3 s of the 14 s runway above still leaves room for the 6 s of settlement and a commitment round trip |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
 //! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is the most exposed against an unfunded front after the initial grant or a paid handoff — 5.9 MB. Use `0` for strict prepay at every rotation; normal overlap usually funds the successor before it reaches the front |
 //! | `max_served_without_progress` | 2048 | Shipped value, and no longer dimension-dependent: the surplus run resets it like any other share, so this bounds genuine silence only |
@@ -841,6 +844,11 @@ pub struct SupervisorConfig {
     /// declining it. The same holds for the opening batch while it has re-sends left (see
     /// [`max_opening_ssa_request_resends`](Self::max_opening_ssa_request_resends)). Once the batch is
     /// at the front, or its re-sends are spent, the deadline is as armed and the Session closes on it.
+    ///
+    /// The batch-scaled budget must be shorter than the reconstructor's `incomplete_commitment_lifetime`
+    /// ([`validate_pix_supervision`] rejects it otherwise): a silent batch's pending registration is last
+    /// refreshed by its last (re-)send, so a longer window lets the Entry answer in time but after the
+    /// registration is gone. At the defaults that rejects an `ssas_per_request` of 6 or more.
     ///
     /// Default: 20 s.
     #[default(Duration::from_secs(20))]
@@ -1001,9 +1009,13 @@ pub struct SupervisorConfig {
     /// `0` restores the old behaviour: the request is sent once.
     ///
     /// Validated to be at most
-    /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), and to keep
-    /// the largest of the doubled gaps under half of the reconstructor's `incomplete_commitment_lifetime`,
-    /// the margin the interval itself is held to, since each re-send refreshes the registration. A repeat
+    /// [`MAX_COMMITMENT_RETRANSMISSIONS`](hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS), and, from two
+    /// re-sends up, to keep its last two gaps together under the reconstructor's
+    /// `incomplete_commitment_lifetime`: each re-send refreshes the registration, and one missed one leaves two
+    /// adjacent gaps between refreshes. (The delivery window itself must also be shorter than that lifetime,
+    /// whatever the cap; see [`max_ssa_delivery_time`](Self::max_ssa_delivery_time).) A re-send is skipped while
+    /// the Session holds no SURB, so as not to hold up the node's other packets for a best-effort repeat; the
+    /// attempt still counts against this cap. A repeat
     /// reaching the Entry more than a few seconds after it published the batch makes it publish again,
     /// which spends one of the cycle's commitment retransmissions, so more re-sends than the cycle has
     /// retransmissions to spend would only exhaust them.
@@ -1575,7 +1587,9 @@ pub enum SessionPixAction {
     /// is re-sent at doubling gaps, at most
     /// [`SupervisorConfig::max_opening_ssa_request_resends`] times, since its request can be lost on the
     /// return path. Always names
-    /// the whole batch, including the members that have replied. Not emitted within a delivery
+    /// the whole batch, including the members that have replied. The action driver does not send it while
+    /// the Session holds no SURB, which would hold up the node's other packets for a best-effort repeat; it
+    /// still refreshes the batch's registration, and reports nothing. Not emitted within a delivery
     /// window of the paid tail's hard deadline, which would end the Session before an admitted request
     /// could be answered, and not while — with the failure allowance spent — the non-service-gated
     /// deadline of a live cycle the re-send does not push is due within a window (a pause, which
@@ -1860,30 +1874,6 @@ pub fn validate_pix_supervision(
             hopr_protocol_pix::MAX_COMMITMENT_RETRANSMISSIONS
         )));
     }
-    // Every re-send refreshes the Exit's pending registration, and the interval rule above keeps twice
-    // the interval inside its lifetime so that one dropped re-send cannot lapse it. The opening gaps
-    // double, so the same margin has to hold for the largest of them, the one before the last re-send,
-    // as clamped at runtime. The widest window is taken, as that gives the largest gap; dynamic
-    // batching only picks smaller batches.
-    if cfg.max_opening_ssa_request_resends > 0 {
-        let window = scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
-        let largest = opening_resend_gap(
-            cfg.ssa_request_resend_interval,
-            window,
-            cfg.max_opening_ssa_request_resends - 1,
-        );
-        if largest.saturating_mul(2) >= reconstructor_cfg.incomplete_commitment_lifetime {
-            return Err(TransportSessionError::InvalidConfig(format!(
-                "max_opening_ssa_request_resends ({}) with ssa_request_resend_interval ({:?}) doubles the gap to \
-                 {:?}, which must be shorter than half of incomplete_commitment_lifetime ({:?}), or a single missed \
-                 re-send lets the pending registration it keeps alive expire",
-                cfg.max_opening_ssa_request_resends,
-                cfg.ssa_request_resend_interval,
-                largest,
-                reconstructor_cfg.incomplete_commitment_lifetime
-            )));
-        }
-    }
     if cfg.max_deposit_wait.is_zero() {
         return Err(TransportSessionError::InvalidConfig(
             "max_deposit_wait must be non-zero".into(),
@@ -2048,6 +2038,45 @@ pub fn validate_pix_supervision(
             };
             return Err(TransportSessionError::InvalidConfig(format!(
                 "{name} ({dur:?}{armed}) must not exceed {MAX_SUPERVISOR_DURATION:?}"
+            )));
+        }
+    }
+    // The registration rules below come after the representability cap, so that an absurd duration is
+    // reported as that rather than as a window longer than the lifetime.
+    // The last refresh of a silent batch's pending registration is its last (re-)send, and the
+    // commitment deadline is one window after that send: the original request, the final opening
+    // re-send, or a successor whose re-sends stopped at the front. A window that is not shorter than
+    // the lifetime lets the Entry answer in time but after the registration is gone, which the Exit
+    // rejects as a missing commitment and closes the Session, after the Entry was told to deposit.
+    // Strict `<` suffices because the driver refreshes when it carries out the send, which is after
+    // the supervisor pushed the deadline. A dropped final re-send moves the deadline without
+    // refreshing, but an answer to the request before it would then have to take longer than the whole
+    // lifetime, which is already longer than the window. The widest window is taken; dynamic batching
+    // only picks smaller batches.
+    let window = scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request);
+    if window >= reconstructor_cfg.incomplete_commitment_lifetime {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "max_ssa_delivery_time ({:?}) scaled by ssas_per_request ({}) gives a delivery window of {:?}, which must \
+             be shorter than incomplete_commitment_lifetime ({:?}), or a request answered late in its window finds \
+             its pending registration gone, after the Entry was told to deposit",
+            cfg.max_ssa_delivery_time, cfg.ssas_per_request, window, reconstructor_cfg.incomplete_commitment_lifetime
+        )));
+    }
+    // One missed re-send leaves two adjacent gaps between refreshes, so the last two opening gaps, which
+    // are the largest as they never decrease, must together stay inside the lifetime. With a single
+    // re-send there is one gap of one interval, which the interval rule above already covers.
+    if cfg.max_opening_ssa_request_resends >= 2 {
+        let cap = cfg.max_opening_ssa_request_resends;
+        let interval = cfg.ssa_request_resend_interval;
+        let previous = opening_resend_gap(interval, window, cap - 2);
+        let last = opening_resend_gap(interval, window, cap - 1);
+        if previous.saturating_add(last) >= reconstructor_cfg.incomplete_commitment_lifetime {
+            return Err(TransportSessionError::InvalidConfig(format!(
+                "max_opening_ssa_request_resends ({cap}) with ssa_request_resend_interval ({interval:?}) ends with \
+                 gaps of {previous:?} and {last:?}, which together must be shorter than \
+                 incomplete_commitment_lifetime ({:?}), or one missed re-send lets the pending registration it keeps \
+                 alive expire",
+                reconstructor_cfg.incomplete_commitment_lifetime
             )));
         }
     }
@@ -2276,36 +2305,73 @@ mod tests {
         Ok(())
     }
 
-    /// The doubled opening gaps stay inside the registration's lifetime, the clamp included.
+    /// One missed opening re-send leaves two adjacent gaps between refreshes, and those are what is bounded.
     #[test]
-    fn validation_bounds_the_opening_resend_gaps_by_the_registration_lifetime() -> anyhow::Result<()> {
+    fn validation_tolerates_one_missed_opening_resend() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        let rcn = SsaReconstructorConfig {
-            incomplete_commitment_lifetime: Duration::from_secs(120),
+        let rcn = |lifetime: u64| SsaReconstructorConfig {
+            incomplete_commitment_lifetime: Duration::from_secs(lifetime),
             ..valid_rcn_cfg()
         };
         let mut cfg = valid_cfg();
-        cfg.max_ssa_delivery_time = Duration::from_secs(600);
-        cfg.ssa_request_resend_interval = Duration::from_secs(40);
+        cfg.ssa_request_resend_interval = Duration::from_secs(3);
+        cfg.max_opening_ssa_request_resends = 3;
 
-        for cap in [3, 2] {
-            cfg.max_opening_ssa_request_resends = cap;
-            match validate_pix_supervision(&cfg, &rcn) {
-                Err(TransportSessionError::InvalidConfig(message)) => assert!(
-                    message.contains("max_opening_ssa_request_resends"),
-                    "cap {cap}: got {message}"
-                ),
-                other => anyhow::bail!("cap {cap}: expected an invalid-config error, got {other:?}"),
+        cfg.max_ssa_delivery_time = Duration::from_secs(20);
+        validate_pix_supervision(&cfg, &rcn(22)).context("refreshes at 3 s and 21 s are 18 s apart, inside 22 s")?;
+
+        // Gaps 3, 6, 12: the last pair is 18 s, which is not inside 17 s. The window, 15 s, is.
+        cfg.max_ssa_delivery_time = Duration::from_secs(15);
+        match validate_pix_supervision(&cfg, &rcn(17)) {
+            Err(TransportSessionError::InvalidConfig(message)) => {
+                assert!(message.contains("max_opening_ssa_request_resends"), "got {message}")
             }
+            other => anyhow::bail!("expected an invalid-config error, got {other:?}"),
         }
 
-        cfg.max_opening_ssa_request_resends = 1;
-        validate_pix_supervision(&cfg, &rcn).context("one re-send has a single gap of 40 s")?;
+        cfg.max_opening_ssa_request_resends = 2;
+        validate_pix_supervision(&cfg, &rcn(17)).context("the last pair is 3 s and 6 s with a cap of 2")?;
+        Ok(())
+    }
 
-        cfg.max_ssa_delivery_time = Duration::from_secs(50);
-        cfg.max_opening_ssa_request_resends = 3;
-        validate_pix_supervision(&cfg, &rcn).context("the window clamp keeps every gap at 40 s")?;
+    /// The delivery window must be shorter than the registration's lifetime, whatever the re-send cap.
+    #[test]
+    fn validation_keeps_the_registration_alive_through_the_delivery_window() -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let mut cfg = valid_cfg();
+        cfg.max_ssa_delivery_time = Duration::from_millis(2500);
+        cfg.ssa_request_resend_interval = Duration::from_millis(500);
+        cfg.commitment_recommit_interval = Duration::from_millis(500);
+        let short = SsaReconstructorConfig {
+            incomplete_commitment_lifetime: Duration::from_millis(1800),
+            ..valid_rcn_cfg()
+        };
+        match validate_pix_supervision(&cfg, &short) {
+            Err(TransportSessionError::InvalidConfig(message)) => assert!(
+                message.contains("delivery window of"),
+                "the window rule must be the one that fires, got {message}"
+            ),
+            other => anyhow::bail!("expected an invalid-config error, got {other:?}"),
+        }
+
+        let long_lived = SsaReconstructorConfig {
+            incomplete_commitment_lifetime: Duration::from_secs(120),
+            ..valid_rcn_cfg()
+        };
+        let mut batched = valid_cfg();
+        batched.max_ssa_delivery_time = Duration::from_secs(20);
+        batched.ssas_per_request = 6;
+        match validate_pix_supervision(&batched, &long_lived) {
+            Err(TransportSessionError::InvalidConfig(message)) => assert!(
+                message.contains("delivery window of"),
+                "6 x 20 s = 120 s is not shorter than 120 s, got {message}"
+            ),
+            other => anyhow::bail!("expected an invalid-config error, got {other:?}"),
+        }
+        batched.ssas_per_request = 5;
+        validate_pix_supervision(&batched, &long_lived).context("5 x 20 s = 100 s fits inside 120 s")?;
         Ok(())
     }
 
@@ -2343,18 +2409,14 @@ mod tests {
         // pending-registration lifetime is left to refuse it. The bound is half of it: one missed
         // re-send must not be enough to let the registration lapse.
         let mut outlives_registration = valid_cfg();
-        outlives_registration.max_ssa_delivery_time = Duration::from_secs(600);
-        // One opening re-send has a single gap of one interval, so this still exercises only the interval rule.
-        outlives_registration.max_opening_ssa_request_resends = 1;
+        // Just under the lifetime below, which the delivery window must be.
+        outlives_registration.max_ssa_delivery_time = Duration::from_secs(119);
         let short_lived = SsaReconstructorConfig {
             incomplete_commitment_lifetime: Duration::from_secs(120),
             ..valid_rcn_cfg()
         };
-        for interval in [
-            Duration::from_secs(120),
-            Duration::from_secs(61),
-            Duration::from_secs(60),
-        ] {
+        // 120 s is not listed: with a delivery time under the lifetime, the delivery-time rule catches it first.
+        for interval in [Duration::from_secs(61), Duration::from_secs(60)] {
             outlives_registration.ssa_request_resend_interval = interval;
             assert!(
                 message_of(&outlives_registration, &short_lived)
@@ -2435,6 +2497,8 @@ mod tests {
         for batch in [1, crate::MAX_SSA_BATCH_SIZE] {
             let mut cfg = valid_cfg();
             cfg.ssas_per_request = batch;
+            // Short enough that the widest batch's window still fits inside the registration's lifetime.
+            cfg.max_ssa_delivery_time = Duration::from_secs(4);
             assert!(
                 validate_pix_supervision(&cfg, &rcn).is_ok(),
                 "ssas_per_request = {batch} is on the boundary and must be accepted"
