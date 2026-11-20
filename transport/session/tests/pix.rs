@@ -1661,7 +1661,8 @@ async fn a_refused_successor_request_is_resent_until_the_entry_admits_it() -> Re
 /// ## Steps
 /// 1. Bob's transport drops the first opening request, and every later one reaches Alice. Bob's resend interval is 200
 ///    ms and his delivery time 1.5 s, which the first re-send at 200 ms is well inside and the unrepaired Session would
-///    not survive. The re-send cap is the shipping default of 3, so the gaps are 200, 400 and 800 ms.
+///    not survive. The re-send cap is the shipping default of 2, so the gaps are 200 and 400 ms (re-sends at 200 and
+///    600 ms).
 /// 2. Alice receives the re-send, commits and announces one deposit: exactly one burst of commitments and one
 ///    `ReadyToDeposit`, and Bob verifies it and gets `DepositNeeded` with the same deposit address.
 /// 3. The re-send is the dropped request byte for byte, and once Alice has answered, Bob stops asking.
