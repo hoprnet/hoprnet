@@ -4682,8 +4682,9 @@ impl PixToolbox {
 /// any of them can fairly be called late.
 ///
 /// The opening request is re-sent too, but on its own rule: it has no predecessor, and so a bounded number of
-/// times (`max_opening_ssa_request_resends`) with gaps that double, since only a loss on the return path can
-/// keep it unanswered. A *successor* request is re-sent without a count: the Entry's successor gate drops
+/// times (`max_opening_ssa_request_resends`) with gaps that double and never at or after its deadline, which
+/// it leaves alone, since only a loss on the return path can keep it unanswered. A *successor* request is
+/// re-sent without a count: the Entry's successor gate drops
 /// one that comes before its predecessor's returned packets have earned it, and says nothing, and a
 /// request can equally be lost on the return path. So while a successor batch is unanswered — none
 /// of its commitment has arrived — and an earlier generation is still being served, the supervisor
@@ -29486,9 +29487,9 @@ mod tests {
                     commitment_recommit_interval: Duration::from_millis(10),
                     // Under the delivery deadline for the same reason.
                     ssa_request_resend_interval: Duration::from_millis(20),
-                    // This test is about the opening request's own deadline closing the Session, which
-                    // opening re-sends would push; they are exercised in the supervisor and pix tests.
-                    max_opening_ssa_request_resends: 0,
+                    // The default cap stays on, so this also covers an opening request whose re-sends go
+                    // unanswered: the Session still closes on its commitment deadline. When it closes, and that
+                    // re-sends never move that deadline, is pinned by the supervisor tests.
                     // Far out of reach, so it cannot be what closes the Session.
                     max_deposit_wait: Duration::from_secs(3600),
                     ..Default::default()
