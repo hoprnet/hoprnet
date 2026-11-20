@@ -675,6 +675,9 @@ where
                 if receipts.tags.len() > MAX_FORWARD_RECEIPT_TAGS {
                     return Err(StartProtocolError::ParseError("fr.too_many_tags".into()));
                 }
+                if receipts.first_seq > receipts.seq {
+                    return Err(StartProtocolError::ParseError("fr.first_seq".into()));
+                }
                 data.extend_from_slice(&receipts.seq.to_be_bytes());
                 data.extend_from_slice(&receipts.first_seq.to_be_bytes());
                 data.extend_from_slice(&(receipts.tags.len() as u16).to_be_bytes());
@@ -2508,6 +2511,27 @@ mod tests {
             .err()
             .ok_or_else(|| anyhow::anyhow!("too many tags must not encode"))?;
         assert!(is_parse_error(&error, "fr.too_many_tags"));
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_forward_receipts_should_refuse_a_first_seq_after_its_seq() -> anyhow::Result<()> {
+        let receipts = |first_seq| {
+            StartProtocol::<u32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::ForwardReceipts(
+                ForwardReceiptsMessage {
+                    session_id: 10_u32,
+                    seq: 3,
+                    first_seq,
+                    tags: vec![],
+                },
+            )
+        };
+        let error = receipts(4)
+            .encode()
+            .err()
+            .ok_or_else(|| anyhow::anyhow!("a first_seq after its seq must not encode"))?;
+        assert!(is_parse_error(&error, "fr.first_seq"));
+        receipts(3).encode()?;
         Ok(())
     }
 
