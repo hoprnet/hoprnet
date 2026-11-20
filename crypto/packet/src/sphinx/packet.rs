@@ -17,7 +17,7 @@ use super::{
     derivation::derive_packet_tag,
     errors::SphinxError,
     routing::{ForwardedHeader, RoutingInfo, SphinxHeaderSpec, forward_header},
-    shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+    shared_keys::{Alpha, DeferredAlpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
     surb::{ReplyOpener, SURB},
 };
 
@@ -327,18 +327,22 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
 ///
 /// The fields are private and the tag is derived only here, so a caller cannot pair a tag with a secret it does not
 /// belong to - the invariant is carried by the type rather than by a doc comment.
+///
+/// It does not bind the state to its packet: a caller must pass each `ForwardSecret` back to the packet
+/// that produced it, or the header MAC is checked against a secret for different bytes.
 pub struct ForwardSecret<S: SphinxSuite> {
-    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    /// The blinded alpha, not yet computed: only a relayed packet consumes it.
+    alpha: DeferredAlpha<S::E, S::G>,
     secret: SharedSecret,
     tag: PacketTag,
 }
 
 /// The three fields of a [`ForwardSecret`], for the transform's internal destructuring.
 ///
-/// The tag is here as well as in `ForwardSecret`, so the pairing is decided inside `forward_secret` rather than by a
+/// The tag is here as well as in `ForwardSecret` so the pairing is decided in `forward_secret`, not by a
 /// caller.
 type ForwardSecretParts<S> = (
-    Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>,
+    DeferredAlpha<<S as SphinxSuite>::E, <S as SphinxSuite>::G>,
     SharedSecret,
     PacketTag,
 );
@@ -355,6 +359,13 @@ impl<S: SphinxSuite> ForwardSecret<S> {
     /// Splits the value into the parts the transform needs.
     fn into_parts(self) -> ForwardSecretParts<S> {
         (self.alpha, self.secret, self.tag)
+    }
+
+    /// Lets a test make only the finalization fail, keeping a real secret and tag.
+    #[cfg(test)]
+    pub(crate) fn with_alpha_for_test(mut self, alpha: DeferredAlpha<S::E, S::G>) -> Self {
+        self.alpha = alpha;
+        self
     }
 }
 
@@ -472,8 +483,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         &mut self.packet[base..base + PaddedPayload::<P>::SIZE]
     }
 
-    /// Derives the shared secret this packet was built for `node_keypair`, together with the blinded alpha the
-    /// next hop will see.
+    /// Derives the shared secret this packet was built for `node_keypair`.
+    ///
+    /// The blinded alpha is deferred: [`MetaPacket::into_forwarded_with_secret`]'s relaying branch
+    /// computes it, so a final hop never pays for one.
     ///
     /// This is the first and most expensive step of [`MetaPacket::into_forwarded`] - an elliptic-curve scalar
     /// multiplication - and it is also the only step needed to derive the packet's [`PacketTag`]. Splitting it out
@@ -486,7 +499,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     {
         let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
             .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
-        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
+        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform_deferred(
             &alpha_arr,
             &(node_keypair.into()),
             node_keypair.public().into(),
@@ -537,6 +550,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         let (alpha, secret, packet_tag) = state.into_parts();
         // Forward the packet header
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
+
+        // Blind only when forwarding, and *before* `on_authenticated`: that callback commits the tag
+        // to the caller's replay filter, so finalizing after it would let a packet then rejected for
+        // a local reason still occupy a slot.
+        let alpha = match &fwd_header {
+            ForwardedHeader::Relayed { .. } => Some(alpha.finalize()?),
+            ForwardedHeader::Final { .. } => None,
+        };
         on_authenticated();
 
         // Perform initial decryption over the payload
@@ -552,7 +573,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => {
                 // The payload is already decrypted in place; write back the blinded alpha and the next header.
-                self.alpha_mut().copy_from_slice(&alpha);
+                self.alpha_mut()
+                    .copy_from_slice(&alpha.expect("the relaying branch finalized the alpha above"));
                 self.routing_info_mut().copy_from_slice(next_header.as_ref());
 
                 ForwardedMetaPacket::Relayed {
@@ -672,6 +694,7 @@ pub(crate) mod tests {
         super::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes},
         *,
     };
+    use crate::Ed25519Suite;
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -976,5 +999,64 @@ pub(crate) mod tests {
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
         )
+    }
+
+    /// A relay whose finalization fails must not have reported authentication, or the tag would
+    /// occupy a replay-filter slot.
+    #[test]
+    fn a_failed_relay_finalization_must_not_report_authentication() -> anyhow::Result<()> {
+        let keypairs: Vec<hopr_types::crypto::keypairs::OffchainKeypair> = (0..3)
+            .map(|_| hopr_types::crypto::keypairs::OffchainKeypair::random())
+            .collect();
+        let pubkeys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
+        let mapper = SimpleBiMapper::<crate::sphinx::ec_groups::Ed25519Suite, TestHeader<Ed25519Suite>>(
+            keypairs
+                .iter()
+                .enumerate()
+                .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
+                .collect::<BiHashMap<_, _>>(),
+        );
+
+        let shared_keys = Ed25519Suite::new_shared_keys(&pubkeys)?;
+        let por_strings = vec![WrappedBytes::<53>::default(); shared_keys.secrets.len() - 1];
+        let pseudonym = SimplePseudonym::random();
+
+        let mp = MetaPacket::<Ed25519Suite, TestHeader<Ed25519Suite>, PAYLOAD_SIZE>::new(
+            PaddedPayload::new(b"relay finalization")?,
+            MetaPacketRouting::ForwardPath {
+                shared_keys,
+                forward_path: &pubkeys,
+                additional_data_relayer: &por_strings,
+                receiver_data: &pseudonym,
+                no_ack: false,
+            },
+            &mapper,
+        )?;
+
+        // Real secret and tag, so the MAC verifies and the relay branch is reached; only the alpha is
+        // replaced, with an identity point that `finalize` rejects.
+        let mut identity_alpha = Alpha::<hopr_types::primitive::typenum::U32>::default();
+        identity_alpha[0] = 1; // compressed Edwards identity: y = 1, sign bit 0
+        let identity_point =
+            <hopr_types::crypto::primitives::Curve25519Point as GroupElement<Curve25519Scalar>>::from_alpha(
+                identity_alpha,
+            )
+            .expect("the Edwards identity must decode");
+        let state = mp
+            .forward_secret(&keypairs[0])?
+            .with_alpha_for_test(DeferredAlpha::for_test(identity_point, SharedSecret::default()));
+
+        let mut authenticated = 0;
+        let result = mp.into_forwarded_with_secret(state, &mapper, |_| None, || authenticated += 1);
+
+        assert!(
+            result.is_err(),
+            "an identity deferred alpha must fail relay finalization"
+        );
+        assert_eq!(
+            0, authenticated,
+            "authentication must not be reported when relay finalization fails"
+        );
+        Ok(())
     }
 }
