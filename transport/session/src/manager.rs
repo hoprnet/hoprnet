@@ -29417,15 +29417,22 @@ mod tests {
         assert!(instance.is_superseded());
         let _ = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
 
-        let outcome = async {
-            session.write_all(&[7u8; 600]).await?;
-            session.flush().await
+        // Write and flush twice: a sink that re-polls its failed `With` future panics on the second round.
+        for round in 0..2 {
+            let outcome = async {
+                session.write_all(&[7u8; 600]).await?;
+                session.flush().await
+            }
+            .await;
+            assert!(
+                outcome.is_err(),
+                "an Entry write after the teardown must fail (round {round}), got {outcome:?}"
+            );
+            assert!(
+                session.flush().await.is_err(),
+                "a flush after a failed write must keep failing (round {round})"
+            );
         }
-        .await;
-        assert!(
-            outcome.is_err(),
-            "an Entry write after the teardown must fail, got {outcome:?}"
-        );
         let sent = originated_during(&mut msg_rx, Duration::from_millis(300)).await;
         assert!(
             sent.iter()
